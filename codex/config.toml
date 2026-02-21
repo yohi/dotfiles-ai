@@ -1,0 +1,16 @@
+model = "gpt-5.2-codex"
+model_reasoning_effort = "high"
+[notice]
+hide_rate_limit_model_nudge = true
+# OpenAI Codex CLI Configuration
+#
+# For more information on configuration options, see the official documentation.
+
+# Set the default model to use for requests.
+# model = "gpt-5"
+
+# Set the approval mode. Options are: suggest, auto-edit, full-auto
+# approval_policy = "on-request"
+
+# You can also configure a different model provider, like Ollama
+# model_provider = "ollama"

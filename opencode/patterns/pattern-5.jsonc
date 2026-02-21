@@ -1,0 +1,87 @@
+{
+  // 【パターン5】Ultra Low Cost (激安構成)
+  //  ほぼ全てをGemini系で固めた構成。大量のログ解析や試行錯誤向け。
+  "description": "激安構成 (All Gemini)",
+  "agents": {
+    "sisyphus": {
+      "model": "google-vertex/gemini-3.1-pro-preview",
+      "variant": "high",
+      "temperature": 0.2,
+    },
+    "prometheus": {
+      "model": "google-vertex/gemini-3.1-pro-preview",
+      "variant": "high"
+    },
+    "atlas": {
+      "model": "google-vertex/gemini-3.1-pro-preview",
+      "variant": "high"
+    },
+    "metis": {
+      "model": "google-vertex/gemini-3.1-pro-preview", // 参謀もGemini Pro
+      "variant": "high",
+      "temperature": 0.5
+    },
+    // Hephaestus (GPT) は使用不可 -> Sisyphusにフォールバック
+    "oracle": {
+      "model": "google-vertex/gemini-3.1-pro-preview", // 相談もGemini
+      "variant": "high"
+    },
+    "momus": {
+      "model": "google-vertex/gemini-3-flash-preview",
+    },
+    "librarian": {
+      "model": "google-vertex/gemini-3-flash-preview",
+    },
+    "explore": {
+      "model": "google-vertex/gemini-3-flash-preview",
+    },
+    "multimodal-looker": {
+      "model": "google-vertex/gemini-3-flash-preview",
+    },
+    "git-specialist": {
+      "description": "Git operations specialist",
+      "model": "google-vertex/gemini-3-flash-preview",
+      "permission": {
+        "bash": {
+          "git push --force": "deny",
+          "git push -f": "deny",
+          "git clean *": "ask",
+          "git add .": "ask",
+          "git *": "allow",
+          "*": "deny",
+        },
+        "edit": "deny",
+        "webfetch": "deny",
+      },
+    },
+  },
+  "categories": {
+    "quick": {
+      "model": "google-vertex/gemini-3-flash-preview"
+    },
+    "writing": {
+      "model": "google-vertex/gemini-3-flash-preview"
+    },
+    "visual-engineering": {
+      "model": "google-vertex/gemini-3.1-pro-preview"
+    },
+    "artistry": {
+      "model": "google-vertex/gemini-3.1-pro-preview",
+      "variant": "high"
+    },
+    "ultrabrain": {
+      "model": "google-vertex/gemini-3.1-pro-preview",
+      "variant": "high"
+    },
+    "deep": {
+      "model": "google-vertex/gemini-3.1-pro-preview",
+      "variant": "high"
+    },
+    "unspecified-low": {
+      "model": "google-vertex/gemini-3-flash-preview"
+    },
+    "unspecified-high": {
+      "model": "google-vertex/gemini-3.1-pro-preview"
+    },
+  }
+}
