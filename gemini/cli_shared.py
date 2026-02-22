@@ -12,7 +12,7 @@ def setup_environment(gemini_home, shared_dir, commands_dir, gemini_md, get_conf
     _ = get_config()
     if not os.path.exists(gemini_md):
         try:
-            with open(gemini_md, 'w') as f:
+            with open(gemini_md, 'w', encoding='utf-8') as f:
                 f.write("# SuperGemini Framework\n\n")
                 f.write("SuperGemini は Gemini CLI のための拡張フレームワークです。\n")
                 f.write("詳細な使い方については、`SuperGemini commands` を実行して確認してください。\n")
