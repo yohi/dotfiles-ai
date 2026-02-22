@@ -1,7 +1,7 @@
 .PHONY: codex install-packages-codex install-codex codex-update codex-setup
 
 codex: ## Install and setup Codex CLI
-	@if command -v codex >/dev/null 2>&1 && [ -L "$(HOME_DIR)/.codex" ] && [ -f "$(DOTFILES_DIR)/codex/config.toml" ]; then \
+	@if command -v codex >/dev/null 2>&1 && [ -L "$(HOME_DIR)/.codex" ] && [ -f "$(REPO_ROOT)/codex/config.toml" ]; then \
 		echo "$(call IDEMPOTENCY_SKIP_MSG,codex)"; \
 		exit 0; \
 	fi
@@ -19,9 +19,9 @@ codex-update: ## Update Codex CLI using npm
 
 codex-setup: ## Setup Codex CLI configuration
 	@echo "Setting up Codex CLI configuration..."
-	@mkdir -p $(DOTFILES_DIR)/codex
-	@if [ ! -f "$(DOTFILES_DIR)/codex/config.toml" ]; then \
-		echo "Creating default config file at $(DOTFILES_DIR)/codex/config.toml"; \
+	@mkdir -p $(REPO_ROOT)/codex
+	@if [ ! -f "$(REPO_ROOT)/codex/config.toml" ]; then \
+		echo "Creating default config file at $(REPO_ROOT)/codex/config.toml"; \
 		printf '%s\n' \
 			'# OpenAI Codex CLI Configuration' \
 			'#' \
@@ -35,14 +35,14 @@ codex-setup: ## Setup Codex CLI configuration
 			'' \
 			'# You can also configure a different model provider, like Ollama' \
 			'# model_provider = "ollama"' \
-			> $(DOTFILES_DIR)/codex/config.toml; \
+			> $(REPO_ROOT)/codex/config.toml; \
 	fi
-	@echo "Creating symbolic link: $(HOME_DIR)/.codex -> $(DOTFILES_DIR)/codex"
+	@echo "Creating symbolic link: $(HOME_DIR)/.codex -> $(REPO_ROOT)/codex"
 	@if [ -d "$(HOME_DIR)/.codex" ] && [ ! -L "$(HOME_DIR)/.codex" ]; then \
 		echo "Removing existing directory: $(HOME_DIR)/.codex"; \
 		rm -rf "$(HOME_DIR)/.codex"; \
 	fi
-	@ln -sfn $(DOTFILES_DIR)/codex $(HOME_DIR)/.codex
+	@ln -sfn $(REPO_ROOT)/codex $(HOME_DIR)/.codex
 	@echo "Codex CLI setup complete."
 
 # User-friendly alias

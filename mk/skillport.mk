@@ -3,7 +3,7 @@
 # ============================================================
 
 SKILLPORT_SKILLS_DIR ?= $(HOME)/.skillport/skills
-AGENT_SKILLS_DOTFILES_DIR ?= $(DOTFILES_DIR)/agent-skills
+AGENT_SKILLS_REPO_ROOT ?= $(REPO_ROOT)/agent-skills
 
 .PHONY: skillport install-skillport setup-skillport check-skillport
 
@@ -36,15 +36,15 @@ setup-skillport: ## SkillPort のディレクトリ構成をセットアップ
 		exit 0; \
 	fi
 	@echo "🚀 SkillPort のセットアップを開始中..."
-	@mkdir -p "$(AGENT_SKILLS_DOTFILES_DIR)"
+	@mkdir -p "$(AGENT_SKILLS_REPO_ROOT)"
 	@mkdir -p "$(HOME)/.skillport"
 	@if [ -e "$(SKILLPORT_SKILLS_DIR)" ] && [ ! -L "$(SKILLPORT_SKILLS_DIR)" ]; then \
 		backup="$(SKILLPORT_SKILLS_DIR).bak.$$(date +%Y%m%d%H%M%S)"; \
 		echo "⚠️  既存の skills ディレクトリを退避します: $$backup"; \
 		mv "$(SKILLPORT_SKILLS_DIR)" "$$backup"; \
 	fi
-	@ln -sfn "$(AGENT_SKILLS_DOTFILES_DIR)" "$(SKILLPORT_SKILLS_DIR)"
-	@echo "✅ セットアップが完了しました: $(SKILLPORT_SKILLS_DIR) -> $(AGENT_SKILLS_DOTFILES_DIR)"
+	@ln -sfn "$(AGENT_SKILLS_REPO_ROOT)" "$(SKILLPORT_SKILLS_DIR)"
+	@echo "✅ セットアップが完了しました: $(SKILLPORT_SKILLS_DIR) -> $(AGENT_SKILLS_REPO_ROOT)"
 	@$(call create_marker,setup-skillport,1)
 
 # SkillPort の状態確認
@@ -71,9 +71,9 @@ check-skillport: ## SkillPort の状態を確認
 			fi; \
 		}; \
 		actual=$$(get_realpath "$(SKILLPORT_SKILLS_DIR)"); \
-		expected=$$(get_realpath "$(AGENT_SKILLS_DOTFILES_DIR)"); \
+		expected=$$(get_realpath "$(AGENT_SKILLS_REPO_ROOT)"); \
 		if [ -n "$$actual" ] && [ "$$actual" = "$$expected" ]; then \
-			echo "✅ skills: $(SKILLPORT_SKILLS_DIR) -> $(AGENT_SKILLS_DOTFILES_DIR)"; \
+			echo "✅ skills: $(SKILLPORT_SKILLS_DIR) -> $(AGENT_SKILLS_REPO_ROOT)"; \
 		else \
 			echo "⚠️  skills: $(SKILLPORT_SKILLS_DIR) points to $$actual (expected $$expected)"; \
 		fi; \

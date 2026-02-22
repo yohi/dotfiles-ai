@@ -6,20 +6,20 @@ OPENCODE_HOME ?= $(HOME_DIR)/.opencode
 OPENCODE_BIN ?= $(OPENCODE_HOME)/bin/opencode
 OPENCODE_CONFIG_DIR ?= $(CONFIG_DIR)/opencode
 OPENCODE_CONFIG_PATH ?= $(OPENCODE_CONFIG_DIR)/opencode.jsonc
-OPENCODE_DOTFILES_CONFIG ?= $(DOTFILES_DIR)/opencode/opencode.jsonc
+OPENCODE_DOTFILES_CONFIG ?= $(REPO_ROOT)/opencode/opencode.jsonc
 # TODO 2026/01/26時点で.jsoncを読みに行かないので、.jsonに修正
 OH_MY_OPENCODE_CONFIG_PATH ?= $(OPENCODE_CONFIG_DIR)/oh-my-opencode.json
-OH_MY_OPENCODE_DOTFILES_CONFIG ?= $(DOTFILES_DIR)/opencode/oh-my-opencode.jsonc
+OH_MY_OPENCODE_DOTFILES_CONFIG ?= $(REPO_ROOT)/opencode/oh-my-opencode.jsonc
 OPENCODE_ANTIGRAVITY_PATH ?= $(OPENCODE_CONFIG_DIR)/antigravity.json
-OPENCODE_DOTFILES_ANTIGRAVITY ?= $(DOTFILES_DIR)/opencode/antigravity.json
+OPENCODE_DOTFILES_ANTIGRAVITY ?= $(REPO_ROOT)/opencode/antigravity.json
 OPENCODE_AGENTS_PATH ?= $(OPENCODE_CONFIG_DIR)/AGENTS.md
-OPENCODE_DOTFILES_AGENTS ?= $(DOTFILES_DIR)/opencode/AGENTS.global.md
+OPENCODE_DOTFILES_AGENTS ?= $(REPO_ROOT)/opencode/AGENTS.global.md
 OPENCODE_COMMANDS_PATH ?= $(OPENCODE_HOME)/commands
-OPENCODE_DOTFILES_COMMANDS ?= $(DOTFILES_DIR)/opencode/commands
+OPENCODE_DOTFILES_COMMANDS ?= $(REPO_ROOT)/opencode/commands
 OPENCODE_SKILLS_PATH ?= $(OPENCODE_HOME)/skills
-OPENCODE_DOTFILES_SKILLS ?= $(DOTFILES_DIR)/opencode/skills
+OPENCODE_DOTFILES_SKILLS ?= $(REPO_ROOT)/opencode/skills
 OPENCODE_DOCS_PATH ?= $(OPENCODE_CONFIG_DIR)/docs
-OPENCODE_DOTFILES_DOCS ?= $(DOTFILES_DIR)/opencode/docs
+OPENCODE_DOTFILES_DOCS ?= $(REPO_ROOT)/opencode/docs
 
 .PHONY: opencode install-packages-opencode install-opencode opencode-update setup-opencode check-opencode
 

@@ -96,21 +96,21 @@ install-packages-supergemini:
 	\
 	echo "🔗 シンボリックリンクを作成中..."; \
 	# SuperGemini本体へのリンク \
-	ln -sf $(DOTFILES_DIR)/gemini/supergemini $(HOME_DIR)/.gemini/supergemini || true; \
+	ln -sf $(REPO_ROOT)/gemini/supergemini $(HOME_DIR)/.gemini/supergemini || true; \
 	# 各種ディレクトリへのリンク \
-	ln -sf $(DOTFILES_DIR)/gemini/supergemini/Core $(HOME_DIR)/.gemini/core || true; \
-	ln -sf $(DOTFILES_DIR)/gemini/supergemini/Hooks $(HOME_DIR)/.gemini/hooks || true; \
+	ln -sf $(REPO_ROOT)/gemini/supergemini/Core $(HOME_DIR)/.gemini/core || true; \
+	ln -sf $(REPO_ROOT)/gemini/supergemini/Hooks $(HOME_DIR)/.gemini/hooks || true; \
 	# 重要なファイルへの直接リンク \
-	ln -sf $(DOTFILES_DIR)/gemini/supergemini/GEMINI.md $(HOME_DIR)/.gemini/GEMINI.md || true; \
+	ln -sf $(REPO_ROOT)/gemini/supergemini/GEMINI.md $(HOME_DIR)/.gemini/GEMINI.md || true; \
 	\
 	echo "📝 カスタムツールファイルを作成中..."; \
-	cp -f $(DOTFILES_DIR)/gemini/supergemini/Commands/help.md $(HOME_DIR)/.gemini/user-tools/user-help.md 2>/dev/null || \
+	cp -f $(REPO_ROOT)/gemini/supergemini/Commands/help.md $(HOME_DIR)/.gemini/user-tools/user-help.md 2>/dev/null || \
 	printf "import-help: # /user-help コマンド\n\nSuperGeminiフレームワークのコマンド一覧を表示します。\n" > $(HOME_DIR)/.gemini/user-tools/user-help.md; \
 	\
-	cp -f $(DOTFILES_DIR)/gemini/supergemini/Commands/analyze.md $(HOME_DIR)/.gemini/user-tools/user-analyze.md 2>/dev/null || \
+	cp -f $(REPO_ROOT)/gemini/supergemini/Commands/analyze.md $(HOME_DIR)/.gemini/user-tools/user-analyze.md 2>/dev/null || \
 	printf "import-analyze: # /user-analyze コマンド\n\nコードや機能を分析します。\n" > $(HOME_DIR)/.gemini/user-tools/user-analyze.md; \
 	\
-	cp -f $(DOTFILES_DIR)/gemini/supergemini/Commands/implement.md $(HOME_DIR)/.gemini/user-tools/user-implement.md 2>/dev/null || \
+	cp -f $(REPO_ROOT)/gemini/supergemini/Commands/implement.md $(HOME_DIR)/.gemini/user-tools/user-implement.md 2>/dev/null || \
 	printf "import-implement: # /user-implement コマンド\n\n新機能を実装します。\n" > $(HOME_DIR)/.gemini/user-tools/user-implement.md; \
 	\
 	echo "🔧 Gemini CLI設定ファイルを更新中..."; \
