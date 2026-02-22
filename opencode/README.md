@@ -80,19 +80,19 @@ opencode/
 {
   "description": "パターンの説明",
   "agents": {
-    "sisyphus": { "model": "google/antigravity-gemini-3-pro" },
+    "sisyphus": { "model": "gemini-3-pro-preview" },
     "hephaestus": { "model": "openai/gpt-5.3-codex" },
     "oracle": { "model": "google/antigravity-claude-opus-4-6-thinking" },
     "momus": { "model": "openai/gpt-5.2" },
-    "librarian": { "model": "google/antigravity-gemini-3-pro" },
+    "librarian": { "model": "gemini-3-pro-preview" },
     "explore": { "model": "google/antigravity-gemini-3-flash" },
     "multimodal-looker": { "model": "google/antigravity-gemini-3-flash" }
   },
   "categories": {
     "quick": { "model": "google/antigravity-gemini-3-flash" },
     "writing": { "model": "google/antigravity-gemini-3-flash" },
-    "visual-engineering": { "model": "google/antigravity-gemini-3-pro" },
-    "artistry": { "model": "google/antigravity-gemini-3-pro", "variant": "max" },
+    "visual-engineering": { "model": "gemini-3-pro-preview" },
+    "artistry": { "model": "gemini-3-pro-preview", "variant": "max" },
     "ultrabrain": { "model": "openai/gpt-5.3-codex", "variant": "xhigh" },
     "deep": { "model": "openai/gpt-5.3-codex", "variant": "medium" },
     "unspecified-low": { "model": "openai/gpt-5.2" },

@@ -47,8 +47,10 @@ check-superclaude: ## SuperClaudeフレームワークのインストール状�
 
 .PHONY: install-packages-superclaude
 install-packages-superclaude: ## SuperClaudeフレームワークをClaude Code向けにインストール
-	@if [ -L "$(CLAUDE_DIR)/CLAUDE.md" ] && command -v SuperClaude >/dev/null 2>&1 && \
-	   [ -f "$(CLAUDE_DIR)/MODE_Brainstorming.md" ] && [ -f "$(CLAUDE_DIR)/PRINCIPLES.md" ]; then \
+	@BOOL_LINK_CHECK=0; if [ -L "$(CLAUDE_DIR)/CLAUDE.md" ]; then BOOL_LINK_CHECK=1; fi; \
+	BOOL_SUPERCLAUDE_CMD=0; if command -v SuperClaude >/dev/null 2>&1; then BOOL_SUPERCLAUDE_CMD=1; fi; \
+	BOOL_REQUIRED_FILES=0; if [ -f "$(CLAUDE_DIR)/MODE_Brainstorming.md" ] && [ -f "$(CLAUDE_DIR)/PRINCIPLES.md" ]; then BOOL_REQUIRED_FILES=1; fi; \
+	if [ "$$BOOL_LINK_CHECK" = "1" ] && [ "$$BOOL_SUPERCLAUDE_CMD" = "1" ] && [ "$$BOOL_REQUIRED_FILES" = "1" ]; then \
 		echo "$(call IDEMPOTENCY_SKIP_MSG,install-packages-superclaude)"; \
 		exit 0; \
 	fi
@@ -107,7 +109,11 @@ install-packages-superclaude: ## SuperClaudeフレームワークをClaude Code�
 			echo "   バージョン: $$CURRENT_VERSION"; \
 		else \
 			echo "📥 SuperClaudeツールをインストール中..."; \
-			bash $(CURDIR)/scripts/install_superclaude.sh || echo "⚠️  インストールに失敗しましたが続行します"; \
+			if [ -x "$(CURDIR)/scripts/install_superclaude.sh" ]; then \
+				bash $(CURDIR)/scripts/install_superclaude.sh || echo "⚠️  インストールに失敗しましたが続行します"; \
+			else \
+				echo "⚠️  skipping... (scripts/install_superclaude.shが見つかりません)"; \
+			fi; \
 		fi; \
 	else \
 		echo "⚠️  Python3またはuvが見つからないため、SuperClaudeツールのインストールをスキップします"; \

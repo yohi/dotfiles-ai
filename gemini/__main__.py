@@ -261,7 +261,7 @@ def show_config(edit=False, reset=False):
     """
     設定の表示・編集
     """
-    from . import CONFIG_PATH
+    from .supergemini import CONFIG_PATH
 
     if reset:
         if os.path.exists(CONFIG_PATH):

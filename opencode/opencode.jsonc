@@ -4,17 +4,17 @@
   // Based on oh-my-opencode v3.7.4
   "$schema": "https://opencode.ai/config.json",
   // モデル
-  //"model": "google/antigravity-gemini-3-pro",
-  //"small_model": "google/antigravity-gemini-3-flash",
+  //"model": "gemini-3-pro-preview",
+  //"small_model": "gemini-3-flash-preview",
   // ログレベル設定（デバッグ用）
   // "logLevel": "DEBUG",
   // [Plugin]
   "plugin": [
-    "oh-my-opencode@latest",
-    "opencode-openai-codex-auth@latest",
+    "oh-my-opencode@^3.7.4",
+    "opencode-openai-codex-auth@^1.0.0",
     // "opencode-antigravity-auth@beta",
-    // "@yohi/opencode-antigravity-quota@latest",
-    "@yohi/opencode-codex-quota@latest",
+    // "@yohi/opencode-antigravity-quota@^1.0.0",
+    "@yohi/opencode-codex-quota@^1.0.0",
     // "@yohi/omo-sdd-hybrid",
   ],
   // [Instruction]
@@ -187,11 +187,10 @@
     "antigravity-bridge": {
       "type": "local",
       "command": [
-        "node",
-        "/home/y_ohi/program/private/antigravity-mcp-bridge/packages/bridge-cli/dist/index.js"
+        "antigravity-bridge"
       ],
       "environment": {
-        "ANTIGRAVITY_TOKEN": "448fd53f30252a8736827dcf58e1aee23f5f91de4751a81833ab7909daa58767",
+        "ANTIGRAVITY_TOKEN": "${ANTIGRAVITY_TOKEN}",
         "ANTIGRAVITY_PORT": "8888"
       }
     }
@@ -214,7 +213,12 @@
         "--stdio"
       ],
       "extensions": [
-        ".ts"
+        ".ts",
+        ".tsx",
+        ".js",
+        ".jsx",
+        ".mts",
+        ".cts"
       ],
       "disabled": false
     },

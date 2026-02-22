@@ -30,6 +30,8 @@ SuperGemini Hooks Module
 __version__ = "1.0.0"
 
 
+_NO_CHANGE = object()
+
 class HookRegistry:
     """フック登録とトリガー管理クラス"""
 
@@ -46,7 +48,9 @@ class HookRegistry:
         """指定されたイベントのフックを実行"""
         if event_name in self.hooks:
             for callback in self.hooks[event_name]:
-                data = callback(data) if data is not None else callback()
+                callback_result = callback(data) if data is not None else callback()
+                if callback_result is not _NO_CHANGE:
+                    data = callback_result
         return data
 
 

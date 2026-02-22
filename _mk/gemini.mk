@@ -3,6 +3,8 @@
 # Gemini CLI、SuperGemini Framework のインストール・管理を担当
 # ============================================================
 
+HOME_DIR ?= $(HOME)
+
 # Gemini CLI のインストール
 install-packages-gemini-cli:
 	@echo "🤖 Gemini CLI のインストールを開始..."

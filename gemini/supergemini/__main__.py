@@ -87,11 +87,14 @@ def install_framework(profile="standard", interactive=False, force=False):
 
     if is_installed and not force:
         print("ℹ️  SuperGemini は既にインストールされています")
-        if not interactive:
+        if interactive:
             choice = input("上書きしますか？ (y/N): ").strip().lower()
             if choice != 'y':
                 print("❌ インストールを中止しました")
                 return
+        else:
+            print("❌ --force オプションを指定して実行してください")
+            return
 
     print("📋 インストール中のコンポーネント:")
 
@@ -195,8 +198,11 @@ def show_config(edit=False, reset=False):
 
     if edit:
         # エディタで開く
+        import subprocess
+        import shlex
         editor = os.environ.get('EDITOR', 'nano')
-        os.system(f"{editor} {CONFIG_PATH}")
+        cmd = shlex.split(editor) + [CONFIG_PATH]
+        subprocess.run(cmd, check=True)
         print("✅ 設定を編集しました")
     else:
         # 設定の表示

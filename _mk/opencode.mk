@@ -9,7 +9,7 @@ OPENCODE_CONFIG_PATH ?= $(OPENCODE_CONFIG_DIR)/opencode.jsonc
 OPENCODE_DOTFILES_CONFIG ?= $(REPO_ROOT)/opencode/opencode.jsonc
 # TODO 2026/01/26時点で.jsoncを読みに行かないので、.jsonに修正
 OH_MY_OPENCODE_CONFIG_PATH ?= $(OPENCODE_CONFIG_DIR)/oh-my-opencode.json
-OH_MY_OPENCODE_DOTFILES_CONFIG ?= $(REPO_ROOT)/opencode/oh-my-opencode.jsonc
+OH_MY_OPENCODE_DOTFILES_CONFIG ?= $(REPO_ROOT)/opencode/oh-my-opencode.base.jsonc
 OPENCODE_ANTIGRAVITY_PATH ?= $(OPENCODE_CONFIG_DIR)/antigravity.json
 OPENCODE_DOTFILES_ANTIGRAVITY ?= $(REPO_ROOT)/opencode/antigravity.json
 OPENCODE_AGENTS_PATH ?= $(OPENCODE_CONFIG_DIR)/AGENTS.md

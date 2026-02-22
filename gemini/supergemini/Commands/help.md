@@ -1,20 +1,25 @@
 # /sg:help コマンド
 
 ## 説明
+
 SuperGeminiフレームワークの利用可能なコマンド一覧と使用方法を表示します。
 
 ## 構文
+
 /sg:help [コマンド名]
 
 ## オプション
+
 - コマンド名: 特定のコマンドの詳細ヘルプを表示します
 
 ## 例
+
 /sg:help
 /sg:help implement
 
 ## レスポンス
-```
+
+```markdown
 # 🚀 SuperGemini コマンドリファレンス
 
 SuperGeminiは、Gemini CLIを強化する拡張フレームワークです。以下のコマンドが利用可能です。

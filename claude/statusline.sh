@@ -6,9 +6,9 @@ set -euo pipefail
 input=$(cat)
 
 # Extract values from JSON
-current_dir=$(echo "$input" | jq -r '.workspace.current_dir // .cwd')
-model_name=$(echo "$input" | jq -r '.model.display_name // "Claude"')
-output_style=$(echo "$input" | jq -r '.output_style.name // ""')
+current_dir=$(printf '%s\n' "$input" | jq -r '.workspace.current_dir // .cwd')
+model_name=$(printf '%s\n' "$input" | jq -r '.model.display_name // "Claude"')
+output_style=$(printf '%s\n' "$input" | jq -r '.output_style.name // ""')
 
 # Get current user and hostname
 user=$(whoami)
@@ -53,12 +53,13 @@ fi
 
 # Try to add ccusage if available
 ccusage_info=""
+if ! command -v bun >/dev/null 2>&1 && [ -x "${HOME}/.bun/bin/bun" ]; then
+    export PATH="${HOME}/.bun/bin:${PATH}"
+fi
+
 if command -v bunx >/dev/null 2>&1; then
     ccusage_info=$(bunx -y ccusage statusline --visual-burn-rate emoji 2>/dev/null || echo "")
 elif command -v bun >/dev/null 2>&1; then
-    if [ -d "${HOME}/.bun/bin" ]; then
-        export PATH="${HOME}/.bun/bin:${PATH}"
-    fi
     ccusage_info=$(bun x ccusage statusline --visual-burn-rate emoji 2>/dev/null || echo "")
 fi
 

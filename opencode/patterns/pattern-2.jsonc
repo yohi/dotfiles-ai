@@ -4,16 +4,16 @@
   "description": "節約構成 (Gemini Pro + GPT-5.3 + Flash)",
   "agents": {
     "sisyphus": {
-      "model": "google-vertex/gemini-3.1-pro-preview", // 指揮はGemini Pro
+      "model": "google-vertex/gemini-3-pro-preview", // 指揮はGemini Pro
       "variant": "high",
       "temperature": 0.2,
     },
     "prometheus": {
-      "model": "google-vertex/gemini-3.1-pro-preview", // 計画立案もGemini Proで節約
+      "model": "google-vertex/gemini-3-pro-preview", // 計画立案もGemini Proで節約
       "variant": "high"
     },
     "atlas": {
-      "model": "google-vertex/gemini-3.1-pro-preview", // ContextもGemini Pro
+      "model": "google-vertex/gemini-3-pro-preview", // ContextもGemini Pro
       "variant": "high"
     },
     "metis": {
@@ -29,7 +29,7 @@
       "variant": "max"
     },
     "momus": {
-      "model": "google-vertex/gemini-3.1-pro-preview",
+      "model": "google-vertex/gemini-3-pro-preview",
     },
     "librarian": {
       "model": "google-vertex/gemini-3-flash-preview",
@@ -42,7 +42,7 @@
     },
     "git-specialist": {
       "description": "Git operations specialist",
-      "model": "google-vertex/gemini-3.1-pro-preview",
+      "model": "google-vertex/gemini-3-pro-preview",
       "permission": {
         "bash": {
           "git push --force": "deny",
@@ -65,14 +65,14 @@
       "model": "google-vertex/gemini-3-flash-preview"
     },
     "visual-engineering": {
-      "model": "google-vertex/gemini-3.1-pro-preview"
+      "model": "google-vertex/gemini-3-pro-preview"
     },
     "artistry": {
-      "model": "google-vertex/gemini-3.1-pro-preview",
+      "model": "google-vertex/gemini-3-pro-preview",
       "variant": "high"
     },
     "ultrabrain": {
-      "model": "google-vertex/gemini-3.1-pro-preview",
+      "model": "google-vertex/gemini-3-pro-preview",
       "variant": "high"
     },
     "deep": {
@@ -83,7 +83,7 @@
       "model": "google-vertex/gemini-3-flash-preview"
     },
     "unspecified-high": {
-      "model": "google-vertex/gemini-3.1-pro-preview"
+      "model": "google-vertex/gemini-3-pro-preview"
     },
   }
 }

@@ -7,6 +7,7 @@
 CLAUDIA_COMMIT := 70c16d8a4910db48cd9684aeacdd431caefd7d71
 
 # Claude Code のインストール
+.PHONY: install-packages-claude-code
 install-packages-claude-code:
 	@echo "🤖 Claude Code のインストールを開始..."
 

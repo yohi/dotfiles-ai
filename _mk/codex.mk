@@ -39,8 +39,9 @@ codex-setup: ## Setup Codex CLI configuration
 	fi
 	@echo "Creating symbolic link: $(HOME_DIR)/.codex -> $(REPO_ROOT)/codex"
 	@if [ -d "$(HOME_DIR)/.codex" ] && [ ! -L "$(HOME_DIR)/.codex" ]; then \
-		echo "Removing existing directory: $(HOME_DIR)/.codex"; \
-		rm -rf "$(HOME_DIR)/.codex"; \
+		backup_dir="$(HOME_DIR)/.codex.backup.$$(date +%s)"; \
+		echo "Moving existing directory to backup: $$backup_dir"; \
+		mv "$(HOME_DIR)/.codex" "$$backup_dir"; \
 	fi
 	@ln -sfn $(REPO_ROOT)/codex $(HOME_DIR)/.codex
 	@echo "Codex CLI setup complete."

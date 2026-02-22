@@ -91,7 +91,7 @@ link-agent-commands: ## agent-commands/ のコマンドを各エージェント�
 		[ -f "$$cmd" ] || continue; \
 		base=$$(basename "$$cmd"); \
 		target="$(REPO_ROOT)/claude/commands/$$base"; \
-		if [ -L "$$target" ]; then \
+		if [ -e "$$target" ]; then \
 			echo "  [SKIP] claude/commands/$$base"; \
 		else \
 			ln -sfn "../../agent-commands/$$base" "$$target"; \
@@ -121,15 +121,15 @@ inject-meta-prompt-opencode: ## OpenCode の docs/ に global-rules/ へのシ�
 	@echo "📌 OpenCode: global-rules への参照リンクを作成中..."
 	@mkdir -p "$(OPENCODE_DOCS)"
 	@if [ -L "$(OPENCODE_DOCS)/global-rules" ]; then \
-		actual=$$(readlink -f "$(OPENCODE_DOCS)/global-rules" 2>/dev/null || true); \
-		expected=$$(readlink -f "$(GLOBAL_RULES_DIR)" 2>/dev/null || true); \
-		if [ "$$actual" = "$$expected" ]; then \
+		actual=$$(readlink -f "$(OPENCODE_DOCS)/global-rules" 2>/dev/null || readlink "$(OPENCODE_DOCS)/global-rules" 2>/dev/null || true); \
+		expected=$$(readlink -f "$(GLOBAL_RULES_DIR)" 2>/dev/null || readlink "$(GLOBAL_RULES_DIR)" 2>/dev/null || true); \
+		if [ -n "$$actual" ] && [ "$$actual" = "$$expected" ]; then \
 			echo "  [SKIP] 既にリンク済み: $(OPENCODE_DOCS)/global-rules -> $(GLOBAL_RULES_DIR)"; \
 			exit 0; \
 		fi; \
 	fi
-	@ln -sfn "$(GLOBAL_RULES_DIR)" "$(OPENCODE_DOCS)/global-rules"
-	@echo "✅ OpenCode: $(OPENCODE_DOCS)/global-rules -> $(GLOBAL_RULES_DIR)"
+	@ln -sfn "../../global-rules" "$(OPENCODE_DOCS)/global-rules"
+	@echo "✅ OpenCode: $(OPENCODE_DOCS)/global-rules -> ../../global-rules"
 
 # ============================================================
 # inject-meta-prompt-codex: Codex config.toml へのコメント注入
