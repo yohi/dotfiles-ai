@@ -1,12 +1,12 @@
 REPO_ROOT ?= $(CURDIR)
 .DEFAULT_GOAL := setup
-include mk/claude.mk
-include mk/gemini.mk
-include mk/codex.mk
-include mk/opencode.mk
-include mk/superclaude.mk
-include mk/skillport.mk
-include mk/mcp.mk
+include _mk/claude.mk
+include _mk/gemini.mk
+include _mk/codex.mk
+include _mk/opencode.mk
+include _mk/superclaude.mk
+include _mk/skillport.mk
+include _mk/mcp.mk
 .PHONY: setup
 setup:
 	@echo "==> Setting up dotfiles-ai"

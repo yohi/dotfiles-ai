@@ -7,7 +7,7 @@
 
 ```text
 dotfiles-ai/
-├── mk/                         # Makefile sub-targets
+├── _mk/                         # Makefile sub-targets
 │   ├── claude.mk               # Claude Code setup
 │   ├── codex.mk                # OpenAI Codex setup
 │   ├── gemini.mk               # Gemini CLI setup
@@ -33,7 +33,7 @@ dotfiles-ai/
 │   ├── commands/               # Custom slash commands
 │   ├── skills/                 # Opencode skills
 │   └── DOCUMENT/               # Reference documents
-└── Makefile                    # Setup entry point (includes mk/*.mk)
+└── Makefile                    # Setup entry point (includes _mk/*.mk)
 ```
 
 ## COMPONENT LAYOUT CONVENTION
@@ -66,7 +66,7 @@ GNU Stow creates symlinks from this repo's root into `~/`.
 
 ```makefile
 .DEFAULT_GOAL := setup
-# include mk/<feature>.mk    # if using mk/ subdirectory
+# include _mk/<feature>.mk    # if using _mk/ subdirectory
 
 .PHONY: setup
 setup:
