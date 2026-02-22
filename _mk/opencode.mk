@@ -83,7 +83,7 @@ install-packages-opencode: ## OpenCode（opencode）をインストール
 		echo "❌ curl が見つかりません。先に curl をインストールしてください"; \
 		exit 1; \
 	fi
-	@bash -c 'set -euo pipefail; tmp="$$(mktemp)"; curl -fsSL https://opencode.ai/install -o "$$tmp"; expected_hash="fc3c1b2123f49b6df545a7622e5127d21cd794b15134fc3b66e1ca49f7fb297e"; actual_hash=$$(sha256sum "$$tmp" | cut -d" " -f1); if [ "$$actual_hash" != "$$expected_hash" ]; then echo "❌ Installer checksum mismatch"; rm -f "$$tmp"; exit 1; fi; bash "$$tmp"; rm -f "$$tmp"'
+	@bash -c 'set -euo pipefail; tmp="$$(mktemp)"; curl -fsSL https://opencode.ai/install -o "$$tmp"; expected_hash="fc3c1b2123f49b6df545a7622e5127d21cd794b15134fc3b66e1ca49f7fb297e"; actual_hash=$$( (command -v sha256sum >/dev/null 2>&1 && sha256sum "$$tmp" | cut -d" " -f1) || shasum -a 256 "$$tmp" | cut -d" " -f1 ); if [ "$$actual_hash" != "$$expected_hash" ]; then echo "❌ Installer checksum mismatch"; rm -f "$$tmp"; exit 1; fi; bash "$$tmp"; rm -f "$$tmp"'
 	@if [ ! -x "$(OPENCODE_BIN)" ]; then \
 		echo "❌ opencode のインストールに失敗しました: $(OPENCODE_BIN) が見つかりません"; \
 		exit 1; \
@@ -98,7 +98,7 @@ opencode-update: ## OpenCode（opencode）をアップデート
 		echo "❌ curl が見つかりません。先に curl をインストールしてください"; \
 		exit 1; \
 	fi
-	@bash -c 'set -euo pipefail; tmp="$$(mktemp)"; curl -fsSL https://opencode.ai/install -o "$$tmp"; expected_hash="fc3c1b2123f49b6df545a7622e5127d21cd794b15134fc3b66e1ca49f7fb297e"; actual_hash=$$(sha256sum "$$tmp" | cut -d" " -f1); if [ "$$actual_hash" != "$$expected_hash" ]; then echo "❌ Installer checksum mismatch"; rm -f "$$tmp"; exit 1; fi; bash "$$tmp"; rm -f "$$tmp"'
+	@bash -c 'set -euo pipefail; tmp="$$(mktemp)"; curl -fsSL https://opencode.ai/install -o "$$tmp"; expected_hash="fc3c1b2123f49b6df545a7622e5127d21cd794b15134fc3b66e1ca49f7fb297e"; actual_hash=$$( (command -v sha256sum >/dev/null 2>&1 && sha256sum "$$tmp" | cut -d" " -f1) || shasum -a 256 "$$tmp" | cut -d" " -f1 ); if [ "$$actual_hash" != "$$expected_hash" ]; then echo "❌ Installer checksum mismatch"; rm -f "$$tmp"; exit 1; fi; bash "$$tmp"; rm -f "$$tmp"'
 	@if [ -x "$(OPENCODE_BIN)" ]; then \
 		echo "✅ 更新後のバージョン: $$($(OPENCODE_BIN) --version 2>/dev/null || echo unknown)"; \
 	fi
