@@ -1,7 +1,19 @@
 #!/bin/bash
-set -eo pipefail
+set -euo pipefail
 
 echo "Fixing _mk/sync-agents.mk..."
-# 1. sync-agents.mk lines 110-114
-sed -i 's/body=\$\$(awk '\''BEGIN{n=0} \/^---\$\$\/{n++; next} n>=2{print}'\'' "\$\$cmd"); \\/body=\$\$(awk '\''BEGIN{n=0} \/^---\$\$\/{n++; next} n>=2{print}'\'' "\$\$cmd" | sed '\''s\/\\\\\/\\\\\\\\\/g; s\/"""\/\\\\"""\/g'\''); \\/' _mk/sync-agents.mk
-# Wait, replacing sed with backslashes is very tricky. I'll use python for sed replacements!
+# Replace complex sed with small python script
+python3 -c '
+import sys
+try:
+    with open("_mk/sync-agents.mk", "r") as f:
+        content = f.read()
+    target = """body=$$(awk '\''BEGIN{n=0} /^---$$/{n++; next} n>=2{print}'\'' "$$cmd"); \\"""
+    replacement = """body=$$(awk '\''BEGIN{n=0} /^---$$/{n++; next} n>=2{print}'\'' "$$cmd" | sed '\''s/\\\\/\\\\\\\\/g; s/\"\"\"/\\\\\"\"\"/g'\''); \\"""
+    if target in content:
+        content = content.replace(target, replacement)
+        with open("_mk/sync-agents.mk", "w") as f:
+            f.write(content)
+except FileNotFoundError:
+    pass
+'

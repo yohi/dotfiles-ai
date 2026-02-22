@@ -5,7 +5,7 @@
 
 define create_desktop_entry
 	echo "📝 デスクトップエントリーを作成中..."; \
-	sudo bash -c "cat << 'EOF' > /usr/share/applications/claudia.desktop\n[Desktop Entry]\nName=Claudia\nComment=A powerful GUI app and Toolkit for Claude Code\nExec=/opt/claudia/claudia\nTryExec=/opt/claudia/claudia\nIcon=applications-development\nTerminal=false\nType=Application\nCategories=Development;IDE;Utility;\nStartupWMClass=claudia\nEOF" ; \
+	printf "[Desktop Entry]\nName=Claudia\nComment=A powerful GUI app and Toolkit for Claude Code\nExec=/opt/claudia/claudia\nTryExec=/opt/claudia/claudia\nIcon=applications-development\nTerminal=false\nType=Application\nCategories=Development;IDE;Utility;\nStartupWMClass=claudia\n" | sudo tee /usr/share/applications/claudia.desktop > /dev/null; \
 	sudo chmod +x /usr/share/applications/claudia.desktop; \
 	sudo update-desktop-database 2>/dev/null || true
 endef

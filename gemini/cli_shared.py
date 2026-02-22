@@ -100,7 +100,7 @@ def show_personas(get_config, get_personas_config=None):
             "backend": "⚙️  API・インフラストラクチャ",
             "analyst": "📊 コード分析・最適化",
             "tester": "🧪 テスト設計・品質保証",
-            "devops": "�� CI/CD・デプロイメント",
+            "devops": "🔧 CI/CD・デプロイメント",
             "security": "🛡️  セキュリティ・脆弱性対策",
             "scribe": "✍️  ドキュメント・技術文書"
         }

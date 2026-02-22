@@ -30,7 +30,7 @@ def create_parser():
     subparsers = parser.add_subparsers(dest="command", help="コマンド")
 
     # バージョン表示コマンド
-    version_parser = subparsers.add_parser("version", help="バージョン情報を表示")
+    subparsers.add_parser("version", help="バージョン情報を表示")
 
     # インストールコマンド
     install_parser = subparsers.add_parser("install", help="SuperGemini をインストールまたは更新")
@@ -40,7 +40,7 @@ def create_parser():
     install_parser.add_argument("--force", action="store_true", help="既存の設定を上書き")
 
     # コマンド一覧表示
-    commands_parser = subparsers.add_parser("commands", help="利用可能なコマンド一覧を表示")
+    subparsers.add_parser("commands", help="利用可能なコマンド一覧を表示")
 
     # 設定表示・編集
     config_parser = subparsers.add_parser("config", help="設定を表示・編集")
@@ -48,7 +48,7 @@ def create_parser():
     config_parser.add_argument("--reset", action="store_true", help="設定をデフォルトにリセット")
 
     # ペルソナ一覧表示
-    personas_parser = subparsers.add_parser("personas", help="利用可能なペルソナ一覧を表示")
+    subparsers.add_parser("personas", help="利用可能なペルソナ一覧を表示")
 
     return parser
 

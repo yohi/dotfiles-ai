@@ -31,7 +31,7 @@ def create_parser():
     subparsers = parser.add_subparsers(dest="command", help="コマンド")
 
     # バージョン表示コマンド
-    version_parser = subparsers.add_parser("version", help="バージョン情報を表示")
+    subparsers.add_parser("version", help="バージョン情報を表示")
 
     # インストールコマンド
     install_parser = subparsers.add_parser(
@@ -51,7 +51,7 @@ def create_parser():
     )
 
     # コマンド一覧表示
-    commands_parser = subparsers.add_parser(
+    subparsers.add_parser(
         "commands", help="利用可能なコマンド一覧を表示"
     )
 
@@ -65,7 +65,7 @@ def create_parser():
     )
 
     # ペルソナ一覧表示
-    personas_parser = subparsers.add_parser(
+    subparsers.add_parser(
         "personas", help="利用可能なペルソナ一覧を表示"
     )
 

@@ -12,7 +12,7 @@ include _mk/skillport.mk
 include _mk/sync-agents.mk
 include _mk/mcp.mk
 
-.PHONY: setup clean
+.PHONY: setup clean link
 
 setup:
 	@echo "==> Setting up dotfiles-ai"
