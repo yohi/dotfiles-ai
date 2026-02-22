@@ -87,7 +87,7 @@ def setup_environment():
     os.makedirs(COMMANDS_DIR, exist_ok=True)
 
     # 設定ファイルの作成
-    config = get_config()
+    _ = get_config()
 
     # GEMINI.mdファイルの作成（存在しない場合）
     if not os.path.exists(GEMINI_MD):
@@ -99,7 +99,7 @@ def setup_environment():
                     "詳細な使い方については、`SuperGemini commands` を実行して確認してください。\n"
                 )
         except Exception as e:
-            logger.error(f"GEMINI.md ファイルの作成エラー: {e}")
+            logger.exception("GEMINI.md ファイルの作成エラー")
 
 
 def install_framework(profile="standard", interactive=False, force=False):
@@ -118,11 +118,14 @@ def install_framework(profile="standard", interactive=False, force=False):
 
     if is_installed and not force:
         print("ℹ️  SuperGemini は既にインストールされています")
-        if interactive:
-            choice = input("上書きしますか？ (y/N): ").strip().lower()
-            if choice != "y":
-                print("❌ インストールを中止しました")
-                return
+        if not interactive:
+            print("❌ --force オプションを指定して実行してください")
+            sys.exit(1)
+
+        choice = input("上書きしますか？ (y/N): ").strip().lower()
+        if choice != "y":
+            print("❌ インストールを中止しました")
+            return
 
     print("📋 インストール中のコンポーネント:")
 
@@ -276,9 +279,11 @@ def show_config(edit=False, reset=False):
         # エディタで開く
         import subprocess
 
+        import shlex
         editor = os.environ.get("EDITOR", "nano")
         try:
-            subprocess.run([editor, CONFIG_PATH], check=True)
+            cmd = shlex.split(editor) + [CONFIG_PATH]
+            subprocess.run(cmd, check=True)
             print("✅ 設定を編集しました")
         except Exception as e:
             print(f"❌ エディタの起動に失敗しました: {e}")

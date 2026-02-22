@@ -44,14 +44,14 @@ class HookRegistry:
             self.hooks[event_name] = []
         self.hooks[event_name].append(callback)
 
-    def execute(self, event_name, data=None):
+    def execute(self, event_name, data=_NO_CHANGE):
         """指定されたイベントのフックを実行"""
         if event_name in self.hooks:
             for callback in self.hooks[event_name]:
-                callback_result = callback(data) if data is not None else callback()
+                callback_result = callback(data) if data is not _NO_CHANGE else callback()
                 if callback_result is not _NO_CHANGE:
                     data = callback_result
-        return data
+        return data if data is not _NO_CHANGE else None
 
 
 # グローバルフックレジストリ
@@ -81,7 +81,7 @@ def list_hooks():
 # Export main components
 __all__ = [
     "HookRegistry",
-    "register_hook",
     "execute_hooks",
     "list_hooks",
+    "register_hook",
 ]

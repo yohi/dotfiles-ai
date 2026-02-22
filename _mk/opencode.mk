@@ -2,6 +2,7 @@
 # OpenCode (opencode): インストール・設定
 # ============================================================
 
+CONFIG_DIR ?= $(HOME_DIR)/.config
 OPENCODE_HOME ?= $(HOME_DIR)/.opencode
 OPENCODE_BIN ?= $(OPENCODE_HOME)/bin/opencode
 OPENCODE_CONFIG_DIR ?= $(CONFIG_DIR)/opencode
@@ -26,7 +27,7 @@ OPENCODE_DOTFILES_DOCS ?= $(REPO_ROOT)/opencode/docs
 # OpenCode (opencode) をインストール & 設定
 opencode: ## OpenCode(opencode)のインストールとセットアップ
 	@if [ -x "$(OPENCODE_BIN)" ] && [ -f "$(OPENCODE_DOTFILES_CONFIG)" ] && [ -L "$(OPENCODE_CONFIG_PATH)" ]; then \
-		actual=$$(readlink -f "$(OPENCODE_CONFIG_PATH)" 2>/dev/null || true); \
+		actual=$$(readlink -f "$(OPENCODE_CONFIG_PATH)" 2>/dev/null || readlink "$(OPENCODE_CONFIG_PATH)" 2>/dev/null || true); \
 		expected=$$(readlink -f "$(OPENCODE_DOTFILES_CONFIG)" 2>/dev/null || true); \
 		if [ "$$actual" = "$$expected" ]; then \
 			skip=1; \

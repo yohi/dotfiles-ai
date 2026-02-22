@@ -61,7 +61,7 @@ def setup_environment():
     os.makedirs(COMMANDS_DIR, exist_ok=True)
 
     # 設定ファイルの作成
-    config = get_config()
+    _ = get_config()
 
     # GEMINI.mdファイルの作成（存在しない場合）
     if not os.path.exists(GEMINI_MD):
@@ -71,7 +71,7 @@ def setup_environment():
                 f.write("SuperGemini は Gemini CLI のための拡張フレームワークです。\n")
                 f.write("詳細な使い方については、`SuperGemini commands` を実行して確認してください。\n")
         except Exception as e:
-            logger.error(f"GEMINI.md ファイルの作成エラー: {e}")
+            logger.exception("GEMINI.md ファイルの作成エラー")
 
 def install_framework(profile="standard", interactive=False, force=False):
     """

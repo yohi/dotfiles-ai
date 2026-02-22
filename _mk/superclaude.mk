@@ -155,7 +155,7 @@ uninstall-superclaude: ## SuperClaudeフレームワークをアンインスト�
 		echo "  - CLAUDE.md (シンボリックリンク)"; \
 	fi
 	@echo ""
-	@read -p "本当にアンインストールしますか? [y/N]: " confirm; \
+	@printf "本当にアンインストールしますか? [y/N]: "; read confirm; \
 	if [ "$$confirm" = "y" ] || [ "$$confirm" = "Y" ]; then \
 		for file in $(SUPERCLAUDE_ALL_FILES); do \
 			rm -f "$(CLAUDE_DIR)/$$file"; \
@@ -166,7 +166,7 @@ uninstall-superclaude: ## SuperClaudeフレームワークをアンインスト�
 		if command -v SuperClaude >/dev/null 2>&1; then \
 			echo ""; \
 			echo "🔧 SuperClaudeツールもアンインストールしますか?"; \
-			read -p "SuperClaudeツールをアンインストール? [y/N]: " confirm_tool; \
+			printf "SuperClaudeツールをアンインストール? [y/N]: "; read confirm_tool; \
 			if [ "$$confirm_tool" = "y" ] || [ "$$confirm_tool" = "Y" ]; then \
 				if command -v uv >/dev/null 2>&1; then \
 					uv tool uninstall SuperClaude 2>/dev/null || python3 -m pip uninstall -y SuperClaude; \

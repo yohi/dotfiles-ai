@@ -6,7 +6,7 @@
     "sisyphus": {
       "model": "google-vertex/gemini-3-pro-preview", // 指揮はGemini Pro
       "variant": "high",
-      "temperature": 0.2,
+      "temperature": 0.2
     },
     "prometheus": {
       "model": "google-vertex/gemini-3-pro-preview", // 計画立案もGemini Proで節約
@@ -21,24 +21,24 @@
       "temperature": 0.5
     },
     "hephaestus": {
-      "model": "openai/gpt-5.3-codex", // 実装だけは妥協せずGPT-5.3
+      "model": "openai/gpt-5.2", // 実装だけは妥協せずGPT-5.2
       "variant": "medium"
     },
     "oracle": {
-      "model": "google-vertex-anthropic/claude-opus-4-6@default", // 相談役だけはOpus（ここぞという時用）
+      "model": "google-vertex-anthropic/claude-opus-4-6", // 相談役だけはOpus（ここぞという時用）
       "variant": "max"
     },
     "momus": {
-      "model": "google-vertex/gemini-3-pro-preview",
+      "model": "google-vertex/gemini-3-pro-preview"
     },
     "librarian": {
-      "model": "google-vertex/gemini-3-flash-preview",
+      "model": "google-vertex/gemini-3-flash-preview"
     },
     "explore": {
-      "model": "google-vertex/gemini-3-flash-preview",
+      "model": "google-vertex/gemini-3-flash-preview"
     },
     "multimodal-looker": {
-      "model": "google-vertex/gemini-3-flash-preview",
+      "model": "google-vertex/gemini-3-flash-preview"
     },
     "git-specialist": {
       "description": "Git operations specialist",
@@ -50,12 +50,12 @@
           "git clean *": "ask",
           "git add .": "ask",
           "git *": "allow",
-          "*": "deny",
+          "*": "deny"
         },
         "edit": "deny",
-        "webfetch": "deny",
-      },
-    },
+        "webfetch": "deny"
+      }
+    }
   },
   "categories": {
     "quick": {
@@ -84,6 +84,6 @@
     },
     "unspecified-high": {
       "model": "google-vertex/gemini-3-pro-preview"
-    },
+    }
   }
 }

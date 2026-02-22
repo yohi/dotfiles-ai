@@ -3,6 +3,22 @@
 # Claude Code (CLI)、Claudia (GUI) のインストール・管理を担当
 # ============================================================
 
+define create_desktop_entry
+	echo "📝 デスクトップエントリーを作成中..."; \
+	echo "[Desktop Entry]" | sudo tee /usr/share/applications/claudia.desktop > /dev/null; \
+	echo "Name=Claudia" | sudo tee -a /usr/share/applications/claudia.desktop > /dev/null; \
+	echo "Comment=A powerful GUI app and Toolkit for Claude Code" | sudo tee -a /usr/share/applications/claudia.desktop > /dev/null; \
+	echo "Exec=/opt/claudia/claudia" | sudo tee -a /usr/share/applications/claudia.desktop > /dev/null; \
+	echo "TryExec=/opt/claudia/claudia" | sudo tee -a /usr/share/applications/claudia.desktop > /dev/null; \
+	echo "Icon=applications-development" | sudo tee -a /usr/share/applications/claudia.desktop > /dev/null; \
+	echo "Terminal=false" | sudo tee -a /usr/share/applications/claudia.desktop > /dev/null; \
+	echo "Type=Application" | sudo tee -a /usr/share/applications/claudia.desktop > /dev/null; \
+	echo "Categories=Development;IDE;Utility;" | sudo tee -a /usr/share/applications/claudia.desktop > /dev/null; \
+	echo "StartupWMClass=claudia" | sudo tee -a /usr/share/applications/claudia.desktop > /dev/null; \
+	sudo chmod +x /usr/share/applications/claudia.desktop; \
+	sudo update-desktop-database 2>/dev/null || true
+endef
+
 # Claudia (Claude Code GUI) のバージョン固定
 CLAUDIA_COMMIT := 70c16d8a4910db48cd9684aeacdd431caefd7d71
 
@@ -79,6 +95,7 @@ install-packages-claude-code:
 	@echo "✅ Claude Code のインストールが完了しました"
 
 # Claudia (Claude Code GUI) のインストール
+.PHONY: install-packages-claudia
 install-packages-claudia:
 	@echo "🖥️  Claudia (Claude Code GUI) のインストールを開始..."
 	@echo "ℹ️  注意: ClaudiaはまだRelease版が公開されていないため、ソースからビルドします"
@@ -196,19 +213,7 @@ install-packages-claudia:
 				sudo cp "$$BIN_PATH" /opt/claudia/claudia; \
 				sudo chmod +x /opt/claudia/claudia; \
 				\
-				echo "📝 デスクトップエントリーを作成中..."; \
-				echo "[Desktop Entry]" | sudo tee /usr/share/applications/claudia.desktop > /dev/null; \
-				echo "Name=Claudia" | sudo tee -a /usr/share/applications/claudia.desktop > /dev/null; \
-				echo "Comment=A powerful GUI app and Toolkit for Claude Code" | sudo tee -a /usr/share/applications/claudia.desktop > /dev/null; \
-				echo "Exec=/opt/claudia/claudia" | sudo tee -a /usr/share/applications/claudia.desktop > /dev/null; \
-				echo "TryExec=/opt/claudia/claudia" | sudo tee -a /usr/share/applications/claudia.desktop > /dev/null; \
-				echo "Icon=applications-development" | sudo tee -a /usr/share/applications/claudia.desktop > /dev/null; \
-				echo "Terminal=false" | sudo tee -a /usr/share/applications/claudia.desktop > /dev/null; \
-				echo "Type=Application" | sudo tee -a /usr/share/applications/claudia.desktop > /dev/null; \
-				echo "Categories=Development;IDE;Utility;" | sudo tee -a /usr/share/applications/claudia.desktop > /dev/null; \
-				echo "StartupWMClass=claudia" | sudo tee -a /usr/share/applications/claudia.desktop > /dev/null; \
-				sudo chmod +x /usr/share/applications/claudia.desktop; \
-				sudo update-desktop-database 2>/dev/null || true; \
+				$(create_desktop_entry); \
 				\
 				echo "✅ Claudia が /opt/claudia にインストールされました"; \
 			else \
@@ -226,19 +231,7 @@ install-packages-claudia:
 					sudo mkdir -p /opt/claudia; \
 					sudo cp "$$ALT_BIN" /opt/claudia/claudia; \
 					sudo chmod +x /opt/claudia/claudia; \
-					echo "📝 デスクトップエントリーを作成中..."; \
-					echo "[Desktop Entry]" | sudo tee /usr/share/applications/claudia.desktop > /dev/null; \
-					echo "Name=Claudia" | sudo tee -a /usr/share/applications/claudia.desktop > /dev/null; \
-					echo "Comment=A powerful GUI app and Toolkit for Claude Code" | sudo tee -a /usr/share/applications/claudia.desktop > /dev/null; \
-					echo "Exec=/opt/claudia/claudia" | sudo tee -a /usr/share/applications/claudia.desktop > /dev/null; \
-					echo "TryExec=/opt/claudia/claudia" | sudo tee -a /usr/share/applications/claudia.desktop > /dev/null; \
-					echo "Icon=applications-development" | sudo tee -a /usr/share/applications/claudia.desktop > /dev/null; \
-					echo "Terminal=false" | sudo tee -a /usr/share/applications/claudia.desktop > /dev/null; \
-					echo "Type=Application" | sudo tee -a /usr/share/applications/claudia.desktop > /dev/null; \
-					echo "Categories=Development;IDE;Utility;" | sudo tee -a /usr/share/applications/claudia.desktop > /dev/null; \
-					echo "StartupWMClass=claudia" | sudo tee -a /usr/share/applications/claudia.desktop > /dev/null; \
-					sudo chmod +x /usr/share/applications/claudia.desktop; \
-					sudo update-desktop-database 2>/dev/null || true; \
+					$(create_desktop_entry); \
 					echo "✅ Claudia が /opt/claudia にインストールされました（代替実行ファイル使用）"; \
 				else \
 					echo "❌ ビルドされた実行ファイルが見つかりません"; \
@@ -288,6 +281,7 @@ install-packages-claudia:
 	@echo "✅ Claudia のインストールが完了しました"
 
 # Claude Code エコシステム一括インストール
+.PHONY: install-claude-ecosystem
 install-claude-ecosystem:
 	@echo "🌟 Claude Code エコシステム一括インストールを開始..."
 	@echo "ℹ️  以下の3つのツールを順次インストールします:"

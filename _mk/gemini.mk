@@ -4,6 +4,9 @@
 # ============================================================
 
 HOME_DIR ?= $(HOME)
+REPO_ROOT ?= $(CURDIR)
+
+.PHONY: install-packages-gemini-cli install-packages-supergemini install-gemini-ecosystem
 
 # Gemini CLI のインストール
 install-packages-gemini-cli:

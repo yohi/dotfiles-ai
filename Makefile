@@ -12,18 +12,28 @@ include _mk/skillport.mk
 include _mk/sync-agents.mk
 include _mk/mcp.mk
 
-.PHONY: setup
+.PHONY: setup clean
+
 setup:
 	@echo "==> Setting up dotfiles-ai"
-	$(MAKE) -f _mk/claude.mk claude
-	$(MAKE) -f _mk/gemini.mk gemini
-	$(MAKE) -f _mk/codex.mk codex
-	$(MAKE) -f _mk/opencode.mk opencode
-	$(MAKE) -f _mk/superclaude.mk superclaude
-	$(MAKE) -f _mk/skillport.mk skillport
-	$(MAKE) -f _mk/mcp.mk mcp
+	$(MAKE) claude
+	$(MAKE) gemini
+	$(MAKE) codex
+	$(MAKE) opencode
+	$(MAKE) superclaude
+	$(MAKE) skillport
+	$(MAKE) mcp
 	$(MAKE) sync-agents
 
-.PHONY: link
 link:
 	@echo "==> Linking dotfiles-ai (Handled in setup targets)"
+
+clean:
+	@echo "==> Cleaning up dotfiles-ai"
+	-$(MAKE) uninstall-superclaude || true
+	-$(MAKE) uninstall-claude || true
+	-$(MAKE) uninstall-gemini || true
+	-$(MAKE) uninstall-codex || true
+	-$(MAKE) uninstall-opencode || true
+	-$(MAKE) uninstall-skillport || true
+	-$(MAKE) uninstall-mcp || true

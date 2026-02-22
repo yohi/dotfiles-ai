@@ -107,7 +107,7 @@ link-agent-commands: ## agent-commands/ のコマンドを各エージェント�
 		if [ -f "$$target" ] && [ "$$target" -nt "$$cmd" ]; then \
 			echo "  [SKIP] gemini/commands/$$base.toml (up-to-date)"; \
 		else \
-			desc=$$(awk '/^---$$/{n++; next} n==1 && /^description:/{sub(/^description: */, ""); print; exit}' "$$cmd"); \
+			desc=$$(awk '/^---$$/{n++; next} n==1 && /^description:/{sub(/^description: */, ""); print; exit}' "$$cmd" | sed 's/"/\\"/g'); \
 			body=$$(awk 'BEGIN{n=0} /^---$$/{n++; next} n>=2{print}' "$$cmd"); \
 			printf 'description = "%s"\n\nprompt = """\n%s\n"""\n' "$$desc" "$$body" > "$$target"; \
 			echo "  ✅ gemini/commands/$$base.toml (generated from .md)"; \
