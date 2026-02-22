@@ -127,7 +127,7 @@ def show_config(edit, reset, get_config, config_path):
         import shlex
         editor = os.environ.get("EDITOR", "nano")
         try:
-            cmd = shlex.split(editor) + [config_path]
+            cmd = [*shlex.split(editor), config_path]
             subprocess.run(cmd, check=True)
             print("✅ 設定を編集しました")
         except Exception as e:
