@@ -22,6 +22,42 @@ OPENCODE_DOCS_PATH ?= $(OPENCODE_CONFIG_DIR)/docs
 OPENCODE_DOTFILES_DOCS ?= $(REPO_ROOT)/opencode/docs
 OPENCODE_INSTALLER_HASH ?= fc3c1b2123f49b6df545a7622e5127d21cd794b15134fc3b66e1ca49f7fb297e
 
+define link_config
+	if [ -e "$(1)" ]; then \
+		if [ -e "$(2)" ] && [ ! -L "$(2)" ]; then \
+			backup="$(2).bak.$$(date +%Y%m%d%H%M%S)"; \
+			if [ -d "$(2)" ]; then \
+				echo "⚠️  既存の $(3) ディレクトリを退避します: $$backup"; \
+			else \
+				if [ "$(3)" = "opencode" ]; then \
+					echo "⚠️  既存の設定ファイルを退避します: $$backup"; \
+				elif [ "$(3)" = "AGENTS.md" ]; then \
+					echo "⚠️  既存の $(3) ファイルを退避します: $$backup"; \
+				elif [ "$(3)" = "commands" ] || [ "$(3)" = "skills" ] || [ "$(3)" = "docs" ]; then \
+					echo "⚠️  既存の $(3) ファイルを退避します: $$backup"; \
+				else \
+					echo "⚠️  既存の $(3) 設定ファイルを退避します: $$backup"; \
+				fi; \
+			fi; \
+			mv "$(2)" "$$backup"; \
+		fi; \
+		ln -sfn "$(1)" "$(2)"; \
+		echo "✅ 設定を適用しました: $(2)"; \
+	else \
+		if [ "$(3)" = "opencode" ]; then \
+			echo "⚠️  設定ファイルが見つかりません: $(1)"; \
+			echo "    先に dotfiles に設定ファイルを用意してください"; \
+			exit 1; \
+		elif [ "$(3)" = "commands" ] || [ "$(3)" = "skills" ] || [ "$(3)" = "docs" ]; then \
+			echo "ℹ️  $(3) ディレクトリはスキップされました（見つかりません）"; \
+		elif [ "$(3)" = "AGENTS.md" ]; then \
+			echo "ℹ️  $(3) ファイルはスキップされました（見つかりません）"; \
+		else \
+			echo "ℹ️  $(3) 設定ファイルはスキップされました（見つかりません）"; \
+		fi; \
+	fi
+endef
+
 .PHONY: opencode install-packages-opencode install-opencode opencode-update setup-opencode check-opencode
 
 # OpenCode (opencode) をインストール & 設定
@@ -100,114 +136,32 @@ opencode-update: ## OpenCode（opencode）をアップデート
 		exit 1; \
 	fi
 	@bash -c 'set -euo pipefail; tmp="$$(mktemp)"; curl -fsSL https://opencode.ai/install -o "$$tmp"; expected_hash="$(OPENCODE_INSTALLER_HASH)"; actual_hash=$$( (command -v sha256sum >/dev/null 2>&1 && sha256sum "$$tmp" | cut -d" " -f1) || shasum -a 256 "$$tmp" | cut -d" " -f1 ); if [ "$$actual_hash" != "$$expected_hash" ]; then echo "❌ Installer checksum mismatch"; rm -f "$$tmp"; exit 1; fi; bash "$$tmp"; rm -f "$$tmp"'
-	@if [ -x "$(OPENCODE_BIN)" ]; then \
-		echo "✅ 更新後のバージョン: $$($(OPENCODE_BIN) --version 2>/dev/null || echo unknown)"; \
+	@if [ ! -x "$(OPENCODE_BIN)" ]; then \
+		echo "❌ opencode のアップデートに失敗しました: $(OPENCODE_BIN) が見つかりません"; \
+		exit 1; \
 	fi
+	@echo "✅ 更新後のバージョン: $$($(OPENCODE_BIN) --version 2>/dev/null || echo unknown)"
 	@$(call create_marker,opencode-update,$$($(OPENCODE_BIN) --version 2>/dev/null || echo unknown))
 
 # OpenCode の設定を適用（XDG config へシンボリックリンク）
 setup-opencode: ## OpenCode（opencode）の設定ファイルを適用
 	@echo "🔧 OpenCode（opencode）の設定を適用中..."
 	@mkdir -p "$(OPENCODE_CONFIG_DIR)"
+	@mkdir -p "$(OPENCODE_HOME)"
 	@# opencode.jsonc の設定
-	@if [ ! -f "$(OPENCODE_DOTFILES_CONFIG)" ]; then \
-		echo "⚠️  設定ファイルが見つかりません: $(OPENCODE_DOTFILES_CONFIG)"; \
-		echo "    先に dotfiles に設定ファイルを用意してください"; \
-		exit 1; \
-	fi
-	@if [ -e "$(OPENCODE_CONFIG_PATH)" ] && [ ! -L "$(OPENCODE_CONFIG_PATH)" ]; then \
-		backup="$(OPENCODE_CONFIG_PATH).bak.$$(date +%Y%m%d%H%M%S)"; \
-		echo "⚠️  既存の設定ファイルを退避します: $$backup"; \
-		mv "$(OPENCODE_CONFIG_PATH)" "$$backup"; \
-	fi
-	@ln -sfn "$(OPENCODE_DOTFILES_CONFIG)" "$(OPENCODE_CONFIG_PATH)"
-	@echo "✅ 設定を適用しました: $(OPENCODE_CONFIG_PATH)"
+	@$(call link_config,$(OPENCODE_DOTFILES_CONFIG),$(OPENCODE_CONFIG_PATH),opencode)
 	@# oh-my-opencode.jsonc の設定
-	@if [ -f "$(OH_MY_OPENCODE_DOTFILES_CONFIG)" ]; then \
-		if [ -e "$(OH_MY_OPENCODE_CONFIG_PATH)" ] && [ ! -L "$(OH_MY_OPENCODE_CONFIG_PATH)" ]; then \
-			backup="$(OH_MY_OPENCODE_CONFIG_PATH).bak.$$(date +%Y%m%d%H%M%S)"; \
-			echo "⚠️  既存の oh-my-opencode 設定ファイルを退避します: $$backup"; \
-			mv "$(OH_MY_OPENCODE_CONFIG_PATH)" "$$backup"; \
-		fi; \
-		ln -sfn "$(OH_MY_OPENCODE_DOTFILES_CONFIG)" "$(OH_MY_OPENCODE_CONFIG_PATH)"; \
-		echo "✅ 設定を適用しました: $(OH_MY_OPENCODE_CONFIG_PATH)"; \
-	else \
-		echo "ℹ️  oh-my-opencode 設定ファイルはスキップされました（見つかりません）"; \
-	fi
+	@$(call link_config,$(OH_MY_OPENCODE_DOTFILES_CONFIG),$(OH_MY_OPENCODE_CONFIG_PATH),oh-my-opencode)
 	@# antigravity.json の設定
-	@if [ -f "$(OPENCODE_DOTFILES_ANTIGRAVITY)" ]; then \
-		if [ -e "$(OPENCODE_ANTIGRAVITY_PATH)" ] && [ ! -L "$(OPENCODE_ANTIGRAVITY_PATH)" ]; then \
-			backup="$(OPENCODE_ANTIGRAVITY_PATH).bak.$$(date +%Y%m%d%H%M%S)"; \
-			echo "⚠️  既存の antigravity 設定ファイルを退避します: $$backup"; \
-			mv "$(OPENCODE_ANTIGRAVITY_PATH)" "$$backup"; \
-		fi; \
-		ln -sfn "$(OPENCODE_DOTFILES_ANTIGRAVITY)" "$(OPENCODE_ANTIGRAVITY_PATH)"; \
-		echo "✅ 設定を適用しました: $(OPENCODE_ANTIGRAVITY_PATH)"; \
-	else \
-		echo "ℹ️  antigravity 設定ファイルはスキップされました（見つかりません）"; \
-	fi
+	@$(call link_config,$(OPENCODE_DOTFILES_ANTIGRAVITY),$(OPENCODE_ANTIGRAVITY_PATH),antigravity)
 	@# AGENTS.md の設定
-	@if [ -f "$(OPENCODE_DOTFILES_AGENTS)" ]; then \
-		if [ -e "$(OPENCODE_AGENTS_PATH)" ] && [ ! -L "$(OPENCODE_AGENTS_PATH)" ]; then \
-			backup="$(OPENCODE_AGENTS_PATH).bak.$$(date +%Y%m%d%H%M%S)"; \
-			echo "⚠️  既存の AGENTS.md ファイルを退避します: $$backup"; \
-			mv "$(OPENCODE_AGENTS_PATH)" "$$backup"; \
-		fi; \
-		ln -sfn "$(OPENCODE_DOTFILES_AGENTS)" "$(OPENCODE_AGENTS_PATH)"; \
-		echo "✅ 設定を適用しました: $(OPENCODE_AGENTS_PATH)"; \
-	else \
-		echo "ℹ️  AGENTS.md ファイルはスキップされました（見つかりません）"; \
-	fi
+	@$(call link_config,$(OPENCODE_DOTFILES_AGENTS),$(OPENCODE_AGENTS_PATH),AGENTS.md)
 	@# commands/ の設定
-	@if [ -d "$(OPENCODE_DOTFILES_COMMANDS)" ]; then \
-		mkdir -p "$(OPENCODE_HOME)"; \
-		if [ -e "$(OPENCODE_COMMANDS_PATH)" ] && [ ! -L "$(OPENCODE_COMMANDS_PATH)" ]; then \
-			backup="$(OPENCODE_COMMANDS_PATH).bak.$$(date +%Y%m%d%H%M%S)"; \
-			if [ -d "$(OPENCODE_COMMANDS_PATH)" ]; then \
-				echo "⚠️  既存の commands ディレクトリを退避します: $$backup"; \
-			else \
-				echo "⚠️  既存の commands ファイルを退避します: $$backup"; \
-			fi; \
-			mv "$(OPENCODE_COMMANDS_PATH)" "$$backup"; \
-		fi; \
-		ln -sfn "$(OPENCODE_DOTFILES_COMMANDS)" "$(OPENCODE_COMMANDS_PATH)"; \
-		echo "✅ 設定を適用しました: $(OPENCODE_COMMANDS_PATH)"; \
-	else \
-		echo "ℹ️  commands ディレクトリはスキップされました（見つかりません）"; \
-	fi
+	@$(call link_config,$(OPENCODE_DOTFILES_COMMANDS),$(OPENCODE_COMMANDS_PATH),commands)
 	@# skills/ の設定
-	@if [ -d "$(OPENCODE_DOTFILES_SKILLS)" ]; then \
-		mkdir -p "$(OPENCODE_HOME)"; \
-		if [ -e "$(OPENCODE_SKILLS_PATH)" ] && [ ! -L "$(OPENCODE_SKILLS_PATH)" ]; then \
-			backup="$(OPENCODE_SKILLS_PATH).bak.$$(date +%Y%m%d%H%M%S)"; \
-			if [ -d "$(OPENCODE_SKILLS_PATH)" ]; then \
-				echo "⚠️  既存の skills ディレクトリを退避します: $$backup"; \
-			else \
-				echo "⚠️  既存の skills ファイルを退避します: $$backup"; \
-			fi; \
-			mv "$(OPENCODE_SKILLS_PATH)" "$$backup"; \
-		fi; \
-		ln -sfn "$(OPENCODE_DOTFILES_SKILLS)" "$(OPENCODE_SKILLS_PATH)"; \
-		echo "✅ 設定を適用しました: $(OPENCODE_SKILLS_PATH)"; \
-	else \
-		echo "ℹ️  skills ディレクトリはスキップされました（見つかりません）"; \
-	fi
+	@$(call link_config,$(OPENCODE_DOTFILES_SKILLS),$(OPENCODE_SKILLS_PATH),skills)
 	@# docs/ の設定
-	@if [ -d "$(OPENCODE_DOTFILES_DOCS)" ]; then \
-		if [ -e "$(OPENCODE_DOCS_PATH)" ] && [ ! -L "$(OPENCODE_DOCS_PATH)" ]; then \
-			backup="$(OPENCODE_DOCS_PATH).bak.$$(date +%Y%m%d%H%M%S)"; \
-			if [ -d "$(OPENCODE_DOCS_PATH)" ]; then \
-				echo "⚠️  既存の docs ディレクトリを退避します: $$backup"; \
-			else \
-				echo "⚠️  既存の docs ファイルを退避します: $$backup"; \
-			fi; \
-			mv "$(OPENCODE_DOCS_PATH)" "$$backup"; \
-		fi; \
-		ln -sfn "$(OPENCODE_DOTFILES_DOCS)" "$(OPENCODE_DOCS_PATH)"; \
-		echo "✅ 設定を適用しました: $(OPENCODE_DOCS_PATH)"; \
-	else \
-		echo "ℹ️  docs ディレクトリはスキップされました（見つかりません）"; \
-	fi
+	@$(call link_config,$(OPENCODE_DOTFILES_DOCS),$(OPENCODE_DOCS_PATH),docs)
 	@$(call create_marker,setup-opencode,1)
 
 # User-friendly alias
