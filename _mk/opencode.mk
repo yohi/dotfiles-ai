@@ -20,6 +20,7 @@ OPENCODE_SKILLS_PATH ?= $(OPENCODE_HOME)/skills
 OPENCODE_DOTFILES_SKILLS ?= $(REPO_ROOT)/opencode/skills
 OPENCODE_DOCS_PATH ?= $(OPENCODE_CONFIG_DIR)/docs
 OPENCODE_DOTFILES_DOCS ?= $(REPO_ROOT)/opencode/docs
+OPENCODE_INSTALLER_HASH ?= fc3c1b2123f49b6df545a7622e5127d21cd794b15134fc3b66e1ca49f7fb297e
 
 .PHONY: opencode install-packages-opencode install-opencode opencode-update setup-opencode check-opencode
 
@@ -83,7 +84,7 @@ install-packages-opencode: ## OpenCode（opencode）をインストール
 		echo "❌ curl が見つかりません。先に curl をインストールしてください"; \
 		exit 1; \
 	fi
-	@bash -c 'set -euo pipefail; tmp="$$(mktemp)"; curl -fsSL https://opencode.ai/install -o "$$tmp"; expected_hash="fc3c1b2123f49b6df545a7622e5127d21cd794b15134fc3b66e1ca49f7fb297e"; actual_hash=$$( (command -v sha256sum >/dev/null 2>&1 && sha256sum "$$tmp" | cut -d" " -f1) || shasum -a 256 "$$tmp" | cut -d" " -f1 ); if [ "$$actual_hash" != "$$expected_hash" ]; then echo "❌ Installer checksum mismatch"; rm -f "$$tmp"; exit 1; fi; bash "$$tmp"; rm -f "$$tmp"'
+	@bash -c 'set -euo pipefail; tmp="$$(mktemp)"; curl -fsSL https://opencode.ai/install -o "$$tmp"; expected_hash="$(OPENCODE_INSTALLER_HASH)"; actual_hash=$$( (command -v sha256sum >/dev/null 2>&1 && sha256sum "$$tmp" | cut -d" " -f1) || shasum -a 256 "$$tmp" | cut -d" " -f1 ); if [ "$$actual_hash" != "$$expected_hash" ]; then echo "❌ Installer checksum mismatch"; rm -f "$$tmp"; exit 1; fi; bash "$$tmp"; rm -f "$$tmp"'
 	@if [ ! -x "$(OPENCODE_BIN)" ]; then \
 		echo "❌ opencode のインストールに失敗しました: $(OPENCODE_BIN) が見つかりません"; \
 		exit 1; \
@@ -98,7 +99,7 @@ opencode-update: ## OpenCode（opencode）をアップデート
 		echo "❌ curl が見つかりません。先に curl をインストールしてください"; \
 		exit 1; \
 	fi
-	@bash -c 'set -euo pipefail; tmp="$$(mktemp)"; curl -fsSL https://opencode.ai/install -o "$$tmp"; expected_hash="fc3c1b2123f49b6df545a7622e5127d21cd794b15134fc3b66e1ca49f7fb297e"; actual_hash=$$( (command -v sha256sum >/dev/null 2>&1 && sha256sum "$$tmp" | cut -d" " -f1) || shasum -a 256 "$$tmp" | cut -d" " -f1 ); if [ "$$actual_hash" != "$$expected_hash" ]; then echo "❌ Installer checksum mismatch"; rm -f "$$tmp"; exit 1; fi; bash "$$tmp"; rm -f "$$tmp"'
+	@bash -c 'set -euo pipefail; tmp="$$(mktemp)"; curl -fsSL https://opencode.ai/install -o "$$tmp"; expected_hash="$(OPENCODE_INSTALLER_HASH)"; actual_hash=$$( (command -v sha256sum >/dev/null 2>&1 && sha256sum "$$tmp" | cut -d" " -f1) || shasum -a 256 "$$tmp" | cut -d" " -f1 ); if [ "$$actual_hash" != "$$expected_hash" ]; then echo "❌ Installer checksum mismatch"; rm -f "$$tmp"; exit 1; fi; bash "$$tmp"; rm -f "$$tmp"'
 	@if [ -x "$(OPENCODE_BIN)" ]; then \
 		echo "✅ 更新後のバージョン: $$($(OPENCODE_BIN) --version 2>/dev/null || echo unknown)"; \
 	fi
@@ -193,7 +194,6 @@ setup-opencode: ## OpenCode（opencode）の設定ファイルを適用
 	fi
 	@# docs/ の設定
 	@if [ -d "$(OPENCODE_DOTFILES_DOCS)" ]; then \
-		mkdir -p "$(OPENCODE_CONFIG_DIR)"; \
 		if [ -e "$(OPENCODE_DOCS_PATH)" ] && [ ! -L "$(OPENCODE_DOCS_PATH)" ]; then \
 			backup="$(OPENCODE_DOCS_PATH).bak.$$(date +%Y%m%d%H%M%S)"; \
 			if [ -d "$(OPENCODE_DOCS_PATH)" ]; then \
