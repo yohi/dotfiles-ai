@@ -1,0 +1,16 @@
+{
+  "$schema": "https://raw.githubusercontent.com/NoeFabris/opencode-antigravity-auth/main/assets/antigravity.schema.json",
+  "soft_quota_threshold_percent": 95,
+  "cli_first": true,
+  "scheduling_mode": "balance",
+  "proactive_token_refresh": true,
+  "mcpServers": {
+    "docker": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@docker/mcp-server"
+      ]
+    }
+  }
+}

@@ -1,0 +1,178 @@
+{
+  // Config Modernized: 2026-02-20
+  // Based on oh-my-opencode v3.7.4
+  // スキーマ定義：エディタでの補完とバリデーションを有効化
+  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
+
+  // [Sisyphus Agent] エージェント自律設定
+  // Prometheus (Planner) を有効化し、複雑なタスクの計画立案能力を強化
+  "sisyphus_agent": {
+    "disabled": false,
+    "planner_enabled": true,
+    "replace_plan": true,
+    "default_builder_enabled": false
+  },
+
+  // ================================================================================
+  // グローバル設定 (Global Configuration)
+  // ================================================================================
+
+  "experimental": {
+    // OpenCodeのTodo UIと同期されず、TodoWriteが無効になりTUIに表示されなくなるため無効化（既知のUX低下）
+    "task_system": false,
+    // [Hashline Edit] ハッシュ検証付きの安全なファイル編集機能 (v3.7.0追加)
+    "hashline_edit": true,
+    // [Performance] 大規模タスク最適化
+    "aggressive_truncation": true,      // コンテキスト溢れ防止
+    "auto_resume": true,                // エラー時の自動リトライ
+    "preemptive_compaction_threshold": 0.85 // 85%で圧縮開始
+  },
+
+  // [Security] グローバルセキュリティ設定
+  "google_auth": false,   // 不要な認証ポップアップ抑制
+  "share": "disabled",    // 誤操作による共有防止
+
+  // パフォーマンスと安定性のための最適化設定
+  "disabled_hooks": [
+    // "startup-toast",           // 起動時の通知が不要な場合は有効化
+    // "tasks-todowrite-disabler" // AIにTODOリストを直接更新させたい場合は有効化（通常は安全のためブロック）
+    "auto-update-checker",        // 起動ごとのアップデート通知を停止
+    "comment-checker"             // AIによるコメント指摘を停止（Linterに任せる）
+  ],
+  "disabled_mcps": [
+  ],
+  "disabled_agents": [
+  ],
+  "disabled_skills": [
+  ],
+
+  // ================================================================================
+  // 機能・挙動設定 (Features & Behaviors)
+  // ================================================================================
+
+  // [Tmux] ターミナル多重化連携
+  // エージェントの思考プロセスやバックグラウンドタスクを別ペインで可視化します
+  "tmux": {
+    "enabled": true,
+    "layout": "main-vertical", // "main-vertical" (左メイン), "even-horizontal" (均等) など
+    "main_pane_size": 60
+  },
+
+  // [Browser Automation] ブラウザ操作エンジン
+  "browser_automation_engine": {
+    "provider": "playwright-cli", // v3.7.0追加の軽量CLIプロバイダ (MCP版より軽量)
+  },
+
+  // [Background Task] バックグラウンドタスク管理
+  // 調査や重い処理を非同期で実行する際の並列数制御
+  "background_task": {
+    "defaultConcurrency": 5,
+    "staleTimeoutMs": 180000,
+    "providerConcurrency": {
+      "google": 20,
+      "openai": 10,
+      "anthropic": 5
+    },
+    "modelConcurrency": {
+      // いちばん高いモデルは1並列に抑えるのが安全
+      "google-vertex-anthropic/claude-opus-4-6@default": 1,
+      "openai/gpt-5.3-codex": 1
+    },
+  },
+
+  // [Git Master] コミット操作設定
+  "git_master": {
+    "commit_footer": false, // trueにすると "Ultraworked with Sisyphus" を付与
+    "include_co_authored_by": false, // trueにするとCo-authored-byを付与
+  },
+
+  // [Ralph Loop] 自律改善ループ (自律的な修正・改善の繰り返し)
+  "ralph_loop": {
+    "enabled": true,
+    "default_max_iterations": 20,
+  },
+
+  // [Boulder State] エージェント状態保存 (Sisyphusの作業状態)
+  // タスク中断時に進捗を保存し、次回起動時に "resume" で再開できるようにします
+  "boulder_state": {
+    "enabled": true,
+    "storage_path": ".sisyphus/boulder_state.json",
+  },
+
+  // [Session Recovery] セッション復旧 (チャット履歴の保全)
+  // クラッシュや予期せぬ終了時に直前の会話状態を復元します
+  "session_recovery": {
+    "enabled": true,
+    "storage_path": ".sisyphus/session_recovery.json",
+  },
+
+  // [Interactive Bash] 持続的シェルセッション
+  // AIが状態を持つシェル（cdの結果を保持するなど）を利用する設定
+  "interactive_bash": {
+    "enabled": true,
+    "timeout_ms": 300000, // 5分間操作がないとセッションを閉じる
+  },
+
+  // [Auto Slash Command] コマンド自動検出
+  // "/help" ではなく単に "help" と入力してもコマンドとして解釈する機能
+  "auto_slash_command": {
+    "enabled": true
+  },
+
+  "commands": {
+    "git-pr-flow": {
+      "description": "Git PR Flow",
+      "prompt": "./commands/git-pr-flow.md",
+      "skills": {
+        "git-master": {
+          "enabled": true,
+          "allow": [
+            "git_add",
+            "git_commit",
+            "git_push",
+            "git_status",
+            "git_diff",
+            "git_log",
+            "git_checkout",
+            "git_branch"
+          ]
+        }
+      }
+    },
+    "build-skill": {
+      "description": "Agent Skill Builder",
+      "prompt": "./commands/build-skill.md",
+      "skills": {
+        "agent-skill-architect": {
+          "enabled": true
+        }
+      }
+    }
+  },
+
+  // [Rules Injector] ルール注入
+  // .cursorrules や CONTEXT.md などをプロンプトに自動挿入する設定
+  // NOTE: oh-my-opencode の rules-injector はハードコードされたパスのみ参照する
+  //       (.claude/rules, .cursor/rules, .sisyphus/rules, ~/.claude/rules)
+  //       カスタム search_paths は未実装のため、グローバルルールを追加したい場合は
+  //       シンボリックリンクで対応すること:
+  //       ln -sfn ~/.config/opencode/docs/global ~/.claude/rules
+  "rules_injector": {
+    "enabled": true
+  },
+
+  "hooks": {
+    "PermissionRequest": [
+      "scripts/auto-approve-git.sh"
+    ]
+  },
+
+  // ================================================================================
+  // パターン設定 (Pattern Configuration)
+  // このファイルには共通設定のみを記載し、
+  // agents/categories は opencode/patterns/*.jsonc の断片を注入する
+  // ================================================================================
+
+  // @pattern:start
+  // @pattern:end
+}

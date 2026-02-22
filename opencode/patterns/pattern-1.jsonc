@@ -1,0 +1,102 @@
+{
+  // 【パターン1】Winning Stack (最強構成: Best-of-Breed)
+  //  レポート推奨の最強構成。SisyphusにOpus、職人にGPT-5.3、検索にGemini Flash。
+  //  設計から実装まで妥協のない最高性能を発揮します。
+  "description": "最強構成 (Opus 4.6 + GPT-5.3 + Gemini Flash)",
+  "agents": {
+    "sisyphus": {
+      "model": "google-vertex-anthropic/claude-opus-4-6@default", // 指揮・推論には最強のOpus (Thinking)
+      "variant": "max",
+      "temperature": 0.1,
+      "thinking": {
+        "budget": 32768
+      }
+    },
+    "prometheus": {
+      "model": "google-vertex-anthropic/claude-opus-4-6@default", // 計画立案も最強のOpus
+      "variant": "max",
+      "thinking": {
+        "budget": 32768
+      }
+    },
+    "atlas": {
+      "model": "google-vertex-anthropic/claude-opus-4-6@default", // アーキテクトもOpus
+      "variant": "max",
+      "thinking": {
+        "budget": 32768
+      }
+    },
+    "metis": {
+      "model": "google-vertex-anthropic/claude-opus-4-6@default", // 参謀：計画の抜け漏れをOpusで徹底レビュー
+      "variant": "max",
+      "temperature": 0.5
+    },
+    "hephaestus": {
+      "model": "openai/gpt-5.3-codex", // 実装：Terminal操作最強のGPT-5.3
+      "variant": "high"
+    },
+    "oracle": {
+      "model": "google-vertex-anthropic/claude-opus-4-6@default", // 相談役：深い推論が必要なためOpus
+      "variant": "max"
+    },
+    "momus": {
+      "model": "google-vertex-anthropic/claude-sonnet-4-6@default", // レビュー：Sonnetで十分高品質
+    },
+    "librarian": {
+      "model": "google-vertex/gemini-3-flash-preview", // 書庫番：圧倒的コスパのGemini Flash
+    },
+    "explore": {
+      "model": "google-vertex/gemini-3-flash-preview", // 探索：高速なコードベース把握
+    },
+    "multimodal-looker": {
+      "model": "google-vertex/gemini-3-flash-preview", // 視覚：画像・PDF認識
+    },
+    // 特権エージェント（Git操作）
+    "git-specialist": {
+      "description": "Git operations specialist with elevated permissions",
+      "model": "openai/gpt-5.3-codex", // 複雑なGit操作もGPT-5.3に任せる
+      "permission": {
+        "bash": {
+          "git push --force": "deny",
+          "git push -f": "deny",
+          "git clean *": "ask",
+          "git add .": "ask",
+          "git *": "allow",
+          "*": "deny",
+        },
+        "edit": "deny",
+        "webfetch": "deny",
+      },
+    },
+  },
+  "categories": {
+    "quick": {
+      "model": "google-vertex/gemini-3-flash-preview",
+    },
+    "writing": {
+      "model": "google-vertex/gemini-3-flash-preview",
+    },
+    "visual-engineering": {
+      "model": "google-vertex-anthropic/claude-sonnet-4-6@default", // UI実装はSonnet 4.6が優秀
+    },
+    "artistry": {
+      "model": "google-vertex-anthropic/claude-opus-4-6@default",
+      "variant": "max",
+    },
+    "ultrabrain": {
+      "model": "google-vertex-anthropic/claude-opus-4-6@default",
+      "variant": "max",
+    },
+    "deep": {
+      "model": "openai/gpt-5.3-codex", // 深い実装はGPT-5.3
+      "variant": "high",
+    },
+    "unspecified-low": {
+      "model": "google-vertex/gemini-3-flash-preview",
+    },
+    "unspecified-high": {
+      "model": "google-vertex-anthropic/claude-opus-4-6@default",
+      "variant": "max",
+    },
+  }
+}

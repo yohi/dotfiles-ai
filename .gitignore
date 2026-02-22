@@ -1,0 +1,7 @@
+# Editor & OS files
+.DS_Store
+*~
+*.bak
+*.swp
+*.log
+fix_all.sh

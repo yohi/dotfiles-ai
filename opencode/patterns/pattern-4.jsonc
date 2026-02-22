@@ -1,0 +1,103 @@
+{
+  // 【パターン4】No GPT (Claude + Gemini)
+  //  OpenAIを使用しない構成。GPT-5.3が使えない分、Opus 4.6の推論力でカバーする。
+  "description": "GPTなし (Opus 4.6 + Gemini)",
+  "agents": {
+    "sisyphus": {
+      "model": "google-vertex-anthropic/claude-opus-4-6@default", // 指揮はOpus
+      "variant": "max",
+      "temperature": 0.1,
+      "thinking": {
+        "budget": 32768
+      }
+    },
+    "prometheus": {
+      "model": "google-vertex-anthropic/claude-opus-4-6@default", // 計画立案もOpus
+      "variant": "max",
+      "thinking": {
+        "budget": 32768
+      }
+    },
+    "atlas": {
+      "model": "google-vertex-anthropic/claude-opus-4-6@default", // Context ManagerもOpus
+      "variant": "max",
+      "thinking": {
+        "budget": 32768
+      }
+    },
+    "metis": {
+      "model": "google-vertex-anthropic/claude-opus-4-6@default", // 参謀もOpus
+      "variant": "max",
+      "temperature": 0.5,
+      "thinking": {
+        "budget": 32768
+      }
+    },
+    // Hephaestus (GPT) は使用不可 -> Sisyphus (Opus) が兼任
+    "oracle": {
+      "model": "google-vertex-anthropic/claude-opus-4-6@default",
+      "variant": "max",
+      "thinking": {
+        "budget": 32768
+      }
+    },
+    "momus": {
+      "model": "google-vertex-anthropic/claude-sonnet-4-6@default",
+    },
+    "librarian": {
+      "model": "google-vertex/gemini-3-flash-preview",
+    },
+    "explore": {
+      "model": "google-vertex/gemini-3-flash-preview",
+    },
+    "multimodal-looker": {
+      "model": "google-vertex/gemini-3-flash-preview",
+    },
+    "git-specialist": {
+      "description": "Git operations specialist",
+      "model": "google-vertex/gemini-3.1-pro-preview", // GPTなしならGemini Proが無難
+      "permission": {
+        "bash": {
+          "git push --force": "deny",
+          "git push -f": "deny",
+          "git clean *": "ask",
+          "git add .": "ask",
+          "git *": "allow",
+          "*": "deny",
+        },
+        "edit": "deny",
+        "webfetch": "deny",
+      },
+    },
+  },
+  "categories": {
+    "quick": {
+      "model": "google-vertex/gemini-3-flash-preview"
+    },
+    "writing": {
+      "model": "google-vertex/gemini-3-flash-preview"
+    },
+    "visual-engineering": {
+      "model": "google-vertex-anthropic/claude-sonnet-4-6@default"
+    },
+    "artistry": {
+      "model": "google-vertex-anthropic/claude-opus-4-6@default",
+      "variant": "max"
+    },
+    "ultrabrain": {
+      "model": "google-vertex-anthropic/claude-opus-4-6@default",
+      "variant": "max"
+    },
+    "deep": {
+      "model": "google-vertex-anthropic/claude-opus-4-6@default",
+      "variant": "max"
+    },
+    "unspecified-low": {
+      "model": "google-vertex-anthropic/claude-sonnet-4-6@default"
+    },
+    "unspecified-high": {
+      "model": "google-vertex-anthropic/claude-opus-4-6@default",
+      "variant": "max"
+    },
+  }
+}

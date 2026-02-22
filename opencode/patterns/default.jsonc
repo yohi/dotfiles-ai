@@ -1,0 +1,91 @@
+{
+  // デフォルト: パターン2（Claude節約構成）
+  "description": "デフォルト: Claude節約（パターン2）",
+  "agents": {
+    "sisyphus": {
+      "model": "google-vertex/gemini-3.1-pro-preview", // 指揮はGemini Proで節約
+      "variant": "high",
+      "temperature": 0.2,
+    },
+    // Planner (計画立案)
+    "prometheus": {
+      "model": "google-vertex/gemini-3.1-pro-preview", // 計画立案もGemini Proで節約
+      "variant": "high"
+    },
+    // Context Manager / Architect
+    "atlas": {
+      "model": "google-vertex/gemini-3.1-pro-preview", // 大規模コンテキストはGemini Pro
+      "variant": "high"
+    },
+    "hephaestus": {
+      "model": "openai/gpt-5.3-codex", // 職人は妥協せずCodex
+    },
+    "oracle": {
+      "model": "google-vertex-anthropic/claude-opus-4-6@default", // ここぞという相談にのみClaude Opusを使用
+    },
+    "momus": {
+      "model": "openai/gpt-5.2", // レビューはGPT
+    },
+    "librarian": {
+      "model": "google-vertex/gemini-3.1-pro-preview",
+    },
+    "explore": {
+      "model": "google-vertex/gemini-3-flash-preview",
+    },
+    "multimodal-looker": {
+      "model": "google-vertex/gemini-3-flash-preview",
+    },
+    // 追加: Git操作専用の職人エージェント ▼▼▼
+    "git-specialist": {
+      "description": "Git operations specialist with elevated permissions",
+      "model": "google-vertex/gemini-3.1-pro-preview",
+      "permission": {
+        "bash": {
+          // 破壊的コマンドはブロック
+          "git push --force": "deny",
+          "git push -f": "deny",
+          "git clean *": "ask",
+          "git add .": "ask",
+          // それ以外のGit操作は全て許可
+          "git *": "allow",
+          // Git以外は実行禁止（セキュリティ担保）
+          "*": "deny",
+        },
+        // コード編集やWeb閲覧も禁止
+        "edit": "deny",
+        "webfetch": "deny",
+      },
+    },
+  },
+  "categories": {
+    "quick": {
+      "model": "google-vertex/gemini-3-flash-preview",
+    },
+    "writing": {
+      "model": "google-vertex/gemini-3-flash-preview",
+    },
+    "visual-engineering": {
+      "model": "google-vertex/gemini-3.1-pro-preview",
+    },
+    "artistry": {
+      "model": "google-vertex/gemini-3.1-pro-preview",
+      "variant": "max",
+    },
+    "ultrabrain": {
+      "model": "openai/gpt-5.3-codex",
+      "variant": "xhigh",
+    },
+    "deep": {
+      "model": "openai/gpt-5.3-codex",
+      "variant": "medium",
+    },
+    // Claudeは最小限：high だけ Opus に寄せる
+    "unspecified-low": {
+      "model": "openai/gpt-5.2",
+    },
+    "unspecified-high": {
+      "model": "google-vertex-anthropic/claude-opus-4-6@default",
+      "variant": "max",
+    },
+  }
+}

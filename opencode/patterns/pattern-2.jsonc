@@ -1,0 +1,89 @@
+{
+  // 【パターン2】Economy (コスパ・節約構成)
+  //  SisyphusをGemini 3 Proに任せてコストを抑制しつつ、要所(実装・相談)で高性能モデルを使う。
+  "description": "節約構成 (Gemini Pro + GPT-4o + Flash)",
+  "agents": {
+    "sisyphus": {
+      "model": "google-vertex/gemini-3-pro-preview", // 指揮はGemini Pro
+      "variant": "high",
+      "temperature": 0.2
+    },
+    "prometheus": {
+      "model": "google-vertex/gemini-3-pro-preview", // 計画立案もGemini Proで節約
+      "variant": "high"
+    },
+    "atlas": {
+      "model": "google-vertex/gemini-3-pro-preview", // ContextもGemini Pro
+      "variant": "high"
+    },
+    "metis": {
+      "model": "openai/gpt-5.2", // 参謀：バランス型のGPT-5.2
+      "temperature": 0.5
+    },
+    "hephaestus": {
+      "model": "openai/gpt-5.2", // 実装だけは妥協せずGPT-5.2
+      "variant": "medium"
+    },
+    "oracle": {
+      "model": "google-vertex-anthropic/claude-opus-4-6", // 相談役だけはOpus（ここぞという時用）
+      "variant": "max"
+    },
+    "momus": {
+      "model": "google-vertex/gemini-3-pro-preview"
+    },
+    "librarian": {
+      "model": "google-vertex/gemini-3-flash-preview"
+    },
+    "explore": {
+      "model": "google-vertex/gemini-3-flash-preview"
+    },
+    "multimodal-looker": {
+      "model": "google-vertex/gemini-3-flash-preview"
+    },
+    "git-specialist": {
+      "description": "Git operations specialist",
+      "model": "google-vertex/gemini-3-pro-preview",
+      "permission": {
+        "bash": {
+          "git push --force": "deny",
+          "git push -f": "deny",
+          "git clean *": "ask",
+          "git add .": "ask",
+          "git *": "allow",
+          "*": "deny"
+        },
+        "edit": "deny",
+        "webfetch": "deny"
+      }
+    }
+  },
+  "categories": {
+    "quick": {
+      "model": "google-vertex/gemini-3-flash-preview"
+    },
+    "writing": {
+      "model": "google-vertex/gemini-3-flash-preview"
+    },
+    "visual-engineering": {
+      "model": "google-vertex/gemini-3-pro-preview"
+    },
+    "artistry": {
+      "model": "google-vertex/gemini-3-pro-preview",
+      "variant": "high"
+    },
+    "ultrabrain": {
+      "model": "google-vertex/gemini-3-pro-preview",
+      "variant": "high"
+    },
+    "deep": {
+      "model": "openai/gpt-4o",
+      "variant": "medium"
+    }, // deepだけはGPT
+    "unspecified-low": {
+      "model": "google-vertex/gemini-3-flash-preview"
+    },
+    "unspecified-high": {
+      "model": "google-vertex/gemini-3-pro-preview"
+    }
+  }
+}
