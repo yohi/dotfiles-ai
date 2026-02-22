@@ -82,21 +82,21 @@ opencode/
   "agents": {
     "sisyphus": { "model": "gemini-3-pro-preview" },
     "hephaestus": { "model": "openai/gpt-5.3-codex" },
-    "oracle": { "model": "google/antigravity-claude-opus-4-6-thinking" },
+    "oracle": { "model": "claude-opus-4-6-thinking" },
     "momus": { "model": "openai/gpt-5.2" },
     "librarian": { "model": "gemini-3-pro-preview" },
-    "explore": { "model": "google/antigravity-gemini-3-flash" },
-    "multimodal-looker": { "model": "google/antigravity-gemini-3-flash" }
+    "explore": { "model": "gemini-3-flash-preview" },
+    "multimodal-looker": { "model": "gemini-3-flash-preview" }
   },
   "categories": {
-    "quick": { "model": "google/antigravity-gemini-3-flash" },
-    "writing": { "model": "google/antigravity-gemini-3-flash" },
+    "quick": { "model": "gemini-3-flash-preview" },
+    "writing": { "model": "gemini-3-flash-preview" },
     "visual-engineering": { "model": "gemini-3-pro-preview" },
     "artistry": { "model": "gemini-3-pro-preview", "variant": "max" },
     "ultrabrain": { "model": "openai/gpt-5.3-codex", "variant": "xhigh" },
     "deep": { "model": "openai/gpt-5.3-codex", "variant": "medium" },
     "unspecified-low": { "model": "openai/gpt-5.2" },
-    "unspecified-high": { "model": "google/antigravity-claude-opus-4-6-thinking", "variant": "max" }
+    "unspecified-high": { "model": "claude-opus-4-6-thinking", "variant": "max" }
   }
 }
 ```

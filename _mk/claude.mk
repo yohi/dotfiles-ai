@@ -5,21 +5,14 @@
 
 define create_desktop_entry
 	echo "📝 デスクトップエントリーを作成中..."; \
-	echo "[Desktop Entry]" | sudo tee /usr/share/applications/claudia.desktop > /dev/null; \
-	echo "Name=Claudia" | sudo tee -a /usr/share/applications/claudia.desktop > /dev/null; \
-	echo "Comment=A powerful GUI app and Toolkit for Claude Code" | sudo tee -a /usr/share/applications/claudia.desktop > /dev/null; \
-	echo "Exec=/opt/claudia/claudia" | sudo tee -a /usr/share/applications/claudia.desktop > /dev/null; \
-	echo "TryExec=/opt/claudia/claudia" | sudo tee -a /usr/share/applications/claudia.desktop > /dev/null; \
-	echo "Icon=applications-development" | sudo tee -a /usr/share/applications/claudia.desktop > /dev/null; \
-	echo "Terminal=false" | sudo tee -a /usr/share/applications/claudia.desktop > /dev/null; \
-	echo "Type=Application" | sudo tee -a /usr/share/applications/claudia.desktop > /dev/null; \
-	echo "Categories=Development;IDE;Utility;" | sudo tee -a /usr/share/applications/claudia.desktop > /dev/null; \
-	echo "StartupWMClass=claudia" | sudo tee -a /usr/share/applications/claudia.desktop > /dev/null; \
+	sudo bash -c "cat << 'EOF' > /usr/share/applications/claudia.desktop\n[Desktop Entry]\nName=Claudia\nComment=A powerful GUI app and Toolkit for Claude Code\nExec=/opt/claudia/claudia\nTryExec=/opt/claudia/claudia\nIcon=applications-development\nTerminal=false\nType=Application\nCategories=Development;IDE;Utility;\nStartupWMClass=claudia\nEOF" ; \
 	sudo chmod +x /usr/share/applications/claudia.desktop; \
 	sudo update-desktop-database 2>/dev/null || true
 endef
 
 # Claudia (Claude Code GUI) のバージョン固定
+export PATH := $(HOME)/.bun/bin:$(PATH)
+
 CLAUDIA_COMMIT := 70c16d8a4910db48cd9684aeacdd431caefd7d71
 
 # Claude Code のインストール

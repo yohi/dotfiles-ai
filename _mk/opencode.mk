@@ -28,48 +28,48 @@ OPENCODE_DOTFILES_DOCS ?= $(REPO_ROOT)/opencode/docs
 opencode: ## OpenCode(opencode)のインストールとセットアップ
 	@if [ -x "$(OPENCODE_BIN)" ] && [ -f "$(OPENCODE_DOTFILES_CONFIG)" ] && [ -L "$(OPENCODE_CONFIG_PATH)" ]; then \
 		actual=$$(readlink -f "$(OPENCODE_CONFIG_PATH)" 2>/dev/null || readlink "$(OPENCODE_CONFIG_PATH)" 2>/dev/null || true); \
-		expected=$$(readlink -f "$(OPENCODE_DOTFILES_CONFIG)" 2>/dev/null || true); \
+		expected=$$(readlink -f "$(OPENCODE_DOTFILES_CONFIG)" 2>/dev/null || readlink "$(OPENCODE_DOTFILES_CONFIG)" 2>/dev/null || true); \
 		if [ "$$actual" = "$$expected" ]; then \
 			skip=1; \
 			if [ -f "$(OH_MY_OPENCODE_DOTFILES_CONFIG)" ]; then \
 				if [ -L "$(OH_MY_OPENCODE_CONFIG_PATH)" ]; then \
-					actual_oh=$$(readlink -f "$(OH_MY_OPENCODE_CONFIG_PATH)" 2>/dev/null || true); \
-					expected_oh=$$(readlink -f "$(OH_MY_OPENCODE_DOTFILES_CONFIG)" 2>/dev/null || true); \
+					actual_oh=$$(readlink -f "$(OH_MY_OPENCODE_CONFIG_PATH)" 2>/dev/null || readlink "$(OH_MY_OPENCODE_CONFIG_PATH)" 2>/dev/null || true); \
+					expected_oh=$$(readlink -f "$(OH_MY_OPENCODE_DOTFILES_CONFIG)" 2>/dev/null || readlink "$(OH_MY_OPENCODE_DOTFILES_CONFIG)" 2>/dev/null || true); \
 					if [ "$$actual_oh" != "$$expected_oh" ]; then skip=0; fi; \
 				else skip=0; fi; \
 			fi; \
 			if [ -f "$(OPENCODE_DOTFILES_ANTIGRAVITY)" ]; then \
 				if [ -L "$(OPENCODE_ANTIGRAVITY_PATH)" ]; then \
-					actual_anti=$$(readlink -f "$(OPENCODE_ANTIGRAVITY_PATH)" 2>/dev/null || true); \
-					expected_anti=$$(readlink -f "$(OPENCODE_DOTFILES_ANTIGRAVITY)" 2>/dev/null || true); \
+					actual_anti=$$(readlink -f "$(OPENCODE_ANTIGRAVITY_PATH)" 2>/dev/null || readlink "$(OPENCODE_ANTIGRAVITY_PATH)" 2>/dev/null || true); \
+					expected_anti=$$(readlink -f "$(OPENCODE_DOTFILES_ANTIGRAVITY)" 2>/dev/null || readlink "$(OPENCODE_DOTFILES_ANTIGRAVITY)" 2>/dev/null || true); \
 					if [ "$$actual_anti" != "$$expected_anti" ]; then skip=0; fi; \
 				else skip=0; fi; \
 			fi; \
 			if [ -f "$(OPENCODE_DOTFILES_AGENTS)" ]; then \
 				if [ -L "$(OPENCODE_AGENTS_PATH)" ]; then \
-					actual_agents=$$(readlink -f "$(OPENCODE_AGENTS_PATH)" 2>/dev/null || true); \
-					expected_agents=$$(readlink -f "$(OPENCODE_DOTFILES_AGENTS)" 2>/dev/null || true); \
+					actual_agents=$$(readlink -f "$(OPENCODE_AGENTS_PATH)" 2>/dev/null || readlink "$(OPENCODE_AGENTS_PATH)" 2>/dev/null || true); \
+					expected_agents=$$(readlink -f "$(OPENCODE_DOTFILES_AGENTS)" 2>/dev/null || readlink "$(OPENCODE_DOTFILES_AGENTS)" 2>/dev/null || true); \
 					if [ "$$actual_agents" != "$$expected_agents" ]; then skip=0; fi; \
 				else skip=0; fi; \
 			fi; \
 			if [ -d "$(OPENCODE_DOTFILES_COMMANDS)" ]; then \
 				if [ -L "$(OPENCODE_COMMANDS_PATH)" ]; then \
-					actual_cmds=$$(readlink -f "$(OPENCODE_COMMANDS_PATH)" 2>/dev/null || true); \
-					expected_cmds=$$(readlink -f "$(OPENCODE_DOTFILES_COMMANDS)" 2>/dev/null || true); \
+					actual_cmds=$$(readlink -f "$(OPENCODE_COMMANDS_PATH)" 2>/dev/null || readlink "$(OPENCODE_COMMANDS_PATH)" 2>/dev/null || true); \
+					expected_cmds=$$(readlink -f "$(OPENCODE_DOTFILES_COMMANDS)" 2>/dev/null || readlink "$(OPENCODE_DOTFILES_COMMANDS)" 2>/dev/null || true); \
 					if [ "$$actual_cmds" != "$$expected_cmds" ]; then skip=0; fi; \
 				else skip=0; fi; \
 			fi; \
 			if [ -d "$(OPENCODE_DOTFILES_SKILLS)" ]; then \
 				if [ -L "$(OPENCODE_SKILLS_PATH)" ]; then \
-					actual_skills=$$(readlink -f "$(OPENCODE_SKILLS_PATH)" 2>/dev/null || true); \
-					expected_skills=$$(readlink -f "$(OPENCODE_DOTFILES_SKILLS)" 2>/dev/null || true); \
+					actual_skills=$$(readlink -f "$(OPENCODE_SKILLS_PATH)" 2>/dev/null || readlink "$(OPENCODE_SKILLS_PATH)" 2>/dev/null || true); \
+					expected_skills=$$(readlink -f "$(OPENCODE_DOTFILES_SKILLS)" 2>/dev/null || readlink "$(OPENCODE_DOTFILES_SKILLS)" 2>/dev/null || true); \
 					if [ "$$actual_skills" != "$$expected_skills" ]; then skip=0; fi; \
 				else skip=0; fi; \
 			fi; \
 			if [ -d "$(OPENCODE_DOTFILES_DOCS)" ]; then \
 				if [ -L "$(OPENCODE_DOCS_PATH)" ]; then \
-					actual_docs=$$(readlink -f "$(OPENCODE_DOCS_PATH)" 2>/dev/null || true); \
-					expected_docs=$$(readlink -f "$(OPENCODE_DOTFILES_DOCS)" 2>/dev/null || true); \
+					actual_docs=$$(readlink -f "$(OPENCODE_DOCS_PATH)" 2>/dev/null || readlink "$(OPENCODE_DOCS_PATH)" 2>/dev/null || true); \
+					expected_docs=$$(readlink -f "$(OPENCODE_DOTFILES_DOCS)" 2>/dev/null || readlink "$(OPENCODE_DOTFILES_DOCS)" 2>/dev/null || true); \
 					if [ "$$actual_docs" != "$$expected_docs" ]; then skip=0; fi; \
 				else skip=0; fi; \
 			fi; \
@@ -232,7 +232,7 @@ check-opencode: ## OpenCode（opencode）の状態を確認
 	fi
 	@if [ -L "$(OPENCODE_CONFIG_PATH)" ]; then \
 		actual=$$(readlink -f "$(OPENCODE_CONFIG_PATH)" 2>/dev/null || readlink "$(OPENCODE_CONFIG_PATH)" 2>/dev/null || true); \
-		expected=$$(readlink -f "$(OPENCODE_DOTFILES_CONFIG)" 2>/dev/null || true); \
+		expected=$$(readlink -f "$(OPENCODE_DOTFILES_CONFIG)" 2>/dev/null || readlink "$(OPENCODE_DOTFILES_CONFIG)" 2>/dev/null || true); \
 		if [ -n "$$actual" ] && [ "$$actual" = "$$expected" ]; then \
 			echo "✅ config: $(OPENCODE_CONFIG_PATH) -> $(OPENCODE_DOTFILES_CONFIG)"; \
 		else \
@@ -246,7 +246,7 @@ check-opencode: ## OpenCode（opencode）の状態を確認
 	@if [ -f "$(OH_MY_OPENCODE_DOTFILES_CONFIG)" ]; then \
 		if [ -L "$(OH_MY_OPENCODE_CONFIG_PATH)" ]; then \
 			actual=$$(readlink -f "$(OH_MY_OPENCODE_CONFIG_PATH)" 2>/dev/null || readlink "$(OH_MY_OPENCODE_CONFIG_PATH)" 2>/dev/null || true); \
-			expected=$$(readlink -f "$(OH_MY_OPENCODE_DOTFILES_CONFIG)" 2>/dev/null || true); \
+			expected=$$(readlink -f "$(OH_MY_OPENCODE_DOTFILES_CONFIG)" 2>/dev/null || readlink "$(OH_MY_OPENCODE_DOTFILES_CONFIG)" 2>/dev/null || true); \
 			if [ -n "$$actual" ] && [ "$$actual" = "$$expected" ]; then \
 				echo "✅ oh-my-config: $(OH_MY_OPENCODE_CONFIG_PATH) -> $(OH_MY_OPENCODE_DOTFILES_CONFIG)"; \
 			else \
@@ -261,7 +261,7 @@ check-opencode: ## OpenCode（opencode）の状態を確認
 	@if [ -f "$(OPENCODE_DOTFILES_ANTIGRAVITY)" ]; then \
 		if [ -L "$(OPENCODE_ANTIGRAVITY_PATH)" ]; then \
 			actual=$$(readlink -f "$(OPENCODE_ANTIGRAVITY_PATH)" 2>/dev/null || readlink "$(OPENCODE_ANTIGRAVITY_PATH)" 2>/dev/null || true); \
-			expected=$$(readlink -f "$(OPENCODE_DOTFILES_ANTIGRAVITY)" 2>/dev/null || true); \
+			expected=$$(readlink -f "$(OPENCODE_DOTFILES_ANTIGRAVITY)" 2>/dev/null || readlink "$(OPENCODE_DOTFILES_ANTIGRAVITY)" 2>/dev/null || true); \
 			if [ -n "$$actual" ] && [ "$$actual" = "$$expected" ]; then \
 				echo "✅ antigravity: $(OPENCODE_ANTIGRAVITY_PATH) -> $(OPENCODE_DOTFILES_ANTIGRAVITY)"; \
 			else \
@@ -276,7 +276,7 @@ check-opencode: ## OpenCode（opencode）の状態を確認
 	@if [ -f "$(OPENCODE_DOTFILES_AGENTS)" ]; then \
 		if [ -L "$(OPENCODE_AGENTS_PATH)" ]; then \
 			actual=$$(readlink -f "$(OPENCODE_AGENTS_PATH)" 2>/dev/null || readlink "$(OPENCODE_AGENTS_PATH)" 2>/dev/null || true); \
-			expected=$$(readlink -f "$(OPENCODE_DOTFILES_AGENTS)" 2>/dev/null || true); \
+			expected=$$(readlink -f "$(OPENCODE_DOTFILES_AGENTS)" 2>/dev/null || readlink "$(OPENCODE_DOTFILES_AGENTS)" 2>/dev/null || true); \
 			if [ -n "$$actual" ] && [ "$$actual" = "$$expected" ]; then \
 				echo "✅ agents: $(OPENCODE_AGENTS_PATH) -> $(OPENCODE_DOTFILES_AGENTS)"; \
 			else \
@@ -291,7 +291,7 @@ check-opencode: ## OpenCode（opencode）の状態を確認
 	@if [ -d "$(OPENCODE_DOTFILES_COMMANDS)" ]; then \
 		if [ -L "$(OPENCODE_COMMANDS_PATH)" ]; then \
 			actual=$$(readlink -f "$(OPENCODE_COMMANDS_PATH)" 2>/dev/null || readlink "$(OPENCODE_COMMANDS_PATH)" 2>/dev/null || true); \
-			expected=$$(readlink -f "$(OPENCODE_DOTFILES_COMMANDS)" 2>/dev/null || true); \
+			expected=$$(readlink -f "$(OPENCODE_DOTFILES_COMMANDS)" 2>/dev/null || readlink "$(OPENCODE_DOTFILES_COMMANDS)" 2>/dev/null || true); \
 			if [ -n "$$actual" ] && [ "$$actual" = "$$expected" ]; then \
 				echo "✅ commands: $(OPENCODE_COMMANDS_PATH) -> $(OPENCODE_DOTFILES_COMMANDS)"; \
 			else \
@@ -306,7 +306,7 @@ check-opencode: ## OpenCode（opencode）の状態を確認
 	@if [ -d "$(OPENCODE_DOTFILES_SKILLS)" ]; then \
 		if [ -L "$(OPENCODE_SKILLS_PATH)" ]; then \
 			actual=$$(readlink -f "$(OPENCODE_SKILLS_PATH)" 2>/dev/null || readlink "$(OPENCODE_SKILLS_PATH)" 2>/dev/null || true); \
-			expected=$$(readlink -f "$(OPENCODE_DOTFILES_SKILLS)" 2>/dev/null || true); \
+			expected=$$(readlink -f "$(OPENCODE_DOTFILES_SKILLS)" 2>/dev/null || readlink "$(OPENCODE_DOTFILES_SKILLS)" 2>/dev/null || true); \
 			if [ -n "$$actual" ] && [ "$$actual" = "$$expected" ]; then \
 				echo "✅ skills: $(OPENCODE_SKILLS_PATH) -> $(OPENCODE_DOTFILES_SKILLS)"; \
 			else \
@@ -321,7 +321,7 @@ check-opencode: ## OpenCode（opencode）の状態を確認
 	@if [ -d "$(OPENCODE_DOTFILES_DOCS)" ]; then \
 		if [ -L "$(OPENCODE_DOCS_PATH)" ]; then \
 			actual=$$(readlink -f "$(OPENCODE_DOCS_PATH)" 2>/dev/null || readlink "$(OPENCODE_DOCS_PATH)" 2>/dev/null || true); \
-			expected=$$(readlink -f "$(OPENCODE_DOTFILES_DOCS)" 2>/dev/null || true); \
+			expected=$$(readlink -f "$(OPENCODE_DOTFILES_DOCS)" 2>/dev/null || readlink "$(OPENCODE_DOTFILES_DOCS)" 2>/dev/null || true); \
 			if [ -n "$$actual" ] && [ "$$actual" = "$$expected" ]; then \
 				echo "✅ docs: $(OPENCODE_DOCS_PATH) -> $(OPENCODE_DOTFILES_DOCS)"; \
 			else \

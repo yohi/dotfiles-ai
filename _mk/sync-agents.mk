@@ -78,9 +78,10 @@ link-agent-commands: ## agent-commands/ のコマンドを各エージェント�
 		[ -f "$$cmd" ] || continue; \
 		base=$$(basename "$$cmd"); \
 		target="$(REPO_ROOT)/opencode/commands/$$base"; \
-		if [ -L "$$target" ]; then \
+		if [ -L "$$target" ] && [ "$$(readlink "$$target" 2>/dev/null || true)" = "../../agent-commands/$$base" ]; then \
 			echo "  [SKIP] opencode/commands/$$base"; \
 		else \
+			rm -f "$$target"; \
 			ln -sfn "../../agent-commands/$$base" "$$target"; \
 			echo "  ✅ opencode/commands/$$base"; \
 		fi; \
@@ -91,9 +92,10 @@ link-agent-commands: ## agent-commands/ のコマンドを各エージェント�
 		[ -f "$$cmd" ] || continue; \
 		base=$$(basename "$$cmd"); \
 		target="$(REPO_ROOT)/claude/commands/$$base"; \
-		if [ -e "$$target" ]; then \
+		if [ -L "$$target" ] && [ "$$(readlink "$$target" 2>/dev/null || true)" = "../../agent-commands/$$base" ]; then \
 			echo "  [SKIP] claude/commands/$$base"; \
 		else \
+			rm -f "$$target"; \
 			ln -sfn "../../agent-commands/$$base" "$$target"; \
 			echo "  ✅ claude/commands/$$base"; \
 		fi; \
@@ -108,7 +110,7 @@ link-agent-commands: ## agent-commands/ のコマンドを各エージェント�
 			echo "  [SKIP] gemini/commands/$$base.toml (up-to-date)"; \
 		else \
 			desc=$$(awk '/^---$$/{n++; next} n==1 && /^description:/{sub(/^description: */, ""); print; exit}' "$$cmd" | sed 's/"/\\"/g'); \
-			body=$$(awk 'BEGIN{n=0} /^---$$/{n++; next} n>=2{print}' "$$cmd"); \
+			body=$$(awk 'BEGIN{n=0} /^---$$/{n++; next} n>=2{print}' "$$cmd" | sed 's/\\/\\\\/g; s/"""/\\"\\"\\"/g'); \
 			printf 'description = "%s"\n\nprompt = """\n%s\n"""\n' "$$desc" "$$body" > "$$target"; \
 			echo "  ✅ gemini/commands/$$base.toml (generated from .md)"; \
 		fi; \

@@ -30,10 +30,10 @@ link:
 
 clean:
 	@echo "==> Cleaning up dotfiles-ai"
-	-$(MAKE) uninstall-superclaude || true
-	-$(MAKE) uninstall-claude || true
-	-$(MAKE) uninstall-gemini || true
-	-$(MAKE) uninstall-codex || true
-	-$(MAKE) uninstall-opencode || true
-	-$(MAKE) uninstall-skillport || true
-	-$(MAKE) uninstall-mcp || true
+	-$(MAKE) uninstall-superclaude
+	-$(MAKE) uninstall-claude
+	-$(MAKE) uninstall-gemini
+	-$(MAKE) uninstall-codex
+	-$(MAKE) uninstall-opencode
+	-$(MAKE) uninstall-skillport
+	-$(MAKE) uninstall-mcp

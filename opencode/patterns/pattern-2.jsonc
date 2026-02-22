@@ -1,7 +1,7 @@
 {
   // 【パターン2】Economy (コスパ・節約構成)
   //  SisyphusをGemini 3 Proに任せてコストを抑制しつつ、要所(実装・相談)で高性能モデルを使う。
-  "description": "節約構成 (Gemini Pro + GPT-5.3 + Flash)",
+  "description": "節約構成 (Gemini Pro + GPT-4o + Flash)",
   "agents": {
     "sisyphus": {
       "model": "google-vertex/gemini-3-pro-preview", // 指揮はGemini Pro
@@ -76,7 +76,7 @@
       "variant": "high"
     },
     "deep": {
-      "model": "openai/gpt-5.3-codex",
+      "model": "openai/gpt-4o",
       "variant": "medium"
     }, // deepだけはGPT
     "unspecified-low": {
