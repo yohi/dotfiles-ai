@@ -1,6 +1,8 @@
 REPO_ROOT ?= $(CURDIR)
 .DEFAULT_GOAL := setup
 
+REQUIRE_NODEJS := 1
+include _mk/idempotency.mk
 SHELL := /bin/bash
 .SHELLFLAGS := -o pipefail -c
 include _mk/claude.mk
@@ -20,8 +22,8 @@ setup:
 	$(MAKE) gemini
 	$(MAKE) codex
 	$(MAKE) opencode
-	$(MAKE) superclaude
-	$(MAKE) skillport
+	# $(MAKE) superclaude
+	# $(MAKE) skillport
 	$(MAKE) mcp
 	$(MAKE) sync-agents
 
