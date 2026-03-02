@@ -13,6 +13,7 @@ include _mk/superclaude.mk
 include _mk/skillport.mk
 include _mk/sync-agents.mk
 include _mk/mcp.mk
+include _mk/superpowers.mk
 
 .PHONY: setup clean link
 
@@ -25,6 +26,7 @@ setup:
 	# $(MAKE) superclaude
 	# $(MAKE) skillport
 	$(MAKE) mcp
+	$(MAKE) setup-superpowers
 	$(MAKE) sync-agents
 
 link:
@@ -39,3 +41,4 @@ clean:
 	-$(MAKE) uninstall-opencode
 	-$(MAKE) uninstall-skillport
 	-$(MAKE) uninstall-mcp
+	-$(MAKE) uninstall-superpowers
