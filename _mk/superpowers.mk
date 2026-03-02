@@ -14,10 +14,12 @@ setup-superpowers: update-superpowers link-superpowers-gemini link-superpowers-a
 
 update-superpowers: ## superpowers リポジトリをクローンまたは更新
 	@echo "🔄 superpowers: リポジトリを更新中..."
-	@if [ ! -d "$(SUPERPOWERS_DIR)/.git" ]; then \
-		echo "🚀 superpowers: $(SUPERPOWERS_DIR) を再作成してクローンします..."; \
-		rm -rf $(SUPERPOWERS_DIR); \
+	@if [ ! -d "$(SUPERPOWERS_DIR)" ]; then \
 		git clone $(SUPERPOWERS_REPO) $(SUPERPOWERS_DIR); \
+	elif [ ! -d "$(SUPERPOWERS_DIR)/.git" ]; then \
+		echo "❌ ERROR: $(SUPERPOWERS_DIR) exists but is not a Git repository."; \
+		echo "👉 Please manually remove or relocate the directory and try again."; \
+		exit 1; \
 	else \
 		echo "📥 superpowers: $(SUPERPOWERS_DIR) を更新中..."; \
 		git -C $(SUPERPOWERS_DIR) pull; \
@@ -58,8 +60,13 @@ link-superpowers-agents: ## Codex/汎用エージェントパスへリンク
 update-gemini-md-superpowers: ## ~/.gemini/GEMINI.md にワークフロー指示を追記
 	@echo "📝 superpowers: GEMINI.md を更新中..."
 	@if [ -f "$(HOME)/.gemini/GEMINI.md" ]; then \
-		if ! grep -q "Superpowers Workflow" "$(HOME)/.gemini/GEMINI.md"; then \
-			printf '
+		# 既存のマーカーブロックを削除 \
+		if grep -q "## BEGIN Superpowers Workflow" "$(HOME)/.gemini/GEMINI.md"; then \
+			sed '/## BEGIN Superpowers Workflow/,/## END Superpowers Workflow/d' "$(HOME)/.gemini/GEMINI.md" > "$(HOME)/.gemini/GEMINI.md.tmp" && mv "$(HOME)/.gemini/GEMINI.md.tmp" "$(HOME)/.gemini/GEMINI.md"; \
+		fi; \
+		# 新しいブロックを追記 \
+		printf '
+## BEGIN Superpowers Workflow
 # Superpowers Workflow
 このプロジェクトでは [obra/superpowers](https://github.com/obra/superpowers) ワークフローを採用しています。
 
@@ -68,8 +75,8 @@ update-gemini-md-superpowers: ## ~/.gemini/GEMINI.md にワークフロー指示
 - **計画と設計:** 実装前に `brainstorming` で設計を固め、`writing-plans` で詳細なタスクリストを作成してください。
 - **TDD:** すべての実装は `test-driven-development` スキルに従い、テストを先に書いてから実装してください。
 - **検証:** 完了前に `verification-before-completion` を実行し、エビデンスに基づいた成功報告を行ってください。
+## END Superpowers Workflow
 ' >> "$(HOME)/.gemini/GEMINI.md"; \
-		fi; \
 	fi
 
 uninstall-superpowers: ## superpowers の統合を解除（リンク削除、GEMINI.md 復元）
@@ -91,8 +98,10 @@ uninstall-superpowers: ## superpowers の統合を解除（リンク削除、GEM
 	done
 	@# 汎用エージェントパスのリンク削除
 	@rm -f $(AGENTS_SKILLS_DIR)/superpowers
-	@# GEMINI.md からセクションを削除 (簡易的に sed で特定のパターンから最後までを削除)
+	@# GEMINI.md からマーカーブロックのみを削除 \
 	@if [ -f "$(HOME)/.gemini/GEMINI.md" ]; then \
-		sed -i '/# Superpowers Workflow/Q' "$(HOME)/.gemini/GEMINI.md"; \
+		if grep -q "## BEGIN Superpowers Workflow" "$(HOME)/.gemini/GEMINI.md"; then \
+			sed '/## BEGIN Superpowers Workflow/,/## END Superpowers Workflow/d' "$(HOME)/.gemini/GEMINI.md" > "$(HOME)/.gemini/GEMINI.md.tmp" && mv "$(HOME)/.gemini/GEMINI.md.tmp" "$(HOME)/.gemini/GEMINI.md"; \
+		fi; \
 	fi
 	@echo "✅ superpowers: アンインストール完了"
