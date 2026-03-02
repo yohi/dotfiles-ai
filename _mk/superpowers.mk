@@ -30,7 +30,11 @@ link-superpowers-gemini: ## Gemini CLI へスキルをリンク
 	@mkdir -p $(GEMINI_SKILLS_DIR)
 	@for skill in $(SUPERPOWERS_DIR)/skills/*; do \
 		if [ -d "$$skill" ]; then \
-			gemini skills link "$$skill" --scope user --consent; \
+			if command -v gemini >/dev/null 2>&1; then \
+				gemini skills link "$$skill" --scope user --consent; \
+			else \
+				echo "⚠️  gemini コマンドが見つかりません。スキップします"; \
+			fi; \
 		fi; \
 	done
 
