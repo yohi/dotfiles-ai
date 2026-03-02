@@ -41,3 +41,4 @@ clean:
 	-$(MAKE) uninstall-opencode
 	-$(MAKE) uninstall-skillport
 	-$(MAKE) uninstall-mcp
+	-$(MAKE) uninstall-superpowers

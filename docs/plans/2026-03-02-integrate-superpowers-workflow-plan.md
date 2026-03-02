@@ -10,7 +10,7 @@
 
 ---
 
-### Task 1: ブランチ作成とコミット
+## Task 1: ブランチ作成とコミット
 
 **Files:**
 - Modify: `Makefile`
@@ -30,7 +30,7 @@ Run: `git commit -m "docs: add design and plan for superpowers workflow integrat
 Run: `git add Makefile _mk/superpowers.mk`
 Run: `git commit -m "feat: integrate superpowers workflow into setup process"`
 
-### Task 2: プッシュとPR作成
+## Task 2: プッシュとPR作成
 
 **Step 1: ブランチをリモートにプッシュ**
 Run: `git push -u origin feature/integrate-superpowers-workflow`
