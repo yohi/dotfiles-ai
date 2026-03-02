@@ -28,15 +28,15 @@ update-superpowers: ## superpowers リポジトリをクローンまたは更新
 link-superpowers-gemini: ## Gemini CLI へスキルをリンク
 	@echo "🔗 superpowers: Gemini CLI へスキルをリンク中..."
 	@mkdir -p $(GEMINI_SKILLS_DIR)
-	@for skill in $(SUPERPOWERS_DIR)/skills/*; do \
-		if [ -d "$$skill" ]; then \
-			if command -v gemini >/dev/null 2>&1; then \
+	@if command -v gemini >/dev/null 2>&1; then \
+		for skill in $(SUPERPOWERS_DIR)/skills/*; do \
+			if [ -d "$$skill" ]; then \
 				gemini skills link "$$skill" --scope user --consent; \
-			else \
-				echo "⚠️  gemini コマンドが見つかりません。スキップします"; \
 			fi; \
-		fi; \
-	done
+		done; \
+	else \
+		echo "⚠️  gemini コマンドが見つかりません。スキップします"; \
+	fi
 
 link-superpowers-antigravity: ## Antigravity IDE へスキルを個別にリンク
 	@echo "🔗 superpowers: Antigravity IDE へスキルをリンク中..."
@@ -44,7 +44,14 @@ link-superpowers-antigravity: ## Antigravity IDE へスキルを個別にリン�
 	@for skill in $(SUPERPOWERS_DIR)/skills/*; do \
 		if [ -d "$$skill" ]; then \
 			base=$$(basename "$$skill"); \
-			ln -sfn "$$skill" "$(ANTIGRAVITY_SKILLS_DIR)/$$base"; \
+			target="$(ANTIGRAVITY_SKILLS_DIR)/$$base"; \
+			if [ -L "$$target" ]; then \
+				rm -f "$$target"; \
+			elif [ -e "$$target" ]; then \
+				echo "⚠️  $$target exists and is NOT a symlink. Skipping."; \
+				continue; \
+			fi; \
+			ln -s "$$skill" "$$target"; \
 		fi; \
 	done
 	@# ワークスペース固有のディレクトリも念のため
@@ -52,14 +59,28 @@ link-superpowers-antigravity: ## Antigravity IDE へスキルを個別にリン�
 	@for skill in $(SUPERPOWERS_DIR)/skills/*; do \
 		if [ -d "$$skill" ]; then \
 			base=$$(basename "$$skill"); \
-			ln -sfn "$$skill" "$(HOME)/.gemini/.agent/skills/$$base"; \
+			target="$(HOME)/.gemini/.agent/skills/$$base"; \
+			if [ -L "$$target" ]; then \
+				rm -f "$$target"; \
+			elif [ -e "$$target" ]; then \
+				echo "⚠️  $$target exists and is NOT a symlink. Skipping."; \
+				continue; \
+			fi; \
+			ln -s "$$skill" "$$target"; \
 		fi; \
 	done
 
 link-superpowers-agents: ## Codex/汎用エージェントパスへリンク
 	@echo "🔗 superpowers: 汎用エージェントパス (~/.agents/skills) へリンク中..."
 	@mkdir -p $(AGENTS_SKILLS_DIR)
-	@ln -sfn $(SUPERPOWERS_DIR)/skills $(AGENTS_SKILLS_DIR)/superpowers
+	@target="$(AGENTS_SKILLS_DIR)/superpowers"; \
+	if [ -L "$$target" ]; then \
+		rm -f "$$target"; \
+	elif [ -e "$$target" ]; then \
+		echo "⚠️  $$target exists and is NOT a symlink. Skipping."; \
+	else \
+		ln -s $(SUPERPOWERS_DIR)/skills "$$target"; \
+	fi
 
 update-gemini-md-superpowers: ## ~/.gemini/GEMINI.md にワークフロー指示を追記
 	@echo "📝 superpowers: GEMINI.md を更新中..."
@@ -89,19 +110,34 @@ uninstall-superpowers: ## superpowers の統合を解除（リンク削除、GEM
 	@for skill in $(SUPERPOWERS_DIR)/skills/*; do \
 		if [ -d "$$skill" ]; then \
 			base=$$(basename "$$skill"); \
-			rm -rf $(GEMINI_SKILLS_DIR)/$$base; \
+			target="$(GEMINI_SKILLS_DIR)/$$base"; \
+			if [ -L "$$target" ]; then \
+				rm -f "$$target"; \
+			elif [ -e "$$target" ]; then \
+				echo "⚠️  $$target is NOT a symlink. Skipping removal."; \
+			fi; \
 		fi; \
 	done
 	@# Antigravity IDE のシンボリックリンク削除
 	@for skill in $(SUPERPOWERS_DIR)/skills/*; do \
 		if [ -d "$$skill" ]; then \
 			base=$$(basename "$$skill"); \
-			rm -f "$(ANTIGRAVITY_SKILLS_DIR)/$$base"; \
-			rm -f "$(HOME)/.gemini/.agent/skills/$$base"; \
+			for target in "$(ANTIGRAVITY_SKILLS_DIR)/$$base" "$(HOME)/.gemini/.agent/skills/$$base"; do \
+				if [ -L "$$target" ]; then \
+					rm -f "$$target"; \
+				elif [ -e "$$target" ]; then \
+					echo "⚠️  $$target is NOT a symlink. Skipping removal."; \
+				fi; \
+			done; \
 		fi; \
 	done
 	@# 汎用エージェントパスのリンク削除
-	@rm -f $(AGENTS_SKILLS_DIR)/superpowers
+	@target="$(AGENTS_SKILLS_DIR)/superpowers"; \
+	if [ -L "$$target" ]; then \
+		rm -f "$$target"; \
+	elif [ -e "$$target" ]; then \
+		echo "⚠️  $$target is NOT a symlink. Skipping removal."; \
+	fi
 	@# GEMINI.md からマーカーブロックのみを削除 \
 	@if [ -f "$(HOME)/.gemini/GEMINI.md" ]; then \
 		if grep -q "## BEGIN Superpowers Workflow" "$(HOME)/.gemini/GEMINI.md"; then \
