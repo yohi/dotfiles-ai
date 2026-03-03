@@ -97,8 +97,17 @@ update-gemini-md-superpowers: ## ~/.gemini/GEMINI.md にワークフロー指示
 		if grep -q "## BEGIN Superpowers Workflow" "$(HOME)/.gemini/GEMINI.md"; then \
 			sed '/## BEGIN Superpowers Workflow/,/## END Superpowers Workflow/d' "$(HOME)/.gemini/GEMINI.md" > "$(HOME)/.gemini/GEMINI.md.tmp" && mv "$(HOME)/.gemini/GEMINI.md.tmp" "$(HOME)/.gemini/GEMINI.md"; \
 		fi; \
-		printf '\n## BEGIN Superpowers Workflow\n# Superpowers Workflow\nこのプロジェクトでは [obra/superpowers](https://github.com/obra/superpowers) ワークフローを採用しています。\n\n## 核心的ルール\n- **スキル優先:** いかなるアクションの前にも必ず `using-superpowers` スキルを確認し、関連するスキルがあれば `activate_skill` で有効にしてください。\n- **計画と設計:** 実装前に `brainstorming` で設計を固め、`writing-plans` で詳細なタスクリストを作成してください。\n- **TDD:** すべての実装は `test-driven-development` スキルに従い、テストを先に書いてから実装してください。\n- **検証:** 完了前に `verification-before-completion` を実行し、エビデンスに基づいた成功報告を行ってください。\n## END Superpowers Workflow\n' >> "$(HOME)/.gemini/GEMINI.md"; \
+		printf '\n## BEGIN Superpowers Workflow\n' >> "$(HOME)/.gemini/GEMINI.md"; \
+		printf '# Superpowers Workflow\n' >> "$(HOME)/.gemini/GEMINI.md"; \
+		printf 'このプロジェクトでは [obra/superpowers](https://github.com/obra/superpowers) ワークフローを採用しています。\n\n' >> "$(HOME)/.gemini/GEMINI.md"; \
+		printf '## 核心的ルール\n' >> "$(HOME)/.gemini/GEMINI.md"; \
+		printf -- '- **スキル優先:** いかなるアクションの前にも必ず `using-superpowers` スキルを確認し、関連するスキルがあれば `activate_skill` で有効にしてください。\n' >> "$(HOME)/.gemini/GEMINI.md"; \
+		printf -- '- **計画と設計:** 実装前に `brainstorming` で設計を固め、`writing-plans` で詳細なタスクリストを作成してください。\n' >> "$(HOME)/.gemini/GEMINI.md"; \
+		printf -- '- **TDD:** すべての実装は `test-driven-development` スキルに従い、テストを先に書いてから実装してください。\n' >> "$(HOME)/.gemini/GEMINI.md"; \
+		printf -- '- **検証:** 完了前に `verification-before-completion` を実行し、エビデンスに基づいた成功報告を行ってください。\n' >> "$(HOME)/.gemini/GEMINI.md"; \
+		printf '## END Superpowers Workflow\n' >> "$(HOME)/.gemini/GEMINI.md"; \
 	fi
+
 
 uninstall-superpowers: ## superpowers の統合を解除（リンク削除、GEMINI.md 復元）
 	@echo "🧹 superpowers: 統合を解除しています..."
