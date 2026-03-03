@@ -42,7 +42,7 @@ pin-superpowers: ## 現在の最新 HEAD をマニフェスト(Lock-file)に固�
 	git clone "$(SUPERPOWERS_REPO)" "$$TMP_DIR" --quiet && \
 	(cd "$$TMP_DIR" && git checkout "$$HASH" --quiet) && \
 	uvx skillport add "$$TMP_DIR/skills/" --namespace $(SUPERPOWERS_NS) --yes --force && \
-	bash $(REPO_ROOT)/scripts/update-skill-manifest.sh "$(SUPERPOWERS_NS)" "https://github.com/obra/superpowers" "$$HASH" "$$DATE" && \
+	bash "$(REPO_ROOT)/scripts/update-skill-manifest.sh" "$(SUPERPOWERS_NS)" "https://github.com/obra/superpowers" "$$HASH" "$$DATE" && \
 	echo "✅ superpowers: バージョン $$HASH を $(MANIFEST_FILE) に固定しました"
 
 link-superpowers-gemini: ## Gemini CLI へスキルをリンク
