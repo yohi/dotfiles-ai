@@ -10,7 +10,7 @@
   // "logLevel": "DEBUG",
   // [Plugin]
   "plugin": [
-    "oh-my-opencode@^3.7.4",
+    "oh-my-opencode@3.10.0",
     "opencode-openai-codex-auth@^1.0.0",
     // "opencode-antigravity-auth@beta",
     // "@yohi/opencode-antigravity-quota@^1.0.0",
@@ -267,15 +267,13 @@
         "baseURL": "http://localhost:8741/v1beta",
       },
       "models": {
-        // "gemini-3-flash-preview": {
         "gemini-3-flash": {
           "name": "Gemini 3 Flash",
-          "limit": { "context": 128000, "output": 65536 },
+          "limit": { "context": 1048576, "output": 65536 },
         },
-        // "gemini-3.1-pro-preview": {
         "gemini-3.1-pro": {
-          "name": "Gemini 3 Pro",
-          "limit": { "context": 128000, "output": 65536 },
+          "name": "Gemini 3.1 Pro",
+          "limit": { "context": 1048576, "output": 65536 },
         },
         // "claude-opus-4-6": {
         "opus-4.6": {

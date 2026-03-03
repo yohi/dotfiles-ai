@@ -4,45 +4,50 @@
   "description": "GPTなし (Opus 4.6 + Gemini)",
   "agents": {
     "sisyphus": {
-      "model": "zerogravity/opus-4-6", // 指揮はOpus
+      "model": "zerogravity/opus-4.6", // 指揮はOpus
       "variant": "max",
       "temperature": 0.1,
       "thinking": {
-        "budget": 32768
+        "type": "enabled",
+        "budgetTokens": 32768
       }
     },
     "prometheus": {
-      "model": "zerogravity/opus-4-6", // 計画立案もOpus
+      "model": "zerogravity/opus-4.6", // 計画立案もOpus
       "variant": "max",
       "thinking": {
-        "budget": 32768
+        "type": "enabled",
+        "budgetTokens": 32768
       }
     },
     "atlas": {
-      "model": "zerogravity/opus-4-6", // Context ManagerもOpus
+      "model": "zerogravity/opus-4.6", // Context ManagerもOpus
       "variant": "max",
       "thinking": {
-        "budget": 32768
+        "type": "enabled",
+        "budgetTokens": 32768
       }
     },
     "metis": {
-      "model": "zerogravity/opus-4-6", // 参謀もOpus
+      "model": "zerogravity/opus-4.6", // 参謀もOpus
       "variant": "max",
       "temperature": 0.5,
       "thinking": {
-        "budget": 32768
+        "type": "enabled",
+        "budgetTokens": 32768
       }
     },
     // Hephaestus (GPT) は使用不可 -> Sisyphus (Opus) が兼任
     "oracle": {
-      "model": "zerogravity/opus-4-6",
+      "model": "zerogravity/opus-4.6",
       "variant": "max",
       "thinking": {
-        "budget": 32768
+        "type": "enabled",
+        "budgetTokens": 32768
       }
     },
     "momus": {
-      "model": "zerogravity/sonnet-4-6",
+      "model": "zerogravity/sonnet-4.6",
     },
     "librarian": {
       "model": "zerogravity/gemini-3-flash",
@@ -78,25 +83,25 @@
       "model": "zerogravity/gemini-3-flash"
     },
     "visual-engineering": {
-      "model": "zerogravity/sonnet-4-6"
+      "model": "zerogravity/sonnet-4.6"
     },
     "artistry": {
-      "model": "zerogravity/opus-4-6",
+      "model": "zerogravity/opus-4.6",
       "variant": "max"
     },
     "ultrabrain": {
-      "model": "zerogravity/opus-4-6",
+      "model": "zerogravity/opus-4.6",
       "variant": "max"
     },
     "deep": {
-      "model": "zerogravity/opus-4-6",
+      "model": "zerogravity/opus-4.6",
       "variant": "max"
     },
     "unspecified-low": {
-      "model": "zerogravity/sonnet-4-6"
+      "model": "zerogravity/sonnet-4.6"
     },
     "unspecified-high": {
-      "model": "zerogravity/opus-4-6",
+      "model": "zerogravity/opus-4.6",
       "variant": "max"
     },
   }
