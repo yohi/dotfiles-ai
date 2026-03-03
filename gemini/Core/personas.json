@@ -128,11 +128,15 @@
     }
   },
   "mcpServers": {
-    "docker": {
-      "command": "npx",
+    "docker-mcp-gateway": {
+      "command": "docker",
       "args": [
-        "-y",
-        "@docker/mcp-server"
+        "mcp",
+        "gateway",
+        "run",
+        "--transport",
+        "stdio",
+        "--enable-all-servers"
       ]
     }
   }

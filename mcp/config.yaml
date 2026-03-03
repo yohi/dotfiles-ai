@@ -1,0 +1,23 @@
+mcpServers:
+  playwright:
+    enabled: true
+  tavily:
+    enabled: true
+  sequentialthinking:
+    enabled: true
+  magic:
+    enabled: true
+  morphllm-fast-apply:
+    enabled: true
+  serena:
+    enabled: true
+  chrome-devtools:
+    enabled: true
+  skillport:
+    enabled: true
+  github-official:
+    enabled: true
+  docker:
+    enabled: true
+  dockerhub:
+    enabled: true

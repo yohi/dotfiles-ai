@@ -40,6 +40,12 @@ check-superclaude: ## SuperClaudeフレームワークのインストール状�
 		else \
 			echo "❌ CLAUDE.md: 未設定"; \
 		fi; \
+		if [ -L "$(CLAUDE_DIR)/settings.json" ]; then \
+			echo "✅ settings.json: シンボリックリンク → $$(readlink $(CLAUDE_DIR)/settings.json)"; \
+		fi; \
+		if [ -L "$(CLAUDE_DIR)/claude-settings.json" ]; then \
+			echo "✅ claude-settings.json: シンボリックリンク → $$(readlink $(CLAUDE_DIR)/claude-settings.json)"; \
+		fi; \
 	else \
 		echo "❌ Claude設定ディレクトリが存在しません: $(CLAUDE_DIR)"; \
 		echo "ℹ️  'make install-packages-superclaude' を実行してください"; \
@@ -47,10 +53,11 @@ check-superclaude: ## SuperClaudeフレームワークのインストール状�
 
 .PHONY: install-packages-superclaude
 install-packages-superclaude: ## SuperClaudeフレームワークをClaude Code向けにインストール
-	@BOOL_LINK_CHECK=0; if [ -L "$(CLAUDE_DIR)/CLAUDE.md" ]; then BOOL_LINK_CHECK=1; fi; \
+	@BOOL_LINK_CHECK=0; if [ -L "$(CLAUDE_DIR)/CLAUDE.md" ] && [ "$$(readlink "$(CLAUDE_DIR)/CLAUDE.md")" = "$(DOTFILES_CLAUDE_DIR)/CLAUDE.md" ]; then BOOL_LINK_CHECK=1; fi; \
+	BOOL_SETTINGS_LINK=0; if [ -L "$(CLAUDE_DIR)/settings.json" ] && [ "$$(readlink "$(CLAUDE_DIR)/settings.json")" = "$(DOTFILES_CLAUDE_DIR)/claude-settings.json" ] && [ -L "$(CLAUDE_DIR)/claude-settings.json" ] && [ "$$(readlink "$(CLAUDE_DIR)/claude-settings.json")" = "$(DOTFILES_CLAUDE_DIR)/claude-settings.json" ]; then BOOL_SETTINGS_LINK=1; fi; \
 	BOOL_SUPERCLAUDE_CMD=0; if command -v SuperClaude >/dev/null 2>&1; then BOOL_SUPERCLAUDE_CMD=1; fi; \
 	BOOL_REQUIRED_FILES=0; if [ -f "$(CLAUDE_DIR)/MODE_Brainstorming.md" ] && [ -f "$(CLAUDE_DIR)/PRINCIPLES.md" ]; then BOOL_REQUIRED_FILES=1; fi; \
-	if [ "$$BOOL_LINK_CHECK" = "1" ] && [ "$$BOOL_SUPERCLAUDE_CMD" = "1" ] && [ "$$BOOL_REQUIRED_FILES" = "1" ]; then \
+	if [ "$$BOOL_LINK_CHECK" = "1" ] && [ "$$BOOL_SETTINGS_LINK" = "1" ] && [ "$$BOOL_SUPERCLAUDE_CMD" = "1" ] && [ "$$BOOL_REQUIRED_FILES" = "1" ]; then \
 		echo "$(call IDEMPOTENCY_SKIP_MSG,install-packages-superclaude)"; \
 		exit 0; \
 	fi
@@ -129,7 +136,25 @@ install-packages-superclaude: ## SuperClaudeフレームワークをClaude Code�
 	@ln -sf "$(DOTFILES_CLAUDE_DIR)/CLAUDE.md" "$(CLAUDE_DIR)/CLAUDE.md"
 	@echo "✅ CLAUDE.md → $(DOTFILES_CLAUDE_DIR)/CLAUDE.md"
 	@echo ""
+	@echo "🔗 settings.json & claude-settings.json シンボリックリンクを設定中..."
+	@if [ -L "$(CLAUDE_DIR)/settings.json" ]; then \
+		rm -f "$(CLAUDE_DIR)/settings.json"; \
+	elif [ -f "$(CLAUDE_DIR)/settings.json" ]; then \
+		mv "$(CLAUDE_DIR)/settings.json" "$(CLAUDE_DIR)/settings.json.backup.$$(date +%Y%m%d_%H%M%S)"; \
+		echo "📋 既存の settings.json をバックアップしました"; \
+	fi
+	@if [ -L "$(CLAUDE_DIR)/claude-settings.json" ]; then \
+		rm -f "$(CLAUDE_DIR)/claude-settings.json"; \
+	elif [ -f "$(CLAUDE_DIR)/claude-settings.json" ]; then \
+		mv "$(CLAUDE_DIR)/claude-settings.json" "$(CLAUDE_DIR)/claude-settings.json.backup.$$(date +%Y%m%d_%H%M%S)"; \
+		echo "📋 既存の claude-settings.json をバックアップしました"; \
+	fi
+	@ln -sf "$(DOTFILES_CLAUDE_DIR)/claude-settings.json" "$(CLAUDE_DIR)/settings.json"
+	@ln -sf "$(DOTFILES_CLAUDE_DIR)/claude-settings.json" "$(CLAUDE_DIR)/claude-settings.json"
+	@echo "✅ settings.json & claude-settings.json → $(DOTFILES_CLAUDE_DIR)/claude-settings.json"
+	@echo ""
 	@$(MAKE) check-superclaude
+
 	@echo ""
 	@echo "🎉 SuperClaude Framework のインストールが完了しました！"
 	@echo ""
@@ -154,15 +179,21 @@ uninstall-superclaude: ## SuperClaudeフレームワークをアンインスト�
 	@if [ -L "$(CLAUDE_DIR)/CLAUDE.md" ]; then \
 		echo "  - CLAUDE.md (シンボリックリンク)"; \
 	fi
+	@if [ -L "$(CLAUDE_DIR)/settings.json" ]; then \
+		echo "  - settings.json (シンボリックリンク)"; \
+	fi
+	@if [ -L "$(CLAUDE_DIR)/claude-settings.json" ]; then \
+		echo "  - claude-settings.json (シンボリックリンク)"; \
+	fi
 	@echo ""
 	@printf "本当にアンインストールしますか? [y/N]: "; read confirm; \
 	if [ "$$confirm" = "y" ] || [ "$$confirm" = "Y" ]; then \
 		for file in $(SUPERCLAUDE_ALL_FILES); do \
 			rm -f "$(CLAUDE_DIR)/$$file"; \
 		done; \
-		if [ -L "$(CLAUDE_DIR)/CLAUDE.md" ]; then \
-			rm -f "$(CLAUDE_DIR)/CLAUDE.md"; \
-		fi; \
+		if [ -L "$(CLAUDE_DIR)/CLAUDE.md" ]; then rm -f "$(CLAUDE_DIR)/CLAUDE.md"; fi; \
+		if [ -L "$(CLAUDE_DIR)/settings.json" ]; then rm -f "$(CLAUDE_DIR)/settings.json"; fi; \
+		if [ -L "$(CLAUDE_DIR)/claude-settings.json" ]; then rm -f "$(CLAUDE_DIR)/claude-settings.json"; fi; \
 		if command -v SuperClaude >/dev/null 2>&1; then \
 			echo ""; \
 			echo "🔧 SuperClaudeツールもアンインストールしますか?"; \

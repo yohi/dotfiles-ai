@@ -1,0 +1,16 @@
+{
+  "catalogs": {
+    "docker-mcp": {
+      "displayName": "Docker MCP Catalog",
+      "url": "https://desktop.docker.com/mcp/catalog/v2/catalog.yaml"
+    },
+    "custom": {
+      "displayName": "Custom Servers",
+      "url": "file://$HOME/.docker/mcp/catalogs/custom.yaml"
+    },
+    "bootstrap": {
+      "displayName": "Bootstrap Servers",
+      "url": "file://$HOME/.docker/mcp/catalogs/bootstrap.yaml"
+    }
+  }
+}

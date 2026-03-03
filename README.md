@@ -55,6 +55,7 @@ make ai-setup
 | `make install-opencode` | OpenCode をインストール |
 | `make opencode-update` | OpenCode をアップデート |
 | `make install-codex` | Codex CLI をインストール |
+| `make mcp` | Docker MCP Gateway をセットアップ |
 | `make skillport` | skillport CLI + MCP をインストール・セットアップ |
 | `make check-skillport` | skillport の状態を確認 |
 | `make check-opencode` | OpenCode の状態を確認 |
@@ -99,6 +100,45 @@ make ai-setup
 | `/user-design <UI>` | UI/UX デザイン |
 | `/user-troubleshoot <issue>` | デバッグ |
 
+## Docker MCP Gateway
+
+[Docker MCP Gateway](https://docs.docker.com/ai/mcp-catalog-and-toolkit/mcp-gateway/) は、MCP サーバーを Docker コンテナとして安全かつポータブルに実行するためのオーケストレーターです。
+
+### 特徴
+- **セキュアな実行**: 各 MCP サーバーはホストから隔離されたコンテナ内で動作します。
+- **豊富なカタログ**: 300 以上の MCP サーバー（SQLite, GitHub, AWS, Slack 等）が即座に利用可能です。
+- **一元管理**: 複数のサーバーを 1 つのゲートウェイ経由で AI エージェントに提供します。
+
+### 起動方法
+セットアップ完了後、以下のコマンドで Gateway を起動できます：
+
+```bash
+# 全てのサーバーを有効にして 10888 ポートで起動
+docker mcp gateway run --port 10888 --enable-all-servers
+
+# 特定のサーバー（例: sqlite）のみを起動
+docker mcp gateway run --servers sqlite
+```
+
+## デプロイ構造 (シンボリックリンク)
+
+`make setup` を実行すると、リポジトリ内の設定ファイルが各エージェントの XDG 構成ディレクトリへシンボリックリンクとして配備されます。
+
+| エージェント / ツール | シンボリックリンク (配置先) | 実体 (リポジトリ内) |
+|:-------------------|:----------------------|:-------------------|
+| **Docker MCP** | `~/.docker/mcp/config.yaml` | `mcp/config.yaml` |
+| | `~/.docker/mcp/catalog.json` | `mcp/catalog.json` |
+| | `~/.docker/mcp/catalogs/` | `mcp/catalogs/` |
+| **Claude Code** | `~/.claude/settings.json` | `claude/claude-settings.json` |
+| | `~/.claude/CLAUDE.md` | `claude/CLAUDE.md` |
+| **Gemini CLI** | `~/.gemini/settings.json` | `gemini/settings.json` |
+| | `~/.gemini/core` | `gemini/Core` |
+| **OpenCode** | `~/.config/opencode/opencode.jsonc` | `opencode/opencode.jsonc` |
+| | `~/.config/opencode/antigravity.json` | `opencode/antigravity.json` |
+| | `~/.opencode/commands` | `opencode/commands` |
+| **Codex** | `~/.codex` | `codex/` |
+| **SkillPort** | `~/.skillport/skills` | `agent-skills/` |
+
 ## SSOT 原則
 
 - **スキルの編集**: `agent-skills/` 配下の `SKILL.md` を編集
@@ -111,5 +151,6 @@ make ai-setup
 | カテゴリ | テクノロジー |
 |:---------|:------------|
 | スキル管理 | [skillport](https://github.com/gotalab/skillport) CLI |
+| ツール管理 | [Docker MCP Gateway](https://docs.docker.com/ai/mcp-catalog-and-toolkit/mcp-gateway/) |
 | ビルド自動化 | GNU Make (`_mk/*.mk`) |
 | スキル記述 | Markdown (SKILL.md) |

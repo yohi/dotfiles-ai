@@ -13,3 +13,5 @@ codex/tmp/
 
 # OpenCode
 opencode/oh-my-opencode.json*
+.mcp.json
+.serena/
