@@ -32,7 +32,10 @@ The following rules apply to **ALL** projects unless overridden by a local proje
 ## 4. Workflow & Context Awareness
 
 1. **Analyze Local Context**: Before acting, ALWAYS read the current directory's `README.md` or local `AGENTS.md` to understand the specific project constraints.
-2. **Resolve Paths**: Paths in Section 3 are relative to the **Central Config Repo**. The repo is considered **accessible** if (a) it is cloned locally, (b) symlinked into the workspace, or (c) reachable via authenticated Git/HTTP endpoints. **Check**: Verify via `[ -d ~/dotfiles/components/dotfiles-ai/.git ]` or `git ls-remote`. If inaccessible, follow these as general principles only.
+2. **Resolve Paths**: Paths in Section 3 are relative to the **Central Config Repo**. Set `$CENTRAL_CONFIG_PATH` (local) or `$CENTRAL_CONFIG_URL` (remote) before checking accessibility. The repo is considered **accessible** if:
+   - (a) Cloned locally: `[ -d "$CENTRAL_CONFIG_PATH/.git" ]`
+   - (b) Reachable via Git/HTTP: `git ls-remote "$CENTRAL_CONFIG_URL"` (e.g., `https://github.com/user/dotfiles-ai.git`).
+   **Check**: Use these variables to determine if you can resolve relative paths. If inaccessible, follow these as general principles only.
 3. **Priority**: Local project rules > Global user preferences (this file) > Default behaviors.
 
 ## 5. Available Agent Skills
