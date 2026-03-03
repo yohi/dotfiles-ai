@@ -76,13 +76,14 @@
       "model": "openai/gpt-5.3-codex", // 複雑なGit操作もGPT-5.3に任せる
       "permission": {
         "bash": {
-          "git *": "allow",
           "git push --force": "deny",
           "git push -f": "deny",
           "git clean *": "ask",
           "git add .": "ask",
-          "*": "deny",
+          "git *": "allow",
+          "*": "deny"
         },
+
         "edit": "deny",
         "webfetch": "deny",
       },
