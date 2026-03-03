@@ -10,3 +10,6 @@ agent-skills/superpowers/
 codex/.personality_migration
 codex/skills/.system/
 codex/tmp/
+
+# OpenCode
+opencode/oh-my-opencode.json*

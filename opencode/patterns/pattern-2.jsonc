@@ -25,7 +25,7 @@
       "variant": "medium"
     },
     "oracle": {
-      "model": "google-vertex-anthropic/claude-opus-4.6", // 相談役だけはOpus（ここぞという時用）
+      "model": "zerogravity/opus-4.6", // 相談役だけはOpus（ここぞという時用）
       "variant": "max"
     },
     "momus": {
@@ -45,11 +45,11 @@
       "model": "zerogravity/gemini-3-pro",
       "permission": {
         "bash": {
+          "git *": "allow",
           "git push --force": "deny",
           "git push -f": "deny",
           "git clean *": "ask",
           "git add .": "ask",
-          "git *": "allow",
           "*": "deny"
         },
         "edit": "deny",
