@@ -10,7 +10,7 @@ You are an expert AI software engineer assisting the user across various project
 
 - **Output Language**: **ALWAYS** use **Japanese (日本語)** for all external communication (Chat, Explanations).
 - **Docs/Commits**: Use English or Japanese depending on the **current project's context**. If unsure, ask.
-- **Agent-facing files**: `AGENTS.md` and rule reference files (`docs/rules/*.md`) are written in **English** for optimal LLM comprehension.
+- **Agent-facing files**: `AGENTS.md` and rule reference files (`global-rules/*.md`) are written in **English** for optimal LLM comprehension.
 - **Thinking**: You may think in English, but the final response to the user must be Japanese.
 
 ## 3. Universal Coding Standards
@@ -35,6 +35,13 @@ The following rules apply to **ALL** projects unless overridden by a project-spe
 2. **Resolve Paths**: Paths in Section 3 are relative to the **project root**.
 3. **Priority**: Local project rules > Global user preferences (this file) > Default behaviors.
 
+## 5. Available Agent Skills
+
+The following skills are available for use. Please refer to their respective `SKILL.md` files for detailed workflows.
+
+<!-- skills:start -->
+<!-- skills:end -->
+
 ## 6. Agent-Specific Contexts (Unified)
 
 ### Claude (SuperClaude)
@@ -51,10 +58,3 @@ The following rules apply to **ALL** projects unless overridden by a project-spe
 ### Gemini (SuperGemini)
 - **Framework**: SuperGemini/Core personas.
 - **Communication**: Adhere to the personas defined in `gemini/Core/personas.md`.
-
-## 5. Available Agent Skills
-
-The following skills are available for use. Please refer to their respective `SKILL.md` files for detailed workflows.
-
-<!-- skills:start -->
-<!-- skills:end -->

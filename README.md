@@ -25,7 +25,7 @@ AIエージェント（Claude Code, Gemini CLI, OpenCode, Codex）の設定・�
 
 1.  **グローバル指示 (`global-rules/AGENTS.global.md`)**:
     *   ユーザーのアイデンティティ、言語設定（日本語優先）、セキュリティ、全AI共通の行動指針。
-    *   `~/.gemini/GEMINI.md` や `~/.claude/CLAUDE.md` などのホームディレクトリ設定の**実体**となります。
+    *   `~/.gemini/GEMINI.md` や `~/.claude/CLAUDE.md` などのホームディレクトリ設定の**リンク元（実体）**となります。
 2.  **プロジェクト指示 (`AGENTS.md`)**:
     *   このリポジトリ（`dotfiles-ai`）固有のルール、利用可能なスキルのリスト、リポジトリ構成の解説。
 
@@ -52,11 +52,16 @@ AIエージェント（Claude Code, Gemini CLI, OpenCode, Codex）の設定・�
 
 ## SSOT 原則
 
-- **グローバルルールの編集**: `global-rules/AGENTS.global.md` を編集（全エージェントに即時反映）。
-- **プロジェクトルールの編集**: ルートの `AGENTS.md` を編集。
-- **スキルの編集**: `agent-skills/` 配下の `SKILL.md` を編集。
-- **同期**: `make sync-agents` で各エージェントの設定ファイルへ反映。
-- **禁止**: ホームディレクトリの `~/.gemini/GEMINI.md` や各サブディレクトリ内の `CLAUDE.md` 等を直接編集しない（シンボリックリンクが壊れます）。
+- **ルールの編集**: 
+  - ユーザー共通設定は `global-rules/AGENTS.global.md` を編集。
+  - `dotfiles-ai` プロジェクト固有の設定はルートの `AGENTS.md` を編集。
+  - 個別のスキルは `agent-skills/*/SKILL.md` を編集。
+- **同期コマンド**:
+  - `make setup`: リポジトリの初期化、ツールのインストール、設定ファイルの初回配置（シンボリックリンク作成）を実行します。
+  - `make sync-agents`: `agent-skills` や `global-rules` の変更を、各エージェントの個別設定ファイルへ伝搬・同期します。
+- **禁止事項**: 
+  - **ホームディレクトリ上の設定ファイル**（例: `~/.gemini/GEMINI.md`, `~/.claude/CLAUDE.md`）を直接編集しないでください。これらはリポジトリ内のファイルへのシンボリックリンクであり、直接編集するとリンクが壊れたり、リポジトリ管理外の変更が発生したりします。
+  - 修正は必ずリポジトリ内の管理ファイル（`global-rules/AGENTS.global.md`, `AGENTS.md` 等）に対して行ってください。
 
 ## 技術スタック
 
