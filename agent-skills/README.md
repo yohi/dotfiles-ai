@@ -68,7 +68,7 @@ uvx skillport validate agent-skills/my-new-skill
 make sync-agents
 ```
 
-※ `make sync-agents` は内部で `uvx skillport doc --all` を実行し、`AGENTS.md` の `<!-- skills:start -->` マーカー内にスキルリストを自動生成します。
+※ `make sync-agents` は内部で `uvx skillport doc --all` を実行し、`AGENTS.md` の `<!-- SKILLPORT_START -->` マーカー内にスキルリストを自動生成します。
 
 ## スキル設計の原則
 

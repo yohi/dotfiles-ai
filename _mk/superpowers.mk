@@ -26,10 +26,10 @@ update-superpowers: ## マニフェスト(Lock-file)に記載されたハッシ�
 	else \
 		echo "📥 superpowers: バージョン $$HASH をインストール中..."; \
 		TMP_DIR=$$(mktemp -d); \
+		trap 'rm -rf "$$TMP_DIR"' EXIT; \
 		git clone "$(SUPERPOWERS_REPO)" "$$TMP_DIR" --quiet && \
 		(cd "$$TMP_DIR" && git checkout "$$HASH" --quiet) && \
-		uvx skillport add "$$TMP_DIR/skills/" --namespace $(SUPERPOWERS_NS) --yes --force && \
-		rm -rf "$$TMP_DIR"; \
+		uvx skillport add "$$TMP_DIR/skills/" --namespace $(SUPERPOWERS_NS) --yes --force; \
 		echo "✅ superpowers: バージョン $$HASH の展開が完了しました"; \
 	fi
 
@@ -37,7 +37,11 @@ pin-superpowers: ## 現在の最新 HEAD をマニフェスト(Lock-file)に固�
 	@echo "📌 superpowers: 最新の HEAD をロックファイルに固定中..."
 	@HASH=$$(git ls-remote "$(SUPERPOWERS_REPO)" HEAD | awk '{print $$1}'); \
 	DATE=$$(date +%Y-%m-%d); \
-	uvx skillport add "$(SUPERPOWERS_REPO)" skills/ --namespace $(SUPERPOWERS_NS) --yes --force; \
+	TMP_DIR=$$(mktemp -d); \
+	trap 'rm -rf "$$TMP_DIR"' EXIT; \
+	git clone "$(SUPERPOWERS_REPO)" "$$TMP_DIR" --quiet && \
+	(cd "$$TMP_DIR" && git checkout "$$HASH" --quiet) && \
+	uvx skillport add "$$TMP_DIR/skills/" --namespace $(SUPERPOWERS_NS) --yes --force; \
 	bash scripts/update-skill-manifest.sh "$(SUPERPOWERS_NS)" "https://github.com/obra/superpowers" "$$HASH" "$$DATE"; \
 	echo "✅ superpowers: バージョン $$HASH を $(MANIFEST_FILE) に固定しました"
 

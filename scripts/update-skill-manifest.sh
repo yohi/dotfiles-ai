@@ -23,14 +23,26 @@ fi
 
 # Create entry if it doesn't exist, or update existing one
 if grep -q "| $NAMESPACE |" "$MANIFEST_FILE"; then
-  # Update existing line (preserving note if not provided)
-  if [ -n "$NOTE" ]; then
-    sed -i "s#| $NAMESPACE |.*#| $NAMESPACE | $URL | $HASH | $PINNED_AT | $NOTE |#" "$MANIFEST_FILE"
-  else
-    # Preserve current note if $NOTE is empty
-    CURRENT_NOTE=$(grep "| $NAMESPACE |" "$MANIFEST_FILE" | awk -F'|' '{print $6}' | sed 's/^ //;s/ $//')
-    sed -i "s#| $NAMESPACE |.*#| $NAMESPACE | $URL | $HASH | $PINNED_AT | $CURRENT_NOTE |#" "$MANIFEST_FILE"
-  fi
+  # Update existing line safely with awk
+  TEMP_FILE=$(mktemp)
+  awk -v ns="$NAMESPACE" -v url="$URL" -v hash="$HASH" -v pinned="$PINNED_AT" -v note="$NOTE" '
+    BEGIN { FS="|"; OFS="|" }
+    {
+      # Match the namespace in field 2 (trimmed)
+      ns_field = $2;
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", ns_field);
+      if (ns_field == ns) {
+        $3 = " " url " ";
+        $4 = " " hash " ";
+        $5 = " " pinned " ";
+        if (note != "") {
+          $6 = " " note " ";
+        }
+        # If note is empty, field 6 is preserved
+      }
+      print $0;
+    }
+  ' "$MANIFEST_FILE" > "$TEMP_FILE" && mv "$TEMP_FILE" "$MANIFEST_FILE"
   echo "✅ Updated lock-file entry for '$NAMESPACE' (Pinned to: $HASH)"
 else
   # Add new line
