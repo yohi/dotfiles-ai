@@ -33,8 +33,9 @@ The following rules apply to **ALL** projects unless overridden by a project-spe
 2. **Resolve Paths**: Paths in Section 3 are relative to this file's location. Resolve them accordingly.
 3. **Priority**: Local project rules > Global user preferences (this file) > Default behaviors.
 
-## 5. Behavior Checklist
+## 5. Available Agent Skills
 
-- [ ] Am I speaking Japanese to the user?
-- [ ] Did I read the relevant rule files from `../global-rules/`?
-- [ ] Have I checked the local project's specific build commands?
+The following skills are available for use. Please refer to their respective `SKILL.md` files for detailed workflows.
+
+<!-- skills:start -->
+<!-- skills:end -->

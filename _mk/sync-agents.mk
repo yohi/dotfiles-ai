@@ -43,6 +43,9 @@ sync-skillport-doc: ## skillport doc を実行し instruction files を更新
 	@if command -v skillport >/dev/null 2>&1; then \
 		cd "$(REPO_ROOT)" && skillport doc --all 2>&1 || \
 			echo "⚠️  skillport doc の実行に問題がありました（スキップして続行）"; \
+	elif command -v uvx >/dev/null 2>&1; then \
+		cd "$(REPO_ROOT)" && uvx skillport doc --all 2>&1 || \
+			echo "⚠️  uvx skillport doc の実行に問題がありました（スキップして続行）"; \
 	else \
 		echo "⚠️  skillport が見つかりません。スキルテーブルの更新をスキップします"; \
 		echo "   インストール: make skillport"; \
