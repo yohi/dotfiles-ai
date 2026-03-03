@@ -126,10 +126,22 @@ install-packages-superclaude: ## SuperClaudeフレームワークをClaude Code�
 		mv "$(CLAUDE_DIR)/CLAUDE.md" "$(CLAUDE_DIR)/CLAUDE.md.backup.$$(date +%Y%m%d_%H%M%S)"; \
 		echo "📋 既存のCLAUDE.mdをバックアップしました"; \
 	fi
-	@ln -sf "$(DOTFILES_CLAUDE_DIR)/CLAUDE.md" "$(CLAUDE_DIR)/CLAUDE.md"
+	ln -sf "$(DOTFILES_CLAUDE_DIR)/CLAUDE.md" "$(CLAUDE_DIR)/CLAUDE.md"
 	@echo "✅ CLAUDE.md → $(DOTFILES_CLAUDE_DIR)/CLAUDE.md"
 	@echo ""
+	@echo "🔗 claude-settings.json シンボリックリンクを設定中..."
+	@if [ -L "$(CLAUDE_DIR)/settings.json" ]; then \
+		rm -f "$(CLAUDE_DIR)/settings.json"; \
+	elif [ -f "$(CLAUDE_DIR)/settings.json" ]; then \
+		mv "$(CLAUDE_DIR)/settings.json" "$(CLAUDE_DIR)/settings.json.backup.$$(date +%Y%m%d_%H%M%S)"; \
+		echo "📋 既存の settings.json をバックアップしました"; \
+	fi
+	@ln -sf "$(DOTFILES_CLAUDE_DIR)/claude-settings.json" "$(CLAUDE_DIR)/settings.json"
+	@ln -sf "$(DOTFILES_CLAUDE_DIR)/claude-settings.json" "$(CLAUDE_DIR)/claude-settings.json"
+	@echo "✅ settings.json → $(DOTFILES_CLAUDE_DIR)/claude-settings.json"
+	@echo ""
 	@$(MAKE) check-superclaude
+
 	@echo ""
 	@echo "🎉 SuperClaude Framework のインストールが完了しました！"
 	@echo ""

@@ -103,7 +103,7 @@ install-packages-supergemini:
 	# SuperGemini本体へのリンク \
 	ln -sf $(REPO_ROOT)/gemini/supergemini $(HOME_DIR)/.gemini/supergemini || true; \
 	# 各種ディレクトリへのリンク \
-	ln -sf $(REPO_ROOT)/gemini/supergemini/Core $(HOME_DIR)/.gemini/core || true; \
+	ln -sfn $(REPO_ROOT)/gemini/Core $(HOME_DIR)/.gemini/core || true; \
 	ln -sf $(REPO_ROOT)/gemini/supergemini/Hooks $(HOME_DIR)/.gemini/hooks || true; \
 	# 重要なファイルへの直接リンク \
 	ln -sf $(REPO_ROOT)/gemini/supergemini/GEMINI.md $(HOME_DIR)/.gemini/GEMINI.md || true; \
@@ -119,7 +119,12 @@ install-packages-supergemini:
 	printf "import-implement: # /user-implement コマンド\n\n新機能を実装します。\n" > $(HOME_DIR)/.gemini/user-tools/user-implement.md; \
 	\
 	echo "🔧 Gemini CLI設定ファイルを更新中..."; \
-	echo '{"selectedAuthType":"oauth-personal","usageStatisticsEnabled":false,"customToolsDirectory":"~/.gemini/user-tools","enableCustomTools":true}' > $(HOME_DIR)/.gemini/settings.json || true; \
+	if [ -L "$(HOME_DIR)/.gemini/settings.json" ]; then \
+		rm -f "$(HOME_DIR)/.gemini/settings.json"; \
+	elif [ -f "$(HOME_DIR)/.gemini/settings.json" ]; then \
+		mv "$(HOME_DIR)/.gemini/settings.json" "$(HOME_DIR)/.gemini/settings.json.backup.$$(date +%Y%m%d_%H%M%S)"; \
+	fi; \
+	ln -sf "$(REPO_ROOT)/gemini/settings.json" "$(HOME_DIR)/.gemini/settings.json"; \
 	\
 	echo "✅ SuperGemini フレームワークのシンボリックリンク設定が完了しました";
 	@echo "";

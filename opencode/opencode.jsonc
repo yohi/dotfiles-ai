@@ -124,75 +124,10 @@
   },
   // [MCP]
   "mcp": {
-    "sequential-thinking": {
-      "type": "local",
-      "command": [
-        "npx",
-        "-y",
-        "@modelcontextprotocol/server-sequential-thinking"
-      ]
-    },
-    "magic": {
-      "type": "local",
-      "command": [
-        "npx",
-        "@21st-dev/magic"
-      ]
-    },
-    "playwright": {
-      "type": "local",
-      "command": [
-        "npx",
-        "@playwright/mcp@latest"
-      ]
-    },
-    "morphllm-fast-apply": {
-      "type": "local",
-      "command": [
-        "npx",
-        "@morph-llm/morph-fast-apply"
-      ]
-    },
-    "serena": {
-      "type": "local",
-      "command": [
-        "uvx",
-        "--from",
-        "git+https://github.com/oraios/serena",
-        "serena",
-        "start-mcp-server",
-        "--context",
-        "ide-assistant"
-      ]
-    },
-    "tavily": {
-      "type": "local",
-      "command": [
-        "npx",
-        "-y",
-        "tavily-mcp@latest"
-      ],
-      "environment": {
-        "TAVILY_API_KEY": "${TAVILY_API_KEY}"
-      }
-    },
-    "chrome-devtools": {
-      "type": "local",
-      "command": [
-        "npx",
-        "-y",
-        "chrome-devtools-mcp@latest"
-      ]
-    },
-    "antigravity-bridge": {
-      "type": "local",
-      "command": [
-        "antigravity-bridge"
-      ],
-      "environment": {
-        "ANTIGRAVITY_TOKEN": "${ANTIGRAVITY_TOKEN}",
-        "ANTIGRAVITY_PORT": "8888"
-      }
+    "docker-mcp-gateway": {
+      "type": "remote",
+      "url": "http://localhost:10888/sse",
+      "enabled": true
     }
   },
   // [LSP] 言語サーバー連携 (コードの構造的理解)

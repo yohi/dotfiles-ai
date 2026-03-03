@@ -1,0 +1,41 @@
+{
+  "security": {
+    "auth": {
+      "selectedType": "oauth-personal"
+    }
+  },
+  "privacy": {
+    "usageStatisticsEnabled": false
+  },
+  "mcpServers": {
+    "docker-mcp-gateway": {
+      "command": "docker",
+      "args": [
+        "mcp",
+        "gateway",
+        "run",
+        "--transport",
+        "stdio",
+        "--enable-all-servers"
+      ]
+    }
+  },
+  "customToolsDirectory": "~/.gemini/user-tools",
+  "enableCustomTools": true,
+  "general": {
+    "previewFeatures": true,
+    "sessionRetention": {
+      "warningAcknowledged": true,
+      "enabled": true,
+      "maxAge": "120d"
+    }
+  },
+  "ui": {
+    "showMemoryUsage": true,
+    "showCitations": true,
+    "showModelInfoInChat": true
+  },
+  "experimental": {
+    "plan": true
+  }
+}
