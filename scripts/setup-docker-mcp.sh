@@ -24,13 +24,12 @@ echo -e "${GREEN}✅ Docker is installed and running.${NC}"
 
 # docker-mcp プラグインの確認
 if ! docker mcp version > /dev/null 2>&1; then
-    echo -e "${BLUE}🔧 Installing docker-mcp CLI plugin...${NC}"
-    # 公式のインストール手順（通常は brew またはバイナリ配布だが、ここでは案内にとどめるか
-    # ユーザー環境に合わせたインストールが必要な場合がある）
-    echo -e "Please ensure 'docker-mcp' is installed as a Docker CLI plugin."
+    echo -e "${RED}❌ docker-mcp CLI plugin not found.${NC}"
+    echo -e "Please install docker-mcp as a Docker CLI plugin."
     echo -e "Refer to: https://docs.docker.com/ai/mcp-catalog-and-toolkit/install/"
-    # 一時的に警告として続行
+    exit 1
 fi
+echo -e "${GREEN}✅ docker-mcp CLI plugin found.${NC}"
 
 # 設定ファイルの配置 (シンボリックリンク)
 echo -e "${BLUE}🔗 Linking Docker MCP configuration files...${NC}"
@@ -61,7 +60,7 @@ Description=Docker MCP Gateway
 After=docker.service
 
 [Service]
-ExecStart=$DOCKER_PATH mcp gateway run --port 10888 --enable-all-servers
+ExecStart=$DOCKER_PATH mcp gateway run --port 10888 --enable-servers sqlite,filesystem
 Restart=always
 RestartSec=10
 StandardOutput=journal
@@ -71,11 +70,17 @@ StandardError=journal
 WantedBy=default.target
 EOF
 
-systemctl --user daemon-reload
-systemctl --user enable docker-mcp-gateway.service
-systemctl --user restart docker-mcp-gateway.service
-
-echo -e "${GREEN}✅ Docker MCP Gateway service enabled and started.${NC}"
+# systemd ユーザーセッションが利用可能か確認
+if systemctl --user status > /dev/null 2>&1; then
+    systemctl --user daemon-reload
+    systemctl --user enable docker-mcp-gateway.service
+    systemctl --user restart docker-mcp-gateway.service
+    echo -e "${GREEN}✅ Docker MCP Gateway service enabled and started.${NC}"
+else
+    echo -e "${RED}⚠️  Warning: User systemd session is unavailable. Skipping service activation.${NC}"
+    echo -e "You can start the gateway manually with:"
+    echo -e "  $DOCKER_PATH mcp gateway run --port 10888 --enable-servers sqlite,filesystem"
+fi
 
 # カタログの初期化（未初期化の場合のみ、docker-mcp.yaml を取得するため）
 if [[ ! -f "$MCP_CONFIG_DIR/catalogs/docker-mcp.yaml" ]]; then
@@ -89,10 +94,15 @@ echo -e "${BLUE}🔍 Checking available MCP servers...${NC}"
 
 echo -e "${GREEN}✅ Docker MCP setup completed successfully.${NC}"
 echo -e ""
-echo -e "${BLUE}Docker MCP Gateway is running as a systemd user service.${NC}"
-echo -e "  - Status: systemctl --user status docker-mcp-gateway"
-echo -e "  - Logs:   journalctl --user -u docker-mcp-gateway -f"
-echo -e "  - Stop:   systemctl --user stop docker-mcp-gateway"
-echo -e "  - Start:  systemctl --user start docker-mcp-gateway"
+if systemctl --user status > /dev/null 2>&1; then
+    echo -e "${BLUE}Docker MCP Gateway is running as a systemd user service.${NC}"
+    echo -e "  - Status: systemctl --user status docker-mcp-gateway"
+    echo -e "  - Logs:   journalctl --user -u docker-mcp-gateway -f"
+    echo -e "  - Stop:   systemctl --user stop docker-mcp-gateway"
+    echo -e "  - Start:  systemctl --user start docker-mcp-gateway"
+else
+    echo -e "${BLUE}Manual Execution:${NC}"
+    echo -e "  $DOCKER_PATH mcp gateway run --port 10888 --enable-servers sqlite,filesystem"
+fi
 echo -e ""
 echo -e "${BLUE}Endpoint:${NC} http://localhost:10888"

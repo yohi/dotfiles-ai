@@ -6,11 +6,11 @@
     },
     "custom": {
       "displayName": "Custom Servers",
-      "url": "file:///home/y_ohi/.docker/mcp/catalogs/custom.yaml"
+      "url": "file://$HOME/.docker/mcp/catalogs/custom.yaml"
     },
     "bootstrap": {
       "displayName": "Bootstrap Servers",
-      "url": "file:///home/y_ohi/.docker/mcp/catalogs/bootstrap.yaml"
+      "url": "file://$HOME/.docker/mcp/catalogs/bootstrap.yaml"
     }
   }
 }
