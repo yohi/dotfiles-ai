@@ -9,6 +9,7 @@ LOCAL_SUPERPOWERS_DIR := $(REPO_ROOT)/agent-skills/superpowers
 
 GEMINI_SKILLS_DIR := $(HOME)/.gemini/skills
 ANTIGRAVITY_SKILLS_DIR := $(HOME)/.gemini/antigravity/skills
+GEMINI_AGENT_SKILLS_DIR := $(HOME)/.gemini/.agent/skills
 AGENTS_SKILLS_DIR := $(HOME)/.agents/skills
 
 MANIFEST_FILE := $(REPO_ROOT)/agent-skills/EXTERNAL_SKILLS.md
@@ -60,34 +61,25 @@ link-superpowers-gemini: ## Gemini CLI へスキルをリンク
 
 link-superpowers-antigravity: ## Antigravity IDE へスキルを個別にリンク
 	@echo "🔗 superpowers: Antigravity IDE へスキルをリンク中..."
-	@mkdir -p "$(ANTIGRAVITY_SKILLS_DIR)"
-	@if [ -d "$(LOCAL_SUPERPOWERS_DIR)" ]; then \
-		for skill in "$(LOCAL_SUPERPOWERS_DIR)"/*; do \
-			if [ -d "$$skill" ]; then \
-				base=$$(basename "$$skill"); \
-				target="$(ANTIGRAVITY_SKILLS_DIR)/$$base"; \
-				if [ -L "$$target" ] || [ ! -e "$$target" ]; then \
-					ln -sfn "$$skill" "$$target"; \
-				else \
-					echo "⚠️  $$target exists and is NOT a symlink. Skipping."; \
+	@link_skills() { \
+		local dest="$$1"; \
+		mkdir -p "$$dest"; \
+		if [ -d "$(LOCAL_SUPERPOWERS_DIR)" ]; then \
+			for skill in "$(LOCAL_SUPERPOWERS_DIR)"/*; do \
+				if [ -d "$$skill" ]; then \
+					local base=$$(basename "$$skill"); \
+					local target="$$dest/$$base"; \
+					if [ -L "$$target" ] || [ ! -e "$$target" ]; then \
+						ln -sfn "$$skill" "$$target"; \
+					else \
+						echo "⚠️  $$target exists and is NOT a symlink. Skipping."; \
+					fi; \
 				fi; \
-			fi; \
-		done; \
-	fi
-	@mkdir -p "$(HOME)/.gemini/.agent/skills"
-	@if [ -d "$(LOCAL_SUPERPOWERS_DIR)" ]; then \
-		for skill in "$(LOCAL_SUPERPOWERS_DIR)"/*; do \
-			if [ -d "$$skill" ]; then \
-				base=$$(basename "$$skill"); \
-				target="$(HOME)/.gemini/.agent/skills/$$base"; \
-				if [ -L "$$target" ] || [ ! -e "$$target" ]; then \
-					ln -sfn "$$skill" "$$target"; \
-				else \
-					echo "⚠️  $$target exists and is NOT a symlink. Skipping."; \
-				fi; \
-			fi; \
-		done; \
-	fi
+			done; \
+		fi; \
+	}; \
+	link_skills "$(ANTIGRAVITY_SKILLS_DIR)"; \
+	link_skills "$(GEMINI_AGENT_SKILLS_DIR)"
 
 link-superpowers-agents: ## Codex/汎用エージェントパスへリンク
 	@echo "🔗 superpowers: 汎用エージェントパス (~/.agents/skills) へリンク中..."
@@ -110,7 +102,7 @@ update-gemini-md-superpowers: ## ~/.gemini/GEMINI.md にワークフロー指示
 
 uninstall-superpowers: ## superpowers の統合を解除（リンク削除、GEMINI.md 復元）
 	@echo "🧹 superpowers: 統合を解除しています..."
-	@for dir in "$(GEMINI_SKILLS_DIR)" "$(ANTIGRAVITY_SKILLS_DIR)" "$(HOME)/.gemini/.agent/skills" "$(AGENTS_SKILLS_DIR)"; do \
+	@for dir in "$(GEMINI_SKILLS_DIR)" "$(ANTIGRAVITY_SKILLS_DIR)" "$(GEMINI_AGENT_SKILLS_DIR)" "$(AGENTS_SKILLS_DIR)"; do \
 		if [ -d "$$dir" ]; then \
 			for item in "$$dir"/*; do \
 				if [ -L "$$item" ]; then \
