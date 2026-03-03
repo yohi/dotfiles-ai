@@ -20,7 +20,7 @@ SkillPort を利用することで、Cursor、VS Code、Claude Code などの異
 
 ### 1. 新しいスキルを作成する (ローカル)
 
-`.skillport/templates/SKILL_TEMPLATE.md` をコピーして新しいディレクトリを作成します。
+`agent-skills/.skillport/templates/SKILL_TEMPLATE.md` をコピーして新しいディレクトリを作成します。以下のコマンドはリポジトリのルートで実行してください。
 
 ```bash
 # 例: my-new-skill というスキルを作成

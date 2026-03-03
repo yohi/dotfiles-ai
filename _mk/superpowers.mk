@@ -29,7 +29,7 @@ update-superpowers: ## マニフェスト(Lock-file)に記載されたハッシ�
 		trap 'rm -rf "$$TMP_DIR"' EXIT; \
 		git clone "$(SUPERPOWERS_REPO)" "$$TMP_DIR" --quiet && \
 		(cd "$$TMP_DIR" && git checkout "$$HASH" --quiet) && \
-		uvx skillport add "$$TMP_DIR/skills/" --namespace $(SUPERPOWERS_NS) --yes --force; \
+		uvx skillport add "$$TMP_DIR/skills/" --namespace $(SUPERPOWERS_NS) --yes --force && \
 		echo "✅ superpowers: バージョン $$HASH の展開が完了しました"; \
 	fi
 
@@ -41,8 +41,8 @@ pin-superpowers: ## 現在の最新 HEAD をマニフェスト(Lock-file)に固�
 	trap 'rm -rf "$$TMP_DIR"' EXIT; \
 	git clone "$(SUPERPOWERS_REPO)" "$$TMP_DIR" --quiet && \
 	(cd "$$TMP_DIR" && git checkout "$$HASH" --quiet) && \
-	uvx skillport add "$$TMP_DIR/skills/" --namespace $(SUPERPOWERS_NS) --yes --force; \
-	bash scripts/update-skill-manifest.sh "$(SUPERPOWERS_NS)" "https://github.com/obra/superpowers" "$$HASH" "$$DATE"; \
+	uvx skillport add "$$TMP_DIR/skills/" --namespace $(SUPERPOWERS_NS) --yes --force && \
+	bash scripts/update-skill-manifest.sh "$(SUPERPOWERS_NS)" "https://github.com/obra/superpowers" "$$HASH" "$$DATE" && \
 	echo "✅ superpowers: バージョン $$HASH を $(MANIFEST_FILE) に固定しました"
 
 link-superpowers-gemini: ## Gemini CLI へスキルをリンク

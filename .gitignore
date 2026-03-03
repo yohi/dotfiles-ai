@@ -6,3 +6,7 @@
 *.log
 fix_all.sh
 agent-skills/superpowers/
+# Codex runtime files
+codex/.personality_migration
+codex/skills/.system/
+codex/tmp/

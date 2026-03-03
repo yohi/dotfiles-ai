@@ -113,7 +113,7 @@ Each skill contains step-by-step instructions, templates, and scripts.
 </skill>
 <skill>
   <name>config-modernizer</name>
-  <description>OpenCodeの設定ファイルを分析し、最新のベストプラクティスやリリース情報に基づいてリファクタリングを行う専門スキル。ユーザーから「設定の最新化」「アップグレード」を求められた際や、.jsonc などの設定ファイルが存在する場合にトリガーされます。</description>
+  <description>Analyzes OpenCode configuration files and performs refactoring based on the latest best practices and release information. Triggered when the user requests "settings modernization" or "upgrades," or when configuration files like .jsonc are present.</description>
   <location>agent-skills/config-modernizer/SKILL.md</location>
 </skill>
 <skill>
@@ -123,7 +123,7 @@ Each skill contains step-by-step instructions, templates, and scripts.
 </skill>
 <skill>
   <name>git-master</name>
-  <description>Gitの操作を安全かつ適切に行うための専門スキル。特に、変更を適切に分割し、Conventional Commitsに従った日本語のコミットメッセージを作成します。</description>
+  <description>Expert skill for safe and appropriate Git operations. Specifically focuses on splitting changes effectively and creating Japanese commit messages following Conventional Commits.</description>
   <location>agent-skills/git-master/SKILL.md</location>
 </skill>
 <skill>
