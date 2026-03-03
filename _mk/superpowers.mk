@@ -18,6 +18,9 @@ update-superpowers: ## skillport を使用して superpowers をインポート/
 	@echo "🔄 superpowers: skillport を使用してインポート/更新中..."
 	@if command -v uvx >/dev/null 2>&1; then \
 		uvx skillport add $(SUPERPOWERS_REPO) skills/ --namespace superpowers --yes --force; \
+		HASH=$$(git ls-remote https://github.com/$(SUPERPOWERS_REPO).git HEAD | awk '{print $$1}'); \
+		DATE=$$(date +%Y-%m-%d); \
+		bash scripts/update-skill-manifest.sh "superpowers" "https://github.com/$(SUPERPOWERS_REPO)" "$$HASH" "$$DATE"; \
 	else \
 		echo "❌ uvx が見つかりません。先に uv をインストールしてください"; \
 		exit 1; \
