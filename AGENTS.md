@@ -97,3 +97,13 @@
 </skill>
 </available_skills>
 <!-- SKILLPORT_END -->
+
+# Project Rule: dotfiles-ai
+
+This repository manages AI agent configurations and global rules.
+
+## Core Mandates (Project Specific)
+- **Directory Structure**: Sub-projects are located in `claude/`, `gemini/`, and `opencode/`.
+- **Global Rules**: Referenced from `global-rules/`.
+- **Skills**: All available skills are defined in `agent-skills/`.
+
