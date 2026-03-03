@@ -15,24 +15,24 @@ You are an expert AI software engineer assisting the user across various project
 
 ## 3. Universal Coding Standards
 
-The following rules apply to **ALL** projects unless overridden by a project-specific config.
-**Note**: All reference paths below are relative to the project root.
+The following rules apply to **ALL** projects unless overridden by a local project-specific config.
+**Note**: These reference documents are located in the **Central Config Repo** (dotfiles-ai).
 
 - **Markdown**: Follow `markdownlint-cli2` standards.
-  - Reference: `global-rules/MARKDOWN.md`
+  - Reference: `global-rules/MARKDOWN.md` (in Config Repo)
 - **Shell Scripts**: Follow `shellcheck` standards (POSIX or Bash).
-  - Reference: `global-rules/SHELL.md`
+  - Reference: `global-rules/SHELL.md` (in Config Repo)
 - **Documentation Style**: Follow documentation standards.
-  - Reference: `global-rules/DOCS_STYLE.md`
+  - Reference: `global-rules/DOCS_STYLE.md` (in Config Repo)
 - **Git Standards**: Follow Conventional Commits in Japanese.
-  - Reference: `global-rules/GIT_STANDARDS.md`
+  - Reference: `global-rules/GIT_STANDARDS.md` (in Config Repo)
 - **Agent Skills**: Reusable skill definitions for specialized tasks.
-  - Reference: `agent-skills/` (each subdirectory contains a `SKILL.md`)
+  - Reference: `agent-skills/` (in Config Repo)
 
 ## 4. Workflow & Context Awareness
 
 1. **Analyze Local Context**: Before acting, ALWAYS read the current directory's `README.md` or local `AGENTS.md` to understand the specific project constraints.
-2. **Resolve Paths**: Paths in Section 3 are relative to the **project root**.
+2. **Resolve Paths**: Paths in Section 3 are relative to the **Central Config Repo**. If working in a different project, follow these as general principles unless the config repo is accessible.
 3. **Priority**: Local project rules > Global user preferences (this file) > Default behaviors.
 
 ## 5. Available Agent Skills
