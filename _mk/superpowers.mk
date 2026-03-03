@@ -1,8 +1,9 @@
 # ============================================================
-# superpowers.mk: obra/superpowers の導入と統合 (SkillPort 管理版)
+# superpowers.mk: obra/superpowers の導入と統合 (Lock-file 管理版)
 # ============================================================
 
-SUPERPOWERS_REPO := obra/superpowers
+SUPERPOWERS_REPO := https://github.com/obra/superpowers.git
+SUPERPOWERS_NS   := superpowers
 # リポジトリ内のスキルディレクトリ
 LOCAL_SUPERPOWERS_DIR := $(REPO_ROOT)/agent-skills/superpowers
 
@@ -10,21 +11,35 @@ GEMINI_SKILLS_DIR := $(HOME)/.gemini/skills
 ANTIGRAVITY_SKILLS_DIR := $(HOME)/.gemini/antigravity/skills
 AGENTS_SKILLS_DIR := $(HOME)/.agents/skills
 
-.PHONY: setup-superpowers update-superpowers link-superpowers-gemini link-superpowers-antigravity link-superpowers-agents update-gemini-md-superpowers uninstall-superpowers
+MANIFEST_FILE := $(REPO_ROOT)/agent-skills/EXTERNAL_SKILLS.md
+
+.PHONY: setup-superpowers update-superpowers pin-superpowers link-superpowers-gemini link-superpowers-antigravity link-superpowers-agents update-gemini-md-superpowers uninstall-superpowers
 
 setup-superpowers: update-superpowers link-superpowers-gemini link-superpowers-antigravity link-superpowers-agents update-gemini-md-superpowers ## superpowers の導入と全エージェントへの統合を実行
 
-update-superpowers: ## skillport を使用して superpowers をインポート/更新
-	@echo "🔄 superpowers: skillport を使用してインポート/更新中..."
-	@if command -v uvx >/dev/null 2>&1; then \
-		uvx skillport add $(SUPERPOWERS_REPO) skills/ --namespace superpowers --yes --force; \
-		HASH=$$(git ls-remote https://github.com/$(SUPERPOWERS_REPO).git HEAD | awk '{print $$1}'); \
-		DATE=$$(date +%Y-%m-%d); \
-		bash scripts/update-skill-manifest.sh "superpowers" "https://github.com/$(SUPERPOWERS_REPO)" "$$HASH" "$$DATE"; \
+update-superpowers: ## マニフェスト(Lock-file)に記載されたハッシュを使用して superpowers をインストール
+	@echo "🔄 superpowers: ロックファイルからバージョンを確認中..."
+	@HASH=$$(grep "| $(SUPERPOWERS_NS) |" "$(MANIFEST_FILE)" | awk -F'|' '{print $$4}' | tr -d ' '); \
+	if [ -z "$$HASH" ] || [ "$$HASH" = "-" ]; then \
+		echo "⚠️  マニフェストにハッシュが見つかりません。最新版を取得して Pin します..."; \
+		$(MAKE) pin-superpowers; \
 	else \
-		echo "❌ uvx が見つかりません。先に uv をインストールしてください"; \
-		exit 1; \
+		echo "📥 superpowers: バージョン $$HASH をインストール中..."; \
+		TMP_DIR=$$(mktemp -d); \
+		git clone "$(SUPERPOWERS_REPO)" "$$TMP_DIR" --quiet && \
+		(cd "$$TMP_DIR" && git checkout "$$HASH" --quiet) && \
+		uvx skillport add "$$TMP_DIR/skills/" --namespace $(SUPERPOWERS_NS) --yes --force && \
+		rm -rf "$$TMP_DIR"; \
+		echo "✅ superpowers: バージョン $$HASH の展開が完了しました"; \
 	fi
+
+pin-superpowers: ## 現在の最新 HEAD をマニフェスト(Lock-file)に固定する
+	@echo "📌 superpowers: 最新の HEAD をロックファイルに固定中..."
+	@HASH=$$(git ls-remote "$(SUPERPOWERS_REPO)" HEAD | awk '{print $$1}'); \
+	DATE=$$(date +%Y-%m-%d); \
+	uvx skillport add "$(SUPERPOWERS_REPO)" skills/ --namespace $(SUPERPOWERS_NS) --yes --force; \
+	bash scripts/update-skill-manifest.sh "$(SUPERPOWERS_NS)" "https://github.com/obra/superpowers" "$$HASH" "$$DATE"; \
+	echo "✅ superpowers: バージョン $$HASH を $(MANIFEST_FILE) に固定しました"
 
 link-superpowers-gemini: ## Gemini CLI へスキルをリンク
 	@echo "🔗 superpowers: Gemini CLI へスキルをリンク中..."
