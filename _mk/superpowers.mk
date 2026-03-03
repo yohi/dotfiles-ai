@@ -19,7 +19,7 @@ setup-superpowers: update-superpowers link-superpowers-gemini link-superpowers-a
 
 update-superpowers: ## マニフェスト(Lock-file)に記載されたハッシュを使用して superpowers をインストール
 	@echo "🔄 superpowers: ロックファイルからバージョンを確認中..."
-	@HASH=$$(grep "| $(SUPERPOWERS_NS) |" "$(MANIFEST_FILE)" | awk -F'|' '{print $$4}' | tr -d ' '); \
+	@HASH=$$(awk -F'|' '$$2 ~ /^[[:space:]]*$(SUPERPOWERS_NS)[[:space:]]*$$/ { gsub(/^[[:space:]]+|[[:space:]]+$$/, "", $$4); print $$4 }' "$(MANIFEST_FILE)"); \
 	if [ -z "$$HASH" ] || [ "$$HASH" = "-" ]; then \
 		echo "⚠️  マニフェストにハッシュが見つかりません。最新版を取得して Pin します..."; \
 		$(MAKE) pin-superpowers; \
