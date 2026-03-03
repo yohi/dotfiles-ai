@@ -52,6 +52,10 @@ SERVICE_DIR="$HOME/.config/systemd/user"
 SERVICE_FILE="$SERVICE_DIR/docker-mcp-gateway.service"
 DOCKER_PATH="$(which docker)"
 
+# デフォルトで有効にするサーバーのリスト (mcp/config.yaml からのパースは複雑なため、ここではデフォルトを指定)
+# ユーザーが環境変数 ENABLE_SERVERS を指定している場合はそれを使用
+ENABLE_SERVERS="${ENABLE_SERVERS:-sqlite,filesystem}"
+
 mkdir -p "$SERVICE_DIR"
 
 cat <<EOF > "$SERVICE_FILE"
@@ -60,7 +64,10 @@ Description=Docker MCP Gateway
 After=docker.service
 
 [Service]
-ExecStart=$DOCKER_PATH mcp gateway run --port 10888 --enable-servers sqlite,filesystem
+Environment="ENABLE_SERVERS=$ENABLE_SERVERS"
+# To enable all servers, you can change the ExecStart line to use --enable-all-servers
+# ExecStart=$DOCKER_PATH mcp gateway run --port 10888 --enable-all-servers
+ExecStart=$DOCKER_PATH mcp gateway run --port 10888 --enable-servers \$ENABLE_SERVERS
 Restart=always
 RestartSec=10
 StandardOutput=journal
@@ -79,7 +86,7 @@ if systemctl --user status > /dev/null 2>&1; then
 else
     echo -e "${RED}⚠️  Warning: User systemd session is unavailable. Skipping service activation.${NC}"
     echo -e "You can start the gateway manually with:"
-    echo -e "  $DOCKER_PATH mcp gateway run --port 10888 --enable-servers sqlite,filesystem"
+    echo -e "  ENABLE_SERVERS=\"$ENABLE_SERVERS\" $DOCKER_PATH mcp gateway run --port 10888 --enable-servers \$ENABLE_SERVERS"
 fi
 
 # カタログの初期化（未初期化の場合のみ、docker-mcp.yaml を取得するため）
@@ -102,7 +109,7 @@ if systemctl --user status > /dev/null 2>&1; then
     echo -e "  - Start:  systemctl --user start docker-mcp-gateway"
 else
     echo -e "${BLUE}Manual Execution:${NC}"
-    echo -e "  $DOCKER_PATH mcp gateway run --port 10888 --enable-servers sqlite,filesystem"
+    echo -e "  ENABLE_SERVERS=\"$ENABLE_SERVERS\" $DOCKER_PATH mcp gateway run --port 10888 --enable-servers \$ENABLE_SERVERS"
 fi
 echo -e ""
 echo -e "${BLUE}Endpoint:${NC} http://localhost:10888"
