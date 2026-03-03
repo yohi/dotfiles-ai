@@ -30,6 +30,7 @@
 
   // [Security] グローバルセキュリティ設定
   "google_auth": false,   // 不要な認証ポップアップ抑制
+
   "share": "disabled",    // 誤操作による共有防止
 
   // パフォーマンスと安定性のための最適化設定
@@ -75,7 +76,7 @@
     },
     "modelConcurrency": {
       // いちばん高いモデルは1並列に抑えるのが安全
-      "google-vertex-anthropic/claude-opus-4-6@default": 1,
+      "zerogravity/opus-4-6": 1,
       "openai/gpt-5.3-codex": 1
     },
   },

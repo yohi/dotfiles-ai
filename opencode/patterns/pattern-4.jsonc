@@ -4,7 +4,7 @@
   "description": "GPTなし (Opus 4.6 + Gemini)",
   "agents": {
     "sisyphus": {
-      "model": "google-vertex-anthropic/claude-opus-4-6@default", // 指揮はOpus
+      "model": "zerogravity/opus-4-6", // 指揮はOpus
       "variant": "max",
       "temperature": 0.1,
       "thinking": {
@@ -12,21 +12,21 @@
       }
     },
     "prometheus": {
-      "model": "google-vertex-anthropic/claude-opus-4-6@default", // 計画立案もOpus
+      "model": "zerogravity/opus-4-6", // 計画立案もOpus
       "variant": "max",
       "thinking": {
         "budget": 32768
       }
     },
     "atlas": {
-      "model": "google-vertex-anthropic/claude-opus-4-6@default", // Context ManagerもOpus
+      "model": "zerogravity/opus-4-6", // Context ManagerもOpus
       "variant": "max",
       "thinking": {
         "budget": 32768
       }
     },
     "metis": {
-      "model": "google-vertex-anthropic/claude-opus-4-6@default", // 参謀もOpus
+      "model": "zerogravity/opus-4-6", // 参謀もOpus
       "variant": "max",
       "temperature": 0.5,
       "thinking": {
@@ -35,27 +35,27 @@
     },
     // Hephaestus (GPT) は使用不可 -> Sisyphus (Opus) が兼任
     "oracle": {
-      "model": "google-vertex-anthropic/claude-opus-4-6@default",
+      "model": "zerogravity/opus-4-6",
       "variant": "max",
       "thinking": {
         "budget": 32768
       }
     },
     "momus": {
-      "model": "google-vertex-anthropic/claude-sonnet-4-6@default",
+      "model": "zerogravity/sonnet-4-6",
     },
     "librarian": {
-      "model": "google-vertex/gemini-3-flash-preview",
+      "model": "zerogravity/gemini-3-flash",
     },
     "explore": {
-      "model": "google-vertex/gemini-3-flash-preview",
+      "model": "zerogravity/gemini-3-flash",
     },
     "multimodal-looker": {
-      "model": "google-vertex/gemini-3-flash-preview",
+      "model": "zerogravity/gemini-3-flash",
     },
     "git-specialist": {
       "description": "Git operations specialist",
-      "model": "google-vertex/gemini-3.1-pro-preview", // GPTなしならGemini Proが無難
+      "model": "zerogravity/gemini-3.1-pro", // GPTなしならGemini Proが無難
       "permission": {
         "bash": {
           "git push --force": "deny",
@@ -72,31 +72,31 @@
   },
   "categories": {
     "quick": {
-      "model": "google-vertex/gemini-3-flash-preview"
+      "model": "zerogravity/gemini-3-flash"
     },
     "writing": {
-      "model": "google-vertex/gemini-3-flash-preview"
+      "model": "zerogravity/gemini-3-flash"
     },
     "visual-engineering": {
-      "model": "google-vertex-anthropic/claude-sonnet-4-6@default"
+      "model": "zerogravity/sonnet-4-6"
     },
     "artistry": {
-      "model": "google-vertex-anthropic/claude-opus-4-6@default",
+      "model": "zerogravity/opus-4-6",
       "variant": "max"
     },
     "ultrabrain": {
-      "model": "google-vertex-anthropic/claude-opus-4-6@default",
+      "model": "zerogravity/opus-4-6",
       "variant": "max"
     },
     "deep": {
-      "model": "google-vertex-anthropic/claude-opus-4-6@default",
+      "model": "zerogravity/opus-4-6",
       "variant": "max"
     },
     "unspecified-low": {
-      "model": "google-vertex-anthropic/claude-sonnet-4-6@default"
+      "model": "zerogravity/sonnet-4-6"
     },
     "unspecified-high": {
-      "model": "google-vertex-anthropic/claude-opus-4-6@default",
+      "model": "zerogravity/opus-4-6",
       "variant": "max"
     },
   }

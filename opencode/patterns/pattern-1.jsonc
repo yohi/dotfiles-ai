@@ -5,7 +5,7 @@
   "description": "最強構成 (Opus 4.6 + GPT-5.3 + Gemini Flash)",
   "agents": {
     "sisyphus": {
-      "model": "google-vertex-anthropic/claude-opus-4-6@default", // 指揮・推論には最強のOpus (Thinking)
+      "model": "zerogravity/opus-4-6", // 指揮・推論には最強のOpus (Thinking)
       "variant": "max",
       "temperature": 0.1,
       "thinking": {
@@ -13,21 +13,21 @@
       }
     },
     "prometheus": {
-      "model": "google-vertex-anthropic/claude-opus-4-6@default", // 計画立案も最強のOpus
+      "model": "zerogravity/opus-4-6", // 計画立案も最強のOpus
       "variant": "max",
       "thinking": {
         "budget": 32768
       }
     },
     "atlas": {
-      "model": "google-vertex-anthropic/claude-opus-4-6@default", // アーキテクトもOpus
+      "model": "zerogravity/opus-4-6", // アーキテクトもOpus
       "variant": "max",
       "thinking": {
         "budget": 32768
       }
     },
     "metis": {
-      "model": "google-vertex-anthropic/claude-opus-4-6@default", // 参謀：計画の抜け漏れをOpusで徹底レビュー
+      "model": "zerogravity/opus-4-6", // 参謀：計画の抜け漏れをOpusで徹底レビュー
       "variant": "max",
       "temperature": 0.5
     },
@@ -36,20 +36,20 @@
       "variant": "high"
     },
     "oracle": {
-      "model": "google-vertex-anthropic/claude-opus-4-6@default", // 相談役：深い推論が必要なためOpus
+      "model": "zerogravity/opus-4-6", // 相談役：深い推論が必要なためOpus
       "variant": "max"
     },
     "momus": {
-      "model": "google-vertex-anthropic/claude-sonnet-4-6@default", // レビュー：Sonnetで十分高品質
+      "model": "zerogravity/sonnet-4-6", // レビュー：Sonnetで十分高品質
     },
     "librarian": {
-      "model": "google-vertex/gemini-3-flash-preview", // 書庫番：圧倒的コスパのGemini Flash
+      "model": "zerogravity/gemini-3-flash", // 書庫番：圧倒的コスパのGemini Flash
     },
     "explore": {
-      "model": "google-vertex/gemini-3-flash-preview", // 探索：高速なコードベース把握
+      "model": "zerogravity/gemini-3-flash", // 探索：高速なコードベース把握
     },
     "multimodal-looker": {
-      "model": "google-vertex/gemini-3-flash-preview", // 視覚：画像・PDF認識
+      "model": "zerogravity/gemini-3-flash", // 視覚：画像・PDF認識
     },
     // 特権エージェント（Git操作）
     "git-specialist": {
@@ -71,20 +71,20 @@
   },
   "categories": {
     "quick": {
-      "model": "google-vertex/gemini-3-flash-preview",
+      "model": "zerogravity/gemini-3-flash",
     },
     "writing": {
-      "model": "google-vertex/gemini-3-flash-preview",
+      "model": "zerogravity/gemini-3-flash",
     },
     "visual-engineering": {
-      "model": "google-vertex-anthropic/claude-sonnet-4-6@default", // UI実装はSonnet 4.6が優秀
+      "model": "zerogravity/sonnet-4-6", // UI実装はSonnet 4.6が優秀
     },
     "artistry": {
-      "model": "google-vertex-anthropic/claude-opus-4-6@default",
+      "model": "zerogravity/opus-4-6",
       "variant": "max",
     },
     "ultrabrain": {
-      "model": "google-vertex-anthropic/claude-opus-4-6@default",
+      "model": "zerogravity/opus-4-6",
       "variant": "max",
     },
     "deep": {
@@ -92,10 +92,10 @@
       "variant": "high",
     },
     "unspecified-low": {
-      "model": "google-vertex/gemini-3-flash-preview",
+      "model": "zerogravity/gemini-3-flash",
     },
     "unspecified-high": {
-      "model": "google-vertex-anthropic/claude-opus-4-6@default",
+      "model": "zerogravity/opus-4-6",
       "variant": "max",
     },
   }
