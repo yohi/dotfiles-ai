@@ -202,28 +202,42 @@
         "baseURL": "http://localhost:8741/v1beta",
       },
       "models": {
+        "gemini-3.1-pro": {
+          "name": "Gemini 3.1 Pro",
+          "limit": { "context": 1048576, "output": 65535 },
+          "modalities": { "input": ["text", "image", "pdf"], "output": ["text"] },
+          "variants": {
+            "low": { "thinkingLevel": "low" },
+            "high": { "thinkingLevel": "high" }
+          }
+        },
         "gemini-3-flash": {
           "name": "Gemini 3 Flash",
           "limit": { "context": 1048576, "output": 65536 },
-        },
-        "gemini-3.1-pro": {
-          "name": "Gemini 3.1 Pro",
-          "limit": { "context": 1048576, "output": 65536 },
-        },
-        // "claude-opus-4-6": {
-        "opus-4.6": {
-          "name": "Claude Opus 4.6",
-          "limit": { "context": 200000, "output": 16000 },
-          "thinking": { "type": "adaptive" },
+          "modalities": { "input": ["text", "image", "pdf"], "output": ["text"] },
+          "variants": {
+            "minimal": { "thinkingLevel": "minimal" },
+            "low": { "thinkingLevel": "low" },
+            "medium": { "thinkingLevel": "medium" },
+            "high": { "thinkingLevel": "high" }
+          }
         },
         "sonnet-4.6": {
           "name": "Claude Sonnet 4.6",
-          "limit": { "context": 200000, "output": 16000 },
-          "thinking": { "type": "adaptive" },
+          "limit": { "context": 200000, "output": 64000 },
+          "modalities": { "input": ["text", "image", "pdf"], "output": ["text"] }
+        },
+        "opus-4.6": {
+          "name": "Claude Opus 4.6 Thinking)",
+          "limit": { "context": 200000, "output": 64000 },
+          "modalities": { "input": ["text", "image", "pdf"], "output": ["text"] },
+          "variants": {
+            "low": { "thinkingConfig": { "thinkingBudget": 8192 } },
+            "max": { "thinkingConfig": { "thinkingBudget": 32768 } }
+          }
         },
       },
     },
-
     // Vertex AI(Google)
     // [For LLM Context]
     // - Documantatin:

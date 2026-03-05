@@ -1,0 +1,73 @@
+# VS Code拡張機能リスト
+# インストール: cat extensions.list | xargs -L 1 code --install-extension
+# 現在の拡張機能を出力: code --list-extensions
+
+# Python開発
+ms-python.python
+ms-python.vscode-pylance
+ms-python.debugpy
+ms-python.flake8
+ms-python.mypy-type-checker
+ms-python.black-formatter
+
+# Django開発
+batisteo.vscode-django
+bigonesystems.django
+thebarkman.vscode-djaneiro
+
+# Docker
+docker.docker
+ms-vscode-remote.remote-containers
+ms-azuretools.vscode-docker
+
+# AI・補完
+github.copilot
+github.copilot-chat
+
+# Git
+eamodio.gitlens
+
+# Jupyter
+ms-toolsai.jupyter
+ms-toolsai.jupyter-keymap
+ms-toolsai.jupyter-renderers
+ms-toolsai.vscode-jupyter-cell-tags
+ms-toolsai.vscode-jupyter-slideshow
+
+# Python支援
+kevinrose.vsc-python-indent
+njpwerner.autodocstring
+njqdev.vscode-python-typehint
+
+# Web開発
+ms-vscode.vscode-typescript-next
+bradlc.vscode-tailwindcss
+ms-vscode.vscode-json
+redhat.vscode-yaml
+
+# その他開発ツール
+ms-vscode.makefile-tools
+ms-vscode.cmake-tools
+ms-vscode.cpptools
+
+# 言語パック
+ms-ceintl.vscode-language-pack-ja
+
+# ユーティリティ
+vscode-icons-team.vscode-icons
+formulahendry.auto-rename-tag
+formulahendry.auto-close-tag
+christian-kohler.path-intellisense
+streetsidesoftware.code-spell-checker
+
+# マークダウン
+yzhang.markdown-all-in-one
+shd101wyy.markdown-preview-enhanced
+
+# テーマ
+zhuangtongfa.material-theme
+pkief.material-icon-theme
+
+# リモート開発
+ms-vscode-remote.remote-ssh
+ms-vscode-remote.remote-ssh-edit 

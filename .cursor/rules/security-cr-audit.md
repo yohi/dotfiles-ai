@@ -1,0 +1,1 @@
+../../ide/cursor/commands/coderabbit/security-cr-audit.md

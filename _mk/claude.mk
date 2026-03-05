@@ -369,8 +369,13 @@ install-claude-ecosystem:
 # エイリアス
 # ========================================
 
-.PHONY: install-claude-code
+.PHONY: install-claude-code install-claudia setup-claude
+
 install-claude-code: install-packages-claude-code  ## Claude Codeをインストール(エイリアス)
 
-.PHONY: install-claudia
 install-claudia: install-packages-claudia  ## Claudiaをインストール(エイリアス)
+
+setup-claude: ## Claude Codeの設定（現在はプレースホルダー）
+	@echo "📝 Claude Codeの設定を適用中..."
+	@# 今後、~/.claude/settings.json へのシンボリックリンクなどをここに追加可能
+	@echo "✅ Claude Codeの設定が完了しました"

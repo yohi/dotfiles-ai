@@ -41,10 +41,10 @@ sync-agents: ## SSOTのスキル群を各エージェントの設定ファイル
 sync-skillport-doc: ## skillport doc を実行し instruction files を更新
 	@echo "📝 skillport doc: スキルテーブルを更新中..."
 	@if command -v skillport >/dev/null 2>&1; then \
-		cd "$(REPO_ROOT)" && skillport doc --all 2>&1 || \
+		cd "$(REPO_ROOT)" && yes | skillport doc --all 2>&1 || \
 			echo "⚠️  skillport doc の実行に問題がありました（スキップして続行）"; \
 	elif command -v uvx >/dev/null 2>&1; then \
-		cd "$(REPO_ROOT)" && uvx skillport doc --all 2>&1 || \
+		cd "$(REPO_ROOT)" && yes | uvx skillport doc --all 2>&1 || \
 			echo "⚠️  uvx skillport doc の実行に問題がありました（スキップして続行）"; \
 	else \
 		echo "⚠️  skillport が見つかりません。スキルテーブルの更新をスキップします"; \
@@ -101,6 +101,43 @@ link-agent-commands: ## agent-commands/ のコマンドを各エージェント�
 			rm -f "$$target"; \
 			ln -sfn "../../agent-commands/$$base" "$$target"; \
 			echo "  ✅ claude/commands/$$base"; \
+		fi; \
+	done
+	@# --- Cursor IDE: .md シンボリックリンク ---
+	@mkdir -p "$(REPO_ROOT)/ide/cursor/commands/agent"
+	@mkdir -p "$(REPO_ROOT)/.cursor/rules"
+	@for cmd in $(AGENT_CMDS_DIR)/*.md; do \
+		[ -f "$$cmd" ] || continue; \
+		base=$$(basename "$$cmd"); \
+		target="$(REPO_ROOT)/ide/cursor/commands/agent/$$base"; \
+		if [ -L "$$target" ] && [ "$$(readlink "$$target" 2>/dev/null || true)" = "../../../agent-commands/$$base" ]; then \
+			echo "  [SKIP] ide/cursor/commands/agent/$$base"; \
+		else \
+			rm -f "$$target"; \
+			ln -sfn "../../../agent-commands/$$base" "$$target"; \
+			echo "  ✅ ide/cursor/commands/agent/$$base"; \
+		fi; \
+		rule_target="$(REPO_ROOT)/.cursor/rules/$$base"; \
+		if [ -L "$$rule_target" ] && [ "$$(readlink "$$rule_target" 2>/dev/null || true)" = "../../agent-commands/$$base" ]; then \
+			echo "  [SKIP] .cursor/rules/$$base"; \
+		else \
+			rm -f "$$rule_target"; \
+			ln -sfn "../../agent-commands/$$base" "$$rule_target"; \
+			echo "  ✅ .cursor/rules/$$base"; \
+		fi; \
+	done
+	@# --- Cursor IDE: coderabbit コマンドのルール同期 ---
+	@for cmd in $(REPO_ROOT)/ide/cursor/commands/coderabbit/*.md; do \
+		[ -f "$$cmd" ] || continue; \
+		base=$$(basename "$$cmd"); \
+		[ "$$base" = "README.md" ] && continue; \
+		rule_target="$(REPO_ROOT)/.cursor/rules/$$base"; \
+		if [ -L "$$rule_target" ] && [ "$$(readlink "$$rule_target" 2>/dev/null || true)" = "../../ide/cursor/commands/coderabbit/$$base" ]; then \
+			echo "  [SKIP] .cursor/rules/$$base (coderabbit)"; \
+		else \
+			rm -f "$$rule_target"; \
+			ln -sfn "../../ide/cursor/commands/coderabbit/$$base" "$$rule_target"; \
+			echo "  ✅ .cursor/rules/$$base (coderabbit)"; \
 		fi; \
 	done
 	@# --- Gemini CLI: .md → .toml 変換 ---

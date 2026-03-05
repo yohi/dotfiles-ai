@@ -1,0 +1,17 @@
+// 既定値を上書きするには、このファイル内にキー バインドを挿入します
+[
+    {
+        "key": "ctrl+i",
+        "command": "composerMode.agent"
+    },
+    {
+        "key": "ctrl+shift+b",
+        "command": "workbench.action.terminal.moveToBackground",
+        "when": "terminalFocus"
+    },
+    {
+        "key": "escape",
+        "command": "workbench.action.terminal.moveToBackground",
+        "when": "terminalFocus && terminalProcessSupported"
+    }
+]
