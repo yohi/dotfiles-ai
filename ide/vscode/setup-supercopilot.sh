@@ -53,10 +53,10 @@ if [ -e "$HOME/.vscode/supercopilot" ]; then
   fi
 fi
 
-ln -sf "$REPO_ROOT/vscode/settings" "$HOME/.vscode/supercopilot"
+ln -sf "$REPO_ROOT/ide/vscode/settings" "$HOME/.vscode/supercopilot"
 if [ $? -eq 0 ]; then
   echo -e "   ${GREEN}✓ シンボリックリンクを作成しました${NC}"
-  echo -e "   ${GREEN}  $REPO_ROOT/vscode/settings -> $HOME/.vscode/supercopilot${NC}"
+  echo -e "   ${GREEN}  $REPO_ROOT/ide/vscode/settings -> $HOME/.vscode/supercopilot${NC}"
 else
   echo -e "   ${RED}✗ シンボリックリンクの作成に失敗しました${NC}"
   exit 1
@@ -75,10 +75,19 @@ if command -v jq >/dev/null 2>&1; then
   if [ -f "$VSCODE_SETTINGS" ]; then
     echo -e "   ${GREEN}✓ VSCode設定ファイルが見つかりました${NC}"
 
-    # 設定が既にあるか確認
-    if jq -e '.github.copilot.advanced.preProcessors.chat | has("path")' "$VSCODE_SETTINGS" >/dev/null 2>&1 && \
-       jq -r '.github.copilot.advanced.preProcessors.chat.path' "$VSCODE_SETTINGS" | grep -q "supercopilot-main.js"; then
+    # JSONC (コメント付きJSON) 対応: 一時的にコメントを除去したファイルを作成
+    SANITIZED_SETTINGS=$(mktemp)
+    if command -v node >/dev/null 2>&1; then
+      node -e 'const fs=require("fs"); console.log(fs.readFileSync(0, "utf8").replace(/\/\/.*|\/\*[\s\S]*?\*\//g, "").replace(/,[[:space:]]*([\]}])/g, "$1"));' < "$VSCODE_SETTINGS" > "$SANITIZED_SETTINGS" 2>/dev/null
+    else
+      sed 's|//.*||g; s|/\*.*\*/||g' "$VSCODE_SETTINGS" | tr -d '\n' | sed 's|,[[:space:]]*]|]|g; s|,[[:space:]]*}|}|g' > "$SANITIZED_SETTINGS" 2>/dev/null
+    fi
+
+    # 設定が既にあるか確認 (サニタイズ済みのファイルを使用)
+    if jq -e '.github.copilot.advanced.preProcessors.chat | has("path")' "$SANITIZED_SETTINGS" >/dev/null 2>&1 && \
+       jq -r '.github.copilot.advanced.preProcessors.chat.path' "$SANITIZED_SETTINGS" | grep -q "supercopilot-main.js"; then
       echo -e "   ${GREEN}✓ SuperCopilot設定は既に追加されています${NC}"
+      rm -f "$SANITIZED_SETTINGS"
     else
       echo -e "   ${YELLOW}SuperCopilot設定を追加します...${NC}"
 
@@ -86,13 +95,16 @@ if command -v jq >/dev/null 2>&1; then
       cp "$VSCODE_SETTINGS" "${VSCODE_SETTINGS}.backup"
 
       # VSCODE_SETTINGSが空、空白のみ、または空オブジェクトかを判定して初期化する
-      if [ ! -s "$VSCODE_SETTINGS" ] || [ -z "$(cat "$VSCODE_SETTINGS" | tr -d '[:space:]')" ] || [ "$(cat "$VSCODE_SETTINGS" | tr -d '[:space:]')" = "{}" ] || jq -e '. == {}' "$VSCODE_SETTINGS" >/dev/null 2>&1; then
+      # (サニタイズ済みのファイルで判定)
+      if [ ! -s "$SANITIZED_SETTINGS" ] || [ -z "$(cat "$SANITIZED_SETTINGS" | tr -d '[:space:]')" ] || [ "$(cat "$SANITIZED_SETTINGS" | tr -d '[:space:]')" = "{}" ] || jq -e '. == {}' "$SANITIZED_SETTINGS" >/dev/null 2>&1; then
         echo "{}" > "$VSCODE_SETTINGS"
+        cp "$VSCODE_SETTINGS" "$SANITIZED_SETTINGS"
       fi
 
-      # 既存のsettings.jsonと新しい設定をマージ
-      if jq --argjson config "$CONFIG_JSON" '. * $config' "$VSCODE_SETTINGS" > "${VSCODE_SETTINGS}.tmp"; then
+      # 既存のsettings.jsonと新しい設定をマージ (サニタイズ済みのファイルを使用してマージ結果を生成)
+      if jq --argjson config "$CONFIG_JSON" '. * $config' "$SANITIZED_SETTINGS" > "${VSCODE_SETTINGS}.tmp"; then
         mv "${VSCODE_SETTINGS}.tmp" "$VSCODE_SETTINGS"
+        rm -f "$SANITIZED_SETTINGS"
 
         # JSON構文の検証
         if jq empty "$VSCODE_SETTINGS" >/dev/null 2>&1; then

@@ -17,7 +17,7 @@ mkdir -p "$HOME/.vscode"
 
 # 環境変数などを利用してリポジトリルートを指定し、シンボリックリンクを作成
 # 実行前にリポジトリルートを設定してください (例: export REPO_ROOT="$(pwd)")
-ln -sf "$REPO_ROOT/vscode/settings" "$HOME/.vscode/supercopilot"
+ln -sf "$REPO_ROOT/ide/vscode/settings" "$HOME/.vscode/supercopilot"
 ```
 
 ### 2. Copilot設定の編集
@@ -105,10 +105,10 @@ install_supercopilot() {
   mkdir -p "$HOME/.vscode"
 
   # スクリプトのディレクトリからリポジトリルートを計算してシンボリックリンクを作成
-  # 前提: このスクリプトは <リポジトリのルート>/vscode ディレクトリ直下に配置されている必要があります
+  # 前提: このスクリプトは <リポジトリのルート>/ide/vscode ディレクトリ直下に配置されている必要があります
   local SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
   local REPO_ROOT="$(dirname "$SCRIPT_DIR")"
-  ln -sf "$REPO_ROOT/vscode/settings" "$HOME/.vscode/supercopilot"
+  ln -sf "$REPO_ROOT/ide/vscode/settings" "$HOME/.vscode/supercopilot"
 
   echo "SuperCopilot Frameworkのセットアップが完了しました"
   echo "VSCodeのsettings.jsonに設定を追加してください"

@@ -14,9 +14,9 @@ AGENTS_SKILLS_DIR := $(HOME)/.agents/skills
 
 MANIFEST_FILE := $(REPO_ROOT)/agent-skills/EXTERNAL_SKILLS.md
 
-.PHONY: setup-superpowers update-superpowers pin-superpowers link-superpowers-gemini link-superpowers-antigravity link-superpowers-agents update-gemini-md-superpowers uninstall-superpowers
+.PHONY: setup-superpowers update-superpowers pin-superpowers update-gemini-md-superpowers uninstall-superpowers
 
-setup-superpowers: update-superpowers link-superpowers-gemini link-superpowers-antigravity link-superpowers-agents update-gemini-md-superpowers ## superpowers の導入と全エージェントへの統合を実行
+setup-superpowers: update-superpowers update-gemini-md-superpowers ## superpowers の導入と全エージェントへの統合を実行
 
 update-superpowers: ## マニフェスト(Lock-file)に記載されたハッシュを使用して superpowers をインストール
 	@echo "🔄 superpowers: ロックファイルからバージョンを確認中..."
@@ -44,54 +44,10 @@ pin-superpowers: ## 現在の最新 HEAD をマニフェスト(Lock-file)に固�
 	(cd "$$TMP_DIR" && git checkout "$$HASH" --quiet) && \
 	uvx skillport add "$$TMP_DIR/skills/" --namespace $(SUPERPOWERS_NS) --yes --force && \
 	bash "$(REPO_ROOT)/scripts/update-skill-manifest.sh" "$(SUPERPOWERS_NS)" "https://github.com/obra/superpowers" "$$HASH" "$$DATE" && \
-	echo "✅ superpowers: バージョン $$HASH を $(MANIFEST_FILE) に固定しました"
+	@echo "✅ superpowers: バージョン $$HASH を $(MANIFEST_FILE) に固定しました"
 
-link-superpowers-gemini: ## Gemini CLI へスキルをリンク
-	@echo "🔗 superpowers: Gemini CLI へスキルをリンク中..."
-	@mkdir -p "$(GEMINI_SKILLS_DIR)"
-	@if command -v gemini >/dev/null 2>&1; then \
-		for skill in "$(LOCAL_SUPERPOWERS_DIR)"/*; do \
-			if [ -d "$$skill" ]; then \
-				gemini skills link "$$skill" --scope user --consent; \
-			fi; \
-		done; \
-	else \
-		echo "⚠️  gemini コマンドが見つかりません。スキップします"; \
-	fi
+	update-gemini-md-superpowers: ## ~/.gemini/GEMINI.md にワークフロー指示を追記
 
-link-superpowers-antigravity: ## Antigravity IDE へスキルを個別にリンク
-	@echo "🔗 superpowers: Antigravity IDE へスキルをリンク中..."
-	@link_skills() { \
-		local dest="$$1"; \
-		mkdir -p "$$dest"; \
-		if [ -d "$(LOCAL_SUPERPOWERS_DIR)" ]; then \
-			for skill in "$(LOCAL_SUPERPOWERS_DIR)"/*; do \
-				if [ -d "$$skill" ]; then \
-					local base=$$(basename "$$skill"); \
-					local target="$$dest/$$base"; \
-					if [ -L "$$target" ] || [ ! -e "$$target" ]; then \
-						ln -sfn "$$skill" "$$target"; \
-					else \
-						echo "⚠️  $$target exists and is NOT a symlink. Skipping."; \
-					fi; \
-				fi; \
-			done; \
-		fi; \
-	}; \
-	link_skills "$(ANTIGRAVITY_SKILLS_DIR)"; \
-	link_skills "$(GEMINI_AGENT_SKILLS_DIR)"
-
-link-superpowers-agents: ## Codex/汎用エージェントパスへリンク
-	@echo "🔗 superpowers: 汎用エージェントパス (~/.agents/skills) へリンク中..."
-	@mkdir -p "$(AGENTS_SKILLS_DIR)"
-	@target="$(AGENTS_SKILLS_DIR)/superpowers"; \
-	if [ -L "$$target" ] || [ ! -e "$$target" ]; then \
-		ln -sfn "$(LOCAL_SUPERPOWERS_DIR)" "$$target"; \
-	else \
-		echo "⚠️  $$target exists and is NOT a symlink. Skipping."; \
-	fi
-
-update-gemini-md-superpowers: ## ~/.gemini/GEMINI.md にワークフロー指示を追記
 	@echo "📝 superpowers: GEMINI.md を更新中..."
 	@if [ -f "$(HOME)/.gemini/GEMINI.md" ]; then \
 		if grep -q "## BEGIN Superpowers Workflow" "$(HOME)/.gemini/GEMINI.md"; then \
@@ -109,22 +65,8 @@ update-gemini-md-superpowers: ## ~/.gemini/GEMINI.md にワークフロー指示
 	fi
 
 
-uninstall-superpowers: ## superpowers の統合を解除（リンク削除、GEMINI.md 復元）
+uninstall-superpowers: ## superpowers の統合を解除（GEMINI.md 復元）
 	@echo "🧹 superpowers: 統合を解除しています..."
-	@for dir in "$(GEMINI_SKILLS_DIR)" "$(ANTIGRAVITY_SKILLS_DIR)" "$(GEMINI_AGENT_SKILLS_DIR)" "$(AGENTS_SKILLS_DIR)"; do \
-		if [ -d "$$dir" ]; then \
-			for item in "$$dir"/*; do \
-				if [ -L "$$item" ]; then \
-					target=$$(readlink "$$item"); \
-					case "$$target" in \
-						"$(LOCAL_SUPERPOWERS_DIR)"*) \
-							rm -f "$$item"; \
-							;; \
-					esac; \
-				fi; \
-			done; \
-		fi; \
-	done
 	@rm -rf "$(LOCAL_SUPERPOWERS_DIR)"
 	@if [ -f "$(HOME)/.gemini/GEMINI.md" ]; then \
 		if grep -q "## BEGIN Superpowers Workflow" "$(HOME)/.gemini/GEMINI.md"; then \

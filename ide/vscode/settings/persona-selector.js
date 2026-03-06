@@ -4,7 +4,7 @@
  * VSCode/GitHub Copilot向けのペルソナ自動選択機能
  */
 
-const superCopilot = require('./supercopilot');
+const superCopilot = typeof require !== 'undefined' ? require('./supercopilot') : (typeof window !== 'undefined' ? window.superCopilot : null);
 
 /**
  * ペルソナ自動選択クラス
@@ -118,7 +118,7 @@ class PersonaSelector {
 
     // コマンド指定の確認
     for (const [cmdKey, cmd] of Object.entries(this.config.commands)) {
-      const commandRegex = new RegExp(`\\b${cmdKey}\\b`, 'i');
+      const commandRegex = new RegExp(`(?:^|\\s)${this.escapeRegExp(cmdKey)}(?:\\s|$)`, 'i');
       if (commandRegex.test(queryText) && cmd.defaultPersona) {
         return this.config.personas[cmd.defaultPersona];
       }
@@ -221,7 +221,7 @@ class PersonaSelector {
 
     // コマンド指定がある場合
     for (const [cmdKey, cmd] of Object.entries(this.config.commands)) {
-      const commandRegex = new RegExp(`\\b${cmdKey}\\b`, 'i');
+      const commandRegex = new RegExp(`(?:^|\\s)${this.escapeRegExp(cmdKey)}(?:\\s|$)`, 'i');
       if (queryText && commandRegex.test(queryText) && cmd.defaultPersona) {
         return {
           persona: this.config.personas[cmd.defaultPersona],

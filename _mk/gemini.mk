@@ -8,6 +8,9 @@ REPO_ROOT ?= $(CURDIR)
 
 .PHONY: install-packages-gemini-cli install-packages-supergemini install-gemini-ecosystem
 
+# install-packages-supergemini を setup-supergemini のエイリアスとして定義
+install-packages-supergemini: setup-supergemini
+
 # Gemini CLI のインストール
 install-packages-gemini-cli:
 	@echo "🤖 Gemini CLI のインストールを開始..."
@@ -224,7 +227,7 @@ install-gemini-ecosystem:
 install-gemini-cli: install-packages-gemini-cli  ## Gemini CLIをインストール(エイリアス)
 
 .PHONY: install-supergemini
-install-supergemini: install-packages-supergemini  ## SuperGeminiをインストール(エイリアス)
+install-supergemini: setup-supergemini  ## SuperGeminiをインストール(エイリアス)
 
 .PHONY: gemini
 gemini: install-gemini-cli  ## Gemini CLIをインストール(エイリアス)

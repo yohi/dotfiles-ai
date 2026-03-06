@@ -26,8 +26,8 @@ SuperCopilot Frameworkは、GitHub Copilotの機能を拡張し、より専門�
 
 ## ファイル構成
 
-```
-vscode/settings/
+```text
+ide/vscode/settings/
 ├── supercopilot.js       # 基本設定・データ定義
 ├── persona-selector.js   # ペルソナ選択ロジック
 ├── commands-handler.js   # コマンド処理ロジック
@@ -44,7 +44,7 @@ vscode/settings/
 mkdir -p ~/.vscode
 
 # リポジトリルートから以下のコマンドを実行し、シンボリックリンクを作成
-ln -sf $(pwd)/vscode/settings ~/.vscode/supercopilot
+ln -sf $(pwd)/ide/vscode/settings ~/.vscode/supercopilot
 ```
 
 1. **VSCodeの設定に追加**

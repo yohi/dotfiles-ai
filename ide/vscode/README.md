@@ -4,8 +4,8 @@
 
 ## ディレクトリ構成
 
-```
-vscode/
+```text
+ide/vscode/
 ├── settings/                  # SuperCopilot Framework
 │   ├── supercopilot.js        # 基本設定・データ定義
 │   ├── persona-selector.js    # ペルソナ選択ロジック
@@ -42,16 +42,16 @@ vscode/
 mkdir -p ~/.config/Code/User
 
 # 設定ファイルのシンボリックリンクを作成（リポジトリルートで実行）
-ln -sf $(pwd)/vscode/settings.json ~/.config/Code/User/settings.json
-ln -sf $(pwd)/vscode/keybindings.json ~/.config/Code/User/keybindings.json
+ln -sf $(pwd)/ide/vscode/settings.json ~/.config/Code/User/settings.json
+ln -sf $(pwd)/ide/vscode/keybindings.json ~/.config/Code/User/keybindings.json
 ```
 
 または、ポータブルな設定として `~/.vscode` を使用している特別な理由がある場合（例えばエディタの起動スクリプトで独自の `--user-data-dir` を指定している場合）は、以下のようにします：
 
 ```bash
 mkdir -p ~/.vscode
-ln -sf $(pwd)/vscode/settings.json ~/.vscode/settings.json
-ln -sf $(pwd)/vscode/keybindings.json ~/.vscode/keybindings.json
+ln -sf $(pwd)/ide/vscode/settings.json ~/.vscode/settings.json
+ln -sf $(pwd)/ide/vscode/keybindings.json ~/.vscode/keybindings.json
 ```
 
 ### 拡張機能のインストール
@@ -59,7 +59,7 @@ ln -sf $(pwd)/vscode/keybindings.json ~/.vscode/keybindings.json
 `extensions.list`に記載されている拡張機能をインストールするには：
 
 ```bash
-cat ~/dotfiles/vscode/extensions.list | xargs -L 1 code --install-extension
+cat ~/dotfiles/ide/vscode/extensions.list | xargs -L 1 code --install-extension
 ```
 
 ### SuperCopilot Frameworkのセットアップ
@@ -67,7 +67,7 @@ cat ~/dotfiles/vscode/extensions.list | xargs -L 1 code --install-extension
 SuperCopilot Frameworkを設定するには、セットアップスクリプトを実行します：
 
 ```bash
-~/dotfiles/vscode/setup-supercopilot.sh
+~/dotfiles/ide/vscode/setup-supercopilot.sh
 ```
 
 これにより、以下が行われます：

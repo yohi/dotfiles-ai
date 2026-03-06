@@ -87,7 +87,7 @@ Specialized commands for managing AI agents and skills:
 --prompt-only                 # Optimized for AI agent integration
 --type uncommitted            # Only uncommitted changes
 --type all                    # All changes (committed + uncommitted)
---base main                   # Compare against main branch
+--base master                   # Compare against master branch
 --plain                       # Detailed feedback mode
 ```
 
@@ -137,7 +137,7 @@ The SuperCursor framework (gitignored but documented here for reference) provide
 **Installation** (if needed):
 
 ```bash
-cd cursor/supercursor
+cd ide/cursor/supercursor
 python -m supercursor install [--interactive|--minimal|--profile developer]
 ```
 
@@ -246,7 +246,7 @@ npm install -g @example/mcp-server
 
 # Direct CLI usage (if needed)
 coderabbit --type uncommitted --prompt-only
-coderabbit --base main --plain
+coderabbit --base master --plain
 ```
 
 ### Creating New Specification

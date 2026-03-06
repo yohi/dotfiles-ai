@@ -1,4 +1,11 @@
 mcpServers:
+  SQLite:
+    enabled: true
+  filesystem:
+    enabled: true
+    args:
+      - /home/y_ohi/dotfiles/components/dotfiles-ai
+      - /home/y_ohi
   playwright:
     enabled: true
   tavily:

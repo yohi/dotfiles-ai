@@ -17,19 +17,26 @@ include _mk/superpowers.mk
 include _mk/ide-cursor.mk
 include _mk/ide-vscode.mk
 
-.PHONY: setup install clean link
+.PHONY: setup install clean link install-agents install-ides setup-agents setup-ides
 
-install: ## Install all AI agents and IDE binaries
-	@echo "==> Installing dotfiles-ai binaries"
+install: install-agents install-ides ## Install all AI agents and IDE binaries
+
+install-agents:
+	@echo "==> Installing dotfiles-ai agent binaries"
 	$(MAKE) install-packages-claude-code
 	$(MAKE) install-packages-gemini-cli
 	$(MAKE) install-packages-codex
 	$(MAKE) install-packages-opencode
+
+install-ides:
+	@echo "==> Installing dotfiles-ai IDE tools"
 	$(MAKE) install-packages-cursor
 	$(MAKE) install-supercopilot
 
-setup: ## Setup all AI agents and IDE configurations
-	@echo "==> Setting up dotfiles-ai configurations"
+setup: setup-agents setup-ides ## Setup all AI agents and IDE configurations
+
+setup-agents:
+	@echo "==> Setting up dotfiles-ai agent configurations"
 	$(MAKE) setup-claude
 	$(MAKE) setup-supergemini
 	$(MAKE) setup-codex
@@ -37,6 +44,9 @@ setup: ## Setup all AI agents and IDE configurations
 	$(MAKE) setup-docker-mcp
 	$(MAKE) setup-superpowers
 	$(MAKE) sync-agents
+
+setup-ides:
+	@echo "==> Setting up dotfiles-ai IDE configurations"
 	$(MAKE) setup-cursor
 	$(MAKE) setup-vscode
 

@@ -27,7 +27,7 @@ coderabbit --plain
 coderabbit --type uncommitted --prompt-only
 
 # ベースブランチとの差分レビュー
-coderabbit --base main --prompt-only
+coderabbit --base master --prompt-only
 ```
 
 ### 3. 統合分析

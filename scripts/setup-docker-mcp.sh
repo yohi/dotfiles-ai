@@ -38,13 +38,17 @@ REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
 mkdir -p "$MCP_CONFIG_DIR/catalogs"
 
-# 既存のファイルがある場合はリンクに置き換え
-ln -sfn "$REPO_ROOT/mcp/config.yaml" "$MCP_CONFIG_DIR/config.yaml"
-ln -sfn "$REPO_ROOT/mcp/catalog.json" "$MCP_CONFIG_DIR/catalog.json"
-ln -sfn "$REPO_ROOT/mcp/catalogs/custom.yaml" "$MCP_CONFIG_DIR/catalogs/custom.yaml"
-ln -sfn "$REPO_ROOT/mcp/catalogs/bootstrap.yaml" "$MCP_CONFIG_DIR/catalogs/bootstrap.yaml"
+# 既存のファイルがある場合はコピーに置き換え
+rm -f "$MCP_CONFIG_DIR/config.yaml" "$MCP_CONFIG_DIR/catalog.json" "$MCP_CONFIG_DIR/catalogs/custom.yaml" "$MCP_CONFIG_DIR/catalogs/bootstrap.yaml"
+cp -f "$REPO_ROOT/mcp/config.yaml" "$MCP_CONFIG_DIR/config.yaml"
+cp -f "$REPO_ROOT/mcp/catalog.json" "$MCP_CONFIG_DIR/catalog.json"
+cp -f "$REPO_ROOT/mcp/catalogs/custom.yaml" "$MCP_CONFIG_DIR/catalogs/custom.yaml"
+cp -f "$REPO_ROOT/mcp/catalogs/bootstrap.yaml" "$MCP_CONFIG_DIR/catalogs/bootstrap.yaml"
 
-echo -e "${GREEN}✅ Symbolic links created in $MCP_CONFIG_DIR${NC}"
+# catalog.json 内の $HOME を実際のホームディレクトリに置換 (docker mcp が環境変数を展開しない場合のため)
+sed -i "s|\$HOME|$HOME|g" "$MCP_CONFIG_DIR/catalog.json"
+
+echo -e "${GREEN}✅ Configuration files copied and paths updated in $MCP_CONFIG_DIR${NC}"
 
 # systemd ユーザーサービスの作成
 echo -e "${BLUE}⚙️  Setting up systemd user service for Docker MCP Gateway...${NC}"
@@ -52,9 +56,12 @@ SERVICE_DIR="$HOME/.config/systemd/user"
 SERVICE_FILE="$SERVICE_DIR/docker-mcp-gateway.service"
 DOCKER_PATH="$(which docker)"
 
-# デフォルトで有効にするサーバーのリスト (mcp/config.yaml からのパースは複雑なため、ここではデフォルトを指定)
-# ユーザーが環境変数 ENABLE_SERVERS を指定している場合はそれを使用
-ENABLE_SERVERS="${ENABLE_SERVERS:-sqlite,filesystem}"
+# ENABLE_SERVERS が指定されていない場合は、--servers フラグを付けず、config.yaml の全設定を使用する
+ENABLE_SERVERS="${ENABLE_SERVERS:-}"
+SERVERS_ARG=""
+if [[ -n "$ENABLE_SERVERS" ]]; then
+    SERVERS_ARG="--servers $ENABLE_SERVERS"
+fi
 
 mkdir -p "$SERVICE_DIR"
 
@@ -64,10 +71,11 @@ Description=Docker MCP Gateway
 After=docker.service
 
 [Service]
+LimitNOFILE=65536
 Environment="ENABLE_SERVERS=$ENABLE_SERVERS"
 # To enable all servers, you can change the ExecStart line to use --enable-all-servers
-# ExecStart=$DOCKER_PATH mcp gateway run --port 10888 --enable-all-servers
-ExecStart=$DOCKER_PATH mcp gateway run --port 10888 --enable-servers \$ENABLE_SERVERS
+# ExecStart=$DOCKER_PATH mcp gateway run --transport sse --port 10888 --enable-all-servers
+ExecStart=$DOCKER_PATH mcp gateway run --transport sse --port 10888 --secrets "$MCP_CONFIG_DIR/secrets.env" --catalog bootstrap.yaml --catalog custom.yaml --watch=false $SERVERS_ARG
 Restart=always
 RestartSec=10
 StandardOutput=journal
@@ -86,7 +94,7 @@ if systemctl --user status > /dev/null 2>&1; then
 else
     echo -e "${RED}⚠️  Warning: User systemd session is unavailable. Skipping service activation.${NC}"
     echo -e "You can start the gateway manually with:"
-    echo -e "  ENABLE_SERVERS=\"$ENABLE_SERVERS\" $DOCKER_PATH mcp gateway run --port 10888 --enable-servers \$ENABLE_SERVERS"
+    echo -e "  ENABLE_SERVERS=\"$ENABLE_SERVERS\" $DOCKER_PATH mcp gateway run --transport sse --port 10888 --servers \$ENABLE_SERVERS"
 fi
 
 # カタログの初期化（未初期化の場合のみ、docker-mcp.yaml を取得するため）
@@ -109,7 +117,7 @@ if systemctl --user status > /dev/null 2>&1; then
     echo -e "  - Start:  systemctl --user start docker-mcp-gateway"
 else
     echo -e "${BLUE}Manual Execution:${NC}"
-    echo -e "  ENABLE_SERVERS=\"$ENABLE_SERVERS\" $DOCKER_PATH mcp gateway run --port 10888 --enable-servers \$ENABLE_SERVERS"
+    echo -e "  ENABLE_SERVERS=\"$ENABLE_SERVERS\" $DOCKER_PATH mcp gateway run --port 10888 --transport sse $SERVERS_ARG"
 fi
 echo -e ""
 echo -e "${BLUE}Endpoint:${NC} http://localhost:10888"

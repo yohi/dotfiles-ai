@@ -105,7 +105,6 @@ cr auth login
 ```bash
 --base master   # masterブランチとの比較
 --base develop  # developブランチとの比較
---base master   # masterブランチとの比較
 ```
 
 ## 📊 使用パターン推奨

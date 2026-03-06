@@ -9,15 +9,7 @@
   },
   "mcpServers": {
     "docker-mcp-gateway": {
-      "command": "docker",
-      "args": [
-        "mcp",
-        "gateway",
-        "run",
-        "--transport",
-        "stdio",
-        "--enable-all-servers"
-      ]
+      "url": "http://localhost:10888/sse"
     }
   },
   "customToolsDirectory": "~/.gemini/user-tools",

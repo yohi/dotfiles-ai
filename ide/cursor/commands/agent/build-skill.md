@@ -1,1 +1,1 @@
-../../../agent-commands/build-skill.md
+../../../../agent-commands/build-skill.md

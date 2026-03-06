@@ -1,1 +1,1 @@
-../../../agent-commands/setup-gh-actions-test-ci.md
+../../../../agent-commands/setup-gh-actions-test-ci.md

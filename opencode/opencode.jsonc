@@ -228,7 +228,7 @@
           "modalities": { "input": ["text", "image", "pdf"], "output": ["text"] }
         },
         "opus-4.6": {
-          "name": "Claude Opus 4.6 Thinking)",
+          "name": "Claude Opus 4.6 Thinking",
           "limit": { "context": 200000, "output": 64000 },
           "modalities": { "input": ["text", "image", "pdf"], "output": ["text"] },
           "variants": {

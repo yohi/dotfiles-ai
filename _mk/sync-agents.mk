@@ -41,10 +41,10 @@ sync-agents: ## SSOTのスキル群を各エージェントの設定ファイル
 sync-skillport-doc: ## skillport doc を実行し instruction files を更新
 	@echo "📝 skillport doc: スキルテーブルを更新中..."
 	@if command -v skillport >/dev/null 2>&1; then \
-		cd "$(REPO_ROOT)" && yes | skillport doc --all 2>&1 || \
+		cd "$(REPO_ROOT)" && printf 'y\n' | skillport doc --all 2>&1 || \
 			echo "⚠️  skillport doc の実行に問題がありました（スキップして続行）"; \
 	elif command -v uvx >/dev/null 2>&1; then \
-		cd "$(REPO_ROOT)" && yes | uvx skillport doc --all 2>&1 || \
+		cd "$(REPO_ROOT)" && printf 'y\n' | uvx skillport doc --all 2>&1 || \
 			echo "⚠️  uvx skillport doc の実行に問題がありました（スキップして続行）"; \
 	else \
 		echo "⚠️  skillport が見つかりません。スキルテーブルの更新をスキップします"; \
@@ -110,11 +110,11 @@ link-agent-commands: ## agent-commands/ のコマンドを各エージェント�
 		[ -f "$$cmd" ] || continue; \
 		base=$$(basename "$$cmd"); \
 		target="$(REPO_ROOT)/ide/cursor/commands/agent/$$base"; \
-		if [ -L "$$target" ] && [ "$$(readlink "$$target" 2>/dev/null || true)" = "../../../agent-commands/$$base" ]; then \
+		if [ -L "$$target" ] && [ "$$(readlink "$$target" 2>/dev/null || true)" = "../../../../agent-commands/$$base" ]; then \
 			echo "  [SKIP] ide/cursor/commands/agent/$$base"; \
 		else \
 			rm -f "$$target"; \
-			ln -sfn "../../../agent-commands/$$base" "$$target"; \
+			ln -sfn "../../../../agent-commands/$$base" "$$target"; \
 			echo "  ✅ ide/cursor/commands/agent/$$base"; \
 		fi; \
 		rule_target="$(REPO_ROOT)/.cursor/rules/$$base"; \

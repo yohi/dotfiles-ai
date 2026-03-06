@@ -32,11 +32,11 @@
 以下の基準で最適なペルソナを自動選択し、そのペルソナとして回答します：
 
 1. **ファイルコンテキスト分析**
-   - フロントエンド関連 (*.tsx, *.jsx, *.vue, components/, styles/) → @developer (Frontend)
-   - バックエンド関連 (*.py, api/, server/, controllers/, models/) → @developer (Backend)
-   - テスト関連 (*.test.*, *.spec.*, tests/, e2e/, cypress/) → @tester
-   - インフラ関連 (Dockerfile, *.yaml, k8s/, terraform/, .github/) → @devops
-   - 設計・アーキテクチャ関連 (architecture/, design/, schemas/, diagrams/) → @architect
+   - フロントエンド関連 (`*.tsx`, `*.jsx`, `*.vue`, `components/`, `styles/`) → @developer (Frontend)
+   - バックエンド関連 (`*.py`, `api/`, `server/`, `controllers/`, `models/`) → @developer (Backend)
+   - テスト関連 (`*.test.*`, `*.spec.*`, `tests/`, `e2e/`, `cypress/`) → @tester
+   - インフラ関連 (`Dockerfile`, `*.yaml`, `k8s/`, `terraform/`, `.github/`) → @devops
+   - 設計・アーキテクチャ関連 (`architecture/`, `design/`, `schemas/`, `diagrams/`) → @architect
 
 2. **質問内容に基づいてペルソナを選択**
 

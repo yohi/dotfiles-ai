@@ -13,7 +13,7 @@ export SHELL := /bin/sh
 # チェックサムが公開されるまでは、空欄に設定されていますが、インストール時には
 # CURSOR_NO_VERIFY_HASH=true を指定しない限りエラーとなります（セキュリティ強化）
 CURSOR_SHA256 :=
-CURSOR_NO_VERIFY_HASH := true
+CURSOR_NO_VERIFY_HASH := false
 
 # 変数のデフォルト定義 (親Makefileから渡されない場合のフォールバック)
 HOME_DIR ?= $(HOME)
@@ -69,10 +69,10 @@ _cursor_link_settings:
 	@ln -sf $(REPO_ROOT)/ide/cursor/keybindings.json $(HOME_DIR)/.config/Cursor/User/keybindings.json
 	@# MCP設定のリンク (docker-mcp-gateway を優先)
 	@mkdir -p $(HOME_DIR)/.config/Cursor/User/globalStorage/rooveterinaryinc.cursor-mcp
-	@if [ "$(USE_DOCKER_MCP)" = "false" ]; then \
-		ln -sf $(REPO_ROOT)/ide/cursor/mcp.json $(HOME_DIR)/.config/Cursor/User/globalStorage/rooveterinaryinc.cursor-mcp/mcp.json; \
-	else \
+	@if [ "$(USE_DOCKER_MCP)" = "true" ]; then \
 		ln -sf $(REPO_ROOT)/ide/cursor/mcp-docker.json $(HOME_DIR)/.config/Cursor/User/globalStorage/rooveterinaryinc.cursor-mcp/mcp.json; \
+	else \
+		ln -sf $(REPO_ROOT)/ide/cursor/mcp.json $(HOME_DIR)/.config/Cursor/User/globalStorage/rooveterinaryinc.cursor-mcp/mcp.json; \
 	fi
 	@echo "✅ Cursorの設定リンクが完了しました (DOCKER_MCP=$(USE_DOCKER_MCP))"
 
@@ -630,7 +630,24 @@ install-supercursor: install-packages-supercursor  ## SuperCursorをインスト
 .PHONY: uninstall-cursor
 uninstall-cursor:
 	@echo "🧹 Cursor IDEのアンインストールを開始..."
+	@if [ -d "$(HOME_DIR)/.cursor" ]; then \
+		if [ "$(FORCE)" != "true" ]; then \
+			printf "⚠️  Cursor の設定ディレクトリ (~/.cursor) を削除してもよろしいですか？ [y/N]: "; \
+			read -r answer; \
+			if [ "$answer" != "y" ] && [ "$answer" != "Y" ]; then \
+				echo "🛑 アンインストールを中止しました"; \
+				exit 1; \
+			fi; \
+		fi; \
+		BACKUP_TS=$(date +%Y%m%d_%H%M%S); \
+		BACKUP_FILE="$(HOME_DIR)/.cursor_backup_$BACKUP_TS.tar.gz"; \
+		echo "📦 設定ファイルをバックアップ中: $BACKUP_FILE"; \
+		tar -czf "$BACKUP_FILE" -C "$(HOME_DIR)" .cursor 2>/dev/null || true; \
+		rm -rf "$(HOME_DIR)/.cursor"; \
+	fi
 	@sudo rm -f /opt/cursor/cursor.AppImage
 	@sudo rm -f /usr/share/applications/cursor.desktop
-	@rm -rf $(HOME_DIR)/.cursor
+	@rm -f $(HOME_DIR)/.config/Cursor/User/settings.json
+	@rm -f $(HOME_DIR)/.config/Cursor/User/keybindings.json
+	@rm -f $(HOME_DIR)/.config/Cursor/User/globalStorage/rooveterinaryinc.cursor-mcp/mcp.json
 	@echo "✅ Cursor IDEのアンインストールが完了しました"

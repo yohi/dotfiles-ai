@@ -21,7 +21,7 @@ coderabbit --plain --type all
 coderabbit --type uncommitted --prompt-only
 
 # ベースブランチとのパフォーマンス差分
-coderabbit --base main --prompt-only
+coderabbit --base master --prompt-only
 ```
 
 ### フェーズ2: ボトルネック特定分析

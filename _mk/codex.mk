@@ -38,8 +38,8 @@ setup-codex: ## Setup Codex CLI configuration
 			> $(REPO_ROOT)/codex/config.toml; \
 	fi
 	@echo "Creating symbolic link: $(HOME_DIR)/.codex -> $(REPO_ROOT)/codex"
-	@if [ -d "$(HOME_DIR)/.codex" ] && [ ! -L "$(HOME_DIR)/.codex" ]; then \
-		backup_dir="$(HOME_DIR)/.codex.backup.$$(date +%s)"; \
+	@if [ -e "$(HOME_DIR)/.codex" ] && [ ! -L "$(HOME_DIR)/.codex" ]; then \
+		backup_dir="$(HOME_DIR)/.codex.backup.$(date +%s)"; \
 		echo "Moving existing directory to backup: $$backup_dir"; \
 		mv "$(HOME_DIR)/.codex" "$$backup_dir"; \
 	fi

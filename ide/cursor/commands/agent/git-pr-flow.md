@@ -1,1 +1,1 @@
-../../../agent-commands/git-pr-flow.md
+../../../../agent-commands/git-pr-flow.md

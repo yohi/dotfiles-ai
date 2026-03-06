@@ -24,9 +24,11 @@ class CommandsHandler {
   detectCommand(text) {
     if (!text) return null;
 
-    // コマンドの検出（単語として存在するか確認）
-    for (const [cmdKey, cmdInfo] of Object.entries(this.config.commands)) {
-      const commandRegex = new RegExp(`\\b${cmdKey}\\b`, 'i');
+    // コマンドの検出（単語として存在するか確認、長いキーワードを優先）
+    const sortedCommandKeys = Object.keys(this.config.commands).sort((a, b) => b.length - a.length);
+    for (const cmdKey of sortedCommandKeys) {
+      const cmdInfo = this.config.commands[cmdKey];
+      const commandRegex = new RegExp(`(?:^|\\s)${this.personaSelector.escapeRegExp(cmdKey)}(?:\\s|$)`, 'i');
       if (commandRegex.test(text)) {
         return {
           name: cmdKey,
@@ -51,7 +53,7 @@ class CommandsHandler {
 
     const command = this.config.commands[commandName];
     const defaultPersonaKey = command.defaultPersona || 'developer';
-    const persona = this.config.personas[defaultPersonaKey];
+    const persona = this.config.personas[defaultPersonaKey] || this.config.personas['developer'];
 
     // コマンドに対応するペルソナの特定
     const personaInfo = {
@@ -96,6 +98,13 @@ class CommandsHandler {
         commandPrompt += `- コンポーネント構成\n`;
         commandPrompt += `- データフロー\n`;
         commandPrompt += `- 技術選定理由\n\n`;
+        break;
+
+      case 'troubleshoot':
+        commandPrompt += `問題解決のデバッグを行います：\n\n`;
+        commandPrompt += `- エラー原因の特定\n`;
+        commandPrompt += `- 修正案の提示\n`;
+        commandPrompt += `- 再発防止策\n\n`;
         break;
 
       // 他のコマンドも同様に定義可能
