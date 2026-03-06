@@ -4,8 +4,15 @@
  * VSCode/GitHub Copilot向けのコマンド処理機能
  */
 
-const superCopilot = require('./supercopilot');
-const { PersonaSelector } = require('./persona-selector');
+let superCopilot, PersonaSelector;
+
+if (typeof require === 'function') {
+  superCopilot = require('./supercopilot');
+  PersonaSelector = require('./persona-selector').PersonaSelector;
+} else {
+  // ブラウザ環境や require がない環境用のフォールバック（必要に応じて）
+  superCopilot = superCopilot || {};
+}
 
 /**
  * コマンド処理クラス

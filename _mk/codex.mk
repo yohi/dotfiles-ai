@@ -39,7 +39,7 @@ setup-codex: ## Setup Codex CLI configuration
 	fi
 	@echo "Creating symbolic link: $(HOME_DIR)/.codex -> $(REPO_ROOT)/codex"
 	@if [ -e "$(HOME_DIR)/.codex" ] && [ ! -L "$(HOME_DIR)/.codex" ]; then \
-		backup_dir="$(HOME_DIR)/.codex.backup.$(date +%s)"; \
+		backup_dir="$(HOME_DIR)/.codex.backup.$$(date +%s)"; \
 		echo "Moving existing directory to backup: $$backup_dir"; \
 		mv "$(HOME_DIR)/.codex" "$$backup_dir"; \
 	fi

@@ -63,5 +63,5 @@ clean:
 	-$(MAKE) uninstall-skillport
 	-$(MAKE) uninstall-mcp
 	-$(MAKE) uninstall-superpowers
-	-$(MAKE) uninstall-cursor
-	-$(MAKE) uninstall-vscode
+	-$(MAKE) uninstall-cursor FORCE=true
+	-$(MAKE) uninstall-vscode FORCE=true

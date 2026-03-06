@@ -94,7 +94,7 @@ if systemctl --user status > /dev/null 2>&1; then
 else
     echo -e "${RED}⚠️  Warning: User systemd session is unavailable. Skipping service activation.${NC}"
     echo -e "You can start the gateway manually with:"
-    echo -e "  ENABLE_SERVERS=\"$ENABLE_SERVERS\" $DOCKER_PATH mcp gateway run --transport sse --port 10888 --servers \$ENABLE_SERVERS"
+    echo -e "  ENABLE_SERVERS=\"$ENABLE_SERVERS\" $DOCKER_PATH mcp gateway run --transport sse --port 10888 $SERVERS_ARG"
 fi
 
 # カタログの初期化（未初期化の場合のみ、docker-mcp.yaml を取得するため）

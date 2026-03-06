@@ -21,7 +21,7 @@ fi
 
 # 現在のディレクトリを確認
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(dirname "$SCRIPT_DIR")"
+REPO_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
 
 echo -e "${BLUE}SuperCopilot Framework セットアップを開始します...${NC}"
 echo -e "${YELLOW}dotfiles ディレクトリ: ${REPO_ROOT}${NC}"
@@ -78,9 +78,19 @@ if command -v jq >/dev/null 2>&1; then
     # JSONC (コメント付きJSON) 対応: 一時的にコメントを除去したファイルを作成
     SANITIZED_SETTINGS=$(mktemp)
     if command -v node >/dev/null 2>&1; then
-      node -e 'const fs=require("fs"); console.log(fs.readFileSync(0, "utf8").replace(/\/\/.*|\/\*[\s\S]*?\*\//g, "").replace(/,[[:space:]]*([\]}])/g, "$1"));' < "$VSCODE_SETTINGS" > "$SANITIZED_SETTINGS" 2>/dev/null
+      # Node.js を使用してコメントと末尾のカンマを安全に除去
+      node -e '
+        const fs = require("fs");
+        let content = fs.readFileSync(0, "utf8");
+        // コメント除去 (文字列内の // や /* */ に配慮しない簡易版だが、正規表現よりは安全)
+        content = content.replace(/\/\*[\s\S]*?\*\/|([^:]|^)\/\/.*$/gm, "$1");
+        // 末尾のカンマを除去
+        content = content.replace(/,[[:space:]]*([\]}])/g, "$1");
+        process.stdout.write(content);
+      ' < "$VSCODE_SETTINGS" > "$SANITIZED_SETTINGS" 2>/dev/null
     else
-      sed 's|//.*||g; s|/\*.*\*/||g' "$VSCODE_SETTINGS" | tr -d '\n' | sed 's|,[[:space:]]*]|]|g; s|,[[:space:]]*}|}|g' > "$SANITIZED_SETTINGS" 2>/dev/null
+      # Node がない場合は perl で同様の処理を行う (sed より堅牢)
+      perl -0777 -pe 's|/\*.*?\*/||gs; s|(?<!:)\/\/.*||g; s|,([[:space:]]*[\]}])|$1|g' "$VSCODE_SETTINGS" > "$SANITIZED_SETTINGS" 2>/dev/null
     fi
 
     # 設定が既にあるか確認 (サニタイズ済みのファイルを使用)

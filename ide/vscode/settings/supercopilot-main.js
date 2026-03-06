@@ -6,9 +6,16 @@
  */
 
 // 必要なモジュールをインポート
-const superCopilot = require('./supercopilot');
-const { PersonaSelector } = require('./persona-selector');
-const { CommandsHandler } = require('./commands-handler');
+let superCopilot, PersonaSelector, CommandsHandler;
+
+if (typeof require === 'function') {
+  superCopilot = require('./supercopilot');
+  PersonaSelector = require('./persona-selector').PersonaSelector;
+  CommandsHandler = require('./commands-handler').CommandsHandler;
+} else {
+  // ブラウザ環境や require がない環境用のフォールバック（必要に応じて）
+  superCopilot = superCopilot || {};
+}
 
 /**
  * SuperCopilot メインクラス

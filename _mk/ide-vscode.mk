@@ -24,25 +24,25 @@ setup-vscode:
 		src="$(REPO_ROOT)/ide/vscode/$f"; \
 		dst="$(VSCODE_USER_DIR)/$f"; \
 		if [ -f "$dst" ] && [ ! -L "$dst" ]; then \
-			backup="$dst.bak.$(date +%Y%m%d_%H%M%S)"; \
-			echo "⚠️  既存の $f をバックアップします: $backup"; \
-			mv "$dst" "$backup"; \
+		        backup="$dst.bak.$$(date +%Y%m%d_%H%M%S)"; \
+		        echo "⚠️  既存の $f をバックアップします: $backup"; \
+		        mv "$dst" "$backup"; \
 		elif [ -L "$dst" ] && [ "$(readlink "$dst")" != "$src" ]; then \
-			echo "🔄 シンボリックリンクを更新します: $dst"; \
+		        echo "🔄 シンボリックリンクを更新します: $dst"; \
 		fi; \
 		ln -sf "$src" "$dst"; \
-	done
-	@echo "✅ VSCodeの設定リンクが完了しました"
+		done
+		@echo "✅ VSCodeの設定リンクが完了しました"
 
-install-supercopilot:
-	@echo "🚀 SuperCopilot Framework のセットアップを開始..."
-	@bash $(REPO_ROOT)/ide/vscode/setup-supercopilot.sh
-	@echo "✅ SuperCopilot のセットアップが完了しました"
+		install-supercopilot:
+		@echo "🚀 SuperCopilot Framework のセットアップを開始..."
+		@bash $(REPO_ROOT)/ide/vscode/setup-supercopilot.sh
+		@echo "✅ SuperCopilot のセットアップが完了しました"
 
-.PHONY: uninstall-vscode
-uninstall-vscode:
-	@echo "🧹 VSCodeの設定リンクを解除しています..."
-	@rm -f "$(VSCODE_USER_DIR)/settings.json"
-	@rm -f "$(VSCODE_USER_DIR)/keybindings.json"
-	@rm -rf $(HOME)/.vscode/supercopilot
-	@echo "✅ VSCodeの設定解除が完了しました"
+		.PHONY: uninstall-vscode
+		uninstall-vscode:
+		@echo "🧹 VSCodeの設定リンクを解除しています..."
+		@if [ -L "$(VSCODE_USER_DIR)/settings.json" ]; then rm -f "$(VSCODE_USER_DIR)/settings.json"; fi
+		@if [ -L "$(VSCODE_USER_DIR)/keybindings.json" ]; then rm -f "$(VSCODE_USER_DIR)/keybindings.json"; fi
+		@if [ -L "$(HOME)/.vscode/supercopilot" ]; then rm -f "$(HOME)/.vscode/supercopilot"; fi
+		@echo "✅ VSCodeの設定解除が完了しました"
