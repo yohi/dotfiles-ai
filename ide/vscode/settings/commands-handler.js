@@ -9,8 +9,12 @@ let superCopilot, PersonaSelector;
 if (typeof require === 'function') {
   superCopilot = require('./supercopilot');
   PersonaSelector = require('./persona-selector').PersonaSelector;
+} else if (typeof window !== 'undefined') {
+  // ブラウザ環境や require がない環境用のフォールバック
+  // グローバル実体が存在する場合はそれを優先する
+  superCopilot = window.superCopilot || superCopilot || {};
+  PersonaSelector = window.PersonaSelector || PersonaSelector;
 } else {
-  // ブラウザ環境や require がない環境用のフォールバック（必要に応じて）
   superCopilot = superCopilot || {};
 }
 

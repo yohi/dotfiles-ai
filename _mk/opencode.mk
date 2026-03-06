@@ -130,7 +130,7 @@ install-packages-opencode: ## OpenCode（opencode）をインストール
 			rm -f "$$tmp"; \
 			exit 1; \
 		fi; \
-		yes | bash "$$tmp" || [ $${PIPESTATUS[0]} -eq 141 ] || [ $${PIPESTATUS[1]} -eq 0 ]; \
+		yes | bash "$$tmp" || [ $${PIPESTATUS[1]} -eq 0 ]; \
 		rm -f "$$tmp"'
 	@if [ ! -x "$(OPENCODE_BIN)" ]; then \
 		echo "❌ opencode のインストールに失敗しました: $(OPENCODE_BIN) が見つかりません"; \
@@ -156,7 +156,7 @@ opencode-update: ## OpenCode（opencode）をアップデート
 			rm -f "$$tmp"; \
 			exit 1; \
 		fi; \
-		yes | bash "$$tmp" || [ $${PIPESTATUS[0]} -eq 141 ] || [ $${PIPESTATUS[1]} -eq 0 ]; \
+		yes | bash "$$tmp" || [ $${PIPESTATUS[1]} -eq 0 ]; \
 		rm -f "$$tmp"'
 	@if [ ! -x "$(OPENCODE_BIN)" ]; then \
 		echo "❌ opencode のアップデートに失敗しました: $(OPENCODE_BIN) が見つかりません"; \

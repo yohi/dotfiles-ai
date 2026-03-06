@@ -38,12 +38,25 @@ REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
 mkdir -p "$MCP_CONFIG_DIR/catalogs"
 
-# 既存のファイルがある場合はコピーに置き換え
-rm -f "$MCP_CONFIG_DIR/config.yaml" "$MCP_CONFIG_DIR/catalog.json" "$MCP_CONFIG_DIR/catalogs/custom.yaml" "$MCP_CONFIG_DIR/catalogs/bootstrap.yaml"
-cp -f "$REPO_ROOT/mcp/config.yaml" "$MCP_CONFIG_DIR/config.yaml"
-cp -f "$REPO_ROOT/mcp/catalog.json" "$MCP_CONFIG_DIR/catalog.json"
-cp -f "$REPO_ROOT/mcp/catalogs/custom.yaml" "$MCP_CONFIG_DIR/catalogs/custom.yaml"
-cp -f "$REPO_ROOT/mcp/catalogs/bootstrap.yaml" "$MCP_CONFIG_DIR/catalogs/bootstrap.yaml"
+# 1. 既存のファイルがある場合はコピーに置き換え (ソースの存在を確認してから)
+FILES_TO_COPY=(
+    "config.yaml:$MCP_CONFIG_DIR/config.yaml"
+    "catalog.json:$MCP_CONFIG_DIR/catalog.json"
+    "catalogs/custom.yaml:$MCP_CONFIG_DIR/catalogs/custom.yaml"
+    "catalogs/bootstrap.yaml:$MCP_CONFIG_DIR/catalogs/bootstrap.yaml"
+)
+
+for pair in "${FILES_TO_COPY[@]}"; do
+    SRC="${pair%%:*}"
+    DST="${pair##*:}"
+    if [[ ! -f "$REPO_ROOT/mcp/$SRC" ]]; then
+        echo -e "${RED}❌ Source file not found: $REPO_ROOT/mcp/$SRC${NC}"
+        exit 1
+    fi
+    # 既存のファイルを削除してからコピー (検証済み)
+    rm -f "$DST"
+    cp -f "$REPO_ROOT/mcp/$SRC" "$DST"
+done
 
 # catalog.json 内の $HOME を実際のホームディレクトリに置換 (docker mcp が環境変数を展開しない場合のため)
 sed -i.bak "s|\$HOME|$HOME|g" "$MCP_CONFIG_DIR/catalog.json" && rm -f "$MCP_CONFIG_DIR/catalog.json.bak"
@@ -63,6 +76,9 @@ if [[ -n "$ENABLE_SERVERS" ]]; then
     SERVERS_ARG="--servers $ENABLE_SERVERS"
 fi
 
+# 共通の Gateway コマンド変数を定義
+GATEWAY_CMD="$DOCKER_PATH mcp gateway run --transport sse --port 10888 --secrets \"$MCP_CONFIG_DIR/secrets.env\" --catalog bootstrap.yaml --catalog custom.yaml --watch=false $SERVERS_ARG"
+
 mkdir -p "$SERVICE_DIR"
 
 cat <<EOF > "$SERVICE_FILE"
@@ -75,7 +91,7 @@ LimitNOFILE=65536
 Environment="ENABLE_SERVERS=$ENABLE_SERVERS"
 # To enable all servers, you can change the ExecStart line to use --enable-all-servers
 # ExecStart=$DOCKER_PATH mcp gateway run --transport sse --port 10888 --enable-all-servers
-ExecStart=$DOCKER_PATH mcp gateway run --transport sse --port 10888 --secrets "$MCP_CONFIG_DIR/secrets.env" --catalog bootstrap.yaml --catalog custom.yaml --watch=false $SERVERS_ARG
+ExecStart=$GATEWAY_CMD
 Restart=always
 RestartSec=10
 StandardOutput=journal
@@ -94,7 +110,7 @@ if systemctl --user status > /dev/null 2>&1; then
 else
     echo -e "${RED}⚠️  Warning: User systemd session is unavailable. Skipping service activation.${NC}"
     echo -e "You can start the gateway manually with:"
-    echo -e "  ENABLE_SERVERS=\"$ENABLE_SERVERS\" $DOCKER_PATH mcp gateway run --transport sse --port 10888 $SERVERS_ARG"
+    echo -e "  ENABLE_SERVERS=\"$ENABLE_SERVERS\" $GATEWAY_CMD"
 fi
 
 # カタログの初期化（未初期化の場合のみ、docker-mcp.yaml を取得するため）
@@ -117,7 +133,7 @@ if systemctl --user status > /dev/null 2>&1; then
     echo -e "  - Start:  systemctl --user start docker-mcp-gateway"
 else
     echo -e "${BLUE}Manual Execution:${NC}"
-    echo -e "  ENABLE_SERVERS=\"$ENABLE_SERVERS\" $DOCKER_PATH mcp gateway run --port 10888 --transport sse $SERVERS_ARG"
+    echo -e "  ENABLE_SERVERS=\"$ENABLE_SERVERS\" $GATEWAY_CMD"
 fi
 echo -e ""
 echo -e "${BLUE}Endpoint:${NC} http://localhost:10888"

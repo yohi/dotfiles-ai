@@ -12,11 +12,13 @@ if (typeof require === 'function') {
   superCopilot = require('./supercopilot');
   PersonaSelector = require('./persona-selector').PersonaSelector;
   CommandsHandler = require('./commands-handler').CommandsHandler;
-} else {
-  // ブラウザ環境や require がない環境用のフォールバック（必要に応じて）
-  superCopilot = superCopilot || {};
+} else if (typeof window !== 'undefined') {
+  // ブラウザ環境や require がない環境用のフォールバック
+  superCopilot = window.superCopilot || superCopilot || {};
   
   // 依存クラスのフォールバック定義
+  // グローバル実体が存在する場合はそれを優先する
+  PersonaSelector = window.PersonaSelector || PersonaSelector;
   if (typeof PersonaSelector === 'undefined') {
     PersonaSelector = class {
       constructor() {}
@@ -24,6 +26,8 @@ if (typeof require === 'function') {
       generatePersonaPrompt() { return ''; }
     };
   }
+  
+  CommandsHandler = window.CommandsHandler || CommandsHandler;
   if (typeof CommandsHandler === 'undefined') {
     CommandsHandler = class {
       constructor() {}
@@ -33,6 +37,8 @@ if (typeof require === 'function') {
       generateHelpText() { return ''; }
     };
   }
+} else {
+  superCopilot = superCopilot || {};
 }
 
 /**

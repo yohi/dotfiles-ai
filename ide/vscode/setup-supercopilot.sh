@@ -78,19 +78,66 @@ if command -v jq >/dev/null 2>&1; then
     # JSONC (コメント付きJSON) 対応: 一時的にコメントを除去したファイルを作成
     SANITIZED_SETTINGS=$(mktemp)
     if command -v node >/dev/null 2>&1; then
-      # Node.js を使用してコメントと末尾のカンマを安全に除去
+      # Node.js を使用してコメントと末尾のカンマを安全に除去 (文字列リテラルを考慮)
       node -e '
         const fs = require("fs");
-        let content = fs.readFileSync(0, "utf8");
-        // コメント除去 (文字列内の // や /* */ に配慮しない簡易版だが、正規表現よりは安全)
-        content = content.replace(/\/\*[\s\S]*?\*\/|([^:]|^)\/\/.*$/gm, "$1");
+        const content = fs.readFileSync(0, "utf8");
+        let result = "";
+        let i = 0;
+        let inString = null;
+        let inComment = null;
+        
+        while (i < content.length) {
+          const char = content[i];
+          const next = content[i + 1];
+          
+          if (inComment === "single") {
+            if (char === "\n") inComment = null;
+          } else if (inComment === "multi") {
+            if (char === "*" && next === "/") { inComment = null; i++; }
+          } else {
+            if (inString) {
+              if (char === "\\" ) { result += char + (next || ""); i++; }
+              else if (char === inString) inString = null;
+              result += char;
+            } else {
+              if (char === "/" && next === "/") { inComment = "single"; i++; }
+              else if (char === "/" && next === "*") { inComment = "multi"; i++; }
+              else if (char === "\"" || char === "'" || char === "`") { inString = char; result += char; }
+              else result += char;
+            }
+          }
+          i++;
+        }
         // 末尾のカンマを除去
-        content = content.replace(/,\s*([\]}])/g, "$1");
-        process.stdout.write(content);
+        result = result.replace(/,\s*([\]}])/g, "$1");
+        process.stdout.write(result);
       ' < "$VSCODE_SETTINGS" > "$SANITIZED_SETTINGS" 2>/dev/null
     else
-      # Node がない場合は perl で同様の処理を行う (sed より堅牢)
-      perl -0777 -pe 's|/\*.*?\*/||gs; s|(?<!:)\/\/.*||g; s|,(\s*[\]}])|$1|g' "$VSCODE_SETTINGS" > "$SANITIZED_SETTINGS" 2>/dev/null
+      # Node がない場合は perl で同様の処理を行う (文字列リテラルを考慮)
+      perl -0777 -ne '
+        $i = 0; $in_str = ""; $in_cmt = ""; $res = "";
+        while ($i < length($_)) {
+          $c = substr($_, $i, 1); $n = substr($_, $i+1, 1);
+          if ($in_cmt eq "s") { if ($c eq "\n") { $in_cmt = ""; } }
+          elsif ($in_cmt eq "m") { if ($c eq "*" && $n eq "/") { $in_cmt = ""; $i++; } }
+          else {
+            if ($in_str) {
+              if ($c eq "\\\\") { $res .= $c . $n; $i++; }
+              elsif ($c eq $in_str) { $in_str = ""; }
+              $res .= $c;
+            } else {
+              if ($c eq "/" && $n eq "/") { $in_cmt = "s"; $i++; }
+              elsif ($c eq "/" && $n eq "*") { $in_cmt = "m"; $i++; }
+              elsif ($c =~ /["\x27`]/) { $in_str = $c; $res .= $c; }
+              else { $res .= $c; }
+            }
+          }
+          $i++;
+        }
+        $res =~ s/,\s*([\]}])/$1/g;
+        print $res;
+      ' "$VSCODE_SETTINGS" > "$SANITIZED_SETTINGS" 2>/dev/null
     fi
 
     # 設定が既にあるか確認 (サニタイズ済みのファイルを使用)

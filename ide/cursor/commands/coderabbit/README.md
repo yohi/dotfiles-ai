@@ -158,8 +158,8 @@ cr auth login
 - **継続的ワークフロー**: 問題検出→修正→検証の自動サイクル
 
 ### 設定ファイル連携
-CodeRabbitは自動的に以下のファイルを読み取り：
-- `claude.md` - コーディング標準とアーキテクチャ設定
+CodeRabbitは自動的に以下のファイルを読み取り、プロジェクトの文脈を理解します（詳細は[CodeRabbit公式ドキュメント](https://docs.coderabbit.ai/integrations/knowledge-base/)を参照）：
+- `CLAUDE.md` - コーディング標準とアーキテクチャ設定（CodeRabbitにより自動検出されます）
 - `.cursorrules` - Cursor固有のルール
 - カスタム設定ファイル (`--config` オプション)
 
