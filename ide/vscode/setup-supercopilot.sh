@@ -103,7 +103,7 @@ if command -v jq >/dev/null 2>&1; then
             } else {
               if (char === "/" && next === "/") { inComment = "single"; i++; }
               else if (char === "/" && next === "*") { inComment = "multi"; i++; }
-              else if (char === "\"" || char === "'" || char === "`") { inString = char; result += char; }
+              else if (char === "\"" || char === "\'" || char === "\x60") { inString = char; result += char; }
               else result += char;
             }
           }
@@ -129,7 +129,7 @@ if command -v jq >/dev/null 2>&1; then
             } else {
               if ($c eq "/" && $n eq "/") { $in_cmt = "s"; $i++; }
               elsif ($c eq "/" && $n eq "*") { $in_cmt = "m"; $i++; }
-              elsif ($c =~ /["\x27`]/) { $in_str = $c; $res .= $c; }
+              elsif ($c =~ /["\x27\x60]/) { $in_str = $c; $res .= $c; }
               else { $res .= $c; }
             }
           }
@@ -138,6 +138,13 @@ if command -v jq >/dev/null 2>&1; then
         $res =~ s/,\s*([\]}])/$1/g;
         print $res;
       ' "$VSCODE_SETTINGS" > "$SANITIZED_SETTINGS" 2>/dev/null
+    fi
+
+    # サニタイズ結果のバリデーション
+    if [ ! -f "$SANITIZED_SETTINGS" ] || [ ! -s "$SANITIZED_SETTINGS" ] || ! jq empty "$SANITIZED_SETTINGS" >/dev/null 2>&1; then
+      echo -e "   ${RED}✗ 設定ファイルの解析に失敗しました。JSONが不正か、サニタイズに失敗しました${NC}"
+      rm -f "$SANITIZED_SETTINGS"
+      exit 1
     fi
 
     # 設定が既にあるか確認 (サニタイズ済みのファイルを使用)

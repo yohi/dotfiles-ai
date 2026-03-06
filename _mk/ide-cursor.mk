@@ -46,8 +46,8 @@ BYTES_TO_MB := 1048576
 
 # Cursor IDEのインストール
 .PHONY: install-packages-cursor _cursor_download _cursor_setup_desktop \
-        update-cursor stop-cursor check-cursor-version \
-        install-packages-supercursor setup-cursor
+	update-cursor stop-cursor check-cursor-version \
+	install-packages-supercursor setup-cursor
 
 setup-cursor: _cursor_link_settings ## Cursorの設定をセットアップ（設定ファイルのみ）
 
@@ -63,20 +63,20 @@ install-packages-cursor:
 	@echo "✅ Cursor IDEのインストールが完了しました"
 
 _cursor_link_settings:
-        @echo "📝 Cursorの設定をリンクしています..."
-        @mkdir -p $(HOME_DIR)/.config/Cursor/User
-        @for f in settings.json keybindings.json; do \
-                src="$(REPO_ROOT)/ide/cursor/$$f"; \
-                dst="$(HOME_DIR)/.config/Cursor/User/$$f"; \
-                if [ -f "$$dst" ] && [ ! -L "$$dst" ]; then \
-                        backup="$$dst.bak.$$(date +%Y%m%d_%H%M%S)"; \
-                        echo "⚠️  既存の $$f をバックアップします: $$backup"; \
-                        mv "$$dst" "$$backup"; \
-                fi; \
-                ln -sf "$$src" "$$dst"; \
-        done
-        @mkdir -p $(HOME_DIR)/.config/Cursor/User/globalStorage/rooveterinaryinc.cursor-mcp
-        @if [ "$(USE_DOCKER_MCP)" = "true" ]; then \
+	@echo "📝 Cursorの設定をリンクしています..."
+	@mkdir -p $(HOME_DIR)/.config/Cursor/User
+	@for f in settings.json keybindings.json; do \
+	        src="$(REPO_ROOT)/ide/cursor/$$f"; \
+	        dst="$(HOME_DIR)/.config/Cursor/User/$$f"; \
+	        if [ -f "$$dst" ] && [ ! -L "$$dst" ]; then \
+	                backup="$$dst.bak.$$(date +%Y%m%d_%H%M%S)"; \
+	                echo "⚠️  既存の $$f をバックアップします: $$backup"; \
+	                mv "$$dst" "$$backup"; \
+	        fi; \
+	        ln -sf "$$src" "$$dst"; \
+	done
+	@mkdir -p $(HOME_DIR)/.config/Cursor/User/globalStorage/rooveterinaryinc.cursor-mcp
+	@if [ "$(USE_DOCKER_MCP)" = "true" ]; then \
 		ln -sf $(REPO_ROOT)/ide/cursor/mcp-docker.json $(HOME_DIR)/.config/Cursor/User/globalStorage/rooveterinaryinc.cursor-mcp/mcp.json; \
 	else \
 		ln -sf $(REPO_ROOT)/ide/cursor/mcp.json $(HOME_DIR)/.config/Cursor/User/globalStorage/rooveterinaryinc.cursor-mcp/mcp.json; \
@@ -294,7 +294,7 @@ _cursor_setup_desktop:
 		echo "⚠️  セキュリティリスク: サンドボックス保護が無効化されます"; \
 		EXEC_VAL="/opt/cursor/cursor.AppImage --no-sandbox %F"; \
 	fi; \
-	printf "[Desktop Entry]\nName=Cursor\nComment=The AI-first code editor\nExec=%%s\nIcon=%%s\nTerminal=false\nType=Application\nCategories=Development;IDE;TextEditor;\nMimeType=text/plain;inode/directory;\nStartupWMClass=cursor\n" \
+	printf "[Desktop Entry]\nName=Cursor\nComment=The AI-first code editor\nExec=%s\nIcon=%s\nTerminal=false\nType=Application\nCategories=Development;IDE;TextEditor;\nMimeType=text/plain;inode/directory;\nStartupWMClass=cursor\n" \
 		"$$EXEC_VAL" "$$ICON_PATH" | sudo tee /usr/share/applications/cursor.desktop > /dev/null; \
 	sudo chmod +x /usr/share/applications/cursor.desktop; \
 	sudo update-desktop-database 2>/dev/null || true; \
@@ -556,41 +556,49 @@ install-packages-supercursor:
 	\
 	echo "🔗 シンボリックリンクを作成中..."; \
 	# SuperCursor本体へのリンク \
-	rm -rf "${HOME_DIR}/.cursor/supercursor"; \
+	# 重複削除の代わりに安全な置換を行う
+	@set -e; \
+	BACKUP_DIR="${HOME_DIR}/.cursor/backups/$$(date +%Y%m%d_%H%M%S)"; \
+	safe_link() { \
+		src="$$1"; dst="$$2"; \
+		if [ -L "$$dst" ]; then \
+			rm -f "$$dst"; \
+		elif [ -e "$$dst" ]; then \
+			mkdir -p "$$BACKUP_DIR"; \
+			mv "$$dst" "$$BACKUP_DIR/"; \
+			echo "📦 既存のファイルをバックアップしました: $$dst -> $$BACKUP_DIR/"; \
+		fi; \
+		ln -sfn "$$src" "$$dst"; \
+	}; \
 	if [ ! -d "${DOTFILES_SHELL_ROOT}/dotfiles-ai/ide/cursor/supercursor" ]; then \
 		echo "❌ Source path not found: ${DOTFILES_SHELL_ROOT}/dotfiles-ai/ide/cursor/supercursor"; \
 		exit 1; \
 	fi; \
-	ln -s "${DOTFILES_SHELL_ROOT}/dotfiles-ai/ide/cursor/supercursor" "${HOME_DIR}/.cursor/supercursor"; \
+	safe_link "${DOTFILES_SHELL_ROOT}/dotfiles-ai/ide/cursor/supercursor" "${HOME_DIR}/.cursor/supercursor"; \
 	# 各種ディレクトリへのリンク \
-	rm -rf "${HOME_DIR}/.cursor/commands"; \
 	if [ ! -d "${DOTFILES_SHELL_ROOT}/dotfiles-ai/ide/cursor/supercursor/Commands" ]; then \
 		echo "❌ Source path not found: ${DOTFILES_SHELL_ROOT}/dotfiles-ai/ide/cursor/supercursor/Commands"; \
 		exit 1; \
 	fi; \
-	ln -s "${DOTFILES_SHELL_ROOT}/dotfiles-ai/ide/cursor/supercursor/Commands" "${HOME_DIR}/.cursor/commands"; \
-	rm -rf "${HOME_DIR}/.cursor/core"; \
+	safe_link "${DOTFILES_SHELL_ROOT}/dotfiles-ai/ide/cursor/supercursor/Commands" "${HOME_DIR}/.cursor/commands"; \
 	if [ ! -d "${DOTFILES_SHELL_ROOT}/dotfiles-ai/ide/cursor/supercursor/Core" ]; then \
 		echo "❌ Source path not found: ${DOTFILES_SHELL_ROOT}/dotfiles-ai/ide/cursor/supercursor/Core"; \
 		exit 1; \
 	fi; \
-	ln -s "${DOTFILES_SHELL_ROOT}/dotfiles-ai/ide/cursor/supercursor/Core" "${HOME_DIR}/.cursor/core"; \
-	rm -rf "${HOME_DIR}/.cursor/hooks"; \
+	safe_link "${DOTFILES_SHELL_ROOT}/dotfiles-ai/ide/cursor/supercursor/Core" "${HOME_DIR}/.cursor/core"; \
 	if [ ! -d "${DOTFILES_SHELL_ROOT}/dotfiles-ai/ide/cursor/supercursor/Hooks" ]; then \
 		echo "❌ Source path not found: ${DOTFILES_SHELL_ROOT}/dotfiles-ai/ide/cursor/supercursor/Hooks"; \
 		exit 1; \
 	fi; \
-	ln -s "${DOTFILES_SHELL_ROOT}/dotfiles-ai/ide/cursor/supercursor/Hooks" "${HOME_DIR}/.cursor/hooks"; \
+	safe_link "${DOTFILES_SHELL_ROOT}/dotfiles-ai/ide/cursor/supercursor/Hooks" "${HOME_DIR}/.cursor/hooks"; \
 	# 重要なファイルへの直接リンク \
-	rm -f "${HOME_DIR}/.cursor/CURSOR.md"; \
 	if [ ! -f "${DOTFILES_SHELL_ROOT}/dotfiles-ai/ide/cursor/supercursor/README.md" ]; then \
 		echo "❌ Source file not found: ${DOTFILES_SHELL_ROOT}/dotfiles-ai/ide/cursor/supercursor/README.md"; \
 		exit 1; \
 	fi; \
-	ln -sf "${DOTFILES_SHELL_ROOT}/dotfiles-ai/ide/cursor/supercursor/README.md" "${HOME_DIR}/.cursor/CURSOR.md"; \
+	safe_link "${DOTFILES_SHELL_ROOT}/dotfiles-ai/ide/cursor/supercursor/README.md" "${HOME_DIR}/.cursor/CURSOR.md"; \
 	# AGENTS.md へのリンク \
-	rm -f "${HOME_DIR}/.cursor/AGENTS.md"; \
-	ln -sf "${DOTFILES_SHELL_ROOT}/dotfiles-ai/global-rules/AGENTS.global.md" "${HOME_DIR}/.cursor/AGENTS.md"; \
+	safe_link "${DOTFILES_SHELL_ROOT}/dotfiles-ai/global-rules/AGENTS.global.md" "${HOME_DIR}/.cursor/AGENTS.md"; \
 	\
 	echo "✅ SuperCursor フレームワークのシンボリックリンク設定が完了しました"
 
@@ -649,8 +657,13 @@ uninstall-cursor:
 		BACKUP_TS=$$(date +%Y%m%d_%H%M%S); \
 		BACKUP_FILE="$(HOME_DIR)/.cursor_backup_$$BACKUP_TS.tar.gz"; \
 		echo "📦 設定ファイルをバックアップ中: $$BACKUP_FILE"; \
-		tar -czf "$$BACKUP_FILE" -C "$(HOME_DIR)" .cursor 2>/dev/null || true; \
-		rm -rf "$(HOME_DIR)/.cursor"; \
+		tar -czf "$$BACKUP_FILE" -C "$(HOME_DIR)" .cursor 2>/dev/null; \
+		if [ $$? -eq 0 ]; then \
+			rm -rf "$(HOME_DIR)/.cursor"; \
+		else \
+			echo "❌ バックアップに失敗したため、.cursor の削除を中止しました"; \
+			exit 1; \
+		fi; \
 	fi
 	@sudo rm -f /opt/cursor/cursor.AppImage
 	@sudo rm -f /usr/share/applications/cursor.desktop

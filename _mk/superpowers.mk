@@ -66,6 +66,13 @@ update-gemini-md-superpowers: ## ~/.gemini/GEMINI.md にワークフロー指示
 
 uninstall-superpowers: ## superpowers の統合を解除（GEMINI.md 復元）
 	@echo "🧹 superpowers: 統合を解除しています..."
+	@# インストールされたスキルの削除
+	@echo "📦 インストールされたスキルを削除中 (Namespace: $(SUPERPOWERS_NS))..."
+	@SKILLS=$$(awk -F'|' '$$2 ~ /^[[:space:]]*$(SUPERPOWERS_NS)[[:space:]]*$$/ { gsub(/^[[:space:]]+|[[:space:]]+$$/, "", $$3); print $$3 }' "$(MANIFEST_FILE)"); \
+	for skill in $$SKILLS; do \
+		echo "  - $$skill を削除中..."; \
+		uvx skillport remove "$$skill" --namespace $(SUPERPOWERS_NS) 2>/dev/null || true; \
+	done
 	@rm -rf "$(LOCAL_SUPERPOWERS_DIR)"
 	@if [ -f "$(HOME)/.gemini/GEMINI.md" ]; then \
 		if grep -q "## BEGIN Superpowers Workflow" "$(HOME)/.gemini/GEMINI.md"; then \

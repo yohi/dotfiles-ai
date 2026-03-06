@@ -53,9 +53,15 @@ for pair in "${FILES_TO_COPY[@]}"; do
         echo -e "${RED}❌ Source file not found: $REPO_ROOT/mcp/$SRC${NC}"
         exit 1
     fi
-    # 既存のファイルを削除してからコピー (検証済み)
-    rm -f "$DST"
-    cp -f "$REPO_ROOT/mcp/$SRC" "$DST"
+    # 一時ファイルへコピーしてからアトミックに移動
+    TMP_DST="$DST.tmp.$$"
+    if cp -f "$REPO_ROOT/mcp/$SRC" "$TMP_DST"; then
+        mv "$TMP_DST" "$DST"
+    else
+        echo -e "${RED}❌ Failed to copy $SRC to $TMP_DST${NC}"
+        rm -f "$TMP_DST"
+        exit 1
+    fi
 done
 
 # catalog.json 内の $HOME を実際のホームディレクトリに置換 (docker mcp が環境変数を展開しない場合のため)
