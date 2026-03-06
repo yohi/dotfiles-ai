@@ -323,26 +323,19 @@ update-cursor:
 		if ! command -v jq >/dev/null 2>&1; then \
 			echo "📦 jqをインストール中..."; \
 			JQ_LOG=$$(mktemp); \
+			JQ_INSTALLED=false; \
 			if command -v apt-get >/dev/null 2>&1; then \
-				if ! (sudo apt-get update >"$$JQ_LOG" 2>&1 && sudo apt-get install -y jq >>"$$JQ_LOG" 2>&1); then \
-					echo "❌ apt-get による jq のインストールに失敗しました"; \
-					cat "$$JQ_LOG"; rm -f "$$JQ_LOG"; exit 1; \
-				fi; \
+				if (sudo apt-get update >"$$JQ_LOG" 2>&1 && sudo apt-get install -y jq >>"$$JQ_LOG" 2>&1); then JQ_INSTALLED=true; fi; \
 			elif command -v brew >/dev/null 2>&1; then \
-				if ! brew install jq >"$$JQ_LOG" 2>&1; then \
-					echo "❌ brew による jq のインストールに失敗しました"; \
-					cat "$$JQ_LOG"; rm -f "$$JQ_LOG"; exit 1; \
-				fi; \
+				if brew install jq >"$$JQ_LOG" 2>&1; then JQ_INSTALLED=true; fi; \
 			elif command -v yum >/dev/null 2>&1; then \
-				if ! sudo yum install -y jq >"$$JQ_LOG" 2>&1; then \
-					echo "❌ yum による jq のインストールに失敗しました"; \
-					cat "$$JQ_LOG"; rm -f "$$JQ_LOG"; exit 1; \
-				fi; \
+				if sudo yum install -y jq >"$$JQ_LOG" 2>&1; then JQ_INSTALLED=true; fi; \
 			elif command -v dnf >/dev/null 2>&1; then \
-				if ! sudo dnf install -y jq >"$$JQ_LOG" 2>&1; then \
-					echo "❌ dnf による jq のインストールに失敗しました"; \
-					cat "$$JQ_LOG"; rm -f "$$JQ_LOG"; exit 1; \
-				fi; \
+				if sudo dnf install -y jq >"$$JQ_LOG" 2>&1; then JQ_INSTALLED=true; fi; \
+			fi; \
+			if [ "$$JQ_INSTALLED" = "false" ]; then \
+				echo "⚠️  警告: jq のインストールに失敗しました。フォールバック方式を使用します。"; \
+				cat "$$JQ_LOG"; \
 			fi; \
 			rm -f "$$JQ_LOG"; \
 		fi && \
@@ -536,7 +529,6 @@ install-packages-supercursor:
 	@echo "⚙️  SuperCursor フレームワークをセットアップ中..."
 	@echo "🔧 SuperCursor セットアップ準備中..."
 	@echo "ℹ️   フレームワークファイル、ペルソナ、コマンドをシンボリックリンクで構成します"
-	\
 	# 必要な変数の確認
 	if [ -z "${REPO_ROOT}" ]; then \
 		echo "❌ REPO_ROOT is not set"; \
@@ -598,7 +590,11 @@ install-packages-supercursor:
 	fi; \
 	safe_link "${DOTFILES_SHELL_ROOT}/dotfiles-ai/ide/cursor/supercursor/README.md" "${HOME_DIR}/.cursor/CURSOR.md"; \
 	# AGENTS.md へのリンク \
-	safe_link "${DOTFILES_SHELL_ROOT}/dotfiles-ai/global-rules/AGENTS.global.md" "${HOME_DIR}/.cursor/AGENTS.md"; \
+	if [ -f "${DOTFILES_SHELL_ROOT}/dotfiles-ai/global-rules/AGENTS.global.md" ]; then \
+		safe_link "${DOTFILES_SHELL_ROOT}/dotfiles-ai/global-rules/AGENTS.global.md" "${HOME_DIR}/.cursor/AGENTS.md"; \
+	else \
+		echo "⚠️  警告: AGENTS.global.md が見つかりません。リンク作成をスキップします。"; \
+	fi; \
 	\
 	echo "✅ SuperCursor フレームワークのシンボリックリンク設定が完了しました"
 
@@ -667,7 +663,20 @@ uninstall-cursor:
 	fi
 	@sudo rm -f /opt/cursor/cursor.AppImage
 	@sudo rm -f /usr/share/applications/cursor.desktop
-	@rm -f $(HOME_DIR)/.config/Cursor/User/settings.json
-	@rm -f $(HOME_DIR)/.config/Cursor/User/keybindings.json
-	@rm -f $(HOME_DIR)/.config/Cursor/User/globalStorage/rooveterinaryinc.cursor-mcp/mcp.json
+	@for f in settings.json keybindings.json; do \
+		path="$(HOME_DIR)/.config/Cursor/User/$$f"; \
+		if [ -L "$$path" ]; then \
+			rm -f "$$path"; \
+		elif [ -f "$$path" ]; then \
+			echo "📦 既存のファイル（実体）をバックアップします: $$path"; \
+			mv "$$path" "$$path.bak.$$(date +%Y%m%d_%H%M%S)"; \
+		fi; \
+	done
+	@mcp_path="$(HOME_DIR)/.config/Cursor/User/globalStorage/rooveterinaryinc.cursor-mcp/mcp.json"; \
+	if [ -L "$$mcp_path" ]; then \
+		rm -f "$$mcp_path"; \
+	elif [ -f "$$mcp_path" ]; then \
+		echo "📦 既存のファイル（実体）をバックアップします: $$mcp_path"; \
+		mv "$$mcp_path" "$$mcp_path.bak.$$(date +%Y%m%d_%H%M%S)"; \
+	fi
 	@echo "✅ Cursor IDEのアンインストールが完了しました"

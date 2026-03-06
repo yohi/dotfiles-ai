@@ -68,11 +68,17 @@ uninstall-superpowers: ## superpowers の統合を解除（GEMINI.md 復元）
 	@echo "🧹 superpowers: 統合を解除しています..."
 	@# インストールされたスキルの削除
 	@echo "📦 インストールされたスキルを削除中 (Namespace: $(SUPERPOWERS_NS))..."
-	@SKILLS=$$(awk -F'|' '$$2 ~ /^[[:space:]]*$(SUPERPOWERS_NS)[[:space:]]*$$/ { gsub(/^[[:space:]]+|[[:space:]]+$$/, "", $$3); print $$3 }' "$(MANIFEST_FILE)"); \
-	for skill in $$SKILLS; do \
-		echo "  - $$skill を削除中..."; \
-		uvx skillport remove "$$skill" --namespace $(SUPERPOWERS_NS) 2>/dev/null || true; \
-	done
+	@SKILLS=$$(uvx skillport list --namespace $(SUPERPOWERS_NS) 2>/dev/null | awk '/^- / {print $$2}'); \
+	if [ -n "$$SKILLS" ]; then \
+		for skill in $$SKILLS; do \
+			echo "  - $$skill を削除中..."; \
+			if ! uvx skillport remove "$$skill" --namespace $(SUPERPOWERS_NS) >/dev/null 2>&1; then \
+				echo "  ⚠️  $$skill の削除に失敗しました"; \
+			fi; \
+		done; \
+	else \
+		echo "  ℹ️  削除対象のスキルは見つかりませんでした"; \
+	fi
 	@rm -rf "$(LOCAL_SUPERPOWERS_DIR)"
 	@if [ -f "$(HOME)/.gemini/GEMINI.md" ]; then \
 		if grep -q "## BEGIN Superpowers Workflow" "$(HOME)/.gemini/GEMINI.md"; then \

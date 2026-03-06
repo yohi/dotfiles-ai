@@ -82,8 +82,14 @@ if [[ -n "$ENABLE_SERVERS" ]]; then
     SERVERS_ARG="--servers $ENABLE_SERVERS"
 fi
 
+# secrets.env の存在を確認（存在しない場合は空のファイルを作成して警告）
+if [[ ! -f "$MCP_CONFIG_DIR/secrets.env" ]]; then
+    echo -e "${YELLOW}⚠️  Warning: $MCP_CONFIG_DIR/secrets.env not found. Creating an empty one.${NC}"
+    touch "$MCP_CONFIG_DIR/secrets.env"
+fi
+
 # 共通の Gateway コマンド変数を定義
-GATEWAY_CMD="$DOCKER_PATH mcp gateway run --transport sse --port 10888 --secrets \"$MCP_CONFIG_DIR/secrets.env\" --catalog bootstrap.yaml --catalog custom.yaml --watch=false $SERVERS_ARG"
+GATEWAY_CMD="$DOCKER_PATH mcp gateway run --transport sse --port 10888 --secrets \"$MCP_CONFIG_DIR/secrets.env\" --catalog \"$MCP_CONFIG_DIR/catalogs/bootstrap.yaml\" --catalog \"$MCP_CONFIG_DIR/catalogs/custom.yaml\" --watch=false $SERVERS_ARG"
 
 mkdir -p "$SERVICE_DIR"
 
@@ -116,7 +122,7 @@ if systemctl --user status > /dev/null 2>&1; then
 else
     echo -e "${RED}⚠️  Warning: User systemd session is unavailable. Skipping service activation.${NC}"
     echo -e "You can start the gateway manually with:"
-    echo -e "  ENABLE_SERVERS=\"$ENABLE_SERVERS\" $GATEWAY_CMD"
+    echo -e "  $GATEWAY_CMD"
 fi
 
 # カタログの初期化（未初期化の場合のみ、docker-mcp.yaml を取得するため）
@@ -139,7 +145,7 @@ if systemctl --user status > /dev/null 2>&1; then
     echo -e "  - Start:  systemctl --user start docker-mcp-gateway"
 else
     echo -e "${BLUE}Manual Execution:${NC}"
-    echo -e "  ENABLE_SERVERS=\"$ENABLE_SERVERS\" $GATEWAY_CMD"
+    echo -e "  $GATEWAY_CMD"
 fi
 echo -e ""
 echo -e "${BLUE}Endpoint:${NC} http://localhost:10888"

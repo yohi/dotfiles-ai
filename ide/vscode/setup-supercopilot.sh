@@ -103,7 +103,7 @@ if command -v jq >/dev/null 2>&1; then
             } else {
               if (char === "/" && next === "/") { inComment = "single"; i++; }
               else if (char === "/" && next === "*") { inComment = "multi"; i++; }
-              else if (char === "\"" || char === "\'" || char === "\x60") { inString = char; result += char; }
+              else if (char === "\"" || char === "\x27" || char === "\x60") { inString = char; result += char; }
               else result += char;
             }
           }
