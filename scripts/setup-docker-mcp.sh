@@ -46,7 +46,7 @@ cp -f "$REPO_ROOT/mcp/catalogs/custom.yaml" "$MCP_CONFIG_DIR/catalogs/custom.yam
 cp -f "$REPO_ROOT/mcp/catalogs/bootstrap.yaml" "$MCP_CONFIG_DIR/catalogs/bootstrap.yaml"
 
 # catalog.json 内の $HOME を実際のホームディレクトリに置換 (docker mcp が環境変数を展開しない場合のため)
-sed -i "s|\$HOME|$HOME|g" "$MCP_CONFIG_DIR/catalog.json"
+sed -i.bak "s|\$HOME|$HOME|g" "$MCP_CONFIG_DIR/catalog.json" && rm -f "$MCP_CONFIG_DIR/catalog.json.bak"
 
 echo -e "${GREEN}✅ Configuration files copied and paths updated in $MCP_CONFIG_DIR${NC}"
 

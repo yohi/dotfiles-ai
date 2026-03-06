@@ -15,6 +15,24 @@ if (typeof require === 'function') {
 } else {
   // ブラウザ環境や require がない環境用のフォールバック（必要に応じて）
   superCopilot = superCopilot || {};
+  
+  // 依存クラスのフォールバック定義
+  if (typeof PersonaSelector === 'undefined') {
+    PersonaSelector = class {
+      constructor() {}
+      selectOptimalPersona() { return { persona: { id: 'developer' }, reason: 'default' }; }
+      generatePersonaPrompt() { return ''; }
+    };
+  }
+  if (typeof CommandsHandler === 'undefined') {
+    CommandsHandler = class {
+      constructor() {}
+      detectCommand() { return null; }
+      generateCommandPrompt() { return ''; }
+      getCommandsList() { return []; }
+      generateHelpText() { return ''; }
+    };
+  }
 }
 
 /**
@@ -25,9 +43,14 @@ class SuperCopilotMain {
   static _instance = null;
 
   constructor(config = superCopilot) {
-    this.config = config;
-    this.personaSelector = new PersonaSelector(config);
-    this.commandsHandler = new CommandsHandler(config);
+    this.config = config || {};
+    this.config.personas = this.config.personas || {};
+    this.config.commands = this.config.commands || {};
+    
+    // 依存関係の初期化 (ガード付き)
+    this.personaSelector = (typeof PersonaSelector !== 'undefined') ? new PersonaSelector(this.config) : null;
+    this.commandsHandler = (typeof CommandsHandler !== 'undefined') ? new CommandsHandler(this.config) : null;
+    
     this.initialized = false;
     this.currentContext = {
       filePath: '',
@@ -63,6 +86,13 @@ class SuperCopilotMain {
     try {
       // 初期化処理
       this.log('info', 'Initializing...');
+
+      // 依存関係のチェック
+      if (!this.personaSelector || !this.commandsHandler) {
+        this.log('error', 'Required components (PersonaSelector/CommandsHandler) are missing');
+        this.initialized = false;
+        return false;
+      }
 
       // 設定の確認
       if (!this.config || !this.config.personas || !this.config.commands) {

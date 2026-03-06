@@ -85,12 +85,12 @@ if command -v jq >/dev/null 2>&1; then
         // コメント除去 (文字列内の // や /* */ に配慮しない簡易版だが、正規表現よりは安全)
         content = content.replace(/\/\*[\s\S]*?\*\/|([^:]|^)\/\/.*$/gm, "$1");
         // 末尾のカンマを除去
-        content = content.replace(/,[[:space:]]*([\]}])/g, "$1");
+        content = content.replace(/,\s*([\]}])/g, "$1");
         process.stdout.write(content);
       ' < "$VSCODE_SETTINGS" > "$SANITIZED_SETTINGS" 2>/dev/null
     else
       # Node がない場合は perl で同様の処理を行う (sed より堅牢)
-      perl -0777 -pe 's|/\*.*?\*/||gs; s|(?<!:)\/\/.*||g; s|,([[:space:]]*[\]}])|$1|g' "$VSCODE_SETTINGS" > "$SANITIZED_SETTINGS" 2>/dev/null
+      perl -0777 -pe 's|/\*.*?\*/||gs; s|(?<!:)\/\/.*||g; s|,(\s*[\]}])|$1|g' "$VSCODE_SETTINGS" > "$SANITIZED_SETTINGS" 2>/dev/null
     fi
 
     # 設定が既にあるか確認 (サニタイズ済みのファイルを使用)
@@ -233,4 +233,4 @@ echo -e "  - ファイルタイプと質問内容から自動的にペルソナ�
 echo -e "  - 明示的にペルソナを指定: ${YELLOW}@architect システムの設計について教えて${NC}"
 echo -e "  - コマンドで指定: ${YELLOW}design システムアーキテクチャ${NC}"
 echo -e "\n${BLUE}詳細な使用方法はこちらをご覧ください:${NC}"
-echo -e "${YELLOW}${REPO_ROOT}/vscode/settings/README.md${NC}"
+echo -e "${YELLOW}${REPO_ROOT}/ide/vscode/settings/README.md${NC}"

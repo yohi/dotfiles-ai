@@ -75,8 +75,8 @@ _cursor_link_settings:
                 fi; \
                 ln -sf "$$src" "$$dst"; \
         done
-        @# MCP設定のリンク (docker-mcp-gateway を優先)	@mkdir -p $(HOME_DIR)/.config/Cursor/User/globalStorage/rooveterinaryinc.cursor-mcp
-	@if [ "$(USE_DOCKER_MCP)" = "true" ]; then \
+        @mkdir -p $(HOME_DIR)/.config/Cursor/User/globalStorage/rooveterinaryinc.cursor-mcp
+        @if [ "$(USE_DOCKER_MCP)" = "true" ]; then \
 		ln -sf $(REPO_ROOT)/ide/cursor/mcp-docker.json $(HOME_DIR)/.config/Cursor/User/globalStorage/rooveterinaryinc.cursor-mcp/mcp.json; \
 	else \
 		ln -sf $(REPO_ROOT)/ide/cursor/mcp.json $(HOME_DIR)/.config/Cursor/User/globalStorage/rooveterinaryinc.cursor-mcp/mcp.json; \
@@ -650,8 +650,10 @@ uninstall-cursor:
 		BACKUP_FILE="$(HOME_DIR)/.cursor_backup_$$BACKUP_TS.tar.gz"; \
 		echo "📦 設定ファイルをバックアップ中: $$BACKUP_FILE"; \
 		tar -czf "$$BACKUP_FILE" -C "$(HOME_DIR)" .cursor 2>/dev/null || true; \
-		rm -rf "$(HOME_DIR)/.cursor"; \	fi
-	@sudo rm -f /opt/cursor/cursor.AppImage
+		rm -rf "$(HOME_DIR)/.cursor"; \
+		fi; \
+		fi
+		@sudo rm -f /opt/cursor/cursor.AppImage
 	@sudo rm -f /usr/share/applications/cursor.desktop
 	@rm -f $(HOME_DIR)/.config/Cursor/User/settings.json
 	@rm -f $(HOME_DIR)/.config/Cursor/User/keybindings.json

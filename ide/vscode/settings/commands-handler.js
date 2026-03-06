@@ -19,8 +19,23 @@ if (typeof require === 'function') {
  */
 class CommandsHandler {
   constructor(config = superCopilot) {
-    this.config = config;
-    this.personaSelector = new PersonaSelector(config);
+    this.config = config || {};
+    this.config.commands = this.config.commands || {};
+    this.config.personas = this.config.personas || {};
+    
+    // PersonaSelector の存在チェックと初期化
+    if (typeof PersonaSelector !== "undefined") {
+      this.personaSelector = new PersonaSelector(this.config);
+    } else if (this.config.PersonaSelector) {
+      this.personaSelector = new this.config.PersonaSelector(this.config);
+    } else {
+      // 最小限のスタブ（エラー防止用）
+      this.personaSelector = {
+        escapeRegExp: (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'),
+        selectOptimalPersona: () => ({ persona: { id: 'developer' }, reason: 'default' }),
+        generatePersonaPrompt: () => ''
+      };
+    }
   }
 
   /**
@@ -29,7 +44,7 @@ class CommandsHandler {
    * @returns {Object|null} 検出されたコマンド情報、または null
    */
   detectCommand(text) {
-    if (!text) return null;
+    if (!text || !this.config.commands) return null;
 
     // コマンドの検出（単語として存在するか確認、長いキーワードを優先）
     const sortedCommandKeys = Object.keys(this.config.commands).sort((a, b) => b.length - a.length);
@@ -54,13 +69,13 @@ class CommandsHandler {
    * @returns {string} プロンプト接頭辞
    */
   generateCommandPrompt(commandName, queryText) {
-    if (!commandName || !this.config.commands[commandName]) {
+    if (!commandName || !this.config.commands || !this.config.commands[commandName]) {
       return '';
     }
 
     const command = this.config.commands[commandName];
     const defaultPersonaKey = command.defaultPersona || 'developer';
-    const persona = this.config.personas[defaultPersonaKey] || this.config.personas['developer'];
+    const persona = (this.config.personas && (this.config.personas[defaultPersonaKey] || this.config.personas['developer'])) || { id: 'developer' };
 
     // コマンドに対応するペルソナの特定
     const personaInfo = {

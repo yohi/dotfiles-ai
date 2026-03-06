@@ -6,7 +6,14 @@
 
 ### CodeRabbit CLI のインストール
 ```bash
-curl -fsSL https://cli.coderabbit.ai/install.sh | sh
+# 1. スクリプトをダウンロード
+curl -fsSL -o /tmp/coderabbit-install.sh https://cli.coderabbit.ai/install.sh
+
+# 2. スクリプトの内容を確認 (推奨)
+less /tmp/coderabbit-install.sh
+
+# 3. インストーラーを実行
+sh /tmp/coderabbit-install.sh
 ```
 
 ### 認証設定
@@ -20,11 +27,15 @@ cr auth login
 - **対応OS**: macOS (Intel/Apple Silicon), Linux
 - **未対応**: Windows
 - **要件**: Git リポジトリ内で実行
+- **検証日**: 2026-03-06
+- **一次ソース**: [CodeRabbit CLI - Overview](https://docs.coderabbit.ai/cli/overview)
 
 ## 📋 利用可能なコマンド
 
 ### 🎯 `/coderabbit-review` - 包括的AIコードレビュー
 **用途**: プロジェクト全体の徹底的なコードレビューと品質分析
+- **検証日**: 2026-03-06
+- **一次ソース**: [CodeRabbit CLI - Overview](https://docs.coderabbit.ai/cli/overview)
 
 **実行される CodeRabbit CLI コマンド**:
 - `coderabbit --prompt-only` (AI統合最適化)
@@ -40,6 +51,8 @@ cr auth login
 
 ### ⚡ `/quick-cr-review` - 高速差分レビュー
 **用途**: 変更されたファイルのみを対象とした高速レビュー
+- **検証日**: 2026-03-06
+- **一次ソース**: [CodeRabbit CLI - Overview](https://docs.coderabbit.ai/cli/overview)
 
 **実行される CodeRabbit CLI コマンド**:
 - `coderabbit --type uncommitted --prompt-only` (未コミット変更)
@@ -60,6 +73,8 @@ cr auth login
 
 ### 🛡️ `/security-cr-audit` - セキュリティ監査
 **用途**: セキュリティ脆弱性に特化した監査レビュー
+- **検証日**: 2026-03-06
+- **一次ソース**: [CodeRabbit CLI - Overview](https://docs.coderabbit.ai/cli/overview)
 
 **実行される CodeRabbit CLI コマンド**:
 - `coderabbit --prompt-only` (AI統合最適化)
@@ -75,6 +90,8 @@ cr auth login
 
 ### 🚀 `/performance-cr-review` - パフォーマンス最適化
 **用途**: パフォーマンス問題の特定と最適化提案
+- **検証日**: 2026-03-06
+- **一次ソース**: [CodeRabbit CLI - Overview](https://docs.coderabbit.ai/cli/overview)
 
 **実行される CodeRabbit CLI コマンド**:
 - `coderabbit --prompt-only` (AI統合最適化)
@@ -93,6 +110,8 @@ cr auth login
 - **トークン効率的**: AIエージェント用に最適化された出力
 - **簡潔なコンテキスト**: 問題の場所、説明、修正提案を含む
 - **自動統合**: Cursorとの seamless な連携
+- **検証日**: 2026-03-06
+- **一次ソース**: [CodeRabbit CLI - Overview](https://docs.coderabbit.ai/cli/overview)
 
 ### 2. レビュータイプ指定
 ```bash
@@ -100,12 +119,17 @@ cr auth login
 --type committed   # コミット済み変更のみ
 --type uncommitted # 未コミット変更のみ
 ```
+- **検証日**: 2026-03-06
+- **一次ソース**: [CodeRabbit CLI - Overview](https://docs.coderabbit.ai/cli/overview)
 
 ### 3. ベースブランチ指定
 ```bash
 --base master   # masterブランチとの比較
 --base develop  # developブランチとの比較
 ```
+- **検証日**: 2026-03-06
+- **一次ソース**: [CodeRabbit CLI - Overview](https://docs.coderabbit.ai/cli/overview)
+
 
 ## 📊 使用パターン推奨
 
@@ -159,6 +183,7 @@ CodeRabbitは自動的に以下のファイルを読み取り：
 ## 📈 期待される効果
 
 以下は公式データに基づく：
+(出典: [CodeRabbit CLI - Overview](https://docs.coderabbit.ai/cli/overview), 計測時点: 2026-03-06)
 - **問題検出精度**: 従来のリンターが見逃す問題を検出
 - **開発効率**: 専門的なレビューとAI修正の組み合わせ
 - **品質向上**: レースコンディション、メモリリーク等の早期発見
