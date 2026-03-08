@@ -531,7 +531,8 @@ install-packages-supercursor:
 	@echo "⚙️  SuperCursor フレームワークをセットアップ中..."
 	@echo "🔧 SuperCursor セットアップ準備中..."
 	@echo "ℹ️   フレームワークファイル、ペルソナ、コマンドをシンボリックリンクで構成します"
-	# 必要な変数の確認
+	@set -e; \
+	# 必要な変数の確認 \
 	if [ -z "${REPO_ROOT}" ]; then \
 		echo "❌ REPO_ROOT is not set"; \
 		exit 1; \
@@ -550,8 +551,7 @@ install-packages-supercursor:
 	\
 	echo "🔗 シンボリックリンクを作成中..."; \
 	# SuperCursor本体へのリンク \
-	# 重複削除の代わりに安全な置換を行う
-	@set -e; \
+	# 重複削除の代わりに安全な置換を行う \
 	BACKUP_DIR="${HOME_DIR}/.cursor/backups/$$(date +%Y%m%d_%H%M%S)"; \
 	safe_link() { \
 		src="$$1"; dst="$$2"; \

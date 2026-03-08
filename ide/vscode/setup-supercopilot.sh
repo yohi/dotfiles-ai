@@ -64,13 +64,17 @@ fi
 
 # 3. settings.jsonの設定確認と生成
 echo -e "\n${BLUE}3. VSCode設定を確認しています...${NC}"
-VSCODE_SETTINGS="$HOME/.vscode/settings.json"
+if [ "$(uname)" = "Darwin" ]; then
+  VSCODE_SETTINGS="$HOME/Library/Application Support/Code/User/settings.json"
+else
+  VSCODE_SETTINGS="$HOME/.config/Code/User/settings.json"
+fi
 userHome="${HOME}"
-CONFIG_JSON='{"github.copilot.advanced": {"preProcessors": {"chat": {"path": "'"${userHome}"'/.vscode/supercopilot/supercopilot-main.js", "function": "preprocessCopilotPrompt"}}}}'
 
 # jqが利用可能かチェック
 if command -v jq >/dev/null 2>&1; then
   echo -e "   ${GREEN}✓ jq が利用可能です。安全なJSON操作を使用します${NC}"
+  CONFIG_JSON=$(jq -n --arg path "${userHome}/.vscode/supercopilot/supercopilot-main.js" '{"github.copilot.advanced": {"preProcessors": {"chat": {"path": $path, "function": "preprocessCopilotPrompt"}}}}')
 
   if [ -f "$VSCODE_SETTINGS" ]; then
     echo -e "   ${GREEN}✓ VSCode設定ファイルが見つかりました${NC}"
@@ -106,13 +110,16 @@ if command -v jq >/dev/null 2>&1; then
               if (char === "/" && next === "/") { inComment = "single"; i++; }
               else if (char === "/" && next === "*") { inComment = "multi"; i++; }
               else if (char === "\"" || char === "\x27" || char === "\x60") { inString = char; result += char; }
-              else result += char;
+              else {
+                if (char === "]" || char === "}") {
+                  result = result.replace(/,\s*$/, "");
+                }
+                result += char;
+              }
             }
           }
           i++;
         }
-        // 末尾のカンマを除去
-        result = result.replace(/,\s*([\]}])/g, "$1");
         process.stdout.write(result);
       ' < "$VSCODE_SETTINGS" > "$SANITIZED_SETTINGS" 2>/dev/null
     else
@@ -134,12 +141,14 @@ if command -v jq >/dev/null 2>&1; then
               if ($c eq "/" && $n eq "/") { $in_cmt = "s"; $i++; }
               elsif ($c eq "/" && $n eq "*") { $in_cmt = "m"; $i++; }
               elsif ($c =~ /["\x27\x60]/) { $in_str = $c; $res .= $c; }
-              else { $res .= $c; }
+              else {
+                if ($c eq "]" || $c eq "}") { $res =~ s/,\s*$//; }
+                $res .= $c;
+              }
             }
           }
           $i++;
         }
-        $res =~ s/,\s*([\]}])/$1/g;
         print $res;
       ' "$VSCODE_SETTINGS" > "$SANITIZED_SETTINGS" 2>/dev/null
     fi
@@ -244,18 +253,26 @@ else
         fi
       else
         # 末尾が}で終わるか確認
-        if grep -q "}" "$VSCODE_SETTINGS"; then
+        LAST_LINE=$(awk 'NF' "$VSCODE_SETTINGS" | tail -n 1)
+        if echo "$LAST_LINE" | grep -q '^[[:space:]]*}[[:space:]]*$'; then
           # 最後の閉じ括弧を見つけて、その前に設定を追加
           # Note: Using actual newline in sed replacement for BSD sed compatibility
           SAFE_CONFIG_ENTRY=$(echo "$CONFIG_ENTRY" | sed 's/&/\\&/g; s/|/\\|/g')
           if sed '$ s|}|,\
   '"$SAFE_CONFIG_ENTRY"'\
 }|' "$VSCODE_SETTINGS" > "$VSCODE_SETTINGS.tmp"; then
-            if mv "$VSCODE_SETTINGS.tmp" "$VSCODE_SETTINGS"; then
-              rm -f "$VSCODE_SETTINGS.bak"
-              echo -e "   ${GREEN}✓ settings.jsonに設定を追加しました${NC}"
+            if grep -q "supercopilot-main.js" "$VSCODE_SETTINGS.tmp"; then
+              if mv "$VSCODE_SETTINGS.tmp" "$VSCODE_SETTINGS"; then
+                rm -f "$VSCODE_SETTINGS.bak"
+                echo -e "   ${GREEN}✓ settings.jsonに設定を追加しました${NC}"
+              else
+                echo -e "   ${RED}✗ 設定の追加に失敗しました（mvエラー）${NC}"
+                [ -f "$VSCODE_SETTINGS.bak" ] && mv "$VSCODE_SETTINGS.bak" "$VSCODE_SETTINGS"
+                rm -f "$VSCODE_SETTINGS.tmp"
+                exit 1
+              fi
             else
-              echo -e "   ${RED}✗ 設定の追加に失敗しました（mvエラー）${NC}"
+              echo -e "   ${RED}✗ 設定の追加に失敗しました（追記の検証エラー）${NC}"
               [ -f "$VSCODE_SETTINGS.bak" ] && mv "$VSCODE_SETTINGS.bak" "$VSCODE_SETTINGS"
               rm -f "$VSCODE_SETTINGS.tmp"
               exit 1
