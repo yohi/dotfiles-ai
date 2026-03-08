@@ -173,3 +173,14 @@ Each skill contains step-by-step instructions, templates, and scripts.
 ### Gemini (SuperGemini)
 - **Framework**: SuperGemini/Core personas.
 - **Communication**: Adhere to the personas defined in `gemini/Core/personas.md`.
+
+## BEGIN Superpowers Workflow
+# Superpowers Workflow
+このプロジェクトでは [obra/superpowers](https://github.com/obra/superpowers) ワークフローを採用しています。
+
+## 核心的ルール
+- **スキル優先:** いかなるアクションの前にも必ず `using-superpowers` スキルを確認し、関連するスキルがあれば `activate_skill` で有効にしてください。
+- **計画と設計:** 実装前に `brainstorming` で設計を固め、`writing-plans` で詳細なタスクリストを作成してください。
+- **TDD:** すべての実装は `test-driven-development` スキルに従い、テストを先に書いてから実装してください。
+- **検証:** 完了前に `verification-before-completion` を実行し、エビデンスに基づいた成功報告を行ってください。
+## END Superpowers Workflow
