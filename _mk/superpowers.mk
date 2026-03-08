@@ -68,16 +68,24 @@ uninstall-superpowers: ## superpowers の統合を解除（GEMINI.md 復元）
 	@echo "🧹 superpowers: 統合を解除しています..."
 	@# インストールされたスキルの削除
 	@echo "📦 インストールされたスキルを削除中 (Namespace: $(SUPERPOWERS_NS))..."
-	@SKILLS=$$(uvx skillport list --namespace $(SUPERPOWERS_NS) 2>/dev/null | awk '/^- / {print $$2}'); \
-	if [ -n "$$SKILLS" ]; then \
-		for skill in $$SKILLS; do \
-			echo "  - $$skill を削除中..."; \
-			if ! uvx skillport remove "$$skill" --namespace $(SUPERPOWERS_NS) >/dev/null 2>&1; then \
-				echo "  ⚠️  $$skill の削除に失敗しました"; \
-			fi; \
-		done; \
+	@LIST_OUTPUT=$$(uvx skillport list --namespace $(SUPERPOWERS_NS) 2>&1); \
+	LIST_STATUS=$$?; \
+	if [ $$LIST_STATUS -eq 0 ]; then \
+		SKILLS=$$(echo "$$LIST_OUTPUT" | awk '/^- / {print $$2}'); \
+		if [ -n "$$SKILLS" ]; then \
+			for skill in $$SKILLS; do \
+				echo "  - $$skill を削除中..."; \
+				if ! uvx skillport remove "$$skill" --namespace $(SUPERPOWERS_NS) >/dev/null 2>&1; then \
+					echo "  ⚠️  $$skill の削除に失敗しました"; \
+				fi; \
+			done; \
+		else \
+			echo "  ℹ️  削除対象のスキルは見つかりませんでした"; \
+		fi; \
 	else \
-		echo "  ℹ️  削除対象のスキルは見つかりませんでした"; \
+		echo "❌ スキル一覧の取得に失敗しました (exit $$LIST_STATUS):"; \
+		echo "$$LIST_OUTPUT"; \
+		exit 1; \
 	fi
 	@rm -rf "$(LOCAL_SUPERPOWERS_DIR)"
 	@if [ -f "$(HOME)/.gemini/GEMINI.md" ]; then \

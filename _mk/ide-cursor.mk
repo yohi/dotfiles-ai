@@ -76,10 +76,16 @@ _cursor_link_settings:
 	        ln -sf "$$src" "$$dst"; \
 	done
 	@mkdir -p $(HOME_DIR)/.config/Cursor/User/globalStorage/rooveterinaryinc.cursor-mcp
-	@if [ "$(USE_DOCKER_MCP)" = "true" ]; then \
-		ln -sf $(REPO_ROOT)/ide/cursor/mcp-docker.json $(HOME_DIR)/.config/Cursor/User/globalStorage/rooveterinaryinc.cursor-mcp/mcp.json; \
+	@mcp_json_dst="$(HOME_DIR)/.config/Cursor/User/globalStorage/rooveterinaryinc.cursor-mcp/mcp.json"; \
+	if [ -f "$$mcp_json_dst" ] && [ ! -L "$$mcp_json_dst" ]; then \
+		backup="$$mcp_json_dst.bak.$$(date +%Y%m%d_%H%M%S)"; \
+		echo "⚠️  既存の mcp.json をバックアップします: $$backup"; \
+		mv "$$mcp_json_dst" "$$backup"; \
+	fi; \
+	if [ "$(USE_DOCKER_MCP)" = "true" ]; then \
+		ln -sf $(REPO_ROOT)/ide/cursor/mcp-docker.json "$$mcp_json_dst"; \
 	else \
-		ln -sf $(REPO_ROOT)/ide/cursor/mcp.json $(HOME_DIR)/.config/Cursor/User/globalStorage/rooveterinaryinc.cursor-mcp/mcp.json; \
+		ln -sf $(REPO_ROOT)/ide/cursor/mcp.json "$$mcp_json_dst"; \
 	fi
 	@echo "✅ Cursorの設定リンクが完了しました (DOCKER_MCP=$(USE_DOCKER_MCP))"
 
@@ -150,9 +156,9 @@ _cursor_download:
 		\
 		if [ "$$VALID_DOWNLOAD" -eq 1 ]; then \
 			echo "✅ ダウンロード完了"; \
-			chmod +x cursor.AppImage; \
-			sudo mkdir -p /opt/cursor; \
-			sudo mv cursor.AppImage /opt/cursor/cursor.AppImage; \
+			chmod +x cursor.AppImage || exit 1; \
+			sudo mkdir -p /opt/cursor || exit 1; \
+			sudo mv cursor.AppImage /opt/cursor/cursor.AppImage || exit 1; \
 			exit 0; \
 		fi; \
 	fi; \
@@ -185,9 +191,9 @@ _cursor_download:
 					fi; \
 				fi; \
 				if [ "$$VALID_FILE" -eq 1 ]; then \
-					chmod +x "$$CURSOR_FILE"; \
-					sudo mkdir -p /opt/cursor; \
-					sudo cp "$$CURSOR_FILE" /opt/cursor/cursor.AppImage; \
+					chmod +x "$$CURSOR_FILE" || exit 1; \
+					sudo mkdir -p /opt/cursor || exit 1; \
+					sudo cp "$$CURSOR_FILE" /opt/cursor/cursor.AppImage || exit 1; \
 					FOUND=true; \
 					break; \
 				else \

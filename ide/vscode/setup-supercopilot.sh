@@ -213,41 +213,57 @@ else
     else
       echo -e "   ${YELLOW}SuperCopilot設定を追加します...${NC}"
 
+      # Backup settings.json
+      [ -f "$VSCODE_SETTINGS" ] && cp "$VSCODE_SETTINGS" "$VSCODE_SETTINGS.bak"
+
       # settings.jsonの末尾の閉じ括弧の前に設定を挿入
       # 空のファイルまたは内容がない場合、もしくは "{}" のみのファイル
       if [ ! -s "$VSCODE_SETTINGS" ] || [ "$(cat "$VSCODE_SETTINGS" | tr -d '[:space:]')" = "" ]; then
-        echo "{" > "$VSCODE_SETTINGS"
-        echo "  $CONFIG_ENTRY" >> "$VSCODE_SETTINGS"
-        echo "}" >> "$VSCODE_SETTINGS"
-        echo -e "   ${GREEN}✓ 新しいsettings.jsonファイルを作成しました${NC}"
+        if { echo "{"; echo "  $CONFIG_ENTRY"; echo "}"; } > "$VSCODE_SETTINGS.tmp" && mv "$VSCODE_SETTINGS.tmp" "$VSCODE_SETTINGS"; then
+          rm -f "$VSCODE_SETTINGS.bak"
+          echo -e "   ${GREEN}✓ 新しいsettings.jsonファイルを作成しました${NC}"
+        else
+          echo -e "   ${RED}✗ 設定の追加に失敗しました${NC}"
+          [ -f "$VSCODE_SETTINGS.bak" ] && mv "$VSCODE_SETTINGS.bak" "$VSCODE_SETTINGS"
+          rm -f "$VSCODE_SETTINGS.tmp"
+          exit 1
+        fi
       elif [ "$(cat "$VSCODE_SETTINGS" | tr -d '[:space:]')" = "{}" ]; then
-        echo "{" > "$VSCODE_SETTINGS"
-        echo "  $CONFIG_ENTRY" >> "$VSCODE_SETTINGS"
-        echo "}" >> "$VSCODE_SETTINGS"
-        echo -e "   ${GREEN}✓ settings.jsonに設定を追加しました${NC}"
+        if { echo "{"; echo "  $CONFIG_ENTRY"; echo "}"; } > "$VSCODE_SETTINGS.tmp" && mv "$VSCODE_SETTINGS.tmp" "$VSCODE_SETTINGS"; then
+          rm -f "$VSCODE_SETTINGS.bak"
+          echo -e "   ${GREEN}✓ settings.jsonに設定を追加しました${NC}"
+        else
+          echo -e "   ${RED}✗ 設定の追加に失敗しました${NC}"
+          [ -f "$VSCODE_SETTINGS.bak" ] && mv "$VSCODE_SETTINGS.bak" "$VSCODE_SETTINGS"
+          rm -f "$VSCODE_SETTINGS.tmp"
+          exit 1
+        fi
       else
         # 末尾が}で終わるか確認
         if grep -q "}" "$VSCODE_SETTINGS"; then
           # 最後の閉じ括弧を見つけて、その前に設定を追加
           # Note: Using actual newline in sed replacement for BSD sed compatibility
-          if sed '$ s/}/,\
-  '"$CONFIG_ENTRY"'\
-}/' "$VSCODE_SETTINGS" > "$VSCODE_SETTINGS.tmp"; then
+          SAFE_CONFIG_ENTRY=$(echo "$CONFIG_ENTRY" | sed 's/&/\\&/g; s/|/\\|/g')
+          if sed '$ s|}|,\
+  '"$SAFE_CONFIG_ENTRY"'\
+}|' "$VSCODE_SETTINGS" > "$VSCODE_SETTINGS.tmp"; then
             if mv "$VSCODE_SETTINGS.tmp" "$VSCODE_SETTINGS"; then
+              rm -f "$VSCODE_SETTINGS.bak"
               echo -e "   ${GREEN}✓ settings.jsonに設定を追加しました${NC}"
             else
               echo -e "   ${RED}✗ 設定の追加に失敗しました（mvエラー）${NC}"
+              [ -f "$VSCODE_SETTINGS.bak" ] && mv "$VSCODE_SETTINGS.bak" "$VSCODE_SETTINGS"
               rm -f "$VSCODE_SETTINGS.tmp"
               exit 1
             fi
           else
             echo -e "   ${RED}✗ 設定の追加に失敗しました（sedエラー）${NC}"
+            [ -f "$VSCODE_SETTINGS.bak" ] && mv "$VSCODE_SETTINGS.bak" "$VSCODE_SETTINGS"
             rm -f "$VSCODE_SETTINGS.tmp"
             exit 1
           fi
         else
           # JSONが不完全な場合（} が見つからない）
-          cp "$VSCODE_SETTINGS" "$VSCODE_SETTINGS.bak"
           echo -e "   ${YELLOW}警告: '}' が見つからないため VSCODE_SETTINGS ($VSCODE_SETTINGS) は不正な JSON の可能性があります。${NC}"
           echo -e "   ${YELLOW}バックアップを $VSCODE_SETTINGS.bak に作成しました。${NC}"
           
