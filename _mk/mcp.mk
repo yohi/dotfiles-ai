@@ -1,4 +1,4 @@
-.PHONY: setup-docker-mcp mcp uninstall-mcp
+.PHONY: setup-docker-mcp mcp uninstall-mcp status-mcp start-mcp stop-mcp logs-mcp
 
 mcp: setup-docker-mcp
 
@@ -6,6 +6,29 @@ setup-docker-mcp:
 	@echo "🐳 Docker MCPの設定をセットアップ中..."
 	@bash scripts/setup-docker-mcp.sh
 	@echo "✅ Docker MCPの設定が完了しました。"
+
+status-mcp: ## Docker MCP Gatewayのステータスを確認
+	@echo "📊 Docker MCP Gateway status:"
+	@if systemctl --user is-active docker-mcp-gateway.service > /dev/null 2>&1; then \
+		systemctl --user status docker-mcp-gateway.service; \
+	else \
+		echo "❌ Docker MCP Gateway is not running."; \
+		exit 1; \
+	fi
+
+start-mcp: ## Docker MCP Gatewayを起動
+	@echo "🚀 Starting Docker MCP Gateway..."
+	@systemctl --user start docker-mcp-gateway.service
+	@$(MAKE) status-mcp
+
+stop-mcp: ## Docker MCP Gatewayを停止
+	@echo "🛑 Stopping Docker MCP Gateway..."
+	@systemctl --user stop docker-mcp-gateway.service
+	@echo "✅ Docker MCP Gateway stopped."
+
+logs-mcp: ## Docker MCP Gatewayのログを表示
+	@echo "📋 Docker MCP Gateway logs (last 50 lines):"
+	@journalctl --user -u docker-mcp-gateway.service -n 50 -f
 
 uninstall-mcp:
 	@echo "🗑️ Docker MCPの設定を削除中..."

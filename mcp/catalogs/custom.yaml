@@ -2,6 +2,41 @@ version: 3
 name: custom
 displayName: Custom Servers
 registry:
+  SQLite:
+    description: Database interaction and business intelligence capabilities.
+    title: SQLite
+    type: server
+    image: mcp/sqlite@sha256:efbc05ccace18df122f26b674bd1730c76ece716551df2b3961d519909c34696
+    tools:
+      - name: append_insight
+      - name: create_table
+      - name: describe_table
+      - name: list_tables
+      - name: read_query
+      - name: write_query
+    command:
+      - --db-path
+      - /mcp/db.sqlite
+    volumes:
+      - mcp-sqlite:/mcp
+  sequentialthinking:
+    description: Dynamic and reflective problem-solving through thought sequences.
+    title: Sequential Thinking
+    type: server
+    image: mcp/sequentialthinking@sha256:cd3174b2ecf37738654cf7671fb1b719a225c40a78274817da00c4241f465e5f
+    tools:
+      - name: sequentialthinking
+  filesystem:
+    description: Local filesystem access with configurable allowed paths.
+    title: Filesystem
+    type: server
+    image: mcp/filesystem@sha256:35fcf0217ca0d5bf7b0a5bd68fb3b89e08174676c0e0b4f431604512cf7b3f67
+    command:
+      - /home/y_ohi/dotfiles/components/dotfiles-ai
+      - /home/y_ohi
+    volumes:
+      - /home/y_ohi/dotfiles/components/dotfiles-ai:/home/y_ohi/dotfiles/components/dotfiles-ai
+      - /home/y_ohi:/home/y_ohi
   magic:
     description: Magic server (local)
     command:

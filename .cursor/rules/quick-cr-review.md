@@ -1,0 +1,1 @@
+../../ide/cursor/commands/coderabbit/quick-cr-review.md

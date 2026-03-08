@@ -1,4 +1,21 @@
 <!-- SKILLPORT_START -->
+## SkillPort Skills
+
+Skills are reusable expert knowledge that help you complete tasks effectively.
+Each skill contains step-by-step instructions, templates, and scripts.
+
+### Workflow
+
+1. **Find a skill** - Check the list below for a skill matching your task
+2. **Get instructions** - Run `skillport show <skill-id>` to load full instructions
+3. **Follow the instructions** - Execute the steps using your available tools
+
+### Tips
+
+- Skills may include scripts - execute them via the skill's path, don't read them into context
+- If instructions reference `{path}`, replace it with the skill's directory path
+- When uncertain, check the skill's description to confirm it matches your task
+
 <available_skills>
 <skill>
   <name>agent-skill-architect</name>
@@ -7,7 +24,7 @@
 </skill>
 <skill>
   <name>config-modernizer</name>
-  <description>Specialized skill for analyzing OpenCode configuration files and refactoring them based on the latest best practices and release information. Triggered when requested to "modernize" or "upgrade" configurations, or when configuration files like .jsonc are present.</description>
+  <description>OpenCodeの設定ファイルを分析し、最新のベストプラクティスやリリース情報に基づいてリファクタリングを行う専門スキル。ユーザーから「設定の最新化」「アップグレード」を求められた際や、.jsonc などの設定ファイルが存在する場合にトリガーされます。</description>
   <location>agent-skills/config-modernizer/SKILL.md</location>
 </skill>
 <skill>
@@ -17,7 +34,7 @@
 </skill>
 <skill>
   <name>git-master</name>
-  <description>Specialized skill for performing Git operations safely and appropriately. Specifically, it appropriately divides changes and creates Japanese commit messages following Conventional Commits.</description>
+  <description>Gitの操作を安全かつ適切に行うための専門スキル。特に、変更を適切に分割し、Conventional Commitsに従った日本語のコミットメッセージを作成します。</description>
   <location>agent-skills/git-master/SKILL.md</location>
 </skill>
 <skill>
@@ -100,10 +117,13 @@
 
 # Project Rule: dotfiles-ai
 
-This repository manages AI agent configurations and global rules.
+This repository manages AI agent configurations, global rules, and AI-enabled IDE settings.
 
 ## Core Mandates (Project Specific)
-- **Directory Structure**: Sub-projects are located in `claude/`, `gemini/`, and `opencode/`.
-- **Global Rules**: Referenced from `global-rules/`.
-- **Skills**: All available skills are defined in `agent-skills/`.
+- **Directory Structure**:
+  - `claude/`, `gemini/`, `opencode/`: AI Agent configurations.
+  - `ide/`: IDE configurations (Cursor, VSCode).
+  - `global-rules/`: Global AI instructions and standards.
+  - `agent-skills/`: Specialized skills for OpenCode agents.
+- **IDE Management**: Cursor and VSCode settings are managed here. Use `make install-cursor`, `make install-supercursor`, `make setup-vscode`, or `make install-supercopilot` for setup.
 

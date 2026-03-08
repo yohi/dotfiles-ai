@@ -1,0 +1,96 @@
+{
+  "mcpServers": {
+    "bitbucket-mcp-server": {
+      "command": "node",
+      "args": [
+        "${HOME}/.cursor/mcp-servers/bitbucket-mcp-server/build/src/index.js"
+      ],
+      "env": {
+        "BITBUCKET_USERNAME": "",
+        "BITBUCKET_APP_PASSWORD": ""
+      }
+    },
+    "playwright": {
+      "command": "node",
+      "args": [
+        "${HOME}/.cursor/mcp-servers/mcp-playwright/dist/index.js"
+      ],
+      "env": {
+        "DISPLAY": ":0"
+      }
+    },
+    "github": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-github@0.7.0"
+      ],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": ""
+      }
+    },
+    "aws-cloudformation-mcp-server": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@gmkirkpatrick/aws-cloudformation-mcp-server@1.0.0"
+      ],
+      "env": {
+        "AWS_PROFILE": "YOUR_AWS_PROFILE_HERE"
+      }
+    },
+    "terraform": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@fermyon/mcp-server-terraform@0.1.0"
+      ]
+    },
+    "backlog-dhead": {
+      "command": "node",
+      "args": [
+        "${HOME}/.cursor/mcp-servers/backlog-mcp-server/build/src/index.js"
+      ],
+      "env": {
+        "BACKLOG_SPACE_ID": "d-head",
+        "BACKLOG_API_KEY": "YOUR_D_HEAD_BACKLOG_API_KEY_HERE"
+      }
+    },
+    "backlog-prescec": {
+      "command": "node",
+      "args": [
+        "${HOME}/.cursor/mcp-servers/backlog-mcp-server/build/src/index.js"
+      ],
+      "env": {
+        "BACKLOG_SPACE_ID": "presc-ec",
+        "BACKLOG_API_KEY": "YOUR_PRESC_EC_BACKLOG_API_KEY_HERE"
+      }
+    },
+    "serena": {
+      "command": "node",
+      "args": [
+        "${HOME}/.cursor/mcp-servers/serena/dist/index.js"
+      ]
+    },
+    "awslabs/core-mcp-server": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@awslabs/core-mcp-server@0.1.0"
+      ]
+    },
+    "awslabs/aws-pricing-mcp-server": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@awslabs/aws-pricing-mcp-server@0.1.0"
+      ]
+    },
+    "skillport": {
+      "command": "uvx",
+      "args": [
+        "skillport-mcp@1.1.0"
+      ]
+    }
+  }
+}

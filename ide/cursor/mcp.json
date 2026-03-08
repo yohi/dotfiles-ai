@@ -1,0 +1,142 @@
+{
+  "mcpServers": {
+    "bitbucket": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "git+ssh://git@bitbucket.org/diamondhead/mcp-bitbucket.git",
+        "mcp-bitbucket"
+      ],
+      "env": {
+        "BITBUCKET_USERNAME": "",
+        "BITBUCKET_APP_PASSWORD": ""
+      }
+    },
+    "playwright": {
+      "command": "npx",
+      "args": [
+        "@playwright/mcp@latest"
+      ]
+    },
+    "atlassian": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "https://mcp.atlassian.com/v1/sse"
+      ]
+    },
+    "github": {
+      "url": "https://api.githubcopilot.com/mcp/",
+      "headers": {
+        "Authorization": "Bearer YOUR_GITHUB_TOKEN_HERE"
+      },
+      "type": "http"
+    },
+    "terraform": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "hashicorp/terraform-mcp-server"
+      ]
+    },
+    "d-head.backlog": {
+      "command": "docker",
+      "args": [
+        "run",
+        "--pull",
+        "always",
+        "-i",
+        "--rm",
+        "-e",
+        "BACKLOG_DOMAIN=d-head.backlog.com",
+        "-e",
+        "BACKLOG_API_KEY=InjAOHd4KbWCmHQUYiLK8zvIGRJZwBlElw6pq2BO8HZFRaDQFm9nIKLpvZ8vg72j",
+        "ghcr.io/nulab/backlog-mcp-server"
+      ],
+      "env": {
+        "BACKLOG_DOMAIN": "d-head.backlog.com",
+        "BACKLOG_API_KEY": "YOUR_D_HEAD_BACKLOG_API_KEY_HERE"
+      }
+    },
+    "presc-ec.backlog": {
+      "command": "docker",
+      "args": [
+        "run",
+        "--pull",
+        "always",
+        "-i",
+        "--rm",
+        "-e",
+        "BACKLOG_DOMAIN",
+        "-e",
+        "BACKLOG_API_KEY",
+        "ghcr.io/nulab/backlog-mcp-server"
+      ],
+      "env": {
+        "BACKLOG_DOMAIN": "presc-ec.backlog.com",
+        "BACKLOG_API_KEY": "YOUR_PRESC_EC_BACKLOG_API_KEY_HERE"
+      }
+    },
+    "awslabs.aws-documentation-mcp-server": {
+      "command": "uvx",
+      "args": [
+        "awslabs.aws-documentation-mcp-server@latest"
+      ],
+      "env": {
+        "FASTMCP_LOG_LEVEL": "ERROR",
+        "AWS_DOCUMENTATION_PARTITION": "aws"
+      },
+      "disabled": false,
+      "autoApprove": []
+    },
+    "awslabs.terraform-mcp-server": {
+      "command": "uvx",
+      "args": [
+        "awslabs.terraform-mcp-server@latest"
+      ],
+      "env": {
+        "FASTMCP_LOG_LEVEL": "ERROR"
+      },
+      "disabled": false,
+      "autoApprove": []
+    },
+    "awslabs.ecs-mcp-server": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "awslabs-ecs-mcp-server",
+        "ecs-mcp-server"
+      ],
+      "env": {
+        "AWS_PROFILE": "default",
+        "AWS_REGION": "ap-northeast-1",
+        "FASTMCP_LOG_LEVEL": "ERROR",
+        "FASTMCP_LOG_FILE": "/var/log/ecs-mcp-server.log",
+        "ALLOW_WRITE": "false",
+        "ALLOW_SENSITIVE_DATA": "false"
+      }
+    },
+    "chrome-devtools": {
+      "command": "npx",
+      "args": [
+        "chrome-devtools-mcp@latest"
+      ]
+    },
+    "skillport": {
+      "command": "uvx",
+      "args": [
+        "skillport-mcp@1.1.0"
+      ]
+    },
+    "docker": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@docker/mcp-server"
+      ]
+    }
+  }
+}

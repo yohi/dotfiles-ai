@@ -8,6 +8,9 @@ REPO_ROOT ?= $(CURDIR)
 
 .PHONY: install-packages-gemini-cli install-packages-supergemini install-gemini-ecosystem
 
+# install-packages-supergemini を setup-supergemini のエイリアスとして定義
+install-packages-supergemini: setup-supergemini
+
 # Gemini CLI のインストール
 install-packages-gemini-cli:
 	@echo "🤖 Gemini CLI のインストールを開始..."
@@ -75,16 +78,15 @@ install-packages-gemini-cli:
 	@echo "";
 	@echo "✅ Gemini CLI のインストールが完了しました"
 
-# SuperGemini (Gemini CLI Framework) のインストール
-install-packages-supergemini:
-	@echo "🚀 SuperGemini (Gemini CLI Framework) のインストールを開始..."
+# SuperGemini (Gemini CLI Framework) のセットアップ
+.PHONY: setup-supergemini
+setup-supergemini:
+	@echo "🚀 SuperGemini (Gemini CLI Framework) のセットアップを開始..."
 
 	# Gemini CLI の確認
 	@echo "🔍 Gemini CLI の確認中..."
 	@if ! command -v gemini >/dev/null 2>&1; then \
-		echo "❌ Gemini CLI がインストールされていません"; \
-		echo "ℹ️  先に 'make install-packages-gemini-cli' を実行してください"; \
-		exit 1; \
+		echo "⚠️  Gemini CLI がインストールされていません。設定のみ進行します。"; \
 	else \
 		echo "✅ Gemini CLI が見つかりました"; \
 	fi
@@ -158,7 +160,7 @@ install-packages-supergemini:
 	@echo "";
 	@echo "📝 注意: カスタムツールを再読み込みするには /reload-user-tools コマンドを使用します"
 	@echo "";
-	@echo "✅ SuperGemini のインストールが完了しました"
+	@echo "✅ SuperGemini のセットアップが完了しました"
 
 # Gemini エコシステム一括インストール
 install-gemini-ecosystem:
@@ -171,10 +173,10 @@ install-gemini-ecosystem:
 	@echo "✅ Gemini CLI のインストールが完了しました"
 	@echo "";
 
-	# Step 2: SuperGemini のインストール
-	@echo "📋 Step 2/2: SuperGemini をインストール中..."
-	@$(MAKE) install-packages-supergemini
-	@echo "✅ SuperGemini のインストールが完了しました"
+	# Step 2: SuperGemini のセットアップ
+	@echo "📋 Step 2/2: SuperGemini をセットアップ中..."
+	@$(MAKE) setup-supergemini
+	@echo "✅ SuperGemini のセットアップが完了しました"
 	@echo "";
 
 	# 最終確認
@@ -225,7 +227,7 @@ install-gemini-ecosystem:
 install-gemini-cli: install-packages-gemini-cli  ## Gemini CLIをインストール(エイリアス)
 
 .PHONY: install-supergemini
-install-supergemini: install-packages-supergemini  ## SuperGeminiをインストール(エイリアス)
+install-supergemini: setup-supergemini  ## SuperGeminiをインストール(エイリアス)
 
 .PHONY: gemini
 gemini: install-gemini-cli  ## Gemini CLIをインストール(エイリアス)
