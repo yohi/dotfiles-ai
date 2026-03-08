@@ -242,33 +242,29 @@ _cursor_setup_desktop:
 	fi; \
 	if [ "$$ICON_EXTRACTED" = "false" ]; then \
 		echo "🔍 AppImageからアイコンを抽出中..."; \
-		if command -v unzip >/dev/null 2>&1; then \
-			TMPDIR=$$(mktemp -d); \
-			if [ -n "$$TMPDIR" ] && cd "$$TMPDIR"; then \
-				run_unzip() { \
-					if [ "$(TIMEOUT_CMD)" != "false" ]; then \
-						"$(TIMEOUT_CMD)" 30 unzip "$$@"; \
-					else \
-						echo "⚠️  警告: timeout/gtimeout コマンドが見つからないため、タイムアウトなしで unzip を実行します。" >&2; \
-						unzip "$$@"; \
-					fi; \
-				}; \
-				if run_unzip -j /opt/cursor/cursor.AppImage "*.png" 2>/dev/null || \
-				   run_unzip -j /opt/cursor/cursor.AppImage "usr/share/pixmaps/*.png" 2>/dev/null || \
-				   run_unzip -j /opt/cursor/cursor.AppImage "resources/*.png" 2>/dev/null; then \
-					ICON_FILE=$$(ls -1 *.png 2>/dev/null | grep -i "cursor\|icon\|app" | head -1); \
-					if [ -z "$$ICON_FILE" ]; then ICON_FILE=$$(ls -1 *.png 2>/dev/null | head -1); fi; \
-					if [ -n "$$ICON_FILE" ] && [ -f "$$ICON_FILE" ]; then \
-						sudo mkdir -p /usr/share/pixmaps; \
-						sudo cp "$$ICON_FILE" /usr/share/pixmaps/cursor.png; \
-						ICON_PATH="/usr/share/pixmaps/cursor.png"; \
-						ICON_EXTRACTED=true; \
-						echo "✅ AppImageからアイコンを抽出しました: $$ICON_FILE"; \
-					fi; \
+		TMPDIR=$$(mktemp -d); \
+		if [ -n "$$TMPDIR" ] && cd "$$TMPDIR"; then \
+			run_extract() { \
+				if [ "$(TIMEOUT_CMD)" != "false" ]; then \
+					"$(TIMEOUT_CMD)" 30 "$$1" --appimage-extract >/dev/null 2>&1 || "$(TIMEOUT_CMD)" 30 unsquashfs -d squashfs-root "$$1" >/dev/null 2>&1; \
+				else \
+					echo "⚠️  警告: timeout/gtimeout コマンドが見つからないため、タイムアウトなしで抽出を実行します。" >&2; \
+					"$$1" --appimage-extract >/dev/null 2>&1 || unsquashfs -d squashfs-root "$$1" >/dev/null 2>&1; \
 				fi; \
-				cd /tmp; \
-				rm -rf "$$TMPDIR"; \
+			}; \
+			if run_extract /opt/cursor/cursor.AppImage; then \
+				ICON_FILE=$$(find squashfs-root -name "*.png" -type f 2>/dev/null | grep -i "cursor\|icon\|app" | head -1); \
+				if [ -z "$$ICON_FILE" ]; then ICON_FILE=$$(find squashfs-root -name "*.png" -type f 2>/dev/null | head -1); fi; \
+				if [ -n "$$ICON_FILE" ] && [ -f "$$ICON_FILE" ]; then \
+					sudo mkdir -p /usr/share/pixmaps; \
+					sudo cp "$$ICON_FILE" /usr/share/pixmaps/cursor.png; \
+					ICON_PATH="/usr/share/pixmaps/cursor.png"; \
+					ICON_EXTRACTED=true; \
+					echo "✅ AppImageからアイコンを抽出しました: $$ICON_FILE"; \
+				fi; \
 			fi; \
+			cd /tmp; \
+			rm -rf "$$TMPDIR"; \
 		fi; \
 	fi; \
 	if [ "$$ICON_EXTRACTED" = "false" ]; then \
@@ -568,36 +564,36 @@ install-packages-supercursor:
 		fi; \
 		ln -sfn "$$src" "$$dst"; \
 	}; \
-	if [ ! -d "${DOTFILES_SHELL_ROOT}/dotfiles-ai/ide/cursor/supercursor" ]; then \
-		echo "❌ Source path not found: ${DOTFILES_SHELL_ROOT}/dotfiles-ai/ide/cursor/supercursor"; \
+	if [ ! -d "${REPO_ROOT}/ide/cursor/supercursor" ]; then \
+		echo "❌ Source path not found: ${REPO_ROOT}/ide/cursor/supercursor"; \
 		exit 1; \
 	fi; \
-	safe_link "${DOTFILES_SHELL_ROOT}/dotfiles-ai/ide/cursor/supercursor" "${HOME_DIR}/.cursor/supercursor"; \
+	safe_link "${REPO_ROOT}/ide/cursor/supercursor" "${HOME_DIR}/.cursor/supercursor"; \
 	# 各種ディレクトリへのリンク \
-	if [ ! -d "${DOTFILES_SHELL_ROOT}/dotfiles-ai/ide/cursor/supercursor/Commands" ]; then \
-		echo "❌ Source path not found: ${DOTFILES_SHELL_ROOT}/dotfiles-ai/ide/cursor/supercursor/Commands"; \
+	if [ ! -d "${REPO_ROOT}/ide/cursor/supercursor/Commands" ]; then \
+		echo "❌ Source path not found: ${REPO_ROOT}/ide/cursor/supercursor/Commands"; \
 		exit 1; \
 	fi; \
-	safe_link "${DOTFILES_SHELL_ROOT}/dotfiles-ai/ide/cursor/supercursor/Commands" "${HOME_DIR}/.cursor/commands"; \
-	if [ ! -d "${DOTFILES_SHELL_ROOT}/dotfiles-ai/ide/cursor/supercursor/Core" ]; then \
-		echo "❌ Source path not found: ${DOTFILES_SHELL_ROOT}/dotfiles-ai/ide/cursor/supercursor/Core"; \
+	safe_link "${REPO_ROOT}/ide/cursor/supercursor/Commands" "${HOME_DIR}/.cursor/commands"; \
+	if [ ! -d "${REPO_ROOT}/ide/cursor/supercursor/Core" ]; then \
+		echo "❌ Source path not found: ${REPO_ROOT}/ide/cursor/supercursor/Core"; \
 		exit 1; \
 	fi; \
-	safe_link "${DOTFILES_SHELL_ROOT}/dotfiles-ai/ide/cursor/supercursor/Core" "${HOME_DIR}/.cursor/core"; \
-	if [ ! -d "${DOTFILES_SHELL_ROOT}/dotfiles-ai/ide/cursor/supercursor/Hooks" ]; then \
-		echo "❌ Source path not found: ${DOTFILES_SHELL_ROOT}/dotfiles-ai/ide/cursor/supercursor/Hooks"; \
+	safe_link "${REPO_ROOT}/ide/cursor/supercursor/Core" "${HOME_DIR}/.cursor/core"; \
+	if [ ! -d "${REPO_ROOT}/ide/cursor/supercursor/Hooks" ]; then \
+		echo "❌ Source path not found: ${REPO_ROOT}/ide/cursor/supercursor/Hooks"; \
 		exit 1; \
 	fi; \
-	safe_link "${DOTFILES_SHELL_ROOT}/dotfiles-ai/ide/cursor/supercursor/Hooks" "${HOME_DIR}/.cursor/hooks"; \
+	safe_link "${REPO_ROOT}/ide/cursor/supercursor/Hooks" "${HOME_DIR}/.cursor/hooks"; \
 	# 重要なファイルへの直接リンク \
-	if [ ! -f "${DOTFILES_SHELL_ROOT}/dotfiles-ai/ide/cursor/supercursor/README.md" ]; then \
-		echo "❌ Source file not found: ${DOTFILES_SHELL_ROOT}/dotfiles-ai/ide/cursor/supercursor/README.md"; \
+	if [ ! -f "${REPO_ROOT}/ide/cursor/supercursor/README.md" ]; then \
+		echo "❌ Source file not found: ${REPO_ROOT}/ide/cursor/supercursor/README.md"; \
 		exit 1; \
 	fi; \
-	safe_link "${DOTFILES_SHELL_ROOT}/dotfiles-ai/ide/cursor/supercursor/README.md" "${HOME_DIR}/.cursor/CURSOR.md"; \
+	safe_link "${REPO_ROOT}/ide/cursor/supercursor/README.md" "${HOME_DIR}/.cursor/CURSOR.md"; \
 	# AGENTS.md へのリンク \
-	if [ -f "${DOTFILES_SHELL_ROOT}/dotfiles-ai/global-rules/AGENTS.global.md" ]; then \
-		safe_link "${DOTFILES_SHELL_ROOT}/dotfiles-ai/global-rules/AGENTS.global.md" "${HOME_DIR}/.cursor/AGENTS.md"; \
+	if [ -f "${REPO_ROOT}/global-rules/AGENTS.global.md" ]; then \
+		safe_link "${REPO_ROOT}/global-rules/AGENTS.global.md" "${HOME_DIR}/.cursor/AGENTS.md"; \
 	else \
 		echo "⚠️  警告: AGENTS.global.md が見つかりません。リンク作成をスキップします。"; \
 	fi; \

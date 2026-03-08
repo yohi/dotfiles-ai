@@ -98,8 +98,10 @@ if command -v jq >/dev/null 2>&1; then
           } else {
             if (inString) {
               if (char === "\\" ) { result += char + (next || ""); i++; }
-              else if (char === inString) inString = null;
-              result += char;
+              else {
+                if (char === inString) inString = null;
+                result += char;
+              }
             } else {
               if (char === "/" && next === "/") { inComment = "single"; i++; }
               else if (char === "/" && next === "*") { inComment = "multi"; i++; }
@@ -124,8 +126,10 @@ if command -v jq >/dev/null 2>&1; then
           else {
             if ($in_str) {
               if ($c eq "\\\\") { $res .= $c . $n; $i++; }
-              elsif ($c eq $in_str) { $in_str = ""; }
-              $res .= $c;
+              else {
+                if ($c eq $in_str) { $in_str = ""; }
+                $res .= $c;
+              }
             } else {
               if ($c eq "/" && $n eq "/") { $in_cmt = "s"; $i++; }
               elsif ($c eq "/" && $n eq "*") { $in_cmt = "m"; $i++; }

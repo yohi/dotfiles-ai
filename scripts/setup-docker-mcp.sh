@@ -87,6 +87,9 @@ fi
 if [[ ! -f "$MCP_CONFIG_DIR/secrets.env" ]]; then
     echo -e "${YELLOW}⚠️  Warning: $MCP_CONFIG_DIR/secrets.env not found. Creating an empty one.${NC}"
     touch "$MCP_CONFIG_DIR/secrets.env"
+    chmod 600 "$MCP_CONFIG_DIR/secrets.env"
+else
+    chmod 600 "$MCP_CONFIG_DIR/secrets.env"
 fi
 
 # 共通の Gateway コマンド変数を定義
