@@ -3,14 +3,9 @@
   // Target OpenCode Version: v1.2.x
   // Based on oh-my-opencode v3.7.4
   "$schema": "https://opencode.ai/config.json",
-  // モデル
-  //"model": "gemini-3-pro-preview",
-  //"small_model": "gemini-3-flash-preview",
-  // ログレベル設定（デバッグ用）
-  // "logLevel": "DEBUG",
-  // [Plugin]
+  // Plugin
   "plugin": [
-    "oh-my-opencode@3.10.0",
+    "oh-my-opencode@3.11.2",
     "opencode-openai-codex-auth@^1.0.0",
     // "opencode-antigravity-auth@beta",
     // "@yohi/opencode-antigravity-quota@^1.0.0",
@@ -18,9 +13,10 @@
     // "@yohi/omo-sdd-hybrid",
     "opencode-geminicli-a2a-provider",
   ],
-  // [Instruction]
-  "instructions": [],
-  // [Watcher]
+  // Instruction
+  "instructions": [
+  ],
+  // Watcher
   "watcher": {
     "ignore": [
       "**/node_modules/**",
@@ -31,12 +27,13 @@
       "**/.cursorrules"
     ]
   },
+  // Compaction
   "compaction": {
     "auto": true,
     "reserved": 10000,
     "prune": true,
   },
-  // [Permission]
+  // Permission
   "permission": {
     // ------------------------------------------------------------------
     // 1. 基本ツールの権限（読み取り系は全開放）
@@ -123,7 +120,7 @@
       "su *": "deny"
     }
   },
-  // [MCP]
+  // MCP
   "mcp": {
     "docker-mcp-gateway": {
       "type": "remote",
@@ -131,7 +128,7 @@
       "enabled": true
     }
   },
-  // [LSP] 言語サーバー連携 (コードの構造的理解)
+  // LSP 言語サーバー連携 (コードの構造的理解)
   "lsp": {
     "bash-language-server": {
       "command": [
@@ -178,47 +175,55 @@
     "protocol": "http"
   },
   "provider": {
-    "stellar-gemini": {
-      "npm": "@ai-sdk/google",
-      "name": "Stellar Gemini (OAuth)",
+    "opencode-geminicli-a2a": {
+      "npm": "file:///home/y_ohi/program/private/opencode-geminicli-a2a/dist/index.js",
       "options": {
-        "apiKey": "not-needed",
-        "baseURL": "http://localhost:8742"
+        "host": "localhost",
+        "port": 41242,
+        "protocol": "http",
+        "autoStart": {
+          "startupTimeoutMs": 60000,
+          "env": {
+            "USE_CCPA": "true"
+          }
+        },
+        // 動的モデル変更により、単一の A2A サーバーでもモデルの切り替えが可能になりました。
+        // 特定のモデルを別のサーバーに送りたい場合のみ agents を使用してください。
+        "agents": [
+          {
+            "key": "a2a-server",
+            "models": [
+              "gemini-3.1-pro-preview-customtools",
+              "gemini-3.1-pro-preview",
+              "gemini-3-flash-preview",
+              "gemini-2.5-pro",
+            ],
+            "host": "localhost",
+            "port": 41242
+          }
+        ]
       },
       "models": {
-        "gemini-3.1-pro-preview": {
-          "name": "Gemini 3.1 Pro (Latest)",
-          "limit": { "context": 1048576, "output": 65536 }
-        },
-        "gemini-3-flash-preview": {
-          "name": "Gemini 3 Flash",
-          "limit": { "context": 1000000, "output": 65536 }
-        },
-        "gemini-2.5-pro": {
-          "name": "Gemini 2.5 Pro",
-          "limit": { "context": 128000, "output": 65536 }
-        }
-      }
-    },
-    "zerogravity": {
-      "npm": "@ai-sdk/google",
-      "name": "ZeroGravity (Gemini)",
-      "options": {
-        "apiKey": "not-needed",
-        "baseURL": "http://localhost:8741/v1beta",
-      },
-      "models": {
-        "gemini-3.1-pro": {
-          "name": "Gemini 3.1 Pro",
-          "limit": { "context": 1048576, "output": 65535 },
+        "gemini-3.1-pro-preview-customtools": {
+          "name": "Gemini 3.1 Pro Customtools (A2A)",
+          "limit": { "context": 1048576, "output": 65536 },
           "modalities": { "input": ["text", "image", "pdf"], "output": ["text"] },
           "variants": {
             "low": { "thinkingLevel": "low" },
             "high": { "thinkingLevel": "high" }
           }
         },
-        "gemini-3-flash": {
-          "name": "Gemini 3 Flash",
+        "gemini-3.1-pro-preview": {
+          "name": "Gemini 3.1 Pro (A2A)",
+          "limit": { "context": 1048576, "output": 65536 },
+          "modalities": { "input": ["text", "image", "pdf"], "output": ["text"] },
+          "variants": {
+            "low": { "thinkingLevel": "low" },
+            "high": { "thinkingLevel": "high" }
+          }
+        },
+        "gemini-3-flash-preview": {
+          "name": "Gemini 3 Flash (A2A)" ,
           "limit": { "context": 1048576, "output": 65536 },
           "modalities": { "input": ["text", "image", "pdf"], "output": ["text"] },
           "variants": {
@@ -227,7 +232,17 @@
             "medium": { "thinkingLevel": "medium" },
             "high": { "thinkingLevel": "high" }
           }
+
         },
+        "gemini-2.5-pro": {
+          "name": "Gemini 2.5 Pro (A2A)",
+          "limit": { "context": 128000, "output": 65536 }
+        },
+      },
+    },
+    // Anthropic (via Vertex AI or Direct)
+    "anthropic": {
+      "models": {
         "sonnet-4.6": {
           "name": "Claude Sonnet 4.6",
           "limit": { "context": 200000, "output": 64000 },
@@ -248,13 +263,13 @@
     // [For LLM Context]
     // - Documantatin:
     //     - http://ai.google.dev/gemini-api/docs/models/gemini-3.1-pro-preview.md.txt
-    "google-vertex": {
-      "models": {
-        "gemini-3-flash-preview": {},
-        "gemini-3.1-pro-preview": {},
-        "gemini-3.1-pro-preview-customtools": {},
-      },
-    },
+    // "google-vertex": {
+    //   "models": {
+    //     "gemini-3-flash-preview": {},
+    //     "gemini-3.1-pro-preview": {},
+    //     "gemini-3.1-pro-preview-customtools": {},
+    //   },
+    // },
     // Vertex AI Anthopic(Google)
     "google-vertex-anthropic": {
       "models": {

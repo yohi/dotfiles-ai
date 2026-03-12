@@ -12,6 +12,6 @@ codex/skills/.system/
 codex/tmp/
 
 # OpenCode
-opencode/oh-my-opencode.json*
+# opencode/oh-my-opencode.json*
 .mcp.json
 .serena/
