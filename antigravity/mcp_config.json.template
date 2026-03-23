@@ -6,6 +6,7 @@
         "mcp",
         "gateway",
         "run",
+        "--enable-all-servers",
         "--catalog", "/home/y_ohi/.docker/mcp/catalogs/bootstrap.yaml",
         "--catalog", "/home/y_ohi/.docker/mcp/catalogs/custom.yaml"
       ]
