@@ -78,6 +78,7 @@ DOCKER_PATH="$(which docker)"
 
 # ENABLE_SERVERS が指定されていない場合は、--servers フラグを付けず、config.yaml の全設定を使用する
 ENABLE_SERVERS="${ENABLE_SERVERS:-}"
+MCP_GATEWAY_AUTH_TOKEN="${MCP_GATEWAY_AUTH_TOKEN:-local-mcp-token-generated-by-setup}"
 SERVERS_ARG=""
 if [[ -n "$ENABLE_SERVERS" ]]; then
     SERVERS_ARG="--servers $ENABLE_SERVERS"
@@ -105,6 +106,7 @@ After=docker.service
 [Service]
 LimitNOFILE=65536
 Environment="ENABLE_SERVERS=$ENABLE_SERVERS"
+Environment="MCP_GATEWAY_AUTH_TOKEN=$MCP_GATEWAY_AUTH_TOKEN"
 # To enable all servers, you can change the ExecStart line to use --enable-all-servers
 # ExecStart=$DOCKER_PATH mcp gateway run --transport sse --port 10888 --enable-all-servers
 ExecStart=$GATEWAY_CMD
