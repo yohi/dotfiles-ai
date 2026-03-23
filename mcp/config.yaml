@@ -22,6 +22,8 @@ mcpServers:
     enabled: true
   skillport:
     enabled: true
+    command: skillport-mcp
+    args: []
   github-official:
     enabled: true
   docker:
