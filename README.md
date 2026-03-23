@@ -61,6 +61,14 @@ AIエージェント（Claude Code, Gemini CLI, OpenCode, Codex）の設定・�
 2. **利用方法**: エージェント（Claude, Gemini, Cursor）で Docker MCP Gateway (`:10888`) を設定するだけで、すべてのスキルが自動的にロードされます。
 3. **同期**: スキルを追加・修正した後は、エージェントが最新の状態を認識できるよう、必要に応じて `make sync-agents` やゲートウェイの再起動を行ってください。
 
+## Antigravity (Standalone MCP Config)
+
+[Antigravity](https://github.com/gotalab/antigravity) は、特定の AI エージェント（主に OpenCode 等）が Docker MCP Gateway を介さずに、直接 MCP サーバーに接続するためのスタンドアロン設定を管理します。
+
+- **役割**: Docker MCP Gateway (`:10888`) を SSE Gateway として利用し、個別の MCP ツールをシームレスに統合します。
+- **設定**: `~/.gemini/antigravity/mcp_config.json` にゲートウェイの URL (`http://localhost:10888/sse`) を定義します。
+- **統合**: これにより、Antigravity を利用するエージェントは、Docker MCP Gateway で稼働している SkillPort MCP 等のツールを透過的に利用可能になります。
+
 ## デプロイ構造 (シンボリックリンク)
 
 `make setup` を実行すると、リポジトリ内の設定ファイルが各エージェントの構成ディレクトリへシンボリックリンクとして配備されます。
@@ -76,6 +84,7 @@ AIエージェント（Claude Code, Gemini CLI, OpenCode, Codex）の設定・�
 | **Claude Code** | `~/.claude/settings.json` | `claude/claude-settings.json` |
 | **Gemini CLI** | `~/.gemini/settings.json` | `gemini/settings.json` |
 | | `~/.gemini/core` | `gemini/Core` |
+| **Antigravity** | `~/.gemini/antigravity/mcp_config.json` | `antigravity/mcp_config.json` |
 | **OpenCode** | `~/.config/opencode/opencode.jsonc` | `opencode/opencode.jsonc` |
 | | `~/.config/opencode/antigravity.json` | `opencode/antigravity.json` |
 | | `~/.opencode/commands` | `opencode/commands` |
