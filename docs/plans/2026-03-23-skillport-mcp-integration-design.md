@@ -15,7 +15,7 @@
 ## 3. Data Flow
 1. エージェントが Gateway (`:10888`) へリクエスト。
 2. Gateway が `mcp/config.yaml` の設定に基づき `skillport-mcp` を起動。
-3. `skillport-mcp` が `./agent-skills/*.md` を解析し、MCP Tools として公開。
+3. `skillport-mcp` が `./agent-skills/*/SKILL.md` をスキャンし、各スキル（サブフォルダ内の SKILL.md）を MCP Tools として解析。
 4. エージェントが Tool を実行し、スキルの内容（インストラクション等）を取得・適用。
 
 ## 4. Implementation Steps

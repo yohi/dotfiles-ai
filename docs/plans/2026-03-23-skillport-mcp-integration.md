@@ -84,9 +84,14 @@ Expected: `skillport-mcp` が正常に起動しているログを確認（また
 
 ### Task 5: Final Validation with Agents
 
-**Step 1: List tools via gateway**
-Run: `curl -s http://localhost:10888/tools` (SSEエンドポイントのため、実際にはエージェントのUIで確認が望ましい。または `skillport-mcp` を直接叩いて確認)
-Alternative: `skillport-mcp list-tools` (コマンドがあれば) もしくは `skillport check`
+**Step 1: List tools via official CLI or protocol**
+Docker MCP Gateway が提供する公式コマンドでツールリストを確認。
+Run: `docker mcp tools ls`
+Expected: `skillport_search`, `skillport_read` などのツールが表示される。
+
+または、`skillport-mcp` に対して直接 JSON-RPC リクエストを送り、ツール一覧を取得。
+Run: `echo '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}' | skillport-mcp`
 
 **Step 2: Verify with current agent (if possible)**
 エージェントに「利用可能なツールをリストして」と依頼し、`skillport` 関連のツールが含まれているか確認。
+注: SSE ゲートウェイ経由の直接的な HTTP アクセス（curl 等）は環境に依存するため、上記の CLI またはプロトコルレベルのチェックを推奨。
