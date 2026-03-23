@@ -86,7 +86,11 @@ if [[ -f "$DOTENV_FILE" ]] && grep -q "^MCP_GATEWAY_AUTH_TOKEN=" "$DOTENV_FILE";
     MCP_GATEWAY_AUTH_TOKEN=$(grep "^MCP_GATEWAY_AUTH_TOKEN=" "$DOTENV_FILE" | head -n 1 | cut -d'=' -f2-)
 else
     echo -e "${BLUE}🔑 Generating new MCP Gateway auth token...${NC}"
-    MCP_GATEWAY_AUTH_TOKEN=$(cat /dev/urandom | tr -dc 'a-z0-9' | fold -w 48 | head -n 1)
+    if command -v openssl > /dev/null 2>&1; then
+        MCP_GATEWAY_AUTH_TOKEN=$(openssl rand -hex 24)
+    else
+        MCP_GATEWAY_AUTH_TOKEN=$(cat /dev/urandom | tr -dc 'a-z0-9' | fold -w 48 | head -n 1)
+    fi
     if [[ -f "$DOTENV_FILE" ]]; then
         if grep -q "^MCP_GATEWAY_AUTH_TOKEN=" "$DOTENV_FILE"; then
             sed -i "s/^MCP_GATEWAY_AUTH_TOKEN=.*$/MCP_GATEWAY_AUTH_TOKEN=$MCP_GATEWAY_AUTH_TOKEN/" "$DOTENV_FILE"
