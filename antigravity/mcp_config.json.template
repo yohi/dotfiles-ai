@@ -1,11 +1,14 @@
 {
   "mcpServers": {
     "gateway": {
-      "serverUrl": "http://localhost:10889/sse/",
-      "headers": {
-        "Authorization": "Bearer __MCP_GATEWAY_AUTH_TOKEN__",
-        "Content-Type": "application/json"
-      }
+      "command": "docker",
+      "args": [
+        "mcp",
+        "gateway",
+        "run",
+        "--catalog", "/home/y_ohi/.docker/mcp/catalogs/bootstrap.yaml",
+        "--catalog", "/home/y_ohi/.docker/mcp/catalogs/custom.yaml"
+      ]
     }
   }
 }
