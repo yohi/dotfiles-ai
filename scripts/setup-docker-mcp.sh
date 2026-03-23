@@ -79,14 +79,25 @@ DOCKER_PATH="$(which docker)"
 # ENABLE_SERVERS が指定されていない場合は、--servers フラグを付けず、config.yaml の全設定を使用する
 ENABLE_SERVERS="${ENABLE_SERVERS:-}"
 
-# Persistent secret store for MCP token
-AUTH_TOKEN_FILE="$HOME/.mcp_secrets.env"
-if [[ ! -f "$AUTH_TOKEN_FILE" ]]; then
+# Persistent secret store for MCP token in project root .env
+DOTENV_FILE="$REPO_ROOT/.env"
+if [[ -f "$DOTENV_FILE" ]] && grep -q "^MCP_GATEWAY_AUTH_TOKEN=" "$DOTENV_FILE"; then
+    echo -e "${BLUE}🔑 Using existing MCP Gateway auth token from .env${NC}"
+    MCP_GATEWAY_AUTH_TOKEN=$(grep "^MCP_GATEWAY_AUTH_TOKEN=" "$DOTENV_FILE" | head -n 1 | cut -d'=' -f2-)
+else
     echo -e "${BLUE}🔑 Generating new MCP Gateway auth token...${NC}"
-    MCP_GATEWAY_AUTH_TOKEN=$(cat /dev/urandom | tr -dc 'a-z0-9' | fold -w 48 | head -n 1) && echo "MCP_GATEWAY_AUTH_TOKEN=$MCP_GATEWAY_AUTH_TOKEN" > "$AUTH_TOKEN_FILE"
-    chmod 600 "$AUTH_TOKEN_FILE"
+    MCP_GATEWAY_AUTH_TOKEN=$(cat /dev/urandom | tr -dc 'a-z0-9' | fold -w 48 | head -n 1)
+    if [[ -f "$DOTENV_FILE" ]]; then
+        if grep -q "^MCP_GATEWAY_AUTH_TOKEN=" "$DOTENV_FILE"; then
+            sed -i "s/^MCP_GATEWAY_AUTH_TOKEN=.*$/MCP_GATEWAY_AUTH_TOKEN=$MCP_GATEWAY_AUTH_TOKEN/" "$DOTENV_FILE"
+        else
+            echo "MCP_GATEWAY_AUTH_TOKEN=$MCP_GATEWAY_AUTH_TOKEN" >> "$DOTENV_FILE"
+        fi
+    else
+        echo "MCP_GATEWAY_AUTH_TOKEN=$MCP_GATEWAY_AUTH_TOKEN" > "$DOTENV_FILE"
+        chmod 600 "$DOTENV_FILE"
+    fi
 fi
-source "$AUTH_TOKEN_FILE"
 
 SERVERS_ARG=""
 if [[ -n "$ENABLE_SERVERS" ]]; then
