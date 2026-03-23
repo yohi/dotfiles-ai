@@ -12,11 +12,11 @@ ANTIGRAVITY_DOTFILES_MCP_TEMPLATE ?= $(REPO_ROOT)/antigravity/mcp_config.json.te
 # Antigravityの設定を適用
 setup-antigravity: ## Antigravityの設定ファイルを適用
 	@echo "🔧 Antigravityの設定を適用中..."
-	@if [ ! -f "$(ANTIGRAVITY_DOTFILES_MCP)" ] || [ -f "$(ANTIGRAVITY_DOTFILES_MCP_TEMPLATE)" -a "$(ANTIGRAVITY_DOTFILES_MCP_TEMPLATE)" -nt "$(ANTIGRAVITY_DOTFILES_MCP)" ]; then \
+	@if [ ! -f "$(ANTIGRAVITY_DOTFILES_MCP)" ] || { [ -f "$(ANTIGRAVITY_DOTFILES_MCP_TEMPLATE)" ] && [ "$(ANTIGRAVITY_DOTFILES_MCP_TEMPLATE)" -nt "$(ANTIGRAVITY_DOTFILES_MCP)" ]; }; then \
 		if [ -f "$(ANTIGRAVITY_DOTFILES_MCP_TEMPLATE)" ]; then \
 			echo "📝 設定ファイルが見つからないか古いため、テンプレートから生成します..."; \
-			bash "$(REPO_ROOT)/scripts/setup-docker-mcp.sh"; \
-		fi \
+			bash "$(REPO_ROOT)/scripts/setup-docker-mcp.sh" --skip-docker-check; \
+		fi; \
 	fi
 	@mkdir -p "$(ANTIGRAVITY_CONFIG_DIR)"
 	@if [ -f "$(ANTIGRAVITY_DOTFILES_MCP)" ]; then \
@@ -29,7 +29,6 @@ setup-antigravity: ## Antigravityの設定ファイルを適用
 		echo "✅ 設定を適用しました: $(ANTIGRAVITY_MCP_PATH)"; \
 	else \
 		echo "⚠️  設定ファイルが見つかりません: $(ANTIGRAVITY_DOTFILES_MCP)"; \
-		echo "    先に dotfiles に設定ファイルを用意してください"; \
 		exit 1; \
 	fi
 

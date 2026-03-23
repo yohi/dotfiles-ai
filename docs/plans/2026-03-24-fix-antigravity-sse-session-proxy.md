@@ -1,10 +1,8 @@
-# Fix Antigravity SSE Session via Static Proxy Implementation Plan
+# Fix Antigravity SSE Session Proxy (Deprecated)
 
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
-
-**Goal:** Resolve "Bad Request" by providing a static SSE endpoint for Antigravity that handles the dynamic `sessionid` of Docker MCP Gateway internally.
-
-**Architecture:**
+> [!CAUTION]
+> **本ドキュメントはアーカイブ済みです。**
+> Proxy サービスを利用したフローは `revert-to-stdio` 構成に置き換えられ、現在は使用されていません。
 - Create a lightweight Node.js proxy (`scripts/mcp-sse-proxy.js`).
 - The proxy maintains a single persistent connection to the Gateway's SSE endpoint and extracts the `sessionid`.
 - Antigravity connects to the proxy at `http://localhost:10889/sse`.

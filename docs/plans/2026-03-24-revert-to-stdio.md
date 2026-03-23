@@ -28,8 +28,11 @@
         "mcp",
         "gateway",
         "run",
-        "--catalog", "/home/y_ohi/.docker/mcp/catalogs/bootstrap.yaml",
-        "--catalog", "/home/y_ohi/.docker/mcp/catalogs/custom.yaml"
+        "--enable-all-servers",
+        "--port",
+        "10888",
+        "--catalog", "__HOME__/.docker/mcp/catalogs/bootstrap.yaml",
+        "--catalog", "__HOME__/.docker/mcp/catalogs/custom.yaml"
       ]
     }
   }

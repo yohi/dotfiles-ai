@@ -10,27 +10,38 @@ YELLOW='\033[0;33m'
 NC='\033[0m' # No Color
 
 echo -e "${BLUE}🐳 Starting Docker MCP setup...${NC}"
+# オプション解析
+SKIP_DOCKER_CHECK=false
+for arg in "$@"; do
+    if [ "$arg" == "--skip-docker-check" ]; then
+        SKIP_DOCKER_CHECK=true
+    fi
+done
 
 # Dockerの確認
-if ! command -v docker > /dev/null 2>&1; then
-    echo -e "${RED}❌ Docker not found. Please install Docker first.${NC}"
-    exit 1
-fi
+if [ "$SKIP_DOCKER_CHECK" = "false" ]; then
+    if ! command -v docker > /dev/null 2>&1; then
+        echo -e "${RED}❌ Docker not found. Please install Docker first.${NC}"
+        exit 1
+    fi
 
-if ! docker info > /dev/null 2>&1; then
-    echo -e "${RED}❌ Docker daemon is not running. Please start Docker first.${NC}"
-    exit 1
-fi
-echo -e "${GREEN}✅ Docker is installed and running.${NC}"
+    if ! docker info > /dev/null 2>&1; then
+        echo -e "${RED}❌ Docker daemon is not running. Please start Docker first.${NC}"
+        exit 1
+    fi
+    echo -e "${GREEN}✅ Docker is installed and running.${NC}"
 
-# docker-mcp プラグインの確認
-if ! docker mcp version > /dev/null 2>&1; then
-    echo -e "${RED}❌ docker-mcp CLI plugin not found.${NC}"
-    echo -e "Please install docker-mcp as a Docker CLI plugin."
-    echo -e "Refer to: https://docs.docker.com/ai/mcp-catalog-and-toolkit/install/"
-    exit 1
+    # docker-mcp プラグインの確認
+    if ! docker mcp version > /dev/null 2>&1; then
+        echo -e "${RED}❌ docker-mcp CLI plugin not found.${NC}"
+        echo -e "Please install docker-mcp as a Docker CLI plugin."
+        echo -e "Refer to: https://docs.docker.com/ai/mcp-catalog-and-toolkit/install/"
+        exit 1
+    fi
+    echo -e "${GREEN}✅ docker-mcp CLI plugin found.${NC}"
+else
+    echo -e "${YELLOW}⚠️  Skipping Docker checks as requested.${NC}"
 fi
-echo -e "${GREEN}✅ docker-mcp CLI plugin found.${NC}"
 
 # 設定ファイルの配置 (シンボリックリンク)
 echo -e "${BLUE}🔗 Linking Docker MCP configuration files...${NC}"
@@ -45,21 +56,38 @@ FILES_TO_COPY=(
     "catalog.json:$MCP_CONFIG_DIR/catalog.json"
     "catalogs/custom.yaml:$MCP_CONFIG_DIR/catalogs/custom.yaml"
     "catalogs/bootstrap.yaml:$MCP_CONFIG_DIR/catalogs/bootstrap.yaml"
+    "../antigravity/mcp_config.json.template:$REPO_ROOT/antigravity/mcp_config.json"
 )
 
 for pair in "${FILES_TO_COPY[@]}"; do
     SRC="${pair%%:*}"
     DST="${pair##*:}"
     if [[ ! -f "$REPO_ROOT/mcp/$SRC" ]]; then
-        echo -e "${RED}❌ Source file not found: $REPO_ROOT/mcp/$SRC${NC}"
-        exit 1
+        # antigravity.json の相対パス解決
+        if [[ "$SRC" == "../antigravity/mcp_config.json.template" ]] && [[ -f "$REPO_ROOT/antigravity/mcp_config.json.template" ]]; then
+            SRC_FILE="$REPO_ROOT/antigravity/mcp_config.json.template"
+        else
+            echo -e "${RED}❌ Source file not found: $REPO_ROOT/mcp/$SRC${NC}"
+            exit 1
+        fi
+    else
+        SRC_FILE="$REPO_ROOT/mcp/$SRC"
     fi
+
     # 一時ファイルへコピーしてからアトミックに移動
     TMP_DST="$DST.tmp.$$"
-    if cp -f "$REPO_ROOT/mcp/$SRC" "$TMP_DST"; then
-        mv "$TMP_DST" "$DST"
+
+    # テンプレートファイルの場合は置換を行う
+    if [[ "$SRC" == *"template" ]]; then
+        sed "s|__HOME__|$HOME|g" "$SRC_FILE" > "$TMP_DST"
     else
-        echo -e "${RED}❌ Failed to copy $SRC to $TMP_DST${NC}"
+        cp -f "$SRC_FILE" "$TMP_DST"
+    fi
+
+    if mv "$TMP_DST" "$DST"; then
+        true
+    else
+        echo -e "${RED}❌ Failed to copy $SRC to $DST${NC}"
         rm -f "$TMP_DST"
         exit 1
     fi
@@ -69,6 +97,12 @@ done
 sed -i.bak "s|\$HOME|$HOME|g" "$MCP_CONFIG_DIR/catalog.json" && rm -f "$MCP_CONFIG_DIR/catalog.json.bak"
 
 echo -e "${GREEN}✅ Configuration files copied and paths updated in $MCP_CONFIG_DIR${NC}"
+
+# systemd ユーザーサービスの作成
+if [ "$SKIP_DOCKER_CHECK" = "true" ]; then
+    echo -e "${YELLOW}⚠️  Skipping systemd service setup as --skip-docker-check is enabled.${NC}"
+    exit 0
+fi
 
 # antigravity/mcp_config.json.template の確認と生成
 TEMPLATE_FILE="$REPO_ROOT/antigravity/mcp_config.json.template"

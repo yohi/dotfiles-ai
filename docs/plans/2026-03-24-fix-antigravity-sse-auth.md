@@ -1,4 +1,9 @@
-# Fix Antigravity SSE Auth (using .env) Implementation Plan
+# Fix Antigravity SSE Auth (Deprecated)
+
+> [!CAUTION]
+> **本ドキュメントはアーカイブ済みです。**
+> 自動的な `.env`/SSE Auth 生成は現在使用されていません。最新の手順については、`docs/plans/2026-03-24-revert-to-stdio.md` を参照してください。
+ (using .env) Implementation Plan
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
