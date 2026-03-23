@@ -78,7 +78,16 @@ DOCKER_PATH="$(which docker)"
 
 # ENABLE_SERVERS が指定されていない場合は、--servers フラグを付けず、config.yaml の全設定を使用する
 ENABLE_SERVERS="${ENABLE_SERVERS:-}"
-MCP_GATEWAY_AUTH_TOKEN="${MCP_GATEWAY_AUTH_TOKEN:-local-mcp-token-generated-by-setup}"
+
+# Persistent secret store for MCP token
+AUTH_TOKEN_FILE="$HOME/.mcp_secrets.env"
+if [[ ! -f "$AUTH_TOKEN_FILE" ]]; then
+    echo -e "${BLUE}🔑 Generating new MCP Gateway auth token...${NC}"
+    MCP_GATEWAY_AUTH_TOKEN=$(cat /dev/urandom | tr -dc 'a-z0-9' | fold -w 48 | head -n 1) && echo "MCP_GATEWAY_AUTH_TOKEN=$MCP_GATEWAY_AUTH_TOKEN" > "$AUTH_TOKEN_FILE"
+    chmod 600 "$AUTH_TOKEN_FILE"
+fi
+source "$AUTH_TOKEN_FILE"
+
 SERVERS_ARG=""
 if [[ -n "$ENABLE_SERVERS" ]]; then
     SERVERS_ARG="--servers $ENABLE_SERVERS"
@@ -129,6 +138,16 @@ else
     echo -e "${RED}⚠️  Warning: User systemd session is unavailable. Skipping service activation.${NC}"
     echo -e "You can start the gateway manually with:"
     echo -e "  $GATEWAY_CMD"
+fi
+
+# antigravity/mcp_config.json.template の確認と生成
+TEMPLATE_FILE="$REPO_ROOT/antigravity/mcp_config.json.template"
+TARGET_FILE="$REPO_ROOT/antigravity/mcp_config.json"
+if [[ -f "$TEMPLATE_FILE" ]]; then
+    echo -e "${BLUE}📝 Generating $TARGET_FILE from template...${NC}"
+    # __MCP_GATEWAY_AUTH_TOKEN__ を実際のトークンで置換
+    sed "s/__MCP_GATEWAY_AUTH_TOKEN__/$MCP_GATEWAY_AUTH_TOKEN/g" "$TEMPLATE_FILE" > "$TARGET_FILE"
+    echo -e "${GREEN}✅ Generated $TARGET_FILE${NC}"
 fi
 
 # カタログの初期化（未初期化の場合のみ、docker-mcp.yaml を取得するため）
