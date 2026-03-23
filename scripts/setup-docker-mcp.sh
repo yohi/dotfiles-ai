@@ -23,6 +23,13 @@ if ! docker info > /dev/null 2>&1; then
 fi
 echo -e "${GREEN}✅ Docker is installed and running.${NC}"
 
+# Node.jsの確認
+if ! command -v node > /dev/null 2>&1; then
+    echo -e "${RED}❌ Node.js not found. Please install Node.js first.${NC}"
+    exit 1
+fi
+echo -e "${GREEN}✅ Node.js is installed.${NC}"
+
 # docker-mcp プラグインの確認
 if ! docker mcp version > /dev/null 2>&1; then
     echo -e "${RED}❌ docker-mcp CLI plugin not found.${NC}"
@@ -71,10 +78,12 @@ sed -i.bak "s|\$HOME|$HOME|g" "$MCP_CONFIG_DIR/catalog.json" && rm -f "$MCP_CONF
 echo -e "${GREEN}✅ Configuration files copied and paths updated in $MCP_CONFIG_DIR${NC}"
 
 # systemd ユーザーサービスの作成
-echo -e "${BLUE}⚙️  Setting up systemd user service for Docker MCP Gateway...${NC}"
+echo -e "${BLUE}⚙️  Setting up systemd user services...${NC}"
 SERVICE_DIR="$HOME/.config/systemd/user"
 SERVICE_FILE="$SERVICE_DIR/docker-mcp-gateway.service"
+PROXY_SERVICE_FILE="$SERVICE_DIR/docker-mcp-proxy.service"
 DOCKER_PATH="$(which docker)"
+NODE_PATH="$(which node)"
 
 # ENABLE_SERVERS が指定されていない場合は、--servers フラグを付けず、config.yaml の全設定を使用する
 ENABLE_SERVERS="${ENABLE_SERVERS:-}"
@@ -143,16 +152,38 @@ StandardError=journal
 WantedBy=default.target
 EOF
 
+cat <<EOF > "$PROXY_SERVICE_FILE"
+[Unit]
+Description=Docker MCP Proxy
+After=docker-mcp-gateway.service
+
+[Service]
+LimitNOFILE=65536
+Environment="MCP_GATEWAY_AUTH_TOKEN=$MCP_GATEWAY_AUTH_TOKEN"
+ExecStart=$NODE_PATH $REPO_ROOT/scripts/mcp-sse-proxy.js
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target
+EOF
+
 # systemd ユーザーセッションが利用可能か確認
 if systemctl --user status > /dev/null 2>&1; then
     systemctl --user daemon-reload
     systemctl --user enable docker-mcp-gateway.service
     systemctl --user restart docker-mcp-gateway.service
     echo -e "${GREEN}✅ Docker MCP Gateway service enabled and started.${NC}"
+    systemctl --user enable docker-mcp-proxy.service
+    systemctl --user restart docker-mcp-proxy.service
+    echo -e "${GREEN}✅ Docker MCP Proxy service enabled and started.${NC}"
 else
     echo -e "${RED}⚠️  Warning: User systemd session is unavailable. Skipping service activation.${NC}"
-    echo -e "You can start the gateway manually with:"
-    echo -e "  $GATEWAY_CMD"
+    echo -e "You can start the services manually with:"
+    echo -e "  Gateway: $GATEWAY_CMD"
+    echo -e "  Proxy:   $NODE_PATH $REPO_ROOT/scripts/mcp-sse-proxy.js"
 fi
 
 # antigravity/mcp_config.json.template の確認と生成
@@ -178,14 +209,23 @@ echo -e "${BLUE}🔍 Checking available MCP servers...${NC}"
 echo -e "${GREEN}✅ Docker MCP setup completed successfully.${NC}"
 echo -e ""
 if systemctl --user status > /dev/null 2>&1; then
-    echo -e "${BLUE}Docker MCP Gateway is running as a systemd user service.${NC}"
+    echo -e "${BLUE}Docker MCP services are running as systemd user services.${NC}"
+    echo -e "Gateway:"
     echo -e "  - Status: systemctl --user status docker-mcp-gateway"
     echo -e "  - Logs:   journalctl --user -u docker-mcp-gateway -f"
-    echo -e "  - Stop:   systemctl --user stop docker-mcp-gateway"
-    echo -e "  - Start:  systemctl --user start docker-mcp-gateway"
+    echo -e "Proxy:"
+    echo -e "  - Status: systemctl --user status docker-mcp-proxy"
+    echo -e "  - Logs:   journalctl --user -u docker-mcp-proxy -f"
+    echo -e ""
+    echo -e "Commands to manage both services:"
+    echo -e "  - Stop:   systemctl --user stop docker-mcp-gateway docker-mcp-proxy"
+    echo -e "  - Start:  systemctl --user start docker-mcp-gateway docker-mcp-proxy"
 else
     echo -e "${BLUE}Manual Execution:${NC}"
-    echo -e "  $GATEWAY_CMD"
+    echo -e "  Gateway: $GATEWAY_CMD"
+    echo -e "  Proxy:   $NODE_PATH $REPO_ROOT/scripts/mcp-sse-proxy.js"
 fi
 echo -e ""
-echo -e "${BLUE}Endpoint:${NC} http://localhost:10888"
+echo -e "${BLUE}Endpoints:${NC}"
+echo -e "  Gateway (SSE): http://localhost:10888"
+echo -e "  Proxy   (SSE): http://localhost:10889 (Proxies to Gateway)"
