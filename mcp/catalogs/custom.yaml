@@ -67,4 +67,6 @@ registry:
     description: SkillPort MCP server (local)
     command:
       - uvx
+      - "--from"
+      - "skillport-mcp"
       - "skillport-mcp"
