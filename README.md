@@ -30,6 +30,37 @@ AIエージェント（Claude Code, Gemini CLI, OpenCode, Codex）の設定・�
 2.  **プロジェクト指示 (`AGENTS.md`)**:
     *   このリポジトリ（`dotfiles-ai`）固有のルール、利用可能なスキルのリスト、リポジトリ構成の解説。
 
+## スキル管理 (SkillPort)
+
+[SkillPort](https://github.com/gotalab/skillport) は、複数の AI エージェント間で再利用可能な「スキル」を一元管理するためのツールです。
+
+- **スキルの実体**: `agent-skills/` ディレクトリ配下に、各スキルの `SKILL.md`（インストラクション）が格納されています。
+- **構成**: `.skillportrc` で設定され、`~/.skillport/skills` からリポジトリの `agent-skills/` へシンボリックリンクが張られます。
+- **コマンド**:
+  - `make skillport`: SkillPort と `skillport-mcp` をインストールし、ディレクトリをセットアップします。
+  - `make check-skillport`: インストール状態とシンボリックリンクの整合性を確認します。
+  - `skillport check`: スキル定義ファイル（.md）の構文や整合性をチェックします。
+
+## Docker MCP Gateway
+
+[Docker MCP Gateway](https://docs.docker.com/ai/mcp-catalog-and-toolkit/mcp-gateway/) は、Model Context Protocol (MCP) サーバーを統合し、SSE (Server-Sent Events) プロキシとして提供するコンポーネントです。
+
+- **役割**: Claude Code, Gemini CLI, Cursor などのエージェントから、単一のエンドポイント（`http://localhost:10888`）経由で複数の MCP サーバー（SQLite, Filesystem, SkillPort 等）にアクセス可能にします。
+- **管理 (Systemd)**: ユーザーセッションの Systemd サービスとして動作します。
+  - `make start-mcp`: ゲートウェイを起動します。
+  - `make stop-mcp`: ゲートウェイを停止します。
+  - `make status-mcp`: 稼働状態を確認します。
+  - `make logs-mcp`: リアルタイムログを表示します (`journalctl -f`)。
+- **設定**: `mcp/config.yaml` がマスター設定であり、`make setup-docker-mcp` によって `~/.docker/mcp/config.yaml` へ同期されます。
+
+## SkillPort & MCP の統合
+
+`skillport-mcp` を MCP サーバーとして Docker MCP Gateway に登録することで、エージェントは `agent-skills/` 内の全スキルを MCP Tool として動的に利用できます。
+
+1. **仕組み**: `skillport-mcp` が起動時にスキルディレクトリをスキャンし、各スキルを MCP ツールとして公開します。
+2. **利用方法**: エージェント（Claude, Gemini, Cursor）で Docker MCP Gateway (`:10888`) を設定するだけで、すべてのスキルが自動的にロードされます。
+3. **同期**: スキルを追加・修正した後は、エージェントが最新の状態を認識できるよう、必要に応じて `make sync-agents` やゲートウェイの再起動を行ってください。
+
 ## デプロイ構造 (シンボリックリンク)
 
 `make setup` を実行すると、リポジトリ内の設定ファイルが各エージェントの構成ディレクトリへシンボリックリンクとして配備されます。
