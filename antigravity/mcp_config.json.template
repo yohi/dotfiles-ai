@@ -1,7 +1,7 @@
 {
   "mcpServers": {
     "gateway": {
-      "serverUrl": "http://localhost:10888/sse/",
+      "serverUrl": "http://localhost:10889/sse/",
       "headers": {
         "Authorization": "Bearer __MCP_GATEWAY_AUTH_TOKEN__",
         "Content-Type": "application/json"
