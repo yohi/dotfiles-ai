@@ -9,6 +9,7 @@ include _mk/claude.mk
 include _mk/gemini.mk
 include _mk/codex.mk
 include _mk/opencode.mk
+include _mk/antigravity.mk
 include _mk/superclaude.mk
 include _mk/skillport.mk
 include _mk/sync-agents.mk
@@ -41,6 +42,7 @@ setup-agents:
 	$(MAKE) setup-supergemini
 	$(MAKE) setup-codex
 	$(MAKE) setup-opencode
+	$(MAKE) setup-antigravity
 	$(MAKE) setup-docker-mcp
 	$(MAKE) setup-superpowers
 	$(MAKE) sync-agents
@@ -60,6 +62,7 @@ clean:
 	-$(MAKE) uninstall-gemini
 	-$(MAKE) uninstall-codex
 	-$(MAKE) uninstall-opencode
+	-$(MAKE) uninstall-antigravity
 	-$(MAKE) uninstall-skillport
 	-$(MAKE) uninstall-mcp
 	-$(MAKE) uninstall-superpowers
