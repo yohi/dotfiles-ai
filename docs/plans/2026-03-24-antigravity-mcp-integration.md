@@ -10,7 +10,7 @@
 
 ---
 
-### Task 1: Create Antigravity Configuration Directory and Files
+## Task 1: Create Antigravity Configuration Directory and Files
 
 **Files:**
 - Create: `antigravity/mcp_config.json`
@@ -35,7 +35,7 @@ Run: `git add antigravity/ && git commit -m "feat(antigravity): add standalone m
 
 ---
 
-### Task 2: Create Antigravity Makefile
+## Task 2: Create Antigravity Makefile
 
 **Files:**
 - Create: `_mk/antigravity.mk`
@@ -48,7 +48,7 @@ Run: `git add _mk/antigravity.mk && git commit -m "feat(makefile): add antigravi
 
 ---
 
-### Task 3: Integrate with Root Makefile
+## Task 3: Integrate with Root Makefile
 
 **Files:**
 - Modify: `Makefile`
@@ -64,7 +64,7 @@ Run: `git add Makefile && git commit -m "feat(makefile): integrate antigravity i
 
 ---
 
-### Task 4: Execute Setup and Verify Symlink
+## Task 4: Execute Setup and Verify Symlink
 
 **Files:**
 - Run: `make setup-antigravity`
@@ -79,7 +79,7 @@ Expected: リポジトリの `antigravity/mcp_config.json` を指している。
 
 ---
 
-### Task 5: Final Validation in Antigravity
+## Task 5: Final Validation in Antigravity
 
 **Step 1: Check server availability**
 Antigravity 本体の「Manage MCP Servers」で `gateway` が認識されているか確認。
