@@ -1,7 +1,11 @@
 {
   "mcpServers": {
     "docker-mcp-gateway": {
-      "url": "http://localhost:10888/sse"
+      "serverUrl": "http://127.0.0.1:10888/sse",
+      "type": "sse",
+      "headers": {
+        "Authorization": "Bearer __MCP_AUTH_TOKEN__"
+      }
     }
   }
 }
