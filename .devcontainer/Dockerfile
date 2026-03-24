@@ -11,5 +11,5 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
 
 # uv (SkillPortの実行・管理用) のインストール
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh \
-    && echo 'export PATH="$HOME/.cargo/bin:$PATH"' >> ~/.bashrc \
-    && echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+    && mv /root/.local/bin/uv /usr/local/bin/uv \
+    && mv /root/.local/bin/uvx /usr/local/bin/uvx

@@ -47,7 +47,7 @@ fi
 # 3. 絶対パスを相対パスに変換する処理
 # 現在のプロジェクトルートの絶対パスを取得し、それを削除して相対パス化する
 REPO_ROOT=$(pwd)
-sed -i "s|${REPO_ROOT}/||g" "$SOURCE_MD"
+perl -pi -e "s|\Q${REPO_ROOT}/||g" "$SOURCE_MD"
 
 # 4. 置換ロジック (一時ファイルを利用して安全に更新)
 TMP_FILE=$(mktemp)
@@ -60,6 +60,7 @@ if grep -qF "$START_MARKER" "$TARGET_MD" && grep -qF "$END_MARKER" "$TARGET_MD";
         -v src="$SOURCE_MD" '
     BEGIN { skip=0 }
     $0 == start_m {
+        print start_m
         while ((getline line < src) > 0) {
             print line
         }
@@ -67,6 +68,7 @@ if grep -qF "$START_MARKER" "$TARGET_MD" && grep -qF "$END_MARKER" "$TARGET_MD";
         next
     }
     $0 == end_m {
+        print end_m
         skip=0
         next
     }
