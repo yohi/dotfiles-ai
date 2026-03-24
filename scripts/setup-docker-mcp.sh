@@ -104,15 +104,6 @@ if [ "$SKIP_DOCKER_CHECK" = "true" ]; then
     exit 0
 fi
 
-# antigravity/mcp_config.json.template の確認と生成
-TEMPLATE_FILE="$REPO_ROOT/antigravity/mcp_config.json.template"
-TARGET_FILE="$REPO_ROOT/antigravity/mcp_config.json"
-if [[ -f "$TEMPLATE_FILE" ]]; then
-    echo -e "${BLUE}📝 Generating $TARGET_FILE from template...${NC}"
-    cp "$TEMPLATE_FILE" "$TARGET_FILE"
-    echo -e "${GREEN}✅ Generated $TARGET_FILE${NC}"
-fi
-
 # カタログの初期化（未初期化の場合のみ、docker-mcp.yaml を取得するため）
 if [[ ! -f "$MCP_CONFIG_DIR/catalogs/docker-mcp.yaml" ]]; then
     echo -e "${BLUE}📦 Initializing official MCP Catalog...${NC}"

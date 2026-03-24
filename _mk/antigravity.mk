@@ -16,7 +16,7 @@ setup-antigravity: ## Antigravityの設定ファイルを適用
 		if [ -f "$(ANTIGRAVITY_DOTFILES_MCP_TEMPLATE)" ]; then \
 			echo "📝 設定ファイルが見つからないか古いため、テンプレートから生成します..."; \
 			bash "$(REPO_ROOT)/scripts/setup-docker-mcp.sh" --skip-docker-check; \
-		fi; \
+		fi \
 	fi
 	@mkdir -p "$(ANTIGRAVITY_CONFIG_DIR)"
 	@if [ -f "$(ANTIGRAVITY_DOTFILES_MCP)" ]; then \

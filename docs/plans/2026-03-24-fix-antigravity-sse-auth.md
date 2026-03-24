@@ -2,8 +2,10 @@
 
 > [!CAUTION]
 > **本ドキュメントはアーカイブ済みです。**
-> 自動的な `.env`/SSE Auth 生成は現在使用されていません。最新の手順については、`docs/plans/2026-03-24-revert-to-stdio.md` を参照してください。
- (using .env) Implementation Plan
+> この計画（.env ファイルを使用した MCP_GATEWAY_AUTH_TOKEN の管理、scripts/setup-docker-mcp.sh の更新など）は、`stdio` ベースの構成への移行に伴い廃止されました。
+> 現在の推奨される手順については、[docs/plans/2026-03-24-revert-to-stdio.md](2026-03-24-revert-to-stdio.md) を参照してください。
+
+## Implementation Plan (Superseded by stdio configuration)
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 

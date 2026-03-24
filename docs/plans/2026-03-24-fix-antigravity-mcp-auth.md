@@ -2,8 +2,10 @@
 
 > [!CAUTION]
 > **本ドキュメントはアーカイブ済みです。**
-> SSE Auth による統合は廃止され、現在は `stdio` ベースの構成（`docs/plans/2026-03-24-revert-to-stdio.md`）に移行しています。以下の手順は現在は適用されません。
- Error Implementation Plan
+> この計画（MCP_GATEWAY_AUTH_TOKEN の設定、docker-mcp-gateway.service への環境変数追加、Authorization/Bearer ヘッダーの使用など）は、`stdio` ベースの構成への移行に伴い廃止されました。
+> 現在の推奨される手順については、[docs/plans/2026-03-24-revert-to-stdio.md](2026-03-24-revert-to-stdio.md) を参照してください。
+
+## Implementation Plan (Superseded by stdio configuration)
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
