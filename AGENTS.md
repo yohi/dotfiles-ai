@@ -135,7 +135,7 @@ This repository manages AI agent configurations, global rules, and AI-enabled ID
   - `ide/`: IDE configurations (Cursor, VSCode).
   - `global-rules/`: Global AI instructions and standards.
   - `agent-skills/`: Specialized skills for OpenCode agents.
-- **IDE Management**: Cursor and VSCode settings are managed here. Use `make install-cursor`, `make setup-vscode`, or `make install-supercopilot` for setup.
+- **IDE Management**: Cursor and VSCode settings are managed here. Use `make install-cursor` or `make setup-vscode` for setup.
 
 # Superpowers Workflow
 このプロジェクトでは [obra/superpowers](https://github.com/obra/superpowers) ワークフローを採用しています。

@@ -32,7 +32,6 @@ install-agents:
 install-ides:
 	@echo "==> Installing dotfiles-ai IDE tools"
 	$(MAKE) install-packages-cursor
-	$(MAKE) install-supercopilot
 
 setup: setup-agents setup-ides ## Setup all AI agents and IDE configurations
 
