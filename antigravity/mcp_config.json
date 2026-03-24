@@ -1,7 +1,0 @@
-{
-  "mcpServers": {
-    "gateway": {
-      "url": "http://localhost:10888/sse"
-    }
-  }
-}

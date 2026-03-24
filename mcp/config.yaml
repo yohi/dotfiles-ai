@@ -20,9 +20,6 @@ mcpServers:
     enabled: true
   chrome-devtools:
     enabled: true
-  skillport:
-    enabled: true
-    command: skillport-mcp
   github-official:
     enabled: true
   docker:
