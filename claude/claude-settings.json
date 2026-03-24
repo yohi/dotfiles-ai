@@ -14,8 +14,7 @@
         "gateway",
         "run",
         "--transport",
-        "stdio",
-        "--enable-all-servers"
+        "stdio"
       ]
     }
   }

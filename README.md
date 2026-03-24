@@ -78,6 +78,7 @@ AIエージェント（Claude Code, Gemini CLI, OpenCode, Codex）の設定・�
 | **Global Rules** | `~/.gemini/GEMINI.md` | `global-rules/AGENTS.global.md` |
 | | `~/.claude/CLAUDE.md` | `global-rules/AGENTS.global.md` |
 | | `~/.config/opencode/AGENTS.md` | `global-rules/AGENTS.global.md` |
+| | `~/.codex/AGENTS.md` | `global-rules/AGENTS.global.md` |
 | **Docker MCP** | `~/.docker/mcp/config.yaml` | `mcp/config.yaml` |
 | | `~/.docker/mcp/catalog.json` | `mcp/catalog.json` |
 | | `~/.docker/mcp/catalogs/` | `mcp/catalogs/` |
