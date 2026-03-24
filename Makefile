@@ -45,6 +45,7 @@ setup-agents:
 	$(MAKE) setup-docker-mcp
 	$(MAKE) setup-superpowers
 	$(MAKE) sync-agents
+	@bash scripts/sync-mcp-configs.sh
 
 setup-ides:
 	@echo "==> Setting up dotfiles-ai IDE configurations"
