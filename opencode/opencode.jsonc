@@ -170,14 +170,20 @@
     }
   },
   // プロバイダ設定
-  // [For LLM Context]
-  // oh-my-opencodeのエージェントに設定するモデルは下記から選択すること
-  "a2aProvider": {
-    "host": "127.0.0.1",
-    "port": 41242,
-    "protocol": "http"
-  },
   "provider": {
+    "opencode-geminicli-a2a": {
+      "npm": "file:///home/y_ohi/program/opencode-geminicli-a2a",
+      "options": {
+        "host": "127.0.0.1",
+        "port": 41242,
+        "protocol": "http"
+      },
+      "models": {
+        "gemini-3.1-pro-preview": {},
+        "gemini-3-flash-preview": {},
+        "gemini-2.5-pro": {}
+      }
+    },
     "stellar-gemini": {
       "npm": "@ai-sdk/google",
       "name": "Stellar Gemini (OAuth)",
