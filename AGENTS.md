@@ -137,3 +137,12 @@ This repository manages AI agent configurations, global rules, and AI-enabled ID
   - `agent-skills/`: Specialized skills for OpenCode agents.
 - **IDE Management**: Cursor and VSCode settings are managed here. Use `make install-cursor`, `make setup-vscode`, or `make install-supercopilot` for setup.
 
+# Superpowers Workflow
+このプロジェクトでは [obra/superpowers](https://github.com/obra/superpowers) ワークフローを採用しています。
+
+## 核心的ルール
+- **スキル優先:** いかなるアクションの前にも必ず `search_skills` で `using-superpowers` スキルを確認し、関連するスキルがあれば `load_skill` で有効にしてください。
+- **計画と設計:** 実装前に `brainstorming` で設計を固め、`writing-plans` で詳細なタスクリストを作成してください。
+- **TDD:** すべての実装は `test-driven-development` スキルに従い、テストを先に書いてから実装してください。
+- **検証:** 完了前に `verification-before-completion` を実行し、エビデンスに基づいた成功報告を行ってください。
+
