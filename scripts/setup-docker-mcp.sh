@@ -62,16 +62,18 @@ FILES_TO_COPY=(
 for pair in "${FILES_TO_COPY[@]}"; do
     SRC="${pair%%:*}"
     DST="${pair##*:}"
-    if [[ ! -f "$REPO_ROOT/mcp/$SRC" ]]; then
-        # antigravity.json の相対パス解決
-        if [[ "$SRC" == "../antigravity/mcp_config.json.template" ]] && [[ -f "$REPO_ROOT/antigravity/mcp_config.json.template" ]]; then
-            SRC_FILE="$REPO_ROOT/antigravity/mcp_config.json.template"
-        else
-            echo -e "${RED}❌ Source file not found: $REPO_ROOT/mcp/$SRC${NC}"
-            exit 1
-        fi
-    else
+
+    # Resolve source file path
+    SRC_FILE=""
+    if [[ -f "$REPO_ROOT/mcp/$SRC" ]]; then
         SRC_FILE="$REPO_ROOT/mcp/$SRC"
+    elif [[ "$SRC" == "../antigravity/"* ]] && [[ -f "$REPO_ROOT/antigravity/$(basename "$SRC")" ]]; then
+        SRC_FILE="$REPO_ROOT/antigravity/$(basename "$SRC")"
+    fi
+
+    if [[ -z "$SRC_FILE" ]]; then
+        echo -e "${RED}❌ Source file not found: $SRC (checked in $REPO_ROOT/mcp and $REPO_ROOT/antigravity)${NC}"
+        exit 1
     fi
 
     # 一時ファイルへコピーしてからアトミックに移動
@@ -84,10 +86,8 @@ for pair in "${FILES_TO_COPY[@]}"; do
         cp -f "$SRC_FILE" "$TMP_DST"
     fi
 
-    if mv "$TMP_DST" "$DST"; then
-        true
-    else
-        echo -e "${RED}❌ Failed to copy $SRC to $DST${NC}"
+    if ! mv "$TMP_DST" "$DST"; then
+        echo -e "${RED}❌ Failed to move $TMP_DST to $DST (Source: $SRC)${NC}"
         rm -f "$TMP_DST"
         exit 1
     fi
