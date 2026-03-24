@@ -107,7 +107,11 @@ fi
 # カタログの初期化（未初期化の場合のみ、docker-mcp.yaml を取得するため）
 if [[ ! -f "$MCP_CONFIG_DIR/catalogs/docker-mcp.yaml" ]]; then
     echo -e "${BLUE}📦 Initializing official MCP Catalog...${NC}"
-    docker mcp catalog update || docker mcp catalog init || true
+    if ! docker mcp catalog update && ! docker mcp catalog init; then
+        echo -e "${RED}❌ Failed to initialize official MCP Catalog.${NC}"
+        echo -e "Please check your network connection or Docker AI configuration."
+        exit 1
+    fi
 fi
 
 echo -e "${GREEN}✅ Docker MCP setup completed successfully.${NC}"
