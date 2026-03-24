@@ -52,6 +52,9 @@ setup-ides:
 	$(MAKE) setup-cursor
 	$(MAKE) setup-vscode
 
+mcp-render:
+	@sed "s|__HOME__|$(HOME)|g" mcp/catalogs/custom.yaml.template > mcp/catalogs/custom.yaml
+
 link:
 	@echo "==> Linking dotfiles-ai (Handled in setup targets)"
 
