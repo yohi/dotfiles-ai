@@ -52,6 +52,15 @@ install-codex: install-packages-codex
 .PHONY: uninstall-codex
 uninstall-codex: ## Codex CLI の設定を削除
 	@echo "🗑️  Codex CLI の設定を削除中..."
-	@rm -f $(HOME_DIR)/.codex
-	@echo "✅ Codex CLI の設定を削除しました"
+	@if [ -L "$(HOME_DIR)/.codex" ]; then \
+		rm -f "$(HOME_DIR)/.codex"; \
+		echo "✅ シンボリックリンクを削除しました: $(HOME_DIR)/.codex"; \
+	elif [ -f "$(HOME_DIR)/.codex" ]; then \
+		rm -f "$(HOME_DIR)/.codex"; \
+		echo "✅ 設定ファイルを削除しました: $(HOME_DIR)/.codex"; \
+	elif [ -d "$(HOME_DIR)/.codex" ]; then \
+		echo "⚠️  $(HOME_DIR)/.codex はディレクトリとして存在するため削除されません。手動で確認してください。"; \
+	else \
+		echo "ℹ️  削除する設定はありません: $(HOME_DIR)/.codex"; \
+	fi
 
