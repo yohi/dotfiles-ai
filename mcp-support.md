@@ -28,7 +28,7 @@ Google のエージェント特化型 IDE。一貫して **`serverUrl`** を使�
 {
   "mcpServers": {
     "remote-tool": {
-      "serverUrl": "[https://mcp-server.example.com/sse](https://mcp-server.example.com/sse)",
+      "serverUrl": "https://mcp-server.example.com/sse",
       "type": "sse"
     }
   }
@@ -42,7 +42,7 @@ Google のエージェント特化型 IDE。一貫して **`serverUrl`** を使�
 {
   "mcpServers": {
     "internal-tool": {
-      "url": "[https://api.gemini-mcp.dev/sse](https://api.gemini-mcp.dev/sse)"
+      "url": "https://api.gemini-mcp.dev/sse"
     }
   }
 }
@@ -56,7 +56,7 @@ Google のエージェント特化型 IDE。一貫して **`serverUrl`** を使�
   "mcpServers": {
     "remote-fetcher": {
       "type": "sse",
-      "url": "[https://api.anthropic.com/mcp/sse](https://api.anthropic.com/mcp/sse)"
+      "url": "https://api.anthropic.com/mcp/sse"
     }
   }
 }
@@ -69,7 +69,7 @@ Google のエージェント特化型 IDE。一貫して **`serverUrl`** を使�
 {
   "mcpServers": {
     "cursor-remote": {
-      "url": "[https://api.cursor.sh/mcp/sse](https://api.cursor.sh/mcp/sse)"
+      "url": "https://api.cursor.sh/mcp/sse"
     }
   }
 }
@@ -84,7 +84,7 @@ Google のエージェント特化型 IDE。一貫して **`serverUrl`** を使�
   "mcp": {
     "remote-agent": {
       "type": "remote",
-      "url": "[https://mcp.opencode.dev/mcp](https://mcp.opencode.dev/mcp)"
+      "url": "https://mcp.opencode.dev/mcp"
     }
   }
 }

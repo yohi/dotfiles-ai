@@ -51,14 +51,15 @@ DOTENV_FILE="$REPO_ROOT/.env"
 if [ ! -f "$DOTENV_FILE" ]; then
     touch "$DOTENV_FILE"
 fi
+chmod 600 "$DOTENV_FILE"
 
-if ! grep -q "MCP_GATEWAY_AUTH_TOKEN" "$DOTENV_FILE"; then
+if ! grep -q "^MCP_GATEWAY_AUTH_TOKEN=" "$DOTENV_FILE"; then
     echo -e "${BLUE}🔑 Generating MCP_GATEWAY_AUTH_TOKEN...${NC}"
     TOKEN=$(openssl rand -hex 32)
     echo "MCP_GATEWAY_AUTH_TOKEN=$TOKEN" >> "$DOTENV_FILE"
     echo -e "${GREEN}✅ Generated and added MCP_GATEWAY_AUTH_TOKEN to .env${NC}"
 else
-    TOKEN=$(grep "MCP_GATEWAY_AUTH_TOKEN" "$DOTENV_FILE" | cut -d'=' -f2)
+    TOKEN=$(grep -m1 "^MCP_GATEWAY_AUTH_TOKEN=" "$DOTENV_FILE" | cut -d'=' -f2-)
     echo -e "${GREEN}✅ MCP_GATEWAY_AUTH_TOKEN already exists in .env${NC}"
 fi
 
@@ -163,7 +164,8 @@ fi
 
 echo -e "${BLUE}⚙️  Setting up systemd service...${NC}"
 mkdir -p "$HOME/.config/systemd/user"
-cp "$REPO_ROOT/mcp/docker-mcp-gateway.service" "$HOME/.config/systemd/user/"
+# Replace __REPO_ROOT__ placeholder with actual path
+sed "s|__REPO_ROOT__|$REPO_ROOT|g" "$REPO_ROOT/mcp/docker-mcp-gateway.service" > "$HOME/.config/systemd/user/docker-mcp-gateway.service"
 systemctl --user daemon-reload
 systemctl --user enable docker-mcp-gateway.service
 systemctl --user restart docker-mcp-gateway.service

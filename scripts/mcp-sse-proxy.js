@@ -6,13 +6,55 @@ const { EventSource } = require('eventsource');
 const axios = require('axios');
 
 const sseUrl = process.argv[2] || 'http://localhost:10888/sse';
-const eventSource = new EventSource(sseUrl);
+const token = process.env.MCP_GATEWAY_AUTH_TOKEN;
+
+if (!token) {
+  console.error('Error: MCP_GATEWAY_AUTH_TOKEN is not set in environment.');
+  // We continue as it might be an open server, but we log the error as requested.
+}
+
+let eventSource = null;
+
+function cleanup() {
+  if (eventSource) {
+    eventSource.close();
+    eventSource = null;
+  }
+}
+
+process.on('SIGINT', () => { cleanup(); process.exit(0); });
+process.on('SIGTERM', () => { cleanup(); process.exit(0); });
+
+eventSource = new EventSource(sseUrl, {
+  headers: token ? { Authorization: `Bearer ${token}` } : {}
+});
 
 let postUrl = null;
 const messageQueue = [];
 
+async function sendPost(payload) {
+  if (!postUrl) {
+    messageQueue.push(payload);
+    return;
+  }
+  try {
+    await axios.post(postUrl, payload, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {}
+    });
+  } catch (e) {
+    console.error('Error posting message to SSE:', e.message);
+  }
+}
+
+async function flushQueue() {
+  while (messageQueue.length > 0 && postUrl) {
+    const msg = messageQueue.shift();
+    await sendPost(msg);
+  }
+}
+
 // Handle endpoint event to discover the POST target URL
-eventSource.addEventListener('endpoint', (event) => {
+eventSource.addEventListener('endpoint', async (event) => {
   try {
     const data = JSON.parse(event.data);
     postUrl = data.endpoint || event.data;
@@ -27,10 +69,7 @@ eventSource.addEventListener('endpoint', (event) => {
   }
 
   // Flush queued messages
-  while (messageQueue.length > 0 && postUrl) {
-    const msg = messageQueue.shift();
-    sendPost(msg);
-  }
+  await flushQueue();
 });
 
 eventSource.onmessage = (event) => {
@@ -39,29 +78,32 @@ eventSource.onmessage = (event) => {
 
 eventSource.onerror = (event) => {
   console.error('EventSource connection failed:', event.message || event);
+  cleanup();
   process.exit(1);
 };
 
-async function sendPost(payload) {
-  if (!postUrl) {
-    messageQueue.push(payload);
-    return;
-  }
-  try {
-    await axios.post(postUrl, payload);
-  } catch (e) {
-    console.error('Error posting message to SSE:', e.message);
-  }
-}
+let stdinBuffer = '';
+process.stdin.on('data', async (data) => {
+  stdinBuffer += data.toString();
+  const lines = stdinBuffer.split('\n');
+  stdinBuffer = lines.pop(); // keep partial line or empty string if ends with \n
 
-process.stdin.on('data', (data) => {
-  const messages = data.toString().split('\n').filter(l => l.trim());
-  for (const msg of messages) {
+  for (const line of lines) {
+    if (!line.trim()) continue;
     try {
-      const payload = JSON.parse(msg);
-      sendPost(payload);
+      const payload = JSON.parse(line);
+      await sendPost(payload);
     } catch (e) {
       // Ignore non-JSON lines
     }
+  }
+});
+
+process.stdin.on('end', async () => {
+  if (stdinBuffer.trim()) {
+    try {
+      const payload = JSON.parse(stdinBuffer);
+      await sendPost(payload);
+    } catch (e) {}
   }
 });

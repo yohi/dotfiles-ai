@@ -13,7 +13,7 @@
 
 ---
 
-### Task 1: トークンの動的生成とセキュリティ強化
+## Task 1: トークンの動的生成とセキュリティ強化
 
 **Files:**
 - Modify: `scripts/setup-docker-mcp.sh`
@@ -43,7 +43,8 @@ ExecStart=/usr/bin/docker mcp gateway run ... (トークンのハードコード
 
 ```bash
 # scripts/sync-mcp-configs.sh
-source "$REPO_ROOT/.env"
+# Extract MCP_GATEWAY_AUTH_TOKEN from .env safely
+MCP_GATEWAY_AUTH_TOKEN=$(grep -m1 '^MCP_GATEWAY_AUTH_TOKEN=' "$REPO_ROOT/.env" | cut -d'=' -f2- | tr -d '"'\''')
 AUTH_TOKEN="$MCP_GATEWAY_AUTH_TOKEN"
 ```
 
@@ -54,7 +55,7 @@ git add scripts/setup-docker-mcp.sh mcp/docker-mcp-gateway.service scripts/sync-
 git commit -m "chore(mcp): dynamic auth token generation and security hardening"
 ```
 
-### Task 2: SSE プロキシの仕様準拠 (endpoint対応)
+## Task 2: SSE プロキシの仕様準拠 (endpoint対応)
 
 **Files:**
 - Modify: `scripts/mcp-sse-proxy.js`
@@ -84,7 +85,7 @@ git add scripts/mcp-sse-proxy.js
 git commit -m "fix(mcp): comply with SSE transport spec for endpoint discovery"
 ```
 
-### Task 3: ポータビリティと一貫性の向上
+## Task 3: ポータビリティと一貫性の向上
 
 **Files:**
 - Modify: `antigravity/mcp_config.json.template`
@@ -125,7 +126,7 @@ git add antigravity/mcp_config.json.template gemini/supergemini/supergemini
 git commit -m "chore(mcp): improve portability and fix configuration consistency"
 ```
 
-### Task 4: 全体の検証
+## Task 4: 全体の検証
 
 **Step 1: 再セットアップの実行**
 

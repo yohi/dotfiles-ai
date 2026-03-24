@@ -14,7 +14,7 @@
 
 ---
 
-### Task 1: systemd サービスユニットの作成
+## Task 1: systemd サービスユニットの作成
 
 **Files:**
 - Create: `~/.config/systemd/user/docker-mcp-gateway.service`
@@ -29,7 +29,7 @@ After=network.target docker.service
 
 [Service]
 Type=simple
-Environment=MCP_GATEWAY_AUTH_TOKEN=default_token
+EnvironmentFile=%h/dotfiles/components/dotfiles-ai/.env
 WorkingDirectory=%h/dotfiles/components/dotfiles-ai
 ExecStartPre=/usr/bin/make mcp-render
 ExecStart=/usr/bin/docker mcp gateway run \
@@ -65,7 +65,7 @@ git add mcp/docker-mcp-gateway.service scripts/setup-docker-mcp.sh
 git commit -m "feat(mcp): add systemd service for sse gateway"
 ```
 
-### Task 2: Cursor 用 SSE プロキシスクリプトの作成
+## Task 2: Cursor 用 SSE プロキシスクリプトの作成
 
 **Files:**
 - Create: `scripts/mcp-sse-proxy.js`
@@ -81,19 +81,46 @@ const { EventSource } = require('eventsource');
 const axios = require('axios');
 
 const sseUrl = process.argv[2] || 'http://localhost:10888/sse';
-const eventSource = new EventSource(sseUrl);
+const token = process.env.MCP_GATEWAY_AUTH_TOKEN;
 
-eventSource.on('message', (event) => {
-  const message = JSON.parse(event.data);
-  process.stdout.write(JSON.stringify(message) + '\n');
+const eventSource = new EventSource(sseUrl, {
+  headers: token ? { Authorization: `Bearer ${token}` } : {}
 });
 
+let postUrl = sseUrl; // fallback
+eventSource.addEventListener('endpoint', (event) => {
+  postUrl = event.data; // MCP仕様に従い endpoint URL を取得
+});
+
+eventSource.addEventListener('message', (event) => {
+  try {
+    const message = JSON.parse(event.data);
+    process.stdout.write(JSON.stringify(message) + '\n');
+  } catch (e) {
+    console.error('Error parsing SSE message:', e.message);
+  }
+});
+
+eventSource.onerror = (err) => {
+  console.error('SSE Connection Error:', err);
+  eventSource.close();
+  process.exit(1);
+};
+
+let stdinBuffer = '';
 process.stdin.on('data', async (data) => {
-  const messages = data.toString().split('\n').filter(l => l.trim());
-  for (const msg of messages) {
+  stdinBuffer += data.toString();
+  const lines = stdinBuffer.split('\n');
+  stdinBuffer = lines.pop(); // keep partial line
+
+  for (const line of lines) {
+    if (!line.trim()) continue;
     try {
-      const payload = JSON.parse(msg);
-      await axios.post(sseUrl, payload);
+      const payload = JSON.parse(line);
+      // Ensure we have a valid postUrl (might need to wait for 'endpoint' event if not fixed sseUrl)
+      await axios.post(postUrl, payload, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
     } catch (e) {
       console.error('Error posting message to SSE:', e.message);
     }
@@ -108,7 +135,7 @@ git add scripts/mcp-sse-proxy.js
 git commit -m "feat(mcp): add sse-to-stdio proxy script for Cursor"
 ```
 
-### Task 3: クライアント設定の一斉更新
+## Task 3: クライアント設定の一斉更新
 
 **Files:**
 - Modify: `~/.gemini/settings.json`

@@ -1,10 +1,14 @@
 {
   "mcpServers": {
     "docker-mcp-gateway": {
-      "command": "${HOME}/dotfiles/components/dotfiles-ai/scripts/mcp-sse-proxy.js",
+      "command": "node",
       "args": [
+        "__REPO_ROOT__/scripts/mcp-sse-proxy.js",
         "http://localhost:10888/sse"
-      ]
+      ],
+      "env": {
+        "MCP_GATEWAY_AUTH_TOKEN": "__MCP_AUTH_TOKEN__"
+      }
     }
   }
 }

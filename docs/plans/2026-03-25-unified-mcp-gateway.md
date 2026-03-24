@@ -1,10 +1,10 @@
-# Unified MCP Gateway Implementation Plan
+# Unified MCP Gateway Implementation Plan (Legacy/Historical)
 
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
+> **Note:** This plan assumes a direct `docker mcp gateway run` (stdio) approach, which has been superseded by the **SSE-resident Gateway** approach detailed in `docs/plans/2026-03-25-unified-mcp-gateway-sse.md`. This document is kept for historical reference.
 
 **Goal:** 各ツールの個別の設定を廃止し、全てのMCPサーバーを Docker MCP Gateway 経由で利用するように一元化する。
 
-**Architecture:**
+**Architecture (Legacy):**
 - `mcp/catalogs/custom.yaml` を Source of Truth とし、不足しているサーバー定義（Skillport等）を追加する。
 - `scripts/sync-mcp-configs.sh` を作成し、各ツール（Gemini CLI, Antigravity, Cursor）の設定ファイルを一括更新する。
 - 各ツールは `docker mcp gateway run` (stdio) のみを参照するように設定される。
@@ -13,7 +13,7 @@
 
 ---
 
-### Task 1: サーバー定義の統合 (Source of Truth の作成)
+## Task 1: サーバー定義の統合 (Source of Truth の作成)
 
 **Files:**
 - Modify: `mcp/catalogs/custom.yaml`

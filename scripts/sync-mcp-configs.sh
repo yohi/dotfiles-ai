@@ -7,12 +7,32 @@ ESCAPED_HOME=$(echo "$HOME" | sed 's/[&/\|]/\\&/g')
 
 # 認証トークンの設定
 if [ -f "$REPO_ROOT/.env" ]; then
-    # Load environment variables from .env
-    # Use grep to remove comments and export
-    export $(grep -v '^#' "$REPO_ROOT/.env" | xargs)
+    # Safer .env loading using a loop to avoid word splitting issues
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        # Skip empty lines and comments
+        [[ -z "$line" ]] || [[ "$line" =~ ^# ]] && continue
+        # Handle lines that start with export
+        if [[ "$line" =~ ^export\  ]]; then
+            eval "$line"
+        else
+            export "$line"
+        fi
+    done < "$REPO_ROOT/.env"
 fi
 AUTH_TOKEN="${MCP_GATEWAY_AUTH_TOKEN:-mcp_auth_token}"
 SSE_URL="http://127.0.0.1:10888/sse"
+
+# .gitignore の更新
+if ! grep -q "ide/cursor/mcp.json" "$REPO_ROOT/.gitignore"; then
+    echo "ide/cursor/mcp.json" >> "$REPO_ROOT/.gitignore"
+    echo "==> Added ide/cursor/mcp.json to .gitignore"
+fi
+
+# すでにコミットされている場合は追跡を解除
+if git ls-files --error-unmatch "ide/cursor/mcp.json" > /dev/null 2>&1; then
+    git rm --cached "ide/cursor/mcp.json" > /dev/null 2>&1
+    echo "==> Removed ide/cursor/mcp.json from git tracking"
+fi
 
 # 1. カタログの配置
 echo "==> Deploying MCP catalogs..."
@@ -52,14 +72,19 @@ cat <<EOF > "$REPO_ROOT/antigravity/mcp_config.json"
 EOF
 
 # 4. Cursor 設定の更新 (ide/cursor/mcp.json)
-echo "==> Updating Cursor configuration..."
+echo "==> Updating Cursor configuration via proxy..."
+# Cursor must connect via the proxy script to handle authentication headers correctly
 cat <<EOF > "$REPO_ROOT/ide/cursor/mcp.json"
 {
   "mcpServers": {
     "docker-mcp-gateway": {
-      "url": "$SSE_URL",
-      "headers": {
-        "Authorization": "Bearer $AUTH_TOKEN"
+      "command": "node",
+      "args": [
+        "$REPO_ROOT/scripts/mcp-sse-proxy.js",
+        "$SSE_URL"
+      ],
+      "env": {
+        "MCP_GATEWAY_AUTH_TOKEN": "$AUTH_TOKEN"
       }
     }
   }

@@ -8,35 +8,34 @@
 ## Architecture
 
 ### 1. Source of Truth (唯一のソース)
-*   **ファイル**: `mcp/catalog.json` (または `mcp/config.yaml`)
-*   **役割**: 利用したい全てのMCPサーバー（GitHub, Playwright, Skillport等）の定義をここに集約します。
+*   **ファイル**: `mcp/catalogs/custom.yaml.template`
+*   **役割**: 利用したい全てのMCPサーバー（GitHub, Playwright, Skillport等）の定義をここに集約します。環境変数（`__REPO_ROOT__`等）をプレースホルダとして含めることができます。
 
-### 2. Synchronization Mechanism (同期メカニズム)
-*   **スクリプト**: `scripts/sync-mcp-configs.sh`
+### 2. Synchronization & Deployment (同期とデプロイ)
+*   **スクリプト**: `scripts/setup-docker-mcp.sh` および `Makefile` (`mcp-render` ターゲット)
 *   **動作**:
-    1.  `mcp/catalog.json` を Docker MCP Gateway が読み込める形式 (`~/.docker/mcp/catalogs/custom.yaml`) に変換・配置します。
-    2.  各ツールの設定ファイルを、`docker mcp gateway run` (stdio方式) を使用する定義に書き換えます。
-        *   `~/.gemini/settings.json`
-        *   `antigravity/mcp_config.json`
-        *   `ide/cursor/mcp.json` (または `~/.cursor/mcp.json`)
+    1.  `mcp/catalogs/custom.yaml.template` をレンダリングし、実際のパスに展開された `~/.docker/mcp/catalogs/custom.yaml` を生成します。
+    2.  SSE 常駐 Gateway (systemd サービス) を起動し、レンダリングされたカタログを読み込ませます。
+    3.  各ツール（Gemini CLI, Cursor, Antigravity等）は、`scripts/mcp-sse-proxy.js` を介してこの SSE Gateway に接続します。
 
 ### 3. Unified Tool Configuration (統一されたツール設定)
-全てのツールで以下の `stdio` 設定が共通して使われます。
+全てのツールで以下の `proxy` 設定が共通して使われます（Cursor 等の stdio 経由の場合）。
 
 ```json
 {
   "mcpServers": {
     "docker-mcp-gateway": {
-      "command": "docker",
+      "command": "node",
       "args": [
-        "mcp", "gateway", "run",
-        "--catalog", "/home/y_ohi/.docker/mcp/catalogs/bootstrap.yaml",
-        "--catalog", "/home/y_ohi/.docker/mcp/catalogs/custom.yaml"
+        "$HOME/dotfiles/components/dotfiles-ai/scripts/mcp-sse-proxy.js",
+        "http://localhost:10888/sse"
       ]
     }
   }
 }
 ```
+
+直接 SSE をサポートするツール（Antigravity 等）は、直接 `http://localhost:10888/sse` に接続します。
 
 ## Implementation Steps
 1.  既存の各設定ファイル（Cursor, Antigravity等）からMCPサーバー定義を抽出し、`mcp/catalog.json` に統合する。
