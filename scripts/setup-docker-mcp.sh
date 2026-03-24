@@ -10,6 +10,8 @@ YELLOW='\033[0;33m'
 NC='\033[0m' # No Color
 
 echo -e "${BLUE}🐳 Starting Docker MCP setup...${NC}"
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+
 # オプション解析
 SKIP_DOCKER_CHECK=false
 for arg in "$@"; do
@@ -43,10 +45,26 @@ else
     echo -e "${YELLOW}⚠️  Skipping Docker checks as requested.${NC}"
 fi
 
-# 設定ファイルの配置 (シンボリックリンク)
+# 認証トークンの設定
+echo -e "${BLUE}🔑 Setting up MCP_GATEWAY_AUTH_TOKEN...${NC}"
+DOTENV_FILE="$REPO_ROOT/.env"
+if [ ! -f "$DOTENV_FILE" ]; then
+    touch "$DOTENV_FILE"
+fi
+
+if ! grep -q "MCP_GATEWAY_AUTH_TOKEN" "$DOTENV_FILE"; then
+    echo -e "${BLUE}🔑 Generating MCP_GATEWAY_AUTH_TOKEN...${NC}"
+    TOKEN=$(openssl rand -hex 32)
+    echo "MCP_GATEWAY_AUTH_TOKEN=$TOKEN" >> "$DOTENV_FILE"
+    echo -e "${GREEN}✅ Generated and added MCP_GATEWAY_AUTH_TOKEN to .env${NC}"
+else
+    TOKEN=$(grep "MCP_GATEWAY_AUTH_TOKEN" "$DOTENV_FILE" | cut -d'=' -f2)
+    echo -e "${GREEN}✅ MCP_GATEWAY_AUTH_TOKEN already exists in .env${NC}"
+fi
+
+# 設定ファイルの配置 (コピー & テンプレート処理)
 echo -e "${BLUE}🔗 Linking Docker MCP configuration files...${NC}"
 MCP_CONFIG_DIR="$HOME/.docker/mcp"
-REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
 mkdir -p "$MCP_CONFIG_DIR/catalogs"
 
@@ -83,7 +101,9 @@ for pair in "${FILES_TO_COPY[@]}"; do
 
     # テンプレートファイルの場合は置換を行う
     if [[ "$SRC" == *"template" ]]; then
-        sed "s|__HOME__|$ESCAPED_HOME|g" "$SRC_FILE" > "$TMP_DST"
+        sed -e "s|__HOME__|$ESCAPED_HOME|g" \
+            -e "s|__MCP_AUTH_TOKEN__|$TOKEN|g" \
+            "$SRC_FILE" > "$TMP_DST"
     else
         cp -f "$SRC_FILE" "$TMP_DST"
     fi
@@ -114,22 +134,6 @@ ESCAPED_HOME=$(echo "$HOME" | sed 's/[&/\|]/\\&/g')
 sed -i.bak "s|\$HOME|$ESCAPED_HOME|g" "$MCP_CONFIG_DIR/catalog.json" && rm -f "$MCP_CONFIG_DIR/catalog.json.bak"
 
 echo -e "${GREEN}✅ Configuration files copied and paths updated in $MCP_CONFIG_DIR${NC}"
-
-# 認証トークンの設定
-echo -e "${BLUE}🔑 Setting up MCP_GATEWAY_AUTH_TOKEN...${NC}"
-DOTENV_FILE="$REPO_ROOT/.env"
-if [ ! -f "$DOTENV_FILE" ]; then
-    touch "$DOTENV_FILE"
-fi
-
-if ! grep -q "MCP_GATEWAY_AUTH_TOKEN" "$DOTENV_FILE"; then
-    echo -e "${BLUE}🔑 Generating MCP_GATEWAY_AUTH_TOKEN...${NC}"
-    TOKEN=$(openssl rand -hex 32)
-    echo "MCP_GATEWAY_AUTH_TOKEN=$TOKEN" >> "$DOTENV_FILE"
-    echo -e "${GREEN}✅ Generated and added MCP_GATEWAY_AUTH_TOKEN to .env${NC}"
-else
-    echo -e "${GREEN}✅ MCP_GATEWAY_AUTH_TOKEN already exists in .env${NC}"
-fi
 
 # systemd ユーザーサービスの作成
 if [ "$SKIP_DOCKER_CHECK" = "true" ]; then
