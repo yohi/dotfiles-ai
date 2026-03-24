@@ -79,9 +79,12 @@ for pair in "${FILES_TO_COPY[@]}"; do
     # 一時ファイルへコピーしてからアトミックに移動
     TMP_DST="$DST.tmp.$$"
 
+    # Escape $HOME for sed
+    ESCAPED_HOME=$(echo "$HOME" | sed 's/[&/\|]/\\&/g')
+
     # テンプレートファイルの場合は置換を行う
     if [[ "$SRC" == *"template" ]]; then
-        sed "s|__HOME__|$HOME|g" "$SRC_FILE" > "$TMP_DST"
+        sed "s|__HOME__|$ESCAPED_HOME|g" "$SRC_FILE" > "$TMP_DST"
     else
         cp -f "$SRC_FILE" "$TMP_DST"
     fi
@@ -94,7 +97,8 @@ for pair in "${FILES_TO_COPY[@]}"; do
 done
 
 # catalog.json 内の $HOME を実際のホームディレクトリに置換 (docker mcp が環境変数を展開しない場合のため)
-sed -i.bak "s|\$HOME|$HOME|g" "$MCP_CONFIG_DIR/catalog.json" && rm -f "$MCP_CONFIG_DIR/catalog.json.bak"
+ESCAPED_HOME=$(echo "$HOME" | sed 's/[&/\|]/\\&/g')
+sed -i.bak "s|\$HOME|$ESCAPED_HOME|g" "$MCP_CONFIG_DIR/catalog.json" && rm -f "$MCP_CONFIG_DIR/catalog.json.bak"
 
 echo -e "${GREEN}✅ Configuration files copied and paths updated in $MCP_CONFIG_DIR${NC}"
 
@@ -105,13 +109,23 @@ if [ "$SKIP_DOCKER_CHECK" = "true" ]; then
 fi
 
 # カタログの初期化（未初期化の場合のみ、docker-mcp.yaml を取得するため）
-if [[ ! -f "$MCP_CONFIG_DIR/catalogs/docker-mcp.yaml" ]]; then
+CATALOG_FILE="$MCP_CONFIG_DIR/catalogs/docker-mcp.yaml"
+if [[ ! -f "$CATALOG_FILE" ]]; then
     echo -e "${BLUE}📦 Initializing official MCP Catalog...${NC}"
-    if ! docker mcp catalog update && ! docker mcp catalog init; then
-        echo -e "${RED}❌ Failed to initialize official MCP Catalog.${NC}"
+    # Try update, fallback to init + update
+    if ! docker mcp catalog update; then
+        echo -e "${YELLOW}⚠️  Update failed, trying init then update...${NC}"
+        docker mcp catalog init || true
+        docker mcp catalog update || true
+    fi
+    
+    # Verify final existence
+    if [[ ! -f "$CATALOG_FILE" ]]; then
+        echo -e "${RED}❌ Failed to initialize official MCP Catalog (File not found: $CATALOG_FILE).${NC}"
         echo -e "Please check your network connection or Docker AI configuration."
         exit 1
     fi
+    echo -e "${GREEN}✅ Official MCP Catalog initialized.${NC}"
 fi
 
 echo -e "${GREEN}✅ Docker MCP setup completed successfully.${NC}"
