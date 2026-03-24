@@ -1,0 +1,28 @@
+{
+  "name": "dotfiles-ai",
+  "version": "1.0.0",
+  "description": "AIエージェント（Claude Code, Gemini CLI, OpenCode, Codex）の設定・スキル・ルールを一元管理するコンポーネントリポジトリです。 `dotfiles-core` と連携して動作します。",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yohi/dotfiles-ai.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/yohi/dotfiles-ai/issues"
+  },
+  "homepage": "https://github.com/yohi/dotfiles-ai#readme",
+  "dependencies": {
+    "axios": "^1.13.6",
+    "eventsource": "^4.1.0"
+  }
+}

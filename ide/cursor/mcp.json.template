@@ -1,15 +1,9 @@
 {
   "mcpServers": {
     "docker-mcp-gateway": {
-      "command": "docker",
+      "command": "${HOME}/dotfiles/components/dotfiles-ai/scripts/mcp-sse-proxy.js",
       "args": [
-        "mcp",
-        "gateway",
-        "run",
-        "--catalog",
-        "${HOME}/.docker/mcp/catalogs/bootstrap.yaml",
-        "--catalog",
-        "${HOME}/.docker/mcp/catalogs/custom.yaml"
+        "http://localhost:10888/sse"
       ]
     }
   }

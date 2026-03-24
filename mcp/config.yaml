@@ -7,22 +7,24 @@ mcpServers:
       - /home/y_ohi/dotfiles/components/dotfiles-ai
       - /home/y_ohi
   playwright:
-    enabled: true
+    enabled: false
   tavily:
-    enabled: true
+    enabled: false
   sequentialthinking:
     enabled: true
   magic:
-    enabled: true
+    enabled: false
   morphllm-fast-apply:
-    enabled: true
+    enabled: false
   serena:
-    enabled: true
+    enabled: false
   chrome-devtools:
-    enabled: true
+    enabled: false
   github-official:
     enabled: true
   docker:
     enabled: true
   dockerhub:
+    enabled: false
+  skillport:
     enabled: true

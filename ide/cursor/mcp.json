@@ -1,12 +1,10 @@
 {
   "mcpServers": {
     "docker-mcp-gateway": {
-      "command": "docker",
-      "args": [
-        "mcp", "gateway", "run",
-        "--catalog", "/home/y_ohi/.docker/mcp/catalogs/bootstrap.yaml",
-        "--catalog", "/home/y_ohi/.docker/mcp/catalogs/custom.yaml"
-      ]
+      "url": "http://127.0.0.1:10888/sse",
+      "headers": {
+        "Authorization": "Bearer mcp_auth_token"
+      }
     }
   }
 }

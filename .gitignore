@@ -18,3 +18,4 @@ opencode/oh-my-opencode.json*
 .env
 antigravity/mcp_config.json
 mcp/catalogs/custom.yaml
+node_modules/

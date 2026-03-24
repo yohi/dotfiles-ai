@@ -1,16 +1,7 @@
 {
   "mcpServers": {
     "docker-mcp-gateway": {
-      "command": "docker",
-      "args": [
-        "mcp",
-        "gateway",
-        "run",
-        "--catalog",
-        "__HOME__/.docker/mcp/catalogs/bootstrap.yaml",
-        "--catalog",
-        "__HOME__/.docker/mcp/catalogs/custom.yaml"
-      ]
+      "url": "http://localhost:10888/sse"
     }
   }
 }

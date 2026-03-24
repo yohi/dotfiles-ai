@@ -41,77 +41,64 @@ AIエージェント（Claude Code, Gemini CLI, OpenCode, Codex）の設定・�
   - `make check-skillport`: インストール状態とシンボリックリンクの整合性を確認します。
   - `skillport check`: スキル定義ファイル（.md）の構文や整合性をチェックします。
 
-## Docker MCP Gateway
+## Docker MCP Gateway (Unified SSE)
 
-[Docker MCP Gateway](https://docs.docker.com/ai/mcp-catalog-and-toolkit/mcp-gateway/) は、Model Context Protocol (MCP) サーバーを統合し、SSE (Server-Sent Events) プロキシとして提供するコンポーネントです。
+[Docker MCP Gateway](https://docs.docker.com/ai/mcp-catalog-and-toolkit/mcp-gateway/) は、複数の MCP サーバーを統合し、共通の **SSE (Server-Sent Events)** エンドポイントを提供します。
 
-- **役割**: Claude Code, Gemini CLI, Cursor などのエージェントから、単一のエンドポイント（`http://localhost:10888`）経由で複数の MCP サーバー（SQLite, Filesystem, SkillPort 等）にアクセス可能にします。
-- **管理 (Systemd)**: ユーザーセッションの Systemd サービスとして動作します。
-  - `make start-mcp`: ゲートウェイを起動します。
-  - `make stop-mcp`: ゲートウェイを停止します。
-  - `make status-mcp`: 稼働状態を確認します。
-  - `make logs-mcp`: リアルタイムログを表示します (`journalctl -f`)。
-- **設定**: `mcp/config.yaml` がマスター設定であり、`make setup-docker-mcp` によって `~/.docker/mcp/config.yaml` へ同期されます。
+- **役割**: Claude Code, Gemini CLI, Cursor などの全てのエージェントから、単一の URL (`http://127.0.0.1:10888/sse`) 経由で複数の MCP サーバーにアクセス可能にします。
+- **管理 (Systemd)**: バックグラウンドサービスとして常駐します。
+  - `make start-mcp`: ゲートウェイを起動。
+  - `make stop-mcp`: ゲートウェイを停止。
+  - `make setup-docker-mcp`: 設定のレンダリング、サービス登録、各エージェント（Gemini, Antigravity, Cursor）への設定同期を**一括実行**します。
+- **Source of Truth**: 
+  - **`mcp/catalogs/custom.yaml.template`**: MCP サーバーの定義（GitHub, Playwright 等）はここを編集してください。
+  - `mcp/config.yaml`: サーバーの有効/無効を管理します。
+- **自動同期**: テンプレートを編集して `make setup-docker-mcp` を実行すると、パスの展開（`__HOME__`）が行われ、全エージェントの設定が自動的に最新化されます。
 
 ## SkillPort & MCP の統合
 
 `skillport-mcp` を MCP サーバーとして Docker MCP Gateway に登録することで、エージェントは `agent-skills/` 内の全スキルを MCP Tool として動的に利用できます。
 
 1. **仕組み**: `skillport-mcp` が起動時にスキルディレクトリをスキャンし、各スキルを MCP ツールとして公開します。
-2. **利用方法**: エージェント（Claude, Gemini, Cursor）で Docker MCP Gateway (`:10888`) を設定するだけで、すべてのスキルが自動的にロードされます。
-3. **同期**: スキルを追加・修正した後は、エージェントが最新の状態を認識できるよう、必要に応じて `make sync-agents` やゲートウェイの再起動を行ってください。
+2. **利用方法**: 全てのエージェントは Docker MCP Gateway (`:10888/sse`) を参照するように統一されているため、自動的に全スキルがロードされます。
 
-## Antigravity (Standalone MCP Config)
+## エージェント設定の自動同期
 
-[Antigravity](https://github.com/gotalab/antigravity) は、特定の AI エージェント（主に OpenCode 等）が Docker MCP Gateway を介さずに、直接 MCP サーバーに接続するためのスタンドアロン設定を管理します。
+`scripts/sync-mcp-configs.sh` により、各エージェントの設定ファイルは以下の状態に自動的に保たれます。
 
-- **役割**: Docker MCP Gateway (`:10888`) を SSE Gateway として利用し、個別の MCP ツールをシームレスに統合します。
-- **設定**: `~/.gemini/antigravity/mcp_config.json` にゲートウェイの URL (`http://localhost:10888/sse`) を定義します。
-- **統合**: これにより、Antigravity を利用するエージェントは、Docker MCP Gateway で稼働している SkillPort MCP 等のツールを透過的に利用可能になります。
+| エージェント | 接続方式 | 認証 |
+|:-----------|:--------|:-----|
+| **Gemini CLI** | Native SSE (`url`) | Bearer Token (`headers`) |
+| **Antigravity** | Native SSE (`serverUrl`) | Bearer Token (`headers`) |
+| **Cursor** | Native SSE (`url`) | Bearer Token (`headers`) |
 
 ## デプロイ構造 (シンボリックリンク)
 
-`make setup` を実行すると、リポジトリ内の設定ファイルが各エージェントの構成ディレクトリへシンボリックリンクとして配備されます。
+`make setup` を実行すると、リポジトリ内の設定ファイルが各エージェントの構成ディレクトリへ配備されます。
 
 | エージェント / ツール | シンボリックリンク (配置先) | 実体 (リポジトリ内) |
 |:-------------------|:----------------------|:-------------------|
 | **Global Rules** | `~/.gemini/GEMINI.md` | `global-rules/AGENTS.global.md` |
-| | `~/.claude/CLAUDE.md` | `global-rules/AGENTS.global.md` |
-| | `~/.config/opencode/AGENTS.md` | `global-rules/AGENTS.global.md` |
-| | `~/.codex/AGENTS.md` | `global-rules/AGENTS.global.md` |
-| **Docker MCP** | `~/.docker/mcp/config.yaml` | `mcp/config.yaml` |
-| | `~/.docker/mcp/catalog.json` | `mcp/catalog.json` |
-| | `~/.docker/mcp/catalogs/` | `mcp/catalogs/` |
-| **Claude Code** | `~/.claude/settings.json` | `claude/claude-settings.json` |
-| **Gemini CLI** | `~/.gemini/settings.json` | `gemini/settings.json` |
-| | `~/.gemini/core` | `gemini/Core` |
+| **Docker MCP** | `~/.docker/mcp/catalogs/custom.yaml` | `mcp/catalogs/custom.yaml` (Generated) |
+| **Gemini CLI** | `~/.gemini/settings.json` | Updated by sync script |
 | **Antigravity** | `~/.gemini/antigravity/mcp_config.json` | `antigravity/mcp_config.json` |
-| **OpenCode** | `~/.config/opencode/opencode.jsonc` | `opencode/opencode.jsonc` |
-| | `~/.config/opencode/antigravity.json` | `opencode/antigravity.json` |
-| | `~/.opencode/commands` | `opencode/commands` |
-| **Codex** | `~/.codex` | `codex/` |
-| **SkillPort** | `~/.skillport/skills` | `agent-skills/` |
-| **Cursor** | `~/.cursor/` | `ide/cursor/` |
-| **VSCode** | `~/.config/Code/User/settings.json` | `ide/vscode/settings.json` |
+| **Cursor** | `.cursor/mcp.json` | `ide/cursor/mcp.json` |
 
 ## SSOT 原則
 
 - **ルールの編集**: 
   - ユーザー共通設定は `global-rules/AGENTS.global.md` を編集。
-  - `dotfiles-ai` プロジェクト固有の設定はルートの `AGENTS.md` を編集。
   - 個別のスキルは `agent-skills/*/SKILL.md` を編集。
+  - **MCP サーバーの追加**は `mcp/catalogs/custom.yaml.template` を編集。
 - **同期コマンド**:
-  - `make setup`: リポジトリの初期化、ツールのインストール、設定ファイルの初回配置（シンボリックリンク作成）を実行します。
-  - `make sync-agents`: `agent-skills` や `global-rules` の変更を、各エージェントの個別設定ファイルへ伝搬・同期します。
-- **禁止事項**: 
-  - **ホームディレクトリ上の設定ファイル**（例: `~/.gemini/GEMINI.md`, `~/.claude/CLAUDE.md`）を直接編集しないでください。これらはリポジトリ内のファイルへのシンボリックリンクであり、直接編集するとリンクが壊れたり、リポジトリ管理外の変更が発生したりします。
-  - 修正は必ずリポジトリ内の管理ファイル（`global-rules/AGENTS.global.md`, `AGENTS.md` 等）に対して行ってください。
+  - `make setup-docker-mcp`: MCP 設定の反映とエージェント同期。
+  - `make sync-agents`: ルールとスキルの同期。
 
 ## 技術スタック
 
 | カテゴリ | テクノロジー |
 |:---------|:------------|
 | スキル管理 | [skillport](https://github.com/gotalab/skillport) CLI |
-| ツール管理 | [Docker MCP Gateway](https://docs.docker.com/ai/mcp-catalog-and-toolkit/mcp-gateway/) |
+| ツール管理 | [Docker MCP Gateway](https://docs.docker.com/ai/mcp-catalog-and-toolkit/mcp-gateway/) (SSE Mode) |
 | ビルド自動化 | GNU Make (`_mk/*.mk`) |
-| スキル記述 | Markdown (SKILL.md) |
+| 構成管理 | Bash, jq, systemd |

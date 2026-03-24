@@ -19,6 +19,29 @@ registry:
       - /mcp/db.sqlite
     volumes:
       - mcp-sqlite:/mcp
+  skillport:
+    description: Professional development and AI skill management.
+    title: Skillport
+    type: server
+    image: ghcr.io/astral-sh/uv:python3.11-alpine
+    command:
+      - uvx
+      - --from
+      - skillport-mcp
+      - skillport-mcp
+    env:
+      - name: SKILLPORT_SKILLS_DIR
+        value: __HOME__/.skillport/skills
+  playwright:
+    description: Web browser automation and testing.
+    title: Playwright
+    type: server
+    image: mcp/playwright
+  github-official:
+    description: Official GitHub MCP server.
+    title: GitHub
+    type: server
+    image: mcp/github
   sequentialthinking:
     description: Dynamic and reflective problem-solving through thought sequences.
     title: Sequential Thinking
@@ -37,13 +60,28 @@ registry:
     volumes:
       - __HOME__/dotfiles/components/dotfiles-ai:__HOME__/dotfiles/components/dotfiles-ai
       - __HOME__:__HOME__
-  skillport:
-    description: Professional development and AI skill management.
-    title: Skillport
+  tavily:
+    description: Tavily search MCP server.
+    title: Tavily
     type: server
-    image: python:3.11-slim
-    command:
-      - uvx
-      - skillport-mcp@1.1.0
-    env:
-      SKILLPORT_SKILLS_DIR: __HOME__/.skillport/skills
+    image: mcp/tavily
+  magic:
+    description: Magic MCP server.
+    title: Magic
+    type: server
+    image: mcp/magic
+  morphllm-fast-apply:
+    description: Morph LLM Fast Apply MCP server.
+    title: Morph LLM
+    type: server
+    image: mcp/morphllm-fast-apply
+  serena:
+    description: Serena MCP server.
+    title: Serena
+    type: server
+    image: mcp/serena
+  chrome-devtools:
+    description: Chrome DevTools MCP server.
+    title: Chrome DevTools
+    type: server
+    image: mcp/chrome-devtools
