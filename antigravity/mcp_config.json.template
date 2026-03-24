@@ -1,6 +1,6 @@
 {
   "mcpServers": {
-    "gateway": {
+    "docker-mcp-gateway": {
       "command": "docker",
       "args": [
         "mcp",
@@ -11,15 +11,6 @@
         "--catalog",
         "__HOME__/.docker/mcp/catalogs/custom.yaml"
       ]
-    },
-    "skillport": {
-      "command": "uvx",
-      "args": [
-        "skillport-mcp"
-      ],
-      "env": {
-        "SKILLPORT_SKILLS_DIR": "__HOME__/.skillport/skills"
-      }
     }
   }
 }
