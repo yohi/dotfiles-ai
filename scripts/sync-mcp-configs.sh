@@ -11,16 +11,20 @@ if [ -f "$REPO_ROOT/.env" ]; then
     while IFS= read -r line || [[ -n "$line" ]]; do
         # Skip empty lines and comments
         [[ -z "$line" ]] || [[ "$line" =~ ^# ]] && continue
-        # Handle lines that start with export
-        if [[ "$line" =~ ^export\  ]]; then
-            eval "$line"
-        else
-            # Extract key and value safely to avoid SC2163
-            if [[ "$line" == *"="* ]]; then
-                key="${line%%=*}"
-                val="${line#*=}"
-                export "$key=$val"
-            fi
+        
+        # Remove 'export ' prefix if exists
+        line_no_prefix="${line#export }"
+        
+        # Extract key and value safely to avoid SC2163 and eval
+        if [[ "$line_no_prefix" == *"="* ]]; then
+            key="${line_no_prefix%%=*}"
+            val="${line_no_prefix#*=}"
+            # Strip surrounding quotes from value
+            val="${val%\"}"
+            val="${val#\"}"
+            val="${val%\'}"
+            val="${val#\'}"
+            export "$key=$val"
         fi
     done < "$REPO_ROOT/.env"
 fi
@@ -70,39 +74,16 @@ if [[ -f "$HOME/.gemini/settings.json" ]]; then
 fi
 
 # 3. Antigravity 設定の更新 (antigravity/mcp_config.json)
-echo "==> Updating Antigravity configuration..."
-cat <<EOF > "$REPO_ROOT/antigravity/mcp_config.json"
-{
-  "mcpServers": {
-    "gateway": {
-      "serverUrl": "$SSE_URL",
-      "type": "sse",
-      "headers": {
-        "Authorization": "Bearer $AUTH_TOKEN"
-      }
-    }
-  }
-}
-EOF
+echo "==> Updating Antigravity configuration from template..."
+sed -e "s|__MCP_AUTH_TOKEN__|$AUTH_TOKEN|g" \
+    -e "s|http://127.0.0.1:10888/sse|$SSE_URL|g" \
+    "$REPO_ROOT/antigravity/mcp_config.json.template" > "$REPO_ROOT/antigravity/mcp_config.json"
 
 # 4. Cursor 設定の更新 (ide/cursor/mcp.json)
-echo "==> Updating Cursor configuration via proxy..."
-# Cursor must connect via the proxy script to handle authentication headers correctly
-cat <<EOF > "$REPO_ROOT/ide/cursor/mcp.json"
-{
-  "mcpServers": {
-    "docker-mcp-gateway": {
-      "command": "node",
-      "args": [
-        "$REPO_ROOT/scripts/mcp-sse-proxy.js",
-        "$SSE_URL"
-      ],
-      "env": {
-        "MCP_GATEWAY_AUTH_TOKEN": "$AUTH_TOKEN"
-      }
-    }
-  }
-}
-EOF
+echo "==> Updating Cursor configuration via proxy from template..."
+sed -e "s|__REPO_ROOT__|$REPO_ROOT|g" \
+    -e "s|__MCP_AUTH_TOKEN__|$AUTH_TOKEN|g" \
+    -e "s|http://localhost:10888/sse|$SSE_URL|g" \
+    "$REPO_ROOT/ide/cursor/mcp.json.template" > "$REPO_ROOT/ide/cursor/mcp.json"
 
 echo "✅ MCP configurations synchronized (Strictly using Bearer token)."
