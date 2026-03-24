@@ -115,6 +115,22 @@ sed -i.bak "s|\$HOME|$ESCAPED_HOME|g" "$MCP_CONFIG_DIR/catalog.json" && rm -f "$
 
 echo -e "${GREEN}✅ Configuration files copied and paths updated in $MCP_CONFIG_DIR${NC}"
 
+# 認証トークンの設定
+echo -e "${BLUE}🔑 Setting up MCP_GATEWAY_AUTH_TOKEN...${NC}"
+DOTENV_FILE="$REPO_ROOT/.env"
+if [ ! -f "$DOTENV_FILE" ]; then
+    touch "$DOTENV_FILE"
+fi
+
+if ! grep -q "MCP_GATEWAY_AUTH_TOKEN" "$DOTENV_FILE"; then
+    echo -e "${BLUE}🔑 Generating MCP_GATEWAY_AUTH_TOKEN...${NC}"
+    TOKEN=$(openssl rand -hex 32)
+    echo "MCP_GATEWAY_AUTH_TOKEN=$TOKEN" >> "$DOTENV_FILE"
+    echo -e "${GREEN}✅ Generated and added MCP_GATEWAY_AUTH_TOKEN to .env${NC}"
+else
+    echo -e "${GREEN}✅ MCP_GATEWAY_AUTH_TOKEN already exists in .env${NC}"
+fi
+
 # systemd ユーザーサービスの作成
 if [ "$SKIP_DOCKER_CHECK" = "true" ]; then
     echo -e "${YELLOW}⚠️  Skipping systemd service setup as --skip-docker-check is enabled.${NC}"

@@ -6,7 +6,12 @@ REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 ESCAPED_HOME=$(echo "$HOME" | sed 's/[&/\|]/\\&/g')
 
 # 認証トークンの設定
-AUTH_TOKEN="mcp_auth_token"
+if [ -f "$REPO_ROOT/.env" ]; then
+    # Load environment variables from .env
+    # Use grep to remove comments and export
+    export $(grep -v '^#' "$REPO_ROOT/.env" | xargs)
+fi
+AUTH_TOKEN="${MCP_GATEWAY_AUTH_TOKEN:-mcp_auth_token}"
 SSE_URL="http://127.0.0.1:10888/sse"
 
 # 1. カタログの配置

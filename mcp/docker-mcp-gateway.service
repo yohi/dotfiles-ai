@@ -5,8 +5,9 @@ After=network.target docker.service
 [Service]
 Type=simple
 WorkingDirectory=%h/dotfiles/components/dotfiles-ai
+EnvironmentFile=%h/dotfiles/components/dotfiles-ai/.env
 ExecStartPre=/usr/bin/make mcp-render
-ExecStart=/usr/bin/env MCP_GATEWAY_AUTH_TOKEN=mcp_auth_token /usr/bin/docker mcp gateway run \
+ExecStart=/usr/bin/docker mcp gateway run \
   --transport sse \
   --port 10888 \
   --catalog %h/.docker/mcp/catalogs/bootstrap.yaml \
