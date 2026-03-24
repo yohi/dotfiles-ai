@@ -6,15 +6,21 @@ Each skill contains step-by-step instructions, templates, and scripts.
 
 ### Workflow
 
-1. **Find a skill** - Check the list below for a skill matching your task
-2. **Get instructions** - Run `skillport show <skill-id>` to load full instructions
-3. **Follow the instructions** - Execute the steps using your available tools
+1. **Search** - Call `search_skills(query)` to find skills matching your task
+2. **Load** - Call `load_skill(skill_id)` to get full instructions and `path`
+3. **Execute** - Follow the instructions using your available tools
+
+### Tools
+
+- `search_skills(query)` - Find skills by task description. Use `""` to list all.
+- `load_skill(id)` - Get full instructions and the skill's filesystem path.
 
 ### Tips
 
-- Skills may include scripts - execute them via the skill's path, don't read them into context
-- If instructions reference `{path}`, replace it with the skill's directory path
-- When uncertain, check the skill's description to confirm it matches your task
+- Use your native Read tool with `{path}/file` for templates/assets
+- Execute scripts via path, don't read them into context: `python {path}/scripts/run.py`
+- Replace `{path}` in instructions with the actual path from `load_skill`
+- If search returns too many results, use more specific terms
 
 <available_skills>
 <skill>
@@ -117,6 +123,10 @@ Each skill contains step-by-step instructions, templates, and scripts.
 
 # Project Rule: dotfiles-ai
 
+> **Note on AGENTS.md Hierarchy:**
+> - **`global-rules/AGENTS.global.md`**: The global rules file. It contains universal policies (e.g., language, coding standards) applied across *all* projects. Other repositories symlink to this file.
+> - **`AGENTS.md` (This file)**: The project-specific rules file. It acts as the local constitution for *this* repository (`dotfiles-ai`) and overrides global rules where necessary.
+
 This repository manages AI agent configurations, global rules, and AI-enabled IDE settings.
 
 ## Core Mandates (Project Specific)
@@ -125,5 +135,5 @@ This repository manages AI agent configurations, global rules, and AI-enabled ID
   - `ide/`: IDE configurations (Cursor, VSCode).
   - `global-rules/`: Global AI instructions and standards.
   - `agent-skills/`: Specialized skills for OpenCode agents.
-- **IDE Management**: Cursor and VSCode settings are managed here. Use `make install-cursor`, `make install-supercursor`, `make setup-vscode`, or `make install-supercopilot` for setup.
+- **IDE Management**: Cursor and VSCode settings are managed here. Use `make install-cursor`, `make setup-vscode`, or `make install-supercopilot` for setup.
 

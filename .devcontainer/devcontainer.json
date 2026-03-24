@@ -1,0 +1,25 @@
+{
+    "name": "Dotfiles AI Toolkit",
+    "build": {
+        "dockerfile": "Dockerfile"
+    },
+    "features": {
+        "ghcr.io/devcontainers/features/common-utils:2": {
+            "installZsh": true,
+            "installOhMyZsh": true,
+            "upgradePackages": true
+        }
+    },
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "timonwong.shellcheck",
+                "mads-hartmann.bash-ide-vscode"
+            ],
+            "settings": {
+                "shellcheck.executablePath": "shellcheck"
+            }
+        }
+    },
+    "postCreateCommand": "uv --version || echo 'uv missing'"
+}

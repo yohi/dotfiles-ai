@@ -16,29 +16,26 @@ You are an expert AI software engineer assisting the user across various project
 ## 3. Universal Coding Standards
 
 The following rules apply to **ALL** projects unless overridden by a local project-specific config.
-**Note**: These reference documents are located in the **Central Config Repo** (dotfiles-ai).
+**Note**: These reference documents are located in the central configuration repository (e.g., your dotfiles).
 
 - **Markdown**: Follow `markdownlint-cli2` standards.
-  - Reference: `global-rules/MARKDOWN.md` (in Config Repo)
+  - Reference: `global-rules/MARKDOWN.md`
 - **Shell Scripts**: Follow `shellcheck` standards (POSIX or Bash).
-  - Reference: `global-rules/SHELL.md` (in Config Repo)
+  - Reference: `global-rules/SHELL.md`
 - **Documentation Style**: Follow documentation standards.
-  - Reference: `global-rules/DOCS_STYLE.md` (in Config Repo)
+  - Reference: `global-rules/DOCS_STYLE.md`
 - **Git Standards**: Follow Conventional Commits in Japanese.
-  - Reference: `global-rules/GIT_STANDARDS.md` (in Config Repo)
+  - Reference: `global-rules/GIT_STANDARDS.md`
 - **Agent Skills**: Reusable skill definitions for specialized tasks.
-  - Reference: `agent-skills/` (in Config Repo)
+  - Reference: `agent-skills/` directory
 
 ## 4. Workflow & Context Awareness
 
 1. **Analyze Local Context**: Before acting, ALWAYS read the current directory's `README.md` or local `AGENTS.md` to understand the specific project constraints.
-2. **Resolve Paths**: Paths in Section 3 are relative to the **Central Config Repo**. Set `$CENTRAL_CONFIG_PATH` (local) or `$CENTRAL_CONFIG_URL` (remote) before checking accessibility. The repo is considered **accessible** if:
-   - (a) Cloned locally: `[ -d "$CENTRAL_CONFIG_PATH/.git" ]`
-   - (b) Reachable via Git/HTTP: `git ls-remote "$CENTRAL_CONFIG_URL"` (e.g., `https://github.com/user/dotfiles-ai.git`).
-   **Check**: Use these variables to determine if you can resolve relative paths. If inaccessible, follow these as general principles only.
+2. **Resolve Paths**: Paths in Section 3 are relative to the Central Config Repo. Check accessibility before trying to resolve them.
 3. **Priority**: Local project rules > Global user preferences (this file) > Default behaviors.
 <!-- SKILLPORT_START -->
-## 5. SkillPort Skills (Agent Skills)
+## SkillPort Skills
 
 Skills are reusable expert knowledge that help you complete tasks effectively.
 Each skill contains step-by-step instructions, templates, and scripts.
@@ -170,11 +167,6 @@ Each skill contains step-by-step instructions, templates, and scripts.
 - **Role**: Sisyphus (Manager), Hephaestus (Coder), Oracle (Advisor).
 - **Restrictions**: `rm`, `ssh`, `sudo` are strictly blocked.
 
-### Gemini (SuperGemini)
-- **Framework**: SuperGemini/Core personas.
-- **Communication**: Adhere to the personas defined in `gemini/Core/personas.md`.
-
-<!-- SKILLPORT_START -->
 # Superpowers Workflow
 このプロジェクトでは [obra/superpowers](https://github.com/obra/superpowers) ワークフローを採用しています。
 
@@ -183,4 +175,3 @@ Each skill contains step-by-step instructions, templates, and scripts.
 - **計画と設計:** 実装前に `brainstorming` で設計を固め、`writing-plans` で詳細なタスクリストを作成してください。
 - **TDD:** すべての実装は `test-driven-development` スキルに従い、テストを先に書いてから実装してください。
 - **検証:** 完了前に `verification-before-completion` を実行し、エビデンスに基づいた成功報告を行ってください。
-<!-- SKILLPORT_END -->

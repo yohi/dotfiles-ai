@@ -36,20 +36,11 @@ sync-agents: ## SSOTのスキル群を各エージェントの設定ファイル
 	@echo "✅ sync-agents: 全エージェントへの同期が完了しました"
 
 # ============================================================
-# sync-skillport-doc: skillport doc によるスキルテーブル更新
+# sync-skillport-doc: skillport doc の実行と AGENTS.global.md への同期
 # ============================================================
-sync-skillport-doc: ## skillport doc を実行し instruction files を更新
-	@echo "📝 skillport doc: スキルテーブルを更新中..."
-	@if command -v skillport >/dev/null 2>&1; then \
-		cd "$(REPO_ROOT)" && printf 'y\n' | skillport doc --all 2>&1 || \
-			echo "⚠️  skillport doc の実行に問題がありました（スキップして続行）"; \
-	elif command -v uvx >/dev/null 2>&1; then \
-		cd "$(REPO_ROOT)" && printf 'y\n' | uvx skillport doc --all 2>&1 || \
-			echo "⚠️  uvx skillport doc の実行に問題がありました（スキップして続行）"; \
-	else \
-		echo "⚠️  skillport が見つかりません。スキルテーブルの更新をスキップします"; \
-		echo "   インストール: make skillport"; \
-	fi
+sync-skillport-doc: ## scripts/sync_agents.sh を実行し、スキル一覧の生成とグローバル設定への同期を行う
+	@echo "📝 skillport doc: スキルテーブルを更新・同期中..."
+	@bash scripts/sync_agents.sh
 
 # ============================================================
 # link-user-agents: ユーザーレベル AGENTS.md の存在確認
