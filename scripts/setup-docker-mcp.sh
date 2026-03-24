@@ -141,5 +141,13 @@ if [[ ! -f "$CATALOG_FILE" ]]; then
     echo -e "${GREEN}✅ Official MCP Catalog initialized.${NC}"
 fi
 
+echo -e "${BLUE}⚙️  Setting up systemd service...${NC}"
+mkdir -p "$HOME/.config/systemd/user"
+cp "$REPO_ROOT/mcp/docker-mcp-gateway.service" "$HOME/.config/systemd/user/"
+systemctl --user daemon-reload
+systemctl --user enable docker-mcp-gateway.service
+systemctl --user restart docker-mcp-gateway.service
+echo -e "${GREEN}✅ systemd service enabled and started.${NC}"
+
 echo -e "${GREEN}✅ Docker MCP setup completed successfully.${NC}"
-echo -e "${BLUE}Antigravity can now use Docker MCP via stdio.${NC}"
+echo -e "${BLUE}Docker MCP Gateway is now running as an SSE server at http://localhost:10888/sse${NC}"
