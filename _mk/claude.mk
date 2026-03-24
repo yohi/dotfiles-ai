@@ -375,7 +375,14 @@ install-claude-code: install-packages-claude-code  ## Claude Codeをインスト
 
 install-claudia: install-packages-claudia  ## Claudiaをインストール(エイリアス)
 
-setup-claude: ## Claude Codeの設定（現在はプレースホルダー）
+setup-claude: ## Claude Codeの設定を適用
 	@echo "📝 Claude Codeの設定を適用中..."
-	@# 今後、~/.claude/settings.json へのシンボリックリンクなどをここに追加可能
+	@mkdir -p $(HOME)/.claude
+	@ln -sf $(REPO_ROOT)/global-rules/AGENTS.global.md $(HOME)/.claude/CLAUDE.md
 	@echo "✅ Claude Codeの設定が完了しました"
+
+uninstall-claude: ## Claude Codeの設定を削除
+	@echo "🗑️  Claude Codeの設定を削除中..."
+	@rm -f $(HOME)/.claude/CLAUDE.md
+	@echo "✅ Claude Codeの設定を削除しました"
+

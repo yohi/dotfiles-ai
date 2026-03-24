@@ -108,7 +108,7 @@ setup-supergemini:
 	ln -sfn $(REPO_ROOT)/gemini/Core $(HOME_DIR)/.gemini/core || true; \
 	ln -sf $(REPO_ROOT)/gemini/supergemini/Hooks $(HOME_DIR)/.gemini/hooks || true; \
 	# 重要なファイルへの直接リンク \
-	ln -sf $(REPO_ROOT)/gemini/supergemini/GEMINI.md $(HOME_DIR)/.gemini/GEMINI.md || true; \
+	ln -sf $(REPO_ROOT)/global-rules/AGENTS.global.md $(HOME_DIR)/.gemini/GEMINI.md || true; \
 	\
 	echo "📝 カスタムツールファイルを作成中..."; \
 	cp -f $(REPO_ROOT)/gemini/supergemini/Commands/help.md $(HOME_DIR)/.gemini/user-tools/user-help.md 2>/dev/null || \
@@ -218,6 +218,16 @@ install-gemini-ecosystem:
 	@echo "  2. '/user-implement' で機能を実装"
 	@echo "";
 	@echo "✅ Gemini エコシステムの一括インストールが完了しました"
+
+.PHONY: uninstall-gemini
+uninstall-gemini: ## Gemini CLI/SuperGemini の設定を削除
+	@echo "🗑️  Gemini CLI/SuperGemini の設定を削除中..."
+	@rm -f $(HOME_DIR)/.gemini/GEMINI.md
+	@rm -f $(HOME_DIR)/.gemini/settings.json
+	@rm -f $(HOME_DIR)/.gemini/supergemini
+	@rm -f $(HOME_DIR)/.gemini/core
+	@rm -f $(HOME_DIR)/.gemini/hooks
+	@echo "✅ Gemini CLI/SuperGemini の設定を削除しました"
 
 # ========================================
 # エイリアス
