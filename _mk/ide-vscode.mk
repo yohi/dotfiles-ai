@@ -15,7 +15,7 @@ else
     VSCODE_USER_DIR := $(HOME)/.config/Code/User
 endif
 
-.PHONY: setup-vscode install-supercopilot
+.PHONY: setup-vscode
 
 setup-vscode:
 	@echo "📝 VSCodeの設定をリンクしています..."
@@ -33,12 +33,6 @@ setup-vscode:
 		ln -sf "$$src" "$$dst"; \
 	done
 	@echo "✅ VSCodeの設定リンクが完了しました"
-
-.PHONY: install-supercopilot
-install-supercopilot:
-	@echo "🚀 SuperCopilot Framework のセットアップを開始..."
-	@bash $(REPO_ROOT)/ide/vscode/setup-supercopilot.sh
-	@echo "✅ SuperCopilot のセットアップが完了しました"
 
 .PHONY: uninstall-vscode
 uninstall-vscode:

@@ -10,7 +10,7 @@ META_PROMPT_SRC  := $(GLOBAL_RULES_DIR)/META_PROMPT.md
 AGENT_CMDS_DIR   := $(REPO_ROOT)/agent-commands
 
 # --- ターゲットファイル ---
-GLOBAL_AGENTS_MD := $(GLOBAL_RULES_DIR)/AGENTS.md
+GLOBAL_AGENTS_MD := $(GLOBAL_RULES_DIR)/AGENTS.global.md
 OPENCODE_DOCS    := $(REPO_ROOT)/opencode/docs
 CODEX_CONFIG     := $(REPO_ROOT)/codex/config.toml
 
@@ -25,40 +25,31 @@ sync-agents: ## SSOTのスキル群を各エージェントの設定ファイル
 	@echo "🔄 sync-agents: SSOT → 各エージェントへの同期を開始..."
 	@# Step 1: skillport doc でスキル一覧を instruction files へ反映
 	@$(MAKE) sync-skillport-doc
-	@# Step 2: ユーザーレベル AGENTS.md のシンボリックリンク配備
+	@# Step 2: ユーザーレベル AGENTS.global.md のシンボリックリンク配備
 	@$(MAKE) link-user-agents
 	@# Step 3: 共通コマンドのシンボリックリンク配備
 	@$(MAKE) link-agent-commands
 	@# Step 4: 各エージェントへメタプロンプトを注入
-	@# NOTE: Claude / Gemini は AGENTS.md を自動参照するため個別注入不要
+	@# NOTE: Claude / Gemini は AGENTS.global.md を自動参照するため個別注入不要
 	@$(MAKE) inject-meta-prompt-opencode
 	@$(MAKE) inject-meta-prompt-codex
 	@echo "✅ sync-agents: 全エージェントへの同期が完了しました"
 
 # ============================================================
-# sync-skillport-doc: skillport doc によるスキルテーブル更新
+# sync-skillport-doc: skillport doc の実行と AGENTS.global.md への同期
 # ============================================================
-sync-skillport-doc: ## skillport doc を実行し instruction files を更新
-	@echo "📝 skillport doc: スキルテーブルを更新中..."
-	@if command -v skillport >/dev/null 2>&1; then \
-		cd "$(REPO_ROOT)" && printf 'y\n' | skillport doc --all 2>&1 || \
-			echo "⚠️  skillport doc の実行に問題がありました（スキップして続行）"; \
-	elif command -v uvx >/dev/null 2>&1; then \
-		cd "$(REPO_ROOT)" && printf 'y\n' | uvx skillport doc --all 2>&1 || \
-			echo "⚠️  uvx skillport doc の実行に問題がありました（スキップして続行）"; \
-	else \
-		echo "⚠️  skillport が見つかりません。スキルテーブルの更新をスキップします"; \
-		echo "   インストール: make skillport"; \
-	fi
+sync-skillport-doc: ## scripts/sync_agents.sh を実行し、スキル一覧の生成とグローバル設定への同期を行う
+	@echo "📝 skillport doc: スキルテーブルを更新・同期中..."
+	@bash $(REPO_ROOT)/scripts/sync_agents.sh
 
 # ============================================================
-# link-user-agents: ユーザーレベル AGENTS.md の存在確認
+# link-user-agents: ユーザーレベル AGENTS.global.md の存在確認
 # NOTE: 各エージェントの setup ターゲット (e.g. setup-opencode) が
-#       ~/.config/<agent>/AGENTS.md → global-rules/AGENTS.md を直接リンクする
+#       ~/.config/<agent>/AGENTS.md → global-rules/AGENTS.global.md を直接リンクする
 # ============================================================
-link-user-agents: ## global-rules/AGENTS.md の存在確認
+link-user-agents: ## global-rules/AGENTS.global.md の存在確認
 	@if [ -f "$(GLOBAL_AGENTS_MD)" ]; then \
-		echo "✅ ユーザーレベル AGENTS.md: $(GLOBAL_AGENTS_MD)"; \
+		echo "✅ ユーザーレベル AGENTS.global.md: $(GLOBAL_AGENTS_MD)"; \
 	else \
 		echo "⚠️  $(GLOBAL_AGENTS_MD) が見つかりません"; \
 	fi
