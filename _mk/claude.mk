@@ -3,6 +3,9 @@
 # Claude Code (CLI)、Claudia (GUI) のインストール・管理を担当
 # ============================================================
 
+HOME_DIR ?= $(HOME)
+REPO_ROOT ?= $(CURDIR)
+
 define create_desktop_entry
 	echo "📝 デスクトップエントリーを作成中..."; \
 	printf "[Desktop Entry]\nName=Claudia\nComment=A powerful GUI app and Toolkit for Claude Code\nExec=/opt/claudia/claudia\nTryExec=/opt/claudia/claudia\nIcon=applications-development\nTerminal=false\nType=Application\nCategories=Development;IDE;Utility;\nStartupWMClass=claudia\n" | sudo tee /usr/share/applications/claudia.desktop > /dev/null; \
@@ -369,7 +372,7 @@ install-claude-ecosystem:
 # エイリアス
 # ========================================
 
-.PHONY: install-claude-code install-claudia setup-claude
+.PHONY: install-claude-code install-claudia setup-claude uninstall-claude
 
 install-claude-code: install-packages-claude-code  ## Claude Codeをインストール(エイリアス)
 
@@ -377,12 +380,11 @@ install-claudia: install-packages-claudia  ## Claudiaをインストール(エ�
 
 setup-claude: ## Claude Codeの設定を適用
 	@echo "📝 Claude Codeの設定を適用中..."
-	@mkdir -p $(HOME)/.claude
-	@ln -sf $(REPO_ROOT)/global-rules/AGENTS.global.md $(HOME)/.claude/CLAUDE.md
+	@mkdir -p $(HOME_DIR)/.claude
+	@ln -sf $(REPO_ROOT)/global-rules/AGENTS.global.md $(HOME_DIR)/.claude/CLAUDE.md
 	@echo "✅ Claude Codeの設定が完了しました"
 
 uninstall-claude: ## Claude Codeの設定を削除
 	@echo "🗑️  Claude Codeの設定を削除中..."
-	@rm -f $(HOME)/.claude/CLAUDE.md
+	@rm -f $(HOME_DIR)/.claude/CLAUDE.md
 	@echo "✅ Claude Codeの設定を削除しました"
-

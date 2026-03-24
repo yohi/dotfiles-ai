@@ -52,7 +52,6 @@ install-codex: install-packages-codex
 .PHONY: uninstall-codex
 uninstall-codex: ## Codex CLI の設定を削除
 	@echo "🗑️  Codex CLI の設定を削除中..."
-	@rm -rf $(HOME_DIR)/.codex
+	@rm -f $(HOME_DIR)/.codex
 	@echo "✅ Codex CLI の設定を削除しました"
-
 
