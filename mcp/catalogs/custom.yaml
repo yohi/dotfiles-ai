@@ -37,3 +37,13 @@ registry:
     volumes:
       - /home/y_ohi/dotfiles/components/dotfiles-ai:/home/y_ohi/dotfiles/components/dotfiles-ai
       - /home/y_ohi:/home/y_ohi
+  skillport:
+    description: Professional development and AI skill management.
+    title: Skillport
+    type: server
+    image: python:3.11-slim
+    command:
+      - uvx
+      - skillport-mcp@1.1.0
+    env:
+      SKILLPORT_SKILLS_DIR: /home/y_ohi/.skillport/skills
