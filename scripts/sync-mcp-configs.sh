@@ -15,7 +15,12 @@ if [ -f "$REPO_ROOT/.env" ]; then
         if [[ "$line" =~ ^export\  ]]; then
             eval "$line"
         else
-            export "$line"
+            # Extract key and value safely to avoid SC2163
+            if [[ "$line" == *"="* ]]; then
+                key="${line%%=*}"
+                val="${line#*=}"
+                export "$key=$val"
+            fi
         fi
     done < "$REPO_ROOT/.env"
 fi
@@ -36,8 +41,17 @@ fi
 
 # 1. カタログの配置
 echo "==> Deploying MCP catalogs..."
-mkdir -p "$HOME/.docker/mcp/catalogs"
-sed "s|__HOME__|$ESCAPED_HOME|g" "$REPO_ROOT/mcp/catalogs/custom.yaml.template" > "$HOME/.docker/mcp/catalogs/custom.yaml"
+TARGET_CUSTOM_YAML="$HOME/.docker/mcp/catalogs/custom.yaml"
+mkdir -p "$(dirname "$TARGET_CUSTOM_YAML")"
+
+# If the target is a symlink, resolve it to avoid clobbering the link itself or its source
+if [ -L "$TARGET_CUSTOM_YAML" ]; then
+    RESOLVED_TARGET=$(readlink -f "$TARGET_CUSTOM_YAML")
+    echo "==> Target is a symlink, writing to resolved path: $RESOLVED_TARGET"
+    sed "s|__HOME__|$ESCAPED_HOME|g" "$REPO_ROOT/mcp/catalogs/custom.yaml.template" > "$RESOLVED_TARGET"
+else
+    sed "s|__HOME__|$ESCAPED_HOME|g" "$REPO_ROOT/mcp/catalogs/custom.yaml.template" > "$TARGET_CUSTOM_YAML"
+fi
 
 # 2. Gemini CLI 設定の更新 (~/.gemini/settings.json)
 # OAuth をバイパスするため authProviderType は含めず、ヘッダーのみを指定

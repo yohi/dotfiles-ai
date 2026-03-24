@@ -38,7 +38,7 @@
 直接 SSE をサポートするツール（Antigravity 等）は、直接 `http://localhost:10888/sse` に接続します。
 
 ## Implementation Steps
-1.  既存の各設定ファイル（Cursor, Antigravity等）からMCPサーバー定義を抽出し、`mcp/catalog.json` に統合する。
+1.  既存の各設定ファイル（Cursor, Antigravity等）からMCPサーバー定義を抽出し、`mcp/catalogs/custom.yaml.template` に統合する。
 2.  設定ファイルの絶対パス展開（`~` や `${HOME}` の置換）を含む同期スクリプトを実装する。
 3.  各ツールの設定を Gateway 経由に切り替える。
 4.  動作検証を行う。
