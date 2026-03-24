@@ -1,6 +1,6 @@
 {
   "mcpServers": {
-    "docker-mcp-gateway": {
+    "gateway": {
       "serverUrl": "http://127.0.0.1:10888/sse",
       "type": "sse",
       "headers": {
