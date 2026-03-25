@@ -172,7 +172,7 @@ Each skill contains step-by-step instructions, templates, and scripts.
 This project employs the [obra/superpowers](https://github.com/obra/superpowers) workflow.
 
 ## Core Rules
-- **Skill-First:** Before implementation/coding actions, you MUST call `search_skills("using-superpowers")` to find the skill ID and then call `load_skill(skill_id)` to load/activate it. Follow this flow for any relevant skills you identify.
+- **Skill-First:** Before implementation/coding actions, you MUST call `search_skills("using-superpowers")` to find the skill ID and then call `load_skill(id)` to load/activate it. Follow this flow for any relevant skills you identify.
 - **Planning & Design:** Solidify the design with the `brainstorming` skill and create a detailed task list with `writing-plans` before implementation.
 - **TDD:** Follow the `test-driven-development` skill for all implementations by writing tests before implementation code.
 - **Verification:** Execute `verification-before-completion` before finishing a task and provide success reports based on empirical evidence.
