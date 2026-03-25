@@ -3,6 +3,7 @@
 mcp: setup-docker-mcp
 
 setup-docker-mcp:
+	@$(MAKE) mcp-render
 	@echo "🐳 Docker MCPの設定をセットアップ中..."
 	@bash scripts/setup-docker-mcp.sh
 	@echo "✅ Docker MCPの設定が完了しました。"

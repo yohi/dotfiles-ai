@@ -18,7 +18,7 @@ include _mk/superpowers.mk
 include _mk/ide-cursor.mk
 include _mk/ide-vscode.mk
 
-.PHONY: setup install clean link install-agents install-ides setup-agents setup-ides
+.PHONY: setup install clean link install-agents install-ides setup-agents setup-ides mcp-render all test
 
 install: install-agents install-ides ## Install all AI agents and IDE binaries
 
@@ -45,11 +45,15 @@ setup-agents:
 	$(MAKE) setup-docker-mcp
 	$(MAKE) setup-superpowers
 	$(MAKE) sync-agents
+	@bash scripts/sync-mcp-configs.sh
 
 setup-ides:
 	@echo "==> Setting up dotfiles-ai IDE configurations"
 	$(MAKE) setup-cursor
 	$(MAKE) setup-vscode
+
+mcp-render:
+	@sed "s|__HOME__|$(HOME)|g" mcp/catalogs/custom.yaml.template > mcp/catalogs/custom.yaml
 
 link:
 	@echo "==> Linking dotfiles-ai (Handled in setup targets)"

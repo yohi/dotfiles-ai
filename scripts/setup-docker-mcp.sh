@@ -10,6 +10,8 @@ YELLOW='\033[0;33m'
 NC='\033[0m' # No Color
 
 echo -e "${BLUE}🐳 Starting Docker MCP setup...${NC}"
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+
 # オプション解析
 SKIP_DOCKER_CHECK=false
 for arg in "$@"; do
@@ -43,10 +45,27 @@ else
     echo -e "${YELLOW}⚠️  Skipping Docker checks as requested.${NC}"
 fi
 
-# 設定ファイルの配置 (シンボリックリンク)
+# 認証トークンの設定
+echo -e "${BLUE}🔑 Setting up MCP_GATEWAY_AUTH_TOKEN...${NC}"
+DOTENV_FILE="$REPO_ROOT/.env"
+if [ ! -f "$DOTENV_FILE" ]; then
+    touch "$DOTENV_FILE"
+fi
+chmod 600 "$DOTENV_FILE"
+
+if ! grep -q "^MCP_GATEWAY_AUTH_TOKEN=" "$DOTENV_FILE"; then
+    echo -e "${BLUE}🔑 Generating MCP_GATEWAY_AUTH_TOKEN...${NC}"
+    TOKEN=$(openssl rand -hex 32)
+    echo "MCP_GATEWAY_AUTH_TOKEN=$TOKEN" >> "$DOTENV_FILE"
+    echo -e "${GREEN}✅ Generated and added MCP_GATEWAY_AUTH_TOKEN to .env${NC}"
+else
+    TOKEN=$(grep -m1 "^MCP_GATEWAY_AUTH_TOKEN=" "$DOTENV_FILE" | cut -d'=' -f2-)
+    echo -e "${GREEN}✅ MCP_GATEWAY_AUTH_TOKEN already exists in .env${NC}"
+fi
+
+# 設定ファイルの配置 (コピー & テンプレート処理)
 echo -e "${BLUE}🔗 Linking Docker MCP configuration files...${NC}"
 MCP_CONFIG_DIR="$HOME/.docker/mcp"
-REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
 mkdir -p "$MCP_CONFIG_DIR/catalogs"
 
@@ -54,7 +73,6 @@ mkdir -p "$MCP_CONFIG_DIR/catalogs"
 FILES_TO_COPY=(
     "config.yaml:$MCP_CONFIG_DIR/config.yaml"
     "catalog.json:$MCP_CONFIG_DIR/catalog.json"
-    "catalogs/custom.yaml:$MCP_CONFIG_DIR/catalogs/custom.yaml"
     "catalogs/bootstrap.yaml:$MCP_CONFIG_DIR/catalogs/bootstrap.yaml"
     "../antigravity/mcp_config.json.template:$REPO_ROOT/antigravity/mcp_config.json"
 )
@@ -84,7 +102,9 @@ for pair in "${FILES_TO_COPY[@]}"; do
 
     # テンプレートファイルの場合は置換を行う
     if [[ "$SRC" == *"template" ]]; then
-        sed "s|__HOME__|$ESCAPED_HOME|g" "$SRC_FILE" > "$TMP_DST"
+        sed -e "s|__HOME__|$ESCAPED_HOME|g" \
+            -e "s|__MCP_AUTH_TOKEN__|$TOKEN|g" \
+            "$SRC_FILE" > "$TMP_DST"
     else
         cp -f "$SRC_FILE" "$TMP_DST"
     fi
@@ -95,6 +115,20 @@ for pair in "${FILES_TO_COPY[@]}"; do
         exit 1
     fi
 done
+
+# 2. custom.yaml はシンボリックリンクにする
+# これにより、リポジトリ内のファイルを編集して make mcp-render を実行するだけで、自動的に反映されるようになる
+echo -e "${BLUE}🔗 Creating symbolic link for custom.yaml...${NC}"
+CUSTOM_YAML_SRC="$REPO_ROOT/mcp/catalogs/custom.yaml"
+CUSTOM_YAML_DST="$MCP_CONFIG_DIR/catalogs/custom.yaml"
+
+if [[ -f "$CUSTOM_YAML_SRC" ]]; then
+    ln -sf "$CUSTOM_YAML_SRC" "$CUSTOM_YAML_DST"
+    echo -e "${GREEN}✅ Symbolic link created: $CUSTOM_YAML_DST -> $CUSTOM_YAML_SRC${NC}"
+else
+    echo -e "${RED}❌ Source file not found: $CUSTOM_YAML_SRC. Please run 'make mcp-render' first.${NC}"
+    exit 1
+fi
 
 # catalog.json 内の $HOME を実際のホームディレクトリに置換 (docker mcp が環境変数を展開しない場合のため)
 ESCAPED_HOME=$(echo "$HOME" | sed 's/[&/\|]/\\&/g')
@@ -128,5 +162,14 @@ if [[ ! -f "$CATALOG_FILE" ]]; then
     echo -e "${GREEN}✅ Official MCP Catalog initialized.${NC}"
 fi
 
+echo -e "${BLUE}⚙️  Setting up systemd service...${NC}"
+mkdir -p "$HOME/.config/systemd/user"
+# Replace __REPO_ROOT__ placeholder with actual path
+sed "s|__REPO_ROOT__|$REPO_ROOT|g" "$REPO_ROOT/mcp/docker-mcp-gateway.service" > "$HOME/.config/systemd/user/docker-mcp-gateway.service"
+systemctl --user daemon-reload
+systemctl --user enable docker-mcp-gateway.service
+systemctl --user restart docker-mcp-gateway.service
+echo -e "${GREEN}✅ systemd service enabled and started.${NC}"
+
 echo -e "${GREEN}✅ Docker MCP setup completed successfully.${NC}"
-echo -e "${BLUE}Antigravity can now use Docker MCP via stdio.${NC}"
+echo -e "${BLUE}Docker MCP Gateway is now running as an SSE server at http://localhost:10888/sse${NC}"

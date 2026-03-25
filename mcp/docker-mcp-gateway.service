@@ -1,0 +1,19 @@
+[Unit]
+Description=Docker MCP Gateway
+After=network.target docker.service
+
+[Service]
+Type=simple
+WorkingDirectory=__REPO_ROOT__
+EnvironmentFile=__REPO_ROOT__/.env
+ExecStartPre=/usr/bin/env make mcp-render
+ExecStart=/usr/bin/env docker mcp gateway run \
+  --transport sse \
+  --port 10888 \
+  --catalog %h/.docker/mcp/catalogs/bootstrap.yaml \
+  --catalog %h/.docker/mcp/catalogs/custom.yaml
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target
