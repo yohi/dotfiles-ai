@@ -38,7 +38,7 @@ if [ "$SKIP_DOCKER_CHECK" = "false" ]; then
         echo -e "${YELLOW}⚠️  node_modules not found. Installing dependencies...${NC}"
         npm install --silent --prefix "$REPO_ROOT"
     fi
-    echo -e "${GREEN}✅ Node.js dependencies installed.${NC}"
+    echo -e "${GREEN}✅ Node.js dependencies checked/ready.${NC}"
 
     # docker-mcp プラグインの確認
     if ! docker mcp version > /dev/null 2>&1; then

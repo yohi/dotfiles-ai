@@ -49,7 +49,7 @@ Each skill contains step-by-step instructions, templates, and scripts.
 ### Tools
 
 - `search_skills(query)` - Find skills by task description. Use `""` to list all.
-- `load_skill(id)` - Get full instructions and the skill's filesystem path.
+- `load_skill(skill_id)` - Get full instructions and the skill's filesystem path.
 
 ### Tips
 
@@ -169,11 +169,11 @@ Each skill contains step-by-step instructions, templates, and scripts.
 
 ## BEGIN Superpowers Workflow
 # Superpowers Workflow
-このプロジェクトでは [obra/superpowers](https://github.com/obra/superpowers) ワークフローを採用しています。
+This project employs the [obra/superpowers](https://github.com/obra/superpowers) workflow.
 
-## 核心的ルール
-- **スキル優先:** いかなるアクションの前にも必ず `using-superpowers` スキルを確認し、関連するスキルがあれば `activate_skill` で有効にしてください。
-- **計画と設計:** 実装前に `brainstorming` で設計を固め、`writing-plans` で詳細なタスクリストを作成してください。
-- **TDD:** すべての実装は `test-driven-development` スキルに従い、テストを先に書いてから実装してください。
-- **検証:** 完了前に `verification-before-completion` を実行し、エビデンスに基づいた成功報告を行ってください。
+## Core Rules
+- **Skill-First:** Before any action, you MUST call `search_skills("using-superpowers")` to find the skill ID and then call `load_skill(skill_id)` to load/activate it. Follow this flow for any relevant skills you identify.
+- **Planning & Design:** Solidify the design with the `brainstorming` skill and create a detailed task list with `writing-plans` before implementation.
+- **TDD:** Follow the `test-driven-development` skill for all implementations by writing tests before implementation code.
+- **Verification:** Execute `verification-before-completion` before finishing a task and provide success reports based on empirical evidence.
 ## END Superpowers Workflow
