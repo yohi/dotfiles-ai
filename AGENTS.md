@@ -40,7 +40,7 @@ Each skill contains step-by-step instructions, templates, and scripts.
 ### Tools
 
 - `search_skills(query)` - Find skills by task description. Use `""` to list all.
-- `load_skill(skill_id)` - Get full instructions and the skill's filesystem path.
+- `load_skill(id)` - Get full instructions and the skill's filesystem path.
 
 ### Tips
 
@@ -57,7 +57,7 @@ Each skill contains step-by-step instructions, templates, and scripts.
 </skill>
 <skill>
   <name>config-modernizer</name>
-  <description>OpenCodeの設定ファイルを分析し、最新のベストプラクティスやリリース情報に基づいてリファクタリングを行う専門スキル。ユーザーから「設定の最新化」「アップグレード」を求められた際や、.jsonc などの設定ファイルが存在する場合にトリガーされます。</description>
+  <description>A specialized skill for analyzing OpenCode configuration files and performing refactoring based on the latest best practices and release information. Triggered when requested for "configuration modernization" or "upgrading", or when configuration files like .jsonc are present.</description>
   <location>agent-skills/config-modernizer/SKILL.md</location>
 </skill>
 <skill>
@@ -67,7 +67,7 @@ Each skill contains step-by-step instructions, templates, and scripts.
 </skill>
 <skill>
   <name>git-master</name>
-  <description>Gitの操作を安全かつ適切に行うための専門スキル。特に、変更を適切に分割し、Conventional Commitsに従った日本語のコミットメッセージを作成します。</description>
+  <description>A specialized skill for performing Git operations safely and appropriately. Particularly focuses on splitting changes correctly and creating Japanese commit messages following Conventional Commits.</description>
   <location>agent-skills/git-master/SKILL.md</location>
 </skill>
 <skill>
@@ -153,7 +153,7 @@ Each skill contains step-by-step instructions, templates, and scripts.
 This project employs the [obra/superpowers](https://github.com/obra/superpowers) workflow.
 
 ## Core Rules
-- **Skill-First:** Before any action, you MUST call `search_skills("using-superpowers")` to find the skill ID and then call `load_skill(skill_id)` to load/activate it. Follow this flow for any relevant skills you identify.
+- **Skill-First:** Before implementation/coding actions, you MUST call `search_skills("using-superpowers")` to find the skill ID and then call `load_skill(skill_id)` to load/activate it. Follow this flow for any relevant skills you identify.
 - **Planning & Design:** Solidify the design with the `brainstorming` skill and create a detailed task list with `writing-plans` before implementation.
 - **TDD:** Follow the `test-driven-development` skill for all implementations by writing tests before implementation code.
 - **Verification:** Execute `verification-before-completion` before finishing a task and provide success reports based on empirical evidence.

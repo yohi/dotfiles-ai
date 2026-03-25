@@ -1,6 +1,6 @@
 ---
 name: config-modernizer
-description: OpenCodeの設定ファイルを分析し、最新のベストプラクティスやリリース情報に基づいてリファクタリングを行う専門スキル。ユーザーから「設定の最新化」「アップグレード」を求められた際や、.jsonc などの設定ファイルが存在する場合にトリガーされます。
+description: A specialized skill for analyzing OpenCode configuration files and performing refactoring based on the latest best practices and release information. Triggered when requested for "configuration modernization" or "upgrading", or when configuration files like .jsonc are present.
 ---
 
 # Role

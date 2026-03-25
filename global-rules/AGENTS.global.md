@@ -49,7 +49,7 @@ Each skill contains step-by-step instructions, templates, and scripts.
 ### Tools
 
 - `search_skills(query)` - Find skills by task description. Use `""` to list all.
-- `load_skill(skill_id)` - Get full instructions and the skill's filesystem path.
+- `load_skill(id)` - Get full instructions and the skill's filesystem path.
 
 ### Tips
 
