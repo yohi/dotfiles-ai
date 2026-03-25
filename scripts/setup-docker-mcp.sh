@@ -33,6 +33,13 @@ if [ "$SKIP_DOCKER_CHECK" = "false" ]; then
     fi
     echo -e "${GREEN}✅ Docker is installed and running.${NC}"
 
+    # node_modules の確認
+    if [ ! -d "$REPO_ROOT/node_modules" ]; then
+        echo -e "${YELLOW}⚠️  node_modules not found. Installing dependencies...${NC}"
+        npm install --silent --prefix "$REPO_ROOT"
+    fi
+    echo -e "${GREEN}✅ Node.js dependencies checked/ready.${NC}"
+
     # docker-mcp プラグインの確認
     if ! docker mcp version > /dev/null 2>&1; then
         echo -e "${RED}❌ docker-mcp CLI plugin not found.${NC}"

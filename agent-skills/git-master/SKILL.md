@@ -1,6 +1,6 @@
 ---
 name: git-master
-description: Gitの操作を安全かつ適切に行うための専門スキル。特に、変更を適切に分割し、Conventional Commitsに従った日本語のコミットメッセージを作成します。
+description: A specialized skill for performing Git operations safely and appropriately. Particularly focuses on splitting changes correctly and creating Japanese commit messages following Conventional Commits.
 ---
 
 # Role

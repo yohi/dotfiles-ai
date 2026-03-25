@@ -40,26 +40,23 @@ The following rules apply to **ALL** projects unless overridden by a local proje
 Skills are reusable expert knowledge that help you complete tasks effectively.
 Each skill contains step-by-step instructions, templates, and scripts.
 
-### Workflow (Search-first loading)
+### Workflow
 
-This project employs **SkillPort (MCP)** to manage specialized workflows.
-To save context and maintain precision, please load skills **on-demand** using the following steps:
+1. **Search** - Call `search_skills(query)` to find skills matching your task
+2. **Load** - Call `load_skill(skill_id)` to get full instructions and `path`
+3. **Execute** - Follow the instructions using your available tools
 
-1. **Search** - Use `search_skills(query)` to find skills related to your current task and identify the `skill_id`.
-2. **Load** - Call `load_skill(skill_id)` to retrieve detailed instructions (`<instructions>`) and required file paths.
-3. **Execute** - Perform the task by strictly following the loaded instructions, utilizing any provided tools or scripts.
+### Tools
 
-### MCP Tools
-
-- `search_skills(query)`: Search for skills by description keywords. Pass an empty string `""` to list all available skills.
-- `load_skill(skill_id)`: Retrieve the full content of a specified skill (instructions, templates, script paths, etc.).
+- `search_skills(query)` - Find skills by task description. Use `""` to list all.
+- `load_skill(id)` - Get full instructions and the skill's filesystem path.
 
 ### Tips
 
-- Use your native Read tool with `{path}/file` for templates/assets.
-- Execute scripts via path; do not read them into context: `python {path}/scripts/run.py`.
-- Replace `{path}` in instructions with the actual path from `load_skill`.
-- If search returns too many results, use more specific terms.
+- Use your native Read tool with `{path}/file` for templates/assets
+- Execute scripts via path, don't read them into context: `python {path}/scripts/run.py`
+- Replace `{path}` in instructions with the actual path from `load_skill`
+- If search returns too many results, use more specific terms
 
 <available_skills>
 <skill>
@@ -69,7 +66,7 @@ To save context and maintain precision, please load skills **on-demand** using t
 </skill>
 <skill>
   <name>config-modernizer</name>
-  <description>Analyzes OpenCode configuration files and performs refactoring based on the latest best practices and release information. Triggered when the user asks for "configuration modernization" or "upgrades," or when configuration files such as .jsonc exist.</description>
+  <description>A specialized skill for analyzing OpenCode configuration files and performing refactoring based on the latest best practices and release information. Triggered when requested for "configuration modernization" or "upgrading", or when configuration files like .jsonc are present.</description>
   <location>agent-skills/config-modernizer/SKILL.md</location>
 </skill>
 <skill>
@@ -79,13 +76,83 @@ To save context and maintain precision, please load skills **on-demand** using t
 </skill>
 <skill>
   <name>git-master</name>
-  <description>Specialized skill for performing Git operations safely and appropriately. Particularly, splits changes correctly and creates Japanese commit messages following Conventional Commits.</description>
+  <description>A specialized skill for performing Git operations safely and appropriately. Particularly focuses on splitting changes correctly and creating Japanese commit messages following Conventional Commits.</description>
   <location>agent-skills/git-master/SKILL.md</location>
 </skill>
 <skill>
   <name>makefile-organization</name>
   <description>Guidelines for organizing and maintaining modular Makefiles. Use when refactoring, creating new .mk files, or ensuring consistency across the project's Makefile structure. Covers naming conventions, inclusion order, idempotency management, and error handling for a robust development environment.</description>
   <location>agent-skills/makefile-organization/SKILL.md</location>
+</skill>
+<skill>
+  <name>superpowers/brainstorming</name>
+  <description>You MUST use this before any creative work - creating features, building components, adding functionality, or modifying behavior. Explores user intent, requirements and design before implementation.</description>
+  <location>agent-skills/superpowers/brainstorming/SKILL.md</location>
+</skill>
+<skill>
+  <name>superpowers/dispatching-parallel-agents</name>
+  <description>Use when facing 2+ independent tasks that can be worked on without shared state or sequential dependencies</description>
+  <location>agent-skills/superpowers/dispatching-parallel-agents/SKILL.md</location>
+</skill>
+<skill>
+  <name>superpowers/executing-plans</name>
+  <description>Use when you have a written implementation plan to execute in a separate session with review checkpoints</description>
+  <location>agent-skills/superpowers/executing-plans/SKILL.md</location>
+</skill>
+<skill>
+  <name>superpowers/finishing-a-development-branch</name>
+  <description>Use when implementation is complete, all tests pass, and you need to decide how to integrate the work - guides completion of development work by presenting structured options for merge, PR, or cleanup</description>
+  <location>agent-skills/superpowers/finishing-a-development-branch/SKILL.md</location>
+</skill>
+<skill>
+  <name>superpowers/receiving-code-review</name>
+  <description>Use when receiving code review feedback, before implementing suggestions, especially if feedback seems unclear or technically questionable - requires technical rigor and verification, not performative agreement or blind implementation</description>
+  <location>agent-skills/superpowers/receiving-code-review/SKILL.md</location>
+</skill>
+<skill>
+  <name>superpowers/requesting-code-review</name>
+  <description>Use when completing tasks, implementing major features, or before merging to verify work meets requirements</description>
+  <location>agent-skills/superpowers/requesting-code-review/SKILL.md</location>
+</skill>
+<skill>
+  <name>superpowers/subagent-driven-development</name>
+  <description>Use when executing implementation plans with independent tasks in the current session</description>
+  <location>agent-skills/superpowers/subagent-driven-development/SKILL.md</location>
+</skill>
+<skill>
+  <name>superpowers/systematic-debugging</name>
+  <description>Use when encountering any bug, test failure, or unexpected behavior, before proposing fixes</description>
+  <location>agent-skills/superpowers/systematic-debugging/SKILL.md</location>
+</skill>
+<skill>
+  <name>superpowers/test-driven-development</name>
+  <description>Use when implementing any feature or bugfix, before writing implementation code</description>
+  <location>agent-skills/superpowers/test-driven-development/SKILL.md</location>
+</skill>
+<skill>
+  <name>superpowers/using-git-worktrees</name>
+  <description>Use when starting feature work that needs isolation from current workspace or before executing implementation plans - creates isolated git worktrees with smart directory selection and safety verification</description>
+  <location>agent-skills/superpowers/using-git-worktrees/SKILL.md</location>
+</skill>
+<skill>
+  <name>superpowers/using-superpowers</name>
+  <description>Use when starting any conversation - establishes how to find and use skills, requiring Skill tool invocation before ANY response including clarifying questions</description>
+  <location>agent-skills/superpowers/using-superpowers/SKILL.md</location>
+</skill>
+<skill>
+  <name>superpowers/verification-before-completion</name>
+  <description>Use when about to claim work is complete, fixed, or passing, before committing or creating PRs - requires running verification commands and confirming output before making any success claims; evidence before assertions always</description>
+  <location>agent-skills/superpowers/verification-before-completion/SKILL.md</location>
+</skill>
+<skill>
+  <name>superpowers/writing-plans</name>
+  <description>Use when you have a spec or requirements for a multi-step task, before touching code</description>
+  <location>agent-skills/superpowers/writing-plans/SKILL.md</location>
+</skill>
+<skill>
+  <name>superpowers/writing-skills</name>
+  <description>Use when creating new skills, editing existing skills, or verifying skills work before deployment</description>
+  <location>agent-skills/superpowers/writing-skills/SKILL.md</location>
 </skill>
 </available_skills>
 <!-- SKILLPORT_END -->
@@ -99,3 +166,14 @@ To save context and maintain precision, please load skills **on-demand** using t
 ### OpenCode
 - **Role**: Sisyphus (Manager), Hephaestus (Coder), Oracle (Advisor).
 - **Restrictions**: `rm`, `ssh`, `sudo` are strictly blocked.
+
+## BEGIN Superpowers Workflow
+# Superpowers Workflow
+This project employs the [obra/superpowers](https://github.com/obra/superpowers) workflow.
+
+## Core Rules
+- **Skill-First:** Before implementation/coding actions, you MUST call `search_skills("using-superpowers")` to find the skill ID and then call `load_skill(id)` to load/activate it. Follow this flow for any relevant skills you identify.
+- **Planning & Design:** Solidify the design with the `brainstorming` skill and create a detailed task list with `writing-plans` before implementation.
+- **TDD:** Follow the `test-driven-development` skill for all implementations by writing tests before implementation code.
+- **Verification:** Execute `verification-before-completion` before finishing a task and provide success reports based on empirical evidence.
+## END Superpowers Workflow
