@@ -32,15 +32,19 @@ AUTH_TOKEN="${MCP_GATEWAY_AUTH_TOKEN:-mcp_auth_token}"
 SSE_URL="http://127.0.0.1:10888/sse"
 
 # .gitignore の更新
-if ! grep -q "ide/cursor/mcp.json" "$REPO_ROOT/.gitignore"; then
-    echo "ide/cursor/mcp.json" >> "$REPO_ROOT/.gitignore"
-    echo "==> Added ide/cursor/mcp.json to .gitignore"
-fi
+if git rev-parse --is-inside-work-tree > /dev/null 2>&1; then
+    if ! grep -q "ide/cursor/mcp.json" "$REPO_ROOT/.gitignore"; then
+        echo "ide/cursor/mcp.json" >> "$REPO_ROOT/.gitignore"
+        echo "==> Added ide/cursor/mcp.json to .gitignore"
+    fi
 
-# すでにコミットされている場合は追跡を解除
-if git ls-files --error-unmatch "ide/cursor/mcp.json" > /dev/null 2>&1; then
-    git rm --cached "ide/cursor/mcp.json" > /dev/null 2>&1
-    echo "==> Removed ide/cursor/mcp.json from git tracking"
+    # すでにコミットされている場合は追跡を解除
+    if git ls-files --error-unmatch "ide/cursor/mcp.json" > /dev/null 2>&1; then
+        git rm --cached "ide/cursor/mcp.json" > /dev/null 2>&1
+        echo "==> Removed ide/cursor/mcp.json from git tracking"
+    fi
+else
+    echo "==> Not inside a git repository, skipping .gitignore updates and tracking removal"
 fi
 
 # 1. カタログの配置
@@ -50,7 +54,12 @@ mkdir -p "$(dirname "$TARGET_CUSTOM_YAML")"
 
 # If the target is a symlink, resolve it to avoid clobbering the link itself or its source
 if [ -L "$TARGET_CUSTOM_YAML" ]; then
-    RESOLVED_TARGET=$(readlink -f "$TARGET_CUSTOM_YAML")
+    # Portable path resolution: use realpath if available, fallback to Python
+    if command -v realpath > /dev/null 2>&1; then
+        RESOLVED_TARGET=$(realpath "$TARGET_CUSTOM_YAML")
+    else
+        RESOLVED_TARGET=$(python3 -c "import os, sys; print(os.path.realpath(sys.argv[1]))" "$TARGET_CUSTOM_YAML")
+    fi
     echo "==> Target is a symlink, writing to resolved path: $RESOLVED_TARGET"
     sed "s|__HOME__|$ESCAPED_HOME|g" "$REPO_ROOT/mcp/catalogs/custom.yaml.template" > "$RESOLVED_TARGET"
 else
@@ -76,14 +85,14 @@ fi
 # 3. Antigravity 設定の更新 (antigravity/mcp_config.json)
 echo "==> Updating Antigravity configuration from template..."
 sed -e "s|__MCP_AUTH_TOKEN__|$AUTH_TOKEN|g" \
-    -e "s|http://127.0.0.1:10888/sse|$SSE_URL|g" \
+    -e "s|__SSE_URL__|$SSE_URL|g" \
     "$REPO_ROOT/antigravity/mcp_config.json.template" > "$REPO_ROOT/antigravity/mcp_config.json"
 
 # 4. Cursor 設定の更新 (ide/cursor/mcp.json)
 echo "==> Updating Cursor configuration via proxy from template..."
 sed -e "s|__REPO_ROOT__|$REPO_ROOT|g" \
     -e "s|__MCP_AUTH_TOKEN__|$AUTH_TOKEN|g" \
-    -e "s|http://localhost:10888/sse|$SSE_URL|g" \
+    -e "s|__SSE_URL__|$SSE_URL|g" \
     "$REPO_ROOT/ide/cursor/mcp.json.template" > "$REPO_ROOT/ide/cursor/mcp.json"
 
 echo "✅ MCP configurations synchronized (Strictly using Bearer token)."

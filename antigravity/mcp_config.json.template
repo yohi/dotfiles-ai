@@ -1,7 +1,7 @@
 {
   "mcpServers": {
     "gateway": {
-      "serverUrl": "http://127.0.0.1:10888/sse",
+      "serverUrl": "__SSE_URL__",
       "type": "sse",
       "headers": {
         "Authorization": "Bearer __MCP_AUTH_TOKEN__"
