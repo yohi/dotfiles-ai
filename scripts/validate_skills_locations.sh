@@ -3,13 +3,17 @@
 
 set -euo pipefail
 
+# Compute the repository root
+REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || dirname "$(cd "$(dirname "$0")" && pwd)")
+cd "$REPO_ROOT" || exit 1
+
 FILE_TO_CHECK="global-rules/AGENTS.global.md"
 EXIT_STATUS=0
 
-echo "Validating skill locations in ${FILE_TO_CHECK}..."
+echo "Validating skill locations in ${FILE_TO_CHECK} (Root: $REPO_ROOT)..."
 
 if [[ ! -f "$FILE_TO_CHECK" ]]; then
-    echo "Error: File $FILE_TO_CHECK not found."
+    echo "Error: File $FILE_TO_CHECK not found relative to $REPO_ROOT."
     exit 1
 fi
 
@@ -24,8 +28,9 @@ fi
 
 while IFS= read -r loc; do
     if [[ -z "$loc" ]]; then continue; fi
+    # Check existence relative to the repo root
     if [[ ! -f "$loc" ]]; then
-        echo "Error: Referenced skill location '$loc' does not exist."
+        echo "Error: Referenced skill location '$loc' does not exist in $REPO_ROOT."
         EXIT_STATUS=1
     else
         echo "OK: $loc"
