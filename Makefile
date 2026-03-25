@@ -37,6 +37,7 @@ setup: setup-agents setup-ides ## Setup all AI agents and IDE configurations
 
 setup-agents:
 	@echo "==> Setting up dotfiles-ai agent configurations"
+	npm install
 	$(MAKE) setup-claude
 	$(MAKE) setup-supergemini
 	$(MAKE) setup-codex
