@@ -172,7 +172,7 @@
   // プロバイダ設定
   "provider": {
     "opencode-geminicli-a2a": {
-      "npm": "file:///home/y_ohi/program/opencode-geminicli-a2a",
+      "npm": "opencode-geminicli-a2a",
       "options": {
         "host": "127.0.0.1",
         "port": 41242,

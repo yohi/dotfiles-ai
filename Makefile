@@ -37,7 +37,13 @@ setup: setup-agents setup-ides ## Setup all AI agents and IDE configurations
 
 setup-agents:
 	@echo "==> Setting up dotfiles-ai agent configurations"
-	npm install
+	@if [ ! -d node_modules ]; then \
+		if [ -f package-lock.json ]; then \
+			npm ci; \
+		else \
+			npm install; \
+		fi \
+	fi
 	$(MAKE) setup-claude
 	$(MAKE) setup-supergemini
 	$(MAKE) setup-codex
