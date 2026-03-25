@@ -28,7 +28,12 @@ if [ -f "$REPO_ROOT/.env" ]; then
         fi
     done < "$REPO_ROOT/.env"
 fi
-AUTH_TOKEN="${MCP_GATEWAY_AUTH_TOKEN:-mcp_auth_token}"
+
+AUTH_TOKEN="${MCP_GATEWAY_AUTH_TOKEN:-}"
+if [ -z "$AUTH_TOKEN" ]; then
+    echo "❌ Error: MCP_GATEWAY_AUTH_TOKEN is not set in .env or environment." >&2
+    exit 1
+fi
 SSE_URL="http://127.0.0.1:10888/sse"
 
 # .gitignore の更新
@@ -61,6 +66,7 @@ if [ -L "$TARGET_CUSTOM_YAML" ]; then
         RESOLVED_TARGET=$(python3 -c "import os, sys; print(os.path.realpath(sys.argv[1]))" "$TARGET_CUSTOM_YAML")
     fi
     echo "==> Target is a symlink, writing to resolved path: $RESOLVED_TARGET"
+    mkdir -p "$(dirname "$RESOLVED_TARGET")"
     sed "s|__HOME__|$ESCAPED_HOME|g" "$REPO_ROOT/mcp/catalogs/custom.yaml.template" > "$RESOLVED_TARGET"
 else
     sed "s|__HOME__|$ESCAPED_HOME|g" "$REPO_ROOT/mcp/catalogs/custom.yaml.template" > "$TARGET_CUSTOM_YAML"
@@ -70,16 +76,15 @@ fi
 # OAuth をバイパスするため authProviderType は含めず、ヘッダーのみを指定
 echo "==> Updating Gemini CLI configuration..."
 if [[ -f "$HOME/.gemini/settings.json" ]]; then
-    jq '.mcpServers = {
-        "docker-mcp-gateway": {
-            "url": "'"$SSE_URL"'",
+    jq --arg sseUrl "$SSE_URL" --arg auth "Bearer $AUTH_TOKEN" \
+        '.mcpServers["docker-mcp-gateway"] = {
+            "url": $sseUrl,
             "type": "sse",
             "headers": {
-                "Authorization": "Bearer '"$AUTH_TOKEN"'"
+                "Authorization": $auth
             },
             "timeout": 30000
-        }
-    }' "$HOME/.gemini/settings.json" > "$HOME/.gemini/settings.json.tmp" && mv "$HOME/.gemini/settings.json.tmp" "$HOME/.gemini/settings.json"
+        }' "$HOME/.gemini/settings.json" > "$HOME/.gemini/settings.json.tmp" && mv "$HOME/.gemini/settings.json.tmp" "$HOME/.gemini/settings.json"
 fi
 
 # 3. Antigravity 設定の更新 (antigravity/mcp_config.json)
