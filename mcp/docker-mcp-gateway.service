@@ -10,8 +10,13 @@ ExecStartPre=/usr/bin/env make mcp-render
 ExecStart=/usr/bin/env docker mcp gateway run \
   --transport sse \
   --port 10888 \
+  --servers SQLite,filesystem,sequentialthinking,skillport \
+  --use-configured-catalogs \
+  --catalog %h/.docker/mcp/catalogs/docker-mcp.yaml \
   --catalog %h/.docker/mcp/catalogs/bootstrap.yaml \
-  --catalog %h/.docker/mcp/catalogs/custom.yaml
+  --catalog %h/.docker/mcp/catalogs/custom.yaml \
+  --secrets __REPO_ROOT__/.env \
+  --watch=false
 Restart=always
 RestartSec=5
 

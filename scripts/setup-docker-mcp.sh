@@ -81,6 +81,7 @@ FILES_TO_COPY=(
     "config.yaml:$MCP_CONFIG_DIR/config.yaml"
     "catalog.json:$MCP_CONFIG_DIR/catalog.json"
     "catalogs/bootstrap.yaml:$MCP_CONFIG_DIR/catalogs/bootstrap.yaml"
+    "catalogs/custom.yaml.template:$REPO_ROOT/mcp/catalogs/custom.yaml"
     "../antigravity/mcp_config.json.template:$REPO_ROOT/antigravity/mcp_config.json"
 )
 

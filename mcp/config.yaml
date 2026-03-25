@@ -1,11 +1,19 @@
 mcpServers:
   SQLite:
     enabled: true
+    volumes:
+      - mcp-sqlite:/mcp
+    args:
+      - --db-path
+      - /mcp/db.sqlite
   filesystem:
     enabled: true
     args:
       - /home/y_ohi/dotfiles/components/dotfiles-ai
       - /home/y_ohi
+    volumes:
+      - /home/y_ohi/dotfiles/components/dotfiles-ai:/home/y_ohi/dotfiles/components/dotfiles-ai
+      - /home/y_ohi:/home/y_ohi
   playwright:
     enabled: true
   tavily:
