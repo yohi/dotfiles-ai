@@ -1,11 +1,17 @@
 {
   "mcpServers": {
     "gateway": {
-      "serverUrl": "__SSE_URL__",
-      "type": "sse",
-      "headers": {
-        "Authorization": "Bearer __MCP_AUTH_TOKEN__"
-      }
+      "command": "docker",
+      "args": [
+        "mcp",
+        "gateway",
+        "run",
+        "--servers", "SQLite,filesystem,sequentialthinking,skillport",
+        "--use-configured-catalogs",
+        "--catalog", "__HOME__/.docker/mcp/catalogs/docker-mcp.yaml",
+        "--catalog", "__HOME__/.docker/mcp/catalogs/bootstrap.yaml",
+        "--catalog", "__HOME__/.docker/mcp/catalogs/custom.yaml"
+      ]
     }
   }
 }

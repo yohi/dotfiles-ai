@@ -1,0 +1,42 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Antigravity MCP Configuration Schema",
+  "type": "object",
+  "properties": {
+    "mcpServers": {
+      "type": "object",
+      "additionalProperties": {
+        "oneOf": [
+          {
+            "title": "Stdio Server",
+            "type": "object",
+            "properties": {
+              "command": { "type": "string" },
+              "args": { "type": "array", "items": { "type": "string" } },
+              "env": { "type": "object", "additionalProperties": { "type": "string" } }
+            },
+            "required": ["command"]
+          },
+          {
+            "title": "SSE Server (Antigravity Extension)",
+            "type": "object",
+            "properties": {
+              "serverUrl": { 
+                "type": "string", 
+                "format": "uri",
+                "description": "Antigravity 独自の SSE 接続用 URL" 
+              },
+              "headers": { 
+                "type": "object", 
+                "additionalProperties": { "type": "string" },
+                "description": "SSE 接続時に付与する HTTP ヘッダー"
+              }
+            },
+            "required": ["serverUrl"]
+          }
+        ]
+      }
+    }
+  }
+}
+

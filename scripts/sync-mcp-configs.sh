@@ -91,6 +91,8 @@ fi
 echo "==> Updating Antigravity configuration from template..."
 sed -e "s|__MCP_AUTH_TOKEN__|$AUTH_TOKEN|g" \
     -e "s|__SSE_URL__|$SSE_URL|g" \
+    -e "s|__REPO_ROOT__|$REPO_ROOT|g" \
+    -e "s|__HOME__|$ESCAPED_HOME|g" \
     "$REPO_ROOT/antigravity/mcp_config.json.template" > "$REPO_ROOT/antigravity/mcp_config.json"
 
 # 4. Cursor 設定の更新 (ide/cursor/mcp.json)

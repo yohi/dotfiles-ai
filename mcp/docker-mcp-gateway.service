@@ -17,7 +17,7 @@ ExecStart=/usr/bin/env docker mcp gateway run \
   --catalog %h/.docker/mcp/catalogs/custom.yaml \
   --secrets __REPO_ROOT__/.env \
   --watch=false
-Restart=always
+
 RestartSec=5
 
 [Install]

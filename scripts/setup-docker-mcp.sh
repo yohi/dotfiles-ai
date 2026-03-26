@@ -55,6 +55,8 @@ fi
 # 認証トークンの設定
 echo -e "${BLUE}🔑 Setting up MCP_GATEWAY_AUTH_TOKEN...${NC}"
 DOTENV_FILE="$REPO_ROOT/.env"
+SSE_URL="http://127.0.0.1:10888/sse"
+
 if [ ! -f "$DOTENV_FILE" ]; then
     touch "$DOTENV_FILE"
 fi
@@ -112,6 +114,7 @@ for pair in "${FILES_TO_COPY[@]}"; do
     if [[ "$SRC" == *"template" ]]; then
         sed -e "s|__HOME__|$ESCAPED_HOME|g" \
             -e "s|__MCP_AUTH_TOKEN__|$TOKEN|g" \
+            -e "s|__SSE_URL__|$SSE_URL|g" \
             "$SRC_FILE" > "$TMP_DST"
     else
         cp -f "$SRC_FILE" "$TMP_DST"
