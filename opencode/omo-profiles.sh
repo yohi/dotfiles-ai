@@ -66,9 +66,10 @@ function omo-set-profile() {
       ;;
   esac
 
-  # テンプレートから設定ファイルを生成
-  local template_path="./opencode/oh-my-opencode.jsonc.template"
-  local output_path="./opencode/oh-my-opencode.jsonc"
+  # スクリプトの場所を基準にパスを解決
+  local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  local template_path="${script_dir}/oh-my-opencode.jsonc.template"
+  local output_path="${script_dir}/oh-my-opencode.jsonc"
   
   if [ -f "$template_path" ]; then
     # 環境変数を展開して上書き生成
