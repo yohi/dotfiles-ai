@@ -31,6 +31,7 @@ OpenCode エージェントの自律性と作業スピードを最大化する�
     - `git add .` (ファイル指定を必須とするため)
     - `rm *`, `rm -rf *`
     - `ssh *`, `sudo *`, `su *`
+    - `curl.*|sh`, `git clean -fd*` (破壊的・危険な操作の防止)
 
 ## 5. 検証プラン
 1. `opencode/opencode.jsonc` の更新。

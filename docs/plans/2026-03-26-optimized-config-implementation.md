@@ -10,7 +10,7 @@
 
 ---
 
-### Task 1: 設定ファイルの作成
+## Task 1: 設定ファイルの作成
 
 **Files:**
 - Create: `oh-my-openagent.jsonc`
@@ -67,7 +67,7 @@ git commit -m "feat: 2026年3月版の最適化設定（GPT/Claude/Gemini役割�
 
 ---
 
-### Task 2: 設定の妥当性検証
+## Task 2: 設定の妥当性検証
 
 **Files:**
 - Read: `oh-my-openagent.jsonc`
@@ -76,7 +76,7 @@ git commit -m "feat: 2026年3月版の最適化設定（GPT/Claude/Gemini役割�
 
 設定ファイルが有効な JSON 構造（コメントを無視）であることを確認します。
 
-Run: `sed 's/\/\/.*$//' oh-my-openagent.jsonc | jq .`
+Run: `perl -pe 's|(?<!:)\/\/.*||g' oh-my-openagent.jsonc | jq .`
 Expected: エラーなくパースされ、内容が表示されること。
 
 **Step 2: スキーマURLの確認**

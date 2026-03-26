@@ -10,7 +10,7 @@
 
 ---
 
-### Task 1: 現状の設定のバックアップと確認
+## Task 1: 現状の設定のバックアップと確認
 
 **Files:**
 - Read: `opencode/opencode.jsonc`
@@ -22,7 +22,7 @@ Expected: 現在の `permission` 設定が表示されること。
 
 ---
 
-### Task 2: 権限設定の更新（緩和の実施）
+## Task 2: 権限設定の更新（緩和の実施）
 
 **Files:**
 - Modify: `opencode/opencode.jsonc`
@@ -65,7 +65,7 @@ Expected: 現在の `permission` 設定が表示されること。
 
 **Step 2: JSON の構文チェックを行う**
 
-Run: `node -e "const fs = require('fs'); const content = fs.readFileSync('opencode/opencode.jsonc', 'utf8').replace(/\/\/.*/g, ''); JSON.parse(content);"`
+Run: `node -e "const fs = require('fs'); const content = fs.readFileSync('opencode/opencode.jsonc', 'utf8').replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, ''); JSON.parse(content);"`
 Expected: エラーが出ないこと（コメントを除去してパース確認）。
 
 **Step 3: コミット**
@@ -77,7 +77,7 @@ git commit -m "feat(opencode): modernize permissions to allow-by-default for max
 
 ---
 
-### Task 3: 設定の反映と検証
+## Task 3: 設定の反映と検証
 
 **Files:**
 - Execute: `opencode/omo-profiles.sh`
