@@ -12,7 +12,7 @@
       "fallback_models": [
         "openai/gpt-5.4-thinking",
         "anthropic/claude-sonnet-4-6",
-        "opencode/glm-5"
+        "opencode/glm-5-free"
       ],
       "temperature": 0.2
     },
@@ -21,7 +21,7 @@
       "model": "${CRAFTSMAN_MODEL}",
       "fallback_models": [
         "anthropic/claude-opus-4-6",
-        "opencode/minimax-m2.5"
+        "opencode/minimax-m2.5-free"
       ],
       "temperature": 0.1
     },
@@ -29,7 +29,7 @@
     "deep": {
       "model": "${DEEP_MODEL}",
       "fallback_models": [
-        "opencode/kimi-k2.5",
+        "opencode/kimi-k2.5-free",
         "google/gemini-3.1-pro"
       ],
       "parallel": 5 // 並列エージェントの同時稼働数
@@ -46,7 +46,7 @@
     "quick": {
       "model": "${QUICK_MODEL}",
       "fallback_models": [
-        "opencode/mimo-v2-flash",
+        "opencode/mimo-v2-flash-free",
         "google/gemini-3.1-flash-lite"
       ],
       "temperature": 0.5
