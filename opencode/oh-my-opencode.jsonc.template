@@ -8,7 +8,7 @@
   "categories": {
     // 【最上位知能】複雑な論理、設計、監査
     "ultrabrain": {
-      "model": "${ULTRABRAIN_MODEL:-anthropic/claude-4-6-opus}",
+      "model": "${ULTRABRAIN_MODEL}",
       "fallback_models": [
         "openai/gpt-5-4-thinking",
         "anthropic/claude-4-6-sonnet",
@@ -18,7 +18,7 @@
     },
     // 【実装職人】高品質なコード生成、既存パターンの模倣
     "craftsman": {
-      "model": "${CRAFTSMAN_MODEL:-openai/gpt-5-3-codex}",
+      "model": "${CRAFTSMAN_MODEL}",
       "fallback_models": [
         "anthropic/claude-4-6-opus",
         "opencode/minimax-m2-5-free"
@@ -27,7 +27,7 @@
     },
     // 【自律調査】大規模検索、並列探索、Agent Swarm
     "deep": {
-      "model": "${DEEP_MODEL:-opencode/glm-5-free}",
+      "model": "${DEEP_MODEL}",
       "fallback_models": [
         "opencode/kimi-k2-5-free",
         "google/gemini-3-1-pro"
@@ -36,7 +36,7 @@
     },
     // 【視覚・UI】マルチモーダル検証、デザイン確認
     "visual": {
-      "model": "${VISUAL_MODEL:-opencode/mimo-v2-omni-free}",
+      "model": "${VISUAL_MODEL}",
       "fallback_models": [
         "google/gemini-3-1-pro",
         "anthropic/claude-4-6-sonnet"
@@ -44,7 +44,7 @@
     },
     // 【高速定型】単純修正、テスト量産、タイポ修正
     "quick": {
-      "model": "${QUICK_MODEL:-opencode/minimax-m2-5-free}",
+      "model": "${QUICK_MODEL}",
       "fallback_models": [
         "opencode/mimo-v2-flash-free",
         "google/gemini-3-1-flash-lite"

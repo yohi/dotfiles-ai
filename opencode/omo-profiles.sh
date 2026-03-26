@@ -73,8 +73,11 @@ function omo-set-profile() {
   local output_path="${script_dir}/oh-my-opencode.jsonc"
   
   if [ -f "$template_path" ]; then
-    # 環境変数を展開して上書き生成
-    envsubst < "$template_path" > "$output_path"
+    # 展開対象の変数をリスト化
+    local vars_to_subst='$ULTRABRAIN_MODEL:$CRAFTSMAN_MODEL:$DEEP_MODEL:$VISUAL_MODEL:$QUICK_MODEL'
+    
+    # 環境変数を展開して上書き生成 (対象変数のみを置換)
+    envsubst "$vars_to_subst" < "$template_path" > "$output_path"
     echo "📄 Config generated: $output_path"
   else
     echo "⚠️ Warning: Template not found at $template_path"
