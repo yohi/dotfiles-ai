@@ -4,8 +4,8 @@
   // Based on oh-my-opencode v3.7.4
   "$schema": "https://opencode.ai/config.json",
   // モデル
-  //"model": "gemini-3-pro-preview",
-  //"small_model": "gemini-3-flash-preview",
+  "model": "opencode-geminicli-a2a/gemini-3.1-pro-preview",
+  "small_model": "opencode-geminicli-a2a/gemini-3-flash-preview",
   // ログレベル設定（デバッグ用）
   // "logLevel": "DEBUG",
   // [Plugin]
@@ -171,17 +171,30 @@
   },
   // プロバイダ設定
   "provider": {
-    "opencode-geminicli-a2a": {
-      "npm": "opencode-geminicli-a2a",
+        "opencode-geminicli-a2a": {
+      "npm": "@yohi/opencode-geminicli-a2a-provider",
       "options": {
         "host": "127.0.0.1",
         "port": 41242,
         "protocol": "http"
       },
       "models": {
-        "gemini-3.1-pro-preview": {},
-        "gemini-3-flash-preview": {},
-        "gemini-2.5-pro": {}
+        "gemini-3.1-pro-preview": {
+          "options": {
+            "generationConfig": {
+              "temperature": 0.2,
+              "maxOutputTokens": 8192
+            }
+          }
+        },
+        "gemini-3-flash-preview": true,
+        "gemini-2.5-pro": {
+          "options": {
+            "generationConfig": {
+              "temperature": 0.7
+            }
+          }
+        }
       }
     },
     "stellar-gemini": {

@@ -25,3 +25,6 @@ ide/cursor/mcp.json
 __pycache__/
 *.py[cod]
 *.class
+
+oh-my-openagent/
+opencode-core/
