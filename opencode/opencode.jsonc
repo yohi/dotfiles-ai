@@ -38,86 +38,29 @@
   },
   // [Permission]
   "permission": {
-    // ------------------------------------------------------------------
-    // 1. 基本ツールの権限（読み取り系は全開放）
-    // ------------------------------------------------------------------
-    "read": "allow", // ファイル読み取り
-    "list": "allow", // ディレクトリ一覧
-    "glob": "allow", // ファイル検索
-    "grep": "allow", // 文字列検索（ツール版）
-    "codesearch": "allow", // コード検索
-    "todoread": "allow", // TODO確認
-    // 編集系（AIの本分なので許可）
+    "read": "allow",
+    "list": "allow",
+    "glob": "allow",
+    "grep": "allow",
+    "codesearch": "allow",
+    "todoread": "allow",
     "edit": "allow",
     "todowrite": "allow",
-    // ------------------------------------------------------------------
-    // 2. 外部アクセス（ここは安全のため「確認」推奨）
-    // ------------------------------------------------------------------
-    "websearch": "allow", // 検索はOK
-    "webfetch": "ask", // URLの中身を見るのは確認（機密漏洩防止）
-    "external_directory": "ask", // プロジェクト外へのアクセスは確認
-    // ------------------------------------------------------------------
-    // 3. コマンド実行（Bash）
-    // ------------------------------------------------------------------
+    "websearch": "allow",
+    "webfetch": "allow", // 緩和: ask -> allow
+    "external_directory": "allow", // 緩和: ask -> allow
     "bash": {
-      // ▼ 基本ポリシー：デフォルトは「確認」
-      // これが「ブラックリスト方式」の危険性を防ぐ命綱です
-      "*": "ask",
-      // ▼ 参照・ログ確認系（すべて許可）
-      // "ls*" と書くことで "ls -la" 等の引数付きもカバー
-      "ls*": "allow",
-      "cat*": "allow",
-      "pwd": "allow",
-      "echo*": "allow",
-      "mkdir*": "allow",
-      "touch*": "allow",
-      "mv*": "ask",
-      "cp*": "ask",
-      // 以前ご要望のあった grep/tail もここで許可
-      "grep*": "allow",
-      "wc*": "allow",
-      "find*": "allow",
-      "tail*": "allow",
-      "head*": "allow",
-      "less*": "allow",
-      "xargs*": "deny",
-      // ▼ 開発ツール系（広範囲許可 = 利便性重視）
-      // GitとNPM関連は、下手に制限すると開発にならないため原則許可します
-      "git *": "allow",
-      "npm *": "allow",
-      "yarn *": "allow",
-      "node *": "allow", // スクリプト実行も許可
-      "python *": "allow", // Python使いなら追加
-      "bun *": "allow",
-      "coderabbit *": "allow",
-      // -----------------------------------------------------------
-      // ▼ 制限・禁止リスト（下の行ほど優先＝上書きされます）
-      // -----------------------------------------------------------
-      // 【Gitの特例制限】
-      // "git *" で許可しましたが、Push/Commitだけは意図を確認したい
+      "*": "allow", // 極限緩和: ask -> allow (デフォルト許可)
+      
+      // --- 安全弁 (ask) ---
       "git push*": "ask",
-      "git commit*": "ask",
-      "git rebase*": "ask",
-      "git merge*": "ask",
-      "git checkout*": "allow",
-      "git branch*": "allow",
-      "git log*": "allow",
-      "git status": "allow",
-      "git diff*": "allow",
-      "git show*": "allow",
-      "git restore*": "ask",
       "git reset*": "ask",
-      "git switch*": "allow",
-      "git stash*": "allow",
-      // 【NPMの特例禁止】
-      "npm publish*": "deny",
-      // 【Gitの全てaddは禁止】
-      "git add .": "deny",
-      // 【システム破壊・危険操作の禁止（最優先）】
-      // rm はゴミ箱に入らないため、AIには使わせないのが鉄則
+      "npm publish*": "ask", // 緩和: deny -> ask
+      
+      // --- 禁止 (deny) ---
+      "git add .": "deny", // 一括追加は禁止を維持
       "rm *": "deny",
       "rm -rf *": "deny",
-      // SSHなどは乗っ取りリスクがあるため禁止
       "ssh *": "deny",
       "sudo *": "deny",
       "su *": "deny"
