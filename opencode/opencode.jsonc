@@ -172,18 +172,36 @@
   // プロバイダ設定
   "provider": {
     "opencode-geminicli-a2a": {
-      "npm": "opencode-geminicli-a2a",
+      // 1. npm フィールドをローカルビルドへの絶対パスに変更
+      "npm": "file:///home/y_ohi/program/private/opencode-geminicli-a2a/dist/index.js",
       "options": {
         "host": "127.0.0.1",
         "port": 41242,
-        "protocol": "http"
+        "protocol": "http",
+        "autoStart": {
+          "env": { "USE_CCPA": "1" }
+        },
       },
       "models": {
+        // 2. 空オブジェクト {} を true に変更（バリデーションエラー回避のため）
         "gemini-3.1-pro-preview": {},
         "gemini-3-flash-preview": {},
         "gemini-2.5-pro": {}
       }
     },
+    // "opencode-geminicli-a2a": {
+    //   "npm": "opencode-geminicli-a2a",
+    //   "options": {
+    //     "host": "127.0.0.1",
+    //     "port": 41242,
+    //     "protocol": "http"
+    //   },
+    //   "models": {
+    //     "gemini-3.1-pro-preview": {},
+    //     "gemini-3-flash-preview": {},
+    //     "gemini-2.5-pro": {}
+    //   }
+    // },
     "stellar-gemini": {
       "npm": "@ai-sdk/google",
       "name": "Stellar Gemini (OAuth)",
