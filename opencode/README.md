@@ -4,28 +4,26 @@
 
 ## 1. 構成ファイル
 
+### `oh-my-opencode.jsonc.template`
+知能レベル（ultrabrain, craftsman等）を環境変数（`${VAR}`）で記述したテンプレートファイルです。
+
 ### `oh-my-opencode.jsonc`
-プロジェクト全体の「脳」と「役割」を定義するメイン設定ファイルです。
-- **カテゴリーベース設計**: 個別のエージェントにモデルを固定せず、知能レベル（ultrabrain, craftsman, deep等）で管理。
-- **フォールバック戦略**: メインモデルがエラーやレート制限に達した際、自動的に次候補のモデルへ切り替えます。
-- **高度な機能**: Hashline（精密編集）、Intent Gate（意図分析）、並列バックグラウンド実行が有効化されています。
+[自動生成] スクリプトによって生成される、実行用の実体ファイルです。**このファイルを直接編集しないでください。**
 
 ### `omo-profiles.sh`
-環境変数を利用して、エージェントの性格（モデル構成）を一瞬で切り替えるためのシェルスクリプトです。
+環境変数を設定し、`envsubst` を用いてテンプレートから実体ファイルを生成するスクリプトです。
 
 ## 2. 使い方
 
 ターミナルで以下のコマンドを実行してプロファイルをロードします。
 
 ```bash
-# プロファイル関数を読み込む（.zshrc 等に追加推奨）
+# プロファイル関数を読み込む
 source ./opencode/omo-profiles.sh
 
 # シーンに合わせてプロファイルを切り替える
-omo-set-profile hybrid        # 標準（Opus + Codex + Free）
-omo-set-profile reasoning     # 深考（Thinking + Swarm）
-omo-set-profile gpt-first     # 安定（GPT-5.4 Standard + Codex + Free）
-omo-set-profile frontier-asia # 爆速（GLM + Kimi + Minimax 無料枠）
+# 実行すると、環境変数が設定され、oh-my-opencode.jsonc が自動生成されます。
+omo-set-profile hybrid
 ```
 
 ## 3. 利用可能なプロファイル

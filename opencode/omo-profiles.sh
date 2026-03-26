@@ -4,7 +4,8 @@
 # 使い方: source ./opencode/omo-profiles.sh && omo-set-profile hybrid
 
 function omo-set-profile() {
-  case $1 in
+  local profile=$1
+  case $profile in
     "hybrid") # 最強のハイブリッド：品質とエージェント能力のベストミックス
       export ULTRABRAIN_MODEL="anthropic/claude-4-6-opus"
       export CRAFTSMAN_MODEL="openai/gpt-5-3-codex"
@@ -64,6 +65,18 @@ function omo-set-profile() {
       return 1
       ;;
   esac
+
+  # テンプレートから設定ファイルを生成
+  local template_path="./opencode/oh-my-opencode.jsonc.template"
+  local output_path="./opencode/oh-my-opencode.jsonc"
+  
+  if [ -f "$template_path" ]; then
+    # 環境変数を展開して上書き生成
+    envsubst < "$template_path" > "$output_path"
+    echo "📄 Config generated: $output_path"
+  else
+    echo "⚠️ Warning: Template not found at $template_path"
+  fi
 }
 
 # 読み込み時にデフォルトをセット
