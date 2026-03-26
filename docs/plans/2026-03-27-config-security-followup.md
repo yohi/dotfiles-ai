@@ -10,31 +10,29 @@
 
 ---
 
-### Task 1: omo-profiles.sh のエラーハンドリング強化
+## Task 1: omo-profiles.sh のエラーハンドリングの検証
 
 **Files:**
-- Modify: `opencode/omo-profiles.sh`
+- Verify: `opencode/omo-profiles.sh`
 
-**Step 1: envsubst のステータスチェックを追加**
+**Step 1: 実装済みの envsubst ステータスチェックを確認する**
 
 ```bash
     # 環境変数を展開して上書き生成 (対象変数のみを置換)
     if envsubst "$vars_to_subst" < "$template_path" > "$output_path"; then
       echo "📄 Config generated: $output_path"
     else
-      echo "⚠️ Error: Failed to generate config at $output_path" >&2
+      echo "❌ Error: Failed to generate config with envsubst" >&2
       return 1
     fi
 ```
 
-**Step 2: コミット**
+**Step 2: 差分を確認し、変更がなければコミットをスキップする**
 
-```bash
-git add opencode/omo-profiles.sh
-git commit -m "fix(opencode): add error handling for envsubst in omo-profiles.sh"
-```
+Run: `git diff opencode/omo-profiles.sh`
+Expected: 既に修正が反映されていることを確認。
 
-### Task 2: opencode.jsonc の整合性とセキュリティ強化
+## Task 2: opencode.jsonc の整合性とセキュリティ強化
 
 **Files:**
 - Modify: `opencode/opencode.jsonc`
@@ -43,7 +41,7 @@ git commit -m "fix(opencode): add error handling for envsubst in omo-profiles.sh
 
 - 61行目: `// 緩和: deny -> ask` -> `// 誤公開防止: deny を維持`
 - `bash` ブロックの `deny` セクションに以下を追加:
-    - `"curl.*|sh": "deny"`
+    - `"curl*|sh": "deny"`
     - `"git clean -fd*": "deny"`
 
 **Step 2: experimental フラグの安全性向上**

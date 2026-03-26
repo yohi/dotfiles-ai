@@ -48,7 +48,7 @@
     "todowrite": "allow",
     "websearch": "allow",
     "webfetch": "allow",
-    "external_directory": "allow",
+    "external_directory": "ask",
     "lsp": "allow", // [New] v1.3 LSP permission
     "skill": "allow", // [New] v1.3 Skill permission
     "task": "allow", // [New] v1.3 Task permission
@@ -61,7 +61,7 @@
       "npm publish*": "deny", // 誤公開防止: deny を維持
       
       // --- 禁止 (deny) ---
-      "curl.*|sh": "deny",
+      "curl*|sh": "deny",
       "git clean -fd*": "deny",
       "git add .": "deny", // 一括追加は禁止を維持
       "rm *": "deny",
