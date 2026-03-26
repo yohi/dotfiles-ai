@@ -84,8 +84,12 @@ function omo-set-profile() {
     local vars_to_subst='$ULTRABRAIN_MODEL:$CRAFTSMAN_MODEL:$DEEP_MODEL:$VISUAL_MODEL:$QUICK_MODEL'
     
     # 環境変数を展開して上書き生成 (対象変数のみを置換)
-    envsubst "$vars_to_subst" < "$template_path" > "$output_path"
-    echo "📄 Config generated: $output_path"
+    if envsubst "$vars_to_subst" < "$template_path" > "$output_path"; then
+      echo "📄 Config generated: $output_path"
+    else
+      echo "❌ Error: Failed to generate config with envsubst" >&2
+      return 1
+    fi
   else
     echo "⚠️ Warning: Template not found at $template_path"
   fi
