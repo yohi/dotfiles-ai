@@ -8,7 +8,7 @@
   "categories": {
     // 【最上位知能】複雑な論理、設計、監査
     "ultrabrain": {
-      "model": "openai/gpt-5.4",
+      "model": "anthropic/claude-opus-4-6",
       "fallback_models": [
         "openai/gpt-5.4-thinking",
         "anthropic/claude-sonnet-4-6",
@@ -36,7 +36,7 @@
     },
     // 【視覚・UI】マルチモーダル検証、デザイン確認
     "visual": {
-      "model": "opencode/mimo-v2-omni-free",
+      "model": "google/gemini-3.1-pro",
       "fallback_models": [
         "google/gemini-3.1-pro",
         "anthropic/claude-sonnet-4-6"
@@ -44,7 +44,7 @@
     },
     // 【高速定型】単純修正、テスト量産、タイポ修正
     "quick": {
-      "model": "openai/gpt-5.4-mini",
+      "model": "opencode/minimax-m2.5-free",
       "fallback_models": [
         "opencode/mimo-v2-omni-free",
         "google/gemini-3.1-flash-lite"
