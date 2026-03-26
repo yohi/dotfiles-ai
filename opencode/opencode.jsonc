@@ -47,8 +47,11 @@
     "edit": "allow",
     "todowrite": "allow",
     "websearch": "allow",
-    "webfetch": "allow", // 緩和: ask -> allow
-    "external_directory": "allow", // 緩和: ask -> allow
+    "webfetch": "allow",
+    "external_directory": "allow",
+    "lsp": "allow", // [New] v1.3 LSP permission
+    "skill": "allow", // [New] v1.3 Skill permission
+    "task": "allow", // [New] v1.3 Task permission
     "bash": {
       "*": "allow", // 極限緩和: ask -> allow (デフォルト許可)
       
@@ -65,6 +68,11 @@
       "sudo *": "deny",
       "su *": "deny"
     }
+  },
+
+  "experimental": {
+    "batch_tool": true, // [New] Enable batching for faster execution
+    "continue_loop_on_deny": true // [New] Continue thinking on permission denial
   },
   // [MCP]
   "mcp": {
