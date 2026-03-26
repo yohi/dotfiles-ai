@@ -53,14 +53,14 @@
     "skill": "allow", // [New] v1.3 Skill permission
     "task": "allow", // [New] v1.3 Task permission
     "bash": {
-      "*": "allow", // 極限緩和: ask -> allow (デフォルト許可)
+      "*": "ask", // 自律性と安全性のバランス: allow -> ask (デフォルト確認)
       
       // --- 安全弁 (ask) ---
       "git push*": "ask",
       "git reset*": "ask",
-      "npm publish*": "deny", // 誤公開防止: deny を維持
       
       // --- 禁止 (deny) ---
+      "npm publish*": "deny", // 誤公開防止: deny を維持
       "curl*|sh": "deny",
       "git clean -fd*": "deny",
       "git add .": "deny", // 一括追加は禁止を維持
@@ -74,7 +74,7 @@
 
   "experimental": {
     "batch_tool": true, // [New] Enable batching for faster execution
-    "continue_loop_on_deny": false // [New] Continue thinking on permission denial
+    "continue_loop_on_deny": false // [New] Stop thinking on permission denial / do not continue
   },
   // [MCP]
   "mcp": {
