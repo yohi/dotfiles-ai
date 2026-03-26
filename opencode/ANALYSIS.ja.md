@@ -35,7 +35,7 @@
 - ユーザーの入力をそのまま実行するのではなく、真の意図（リサーチ、実装、修正、評価など）を分析してから適切なルーティングを行う。
 
 ### マルチモデル・オーケストレーション
-- `visual-engineering`, `deep`, `quick`, `ultrabrain` といったカテゴリーに基づき、最適なモデル（Claude 3.7, GPT-4o, Kimi K2.5等）を自動的に選択。
+- `visual-engineering`, `deep`, `quick`, `ultrabrain` といったカテゴリーに基づき、最適なモデル（Claude 4.x, GPT-5.x, Gemini 3.1等）を自動的に選択。
 
 ## 5. 主要機能
 

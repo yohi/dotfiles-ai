@@ -33,7 +33,7 @@ omo-set-profile hybrid
 | **hybrid** | Claude 4.6 Opus | GPT-5.3 Codex | 品質と知能のベストバランス。常用。 |
 | **reasoning** | GPT-5.4 Thinking | Claude 4.6 Opus | 難解なバグ修正、アルゴリズム設計用。 |
 | **gpt-first** | GPT-5.4 Standard | GPT-5.3 Codex | GPT-5.4の安定性と無料モデルのコスト効率。 |
-| **frontier-asia**| GLM-5-free | Minimax-M2.5-free| エージェントの暴力。大量の調査・並列作業用。 |
+| **frontier-asia**| big-pickle (opencode) | Minimax-M2.5-free| エージェントの暴力。大量の調査・並列作業用。 |
 | **creative-ui** | Claude 4.6 Opus | Claude 4.6 Sonnet| UI/UX検証、Mimo-V2-Omniによる視覚確認。 |
 | **speed** | Claude 4.6 Sonnet| Minimax-M2.5-free| 知能より速度とスループットを優先。 |
 
