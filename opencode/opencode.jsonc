@@ -58,9 +58,11 @@
       // --- 安全弁 (ask) ---
       "git push*": "ask",
       "git reset*": "ask",
-      "npm publish*": "deny", // 緩和: deny -> ask
+      "npm publish*": "deny", // 誤公開防止: deny を維持
       
       // --- 禁止 (deny) ---
+      "curl.*|sh": "deny",
+      "git clean -fd*": "deny",
       "git add .": "deny", // 一括追加は禁止を維持
       "rm *": "deny",
       "rm -rf *": "deny",
@@ -72,7 +74,7 @@
 
   "experimental": {
     "batch_tool": true, // [New] Enable batching for faster execution
-    "continue_loop_on_deny": true // [New] Continue thinking on permission denial
+    "continue_loop_on_deny": false // [New] Continue thinking on permission denial
   },
   // [MCP]
   "mcp": {
