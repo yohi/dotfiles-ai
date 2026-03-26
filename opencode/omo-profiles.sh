@@ -50,13 +50,13 @@ function omo-set-profile() {
       echo "⚡ Profile: [Speed] Set - High throughput for routine tasks"
       ;;
 
-    "gpt-first") # GPT-First (Efficient): GPT-5.4 Standardを脳に、無料モデルを脇役に
-      export ULTRABRAIN_MODEL="openai/gpt-5-4-standard"
+    "gpt-first") # GPT-First (Efficient): GPT-5.4を脳に、無料モデルを脇役に
+      export ULTRABRAIN_MODEL="openai/gpt-5-4"
       export CRAFTSMAN_MODEL="openai/gpt-5-3-codex"
       export DEEP_MODEL="opencode/glm-5-free"
       export VISUAL_MODEL="opencode/mimo-v2-omni-free"
       export QUICK_MODEL="openai/gpt-5-4-mini"
-      echo "🤖 Profile: [GPT-First] Set - GPT-5.4 Standard Brain with OpenCode Free Support"
+      echo "🤖 Profile: [GPT-First] Set - GPT-5.4 Brain with OpenCode Free Support"
       ;;
 
     *)
