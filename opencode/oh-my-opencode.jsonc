@@ -8,46 +8,46 @@
   "categories": {
     // 【最上位知能】複雑な論理、設計、監査
     "ultrabrain": {
-      "model": "${ULTRABRAIN_MODEL:-anthropic/claude-4-6-opus}",
+      "model": "openai/gpt-5.4",
       "fallback_models": [
-        "openai/gpt-5-4-thinking",
-        "anthropic/claude-4-6-sonnet",
-        "opencode/glm-5-free"
+        "openai/gpt-5.4-thinking",
+        "anthropic/claude-sonnet-4-6",
+        "opencode/big-pickle"
       ],
       "temperature": 0.2
     },
     // 【実装職人】高品質なコード生成、既存パターンの模倣
     "craftsman": {
-      "model": "${CRAFTSMAN_MODEL:-openai/gpt-5-3-codex}",
+      "model": "openai/gpt-5.3-codex",
       "fallback_models": [
-        "anthropic/claude-4-6-opus",
-        "opencode/minimax-m2-5-free"
+        "anthropic/claude-opus-4-6",
+        "opencode/nemotron-3-super-free"
       ],
       "temperature": 0.1
     },
     // 【自律調査】大規模検索、並列探索、Agent Swarm
     "deep": {
-      "model": "${DEEP_MODEL:-opencode/glm-5-free}",
+      "model": "opencode/big-pickle",
       "fallback_models": [
-        "opencode/kimi-k2-5-free",
-        "google/gemini-3-1-pro"
+        "opencode/mimo-v2-pro-free",
+        "google/gemini-3.1-pro"
       ],
       "parallel": 5 // 並列エージェントの同時稼働数
     },
     // 【視覚・UI】マルチモーダル検証、デザイン確認
     "visual": {
-      "model": "${VISUAL_MODEL:-opencode/mimo-v2-omni-free}",
+      "model": "opencode/mimo-v2-omni-free",
       "fallback_models": [
-        "google/gemini-3-1-pro",
-        "anthropic/claude-4-6-sonnet"
+        "google/gemini-3.1-pro",
+        "anthropic/claude-sonnet-4-6"
       ]
     },
     // 【高速定型】単純修正、テスト量産、タイポ修正
     "quick": {
-      "model": "${QUICK_MODEL:-opencode/minimax-m2-5-free}",
+      "model": "openai/gpt-5.4-mini",
       "fallback_models": [
-        "opencode/mimo-v2-flash-free",
-        "google/gemini-3-1-flash-lite"
+        "opencode/mimo-v2-omni-free",
+        "google/gemini-3.1-flash-lite"
       ],
       "temperature": 0.5
     }
