@@ -66,9 +66,16 @@ function omo-set-profile() {
       ;;
   esac
 
-  # スクリプトの場所を基準にパスを解決 (Bash & Zsh 両対応)
-  local script_path="${BASH_SOURCE[0]:-${(%):-%x}}"
-  local script_dir="$(cd "$(dirname "$script_path")" && pwd)"
+  # スクリプトの場所を基準にパスを解決
+  local script_path="${BASH_SOURCE[0]:-$0}"
+  local script_dir
+  script_dir="$(dirname "$script_path")"
+  
+  # cd と pwd を分離し、エラーチェックを導入
+  if ! script_dir="$(cd "$script_dir" && pwd)"; then
+    echo "⚠️ Error: Could not determine script directory" >&2
+    return 1
+  fi
   local template_path="${script_dir}/oh-my-opencode.jsonc.template"
   local output_path="${script_dir}/oh-my-opencode.jsonc"
   
