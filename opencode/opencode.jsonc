@@ -1,6 +1,6 @@
 {
   // Config Modernized: 2026-02-20
-  // Target OpenCode Version: v1.2.x
+  // Target OpenCode Version: v1.3.x
   // Based on oh-my-opencode v3.7.4
   "$schema": "https://opencode.ai/config.json",
   // モデル
@@ -58,7 +58,7 @@
       // --- 安全弁 (ask) ---
       "git push*": "ask",
       "git reset*": "ask",
-      "npm publish*": "ask", // 緩和: deny -> ask
+      "npm publish*": "deny", // 緩和: deny -> ask
       
       // --- 禁止 (deny) ---
       "git add .": "deny", // 一括追加は禁止を維持
