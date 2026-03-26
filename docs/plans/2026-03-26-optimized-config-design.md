@@ -21,30 +21,30 @@
 
 ```jsonc
 {
-  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-opencode.schema.json",
+  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/refs/heads/dev/dist/oh-my-opencode.schema.json",
   "new_task_system_enabled": true,
-  "default_run_agent": "gpt-5.4-mini",
+  "default_run_agent": "openai/gpt-5.4-mini",
   "hashline_edit": true,
   "model_fallback": true,
   "agents": {
     "build": {
-      "model": "claude-4-6-sonnet",
+      "model": "anthropic/claude-4-6-sonnet",
       "thinking": {
         "type": "enabled",
         "budgetTokens": 16000
       }
     },
     "plan": {
-      "model": "gpt-5.4-pro",
+      "model": "openai/gpt-5.4-pro",
       "reasoningEffort": "high"
     }
   },
   "categories": {
     "quick": {
-      "model": "gpt-5.4-mini"
+      "model": "openai/gpt-5.4-mini"
     },
     "explore": {
-      "model": "gemini-3.1-pro",
+      "model": "google/gemini-3.1-pro",
       "max_prompt_tokens": 1000000
     }
   },
