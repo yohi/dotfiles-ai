@@ -16,7 +16,12 @@ CONFIG_PATH = REPO_ROOT / "mcp" / "servers.yaml"
 
 
 def load_config() -> dict[str, Any]:
-    return yaml.safe_load(CONFIG_PATH.read_text(encoding="utf-8"))
+    loaded = yaml.safe_load(CONFIG_PATH.read_text(encoding="utf-8"))
+    if not isinstance(loaded, dict):
+        raise ValueError(
+            f"Malformed config at {CONFIG_PATH}: expected a mapping at the top level"
+        )
+    return loaded
 
 
 def parse_jsonc(text: str) -> dict[str, Any]:
