@@ -69,9 +69,7 @@ install-requirements:
 lint: ## Run Ruff and Mypy on scripts/
 	@echo "🔍 scripts/ に対して Ruff と Mypy を実行中..."
 	@if command -v uv >/dev/null 2>&1; then \
-		$(PYTHON) ruff check scripts/; \
-		$(PYTHON) mypy scripts/; \
+		$(PYTHON) ruff check scripts/ && $(PYTHON) mypy scripts/; \
 	else \
-		ruff check scripts/; \
-		mypy scripts/; \
+		ruff check scripts/ && mypy scripts/; \
 	fi
