@@ -58,7 +58,7 @@ define link_config
 	fi
 endef
 
-.PHONY: opencode install-packages-opencode install-opencode opencode-update setup-opencode check-opencode
+.PHONY: opencode install-packages-opencode install-opencode opencode-update setup-opencode check-opencode uninstall-opencode
 
 # OpenCode (opencode) をインストール & 設定
 opencode: ## OpenCode(opencode)のインストールとセットアップ
@@ -288,7 +288,7 @@ check-opencode: ## OpenCode（opencode）の状態を確認
 	@if [ -d "$(OPENCODE_DOTFILES_DOCS)" ]; then \
 		if [ -L "$(OPENCODE_DOCS_PATH)" ]; then \
 			actual=$$(readlink -f "$(OPENCODE_DOCS_PATH)" 2>/dev/null || readlink "$(OPENCODE_DOCS_PATH)" 2>/dev/null || true); \
-			expected=$$(readlink -f "$(OPENCODE_DOTFILES_DOCS)" 2>/dev/null || readlink "$(OPENCODE_DOTFILES_DOCS)" 2>/dev/null || true); \
+			expected=$$(readlink -f "$(OPENCODE_DOTFILES_DOCS)" 2>/dev/null || readlink "$(OH_MY_OPENCODE_DOTFILES_CONFIG)" 2>/dev/null || true); \
 			if [ -n "$$actual" ] && [ "$$actual" = "$$expected" ]; then \
 				echo "✅ docs: $(OPENCODE_DOCS_PATH) -> $(OPENCODE_DOTFILES_DOCS)"; \
 			else \
@@ -300,3 +300,9 @@ check-opencode: ## OpenCode（opencode）の状態を確認
 			echo "⚠️  docs: $(OPENCODE_DOCS_PATH) is not configured"; \
 		fi; \
 	fi
+
+uninstall-opencode: ## OpenCode（opencode）のアンインストール
+	@echo "🗑️  OpenCode（opencode）をアンインストール中..."
+	@rm -rf "$(OPENCODE_HOME)"
+	@rm -rf "$(OPENCODE_CONFIG_DIR)"
+	@echo "✅ OpenCode（opencode）のアンインストールが完了しました"
