@@ -39,9 +39,9 @@ setup-ides:
 	$(MAKE) setup-vscode
 
 mcp-render:
-	@sed "s|__HOME__|$(HOME)|g" mcp/catalogs/custom.yaml.template > mcp/catalogs/custom.yaml
+	@sed "s|__HOME__|$$HOME|g" mcp/catalogs/custom.yaml.template > mcp/catalogs/custom.yaml
 
-link:
+link: setup
 	@echo "🔗 dotfiles-ai をリンク中 (Handled in setup targets)"
 
 clean:
@@ -58,7 +58,15 @@ clean:
 	-$(MAKE) uninstall-cursor FORCE=true
 	-$(MAKE) uninstall-vscode FORCE=true
 
-lint:
+install-requirements:
+	@echo "📦 依存関係をインストール中..."
+	@if command -v uv >/dev/null 2>&1; then \
+		uv pip install --system -r requirements.txt; \
+	else \
+		pip install -r requirements.txt; \
+	fi
+
+lint: install-requirements
 	@echo "🔍 scripts/ に対して Ruff と Mypy を実行中..."
 	ruff check scripts/
 	mypy scripts/

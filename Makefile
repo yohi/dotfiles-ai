@@ -6,10 +6,10 @@ include _mk/variables.mk
 include _mk/idempotency.mk
 include _mk/help.mk
 
-# 4. Meta
+# 2. Meta
 include _mk/main.mk
 
-# 5. AI & Tools
+# 3. AI & Tools
 include _mk/claude.mk
 include _mk/gemini.mk
 include _mk/codex.mk
