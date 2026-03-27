@@ -13,14 +13,14 @@
 
 ---
 
-### Task 1: Update .gitignore
+## Task 1: Update .gitignore
 
 **Files:**
 - Modify: `.gitignore`
 
 **Step 1: Add patterns to .gitignore**
 Add the following to the bottom of the "OpenCode" section:
-```
+```text
 .opencode/
 .cursor/
 .gemini/
@@ -38,7 +38,7 @@ git commit -m "chore: .gitignore にエージェント生成ディレクトリ�
 
 ---
 
-### Task 2: Untrack directories from Git Index
+## Task 2: Untrack directories from Git Index
 
 **Files:**
 - Untrack: `.cursor/`, `.gemini/`, `.opencode/`
@@ -57,7 +57,7 @@ git commit -m "chore: .cursor, .gemini, .opencode を Git 追跡から解除"
 
 ---
 
-### Task 3: Physical Cleanup of legacy directories
+## Task 3: Physical Cleanup of legacy directories
 
 **Files:**
 - Delete: `.opencode/`, `.gemini/`
@@ -71,7 +71,7 @@ Expected: "No such file or directory" error for both.
 
 ---
 
-### Task 4: Final Verification
+## Task 4: Final Verification
 
 **Step 1: Check git status**
 Run: `git status`
@@ -79,4 +79,4 @@ Expected: Working tree clean (ignoring the untracked .cursor directory which is 
 
 **Step 2: Run sync-agents to ensure .cursor is still regenerated correctly**
 Run: `make sync-agents`
-Expected: Successful execution, recreating necessary symlinks in `.cursor/rules/`.
+Expected: Successful execution. Note that the `sync-agents` target intentionally recreates the `.cursor/rules` directory by executing `mkdir -p "$(REPO_ROOT)/.cursor/rules"`. This ensures readers understand that the `.cursor/` directory is regenerated on demand, while `.cursor/rules` remains untracked by design.

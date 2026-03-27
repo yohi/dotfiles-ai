@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import json
+import json5
 import re
 import sys
 from pathlib import Path
 from typing import Any
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -23,8 +24,6 @@ def load_config() -> dict[str, Any]:
         )
     return loaded
 
-
-import json5
 
 def parse_jsonc(text: str) -> dict[str, Any]:
     return json5.loads(text)
@@ -43,24 +42,31 @@ def replace_placeholders(value: Any, gateway_url: str) -> Any:
     return value
 
 
-def write_json_file(path: Path, root_key: str, servers: dict[str, Any]) -> None:
+def write_json_file(path: Path, root_key: str, servers: dict[str, Any]) -> bool:
     path.parent.mkdir(parents=True, exist_ok=True)
+    existing_content: str | None = None
     data: dict[str, Any] = {}
     if path.exists():
-        data = parse_jsonc(path.read_text(encoding="utf-8"))
+        existing_content = path.read_text(encoding="utf-8")
+        data = parse_jsonc(existing_content)
     data[root_key] = servers
     
     new_content = json.dumps(data, indent=2, ensure_ascii=False) + "\n"
-    if path.exists() and path.read_text(encoding="utf-8") == new_content:
+    if existing_content is not None and existing_content == new_content:
         print(f"Skipped {path.name} (no changes)")
-        return
+        return False
         
     path.write_text(new_content, encoding="utf-8")
+    return True
 
 
-def write_opencode_jsonc(path: Path, root_key: str, servers: dict[str, Any]) -> None:
+def write_opencode_jsonc(path: Path, root_key: str, servers: dict[str, Any]) -> bool:
     path.parent.mkdir(parents=True, exist_ok=True)
-    text = path.read_text(encoding="utf-8")
+    
+    text = ""
+    if path.exists():
+        text = path.read_text(encoding="utf-8")
+        
     raw_block = json.dumps(servers, indent=2, ensure_ascii=False)
     block_lines = raw_block.splitlines()
     block = block_lines[0]
@@ -71,15 +77,20 @@ def write_opencode_jsonc(path: Path, root_key: str, servers: dict[str, Any]) -> 
         r'^  // \[MCP\]\n.*?^  // \[LSP\]',
         re.MULTILINE | re.DOTALL,
     )
-    updated, count = pattern.subn(replacement, text, count=1)
-    if count != 1:
-        raise RuntimeError(f"Failed to update MCP block in {path}")
-        
-    if path.exists() and path.read_text(encoding="utf-8") == updated:
-        print(f"Skipped {path.name} (no changes)")
-        return
+    
+    if text:
+        updated, count = pattern.subn(replacement, text, count=1)
+        if count != 1:
+            raise RuntimeError(f"Failed to update MCP block in {path}")
+            
+        if text == updated:
+            print(f"Skipped {path.name} (no changes)")
+            return False
+    else:
+        updated = f"{{\n{replacement}\n}}\n"
         
     path.write_text(updated, encoding="utf-8")
+    return True
 
 
 def find_object_span(text: str, open_brace_index: int) -> tuple[int, int]:
@@ -130,7 +141,7 @@ def find_object_span(text: str, open_brace_index: int) -> tuple[int, int]:
     raise RuntimeError("Object closing brace not found")
 
 
-def write_jsonc_object_key(path: Path, root_key: str, servers: dict[str, Any]) -> None:
+def write_jsonc_object_key(path: Path, root_key: str, servers: dict[str, Any]) -> bool:
     text = path.read_text(encoding="utf-8")
     match = re.search(rf'"{re.escape(root_key)}"\s*:\s*\{{', text)
     if not match:
@@ -152,11 +163,12 @@ def write_jsonc_object_key(path: Path, root_key: str, servers: dict[str, Any]) -
     replacement = f'{indent}"{root_key}": {block}'
     updated = text[:line_start] + replacement + text[object_end:]
     
-    if path.exists() and path.read_text(encoding="utf-8") == updated:
+    if text == updated:
         print(f"Skipped {path.name} (no changes)")
-        return
+        return False
         
     path.write_text(updated, encoding="utf-8")
+    return True
 
 
 def main() -> int:
@@ -174,19 +186,21 @@ def main() -> int:
         root_key = agent_config["root_key"]
         servers = replace_placeholders(agent_config["servers"], gateway_url)
 
+        changed = False
         if format_name in {"json", "generated_json"}:
-            write_json_file(path, root_key, servers)
+            changed = write_json_file(path, root_key, servers)
         elif format_name == "jsonc":
             path.parent.mkdir(parents=True, exist_ok=True)
-            write_jsonc_object_key(path, root_key, servers)
+            changed = write_jsonc_object_key(path, root_key, servers)
         elif format_name == "opencode_jsonc":
-            write_opencode_jsonc(path, root_key, servers)
+            changed = write_opencode_jsonc(path, root_key, servers)
         else:
             raise RuntimeError(
                 f"Unsupported render format '{format_name}' for {agent_name}"
             )
 
-        print(f"rendered {agent_name}: {path.relative_to(REPO_ROOT)}")
+        if changed:
+            print(f"rendered {agent_name}: {path.relative_to(REPO_ROOT)}")
 
     return 0
 
