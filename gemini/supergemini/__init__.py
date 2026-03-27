@@ -8,7 +8,6 @@ __author__ = "SuperGemini Team"
 __license__ = "MIT"
 
 import os
-import sys
 import json
 import logging
 from pathlib import Path

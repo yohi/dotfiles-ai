@@ -1,7 +1,6 @@
 import os
 import sys
 import logging
-import argparse
 
 logger = logging.getLogger("SuperGemini.CLI")
 
