@@ -55,7 +55,7 @@ AIエージェント（Claude Code, Gemini CLI, OpenCode, Codex）の設定・�
   - **`mcp/catalogs/custom.yaml.template`**: Docker MCP Gateway の custom catalog 定義です。
   - **`mcp/config.yaml`**: Gateway 上で有効化するサーバーを管理します。
   - **`mcp/servers.yaml`**: 各エージェント/IDE に配る MCP クライアント設定の SSOT です。
-- **自動同期**: テンプレートを編集して `make setup-docker-mcp` を実行すると、パスの展開（`__HOME__`）が行われ、全エージェントの設定が自動的に最新化されます。
+- **初期セットアップ**: `make setup-docker-mcp` を実行すると、`custom.yaml.template` から `custom.yaml` が生成され、Gateway の初期配置が完了します。
 - **自動同期**: `mcp/servers.yaml` または catalog/template を編集したら `make sync-mcp` を実行してください。
 
 ## SkillPort & MCP の統合
