@@ -3,6 +3,7 @@ override REPO_ROOT := $(CURDIR)
 
 include _mk/variables.mk
 include _mk/idempotency.mk
+include _mk/help.mk
 include _mk/claude.mk
 include _mk/gemini.mk
 include _mk/codex.mk
