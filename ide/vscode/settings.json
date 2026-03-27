@@ -1,5 +1,4 @@
 {
-    // エディタ設定
     "editor.fontSize": 14,
     "editor.fontFamily": "'Cica', 'Noto Sans CJK JP', monospace",
     "editor.tabSize": 4,
@@ -16,17 +15,14 @@
     ],
     "editor.bracketPairColorization.enabled": true,
     "editor.guides.bracketPairs": true,
-    // ワークベンチ設定
     "workbench.colorTheme": "Default Dark+",
     "workbench.iconTheme": "vscode-icons",
     "workbench.startupEditor": "welcomePage",
     "workbench.editor.enablePreview": false,
     "workbench.editor.enablePreviewFromQuickOpen": false,
-    // エクスプローラー設定
     "explorer.confirmDelete": false,
     "explorer.confirmDragAndDrop": false,
     "explorer.compactFolders": false,
-    // 検索設定
     "search.exclude": {
         "**/node_modules": true,
         "**/bower_components": true,
@@ -38,7 +34,6 @@
         "**/__pycache__": true,
         "**/*.pyc": true
     },
-    // ファイル設定
     "files.autoSave": "afterDelay",
     "files.autoSaveDelay": 1000,
     "files.trimTrailingWhitespace": true,
@@ -46,18 +41,15 @@
     "files.trimFinalNewlines": true,
     "files.encoding": "utf8",
     "files.eol": "\n",
-    // ターミナル設定
     "terminal.integrated.fontSize": 13,
     "terminal.integrated.fontFamily": "'Cica', 'Noto Sans Mono CJK JP', monospace",
     "terminal.integrated.defaultProfile.linux": "zsh",
     "terminal.integrated.cursorBlinking": true,
     "terminal.integrated.cursorStyle": "line",
-    // Git設定
     "git.enableSmartCommit": true,
     "git.confirmSync": false,
     "git.autofetch": true,
     "git.openRepositoryInParentFolders": "always",
-    // Python設定
     "python.defaultInterpreterPath": "/usr/bin/python3",
     "python.linting.enabled": true,
     "python.linting.flake8Enabled": true,
@@ -68,21 +60,16 @@
         "--line-length",
         "88"
     ],
-    // Django設定
     "python.linting.pylintArgs": [
         "--django-settings-module=myproject.settings"
     ],
-    // JavaScript/TypeScript設定
     "javascript.updateImportsOnFileMove.enabled": "always",
     "typescript.updateImportsOnFileMove.enabled": "always",
     "javascript.preferences.quoteStyle": "single",
     "typescript.preferences.quoteStyle": "single",
-    // Docker設定
     "docker.showStartPage": false,
-    // 拡張機能設定
     "extensions.autoUpdate": false,
     "extensions.autoCheckUpdates": false,
-    // Copilot設定
     "github.copilot.enable": {
         "*": true,
         "yaml": false,
@@ -114,7 +101,6 @@
             "text": "コミットメッセージは日本語で、[種別] 内容 の形式で生成すること。種別は feat/fix/docs/style/refactor/test/chore のいずれか"
         }
     ],
-    // 言語固有設定
     "[python]": {
         "editor.tabSize": 4,
         "editor.insertSpaces": true,
@@ -186,11 +172,8 @@
     "chat.tools.autoApprove": true,
     "docker.extension.enableComposeLanguageServer": false,
     "mcpServers": {
-        "skillport": {
-            "command": "uvx",
-            "args": [
-                "skillport-mcp"
-            ]
+        "docker-mcp-gateway": {
+            "url": "http://127.0.0.1:10888/sse"
         }
     }
 }
