@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import json
+import json5
 import re
 import sys
 from pathlib import Path
 from typing import Any
 
 import yaml  # type: ignore[import-untyped]
-import json5  # type: ignore[import-untyped, import-not-found]
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -62,7 +62,11 @@ def write_json_file(path: Path, root_key: str, servers: dict[str, Any]) -> bool:
 
 def write_opencode_jsonc(path: Path, root_key: str, servers: dict[str, Any]) -> bool:
     path.parent.mkdir(parents=True, exist_ok=True)
-    text = path.read_text(encoding="utf-8")
+    
+    text = ""
+    if path.exists():
+        text = path.read_text(encoding="utf-8")
+        
     raw_block = json.dumps(servers, indent=2, ensure_ascii=False)
     block_lines = raw_block.splitlines()
     block = block_lines[0]
@@ -73,13 +77,17 @@ def write_opencode_jsonc(path: Path, root_key: str, servers: dict[str, Any]) -> 
         r'^  // \[MCP\]\n.*?^  // \[LSP\]',
         re.MULTILINE | re.DOTALL,
     )
-    updated, count = pattern.subn(replacement, text, count=1)
-    if count != 1:
-        raise RuntimeError(f"Failed to update MCP block in {path}")
-        
-    if text == updated:
-        print(f"Skipped {path.name} (no changes)")
-        return False
+    
+    if text:
+        updated, count = pattern.subn(replacement, text, count=1)
+        if count != 1:
+            raise RuntimeError(f"Failed to update MCP block in {path}")
+            
+        if text == updated:
+            print(f"Skipped {path.name} (no changes)")
+            return False
+    else:
+        updated = f"{{\n{replacement}\n}}\n"
         
     path.write_text(updated, encoding="utf-8")
     return True

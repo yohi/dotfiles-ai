@@ -17,7 +17,7 @@ description: Guidelines for organizing and maintaining modular Makefiles. Use wh
 ### 1. Makefileの構造化
 - 大きなMakefile（1000行以上）は機能別に分割する
 - メインMakefileはincludeディレクティブと最小限のターゲットのみを含む
-- 分割ファイルは`mk/`ディレクトリに格納する
+- 分割ファイルは`_mk/`ディレクトリに格納する
 
 ### 2. ファイル命名規則
 - 分割ファイル名は機能を表す英語名.mkとする
