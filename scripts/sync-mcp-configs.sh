@@ -2,6 +2,12 @@
 # scripts/sync-mcp-configs.sh
 set -euo pipefail
 
+# Preflight check for uv
+if ! command -v uv > /dev/null 2>&1; then
+    echo "Error: 'uv' is not installed. Please install it to proceed." >&2
+    exit 1
+fi
+
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 ESCAPED_HOME=$(printf '%s' "$HOME" | sed 's/[&/|]/\\&/g')
 ESCAPED_REPO_ROOT=$(printf '%s' "$REPO_ROOT" | sed 's/[&/|]/\\&/g')
@@ -10,7 +16,7 @@ echo "==> Rendering MCP catalogs..."
 sed -e "s|__HOME__|$ESCAPED_HOME|g" -e "s|__REPO_ROOT__|$ESCAPED_REPO_ROOT|g" "$REPO_ROOT/mcp/catalogs/custom.yaml.template" > "$REPO_ROOT/mcp/catalogs/custom.yaml"
 
 echo "==> Rendering centralized MCP client configs..."
-python3 "$REPO_ROOT/scripts/render-mcp-configs.py"
+uv run --with-requirements "$REPO_ROOT/requirements.txt" "$REPO_ROOT/scripts/render-mcp-configs.py"
 
 echo "==> Deploying Docker MCP catalog files..."
 mkdir -p "$HOME/.docker/mcp/catalogs"
