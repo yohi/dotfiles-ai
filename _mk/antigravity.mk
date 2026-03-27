@@ -5,18 +5,15 @@
 ANTIGRAVITY_CONFIG_DIR ?= $(HOME)/.gemini/antigravity
 ANTIGRAVITY_MCP_PATH ?= $(ANTIGRAVITY_CONFIG_DIR)/mcp_config.json
 ANTIGRAVITY_DOTFILES_MCP ?= $(REPO_ROOT)/antigravity/mcp_config.json
-ANTIGRAVITY_DOTFILES_MCP_TEMPLATE ?= $(REPO_ROOT)/antigravity/mcp_config.json.template
 
 .PHONY: setup-antigravity check-antigravity uninstall-antigravity
 
 # Antigravityの設定を適用
 setup-antigravity: ## Antigravityの設定ファイルを適用
 	@echo "🔧 Antigravityの設定を適用中..."
-	@if [ ! -f "$(ANTIGRAVITY_DOTFILES_MCP)" ] || { [ -f "$(ANTIGRAVITY_DOTFILES_MCP_TEMPLATE)" ] && [ "$(ANTIGRAVITY_DOTFILES_MCP_TEMPLATE)" -nt "$(ANTIGRAVITY_DOTFILES_MCP)" ]; }; then \
-		if [ -f "$(ANTIGRAVITY_DOTFILES_MCP_TEMPLATE)" ]; then \
-			echo "📝 設定ファイルが見つからないか古いため、テンプレートから生成します..."; \
-			bash "$(REPO_ROOT)/scripts/setup-docker-mcp.sh" --skip-docker-check; \
-		fi \
+	@if [ ! -f "$(ANTIGRAVITY_DOTFILES_MCP)" ] || [ "$(REPO_ROOT)/mcp/servers.yaml" -nt "$(ANTIGRAVITY_DOTFILES_MCP)" ] || [ "$(REPO_ROOT)/scripts/render-mcp-configs.py" -nt "$(ANTIGRAVITY_DOTFILES_MCP)" ]; then \
+		echo "📝 中央管理ファイルから Antigravity MCP 設定を再生成します..."; \
+		$(MAKE) sync-mcp; \
 	fi
 	@mkdir -p "$(ANTIGRAVITY_CONFIG_DIR)"
 	@if [ -f "$(ANTIGRAVITY_DOTFILES_MCP)" ]; then \
