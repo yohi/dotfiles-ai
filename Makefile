@@ -1,10 +1,8 @@
 override REPO_ROOT := $(CURDIR)
 .DEFAULT_GOAL := setup
 
-REQUIRE_NODEJS := 1
+include _mk/variables.mk
 include _mk/idempotency.mk
-SHELL := /bin/bash
-.SHELLFLAGS := -o pipefail -c
 include _mk/claude.mk
 include _mk/gemini.mk
 include _mk/codex.mk
@@ -18,7 +16,7 @@ include _mk/superpowers.mk
 include _mk/ide-cursor.mk
 include _mk/ide-vscode.mk
 
-.PHONY: setup install clean link install-agents install-ides setup-agents setup-ides mcp-render all test lint
+
 
 install: install-agents install-ides ## Install all AI agents and IDE binaries
 
