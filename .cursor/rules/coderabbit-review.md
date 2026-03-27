@@ -1,1 +1,0 @@
-../../ide/cursor/commands/coderabbit/coderabbit-review.md
