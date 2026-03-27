@@ -79,4 +79,4 @@ Expected: Working tree clean (ignoring the untracked .cursor directory which is 
 
 **Step 2: Run sync-agents to ensure .cursor is still regenerated correctly**
 Run: `make sync-agents`
-Expected: Successful execution, recreating necessary symlinks in `.cursor/rules/`.
+Expected: Successful execution. Note that the `sync-agents` target intentionally recreates the `.cursor/rules` directory by executing `mkdir -p "$(REPO_ROOT)/.cursor/rules"`. This ensures readers understand that the `.cursor/` directory is regenerated on demand, while `.cursor/rules` remains untracked by design.

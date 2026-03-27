@@ -10,7 +10,7 @@
 
 ---
 
-### Task 1: GitHub Actions CI/CDとLinterのセットアップ
+## Task 1: GitHub Actions CI/CDとLinterのセットアップ
 
 **Files:**
 - Modify: `requirements.txt`
@@ -63,7 +63,6 @@ on:
 jobs:
   lint:
     runs-on: ubuntu-latest
-    container: ubuntu-slim
     steps:
     - uses: actions/checkout@v4
     - name: Install uv and Python
@@ -93,7 +92,7 @@ git commit -m "ci: migrate from bitbucket to GitHub Actions and configure ruff/m
 
 ---
 
-### Task 2: `render-mcp-configs.py` の `json5` 置き換え
+## Task 2: `render-mcp-configs.py` の `json5` 置き換え
 
 **Files:**
 - Modify: `scripts/render-mcp-configs.py`
@@ -144,7 +143,7 @@ git commit -m "refactor: replace custom jsonc parser with json5 library"
 
 ---
 
-### Task 3: 生成スクリプトの冪等性 (Idempotency) 強化
+## Task 3: 生成スクリプトの冪等性 (Idempotency) 強化
 
 同じ設定内容の場合は一切のファイル書き込みや更新を行わないようにして、再起動やIDEの不要なリロードを回避します。
 
