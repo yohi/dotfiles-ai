@@ -68,5 +68,5 @@ install-requirements:
 
 lint: install-requirements
 	@echo "🔍 scripts/ に対して Ruff と Mypy を実行中..."
-	ruff check scripts/
-	mypy scripts/
+	uv run --with-requirements requirements.txt ruff check scripts/
+	uv run --with-requirements requirements.txt mypy scripts/
