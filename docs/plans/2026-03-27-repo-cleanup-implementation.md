@@ -13,14 +13,14 @@
 
 ---
 
-### Task 1: Update .gitignore
+## Task 1: Update .gitignore
 
 **Files:**
 - Modify: `.gitignore`
 
 **Step 1: Add patterns to .gitignore**
 Add the following to the bottom of the "OpenCode" section:
-```
+```text
 .opencode/
 .cursor/
 .gemini/
@@ -38,7 +38,7 @@ git commit -m "chore: .gitignore にエージェント生成ディレクトリ�
 
 ---
 
-### Task 2: Untrack directories from Git Index
+## Task 2: Untrack directories from Git Index
 
 **Files:**
 - Untrack: `.cursor/`, `.gemini/`, `.opencode/`
@@ -57,7 +57,7 @@ git commit -m "chore: .cursor, .gemini, .opencode を Git 追跡から解除"
 
 ---
 
-### Task 3: Physical Cleanup of legacy directories
+## Task 3: Physical Cleanup of legacy directories
 
 **Files:**
 - Delete: `.opencode/`, `.gemini/`
@@ -71,7 +71,7 @@ Expected: "No such file or directory" error for both.
 
 ---
 
-### Task 4: Final Verification
+## Task 4: Final Verification
 
 **Step 1: Check git status**
 Run: `git status`
