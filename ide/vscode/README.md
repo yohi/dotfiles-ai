@@ -76,6 +76,12 @@ SuperCopilot Frameworkを設定するには、セットアップスクリプト�
 2. VSCode設定の確認と必要な設定の案内
 3. 使用方法の表示
 
+## MCP 設定
+
+- VSCode の `mcpServers` は `mcp/servers.yaml` を SSOT として管理します。
+- 変更を反映するにはリポジトリルートで `make sync-mcp` を実行してください。
+- このコマンドで `ide/vscode/settings.json` の MCP セクションが再生成されます。
+
 ## 特徴
 
 ### キーバインディング

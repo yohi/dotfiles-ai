@@ -92,7 +92,17 @@ Google のエージェント特化型 IDE。一貫して **`serverUrl`** を使�
 
 ---
 
-## 3. 設定時のハマりどころ
+## 3. ローカル Docker MCP Gateway 運用メモ
+
+このリポジトリでは、ローカルの Docker MCP Gateway を `http://127.0.0.1:10888/sse` で常駐させ、各クライアントをそこへ SSE 接続させます。
+
+- クライアント設定の SSOT は `mcp/servers.yaml`
+- 反映は `make sync-mcp`
+- 現在のローカル Gateway 接続ではクライアント側 Bearer ヘッダーを必須としていません
+
+---
+
+## 4. 設定時のハマりどころ
 
 1. **Google ツールのキー名の不一致:**
    - **Antigravity** (IDE) は **`serverUrl`**。
@@ -100,5 +110,6 @@ Google のエージェント特化型 IDE。一貫して **`serverUrl`** を使�
    同じ Google 製でも、これらを間違えると「接続失敗」や「設定が無視される」原因となります。
 2. **自動検出の挙動:**
    - `Cursor` 等は `url` キーの存在だけで SSE と判断しますが、`Claude Code` は `type: "sse"` の明示的な指定が推奨されます。
-3. **認証 (OAuth/PAT):**
-   - SSE 接続では、設定内の `headers` プロパティを使って `Authorization: Bearer <token>` を渡す構成が一般的です。
+3. **認証の有無は Gateway 実装依存:**
+   - 一般論としては `headers.Authorization` を使う構成があります。
+   - ただしこのリポジトリのローカル Docker MCP Gateway は、クライアント設定としてはヘッダー必須にしていません。

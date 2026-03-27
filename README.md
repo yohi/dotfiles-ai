@@ -45,15 +45,18 @@ AIエージェント（Claude Code, Gemini CLI, OpenCode, Codex）の設定・�
 
 [Docker MCP Gateway](https://docs.docker.com/ai/mcp-catalog-and-toolkit/mcp-gateway/) は、複数の MCP サーバーを統合し、共通の **SSE (Server-Sent Events)** エンドポイントを提供します。
 
-- **役割**: Claude Code, Gemini CLI, Cursor などの全てのエージェントから、単一の URL (`http://127.0.0.1:10888/sse`) 経由で複数の MCP サーバーにアクセス可能にします。
+- **役割**: Claude Code, Gemini CLI, Antigravity, Cursor, OpenCode, VSCode から、単一の URL (`http://127.0.0.1:10888/sse`) 経由で複数の MCP サーバーにアクセス可能にします。
 - **管理 (Systemd)**: バックグラウンドサービスとして常駐します。
   - `make start-mcp`: ゲートウェイを起動。
   - `make stop-mcp`: ゲートウェイを停止。
-  - `make setup-docker-mcp`: 設定のレンダリング、サービス登録、各エージェント（Gemini, Antigravity, Cursor）への設定同期を**一括実行**します。
+  - `make setup-docker-mcp`: Docker MCP Gateway 自体のセットアップを行います。
+  - `make sync-mcp`: `mcp/servers.yaml` から各エージェント/IDE 向け設定を再生成し、Gateway を再読み込みします。
 - **Source of Truth**: 
-  - **`mcp/catalogs/custom.yaml.template`**: MCP サーバーの定義（GitHub, Playwright 等）はここを編集してください。
-  - `mcp/config.yaml`: サーバーの有効/無効を管理します。
+  - **`mcp/catalogs/custom.yaml.template`**: Docker MCP Gateway の custom catalog 定義です。
+  - **`mcp/config.yaml`**: Gateway 上で有効化するサーバーを管理します。
+  - **`mcp/servers.yaml`**: 各エージェント/IDE に配る MCP クライアント設定の SSOT です。
 - **自動同期**: テンプレートを編集して `make setup-docker-mcp` を実行すると、パスの展開（`__HOME__`）が行われ、全エージェントの設定が自動的に最新化されます。
+- **自動同期**: `mcp/servers.yaml` または catalog/template を編集したら `make sync-mcp` を実行してください。
 
 ## SkillPort & MCP の統合
 
@@ -66,11 +69,14 @@ AIエージェント（Claude Code, Gemini CLI, OpenCode, Codex）の設定・�
 
 `scripts/sync-mcp-configs.sh` により、各エージェントの設定ファイルは以下の状態に自動的に保たれます。
 
-| エージェント | 接続方式 | 認証 |
+| エージェント | 接続方式 | 備考 |
 |:-----------|:--------|:-----|
-| **Gemini CLI** | Native SSE (`url`) | Bearer Token (`headers`) |
-| **Antigravity** | Native SSE (`serverUrl`) | Bearer Token (`headers`) |
-| **Cursor** | Native SSE (`url`) | Bearer Token (`headers`) |
+| **Claude Code** | Native SSE (`type` + `url`) | `claude/claude-settings.json` を再生成 |
+| **Gemini CLI** | Native SSE (`url`) | `gemini/settings.json` を再生成 |
+| **Antigravity** | Native SSE (`serverUrl`) | `antigravity/mcp_config.json` を生成 |
+| **Cursor** | Native SSE (`url`) | `ide/cursor/mcp.json` を生成 |
+| **OpenCode** | Remote MCP (`type: remote`) | `opencode/opencode.jsonc` の MCP ブロックを再生成 |
+| **VSCode** | Native SSE (`url`) | `ide/vscode/settings.json` の `mcpServers` を再生成 |
 
 ## デプロイ構造 (シンボリックリンク)
 
@@ -90,8 +96,10 @@ AIエージェント（Claude Code, Gemini CLI, OpenCode, Codex）の設定・�
   - ユーザー共通設定は `global-rules/AGENTS.global.md` を編集。
   - 個別のスキルは `agent-skills/*/SKILL.md` を編集。
   - **MCP サーバーの追加**は `mcp/catalogs/custom.yaml.template` を編集。
+  - **エージェント/IDE の接続設定変更**は `mcp/servers.yaml` を編集。
 - **同期コマンド**:
-  - `make setup-docker-mcp`: MCP 設定の反映とエージェント同期。
+  - `make setup-docker-mcp`: Docker MCP Gateway のセットアップ。
+  - `make sync-mcp`: MCP クライアント設定の再生成と同期。
   - `make sync-agents`: ルールとスキルの同期。
 
 ## 技術スタック
