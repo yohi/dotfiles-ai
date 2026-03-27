@@ -186,11 +186,8 @@
     "chat.tools.autoApprove": true,
     "docker.extension.enableComposeLanguageServer": false,
     "mcpServers": {
-        "skillport": {
-            "command": "uvx",
-            "args": [
-                "skillport-mcp"
-            ]
-        }
+      "docker-mcp-gateway": {
+        "url": "http://127.0.0.1:10888/sse"
+      }
     }
 }

@@ -1,4 +1,4 @@
-REPO_ROOT ?= $(CURDIR)
+override REPO_ROOT := $(CURDIR)
 .DEFAULT_GOAL := setup
 
 REQUIRE_NODEJS := 1
@@ -50,9 +50,10 @@ setup-agents:
 	$(MAKE) setup-opencode
 	$(MAKE) setup-antigravity
 	$(MAKE) setup-docker-mcp
+	$(MAKE) install-packages-superclaude
 	$(MAKE) setup-superpowers
 	$(MAKE) sync-agents
-	@bash scripts/sync-mcp-configs.sh
+	$(MAKE) sync-mcp
 
 setup-ides:
 	@echo "==> Setting up dotfiles-ai IDE configurations"
