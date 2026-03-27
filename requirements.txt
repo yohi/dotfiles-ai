@@ -1,1 +1,5 @@
 PyYAML>=5.4
+ruff>=0.3.0
+mypy>=1.9.0
+types-PyYAML
+json5>=0.9.22

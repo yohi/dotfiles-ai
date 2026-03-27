@@ -1,1 +1,0 @@
-../../ide/cursor/commands/coderabbit/performance-cr-review.md

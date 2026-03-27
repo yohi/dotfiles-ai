@@ -18,7 +18,7 @@ include _mk/superpowers.mk
 include _mk/ide-cursor.mk
 include _mk/ide-vscode.mk
 
-.PHONY: setup install clean link install-agents install-ides setup-agents setup-ides mcp-render all test
+.PHONY: setup install clean link install-agents install-ides setup-agents setup-ides mcp-render all test lint
 
 install: install-agents install-ides ## Install all AI agents and IDE binaries
 
@@ -79,3 +79,8 @@ clean:
 	-$(MAKE) uninstall-superpowers
 	-$(MAKE) uninstall-cursor FORCE=true
 	-$(MAKE) uninstall-vscode FORCE=true
+
+lint:
+	@echo "==> Running Ruff and Mypy on scripts/"
+	ruff check scripts/
+	mypy scripts/

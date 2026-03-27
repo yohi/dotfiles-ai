@@ -20,3 +20,10 @@ antigravity/mcp_config.json
 mcp/catalogs/custom.yaml
 node_modules/
 ide/cursor/mcp.json
+.opencode/
+.cursor/
+.gemini/
+
+# Worktrees
+.worktrees/
+.worktrees
