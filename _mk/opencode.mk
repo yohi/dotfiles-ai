@@ -303,6 +303,15 @@ check-opencode: ## OpenCode（opencode）の状態を確認
 
 uninstall-opencode: ## OpenCode（opencode）のアンインストール
 	@echo "🗑️  OpenCode（opencode）をアンインストール中..."
+	@# 防護策: 変数が空、または危険なパス（/ や HOME）を指している場合は中断する
+	@if [ -z "$(OPENCODE_HOME)" ] || [ "$(OPENCODE_HOME)" = "/" ] || [ "$(OPENCODE_HOME)" = "$(HOME)" ]; then \
+		echo "❌ エラー: OPENCODE_HOME ($(OPENCODE_HOME)) が設定されていないか、削除するには危険なパスです。中断します。"; \
+		exit 1; \
+	fi
+	@if [ -z "$(OPENCODE_CONFIG_DIR)" ] || [ "$(OPENCODE_CONFIG_DIR)" = "/" ] || [ "$(OPENCODE_CONFIG_DIR)" = "$(HOME)" ]; then \
+		echo "❌ エラー: OPENCODE_CONFIG_DIR ($(OPENCODE_CONFIG_DIR)) が設定されていないか、削除するには危険なパスです。中断します。"; \
+		exit 1; \
+	fi
 	@rm -rf "$(OPENCODE_HOME)"
 	@rm -rf "$(OPENCODE_CONFIG_DIR)"
 	@rm -f "$(MARKER_DIR)/install-packages-opencode"*
