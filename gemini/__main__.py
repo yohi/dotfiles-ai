@@ -4,11 +4,8 @@ SuperGemini CLI
 Gemini CLIを拡張するためのコマンドラインツール
 """
 
-import os
-import sys
 import argparse
 import logging
-from pathlib import Path
 
 from . import __version__, show_version, get_config, get_personas_config
 from . import GEMINI_HOME, SHARED_DIR, COMMANDS_DIR, GEMINI_MD

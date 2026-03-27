@@ -8,8 +8,7 @@ on:
 
 jobs:
   lint:
-    runs-on: ubuntu-latest
-    container: ubuntu-slim
+    runs-on: ubuntu-slim
     steps:
     - uses: actions/checkout@v4
     - name: Install uv and Python
@@ -18,7 +17,7 @@ jobs:
         enable-cache: true
     - name: Set up Python via uv
       run: uv python install 3.10
-    - name: Install dependencies
-      run: uv pip install --system -r requirements.txt
     - name: Run Linters
-      run: make lint
+      run: |
+        uv run --python 3.10 --with-requirements requirements.txt ruff check .
+        uv run --python 3.10 --with-requirements requirements.txt mypy .
