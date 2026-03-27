@@ -23,3 +23,7 @@ ide/cursor/mcp.json
 .opencode/
 .cursor/
 .gemini/
+
+# Worktrees
+.worktrees/
+.worktrees
