@@ -38,6 +38,7 @@
   },
   // [Permission]
   "permission": {
+    "*": "ask",
     "read": "allow",
     "list": "allow",
     "glob": "allow",
@@ -62,6 +63,7 @@
       // --- 禁止 (deny) ---
       "npm publish*": "deny", // 誤公開防止: deny を維持
       "curl*|sh": "deny",
+      "curl*|bash": "deny",
       "git clean -fd*": "deny",
       "git add .": "deny", // 一括追加は禁止を維持
       "rm *": "deny",
