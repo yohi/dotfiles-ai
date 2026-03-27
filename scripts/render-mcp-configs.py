@@ -24,42 +24,10 @@ def load_config() -> dict[str, Any]:
     return loaded
 
 
+import json5
+
 def parse_jsonc(text: str) -> dict[str, Any]:
-    stripped: list[str] = []
-    in_string = False
-    escape = False
-    i = 0
-
-    while i < len(text):
-        char = text[i]
-
-        if in_string:
-            stripped.append(char)
-            if escape:
-                escape = False
-            elif char == "\\":
-                escape = True
-            elif char == '"':
-                in_string = False
-            i += 1
-            continue
-
-        if char == '"':
-            in_string = True
-            stripped.append(char)
-            i += 1
-            continue
-
-        if char == "/" and i + 1 < len(text) and text[i + 1] == "/":
-            while i < len(text) and text[i] != "\n":
-                i += 1
-            continue
-
-        stripped.append(char)
-        i += 1
-
-    normalized = re.sub(r",(\s*[}\]])", r"\1", "".join(stripped))
-    return json.loads(normalized)
+    return json5.loads(text)
 
 
 def replace_placeholders(value: Any, gateway_url: str) -> Any:
@@ -81,10 +49,13 @@ def write_json_file(path: Path, root_key: str, servers: dict[str, Any]) -> None:
     if path.exists():
         data = parse_jsonc(path.read_text(encoding="utf-8"))
     data[root_key] = servers
-    path.write_text(
-        json.dumps(data, indent=2, ensure_ascii=False) + "\n",
-        encoding="utf-8",
-    )
+    
+    new_content = json.dumps(data, indent=2, ensure_ascii=False) + "\n"
+    if path.exists() and path.read_text(encoding="utf-8") == new_content:
+        print(f"Skipped {path.name} (no changes)")
+        return
+        
+    path.write_text(new_content, encoding="utf-8")
 
 
 def write_opencode_jsonc(path: Path, root_key: str, servers: dict[str, Any]) -> None:
@@ -103,6 +74,11 @@ def write_opencode_jsonc(path: Path, root_key: str, servers: dict[str, Any]) -> 
     updated, count = pattern.subn(replacement, text, count=1)
     if count != 1:
         raise RuntimeError(f"Failed to update MCP block in {path}")
+        
+    if path.exists() and path.read_text(encoding="utf-8") == updated:
+        print(f"Skipped {path.name} (no changes)")
+        return
+        
     path.write_text(updated, encoding="utf-8")
 
 
@@ -175,6 +151,11 @@ def write_jsonc_object_key(path: Path, root_key: str, servers: dict[str, Any]) -
 
     replacement = f'{indent}"{root_key}": {block}'
     updated = text[:line_start] + replacement + text[object_end:]
+    
+    if path.exists() and path.read_text(encoding="utf-8") == updated:
+        print(f"Skipped {path.name} (no changes)")
+        return
+        
     path.write_text(updated, encoding="utf-8")
 
 
