@@ -74,7 +74,7 @@ def write_json_file(path: Path, root_key: str, servers: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     data: dict[str, Any] = {}
     if path.exists():
-        data = json.loads(path.read_text(encoding="utf-8"))
+        data = parse_jsonc(path.read_text(encoding="utf-8"))
     data[root_key] = servers
     path.write_text(
         json.dumps(data, indent=2, ensure_ascii=False) + "\n",
@@ -99,10 +99,88 @@ def write_opencode_jsonc(path: Path, root_key: str, servers: dict[str, Any]) -> 
     if count != 1:
         raise RuntimeError(f"Failed to update MCP block in {path}")
     path.write_text(updated, encoding="utf-8")
+
+
+def find_object_span(text: str, open_brace_index: int) -> tuple[int, int]:
+    i = open_brace_index
+    depth = 0
+    in_string = False
+    escape = False
+
+    while i < len(text):
+        char = text[i]
+        next_char = text[i + 1] if i + 1 < len(text) else ""
+
+        if in_string:
+            if escape:
+                escape = False
+            elif char == "\\":
+                escape = True
+            elif char == '"':
+                in_string = False
+            i += 1
+            continue
+
+        if char == "/" and next_char == "/":
+            i += 2
+            while i < len(text) and text[i] != "\n":
+                i += 1
+            continue
+
+        if char == '"':
+            in_string = True
+            i += 1
+            continue
+
+        if char == "{":
+            depth += 1
+            i += 1
+            continue
+
+        if char == "}":
+            depth -= 1
+            i += 1
+            if depth == 0:
+                return open_brace_index, i
+            continue
+
+        i += 1
+
+    raise RuntimeError("Object closing brace not found")
+
+
+def write_jsonc_object_key(path: Path, root_key: str, servers: dict[str, Any]) -> None:
+    text = path.read_text(encoding="utf-8")
+    match = re.search(rf'"{re.escape(root_key)}"\s*:\s*\{{', text)
+    if not match:
+        raise RuntimeError(f"Key '{root_key}' not found in {path}")
+
+    open_brace_index = text.find("{", match.start())
+    _, object_end = find_object_span(text, open_brace_index)
+
+    line_start = text.rfind("\n", 0, match.start()) + 1
+    top_level_indent_match = re.search(r'^(\s*)"[^"\n]+"\s*:', text, re.MULTILINE)
+    indent = top_level_indent_match.group(1) if top_level_indent_match else "    "
+
+    raw_block = json.dumps(servers, indent=2, ensure_ascii=False)
+    block_lines = raw_block.splitlines()
+    block = block_lines[0]
+    if len(block_lines) > 1:
+        block += "\n" + "\n".join(f"{indent}{line}" for line in block_lines[1:])
+
+    replacement = f'{indent}"{root_key}": {block}'
+    updated = text[:line_start] + replacement + text[object_end:]
+    path.write_text(updated, encoding="utf-8")
+
+
 def main() -> int:
     config = load_config()
     defaults = config.get("defaults", {})
-    gateway_url = defaults["gateway_url"]
+    gateway_url = defaults.get("gateway_url")
+    if not gateway_url:
+        raise RuntimeError(
+            f"Missing required 'gateway_url' in {CONFIG_PATH} under defaults"
+        )
 
     for agent_name, agent_config in config.get("agents", {}).items():
         path = REPO_ROOT / agent_config["path"]
@@ -114,12 +192,7 @@ def main() -> int:
             write_json_file(path, root_key, servers)
         elif format_name == "jsonc":
             path.parent.mkdir(parents=True, exist_ok=True)
-            data = parse_jsonc(path.read_text(encoding="utf-8"))
-            data[root_key] = servers
-            path.write_text(
-                json.dumps(data, indent=4, ensure_ascii=False) + "\n",
-                encoding="utf-8",
-            )
+            write_jsonc_object_key(path, root_key, servers)
         elif format_name == "opencode_jsonc":
             write_opencode_jsonc(path, root_key, servers)
         else:
@@ -137,4 +210,4 @@ if __name__ == "__main__":
         raise SystemExit(main())
     except Exception as exc:  # pragma: no cover - CLI error path
         print(f"render-mcp-configs: {exc}", file=sys.stderr)
-        raise SystemExit(1)
+        raise SystemExit(1) from exc
