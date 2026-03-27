@@ -52,23 +52,15 @@ else
     echo -e "${YELLOW}⚠️  Skipping Docker checks as requested.${NC}"
 fi
 
-# 認証トークンの設定
-echo -e "${BLUE}🔑 Setting up MCP_GATEWAY_AUTH_TOKEN...${NC}"
+# 共有シークレットファイルの設定
+echo -e "${BLUE}🔑 Preparing shared .env for Docker MCP secrets...${NC}"
 DOTENV_FILE="$REPO_ROOT/.env"
+
 if [ ! -f "$DOTENV_FILE" ]; then
     touch "$DOTENV_FILE"
 fi
 chmod 600 "$DOTENV_FILE"
-
-if ! grep -q "^MCP_GATEWAY_AUTH_TOKEN=" "$DOTENV_FILE"; then
-    echo -e "${BLUE}🔑 Generating MCP_GATEWAY_AUTH_TOKEN...${NC}"
-    TOKEN=$(openssl rand -hex 32)
-    echo "MCP_GATEWAY_AUTH_TOKEN=$TOKEN" >> "$DOTENV_FILE"
-    echo -e "${GREEN}✅ Generated and added MCP_GATEWAY_AUTH_TOKEN to .env${NC}"
-else
-    TOKEN=$(grep -m1 "^MCP_GATEWAY_AUTH_TOKEN=" "$DOTENV_FILE" | cut -d'=' -f2-)
-    echo -e "${GREEN}✅ MCP_GATEWAY_AUTH_TOKEN already exists in .env${NC}"
-fi
+echo -e "${GREEN}✅ Shared .env file is ready.${NC}"
 
 # 設定ファイルの配置 (コピー & テンプレート処理)
 echo -e "${BLUE}🔗 Linking Docker MCP configuration files...${NC}"
@@ -78,10 +70,9 @@ mkdir -p "$MCP_CONFIG_DIR/catalogs"
 
 # 1. 既存のファイルがある場合はコピーに置き換え (ソースの存在を確認してから)
 FILES_TO_COPY=(
-    "config.yaml:$MCP_CONFIG_DIR/config.yaml"
     "catalog.json:$MCP_CONFIG_DIR/catalog.json"
     "catalogs/bootstrap.yaml:$MCP_CONFIG_DIR/catalogs/bootstrap.yaml"
-    "../antigravity/mcp_config.json.template:$REPO_ROOT/antigravity/mcp_config.json"
+    "catalogs/custom.yaml.template:$REPO_ROOT/mcp/catalogs/custom.yaml"
 )
 
 for pair in "${FILES_TO_COPY[@]}"; do
@@ -109,9 +100,7 @@ for pair in "${FILES_TO_COPY[@]}"; do
 
     # テンプレートファイルの場合は置換を行う
     if [[ "$SRC" == *"template" ]]; then
-        sed -e "s|__HOME__|$ESCAPED_HOME|g" \
-            -e "s|__MCP_AUTH_TOKEN__|$TOKEN|g" \
-            "$SRC_FILE" > "$TMP_DST"
+        sed -e "s|__HOME__|$ESCAPED_HOME|g" "$SRC_FILE" > "$TMP_DST"
     else
         cp -f "$SRC_FILE" "$TMP_DST"
     fi
@@ -122,6 +111,10 @@ for pair in "${FILES_TO_COPY[@]}"; do
         exit 1
     fi
 done
+
+ESCAPED_HOME=$(echo "$HOME" | sed 's/[&/\|]/\\&/g')
+ESCAPED_REPO_ROOT=$(echo "$REPO_ROOT" | sed 's/[&/\|]/\\&/g')
+sed -e "s|__HOME__|$ESCAPED_HOME|g" -e "s|__REPO_ROOT__|$ESCAPED_REPO_ROOT|g" "$REPO_ROOT/mcp/config.yaml" > "$MCP_CONFIG_DIR/config.yaml"
 
 # 2. custom.yaml はシンボリックリンクにする
 # これにより、リポジトリ内のファイルを編集して make mcp-render を実行するだけで、自動的に反映されるようになる
