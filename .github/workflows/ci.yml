@@ -9,7 +9,6 @@ on:
 jobs:
   lint:
     runs-on: ubuntu-latest
-    container: ubuntu-slim
     steps:
     - uses: actions/checkout@v4
     - name: Install uv and Python
