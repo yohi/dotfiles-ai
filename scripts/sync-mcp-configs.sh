@@ -7,7 +7,7 @@ ESCAPED_HOME=$(printf '%s' "$HOME" | sed 's/[&/|]/\\&/g')
 ESCAPED_REPO_ROOT=$(printf '%s' "$REPO_ROOT" | sed 's/[&/|]/\\&/g')
 
 echo "==> Rendering MCP catalogs..."
-sed "s|__HOME__|$HOME|g" "$REPO_ROOT/mcp/catalogs/custom.yaml.template" > "$REPO_ROOT/mcp/catalogs/custom.yaml"
+sed -e "s|__HOME__|$ESCAPED_HOME|g" -e "s|__REPO_ROOT__|$ESCAPED_REPO_ROOT|g" "$REPO_ROOT/mcp/catalogs/custom.yaml.template" > "$REPO_ROOT/mcp/catalogs/custom.yaml"
 
 echo "==> Rendering centralized MCP client configs..."
 python3 "$REPO_ROOT/scripts/render-mcp-configs.py"

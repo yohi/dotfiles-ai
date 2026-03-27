@@ -96,7 +96,7 @@ for pair in "${FILES_TO_COPY[@]}"; do
     TMP_DST="$DST.tmp.$$"
 
     # Escape $HOME for sed
-    ESCAPED_HOME=$(echo "$HOME" | sed 's/[&/\|]/\\&/g')
+    ESCAPED_HOME=$(echo "$HOME" | sed 's/[&/|]/\\&/g')
 
     # テンプレートファイルの場合は置換を行う
     if [[ "$SRC" == *"template" ]]; then
@@ -112,8 +112,8 @@ for pair in "${FILES_TO_COPY[@]}"; do
     fi
 done
 
-ESCAPED_HOME=$(echo "$HOME" | sed 's/[&/\|]/\\&/g')
-ESCAPED_REPO_ROOT=$(echo "$REPO_ROOT" | sed 's/[&/\|]/\\&/g')
+ESCAPED_HOME=$(echo "$HOME" | sed 's/[&/|]/\\&/g')
+ESCAPED_REPO_ROOT=$(echo "$REPO_ROOT" | sed 's/[&/|]/\\&/g')
 sed -e "s|__HOME__|$ESCAPED_HOME|g" -e "s|__REPO_ROOT__|$ESCAPED_REPO_ROOT|g" "$REPO_ROOT/mcp/config.yaml" > "$MCP_CONFIG_DIR/config.yaml"
 
 # 2. custom.yaml はシンボリックリンクにする
@@ -131,7 +131,7 @@ else
 fi
 
 # catalog.json 内の $HOME を実際のホームディレクトリに置換 (docker mcp が環境変数を展開しない場合のため)
-ESCAPED_HOME=$(echo "$HOME" | sed 's/[&/\|]/\\&/g')
+ESCAPED_HOME=$(echo "$HOME" | sed 's/[&/|]/\\&/g')
 sed -i.bak "s|\$HOME|$ESCAPED_HOME|g" "$MCP_CONFIG_DIR/catalog.json" && rm -f "$MCP_CONFIG_DIR/catalog.json.bak"
 
 echo -e "${GREEN}✅ Configuration files copied and paths updated in $MCP_CONFIG_DIR${NC}"
