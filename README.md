@@ -20,6 +20,15 @@ AIエージェント（Claude Code, Gemini CLI, OpenCode, Codex）の設定・�
 | `ide/` | IDE (Cursor, VSCode) 設定と SuperCursor/SuperCopilot |
 | `_mk/` | Makefile サブターゲット群 |
 
+## 依存関係
+
+- Python スクリプト（`scripts/render-mcp-configs.py`）の実行には `PyYAML` が必要です。
+- 初回セットアップ時に以下を実行してください。
+
+```bash
+python3 -m pip install -r requirements.txt
+```
+
 ## ルール管理構造 (SSOT)
 
 本プロジェクトでは、AIエージェントへの指示を以下の2層で管理しています。
