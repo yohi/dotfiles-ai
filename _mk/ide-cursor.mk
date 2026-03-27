@@ -76,18 +76,18 @@ _cursor_link_settings:
 	        ln -sf "$$src" "$$dst"; \
 	done
 	@mkdir -p $(HOME_DIR)/.config/Cursor/User/globalStorage/rooveterinaryinc.cursor-mcp
+	@if [ ! -f "$(REPO_ROOT)/ide/cursor/mcp.json" ] || [ "$(REPO_ROOT)/mcp/servers.yaml" -nt "$(REPO_ROOT)/ide/cursor/mcp.json" ] || [ "$(REPO_ROOT)/scripts/render-mcp-configs.py" -nt "$(REPO_ROOT)/ide/cursor/mcp.json" ]; then \
+		echo "📝 中央管理ファイルから Cursor MCP 設定を再生成します..."; \
+		$(MAKE) sync-mcp; \
+	fi
 	@mcp_json_dst="$(HOME_DIR)/.config/Cursor/User/globalStorage/rooveterinaryinc.cursor-mcp/mcp.json"; \
 	if [ -f "$$mcp_json_dst" ] && [ ! -L "$$mcp_json_dst" ]; then \
 		backup="$$mcp_json_dst.bak.$$(date +%Y%m%d_%H%M%S)"; \
 		echo "⚠️  既存の mcp.json をバックアップします: $$backup"; \
 		mv "$$mcp_json_dst" "$$backup"; \
 	fi; \
-	if [ "$(USE_DOCKER_MCP)" = "true" ]; then \
-		ln -sf $(REPO_ROOT)/ide/cursor/mcp-docker.json "$$mcp_json_dst"; \
-	else \
-		ln -sf $(REPO_ROOT)/ide/cursor/mcp.json "$$mcp_json_dst"; \
-	fi
-	@echo "✅ Cursorの設定リンクが完了しました (DOCKER_MCP=$(USE_DOCKER_MCP))"
+	ln -sf $(REPO_ROOT)/ide/cursor/mcp.json "$$mcp_json_dst"
+	@echo "✅ CursorのMCP設定リンクが完了しました (SSE via Docker MCP Gateway)"
 
 _cursor_download:
 	@echo "📦 方法1: 自動ダウンロードを試行中..."

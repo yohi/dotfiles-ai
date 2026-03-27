@@ -9,7 +9,20 @@
   },
   "mcpServers": {
     "docker-mcp-gateway": {
-      "url": "http://localhost:10888/sse"
+      "type": "sse",
+      "url": "http://127.0.0.1:10888/sse",
+      "timeout": 30000
+    },
+    "atlassian": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "https://mcp.atlassian.com/v1/mcp"
+      ],
+      "env": {
+        "PORT": "0"
+      }
     }
   },
   "customToolsDirectory": "~/.gemini/user-tools",

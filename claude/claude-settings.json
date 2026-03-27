@@ -8,14 +8,8 @@
   "opt_out": true,
   "mcpServers": {
     "docker-mcp-gateway": {
-      "command": "docker",
-      "args": [
-        "mcp",
-        "gateway",
-        "run",
-        "--transport",
-        "stdio"
-      ]
+      "type": "sse",
+      "url": "http://127.0.0.1:10888/sse"
     }
   }
 }

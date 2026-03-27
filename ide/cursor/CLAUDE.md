@@ -13,43 +13,25 @@ This repository contains Cursor IDE configuration files and custom slash command
 ```text
 ide/cursor/
 ├── settings.json           # Cursor IDE settings
-├── keybindings.json       # Custom keybindings
-├── mcp.json               # MCP server configurations
-├── mcp.json.template      # MCP configuration template
-├── mcp-docker.json        # Docker MCP Gateway configuration
-├── commands/              # Custom slash commands
-│   └── coderabbit/        # CodeRabbit CLI commands
-└── supercursor/           # SuperCursor framework (gitignored)
-    ├── Commands/          # Framework commands
-    ├── Core/              # Core framework components
-    └── Hooks/             # Development hooks
+├── keybindings.json        # Custom keybindings
+├── mcp.json                # Generated MCP config (from mcp/servers.yaml)
+├── commands/               # Custom slash commands
+│   └── coderabbit/         # CodeRabbit CLI commands
+└── supercursor/            # SuperCursor framework (gitignored)
+    ├── Commands/           # Framework commands
+    ├── Core/               # Core framework components
+    └── Hooks/              # Development hooks
 ```
 
 ### MCP Server Integration
 
 This repository manages multiple MCP server configurations:
 
-**Primary Configuration** (`mcp.json`):
+**Generated Configuration** (`mcp.json`):
 
-- Bitbucket MCP (Git SSH integration)
-- Playwright (Browser automation)
-- Atlassian (Jira/Confluence integration)
-- GitHub (via Copilot MCP)
-- Terraform (Docker-based)
-- Backlog MCP (d-head, presc-ec instances)
-- AWS MCP Servers (Documentation, Terraform, ECS)
-- Chrome DevTools MCP
-
-**Template Configuration** (`mcp.json.template`):
-
-- Node-based local server installations
-- Environment variable placeholders
-- Additional AWS MCP servers (Core, Pricing)
-
-**Docker Gateway** (`mcp-docker.json`):
-
-- Unified Docker MCP Gateway
-- Environment secrets via `.env` file
+- Rendered from the repository-wide SSOT: `mcp/servers.yaml`
+- Points Cursor directly at the local Docker MCP Gateway SSE endpoint
+- Refreshed by `make sync-mcp`
 
 ### Custom Slash Commands
 
@@ -145,31 +127,23 @@ python -m supercursor install [--interactive|--minimal|--profile developer]
 
 ### MCP Server Configuration
 
-**Switching Between Configurations**:
+**Syncing Configuration**:
 
 ```bash
-# Use template configuration (local Node-based servers)
-cp mcp.json.template mcp.json
-
-# Use Docker gateway (all servers via Docker)
-cp mcp-docker.json mcp.json
-
-# Custom hybrid configuration
-# Edit mcp.json directly to combine approaches
+# Re-render Cursor MCP config from the centralized SSOT
+make sync-mcp
 ```
 
 **Adding New MCP Servers**:
 
-1. Add entry to `mcp.json` with appropriate command and args
-2. Configure environment variables (use placeholders like `YOUR_*_HERE`)
-3. Update `mcp.json.template` to document the configuration
-4. Test with `disabled: false` flag
+1. Update `mcp/servers.yaml`
+2. Run `make sync-mcp`
+3. Restart Cursor if needed
 
 **Environment Variables**:
 
-- Store sensitive values in `.env` file (for docker-mcp-gateway)
-- Use environment variable placeholders in configurations
-- Never commit actual API keys or tokens
+- Keep Gateway/runtime secrets in `.env` only when individual MCP servers need them
+- Cursor itself now connects to the local Gateway without the old SSE proxy layer
 
 ### Settings Synchronization
 
@@ -266,7 +240,7 @@ coderabbit --base master --plain
 ## Notes
 
 - SuperCursor framework is gitignored but can be installed via Python
-- MCP server configurations use multiple approaches (npx, Docker, local Node)
+- MCP server configuration is centralized in `mcp/servers.yaml` and rendered via `make sync-mcp`
 - CodeRabbit requires authentication and Git repository context
 - Kiro workflow enforces approval gates between phases
 - Settings are optimized for Japanese development (fonts, language support)

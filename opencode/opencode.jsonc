@@ -80,7 +80,7 @@
   "mcp": {
     "docker-mcp-gateway": {
       "type": "remote",
-      "url": "http://localhost:10888/sse",
+      "url": "http://127.0.0.1:10888/sse",
       "enabled": true
     }
   },
