@@ -1,7 +1,12 @@
-model = "gpt-5.2-codex"
+model = "gpt-5.4"
 model_reasoning_effort = "high"
 [notice]
 hide_rate_limit_model_nudge = true
+
+[notice.model_migrations]
+"gpt-5.2-codex" = "gpt-5.3-codex"
+"gpt-5.3-codex" = "gpt-5.4"
+
 # OpenAI Codex CLI Configuration
 #
 # For more information on configuration options, see the official documentation.
