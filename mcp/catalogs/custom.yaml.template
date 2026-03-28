@@ -23,15 +23,16 @@ registry:
     description: Professional development and AI skill management.
     title: Skillport
     type: server
-    image: ghcr.io/astral-sh/uv:python3.11-alpine
+    image: ghcr.io/yohi/skillport:latest
     command:
-      - uvx
-      - --from
-      - skillport-mcp
-      - skillport-mcp
+      - --skip-auto-reindex
     env:
       - name: SKILLPORT_SKILLS_DIR
         value: __HOME__/.skillport/skills
+      - name: SKILLPORT_DB_PATH
+        value: __HOME__/.skillport/db
+    volumes:
+      - __HOME__/.skillport:__HOME__/.skillport
   playwright:
     description: Web browser automation and testing.
     title: Playwright

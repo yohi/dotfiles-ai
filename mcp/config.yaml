@@ -30,4 +30,4 @@ mcpServers:
   dockerhub:
     enabled: true
   skillport:
-    enabled: false
+    enabled: true

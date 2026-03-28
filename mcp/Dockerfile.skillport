@@ -1,0 +1,7 @@
+FROM ghcr.io/astral-sh/uv:python3.11-bookworm-slim
+
+# skillport-mcp をインストール
+RUN uv pip install --system skillport-mcp
+
+# 実行コマンドのデフォルト設定
+ENTRYPOINT ["skillport-mcp"]
