@@ -119,3 +119,23 @@ python3 -m pip install -r requirements.txt
 | ツール管理 | [Docker MCP Gateway](https://docs.docker.com/ai/mcp-catalog-and-toolkit/mcp-gateway/) (SSE Mode) |
 | ビルド自動化 | GNU Make (`_mk/*.mk`) |
 | 構成管理 | Bash, jq, systemd |
+
+
+
+## ⚠️  Standalone Usage Note
+This repository depends on common Makefile fragments and rules from [dotfiles-core](https://github.com/yohi/dotfiles-core). When using this repository standalone, ensure the **common-mk** directory is placed as a sibling to the project parent, as shown below:
+
+```text
+parent-dir/
+├── common-mk/                  # Common Makefile fragments and rules
+│   ├── core.mk
+│   ├── help.mk
+│   └── DOTFILES_COMMON_RULES.md
+└── dotfiles-ai/                # This repository
+    ├── DOTFILES_COMMON_RULES.md -> ../../common-mk/DOTFILES_COMMON_RULES.md
+    └── _mk/
+        ├── core.mk             # Symbolic link to ../../../common-mk/core.mk
+        └── help.mk             # Symbolic link to ../../../common-mk/help.mk
+```
+
+Alternatively, use **dotfiles-core** as the orchestrator which manages this layout automatically.

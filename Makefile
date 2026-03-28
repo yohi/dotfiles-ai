@@ -1,10 +1,16 @@
-override REPO_ROOT := $(CURDIR)
+REPO_ROOT ?= $(CURDIR)
+
+# Orchestrator core configuration
+# Note: These are symlinked from common-mk/ when managed by dotfiles-core
+include _mk/core.mk
+include _mk/help.mk
 .DEFAULT_GOAL := setup
+
+# Component-specific logic
 
 # 1. Core
 include _mk/variables.mk
 include _mk/idempotency.mk
-include _mk/help.mk
 
 # 2. Meta
 include _mk/main.mk
