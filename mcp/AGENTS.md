@@ -30,7 +30,7 @@ The Atlassian MCP server is a primary example of a server kept outside the Gatew
 - **Endpoint**: `https://mcp.atlassian.com/v1/mcp`
 - **Transport**:
   - The hosted backend uses **SSE**.
-  - It is integrated into Gemini CLI using a **local stdio proxy** (`npx -y mcp-remote ...`). This setup ensures reliable browser-based authentication on Linux.
+  - It is integrated into Gemini CLI using a **direct SSE connection**. Gemini CLI handles the OAuth 2.0 authentication flow and token management natively.
 
 ### 6. Server Registration Process
 Contributions to the registry follow this workflow:

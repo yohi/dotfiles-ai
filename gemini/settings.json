@@ -17,15 +17,9 @@
       "timeout": 60000
     },
     "atlassian": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "mcp-remote",
-        "https://mcp.atlassian.com/v1/mcp"
-      ],
-      "env": {
-        "PORT": "0"
-      }
+      "type": "sse",
+      "url": "https://mcp.atlassian.com/v1/mcp",
+      "timeout": 30000
     }
   },
   "customToolsDirectory": "~/.gemini/user-tools",

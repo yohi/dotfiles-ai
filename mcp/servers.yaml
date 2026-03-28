@@ -27,13 +27,9 @@ agents:
           Authorization: Bearer mcp_auth_token
         timeout: 60000
       atlassian:
-        command: npx
-        args:
-          - -y
-          - mcp-remote
-          - https://mcp.atlassian.com/v1/mcp
-        env:
-          PORT: "0"
+        type: sse
+        url: https://mcp.atlassian.com/v1/mcp
+        timeout: 30000
 
   antigravity:
     path: antigravity/mcp_config.json
