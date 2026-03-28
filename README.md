@@ -7,6 +7,14 @@ AIエージェント（Claude Code, Gemini CLI, OpenCode, Codex）の設定・�
 
 **SSOT（Single Source of Truth）** 方式で、共通のスキル定義とコーディングルールを管理し、各エージェントへ自動配備します。
 
+### 💡 設計思想: `dotfiles-ide` との境界線
+当リポジトリ（`dotfiles-ai`）は、**「AIの振る舞いとルール（頭脳）」** を一元管理する役割を担います。
+対して、`dotfiles-ide` は **「エディタとしての基本的な器と振る舞い（UI/UX）」** を管理します。
+*   **`dotfiles-ide`**: VS CodeやCursorのUI設定（`settings.json`）、キーバインド（`keybindings.json`）、拡張機能リストなどを管理。
+*   **`dotfiles-ai`** (本リポジトリ): AIエージェントへの指示（プロンプト）、SkillPortによるスキル管理、MCPハブ設定、エディタ向けAI設定（`mcp.json` や `supercursor` など）を管理。
+
+この「関心の分離」により、すべてのAIツールで統一されたペルソナを維持しつつ、エディタのUI設定と切り離してスケーラブルに運用します。
+
 | ディレクトリ | 役割 |
 |:------------|:-----|
 | `agent-skills/` | **[SSOT]** 全エージェント共通のスキル定義群（skillport 管理） |
@@ -17,7 +25,7 @@ AIエージェント（Claude Code, Gemini CLI, OpenCode, Codex）の設定・�
 | `gemini/` | Gemini CLI / SuperGemini 設定 |
 | `opencode/` | OpenCode 固有設定 |
 | `codex/` | Codex 固有設定 |
-| `ide/` | IDE (Cursor, VSCode) 設定と SuperCursor/SuperCopilot |
+| `ide/` | IDE 向け AI 設定（MCP、SuperCursor/SuperCopilot）など。UI設定は `dotfiles-ide` を参照 |
 | `_mk/` | Makefile サブターゲット群 |
 
 ## 依存関係

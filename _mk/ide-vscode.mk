@@ -18,26 +18,21 @@ endif
 .PHONY: setup-vscode
 
 setup-vscode:
-	@echo "📝 VSCodeの設定をリンクしています..."
-	@mkdir -p "$(VSCODE_USER_DIR)"
+	@echo "📝 VSCodeのAI設定をリンクしています..."
+	@mkdir -p "$(VSCODE_USER_DIR)/globalStorage"
+	@# VSCodeのUI設定（settings.json, keybindings.json）は dotfiles-ide が担当します。
+	@# ここでは古い（壊れた）リンクのクリーンアップのみ行います。
 	@for f in settings.json keybindings.json; do \
-		src="$(REPO_ROOT)/ide/vscode/$$f"; \
-		dst="$(VSCODE_USER_DIR)/$$f"; \
-		if [ -f "$$dst" ] && [ ! -L "$$dst" ]; then \
-			backup="$$dst.bak.$$(date +%Y%m%d_%H%M%S)"; \
-			echo "⚠️  既存の $$f をバックアップします: $$backup"; \
-			mv "$$dst" "$$backup"; \
-		elif [ -L "$$dst" ] && [ "$$(readlink "$$dst")" != "$$src" ]; then \
-			echo "🔄 シンボリックリンクを更新します: $$dst"; \
-		fi; \
-		ln -sf "$$src" "$$dst"; \
-	done
-	@echo "✅ VSCodeの設定リンクが完了しました"
+	        dst="$(VSCODE_USER_DIR)/$$f"; \
+	        if [ -L "$$dst" ] && [ ! -e "$$dst" ]; then \
+	                echo "🧹 古い設定シンボリックリンクを削除します (dotfiles-ide へ移管): $$f"; \
+	                rm "$$dst"; \
+	        fi; \
+	done	@echo "✅ VSCodeのAI設定（クリーンアップ）が完了しました"
 
 .PHONY: uninstall-vscode
 uninstall-vscode:
-	@echo "🧹 VSCodeの設定リンクを解除しています..."
-	@if [ -L "$(VSCODE_USER_DIR)/settings.json" ]; then rm -f "$(VSCODE_USER_DIR)/settings.json"; fi
-	@if [ -L "$(VSCODE_USER_DIR)/keybindings.json" ]; then rm -f "$(VSCODE_USER_DIR)/keybindings.json"; fi
+	@echo "🧹 VSCodeのAI設定リンクを解除しています..."
 	@if [ -L "$(HOME)/.vscode/supercopilot" ]; then rm -f "$(HOME)/.vscode/supercopilot"; fi
-	@echo "✅ VSCodeの設定解除が完了しました"
+	@echo "✅ VSCodeのAI設定解除が完了しました"
+
