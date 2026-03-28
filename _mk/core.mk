@@ -1,0 +1,1 @@
+../../../common-mk/core.mk

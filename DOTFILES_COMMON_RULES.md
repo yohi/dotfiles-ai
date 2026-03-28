@@ -1,0 +1,1 @@
+../../common-mk/DOTFILES_COMMON_RULES.md
