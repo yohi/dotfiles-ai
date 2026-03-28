@@ -28,7 +28,8 @@ setup-vscode:
 	                echo "🧹 古い設定シンボリックリンクを削除します (dotfiles-ide へ移管): $$f"; \
 	                rm "$$dst"; \
 	        fi; \
-	done	@echo "✅ VSCodeのAI設定（クリーンアップ）が完了しました"
+	done
+	@echo "✅ VSCodeのAI設定（クリーンアップ）が完了しました"
 
 .PHONY: uninstall-vscode
 uninstall-vscode:
