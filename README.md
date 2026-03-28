@@ -7,6 +7,18 @@ AIエージェント（Claude Code, Gemini CLI, OpenCode, Codex）の設定・�
 
 **SSOT（Single Source of Truth）** 方式で、共通のスキル定義とコーディングルールを管理し、各エージェントへ自動配備します。
 
+## 管理と依存関係
+
+本リポジトリは [dotfiles-core](https://github.com/yohi/dotfiles-core) によって管理されるコンポーネントの一つです。
+
+### ⚠️ 単体使用時の注意点
+本リポジトリは `dotfiles-core` の共通 Makefile ルール（`common-mk`）に依存しています。単体で使用（クローン）する場合は、以下の手順が必要です：
+
+1. `common-mk` ディレクトリを本リポジトリの親ディレクトリに配置するか、パスを適切に設定してください。
+2. `make help` を実行して、正しく設定されていることを確認してください。
+
+推奨される使用方法は、`dotfiles-core` から `make setup` を実行することです。
+
 ### 💡 設計思想: `dotfiles-ide` との境界線
 当リポジトリ（`dotfiles-ai`）は、**「AIの振る舞いとルール（頭脳）」** を一元管理する役割を担います。
 対して、`dotfiles-ide` は **「エディタとしての基本的な器と振る舞い（UI/UX）」** を管理します。
@@ -127,23 +139,3 @@ python3 -m pip install -r requirements.txt
 | ツール管理 | [Docker MCP Gateway](https://docs.docker.com/ai/mcp-catalog-and-toolkit/mcp-gateway/) (SSE Mode) |
 | ビルド自動化 | GNU Make (`_mk/*.mk`) |
 | 構成管理 | Bash, jq, systemd |
-
-
-
-## ⚠️  Standalone Usage Note
-This repository depends on common Makefile fragments and rules from [dotfiles-core](https://github.com/yohi/dotfiles-core). When using this repository standalone, ensure the **common-mk** directory is placed as a sibling to the project parent, as shown below:
-
-```text
-parent-dir/
-├── common-mk/                  # Common Makefile fragments and rules
-│   ├── core.mk
-│   ├── help.mk
-│   └── DOTFILES_COMMON_RULES.md
-└── dotfiles-ai/                # This repository
-    ├── DOTFILES_COMMON_RULES.md -> ../../common-mk/DOTFILES_COMMON_RULES.md
-    └── _mk/
-        ├── core.mk             # Symbolic link to ../../../common-mk/core.mk
-        └── help.mk             # Symbolic link to ../../../common-mk/help.mk
-```
-
-Alternatively, use **dotfiles-core** as the orchestrator which manages this layout automatically.
