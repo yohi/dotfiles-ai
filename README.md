@@ -25,7 +25,7 @@ AIエージェント（Claude Code, Gemini CLI, OpenCode, Codex）の設定・�
 | `gemini/` | Gemini CLI / SuperGemini 設定 |
 | `opencode/` | OpenCode 固有設定 |
 | `codex/` | Codex 固有設定 |
-| `ide/` | IDE (Cursor, VSCode) 設定と SuperCursor/SuperCopilot |
+| `ide/` | IDE 向け AI 設定（MCP、SuperCursor/SuperCopilot）など。UI設定は `dotfiles-ide` を参照 |
 | `_mk/` | Makefile サブターゲット群 |
 
 ## 依存関係

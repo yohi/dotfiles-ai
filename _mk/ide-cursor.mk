@@ -64,7 +64,13 @@ install-packages-cursor:
 
 _cursor_link_settings:
 	@echo "📝 Cursorの設定をリンクしています..."
-	@mkdir -p $(HOME_DIR)/.config/Cursor/User
+	@for f in settings.json keybindings.json; do \
+		dst="$(HOME_DIR)/.config/Cursor/User/$$f"; \
+		if [ -L "$$dst" ]; then \
+			echo "🧹 古い設定シンボリックリンクを削除します (dotfiles-ide へ移管): $$f"; \
+			rm "$$dst"; \
+		fi; \
+	done
 	@mkdir -p $(HOME_DIR)/.config/Cursor/User/globalStorage/rooveterinaryinc.cursor-mcp
 	@if [ ! -f "$(REPO_ROOT)/ide/cursor/mcp.json" ] || [ "$(REPO_ROOT)/mcp/servers.yaml" -nt "$(REPO_ROOT)/ide/cursor/mcp.json" ] || [ "$(REPO_ROOT)/scripts/render-mcp-configs.py" -nt "$(REPO_ROOT)/ide/cursor/mcp.json" ]; then \
 		echo "📝 中央管理ファイルから Cursor MCP 設定を再生成します..."; \
