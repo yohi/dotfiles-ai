@@ -5,13 +5,11 @@
 
 # Component-specific logic
 
-# Orchestrator core configuration
-# Note: These are symlinked from ../../common-mk/ when managed by dotfiles-core
 
-# Component-specific logic
+
+
 
 override REPO_ROOT := $(CURDIR)
-.DEFAULT_GOAL := setup
 
 # 1. Core
 include _mk/variables.mk
