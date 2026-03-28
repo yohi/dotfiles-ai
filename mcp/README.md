@@ -16,9 +16,9 @@
   - **Sequential Thinking**: [リファレンス](https://github.com/docker/mcp-registry/blob/main/servers/sequentialthinking.yaml)
   - **Playwright**, **Tavily**, **Chrome DevTools** など。
 
-### 2. Atlassian MCP (SSE 直接接続)
+### 2. Atlassian MCP (httpUrl 直接接続)
 Atlassian 製品（Jira, Confluence）用の公式 MCP サーバーです。
-- **ステータス**: 有効（Gemini CLI から SSE で直接接続し、ブラウザベースの OAuth 認証をネイティブに処理）
+- **ステータス**: 有効（Gemini CLI から httpUrl で直接接続。Streamable HTTP を使用して OAuth 認証をネイティブに処理）
 - **リポジトリ**: [atlassian/atlassian-mcp-server](https://github.com/atlassian/atlassian-mcp-server)
 - **エンドポイント**: `https://mcp.atlassian.com/v1/mcp`
 
