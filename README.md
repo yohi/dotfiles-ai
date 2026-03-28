@@ -2,10 +2,15 @@
 
 AIエージェント（Claude Code, Gemini CLI, OpenCode, Codex）の設定・スキル・ルールを一元管理するコンポーネントリポジトリです。
 `dotfiles-core` と連携して動作します。
-
-## 概要
-
 **SSOT（Single Source of Truth）** 方式で、共通のスキル定義とコーディングルールを管理し、各エージェントへ自動配備します。
+
+### 💡 設計思想: `dotfiles-ide` との境界線
+当リポジトリ（`dotfiles-ai`）は、**「AIの振る舞いとルール（頭脳）」** を一元管理する役割を担います。
+対して、`dotfiles-ide` は **「エディタとしての基本的な器と振る舞い（UI/UX）」** を管理します。
+*   **`dotfiles-ide`**: VS CodeやCursorのUI設定（`settings.json`）、キーバインド（`keybindings.json`）、 拡張機能リストなどを管理。
+*   **`dotfiles-ai`** (本リポジトリ): AIエージェントへの指示（プロンプト）、SkillPortによるスキル管理、MCPハブ設定、エディタ向けAI設定（`mcp.json` や `supercursor` など）を管理。
+
+この「関心の分離」により、すべてのAIツールで統一されたペルソナを維持しつつ、エディタのUI設定と切り離して スケーラブルに運用します。
 
 ## 管理と依存関係
 
@@ -19,28 +24,7 @@ AIエージェント（Claude Code, Gemini CLI, OpenCode, Codex）の設定・�
 
 推奨される使用方法は、`dotfiles-core` から `make setup` を実行することです。
 
-### 💡 設計思想: `dotfiles-ide` との境界線
-当リポジトリ（`dotfiles-ai`）は、**「AIの振る舞いとルール（頭脳）」** を一元管理する役割を担います。
-対して、`dotfiles-ide` は **「エディタとしての基本的な器と振る舞い（UI/UX）」** を管理します。
-*   **`dotfiles-ide`**: VS CodeやCursorのUI設定（`settings.json`）、キーバインド（`keybindings.json`）、拡張機能リストなどを管理。
-*   **`dotfiles-ai`** (本リポジトリ): AIエージェントへの指示（プロンプト）、SkillPortによるスキル管理、MCPハブ設定、エディタ向けAI設定（`mcp.json` や `supercursor` など）を管理。
-
-この「関心の分離」により、すべてのAIツールで統一されたペルソナを維持しつつ、エディタのUI設定と切り離してスケーラブルに運用します。
-
-| ディレクトリ | 役割 |
-|:------------|:-----|
-| `agent-skills/` | **[SSOT]** 全エージェント共通のスキル定義群（skillport 管理） |
-| `agent-commands/` | **[SSOT]** 全エージェント共通のスラッシュコマンド |
-| `global-rules/` | **[SSOT]** コーディング規約・ルール・ユーザーレベル指示（マスター） |
-| `AGENTS.md` | **[Project]** dotfiles-ai プロジェクト固有のルールとスキルリスト |
-| `claude/` | Claude Code 固有設定 |
-| `gemini/` | Gemini CLI / SuperGemini 設定 |
-| `opencode/` | OpenCode 固有設定 |
-| `codex/` | Codex 固有設定 |
-| `ide/` | IDE 向け AI 設定（MCP、SuperCursor/SuperCopilot）など。UI設定は `dotfiles-ide` を参照 |
-| `_mk/` | Makefile サブターゲット群 |
-
-## 依存関係
+### 依存関係
 
 - Python スクリプト（`scripts/render-mcp-configs.py`）の実行には `PyYAML` が必要です。
 - 初回セットアップ時に以下を実行してください。
@@ -48,6 +32,30 @@ AIエージェント（Claude Code, Gemini CLI, OpenCode, Codex）の設定・�
 ```bash
 python3 -m pip install -r requirements.txt
 ```
+
+## ディレクトリ構成
+
+```text
+.
+├── Makefile
+├── README.md
+├── AGENTS.md
+├── agent-skills/           # [SSOT] Skill definitions (skillport)
+├── agent-commands/         # [SSOT] Slash commands
+├── global-rules/           # [SSOT] Global AI rules
+├── claude/                 # Claude Code specific settings
+├── gemini/                 # Gemini CLI / SuperGemini settings
+├── opencode/               # OpenCode specific settings
+├── ide/                    # IDE AI settings (MCP, SuperCursor)
+└── mcp/                    # Docker MCP Gateway settings
+```
+
+## 主要機能
+
+- **SkillPort**: 全エージェントで再利用可能なスキルの SSOT 管理。
+- **Docker MCP Gateway**: SSE による複数エージェント/IDE 向け MCP サーバーの統合。
+- **SSOT ルール管理**: 規約やユーザー指示の一元化と自動同期。
+- **マルチエージェント対応**: Claude Code, Gemini CLI, OpenCode, Codex, Cursor/VSCode への自動配備。
 
 ## ルール管理構造 (SSOT)
 
@@ -61,10 +69,10 @@ python3 -m pip install -r requirements.txt
 
 ## スキル管理 (SkillPort)
 
-[SkillPort](https://github.com/gotalab/skillport) は、複数の AI エージェント間で再利用可能な「スキル」を一元管理するためのツールです。
+[SkillPort](https://github.com/gotalab/skillport) は、複数の AI エージェント間で再利用可能な「スキル」を 一元管理するためのツールです。
 
 - **スキルの実体**: `agent-skills/` ディレクトリ配下に、各スキルの `SKILL.md`（インストラクション）が格納されています。
-- **構成**: `.skillportrc` で設定され、`~/.skillport/skills` からリポジトリの `agent-skills/` へシンボリックリンクが張られます。
+- **構成**: `.skillportrc` で設定され、`~/.skillport/skills` からリポジトリの `agent-skills/` へシンボリ ックリンクが張られます。
 - **コマンド**:
   - `make skillport`: SkillPort と `skillport-mcp` をインストールし、ディレクトリをセットアップします。
   - `make check-skillport`: インストール状態とシンボリックリンクの整合性を確認します。
@@ -84,15 +92,15 @@ python3 -m pip install -r requirements.txt
   - **`mcp/catalogs/custom.yaml.template`**: Docker MCP Gateway の custom catalog 定義です。
   - **`mcp/config.yaml`**: Gateway 上で有効化するサーバーを管理します。
   - **`mcp/servers.yaml`**: 各エージェント/IDE に配る MCP クライアント設定の SSOT です。
-- **初期セットアップ**: `make setup-docker-mcp` を実行すると、`custom.yaml.template` から `custom.yaml` が生成され、Gateway の初期配置が完了します。
-- **自動同期**: `mcp/servers.yaml` または catalog/template を編集したら `make sync-mcp` を実行してください。
+- **初期セットアップ**: `make setup-docker-mcp` を実行すると、`custom.yaml.template` から `custom.yaml`  が生成され、Gateway の初期配置が完了します。
+- **自動同期**: `mcp/servers.yaml` または catalog/template を編集したら `make sync-mcp` を実行してくださ い。
 
 ## SkillPort & MCP の統合
 
 `skillport-mcp` を MCP サーバーとして Docker MCP Gateway に登録することで、エージェントは `agent-skills/` 内の全スキルを MCP Tool として動的に利用できます。
 
-1. **仕組み**: `skillport-mcp` が起動時にスキルディレクトリをスキャンし、各スキルを MCP ツールとして公開します。
-2. **利用方法**: 全てのエージェントは Docker MCP Gateway (`:10888/sse`) を参照するように統一されているため、自動的に全スキルがロードされます。
+1. **仕組み**: `skillport-mcp` が起動時にスキルディレクトリをスキャンし、各スキルを MCP ツールとして公開 します。
+2. **利用方法**: 全てのエージェントは Docker MCP Gateway (`:10888/sse`) を参照するように統一されているた め、自動的に全スキルがロードされます。
 
 ## エージェント設定の自動同期
 
