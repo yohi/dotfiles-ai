@@ -1,3 +1,6 @@
+include _mk/core.mk
+include _mk/help.mk
+
 override REPO_ROOT := $(CURDIR)
 .DEFAULT_GOAL := setup
 
