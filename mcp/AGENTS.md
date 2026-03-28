@@ -1,29 +1,34 @@
 # Docker MCP Gateway Configuration
 
 ## MCP Catalog Registry
-Docker MCP Gateway で使用される公式の MCP サーバー情報は、以下のリポジトリで一元管理されています。
+The official source of MCP server information used by the Docker MCP Gateway is managed in the following repository:
 - [docker/mcp-registry](https://github.com/docker/mcp-registry)
 
-### 1. 役割と目的
-このレジストリは、MCP サーバーのメタデータを管理し、Docker インフラ（Docker Hub や Docker Desktop MCP Toolkit）を通じて安全に MCP サーバーを配布・実行するためのプラットフォームとして機能します。
+### 1. Purpose and Goals
+This registry serves as a centralized platform for managing MCP server metadata. It facilitates the secure distribution and execution of MCP servers through Docker infrastructure, including Docker Hub and the Docker Desktop MCP Toolkit.
 
-### 2. ディレクトリ構造と重要ファイル
-リポジトリは Go 言語で構築されており、以下の構成になっています。
-- `/servers/`: **カタログの本体**。登録されている各 MCP サーバーの定義ファイルが格納されています。
-- `/cmd/`, `/pkg/`, `/internal/`: レジストリ管理やバリデーションを行うプログラム本体。
-- `/agents/security-reviewer/`: 登録されるサーバーのセキュリティを自動検証するエージェント。
-- `Taskfile.yml`: 開発・テストタスク管理用の定義。
+### 2. Repository Structure
+The project is built with Go and follows a standard structure:
+- `/servers/`: **Core Catalog**. Contains definition files for each registered MCP server.
+- `/cmd/`, `/pkg/`, `/internal/`: Logic for registry management and validation.
+- `/agents/security-reviewer/`: Automated agents that verify the security of submitted servers.
+- `Taskfile.yml`: Definition for development and testing tasks.
 
-### 3. MCP サーバーの登録プロセス
-新しいサーバーを追加する場合、以下の流れでコントリビューションを行います。
-1. **リポジトリのフォーク**: 自身のブランチで作業を開始。
-2. **定義の追加**: `/servers/` 内に YAML 形式でメタデータ（名称、説明、イメージ参照、メンテナンス情報）を記述。
-3. **提供形態の選択**:
-   - **Docker 管理ビルド (推奨)**: Docker 側でイメージビルド、暗号署名、SBOM 付与を行い、信頼性を担保。
-   - **外部イメージ提供**: 自身でビルド済みのイメージを登録。
-4. **プルリクエスト送信**: Docker チームによるレビューと自動セキュリティチェックを通過後、公式カタログに反映。
+### 3. Guidelines for Adding Servers
+When adding a new MCP server to the Docker MCP Gateway, adhere to the following priority and standards:
+- **Priority Use of MCP Registry**: Always prioritize using Docker Hub images that are registered in the [MCP Registry](https://github.com/docker/mcp-registry).
+- **Official Images**: Ensure that **Official Docker Hub images** are used. Prefer images maintained by Docker or the original tool authors to ensure security and stability.
 
-### 4. 技術的な特徴
-- **高度なセキュリティ**: Docker が提供するイメージには SBOM（ソフトウェア部品構成表）やプロバナンス追跡が含まれ、改ざん防止が図られています。
-- **コンテナ隔離**: すべての MCP サーバーは Docker コンテナ内で実行されるため、ホスト環境から分離された安全な実行が保証されます。
-- **自動更新**: カタログへの追加は、Docker Desktop や `docker mcp` CLI を通じて、ユーザー環境に反映されます。
+### 4. Server Registration Process
+Contributions to the registry follow this workflow:
+1. **Fork the Repository**: Start work on your own branch.
+2. **Add Definition**: Create a YAML metadata file in `/servers/` including the name, description, image reference, and maintenance info.
+3. **Select Delivery Option**:
+   - **Docker-managed Build (Recommended)**: Docker handles the build, signing, and SBOM attachment for maximum trust.
+   - **External Image**: Register an image you have already built.
+4. **Submit Pull Request**: After passing code review and automated security checks by the Docker team, the server is added to the official catalog.
+
+### 5. Technical Highlights
+- **High Security**: Docker-provided images include SBOMs (Software Bill of Materials) and provenance tracking to prevent tampering.
+- **Container Isolation**: All MCP servers run within Docker containers, ensuring safe execution isolated from the host environment.
+- **Seamless Updates**: New additions to the catalog are automatically reflected in users' environments via Docker Desktop or the `docker mcp` CLI.
