@@ -23,7 +23,9 @@ agents:
       docker-mcp-gateway:
         type: sse
         url: __GATEWAY_URL__
-        timeout: 30000
+        headers:
+          Authorization: Bearer mcp_auth_token
+        timeout: 60000
       atlassian:
         command: npx
         args:
