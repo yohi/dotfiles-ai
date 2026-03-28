@@ -120,5 +120,6 @@ python3 -m pip install -r requirements.txt
 | ビルド自動化 | GNU Make (`_mk/*.mk`) |
 | 構成管理 | Bash, jq, systemd |
 
+
 ## ⚠️  Standalone Usage Note
-This repository depends on common Makefile fragments from [dotfiles-core](https://github.com/yohi/dotfiles-core). When using this repository standalone, ensure the  directory is present in the parent directory, or use  as the orchestrator.
+This repository depends on common Makefile fragments from [dotfiles-core](https://github.com/yohi/dotfiles-core). When using this repository standalone, ensure the `common-mk` directory is present in the parent directory, or use `dotfiles-core` as the orchestrator.
