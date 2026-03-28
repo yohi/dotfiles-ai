@@ -7,6 +7,8 @@ on:
     paths:
       - 'mcp/Dockerfile.skillport'
       - '.github/workflows/publish-skillport.yml'
+  schedule:
+    - cron: '0 0 * * 0' # 毎週日曜日の 00:00 (UTC)
   workflow_dispatch:
 
 env:
@@ -46,5 +48,6 @@ jobs:
           context: ./mcp
           file: ./mcp/Dockerfile.skillport
           push: true
+          no-cache: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

@@ -3,5 +3,9 @@ FROM ghcr.io/astral-sh/uv:python3.11-bookworm-slim
 # skillport-mcp をインストール
 RUN uv pip install --system skillport-mcp
 
-# 実行コマンドのデフォルト設定
-ENTRYPOINT ["skillport-mcp"]
+# 起動時にバージョン情報を表示するスクリプト
+RUN echo '#!/usr/bin/env bash\necho "[skillport] Version: $(pip show skillport-mcp | grep Version | awk '"'"'{print $2}'"'"')" >&2\nexec skillport-mcp "$@"' > /usr/local/bin/entrypoint.sh \
+    && chmod +x /usr/local/bin/entrypoint.sh
+
+# 実行コマンドの設定
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
