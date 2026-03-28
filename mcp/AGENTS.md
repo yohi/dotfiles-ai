@@ -19,7 +19,20 @@ When adding a new MCP server to the Docker MCP Gateway, adhere to the following 
 - **Priority Use of MCP Registry**: Always prioritize using Docker Hub images that are registered in the [MCP Registry](https://github.com/docker/mcp-registry).
 - **Official Images**: Ensure that **Official Docker Hub images** are used. Prefer images maintained by Docker or the original tool authors to ensure security and stability.
 
-### 4. Server Registration Process
+### 4. Special Handling: Browser-based Authentication
+In Linux environments (without Docker Desktop), servers requiring browser-based OAuth authentication should be kept **outside** the Docker MCP Gateway.
+- **Reason**: The Docker MCP Gateway relies on Docker Desktop's proprietary notification channel (`backend.sock`) to handle OAuth flows. Native Linux environments lack this mechanism, causing authentication to fail inside the Gateway container.
+- **Best Practice**: Use a local `stdio` proxy or a standalone installation for these servers to ensure the browser can be launched and tokens can be managed within the user's host session.
+
+### 5. Atlassian MCP Server
+The Atlassian MCP server is a primary example of a server kept outside the Gateway for authentication stability.
+- **Repository**: [atlassian/atlassian-mcp-server](https://github.com/atlassian/atlassian-mcp-server)
+- **Endpoint**: `https://mcp.atlassian.com/v1/mcp`
+- **Transport**:
+  - The hosted backend uses **SSE**.
+  - It is integrated into Gemini CLI using a **local stdio proxy** (`npx -y mcp-remote ...`). This setup ensures reliable browser-based authentication on Linux.
+
+### 6. Server Registration Process
 Contributions to the registry follow this workflow:
 1. **Fork the Repository**: Start work on your own branch.
 2. **Add Definition**: Create a YAML metadata file in `/servers/` including the name, description, image reference, and maintenance info.
@@ -28,7 +41,7 @@ Contributions to the registry follow this workflow:
    - **External Image**: Register an image you have already built.
 4. **Submit Pull Request**: After passing code review and automated security checks by the Docker team, the server is added to the official catalog.
 
-### 5. Technical Highlights
+### 7. Technical Highlights
 - **High Security**: Docker-provided images include SBOMs (Software Bill of Materials) and provenance tracking to prevent tampering.
 - **Container Isolation**: All MCP servers run within Docker containers, ensuring safe execution isolated from the host environment.
 - **Seamless Updates**: New additions to the catalog are automatically reflected in users' environments via Docker Desktop or the `docker mcp` CLI.
