@@ -1,5 +1,9 @@
-include _mk/core.mk
-include _mk/help.mk
+# Orchestrator core configuration
+# Note: These are symlinked from ../../common-mk/ when managed by dotfiles-core
+-include _mk/core.mk
+-include _mk/help.mk
+
+# Component-specific logic
 
 override REPO_ROOT := $(CURDIR)
 .DEFAULT_GOAL := setup
@@ -7,7 +11,6 @@ override REPO_ROOT := $(CURDIR)
 # 1. Core
 include _mk/variables.mk
 include _mk/idempotency.mk
-include _mk/help.mk
 
 # 2. Meta
 include _mk/main.mk
