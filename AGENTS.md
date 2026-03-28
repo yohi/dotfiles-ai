@@ -2,6 +2,14 @@
 
 > [!IMPORTANT]
 > Please refer to [DOTFILES_COMMON_RULES.md](./DOTFILES_COMMON_RULES.md) for common base rules.
+> 
+> **Note on Symbolic Links:**
+> Several files are symbolic links to an external `common-mk` directory:
+> - `DOTFILES_COMMON_RULES.md` -> `../../common-mk/DOTFILES_COMMON_RULES.md`
+> - `_mk/core.mk` -> `../../../common-mk/core.mk`
+> - `_mk/help.mk` -> `../../../common-mk/help.mk`
+>
+> If these links appear broken, ensure the `common-mk` repository is placed at the correct relative path as specified in [README.md](./README.md#standalone-usage-note).
 
 ## 1. Hierarchy & Authority
 - **Global Rules (`global-rules/AGENTS.global.md`)**: The **Global Foundation**. It contains universal instructions shared across *all* projects, such as Identity, Language Policy (Japanese output), Security protocols, and cross-project SkillPort workflows.

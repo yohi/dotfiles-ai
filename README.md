@@ -123,14 +123,19 @@ python3 -m pip install -r requirements.txt
 
 
 ## ⚠️  Standalone Usage Note
-This repository depends on common Makefile fragments from [dotfiles-core](https://github.com/yohi/dotfiles-core). When using this repository standalone, ensure the **common-mk** directory is placed as a sibling to the project parent, as shown below:
+This repository depends on common Makefile fragments and rules from [dotfiles-core](https://github.com/yohi/dotfiles-core). When using this repository standalone, ensure the **common-mk** directory is placed as a sibling to the project parent, as shown below:
 
 ```text
 parent-dir/
-├── common-mk/          # Common Makefile fragments
-└── dotfiles-ai/        # This repository
+├── common-mk/                  # Common Makefile fragments and rules
+│   ├── core.mk
+│   ├── help.mk
+│   └── DOTFILES_COMMON_RULES.md
+└── dotfiles-ai/                # This repository
+    ├── DOTFILES_COMMON_RULES.md -> ../../common-mk/DOTFILES_COMMON_RULES.md
     └── _mk/
-        └── core.mk     # Symbolic link to ../../../common-mk/core.mk
+        ├── core.mk             # Symbolic link to ../../../common-mk/core.mk
+        └── help.mk             # Symbolic link to ../../../common-mk/help.mk
 ```
 
 Alternatively, use **dotfiles-core** as the orchestrator which manages this layout automatically.
