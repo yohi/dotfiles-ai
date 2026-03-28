@@ -10,7 +10,7 @@
 
 ---
 
-### Task 1: Update `AGENTS.md` Language Policy Compliance
+## Task 1: Update `AGENTS.md` Language Policy Compliance
 
 **Files:**
 - Modify: `AGENTS.md:3-4`
@@ -34,7 +34,7 @@ New string:
 Run: `grep "Please refer to" AGENTS.md`
 Expected: The updated English sentence is present.
 
-### Task 2: Update `Makefile` to use Mandatory Includes
+## Task 2: Update `Makefile` to use Mandatory Includes
 
 **Files:**
 - Modify: `Makefile:3-4`
@@ -63,7 +63,7 @@ Expected: The help menu is displayed correctly.
 Run: `mv _mk/core.mk _mk/core.mk.bak && make help; mv _mk/core.mk.bak _mk/core.mk`
 Expected: `make` fails with an error stating `_mk/core.mk` is missing.
 
-### Task 3: Update `README.md` Standalone Setup Instructions
+## Task 3: Update `README.md` Standalone Setup Instructions
 
 **Files:**
 - Modify: `README.md:160-162`
