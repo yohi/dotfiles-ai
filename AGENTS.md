@@ -19,6 +19,12 @@
 ## 2. Project Purpose
 This repository is the Central Authority for AI Agent configurations, specialized skills, and AI-enabled development environments. It ensures a consistent "AI persona" across all tools and machines.
 
+### 💡 Core Design Philosophy: Separation of Concerns
+We strictly separate **"AI Rules & Behavior"** (`dotfiles-ai`) from **"IDE Infrastructure & UI"** (`dotfiles-ide`).
+- **`dotfiles-ide`** manages the physical editor settings (`settings.json`, `keybindings.json`, visual themes).
+- **`dotfiles-ai`** (this repository) manages the mind and tools of the AI (`mcp.json`, `supercursor` framework, Agent instructions, SkillPort).
+Never mix IDE styling configurations here, and never put AI instructions or MCP configs in `dotfiles-ide`.
+
 ## 3. Directory Mandates
 - `claude/`, `gemini/`, `opencode/`, `codex/`: High-level configuration for specific AI CLI tools.
 - `ide/`: Configuration and extension management for Cursor and VSCode.
