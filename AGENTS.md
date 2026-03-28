@@ -9,7 +9,13 @@
 > - `_mk/core.mk` -> `../../../common-mk/core.mk`
 > - `_mk/help.mk` -> `../../../common-mk/help.mk`
 >
-> If these links appear broken, ensure the `common-mk` repository is placed at the correct relative path as specified in [README.md](./README.md#standalone-usage-note).
+> If these links appear broken, ensure the `common-mk` repository is placed at the correct relative path as specified in [README.md](./README.md#-単体使用時の注意点).
+
+## COMPONENT LAYOUT CONVENTION
+
+This repository is part of the **dotfiles polyrepo** orchestrated by [dotfiles-core](https://github.com/yohi/dotfiles-core).
+All changes MUST comply with the central layout rules. Please refer to the central [ARCHITECTURE.md](https://raw.githubusercontent.com/yohi/dotfiles-core/refs/heads/master/docs/ARCHITECTURE.md) for the full, authoritative rules and constraints.
+If the remote ARCHITECTURE.md is unavailable, you can refer to the local [SPEC.md#architecture](./SPEC.md#architecture) and [README.md#ディレクトリ構成](./README.md#ディレクトリ構成) as fallbacks.
 
 ## 1. Hierarchy & Authority
 - **Global Rules (`global-rules/AGENTS.global.md`)**: The **Global Foundation**. It contains universal instructions shared across *all* projects, such as Identity, Language Policy (Japanese output), Security protocols, and cross-project SkillPort workflows.

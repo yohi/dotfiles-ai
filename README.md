@@ -2,9 +2,6 @@
 
 AIエージェント（Claude Code, Gemini CLI, OpenCode, Codex）の設定・スキル・ルールを一元管理するコンポーネントリポジトリです。
 `dotfiles-core` と連携して動作します。
-
-## 概要
-
 **SSOT（Single Source of Truth）** 方式で、共通のスキル定義とコーディングルールを管理し、各エージェントへ自動配備します。
 
 ### 💡 設計思想: `dotfiles-ide` との境界線
@@ -15,20 +12,19 @@ AIエージェント（Claude Code, Gemini CLI, OpenCode, Codex）の設定・�
 
 この「関心の分離」により、すべてのAIツールで統一されたペルソナを維持しつつ、エディタのUI設定と切り離してスケーラブルに運用します。
 
-| ディレクトリ | 役割 |
-|:------------|:-----|
-| `agent-skills/` | **[SSOT]** 全エージェント共通のスキル定義群（skillport 管理） |
-| `agent-commands/` | **[SSOT]** 全エージェント共通のスラッシュコマンド |
-| `global-rules/` | **[SSOT]** コーディング規約・ルール・ユーザーレベル指示（マスター） |
-| `AGENTS.md` | **[Project]** dotfiles-ai プロジェクト固有のルールとスキルリスト |
-| `claude/` | Claude Code 固有設定 |
-| `gemini/` | Gemini CLI / SuperGemini 設定 |
-| `opencode/` | OpenCode 固有設定 |
-| `codex/` | Codex 固有設定 |
-| `ide/` | IDE 向け AI 設定（MCP、SuperCursor/SuperCopilot）など。UI設定は `dotfiles-ide` を参照 |
-| `_mk/` | Makefile サブターゲット群 |
+## 管理と依存関係
 
-## 依存関係
+本リポジトリは [dotfiles-core](https://github.com/yohi/dotfiles-core) によって管理されるコンポーネントの一つです。
+
+### ⚠️ 単体使用時の注意点
+本リポジトリは `dotfiles-core` の共通 Makefile ルール（`common-mk`）に依存しています。単体で使用（クローン）する場合は、以下の手順が必要です：
+
+1. `common-mk` ディレクトリを本リポジトリの親ディレクトリに配置するか、パスを適切に設定してください。
+2. `make help` を実行して、正しく設定されていることを確認してください。
+
+推奨される使用方法は、`dotfiles-core` から `make setup` を実行することです。
+
+### 依存関係
 
 - Python スクリプト（`scripts/render-mcp-configs.py`）の実行には `PyYAML` が必要です。
 - 初回セットアップ時に以下を実行してください。
@@ -36,6 +32,31 @@ AIエージェント（Claude Code, Gemini CLI, OpenCode, Codex）の設定・�
 ```bash
 python3 -m pip install -r requirements.txt
 ```
+
+## ディレクトリ構成
+
+```text
+.
+├── Makefile
+├── README.md
+├── AGENTS.md
+├── agent-skills/           # [SSOT] Skill definitions (skillport)
+├── agent-commands/         # [SSOT] Slash commands
+├── global-rules/           # [SSOT] Global AI rules
+├── claude/                 # Claude Code specific settings
+├── gemini/                 # Gemini CLI / SuperGemini settings
+├── opencode/               # OpenCode specific settings
+├── codex/                  # Codex specific settings
+├── ide/                    # IDE AI settings (MCP, SuperCursor)
+└── mcp/                    # Docker MCP Gateway settings
+```
+
+## 主要機能
+
+- **SkillPort**: 全エージェントで再利用可能なスキルの SSOT 管理。
+- **Docker MCP Gateway**: SSE による複数エージェント/IDE 向け MCP サーバーの統合。
+- **SSOT ルール管理**: 規約やユーザー指示の一元化と自動同期。
+- **マルチエージェント対応**: Claude Code, Gemini CLI, OpenCode, Codex, Cursor/VSCode への自動配備。
 
 ## ルール管理構造 (SSOT)
 
@@ -127,23 +148,3 @@ python3 -m pip install -r requirements.txt
 | ツール管理 | [Docker MCP Gateway](https://docs.docker.com/ai/mcp-catalog-and-toolkit/mcp-gateway/) (SSE Mode) |
 | ビルド自動化 | GNU Make (`_mk/*.mk`) |
 | 構成管理 | Bash, jq, systemd |
-
-
-
-## ⚠️  Standalone Usage Note
-This repository depends on common Makefile fragments and rules from [dotfiles-core](https://github.com/yohi/dotfiles-core). When using this repository standalone, ensure the **common-mk** directory is placed as a sibling to the project parent, as shown below:
-
-```text
-parent-dir/
-├── common-mk/                  # Common Makefile fragments and rules
-│   ├── core.mk
-│   ├── help.mk
-│   └── DOTFILES_COMMON_RULES.md
-└── dotfiles-ai/                # This repository
-    ├── DOTFILES_COMMON_RULES.md -> ../../common-mk/DOTFILES_COMMON_RULES.md
-    └── _mk/
-        ├── core.mk             # Symbolic link to ../../../common-mk/core.mk
-        └── help.mk             # Symbolic link to ../../../common-mk/help.mk
-```
-
-Alternatively, use **dotfiles-core** as the orchestrator which manages this layout automatically.
