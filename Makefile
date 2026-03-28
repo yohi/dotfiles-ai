@@ -1,7 +1,8 @@
 # Orchestrator core configuration
-# Note: These are symlinked from ../../common-mk/ when managed by dotfiles-core
+# Note: These are symlinked from common-mk/ when managed by dotfiles-core
 include _mk/core.mk
 include _mk/help.mk
+.DEFAULT_GOAL := setup
 
 # Component-specific logic
 
