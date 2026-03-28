@@ -21,13 +21,13 @@ This repository is the Central Authority for AI Agent configurations, specialize
 
 ### 💡 Core Design Philosophy: Separation of Concerns
 We strictly separate **"AI Rules & Behavior"** (`dotfiles-ai`) from **"IDE Infrastructure & UI"** (`dotfiles-ide`).
-- **`dotfiles-ide`** manages the physical editor settings (`settings.json`, `keybindings.json`, visual themes).
-- **`dotfiles-ai`** (this repository) manages the mind and tools of the AI (`mcp.json`, `supercursor` framework, Agent instructions, SkillPort).
+- **`dotfiles-ide`** manages the physical editor settings (`settings.json`, `keybindings.json`, visual themes) for both Cursor and VSCode.
+- **`dotfiles-ai`** (this repository) manages the mind and tools of the AI (`mcp.json`, `supercursor`/`supercopilot` framework, Agent instructions, SkillPort).
 Never mix IDE styling configurations here, and never put AI instructions or MCP configs in `dotfiles-ide`.
 
 ## 3. Directory Mandates
 - `claude/`, `gemini/`, `opencode/`, `codex/`: High-level configuration for specific AI CLI tools.
-- `ide/`: Configuration and extension management for Cursor and VSCode.
+- `ide/`: AI-specific configurations (MCP, SuperCursor/SuperCopilot) for Cursor and VSCode. (UI settings are moved to `dotfiles-ide`).
 - `global-rules/`: Source of Truth for cross-project AI instructions.
 - `agent-skills/`: The master repository for SkillPort skills.
 - `mcp/`: Management of the Docker MCP Gateway and associated catalogs.

@@ -18,15 +18,22 @@ endif
 .PHONY: setup-vscode
 
 setup-vscode:
-	@echo "📝 VSCodeの設定をリンクしています..."
-	@mkdir -p "$(VSCODE_USER_DIR)"
-
-	@echo "✅ VSCodeの設定リンクが完了しました"
+	@echo "📝 VSCodeのAI設定をリンクしています..."
+	@mkdir -p "$(VSCODE_USER_DIR)/globalStorage"
+	@# VSCodeのUI設定（settings.json, keybindings.json）は dotfiles-ide が担当します。
+	@# ここでは古いリンクのクリーンアップのみ行います。
+	@for f in settings.json keybindings.json; do \
+		dst="$(VSCODE_USER_DIR)/$$f"; \
+		if [ -L "$$dst" ]; then \
+			echo "🧹 古い設定シンボリックリンクを削除します (dotfiles-ide へ移管): $$f"; \
+			rm "$$dst"; \
+		fi; \
+	done
+	@echo "✅ VSCodeのAI設定（クリーンアップ）が完了しました"
 
 .PHONY: uninstall-vscode
 uninstall-vscode:
-	@echo "🧹 VSCodeの設定リンクを解除しています..."
-	# @if [ -L "$(VSCODE_USER_DIR)/settings.json" ]; then rm -f "$(VSCODE_USER_DIR)/settings.json"; fi # Moved to dotfiles-ide
-	# @if [ -L "$(VSCODE_USER_DIR)/keybindings.json" ]; then rm -f "$(VSCODE_USER_DIR)/keybindings.json"; fi # Moved to dotfiles-ide
+	@echo "🧹 VSCodeのAI設定リンクを解除しています..."
 	@if [ -L "$(HOME)/.vscode/supercopilot" ]; then rm -f "$(HOME)/.vscode/supercopilot"; fi
-	@echo "✅ VSCodeの設定解除が完了しました"
+	@echo "✅ VSCodeのAI設定解除が完了しました"
+
