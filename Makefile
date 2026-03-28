@@ -6,10 +6,6 @@ include _mk/help.mk
 
 # Component-specific logic
 
-
-
-
-
 override REPO_ROOT := $(CURDIR)
 
 # 1. Core
