@@ -1,40 +1,40 @@
-# MCP (Model Context Protocol) Configuration
+# MCP (Model Context Protocol) 設定
 
-This directory contains the configuration and management scripts for MCP servers used across various AI agents in this repository.
+このディレクトリには、本リポジトリの各種 AI エージェントで使用される MCP サーバーの設定および管理スクリプトが含まれています。
 
-## Configured MCP Servers
+## 設定済み MCP サーバー
 
 ### 1. Docker MCP Gateway (SSE)
-A centralized gateway that runs multiple MCP servers inside Docker containers.
-- **Status**: Enabled
-- **Gateway URL**: `http://localhost:10888/sse`
-- **Reference**: [docker/mcp-registry](https://github.com/docker/mcp-registry)
-- **Included Tools (Managed via `mcp/config.yaml`):**
-  - **GitHub Official**: [Reference](https://github.com/docker/mcp-registry/blob/main/servers/github.yaml)
-  - **Filesystem**: [Reference](https://github.com/docker/mcp-registry/blob/main/servers/filesystem.yaml)
-  - **SQLite**: [Reference](https://github.com/docker/mcp-registry/blob/main/servers/sqlite.yaml)
-  - **Sequential Thinking**: [Reference](https://github.com/docker/mcp-registry/blob/main/servers/sequentialthinking.yaml)
-  - **Playwright**, **Tavily**, **Chrome DevTools**, etc.
+複数の MCP サーバーを Docker コンテナ内で一括実行する集中管理ゲートウェイです。
+- **ステータス**: 有効
+- **ゲートウェイ URL**: `http://localhost:10888/sse`
+- **リファレンス**: [docker/mcp-registry](https://github.com/docker/mcp-registry)
+- **含まれるツール (`mcp/config.yaml` で管理):**
+  - **GitHub Official**: [リファレンス](https://github.com/docker/mcp-registry/blob/main/servers/github.yaml)
+  - **Filesystem**: [リファレンス](https://github.com/docker/mcp-registry/blob/main/servers/filesystem.yaml)
+  - **SQLite**: [リファレンス](https://github.com/docker/mcp-registry/blob/main/servers/sqlite.yaml)
+  - **Sequential Thinking**: [リファレンス](https://github.com/docker/mcp-registry/blob/main/servers/sequentialthinking.yaml)
+  - **Playwright**, **Tavily**, **Chrome DevTools** など。
 
-### 2. Atlassian MCP (Direct SSE)
-Official MCP server for Atlassian products (Jira, Confluence).
-- **Status**: Enabled (Connected directly via SSE to handle browser-based OAuth natively in Gemini CLI)
-- **Repository**: [atlassian/atlassian-mcp-server](https://github.com/atlassian/atlassian-mcp-server)
-- **Endpoint**: `https://mcp.atlassian.com/v1/mcp`
+### 2. Atlassian MCP (SSE 直接接続)
+Atlassian 製品（Jira, Confluence）用の公式 MCP サーバーです。
+- **ステータス**: 有効（Gemini CLI から SSE で直接接続し、ブラウザベースの OAuth 認証をネイティブに処理）
+- **リポジトリ**: [atlassian/atlassian-mcp-server](https://github.com/atlassian/atlassian-mcp-server)
+- **エンドポイント**: `https://mcp.atlassian.com/v1/mcp`
 
-### 3. Skillport (Custom Docker Image)
-Professional development and AI skill management tool.
-- **Status**: Enabled (Running via Docker MCP Gateway)
-- **Repository**: [gotalab/skillport](https://github.com/gotalab/skillport)
-- **Image**: `ghcr.io/yohi/skillport:latest`
-- **Features**: Indexed search and loading of agent skills.
+### 3. Skillport (カスタム Docker イメージ)
+専門スキルの開発および AI スキル管理ツールです。
+- **ステータス**: 有効（Docker MCP Gateway 経由で実行）
+- **リポジトリ**: [gotalab/skillport](https://github.com/gotalab/skillport)
+- **イメージ**: `ghcr.io/yohi/skillport:latest`
+- **機能**: エージェントスキルのインデックス検索およびロード。
 
-## Configuration Files
-- `servers.yaml`: Master configuration for all AI agents (Gemini, Claude, etc.).
-- `config.yaml`: Defines which servers are enabled within the Docker MCP Gateway.
-- `catalogs/custom.yaml.template`: Template for custom server definitions (like Skillport).
+## 設定ファイル
+- `servers.yaml`: 全 AI エージェント（Gemini, Claude 等）のマスター設定ファイル。
+- `config.yaml`: Docker MCP Gateway 内で有効にするサーバーを定義。
+- `catalogs/custom.yaml.template`: カスタムサーバー（Skillport 等）の定義テンプレート。
 
-## Maintenance Scripts
-- `make sync-mcp`: Synchronizes configurations from `servers.yaml` to all agent-specific settings.
-- `make setup-docker-mcp`: Sets up the Docker MCP Gateway systemd service and environment.
-- `scripts/check-skillport-version.sh`: Checks if the Skillport image is up to date with PyPI.
+## メンテナンススクリプト
+- `make sync-mcp`: `servers.yaml` から各エージェント固有の設定ファイルへ同期を実行。
+- `make setup-docker-mcp`: Docker MCP Gateway の systemd サービスと環境をセットアップ。
+- `scripts/check-skillport-version.sh`: Skillport イメージが PyPI の最新版と一致するか確認。
