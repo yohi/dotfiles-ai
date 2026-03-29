@@ -7,7 +7,7 @@ RUN groupadd -r skillport && useradd -r -g skillport skillport
 RUN uv pip install --system skillport-mcp
 
 # 起動用エントリポイントスクリプトのコピー
-COPY mcp/entrypoint-skillport.sh /usr/local/bin/entrypoint.sh
+COPY entrypoint-skillport.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh && \
     chown skillport:skillport /usr/local/bin/entrypoint.sh
 
