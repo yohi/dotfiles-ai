@@ -16,6 +16,10 @@ echo "==> Rendering MCP catalogs..."
 sed -e "s|__HOME__|$ESCAPED_HOME|g" -e "s|__REPO_ROOT__|$ESCAPED_REPO_ROOT|g" "$REPO_ROOT/mcp/catalogs/custom.yaml.template" > "$REPO_ROOT/mcp/catalogs/custom.yaml"
 
 echo "==> Rendering centralized MCP client configs..."
+if [ -f "$REPO_ROOT/.env" ]; then
+    # .env ファイルの内容を環境変数としてエクスポート
+    export $(grep -v '^#' "$REPO_ROOT/.env" | xargs)
+fi
 uv run --with-requirements "$REPO_ROOT/requirements.txt" "$REPO_ROOT/scripts/render-mcp-configs.py"
 
 echo "==> Deploying Docker MCP catalog files..."

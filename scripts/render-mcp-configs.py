@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import json
 import json5
 import re
@@ -31,7 +32,10 @@ def parse_jsonc(text: str) -> dict[str, Any]:
 
 def replace_placeholders(value: Any, gateway_url: str) -> Any:
     if isinstance(value, str):
-        return value.replace("__GATEWAY_URL__", gateway_url)
+        # __GATEWAY_URL__ を置換
+        val = value.replace("__GATEWAY_URL__", gateway_url)
+        # ${VAR} 形式の環境変数を展開
+        return os.path.expandvars(val)
     if isinstance(value, list):
         return [replace_placeholders(item, gateway_url) for item in value]
     if isinstance(value, dict):
