@@ -60,7 +60,7 @@ if [ ! -f "$DOTENV_FILE" ]; then
     touch "$DOTENV_FILE"
 fi
 
-if ! grep -q "MCP_AUTH_TOKEN" "$DOTENV_FILE"; then
+if ! grep -qE '^[[:space:]]*MCP_AUTH_TOKEN=' "$DOTENV_FILE"; then
     # トークンを生成して .env に追加
     NEW_TOKEN=$(openssl rand -hex 16)
     echo "MCP_AUTH_TOKEN=$NEW_TOKEN" >> "$DOTENV_FILE"
