@@ -31,6 +31,7 @@ ln -sfn "$REPO_ROOT/mcp/catalogs/custom.yaml" "$HOME/.docker/mcp/catalogs/custom
 
 echo "==> Deploying Gemini CLI settings..."
 mkdir -p "$HOME/.gemini/shared"
+cp "$REPO_ROOT/gemini/settings.json" "$HOME/.gemini/settings.json"
 cp "$REPO_ROOT/gemini/settings.json" "$HOME/.gemini/shared/settings.json"
 
 echo "✅ MCP configurations synchronized from mcp/servers.yaml"
