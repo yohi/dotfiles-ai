@@ -59,6 +59,15 @@ DOTENV_FILE="$REPO_ROOT/.env"
 if [ ! -f "$DOTENV_FILE" ]; then
     touch "$DOTENV_FILE"
 fi
+
+if ! grep -q "MCP_AUTH_TOKEN" "$DOTENV_FILE"; then
+    # トークンを生成して .env に追加
+    NEW_TOKEN=$(openssl rand -hex 16)
+    echo "MCP_AUTH_TOKEN=$NEW_TOKEN" >> "$DOTENV_FILE"
+    echo "MCP_GATEWAY_AUTH_TOKEN=$NEW_TOKEN" >> "$DOTENV_FILE"
+    echo -e "${GREEN}✅ Generated new MCP_AUTH_TOKEN and added to .env${NC}"
+fi
+
 chmod 600 "$DOTENV_FILE"
 echo -e "${GREEN}✅ Shared .env file is ready.${NC}"
 

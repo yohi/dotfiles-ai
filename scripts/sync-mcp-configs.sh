@@ -26,3 +26,15 @@ cp "$REPO_ROOT/mcp/catalogs/bootstrap.yaml" "$HOME/.docker/mcp/catalogs/bootstra
 ln -sfn "$REPO_ROOT/mcp/catalogs/custom.yaml" "$HOME/.docker/mcp/catalogs/custom.yaml"
 
 echo "✅ MCP configurations synchronized from mcp/servers.yaml"
+
+# Update systemd service with current token if it exists
+SERVICE_FILE="$HOME/.config/systemd/user/docker-mcp-gateway.service"
+if [ -f "$REPO_ROOT/.env" ] && [ -f "$SERVICE_FILE" ]; then
+    TOKEN=$(grep "MCP_AUTH_TOKEN" "$REPO_ROOT/.env" | cut -d'=' -f2)
+    if [ -n "$TOKEN" ]; then
+        echo "🔄 Updating systemd service with current token..."
+        sed -i "/Environment=\"MCP_GATEWAY_AUTH_TOKEN=/d" "$SERVICE_FILE"
+        sed -i "/\[Service\]/a Environment=\"MCP_GATEWAY_AUTH_TOKEN=$TOKEN\"" "$SERVICE_FILE"
+        systemctl --user daemon-reload
+    fi
+fi
