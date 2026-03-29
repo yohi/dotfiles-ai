@@ -8,6 +8,7 @@ __author__ = "SuperGemini Team"
 __license__ = "MIT"
 
 import os
+import re
 import json
 import logging
 from pathlib import Path
@@ -61,7 +62,8 @@ def expand_env_vars(obj: Any) -> Any:
     設定値内の ${VAR} 形式の環境変数を展開する
     """
     if isinstance(obj, str):
-        return os.path.expandvars(obj)
+        # ${VAR} 形式のみを置換 (os.path.expandvars は $VAR も置換してしまうため)
+        return re.sub(r"\$\{([^}]+)\}", lambda m: os.environ.get(m.group(1), m.group(0)), obj)
     elif isinstance(obj, list):
         return [expand_env_vars(item) for item in obj]
     elif isinstance(obj, dict):
