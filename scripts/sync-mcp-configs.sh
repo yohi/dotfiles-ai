@@ -29,6 +29,10 @@ sed -e "s|__HOME__|$ESCAPED_HOME|g" -e "s|__REPO_ROOT__|$ESCAPED_REPO_ROOT|g" "$
 cp "$REPO_ROOT/mcp/catalogs/bootstrap.yaml" "$HOME/.docker/mcp/catalogs/bootstrap.yaml"
 ln -sfn "$REPO_ROOT/mcp/catalogs/custom.yaml" "$HOME/.docker/mcp/catalogs/custom.yaml"
 
+echo "==> Deploying Gemini CLI settings..."
+mkdir -p "$HOME/.gemini/shared"
+cp "$REPO_ROOT/gemini/settings.json" "$HOME/.gemini/shared/settings.json"
+
 echo "✅ MCP configurations synchronized from mcp/servers.yaml"
 
 # Update systemd service with current token if it exists
