@@ -22,7 +22,7 @@ agents:
     servers:
       docker-mcp-gateway:
         type: sse
-        url: http://localhost:10888/sse
+        url: http://127.0.0.1:10888/sse
         headers:
           Authorization: Bearer ${MCP_AUTH_TOKEN}
         timeout: 60000
