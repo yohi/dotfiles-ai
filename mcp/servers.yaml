@@ -22,7 +22,9 @@ agents:
     servers:
       docker-mcp-gateway:
         type: sse
-        httpUrl: http://localhost:10888/sse?token=${MCP_AUTH_TOKEN}
+        httpUrl: http://localhost:10888/sse
+        headers:
+          Authorization: Bearer ${MCP_AUTH_TOKEN}
         timeout: 60000
       atlassian:
         type: sse
