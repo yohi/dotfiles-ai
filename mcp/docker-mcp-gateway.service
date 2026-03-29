@@ -11,7 +11,8 @@ ExecStart=/usr/bin/env docker mcp gateway run \
   --transport sse \
   --port 10888 \
   --catalog %h/.docker/mcp/catalogs/bootstrap.yaml \
-  --catalog %h/.docker/mcp/catalogs/custom.yaml
+  --catalog %h/.docker/mcp/catalogs/custom.yaml \
+  --secrets __REPO_ROOT__/.env
 Restart=always
 RestartSec=5
 

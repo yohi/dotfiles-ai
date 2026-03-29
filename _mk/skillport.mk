@@ -5,7 +5,7 @@
 SKILLPORT_SKILLS_DIR ?= $(HOME)/.skillport/skills
 AGENT_SKILLS_REPO_ROOT ?= $(REPO_ROOT)/agent-skills
 
-.PHONY: skillport install-skillport setup-skillport check-skillport
+.PHONY: skillport install-skillport setup-skillport check-skillport check-skillport-version
 
 # SkillPort のインストールとセットアップ
 skillport: ## SkillPortのインストールとセットアップ
@@ -49,6 +49,7 @@ setup-skillport: ## SkillPort のディレクトリ構成をセットアップ
 
 # SkillPort の状態確認
 check-skillport: ## SkillPort の状態を確認
+	@$(MAKE) check-skillport-version || true
 	@echo "🔍 SkillPort の状態確認..."
 	@if command -v skillport >/dev/null 2>&1; then \
 		echo "✅ skillport: $$(skillport --version 2>/dev/null || echo installed)"; \
@@ -82,3 +83,8 @@ check-skillport: ## SkillPort の状態を確認
 	else \
 		echo "⚠️  skills: $(SKILLPORT_SKILLS_DIR) is not a symlink"; \
 	fi
+
+# SkillPort のバージョン確認 (GHCR vs PyPI)
+check-skillport-version: ## SkillPort のコンテナと PyPI のバージョンを比較
+	@echo "🔍 SkillPort のバージョン比較を確認中..."
+	@bash scripts/check-skillport-version.sh

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import json
 import json5
 import re
@@ -31,7 +32,21 @@ def parse_jsonc(text: str) -> dict[str, Any]:
 
 def replace_placeholders(value: Any, gateway_url: str) -> Any:
     if isinstance(value, str):
-        return value.replace("__GATEWAY_URL__", gateway_url)
+        # __GATEWAY_URL__ を置換
+        val = value.replace("__GATEWAY_URL__", gateway_url)
+        
+        # ${VAR} 形式の環境変数を探し、存在を確認する
+        # (os.path.expandvars は未定義の変数を空文字に変換してしまうため)
+        env_vars = re.findall(r"\$\{([^}]+)\}", val)
+        for var in env_vars:
+            if var not in os.environ:
+                raise ValueError(
+                    f"Required environment variable '{var}' is not set. "
+                    "Please check your .env file or environment."
+                )
+        
+        # すべて存在することが確認できたら展開
+        return os.path.expandvars(val)
     if isinstance(value, list):
         return [replace_placeholders(item, gateway_url) for item in value]
     if isinstance(value, dict):

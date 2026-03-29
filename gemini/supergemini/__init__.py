@@ -8,9 +8,11 @@ __author__ = "SuperGemini Team"
 __license__ = "MIT"
 
 import os
+import re
 import json
 import logging
 from pathlib import Path
+from typing import Any
 
 # グローバル定数
 HOME_DIR = str(Path.home())
@@ -55,6 +57,20 @@ logging.basicConfig(
 logger = logging.getLogger("SuperGemini")
 
 
+def expand_env_vars(obj: Any) -> Any:
+    """
+    設定値内の ${VAR} 形式の環境変数を展開する
+    """
+    if isinstance(obj, str):
+        # ${VAR} 形式のみを置換 (os.path.expandvars は $VAR も置換してしまうため)
+        return re.sub(r"\$\{([^}]+)\}", lambda m: os.environ.get(m.group(1), m.group(0)), obj)
+    elif isinstance(obj, list):
+        return [expand_env_vars(item) for item in obj]
+    elif isinstance(obj, dict):
+        return {key: expand_env_vars(val) for key, val in obj.items()}
+    return obj
+
+
 def get_config():
     """
     SuperGeminiの設定を読み込む
@@ -62,7 +78,8 @@ def get_config():
     if os.path.exists(CONFIG_PATH):
         try:
             with open(CONFIG_PATH, "r") as f:
-                return json.load(f)
+                config = json.load(f)
+                return expand_env_vars(config)
         except Exception as e:
             logger.error(f"設定ファイルの読み込みエラー: {e}")
             return {}

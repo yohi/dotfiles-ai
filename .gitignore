@@ -27,3 +27,5 @@ ide/cursor/mcp.json
 # Worktrees
 .worktrees/
 .worktrees
+gemini/settings.json
+claude/claude-settings.json
