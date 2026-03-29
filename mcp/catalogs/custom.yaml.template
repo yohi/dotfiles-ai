@@ -23,7 +23,7 @@ registry:
     description: Professional development and AI skill management.
     title: Skillport
     type: server
-    image: ghcr.io/yohi/skillport:latest
+    image: ghcr.io/yohi/skillport@sha256:<CI_COMMIT_SHA>
     command:
       - --skip-auto-reindex
     env:
