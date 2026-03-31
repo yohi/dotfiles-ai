@@ -3,7 +3,7 @@
 > [!CAUTION]
 > **本ドキュメントはアーカイブ済みです。**
 > この計画（.env ファイルを使用した MCP_GATEWAY_AUTH_TOKEN の管理、scripts/setup-docker-mcp.sh の更新など）は、`stdio` ベースの構成への移行に伴い廃止されました。
-> 現在の推奨される手順については、[docs/plans/2026-03-24-revert-to-stdio.md](2026-03-24-revert-to-stdio.md) を参照してください。
+> 現在の推奨される手順については、[_docs/plans/2026-03-24-revert-to-stdio.md](2026-03-24-revert-to-stdio.md) を参照してください。
 
 ## Implementation Plan (Superseded by stdio configuration)
 
@@ -55,7 +55,7 @@ Ensure the service still gets the token correctly (either by sourcing `.env` or 
 **Step 4: Commit**
 
 ```bash
-git add scripts/setup-docker-mcp.sh
+git add _scripts/setup-docker-mcp.sh
 git commit -m "feat(mcp): use root .env for auth token storage"
 ```
 
@@ -63,7 +63,7 @@ git commit -m "feat(mcp): use root .env for auth token storage"
 
 **Step 1: Run the setup**
 
-Run: `./scripts/setup-docker-mcp.sh && make setup-antigravity`
+Run: `./_scripts/setup-docker-mcp.sh && make setup-antigravity`
 
 **Step 2: Check .env content**
 

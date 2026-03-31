@@ -110,7 +110,7 @@ git commit -m "fix(codex): remove machine-specific absolute path"
 **Step 4: コミット**
 
 ```bash
-git add docs/plans/*.md
+git add _docs/plans/*.md
 git commit -m "docs(plans): fix markdown lint and improve validation scripts"
 ```
 

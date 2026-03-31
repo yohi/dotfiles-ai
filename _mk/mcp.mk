@@ -4,11 +4,11 @@ mcp: setup-docker-mcp
 
 setup-docker-mcp:
 	@echo "🐳 Docker MCPの設定をセットアップ中..."
-	@bash scripts/setup-docker-mcp.sh
+	@bash _scripts/setup-docker-mcp.sh
 	@echo "✅ Docker MCPの設定が完了しました。"
 
 sync-mcp: ## Render and synchronize centralized MCP configs
-	@bash scripts/sync-mcp-configs.sh
+	@bash _scripts/sync-mcp-configs.sh
 	@if systemctl --user is-active docker-mcp-gateway.service > /dev/null 2>&1; then \
 		echo "🔄 Restarting Docker MCP Gateway to pick up changes..."; \
 		systemctl --user restart docker-mcp-gateway.service; \

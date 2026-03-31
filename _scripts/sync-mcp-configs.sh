@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/sync-mcp-configs.sh
+# _scripts/sync-mcp-configs.sh
 set -euo pipefail
 
 # Preflight check for uv

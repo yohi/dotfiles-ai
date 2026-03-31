@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# scripts/sync_agents.sh
+# _scripts/sync_agents.sh
 # description: skillport doc を実行して AGENTS.md を生成し、
 #              その内容を global-rules/AGENTS.global.md に上書き同期する。
 #

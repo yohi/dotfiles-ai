@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/check-skillport-version.sh
+# _scripts/check-skillport-version.sh
 set -euo pipefail
 
 # PyPIから最新バージョンを取得 (python3を使用して堅牢に)

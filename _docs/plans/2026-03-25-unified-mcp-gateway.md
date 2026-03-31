@@ -51,7 +51,7 @@ git commit -m "feat(mcp): add skillport server definition to custom catalog"
 
 ```bash
 #!/usr/bin/env bash
-# scripts/sync-mcp-configs.sh
+# _scripts/sync-mcp-configs.sh
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -121,7 +121,7 @@ echo "✅ MCP configurations synchronized."
 **Step 2: 実行権限の付与と Makefile への統合**
 
 ```bash
-chmod +x scripts/sync-mcp-configs.sh
+chmod +x _scripts/sync-mcp-configs.sh
 ```
 
 `Makefile` の `setup-agents` ターゲットなどに `scripts/sync-mcp-configs.sh` を追加。
@@ -129,7 +129,7 @@ chmod +x scripts/sync-mcp-configs.sh
 **Step 3: Commit**
 
 ```bash
-git add scripts/sync-mcp-configs.sh Makefile
+git add _scripts/sync-mcp-configs.sh Makefile
 git commit -m "feat(mcp): add config synchronization script"
 ```
 
@@ -137,7 +137,7 @@ git commit -m "feat(mcp): add config synchronization script"
 
 **Step 1: 同期スクリプトの実行**
 
-Run: `./scripts/sync-mcp-configs.sh`
+Run: `./_scripts/sync-mcp-configs.sh`
 
 **Step 2: Gemini CLI での確認**
 

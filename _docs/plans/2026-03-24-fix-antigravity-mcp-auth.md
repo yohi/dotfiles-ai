@@ -3,7 +3,7 @@
 > [!CAUTION]
 > **本ドキュメントはアーカイブ済みです。**
 > この計画（MCP_GATEWAY_AUTH_TOKEN の設定、docker-mcp-gateway.service への環境変数追加、Authorization/Bearer ヘッダーの使用など）は、`stdio` ベースの構成への移行に伴い廃止されました。
-> 現在の推奨される手順については、[docs/plans/2026-03-24-revert-to-stdio.md](2026-03-24-revert-to-stdio.md) を参照してください。
+> 現在の推奨される手順については、[_docs/plans/2026-03-24-revert-to-stdio.md](2026-03-24-revert-to-stdio.md) を参照してください。
 
 ## Implementation Plan (Superseded by stdio configuration)
 
@@ -35,7 +35,7 @@ Check the `cat <<EOF > "$SERVICE_FILE"` block.
 **Step 3: Commit**
 
 ```bash
-git add scripts/setup-docker-mcp.sh
+git add _scripts/setup-docker-mcp.sh
 git commit -m "fix(mcp): add auth token support to docker-mcp-gateway service"
 ```
 
@@ -46,7 +46,7 @@ git commit -m "fix(mcp): add auth token support to docker-mcp-gateway service"
 
 **Step 1: Run the setup script**
 
-Run: `./scripts/setup-docker-mcp.sh`
+Run: `./_scripts/setup-docker-mcp.sh`
 
 **Step 2: Verify the service is running with the token**
 

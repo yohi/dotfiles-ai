@@ -87,4 +87,4 @@ check-skillport: ## SkillPort の状態を確認
 # SkillPort のバージョン確認 (GHCR vs PyPI)
 check-skillport-version: ## SkillPort のコンテナと PyPI のバージョンを比較
 	@echo "🔍 SkillPort のバージョン比較を確認中..."
-	@bash scripts/check-skillport-version.sh
+	@bash _scripts/check-skillport-version.sh

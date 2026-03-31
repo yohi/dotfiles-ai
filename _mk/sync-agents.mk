@@ -38,7 +38,7 @@ sync-agents: ## SSOTのスキル群を各エージェントの設定ファイル
 # ============================================================
 # sync-skillport-doc: skillport doc の実行と AGENTS.global.md への同期
 # ============================================================
-sync-skillport-doc: ## scripts/sync_agents.sh を実行し、スキル一覧の生成とグローバル設定への同期を行う
+sync-skillport-doc: ## _scripts/sync_agents.sh を実行し、スキル一覧の生成とグローバル設定への同期を行う
 	@echo "📝 skillport doc: スキルテーブルを更新・同期中..."
 	@bash $(REPO_ROOT)/scripts/sync_agents.sh
 
@@ -150,7 +150,7 @@ link-agent-commands: ## agent-commands/ のコマンドを各エージェント�
 # ============================================================
 # inject-meta-prompt-opencode: OpenCode docs への参照リンク作成
 # ============================================================
-inject-meta-prompt-opencode: ## OpenCode の docs/ に global-rules/ へのシンボリックリンクを作成
+inject-meta-prompt-opencode: ## OpenCode の _docs/ に global-rules/ へのシンボリックリンクを作成
 	@echo "📌 OpenCode: global-rules への参照リンクを作成中..."
 	@mkdir -p "$(OPENCODE_DOCS)"
 	@if [ -L "$(OPENCODE_DOCS)/global-rules" ]; then \

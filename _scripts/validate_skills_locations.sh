@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/validate_skills_locations.sh
+# _scripts/validate_skills_locations.sh
 
 set -euo pipefail
 

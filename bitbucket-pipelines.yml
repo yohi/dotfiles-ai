@@ -6,12 +6,12 @@ pipelines:
     - step:
         name: Validate Skill Locations
         script:
-          - chmod +x scripts/validate_skills_locations.sh
-          - ./scripts/validate_skills_locations.sh
+          - chmod +x _scripts/validate_skills_locations.sh
+          - ./_scripts/validate_skills_locations.sh
   pull-requests:
     '**':
       - step:
           name: Validate Skill Locations
           script:
-            - chmod +x scripts/validate_skills_locations.sh
-            - ./scripts/validate_skills_locations.sh
+            - chmod +x _scripts/validate_skills_locations.sh
+            - ./_scripts/validate_skills_locations.sh

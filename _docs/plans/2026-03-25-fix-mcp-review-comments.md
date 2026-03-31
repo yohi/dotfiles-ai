@@ -23,7 +23,7 @@
 **Step 1: setup スクリプトでトークンを自動生成するロジックを追加**
 
 ```bash
-# scripts/setup-docker-mcp.sh 内
+# _scripts/setup-docker-mcp.sh 内
 if ! grep -q "MCP_GATEWAY_AUTH_TOKEN" "$REPO_ROOT/.env" 2>/dev/null; then
     TOKEN=$(openssl rand -hex 32)
     echo "MCP_GATEWAY_AUTH_TOKEN=$TOKEN" >> "$REPO_ROOT/.env"
@@ -42,7 +42,7 @@ ExecStart=/usr/bin/docker mcp gateway run ... (トークンのハードコード
 **Step 3: 同期スクリプトで .env からトークンを読み込むように修正**
 
 ```bash
-# scripts/sync-mcp-configs.sh
+# _scripts/sync-mcp-configs.sh
 # Extract MCP_GATEWAY_AUTH_TOKEN from .env safely
 MCP_GATEWAY_AUTH_TOKEN=$(grep -m1 '^MCP_GATEWAY_AUTH_TOKEN=' "$REPO_ROOT/.env" | cut -d'=' -f2- | tr -d '"'\''')
 AUTH_TOKEN="$MCP_GATEWAY_AUTH_TOKEN"
@@ -51,7 +51,7 @@ AUTH_TOKEN="$MCP_GATEWAY_AUTH_TOKEN"
 **Step 4: Commit**
 
 ```bash
-git add scripts/setup-docker-mcp.sh mcp/docker-mcp-gateway.service scripts/sync-mcp-configs.sh
+git add _scripts/setup-docker-mcp.sh mcp/docker-mcp-gateway.service _scripts/sync-mcp-configs.sh
 git commit -m "chore(mcp): dynamic auth token generation and security hardening"
 ```
 
@@ -81,7 +81,7 @@ eventSource.onerror = (err) => {
 **Step 3: Commit**
 
 ```bash
-git add scripts/mcp-sse-proxy.js
+git add _scripts/mcp-sse-proxy.js
 git commit -m "fix(mcp): comply with SSE transport spec for endpoint discovery"
 ```
 

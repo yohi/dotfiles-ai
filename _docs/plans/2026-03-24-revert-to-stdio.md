@@ -58,11 +58,11 @@ Remove all code related to generating/managing `docker-mcp-proxy.service` and th
 
 **Step 2: Remove the proxy script**
 
-Run: `rm scripts/mcp-sse-proxy.js`
+Run: `rm _scripts/mcp-sse-proxy.js`
 
 **Step 3: Run the updated setup and make**
 
-Run: `./scripts/setup-docker-mcp.sh && make setup-antigravity`
+Run: `./_scripts/setup-docker-mcp.sh && make setup-antigravity`
 
 **Step 4: Stop and remove unused services**
 
@@ -72,7 +72,7 @@ Run: `systemctl --user disable docker-mcp-proxy.service docker-mcp-gateway.servi
 **Step 5: Commit**
 
 ```bash
-git add scripts/setup-docker-mcp.sh
+git add _scripts/setup-docker-mcp.sh
 git commit -m "chore(mcp): remove SSE proxy and gateway services"
 ```
 

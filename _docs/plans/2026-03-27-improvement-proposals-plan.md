@@ -35,9 +35,9 @@ json5>=0.9.22
 
 ```makefile
 lint:
-	@echo "==> Running Ruff and Mypy on scripts/"
-	ruff check scripts/
-	mypy scripts/
+	@echo "==> Running Ruff and Mypy on _scripts/"
+	ruff check _scripts/
+	mypy _scripts/
 ```
 
 **Step 3: 古いCI設定の削除**
@@ -116,7 +116,7 @@ if __name__ == "__main__":
 
 **Step 2: テストの実行と確認**
 
-Run: `python scripts/test_render_configs.py`
+Run: `python _scripts/test_render_configs.py`
 Expected: `Test passed` と出力されること
 
 **Step 3: スクリプトの `parse_jsonc` 置き換え**
@@ -131,13 +131,13 @@ def parse_jsonc(text: str) -> dict[str, Any]:
 
 **Step 4: スクリプトの動作確認**
 
-Run: `python scripts/render-mcp-configs.py`
+Run: `python _scripts/render-mcp-configs.py`
 Expected: エラー無く実行され、`rendered ...` 等が出力されること。
 
 **Step 5: コミット**
 
 ```bash
-git add scripts/render-mcp-configs.py scripts/test_render_configs.py
+git add _scripts/render-mcp-configs.py _scripts/test_render_configs.py
 git commit -m "refactor: replace custom jsonc parser with json5 library"
 ```
 
@@ -174,16 +174,16 @@ def write_json_file(path: Path, root_key: str, servers: dict[str, Any]) -> None:
 
 **Step 2: テスト実行（初回）**
 
-Run: `python scripts/render-mcp-configs.py`
+Run: `python _scripts/render-mcp-configs.py`
 
 **Step 3: テスト実行（2回目）**
 
-Run: `python scripts/render-mcp-configs.py`
+Run: `python _scripts/render-mcp-configs.py`
 Expected: 2回目は内容に差分がないためファイルの内容は更新されない。スクリプトが問題なく終了すること。
 
 **Step 4: コミット**
 
 ```bash
-git add scripts/render-mcp-configs.py
+git add _scripts/render-mcp-configs.py
 git commit -m "perf: ensure idempotency by skipping unchanged files"
 ```

@@ -49,7 +49,7 @@ WantedBy=default.target
 **Step 2: セットアップスクリプトにサービス有効化ロジックを追加**
 
 ```bash
-# scripts/setup-docker-mcp.sh
+# _scripts/setup-docker-mcp.sh
 echo "==> Setting up systemd service..."
 mkdir -p "$HOME/.config/systemd/user"
 cp "$REPO_ROOT/mcp/docker-mcp-gateway.service" "$HOME/.config/systemd/user/"
@@ -61,7 +61,7 @@ systemctl --user restart docker-mcp-gateway.service
 **Step 3: Commit**
 
 ```bash
-git add mcp/docker-mcp-gateway.service scripts/setup-docker-mcp.sh
+git add mcp/docker-mcp-gateway.service _scripts/setup-docker-mcp.sh
 git commit -m "feat(mcp): add systemd service for sse gateway"
 ```
 
@@ -74,7 +74,7 @@ git commit -m "feat(mcp): add systemd service for sse gateway"
 
 ```javascript
 #!/usr/bin/env node
-// scripts/mcp-sse-proxy.js
+// _scripts/mcp-sse-proxy.js
 // Proxies stdio to an MCP SSE server.
 
 const { EventSource } = require('eventsource');
@@ -131,7 +131,7 @@ process.stdin.on('data', async (data) => {
 **Step 2: Commit**
 
 ```bash
-git add scripts/mcp-sse-proxy.js
+git add _scripts/mcp-sse-proxy.js
 git commit -m "feat(mcp): add sse-to-stdio proxy script for Cursor"
 ```
 
