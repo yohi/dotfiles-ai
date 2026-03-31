@@ -30,15 +30,15 @@ uv run --with-requirements "$REPO_ROOT/requirements.txt" "$REPO_ROOT/_scripts/re
 
 echo "==> Deploying Docker MCP catalog files..."
 mkdir -p "$HOME/.docker/mcp/catalogs"
-cp "$REPO_ROOT/mcp/catalog.json" "$HOME/.docker/mcp/catalog.json"
+ln -sfn "$REPO_ROOT/mcp/catalog.json" "$HOME/.docker/mcp/catalog.json"
 sed -e "s|__HOME__|$ESCAPED_HOME|g" -e "s|__REPO_ROOT__|$ESCAPED_REPO_ROOT|g" "$REPO_ROOT/mcp/config.yaml" > "$HOME/.docker/mcp/config.yaml"
-cp "$REPO_ROOT/mcp/catalogs/bootstrap.yaml" "$HOME/.docker/mcp/catalogs/bootstrap.yaml"
+ln -sfn "$REPO_ROOT/mcp/catalogs/bootstrap.yaml" "$HOME/.docker/mcp/catalogs/bootstrap.yaml"
 ln -sfn "$REPO_ROOT/mcp/catalogs/custom.yaml" "$HOME/.docker/mcp/catalogs/custom.yaml"
 
 echo "==> Deploying Gemini CLI settings..."
 mkdir -p "$HOME/.gemini/shared"
-cp "$REPO_ROOT/gemini/settings.json" "$HOME/.gemini/settings.json"
-cp "$REPO_ROOT/gemini/settings.json" "$HOME/.gemini/shared/settings.json"
+ln -sfn "$REPO_ROOT/gemini/settings.json" "$HOME/.gemini/settings.json"
+ln -sfn "$REPO_ROOT/gemini/settings.json" "$HOME/.gemini/shared/settings.json"
 
 echo "✅ MCP configurations synchronized from mcp/servers.yaml"
 
