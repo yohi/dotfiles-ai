@@ -150,7 +150,7 @@ link-agent-commands: ## agent-commands/ のコマンドを各エージェント�
 # ============================================================
 # inject-meta-prompt-opencode: OpenCode docs への参照リンク作成
 # ============================================================
-inject-meta-prompt-opencode: ## OpenCode の _docs/ に global-rules/ へのシンボリックリンクを作成
+inject-meta-prompt-opencode: ## OpenCode の docs/ に global-rules/ へのシンボリックリンクを作成
 	@echo "📌 OpenCode: global-rules への参照リンクを作成中..."
 	@mkdir -p "$(OPENCODE_DOCS)"
 	@if [ -L "$(OPENCODE_DOCS)/global-rules" ]; then \

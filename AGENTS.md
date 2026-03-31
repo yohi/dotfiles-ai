@@ -6,7 +6,7 @@
 This repository is part of the **dotfiles polyrepo** managed by [dotfiles-core](https://github.com/yohi/dotfiles).
 
 ### ⚠️ CRITICAL: SYMBOLIC LINK & STANDALONE USAGE
-- **Standalone usage is NOT supported.** This repository depends on the central `common-mk` rules.
+- **Standalone usage is NOT supported.** 公式にはサポートされていませんが、自己責任での単体使用は可能であり、使用する場合は symbolic links と ARCHITECTURE.md に従い、共通ライブラリ（dotfiles-core）を上書きしないことを前提としてください.
 - **Symbolic Links:** This repository relies on symbolic links to `common-mk`. **NEVER** suggest or perform a replacement of these symbolic links with physical files/directories. 
 - **SSOT:** Always respect the "Single Source of Truth" principle. Shared logic resides in `dotfiles-core`, and components must remain thin wrappers or specific configurations.
 - **Architectural Compliance:** All modifications must adhere to the layout defined in the central [ARCHITECTURE.md](https://github.com/yohi/dotfiles/blob/master/docs/ARCHITECTURE.md).
@@ -186,3 +186,7 @@ This project employs the [obra/superpowers](https://github.com/obra/superpowers)
 - **TDD:** Follow the `test-driven-development` skill for all implementations by writing tests before implementation code.
 - **Verification:** Execute `verification-before-completion` before finishing a task and provide success reports based on empirical evidence.
 ## END Superpowers Workflow
+
+## 単体使用時の注意点
+
+公式にはサポートされていませんが、自己責任での単体使用は可能であり、使用する場合は symbolic links と ARCHITECTURE.md に従い、共通ライブラリ（dotfiles-core）を上書きしないことを前提としてください.
