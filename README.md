@@ -7,7 +7,7 @@ AIエージェント（Claude Code, Gemini CLI, OpenCode, Codex）の設定・�
 ## 管理と共存関係
 
 > [!IMPORTANT]
-> 本リポジトリは [dotfiles-core](https://github.com/yohi/dotfiles) によって管理されるコンポーネントの一つです。
+> 本リポジトリは [dotfiles-core](https://github.com/yohi/dotfiles-core) によって管理されるコンポーネントの一つです。
 
 > [!WARNING]
 > **使用時の注意点**
