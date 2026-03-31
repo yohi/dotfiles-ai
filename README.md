@@ -1,17 +1,19 @@
 # dotfiles-ai
 
-## 管理と共存関係
-
-本リポジトリは [dotfiles-core](https://github.com/yohi/dotfiles-core) によって管理されるコンポーネントの一つです。
-
-### ⚠️ 使用時の注意点
-本リポジトリは `dotfiles-core` の共通 Makefile ルール（`common-mk`）に依存しており、実行時には `common-mk` へのシンボリックリンクが必要です。そのため、**本リポジトリ単体での使用（クローンしての利用）はサポートされていません。**
-
-推奨される使用方法は、`dotfiles-core` リポジトリから `make setup` を実行し、適切なディレクトリ構造とシンボリックリンクが構成された状態で利用することです。
-
 AIエージェント（Claude Code, Gemini CLI, OpenCode, Codex）の設定・スキル・ルールを一元管理するコンポーネントリポジトリです。
 `dotfiles-core` と連携して動作します。
 **SSOT（Single Source of Truth）** 方式で、共通のスキル定義とコーディングルールを管理し、各エージェントへ自動配備します。
+
+## 管理と共存関係
+
+> [!IMPORTANT]
+> 本リポジトリは [dotfiles-core](https://github.com/yohi/dotfiles) によって管理されるコンポーネントの一つです。
+
+> [!WARNING]
+> **使用時の注意点**
+> 本リポジトリは `dotfiles-core` の共通 Makefile ルール（`common-mk`）に依存しており、実行時には `common-mk` へのシンボリックリンクが必要です。そのため、**本リポジトリ単体での使用（クローンしての利用）はサポートされていません。**
+>
+> 推奨される使用方法は、`dotfiles-core` リポジトリから `make setup` を実行し、適切なディレクトリ構造とシンボリックリンクが構成された状態で利用することです。
 
 ## ディレクトリ構成
 
@@ -63,7 +65,7 @@ AIエージェント（Claude Code, Gemini CLI, OpenCode, Codex）の設定・�
 
 [Docker MCP Gateway](https://docs.docker.com/ai/mcp-catalog-and-toolkit/mcp-gateway/) は、複数の MCP サーバーを統合し、共通の **SSE (Server-Sent Events)** エンドポイントを提供します。
 
-- **役割**: Claude Code, Gemini CLI, Antigravity, Cursor, OpenCode, VSCode から、単一の URL (`http://127.0.0.1:10888/sse`) 経由で複数の MCP サーバーにアクセス可能にします。
+- **役割**: Claude Code, Gemini CLI, Antigravity, Cursor, OpenCode, VSCode から、単一の URL (`http://127.0.0.1:10888/sse`) 経由 で複数の MCP サーバーにアクセス可能にします。
 - **管理 (Systemd)**: バックグラウンドサービスとして常駐します。
   - `make start-mcp`: ゲートウェイを起動。
   - `make stop-mcp`: ゲートウェイを停止。
