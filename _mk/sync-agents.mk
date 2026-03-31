@@ -40,7 +40,7 @@ sync-agents: ## SSOTのスキル群を各エージェントの設定ファイル
 # ============================================================
 sync-skillport-doc: ## _scripts/sync_agents.sh を実行し、スキル一覧の生成とグローバル設定への同期を行う
 	@echo "📝 skillport doc: スキルテーブルを更新・同期中..."
-	@bash $(REPO_ROOT)/_scripts/sync_agents.sh
+	@bash "$(REPO_ROOT)/_scripts/sync_agents.sh"
 
 # ============================================================
 # link-user-agents: ユーザーレベル AGENTS.global.md の存在確認
@@ -68,7 +68,7 @@ link-agent-commands: ## agent-commands/ のコマンドを各エージェント�
 	fi
 	@# --- OpenCode: .md シンボリックリンク ---
 	@mkdir -p "$(REPO_ROOT)/opencode/commands"
-	@for cmd in $(AGENT_CMDS_DIR)/*.md; do \
+	@for cmd in "$(AGENT_CMDS_DIR)"/*.md; do \
 		[ -f "$$cmd" ] || continue; \
 		base=$$(basename "$$cmd"); \
 		target="$(REPO_ROOT)/opencode/commands/$$base"; \
@@ -82,7 +82,7 @@ link-agent-commands: ## agent-commands/ のコマンドを各エージェント�
 	done
 	@# --- Claude Code: .md シンボリックリンク ---
 	@mkdir -p "$(REPO_ROOT)/claude/commands"
-	@for cmd in $(AGENT_CMDS_DIR)/*.md; do \
+	@for cmd in "$(AGENT_CMDS_DIR)"/*.md; do \
 		[ -f "$$cmd" ] || continue; \
 		base=$$(basename "$$cmd"); \
 		target="$(REPO_ROOT)/claude/commands/$$base"; \
@@ -97,7 +97,7 @@ link-agent-commands: ## agent-commands/ のコマンドを各エージェント�
 	@# --- Cursor IDE: .md シンボリックリンク ---
 	@mkdir -p "$(REPO_ROOT)/ide/cursor/commands/agent"
 	@mkdir -p "$(REPO_ROOT)/.cursor/rules"
-	@for cmd in $(AGENT_CMDS_DIR)/*.md; do \
+	@for cmd in "$(AGENT_CMDS_DIR)"/*.md; do \
 		[ -f "$$cmd" ] || continue; \
 		base=$$(basename "$$cmd"); \
 		target="$(REPO_ROOT)/ide/cursor/commands/agent/$$base"; \
@@ -118,7 +118,7 @@ link-agent-commands: ## agent-commands/ のコマンドを各エージェント�
 		fi; \
 	done
 	@# --- Cursor IDE: coderabbit コマンドのルール同期 ---
-	@for cmd in $(REPO_ROOT)/ide/cursor/commands/coderabbit/*.md; do \
+	@for cmd in "$(REPO_ROOT)"/ide/cursor/commands/coderabbit/*.md; do \
 		[ -f "$$cmd" ] || continue; \
 		base=$$(basename "$$cmd"); \
 		[ "$$base" = "README.md" ] && continue; \
@@ -133,7 +133,7 @@ link-agent-commands: ## agent-commands/ のコマンドを各エージェント�
 	done
 	@# --- Gemini CLI: .md → .toml 変換 ---
 	@mkdir -p "$(REPO_ROOT)/gemini/commands"
-	@for cmd in $(AGENT_CMDS_DIR)/*.md; do \
+	@for cmd in "$(AGENT_CMDS_DIR)"/*.md; do \
 		[ -f "$$cmd" ] || continue; \
 		base=$$(basename "$$cmd" .md); \
 		target="$(REPO_ROOT)/gemini/commands/$$base.toml"; \

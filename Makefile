@@ -2,7 +2,7 @@ include _mk/core.mk
 include _mk/help.mk
 
 # .PHONY targets
-.PHONY: install setup install-ai setup-ai
+.PHONY: all clean test install setup install-ai setup-ai
 
 # Include individual modules
 -include _mk/variables.mk
@@ -21,15 +21,36 @@ include _mk/help.mk
 -include _mk/ide-cursor.mk
 -include _mk/ide-vscode.mk
 
-# Top-level install and setup (delegates to _mk/main.mk which handles agents/ides)
-install: install-agents install-ides ## AI 関連コンポーネントの全インストール
-setup: setup-agents setup-ides ## AI 関連コンポーネントの全設定適用
+# Standard Makefile targets
+all: install ## 全てのコンポーネントをビルド/インストール
 
-# Component-specific targets (placeholder or direct implementation)
+clean: ## 生成されたアーティファクトとキャッシュを削除
+	@echo "🧹 クリーンアップ中..."
+	@$(MAKE) -s clean-legacy 2>/dev/null || true
+	@# _mk/main.mk の clean を呼び出し
+	@$(MAKE) -s -f _mk/main.mk clean REPO_ROOT=$(REPO_ROOT) 2>/dev/null || true
+	@rm -rf build/ dist/ *.pyc __pycache__ .ruff_cache .mypy_cache
+	@echo "✅ クリーンアップが完了しました"
+
+test: ## プロジェクトのテスト/静的解析を実行
+	@$(MAKE) lint
+
+# Top-level install and setup (delegated to _mk/main.mk)
+# install: install-agents install-ides (Defined in _mk/main.mk)
+# setup: setup-agents setup-ides (Defined in _mk/main.mk)
+
+# Component-specific targets (Core AI logic)
 install-ai: ## dotfiles-ai のコアコンポーネントをインストール
 	@echo "==> Installing dotfiles-ai core..."
-	@# TODO: Add specific core installation steps here
+	@if ! command -v npm >/dev/null 2>&1; then echo "❌ npm が見つかりません。Node.js をインストールしてください"; exit 1; fi
+	@if ! command -v python3 >/dev/null 2>&1; then echo "❌ python3 が見つかりません。Python をインストールしてください"; exit 1; fi
+	@$(MAKE) install-requirements
+	@echo "✅ dotfiles-ai のコアコンポーネントがインストールされました"
 
 setup-ai: ## dotfiles-ai のコア設定を適用
 	@echo "==> Setting up dotfiles-ai core..."
-	@# TODO: Add specific core setup steps here
+	@# MCP 設定のレンダリング
+	@$(MAKE) mcp-render
+	@# エージェントスキルの同期
+	@$(MAKE) sync-agents
+	@echo "✅ dotfiles-ai のコア設定が適用されました"
