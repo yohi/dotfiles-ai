@@ -66,10 +66,10 @@ install-requirements:
 		pip install -r requirements.txt; \
 	fi
 
-lint: ## Run Ruff and Mypy on scripts/
-	@echo "🔍 scripts/ に対して Ruff と Mypy を実行中..."
+lint: ## Run Ruff and Mypy on _scripts/
+	@echo "🔍 _scripts/ に対して Ruff と Mypy を実行中..."
 	@if command -v uv >/dev/null 2>&1; then \
-		$(PYTHON) ruff check scripts/ && $(PYTHON) mypy scripts/; \
+		$(PYTHON) ruff check _scripts/ && $(PYTHON) mypy _scripts/; \
 	else \
-		ruff check scripts/ && mypy scripts/; \
+		ruff check _scripts/ && mypy _scripts/; \
 	fi

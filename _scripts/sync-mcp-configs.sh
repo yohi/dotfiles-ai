@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/sync-mcp-configs.sh
+# _scripts/sync-mcp-configs.sh
 set -euo pipefail
 
 # Preflight check for uv
@@ -26,7 +26,7 @@ if [ -f "$REPO_ROOT/.env" ]; then
         export "$line"
     done < "$REPO_ROOT/.env"
 fi
-uv run --with-requirements "$REPO_ROOT/requirements.txt" "$REPO_ROOT/scripts/render-mcp-configs.py"
+uv run --with-requirements "$REPO_ROOT/requirements.txt" "$REPO_ROOT/_scripts/render-mcp-configs.py"
 
 echo "==> Deploying Docker MCP catalog files..."
 mkdir -p "$HOME/.docker/mcp/catalogs"

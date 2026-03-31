@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/setup-docker-mcp.sh
+# _scripts/setup-docker-mcp.sh
 set -euo pipefail
 
 # カラー定義

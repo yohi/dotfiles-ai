@@ -164,7 +164,7 @@
 
   "hooks": {
     "PermissionRequest": [
-      "scripts/auto-approve-git.sh"
+      "_scripts/auto-approve-git.sh"
     ]
   },
 

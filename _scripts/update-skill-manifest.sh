@@ -1,5 +1,5 @@
 #!/bin/bash
-# scripts/update-skill-manifest.sh: Update External Skills Manifest (Lock-file) table
+# _scripts/update-skill-manifest.sh: Update External Skills Manifest (Lock-file) table
 
 set -euo pipefail
 

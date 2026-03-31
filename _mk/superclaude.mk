@@ -116,10 +116,10 @@ install-packages-superclaude: ## SuperClaudeフレームワークをClaude Code�
 			echo "   バージョン: $$CURRENT_VERSION"; \
 		else \
 			echo "📥 SuperClaudeツールをインストール中..."; \
-			if [ -x "$(CURDIR)/scripts/install_superclaude.sh" ]; then \
-				bash $(CURDIR)/scripts/install_superclaude.sh || echo "⚠️  インストールに失敗しましたが続行します"; \
+			if [ -x "$(CURDIR)/_scripts/install_superclaude.sh" ]; then \
+				bash $(CURDIR)/_scripts/install_superclaude.sh || echo "⚠️  インストールに失敗しましたが続行します"; \
 			else \
-				echo "⚠️  skipping... (scripts/install_superclaude.shが見つかりません)"; \
+				echo "⚠️  skipping... (_scripts/install_superclaude.shが見つかりません)"; \
 			fi; \
 		fi; \
 	else \

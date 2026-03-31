@@ -4,7 +4,7 @@
 
 ## 1. ファイル分類と責任範囲
 
-| カテゴリ | 対象ファイル (mk/*.mk) | 責任範囲 |
+| カテゴリ | 対象ファイル (_mk/*.mk) | 責任範囲 |
 | :--- | :--- | :--- |
 | **Core** | `variables.mk`, `idempotency.mk`, `help.mk`, `presets.mk` | 定数定義、冪等性マクロ、ヘルプ表示、共通設定。 |
 | **Infrastructure** | `bitwarden.mk`, `system.mk`, `docker.mk` | OS 設定、パッケージマネージャ、秘密情報管理、コンテナ基盤。 |

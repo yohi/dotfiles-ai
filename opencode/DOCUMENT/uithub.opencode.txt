@@ -199,7 +199,7 @@
     │   │   └── bun.lock
     │   └── function/ (100 tokens)
     │   │   └── tsconfig.json
-    ├── docs/ (400 tokens)
+    ├── _docs/ (400 tokens)
     │   ├── openapi.json
     │   ├── images/ (300 tokens)
     │   │   ├── hero-dark.png
@@ -552,7 +552,7 @@
     │   ├── AGENTS.md
     │   ├── sst-env.d.ts
     │   ├── .gitignore
-    │   └── scripts/ (100 tokens)
+    │   └── _scripts/ (100 tokens)
     │   │   └── copy-bundles.ts
     ├── util/ (700 tokens)
     │   ├── src/ (400 tokens)

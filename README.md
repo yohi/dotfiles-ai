@@ -1,37 +1,17 @@
 # dotfiles-ai
 
-AIエージェント（Claude Code, Gemini CLI, OpenCode, Codex）の設定・スキル・ルールを一元管理するコンポーネントリポジトリです。
-`dotfiles-core` と連携して動作します。
-**SSOT（Single Source of Truth）** 方式で、共通のスキル定義とコーディングルールを管理し、各エージェントへ自動配備します。
-
-### 💡 設計思想: `dotfiles-ide` との境界線
-当リポジトリ（`dotfiles-ai`）は、**「AIの振る舞いとルール（頭脳）」** を一元管理する役割を担います。
-対して、`dotfiles-ide` は **「エディタとしての基本的な器と振る舞い（UI/UX）」** を管理します。
-*   **`dotfiles-ide`**: VS CodeやCursorのUI設定（`settings.json`）、キーバインド（`keybindings.json`）、拡張機能リストなどを管理。
-*   **`dotfiles-ai`** (本リポジトリ): AIエージェントへの指示（プロンプト）、SkillPortによるスキル管理、MCPハブ設定、エディタ向けAI設定（`mcp.json` や `supercursor` など）を管理。
-
-この「関心の分離」により、すべてのAIツールで統一されたペルソナを維持しつつ、エディタのUI設定と切り離してスケーラブルに運用します。
-
-## 管理と依存関係
+## 管理と共存関係
 
 本リポジトリは [dotfiles-core](https://github.com/yohi/dotfiles-core) によって管理されるコンポーネントの一つです。
 
-### ⚠️ 単体使用時の注意点
-本リポジトリは `dotfiles-core` の共通 Makefile ルール（`common-mk`）に依存しています。単体で使用（クローン）する場合は、以下の手順が必要です：
+### ⚠️ 使用時の注意点
+本リポジトリは `dotfiles-core` の共通 Makefile ルール（`common-mk`）に依存しており、実行時には `common-mk` へのシンボリックリンクが必要です。そのため、**本リポジトリ単体での使用（クローンしての利用）はサポートされていません。**
 
-1. `common-mk` ディレクトリを本リポジトリの親ディレクトリに配置するか、パスを適切に設定してください。
-2. `make help` を実行して、正しく設定されていることを確認してください。
+推奨される使用方法は、`dotfiles-core` リポジトリから `make setup` を実行し、適切なディレクトリ構造とシンボリックリンクが構成された状態で利用することです。
 
-推奨される使用方法は、`dotfiles-core` から `make setup` を実行することです。
-
-### 依存関係
-
-- Python スクリプト（`scripts/render-mcp-configs.py`）の実行には `PyYAML` が必要です。
-- 初回セットアップ時に以下を実行してください。
-
-```bash
-python3 -m pip install -r requirements.txt
-```
+AIエージェント（Claude Code, Gemini CLI, OpenCode, Codex）の設定・スキル・ルールを一元管理するコンポーネントリポジトリです。
+`dotfiles-core` と連携して動作します。
+**SSOT（Single Source of Truth）** 方式で、共通のスキル定義とコーディングルールを管理し、各エージェントへ自動配備します。
 
 ## ディレクトリ構成
 
@@ -133,7 +113,7 @@ python3 -m pip install -r requirements.txt
 - **ルールの編集**: 
   - ユーザー共通設定は `global-rules/AGENTS.global.md` を編集。
   - 個別のスキルは `agent-skills/*/SKILL.md` を編集。
-  - **MCP サーバーの追加**は `mcp/catalogs/custom.yaml.template` を編集。
+  - **MCP サーバーの追加**は `mcp/catalogs/custom.yaml.template` を編集.
   - **エージェント/IDE の接続設定変更**は `mcp/servers.yaml` を編集。
 - **同期コマンド**:
   - `make setup-docker-mcp`: Docker MCP Gateway のセットアップ。

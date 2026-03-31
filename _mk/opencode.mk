@@ -182,7 +182,7 @@ setup-opencode: ## OpenCode（opencode）の設定ファイルを適用
 	@$(call link_config,$(OPENCODE_DOTFILES_COMMANDS),$(OPENCODE_COMMANDS_PATH),commands)
 	@# skills/ の設定
 	@$(call link_config,$(OPENCODE_DOTFILES_SKILLS),$(OPENCODE_SKILLS_PATH),skills)
-	@# docs/ の設定
+	@# _docs/ の設定
 	@$(call link_config,$(OPENCODE_DOTFILES_DOCS),$(OPENCODE_DOCS_PATH),docs)
 	@$(call create_marker,setup-opencode,1)
 
