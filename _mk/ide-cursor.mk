@@ -91,7 +91,7 @@ _cursor_download:
 	API_URL="https://www.cursor.com/api/download?platform=linux-x64&releaseTrack=stable"; \
 	DOWNLOAD_URL=""; \
 	if command -v jq >/dev/null 2>&1; then \
-		API_RESPONSE=$$(curl -sL "$$API_URL" 2>/dev/null); \
+		API_RESPONSE=$$(curl -sL --connect-timeout 10 --max-time 30 "$$API_URL" 2>/dev/null); \
 		if [ -n "$$API_RESPONSE" ] && echo "$$API_RESPONSE" | jq . >/dev/null 2>&1; then \
 			DOWNLOAD_URL=$$(echo "$$API_RESPONSE" | jq -r '.downloadUrl' 2>/dev/null); \
 		fi; \
@@ -115,7 +115,6 @@ _cursor_download:
 					echo "   期待値: $(CURSOR_SHA256)"; \
 					echo "   実際値: $$ACTUAL_HASH"; \
 					rm -f cursor.AppImage; \
-					exit 1; \
 				else \
 					echo "✅ ハッシュ検証に成功しました"; \
 					VALID_DOWNLOAD=1; \
@@ -128,7 +127,6 @@ _cursor_download:
 				echo "   セキュリティポリシーにより、整合性検証のないインストールはブロックされます。"; \
 				echo "   CURSOR_NO_VERIFY_HASH=true でスキップできます。"; \
 				rm -f cursor.AppImage; \
-				exit 1; \
 			fi; \
 			if [ "$$VALID_DOWNLOAD" -eq 1 ]; then \
 				chmod +x cursor.AppImage || exit 1; \
@@ -143,7 +141,7 @@ _cursor_download:
 	fi; \
 	echo "⚠️  自動ダウンロードに失敗しました (ホスト解決不可、タイムアウト、または検証失敗)"; \
 	echo "📦 方法2: ローカルディレクトリから検索中..."; \
-	LOCAL_FILE=$$(HOME_DIR=$(HOME_DIR) CURSOR_SHA256=$(CURSOR_SHA256) CURSOR_NO_VERIFY_HASH=$(CURSOR_NO_VERIFY_HASH) CURSOR_MIN_SIZE_BYTES=$(CURSOR_MIN_SIZE_BYTES) CURSOR_MAX_SIZE_BYTES=$(CURSOR_MAX_SIZE_BYTES) $(REPO_ROOT)/_scripts/find-local-cursor.sh); \
+	LOCAL_FILE=$$(HOME_DIR="$(HOME_DIR)" CURSOR_SHA256="$(CURSOR_SHA256)" CURSOR_NO_VERIFY_HASH="$(CURSOR_NO_VERIFY_HASH)" CURSOR_MIN_SIZE_BYTES="$(CURSOR_MIN_SIZE_BYTES)" CURSOR_MAX_SIZE_BYTES="$(CURSOR_MAX_SIZE_BYTES)" "$(REPO_ROOT)/_scripts/find-local-cursor.sh"); \
 	if [ -n "$$LOCAL_FILE" ] && [ -f "$$LOCAL_FILE" ]; then \
 		echo "✅ 妥当なローカルファイルが見つかりました: $$LOCAL_FILE"; \
 		sudo mkdir -p /opt/cursor || exit 1; \
@@ -289,7 +287,7 @@ update-cursor:
 		fi && \
 		\
 		if command -v jq >/dev/null 2>&1; then \
-			API_RESPONSE=$$(curl -sL "https://www.cursor.com/api/download?platform=linux-x64&releaseTrack=stable" 2>/dev/null); \
+			API_RESPONSE=$$(curl -sL --connect-timeout 10 --max-time 30 "https://www.cursor.com/api/download?platform=linux-x64&releaseTrack=stable" 2>/dev/null); \
 			if [ -n "$$API_RESPONSE" ] && echo "$$API_RESPONSE" | jq . >/dev/null 2>&1; then \
 				DOWNLOAD_URL=$$(echo "$$API_RESPONSE" | jq -r '.downloadUrl' 2>/dev/null); \
 				VERSION=$$(echo "$$API_RESPONSE" | jq -r '.version' 2>/dev/null); \
@@ -345,19 +343,24 @@ update-cursor:
 				if [ "$$VALID_DOWNLOAD" -eq 1 ]; then \
 					echo "🔧 既存ファイルをバックアップ中..."; \
 					BACKUP_FILE="/opt/cursor/cursor.AppImage.backup.$$(date +%Y%m%d_%H%M%S)"; \
-					sudo cp /opt/cursor/cursor.AppImage "$$BACKUP_FILE" && \
-					echo "🧹 古いバックアップを整理中 (最新5件を保持)..."; \
-					BACKUP_LIST=$$(ls -t /opt/cursor/cursor.AppImage.backup.* 2>/dev/null | tail -n +6); \
-					if [ -n "$$BACKUP_LIST" ]; then \
-						echo "$$BACKUP_LIST" | xargs sudo rm -f; \
-					fi && \
-					chmod +x cursor-new.AppImage && \
-					sudo cp cursor-new.AppImage /opt/cursor/cursor.AppImage && \
-					sudo chown root:root /opt/cursor/cursor.AppImage && \
-					sudo chmod 755 /opt/cursor/cursor.AppImage && \
-					rm -f cursor-new.AppImage && \
-					CURSOR_UPDATED=true && \
-					echo "🎉 Cursor IDEのアップデートが完了しました"; \
+					if sudo cp /opt/cursor/cursor.AppImage "$$BACKUP_FILE"; then \
+						echo "🧹 古いバックアップを整理中 (最新5件を保持)..."; \
+						BACKUP_LIST=$$(ls -t /opt/cursor/cursor.AppImage.backup.* 2>/dev/null | tail -n +6); \
+						if [ -n "$$BACKUP_LIST" ]; then \
+							echo "$$BACKUP_LIST" | xargs sudo rm -f; \
+						fi && \
+						chmod +x cursor-new.AppImage && \
+						sudo cp cursor-new.AppImage /opt/cursor/cursor.AppImage && \
+						sudo chown root:root /opt/cursor/cursor.AppImage && \
+						sudo chmod 755 /opt/cursor/cursor.AppImage && \
+						rm -f cursor-new.AppImage && \
+						CURSOR_UPDATED=true && \
+						echo "🎉 Cursor IDEのアップデートが完了しました"; \
+					else \
+						echo "❌ バックアップの作成に失敗しました。アップデートを中止します。"; \
+						rm -f cursor-new.AppImage; \
+						exit 1; \
+					fi; \
 				fi; \
 			else \
 				echo "❌ ダウンロードファイルが不完全または不正なサイズです ($$FILE_SIZE bytes)"; \
@@ -446,7 +449,7 @@ check-cursor-version:
 	\
 	echo "🌐 最新バージョンを確認中..." && \
 	if command -v jq >/dev/null 2>&1; then \
-		API_RESPONSE=$$(curl -sL "https://www.cursor.com/api/download?platform=linux-x64&releaseTrack=stable" 2>/dev/null); \
+		API_RESPONSE=$$(curl -sL --connect-timeout 10 --max-time 30 "https://www.cursor.com/api/download?platform=linux-x64&releaseTrack=stable" 2>/dev/null); \
 		if [ -n "$$API_RESPONSE" ] && echo "$$API_RESPONSE" | jq . >/dev/null 2>&1; then \
 			LATEST_VERSION=$$(echo "$$API_RESPONSE" | jq -r '.version' 2>/dev/null); \
 			echo "🆕 最新バージョン: $$LATEST_VERSION"; \
