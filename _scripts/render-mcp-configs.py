@@ -8,7 +8,7 @@ import json5
 import re
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import yaml  # type: ignore[import-untyped]
 
@@ -27,14 +27,14 @@ def load_config() -> dict[str, Any]:
 
 
 def parse_jsonc(text: str) -> dict[str, Any]:
-    return json5.loads(text)
+    return cast(dict[str, Any], json5.loads(text))
 
 
 def replace_placeholders(value: Any, gateway_url: str) -> Any:
     if isinstance(value, str):
         # __GATEWAY_URL__ を置換
         val = value.replace("__GATEWAY_URL__", gateway_url)
-        
+
         # ${VAR} 形式の環境変数を探し、存在を確認する
         # (os.path.expandvars は未定義の変数を空文字に変換してしまうため)
         env_vars = re.findall(r"\$\{([^}]+)\}", val)
@@ -44,7 +44,7 @@ def replace_placeholders(value: Any, gateway_url: str) -> Any:
                     f"Required environment variable '{var}' is not set. "
                     "Please check your .env file or environment."
                 )
-        
+
         # すべて存在することが確認できたら展開
         return os.path.expandvars(val)
     if isinstance(value, list):
@@ -65,23 +65,23 @@ def write_json_file(path: Path, root_key: str, servers: dict[str, Any]) -> bool:
         existing_content = path.read_text(encoding="utf-8")
         data = parse_jsonc(existing_content)
     data[root_key] = servers
-    
+
     new_content = json.dumps(data, indent=2, ensure_ascii=False) + "\n"
     if existing_content is not None and existing_content == new_content:
         print(f"Skipped {path.name} (no changes)")
         return False
-        
+
     path.write_text(new_content, encoding="utf-8")
     return True
 
 
 def write_opencode_jsonc(path: Path, root_key: str, servers: dict[str, Any]) -> bool:
     path.parent.mkdir(parents=True, exist_ok=True)
-    
+
     text = ""
     if path.exists():
         text = path.read_text(encoding="utf-8")
-        
+
     raw_block = json.dumps(servers, indent=2, ensure_ascii=False)
     block_lines = raw_block.splitlines()
     block = block_lines[0]
@@ -92,18 +92,18 @@ def write_opencode_jsonc(path: Path, root_key: str, servers: dict[str, Any]) -> 
         r'^  // \[MCP\]\n.*?^  // \[LSP\]',
         re.MULTILINE | re.DOTALL,
     )
-    
+
     if text:
         updated, count = pattern.subn(replacement, text, count=1)
         if count != 1:
             raise RuntimeError(f"Failed to update MCP block in {path}")
-            
+
         if text == updated:
             print(f"Skipped {path.name} (no changes)")
             return False
     else:
         updated = f"{{\n{replacement}\n}}\n"
-        
+
     path.write_text(updated, encoding="utf-8")
     return True
 
@@ -177,11 +177,11 @@ def write_jsonc_object_key(path: Path, root_key: str, servers: dict[str, Any]) -
 
     replacement = f'{indent}"{root_key}": {block}'
     updated = text[:line_start] + replacement + text[object_end:]
-    
+
     if text == updated:
         print(f"Skipped {path.name} (no changes)")
         return False
-        
+
     path.write_text(updated, encoding="utf-8")
     return True
 

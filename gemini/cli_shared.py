@@ -53,7 +53,7 @@ def show_commands(get_config):
     commands = config.get("commands", {})
     prefix = config.get("prefix", "/sg")
     print("📋 SuperGemini コマンド一覧:\n")
-    categories = {}
+    categories: dict[str, list[dict[str, str]]] = {}
     for cmd_name, cmd_info in commands.items():
         if cmd_info.get("enabled", True):
             category = cmd_info.get("category", "その他")
@@ -79,7 +79,7 @@ def show_personas(get_config, get_personas_config=None):
     config = get_config()
     personas = config.get("personas", [])
     print("🎭 SuperGemini ペルソナ一覧:\n")
-    
+
     if get_personas_config:
         personas_config = get_personas_config()
         personas_data = personas_config.get("personas", {})
@@ -108,7 +108,7 @@ def show_personas(get_config, get_personas_config=None):
                 print(f"  @{persona} - {persona_details[persona]}")
             else:
                 print(f"  @{persona}")
-                
+
     print("\n使用例: @architect として、マイクロサービスのアーキテクチャを設計して")
     if get_personas_config:
         print("\n詳細情報を見るには: python -m gemini persona-detail <persona名>")
