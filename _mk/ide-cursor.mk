@@ -130,7 +130,7 @@ _cursor_download:
 	fi; \
 	echo "⚠️  自動ダウンロードに失敗しました (ホスト解決不可、タイムアウト、または検証失敗)"; \
 	echo "📦 方法2: ローカルディレクトリから検索中..."; \
-	LOCAL_FILE=$$(HOME_DIR=$(HOME_DIR) CURSOR_SHA256=$(CURSOR_SHA256) CURSOR_MIN_SIZE_BYTES=$(CURSOR_MIN_SIZE_BYTES) CURSOR_MAX_SIZE_BYTES=$(CURSOR_MAX_SIZE_BYTES) $(REPO_ROOT)/_scripts/find-local-cursor.sh); \
+	LOCAL_FILE=$$(HOME_DIR=$(HOME_DIR) CURSOR_SHA256=$(CURSOR_SHA256) CURSOR_NO_VERIFY_HASH=$(CURSOR_NO_VERIFY_HASH) CURSOR_MIN_SIZE_BYTES=$(CURSOR_MIN_SIZE_BYTES) CURSOR_MAX_SIZE_BYTES=$(CURSOR_MAX_SIZE_BYTES) $(REPO_ROOT)/_scripts/find-local-cursor.sh); \
 	if [ -n "$$LOCAL_FILE" ] && [ -f "$$LOCAL_FILE" ]; then \
 		echo "✅ 妥当なローカルファイルが見つかりました: $$LOCAL_FILE"; \
 		sudo mkdir -p /opt/cursor || exit 1; \

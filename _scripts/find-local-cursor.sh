@@ -6,6 +6,7 @@ set -euo pipefail
 CURSOR_MIN_SIZE_BYTES="${CURSOR_MIN_SIZE_BYTES:-100000000}"
 CURSOR_MAX_SIZE_BYTES="${CURSOR_MAX_SIZE_BYTES:-500000000}"
 CURSOR_SHA256="${CURSOR_SHA256:-}"
+CURSOR_NO_VERIFY_HASH="${CURSOR_NO_VERIFY_HASH:-false}"
 HOME_DIR="${HOME_DIR:-$HOME}"
 
 # OS検出と互換コマンドの設定
@@ -29,7 +30,7 @@ verify_file() {
         return 1
     fi
 
-    # ハッシュ検証 (CURSOR_SHA256 が設定されている場合のみ)
+    # ハッシュ検証
     if [ -n "$CURSOR_SHA256" ]; then
         local actual_hash
         actual_hash=$($SHA256_CMD "$file" | awk '{print $1}')
@@ -40,8 +41,12 @@ verify_file() {
             return 1
         fi
         echo "✅ ハッシュ検証に成功しました: $file" >&2
+    elif [ "$CURSOR_NO_VERIFY_HASH" = "true" ]; then
+        echo "⚠️  【セキュリティ警告】CURSOR_NO_VERIFY_HASH=true により、ハッシュ検証をスキップします: $file" >&2
     else
-        echo "⚠️  【セキュリティ警告】SHA256チェックサムが設定されていません。サイズ検証のみ実行します: $file" >&2
+        echo "❌ エラー: CURSOR_SHA256 が設定されておらず、整合性検証をスキップできません: $file" >&2
+        echo "   (CURSOR_NO_VERIFY_HASH=true を設定することでスキップ可能です)" >&2
+        return 1
     fi
 
     return 0
@@ -53,7 +58,6 @@ SEARCH_DIRS=("$HOME_DIR/Downloads" "$HOME_DIR/Desktop" "/tmp")
 for dir in "${SEARCH_DIRS[@]}"; do
     if [ -d "$dir" ]; then
         # ファイルが見つかった場合のみループに入る
-        # shopt -s nullglob は bash 特有のため、伝統的な for + if [ -f ] を使用
         for file in "$dir"/cursor*.AppImage; do
             if [ -f "$file" ]; then
                 echo "🔍 $file が見つかりました。検証中..." >&2
