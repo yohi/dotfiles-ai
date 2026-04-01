@@ -27,8 +27,8 @@ all: install ## 全てのコンポーネントをビルド/インストール
 clean: ## 生成されたアーティファクトとキャッシュを削除
 	@echo "🧹 クリーンアップ中..."
 	@$(MAKE) -s clean-legacy 2>/dev/null || true
-	@# _mk/main.mk の clean を呼び出し
-	@$(MAKE) -s -f _mk/main.mk clean REPO_ROOT=$(REPO_ROOT) 2>/dev/null || true
+	@# _mk/main.mk の clean-internal を呼び出し
+	@$(MAKE) -s clean-internal 2>/dev/null || true
 	@rm -rf build/ dist/ *.pyc __pycache__ .ruff_cache .mypy_cache
 	@echo "✅ クリーンアップが完了しました"
 

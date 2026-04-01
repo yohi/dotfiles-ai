@@ -3,40 +3,29 @@
   // Target OpenCode Version: v1.3.x
   // Based on oh-my-opencode v3.7.4
   "$schema": "https://opencode.ai/config.json",
-  // モデル
-  //"model": "gemini-3-pro-preview",
-  //"small_model": "gemini-3-flash-preview",
-  // ログレベル設定（デバッグ用）
-  // "logLevel": "DEBUG",
+
+  // [1] 有効化するプロバイダーのホワイトリスト
+  "enabled_providers": [
+    "google-vertex",
+    "google-vertex-anthropic",
+    "openai",
+    "opencode-cursorcli-a2a"
+  ],
+
   // [Plugin]
   "plugin": [
-    "oh-my-opencode@3.10.0",
+    "oh-my-openagent@latest",
     "opencode-openai-codex-auth@^1.0.0",
-    // "opencode-antigravity-auth@beta",
-    // "@yohi/opencode-antigravity-quota@^1.0.0",
+    "opencode-antigravity-auth@latest",
     "@yohi/opencode-codex-quota@^1.0.0",
-    // "@yohi/omo-sdd-hybrid",
-    "opencode-geminicli-a2a-provider",
+    "opencode-geminicli-a2a",
+    "opencode-cursorcli-a2a"
   ],
-  // [Instruction]
   "instructions": [],
-  // [Watcher]
   "watcher": {
-    "ignore": [
-      "**/node_modules/**",
-      "**/dist/**",
-      "**/.next/**",
-      "**/coverage/**",
-      "**/*.lock",
-      "**/.cursorrules"
-    ]
+    "ignore": ["**/node_modules/**", "**/dist/**", "**/.next/**", "**/coverage/**", "**/*.lock", "**/.cursorrules"]
   },
-  "compaction": {
-    "auto": true,
-    "reserved": 10000,
-    "prune": true,
-  },
-  // [Permission]
+  "compaction": { "auto": true, "reserved": 10000, "prune": true },
   "permission": {
     "*": "ask",
     "read": "allow",
@@ -50,22 +39,18 @@
     "websearch": "allow",
     "webfetch": "allow",
     "external_directory": "ask",
-    "lsp": "allow", // [New] v1.3 LSP permission
-    "skill": "allow", // [New] v1.3 Skill permission
-    "task": "allow", // [New] v1.3 Task permission
+    "lsp": "allow",
+    "skill": "allow",
+    "task": "allow",
     "bash": {
-      "*": "ask", // 自律性と安全性のバランス: allow -> ask (デフォルト確認)
-      
-      // --- 安全弁 (ask) ---
+      "*": "ask",
       "git push*": "ask",
       "git reset*": "ask",
-      
-      // --- 禁止 (deny) ---
-      "npm publish*": "deny", // 誤公開防止: deny を維持
+      "npm publish*": "deny",
       "curl*|sh": "deny",
       "curl*|bash": "deny",
       "git clean -fd*": "deny",
-      "git add .": "deny", // 一括追加は禁止を維持
+      "git add .": "deny",
       "rm *": "deny",
       "rm -rf *": "deny",
       "ssh *": "deny",
@@ -73,11 +58,7 @@
       "su *": "deny"
     }
   },
-
-  "experimental": {
-    "batch_tool": true, // [New] Enable batching for faster execution
-    "continue_loop_on_deny": false // [New] Stop thinking on permission denial / do not continue
-  },
+  "experimental": { "batch_tool": true, "continue_loop_on_deny": false },
   // [MCP]
   "mcp": {
     "docker-mcp-gateway": {
@@ -86,296 +67,125 @@
       "enabled": true
     }
   },
-  // [LSP] 言語サーバー連携 (コードの構造的理解)
+  // [LSP]
   "lsp": {
-    "bash-language-server": {
-      "command": [
-        "bash-language-server",
-        "start"
-      ],
-      "extensions": [
-        ".sh"
-      ],
-      "disabled": false
-    },
-    "typescript-language-server": {
-      "command": [
-        "typescript-language-server",
-        "--stdio"
-      ],
-      "extensions": [
-        ".ts",
-        ".tsx",
-        ".js",
-        ".jsx",
-        ".mts",
-        ".cts"
-      ],
-      "disabled": false
-    },
-    "pyright": {
-      "command": [
-        "pyright-langserver",
-        "--stdio"
-      ],
-      "extensions": [
-        ".py"
-      ],
-      "disabled": false
-    }
+    "bash-language-server": { "command": ["bash-language-server", "start"], "extensions": [".sh"], "disabled": false },
+    "typescript-language-server": { "command": ["typescript-language-server", "--stdio"], "extensions": [".ts", ".tsx", ".js", ".jsx", ".mts", ".cts"], "disabled": false },
+    "pyright": { "command": ["pyright-langserver", "--stdio"], "extensions": [".py"], "disabled": false }
   },
+
   // プロバイダ設定
   "provider": {
+    "opencode": {
+      "whitelist": ["gpt-5-nano", "kimi-k2.5-free", "big-pickle", "minimax-m2.5-free"],
+      "models": {
+        "gpt-5-nano": { "name": "GPT-5 Nano (Zen Free)" },
+        "kimi-k2.5-free": { "name": "Kimi K2.5 (Zen Free)" },
+        "big-pickle": { "name": "Big Pickle (Zen Free GLM)" },
+        "minimax-m2.5-free": { "name": "MiniMax M2.5 (Zen Free)" }
+      }
+    },
+    "poe": {
+      "npm": "@ai-sdk/openai-compatible",
+      "options": { "baseURL": "https://api.poe.com/v1" },
+      "whitelist": ["Claude-4.6-Sonnet", "Claude-4-Opus", "GPT-5-Pro"],
+      "models": {
+        "Claude-4.6-Sonnet": { "name": "Claude 4.6 Sonnet (Poe)" },
+        "Claude-4-Opus": { "name": "Claude 4 Opus (Poe)" },
+        "GPT-5-Pro": { "name": "GPT-5 Pro (Poe)" }
+      }
+    },
     "openrouter": {
       "npm": "@ai-sdk/openai-compatible",
-      "options": {
-        "baseURL": "https://openrouter.ai/api/v1"
-      },
+      "options": { "baseURL": "https://openrouter.ai/api/v1" },
+      "whitelist": ["anthropic/claude-opus-4-6", "anthropic/claude-4.6-sonnet", "qwen/qwen3.6-plus-preview:free", "google/gemini-3.1-pro-preview"],
       "models": {
+        "anthropic/claude-opus-4-6": { "name": "Claude Opus 4.6" },
+        "anthropic/claude-4.6-sonnet": { "name": "Claude 4.6 Sonnet" },
         "qwen/qwen3.6-plus-preview:free": { "name": "Qwen 3.6 Free" },
         "google/gemini-3.1-pro-preview": { "name": "Gemini 3.1 Pro" }
       }
     },
-    "nvidia": {
-      "npm": "@ai-sdk/openai-compatible",
-      "options": {
-        "baseURL": "https://integrate.api.nvidia.com/v1"
-      },
+    "github-copilot": {
+      "whitelist": ["claude-opus-4.6", "claude-sonnet-4.6", "claude-3.5-sonnet", "claude-3-5-sonnet", "gpt-5.4", "gpt-5.3-codex", "gemini-3.1-pro-preview", "grok-code-fast-1"],
       "models": {
-        "moonshotai/kimi-k2.5": { "name": "Kimi K2.5" },
-        "zai/glm-5": { "name": "GLM 5" }
+        "claude-opus-4.6": { "name": "Claude Opus 4.6 (Copilot)" },
+        "claude-sonnet-4.6": { "name": "Claude Sonnet 4.6 (Copilot)" },
+        "claude-3.5-sonnet": { "name": "Claude 3.5 Sonnet (Copilot Alt)" },
+        "claude-3-5-sonnet": { "name": "Claude 3.5 Sonnet (Copilot Alt 2)" },
+        "gpt-5.4": { "name": "GPT-5.4 (Copilot)" },
+        "gpt-5.3-codex": { "name": "GPT-5.3 Codex (Copilot)" },
+        "gemini-3.1-pro-preview": { "name": "Gemini 3.1 Pro (Copilot)" },
+        "grok-code-fast-1": { "name": "Grok Code Fast 1 (Copilot)" }
       }
     },
-    "opencode-geminicli-a2a": {
-      "npm": "opencode-geminicli-a2a",
+    "github-models": {
+      "npm": "@ai-sdk/openai-compatible",
+      "options": { "baseURL": "https://models.inference.ai.azure.com" },
+      "whitelist": ["anthropic/claude-4.6-sonnet", "openai/gpt-5.4", "google/gemini-3.1-pro-preview"],
+      "models": {
+        "anthropic/claude-4.6-sonnet": { "name": "Claude 4.6 Sonnet (Models)" },
+        "openai/gpt-5.4": { "name": "GPT-5.4 (Models)" },
+        "google/gemini-3.1-pro-preview": { "name": "Gemini 3.1 Pro (Models)" }
+      }
+    },
+    "google": {
+      "npm": "@ai-sdk/google",
+      "whitelist": ["gemini-3.1-pro-preview", "gemini-3-flash"],
+      "models": {
+        "gemini-3.1-pro-preview": { "name": "Gemini 3.1 Pro" },
+        "gemini-3-flash": { "name": "Gemini 3 Flash" }
+      }
+    },
+    "nvidia-nim": {
+      "npm": "@ai-sdk/openai-compatible",
+      "options": { "baseURL": "https://integrate.api.nvidia.com/v1" },
+      "whitelist": ["nemotron-3-nano-30b-a3b", "llama-3.3-70b-instruct"],
+      "models": {
+        "nemotron-3-nano-30b-a3b": { "name": "Nemotron-3 Nano" },
+        "llama-3.3-70b-instruct": { "name": "Llama 3.3 70B" }
+      }
+    },
+    "opencode-geminicli-a2a-dev": {
+      "npm": "/home/y_ohi/program/private/opencode-geminicli-a2a/dist/index.cjs",
       "options": {
         "host": "127.0.0.1",
         "port": 41242,
-        "protocol": "http"
-      },
-      "models": {
-        "gemini-3.1-pro-preview": {},
-        "gemini-3-flash-preview": {},
-        "gemini-2.5-pro": {}
-      }
-    },
-    "stellar-gemini": {
-      "npm": "@ai-sdk/google",
-      "name": "Stellar Gemini (OAuth)",
-      "options": {
-        "apiKey": "not-needed",
-        "baseURL": "http://localhost:8742"
-      },
-      "models": {
-        "gemini-3.1-pro-preview": {
-          "name": "Gemini 3.1 Pro (Latest)",
-          "limit": { "context": 1048576, "output": 65536 }
-        },
-        "gemini-3-flash-preview": {
-          "name": "Gemini 3 Flash",
-          "limit": { "context": 1000000, "output": 65536 }
-        },
-        "gemini-2.5-pro": {
-          "name": "Gemini 2.5 Pro",
-          "limit": { "context": 128000, "output": 65536 }
+        "protocol": "http",
+        "autoStart": {
+          "env": {
+            "USE_CCPA": "true",
+            "GEMINI_API_KEY": "dummy"
+          }
         }
+      },
+      "models": { "gemini-3.1-pro-preview": {}, "gemini-3-flash-preview": {}, "gemini-2.5-pro": {} }
+    },
+    "opencode-cursorcli-a2a": {
+      "npm": "file:///home/y_ohi/program/private/opencode-cursorcli-a2a/dist/index.cjs",
+      "name": "Cursor A2A",
+      "whitelist" : ["auto", "claude-4.6-sonnet-medium"],
+      "models": {
+        "auto": {},
+        "claude-4.6-sonnet-medium": {},
+      },
+      "options": {
+        "port": 4937,
+        "autoStart": {}
       }
     },
-    "zerogravity": {
-      "npm": "@ai-sdk/google",
-      "name": "ZeroGravity (Gemini)",
-      "options": {
-        "apiKey": "not-needed",
-        "baseURL": "http://localhost:8741/v1beta",
-      },
-      "models": {
-        "gemini-3.1-pro": {
-          "name": "Gemini 3.1 Pro",
-          "limit": { "context": 1048576, "output": 65535 },
-          "modalities": { "input": ["text", "image", "pdf"], "output": ["text"] },
-          "variants": {
-            "low": { "thinkingLevel": "low" },
-            "high": { "thinkingLevel": "high" }
-          }
-        },
-        "gemini-3-flash": {
-          "name": "Gemini 3 Flash",
-          "limit": { "context": 1048576, "output": 65536 },
-          "modalities": { "input": ["text", "image", "pdf"], "output": ["text"] },
-          "variants": {
-            "minimal": { "thinkingLevel": "minimal" },
-            "low": { "thinkingLevel": "low" },
-            "medium": { "thinkingLevel": "medium" },
-            "high": { "thinkingLevel": "high" }
-          }
-        },
-        "sonnet-4.6": {
-          "name": "Claude Sonnet 4.6",
-          "limit": { "context": 200000, "output": 64000 },
-          "modalities": { "input": ["text", "image", "pdf"], "output": ["text"] }
-        },
-        "opus-4.6": {
-          "name": "Claude Opus 4.6 Thinking",
-          "limit": { "context": 200000, "output": 64000 },
-          "modalities": { "input": ["text", "image", "pdf"], "output": ["text"] },
-          "variants": {
-            "low": { "thinkingConfig": { "thinkingBudget": 8192 } },
-            "max": { "thinkingConfig": { "thinkingBudget": 32768 } }
-          }
-        },
-      },
-    },
-    // Vertex AI(Google)
-    // [For LLM Context]
-    // - Documantatin:
-    //     - http://ai.google.dev/gemini-api/docs/models/gemini-3.1-pro-preview.md.txt
     "google-vertex": {
-      "models": {
-        "gemini-3-flash-preview": {},
-        "gemini-3.1-pro-preview": {},
-        "gemini-3.1-pro-preview-customtools": {},
-      },
+      "whitelist": ["gemini-3-flash-preview", "gemini-3.1-pro-preview"],
+      "models": { "gemini-3-flash-preview": {}, "gemini-3-pro-preview": {} }
     },
-    // Vertex AI Anthopic(Google)
-    "google-vertex-anthropic": {
-      "models": {
-        "claude-haiku-4-5@20251001": {},
-        "claude-sonnet-4-6@default": {},
-        "claude-opus-4-6@default": {},
-      },
-    },
-    // OpenAI
     "openai": {
-      "options": {
-        "reasoningEffort": "medium",
-        "reasoningSummary": "auto",
-        "textVerbosity": "medium",
-        "include": [
-          "reasoning.encrypted_content"
-        ],
-        "store": false
-      },
+      "whitelist": ["gpt-5.4", "gpt-5.4-mini", "gpt-5.3-codex", "gpt-5.2"],
       "models": {
-        "gpt-5.3-codex": {
-          "name": "GPT 5.3 Codex (OAuth)",
-          "limit": {
-            "context": 272000,
-            "output": 128000
-          },
-          "modalities": {
-            "input": [
-              "text",
-              "image"
-            ],
-            "output": [
-              "text"
-            ]
-          },
-          "variants": {
-            "low": {
-              "reasoningEffort": "low",
-              "reasoningSummary": "auto",
-              "textVerbosity": "medium"
-            },
-            "medium": {
-              "reasoningEffort": "medium",
-              "reasoningSummary": "auto",
-              "textVerbosity": "medium"
-            },
-            "high": {
-              "reasoningEffort": "high",
-              "reasoningSummary": "detailed",
-              "textVerbosity": "medium"
-            },
-            "xhigh": {
-              "reasoningEffort": "xhigh",
-              "reasoningSummary": "detailed",
-              "textVerbosity": "medium"
-            }
-          }
-        },
-        "gpt-5.2": {
-          "name": "GPT 5.2 (OAuth)",
-          "limit": {
-            "context": 272000,
-            "output": 128000
-          },
-          "modalities": {
-            "input": [
-              "text",
-              "image"
-            ],
-            "output": [
-              "text"
-            ]
-          },
-          "variants": {
-            "none": {
-              "reasoningEffort": "none",
-              "reasoningSummary": "auto",
-              "textVerbosity": "medium"
-            },
-            "low": {
-              "reasoningEffort": "low",
-              "reasoningSummary": "auto",
-              "textVerbosity": "medium"
-            },
-            "medium": {
-              "reasoningEffort": "medium",
-              "reasoningSummary": "auto",
-              "textVerbosity": "medium"
-            },
-            "high": {
-              "reasoningEffort": "high",
-              "reasoningSummary": "detailed",
-              "textVerbosity": "medium"
-            },
-            "xhigh": {
-              "reasoningEffort": "xhigh",
-              "reasoningSummary": "detailed",
-              "textVerbosity": "medium"
-            }
-          }
-        },
-        "gpt-5.1-codex-max": {
-          "name": "GPT 5.1 Codex Max (OAuth)",
-          "limit": {
-            "context": 272000,
-            "output": 128000
-          },
-          "modalities": {
-            "input": [
-              "text",
-              "image"
-            ],
-            "output": [
-              "text"
-            ]
-          },
-          "variants": {
-            "low": {
-              "reasoningEffort": "low",
-              "reasoningSummary": "detailed",
-              "textVerbosity": "medium"
-            },
-            "medium": {
-              "reasoningEffort": "medium",
-              "reasoningSummary": "detailed",
-              "textVerbosity": "medium"
-            },
-            "high": {
-              "reasoningEffort": "high",
-              "reasoningSummary": "detailed",
-              "textVerbosity": "medium"
-            },
-            "xhigh": {
-              "reasoningEffort": "xhigh",
-              "reasoningSummary": "detailed",
-              "textVerbosity": "medium"
-            }
-          }
-        },
-      },
-    }, // End Provider
-  },
+        "gpt-5.4": { "name": "GPT 5.4" },
+        "gpt-5.4-mini": { "name": "GPT 5.4 Mini" },
+        "gpt-5.3-codex": { "name": "GPT 5.3 Codex" },
+        "gpt-5.2": { "name": "GPT 5.2" }
+      }
+    }
+  }
 }

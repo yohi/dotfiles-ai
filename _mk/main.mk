@@ -44,7 +44,7 @@ mcp-render:
 link: setup
 	@echo "🔗 dotfiles-ai をリンク中 (Handled in setup targets)"
 
-clean:
+clean-internal:
 	@echo "🧹 dotfiles-ai をクリーンアップ中..."
 	-$(MAKE) uninstall-superclaude
 	-$(MAKE) uninstall-claude

@@ -46,7 +46,7 @@ echo "✅ MCP configurations synchronized from mcp/servers.yaml"
 SERVICE_FILE="$HOME/.config/systemd/user/docker-mcp-gateway.service"
 if [ -f "$REPO_ROOT/.env" ] && [ -f "$SERVICE_FILE" ]; then
     # トークンを厳密に抽出 (行頭アンカー、引用符の除去)
-    TOKEN=$(grep -E "^MCP_AUTH_TOKEN=" "$REPO_ROOT/.env" | cut -d'=' -f2- | sed -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//" | xargs)
+    TOKEN=$(grep -E "^MCP_GATEWAY_AUTH_TOKEN=" "$REPO_ROOT/.env" | cut -d'=' -f2- | sed -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//" | xargs || true)
     if [ -n "$TOKEN" ]; then
         echo "🔄 Updating systemd service with current token..."
         # sed 用にトークンをエスケープ (バックスラッシュ, アンパサンド, スラッシュ)

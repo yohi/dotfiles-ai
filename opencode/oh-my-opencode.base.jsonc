@@ -13,6 +13,98 @@
     "default_builder_enabled": false
   },
 
+  "plugin": [
+    "oh-my-openagent@latest",
+    "opencode-openai-codex-auth@^1.0.0",
+    "opencode-antigravity-auth@latest",
+    "@yohi/opencode-codex-quota@^1.0.0",
+    "opencode-geminicli-a2a-provider"
+  ],
+
+  // [Agents] エージェント個別設定（必要最小限）
+  "agents": {
+    "sisyphus": {
+      "category": "anthropic"
+    },
+    "oracle": {
+      "category": "ultrabrain"
+    },
+    "explore": {
+      "category": "fast"
+    },
+    "atlas": {
+      "category": "quick"
+    },
+    "librarian": {
+      "category": "fast"
+    },
+    "multimodal-looker": {
+      "category": "visual-engineering"
+    }
+  },
+
+  // [Categories] モデルグループ一括設定
+  "categories": {
+    "anthropic": {
+      "model": "openrouter/anthropic/claude-4.6-sonnet",
+      "fallback_models": [
+        "poe/Claude-4.6-Sonnet",
+        "github-copilot/claude-sonnet-4.6",
+        "opencode/claude-opus-4-6",
+        "opencode-go/kimi-k2.5"
+      ]
+    },
+    "ultrabrain": {
+      "model": "openrouter/anthropic/claude-4.6-sonnet",
+      "fallback_models": [
+        "poe/Claude-4.6-Sonnet",
+        "github-copilot/claude-opus-4.6",
+        "opencode/claude-opus-4-6",
+        "openai/gpt-5.4"
+      ]
+    },
+    "deep": {
+      "model": "openai/gpt-5.4",
+      "fallback_models": [
+        "github-copilot/gpt-5.4",
+        "opencode/gpt-5.4",
+        "opencode-go/kimi-k2.5"
+      ]
+    },
+    "quick": {
+      "model": "openai/gpt-5.4-mini",
+      "fallback_models": [
+        "opencode/gpt-5-nano",
+        "anthropic/claude-haiku-4.5"
+      ]
+    },
+    "fast": {
+      "model": "github-copilot/grok-code-fast-1",
+      "fallback_models": [
+        "opencode-go/minimax-m2.7-highspeed",
+        "opencode/minimax-m2.7",
+        "opencode/gpt-5-nano"
+      ]
+    },
+    "visual-engineering": {
+      "model": "google/gemini-3.1-pro",
+      "fallback_models": [
+        "openai/gpt-5.4",
+        "opencode-go/kimi-k2.5"
+      ]
+    },
+    "unspecified-low": {
+      "model": "opencode/gpt-5-nano"
+    },
+    "unspecified-high": {
+      "model": "anthropic/claude-4.6-sonnet",
+      "fallback_models": [
+        "opencode-go/kimi-k2.5",
+        "zai-coding-plan/glm-5"
+      ]
+    }
+  },
+
   // ================================================================================
   // グローバル設定 (Global Configuration)
   // ================================================================================
