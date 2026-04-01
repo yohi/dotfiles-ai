@@ -126,6 +126,26 @@
   },
   // プロバイダ設定
   "provider": {
+    "openrouter": {
+      "npm": "@ai-sdk/openai-compatible",
+      "options": {
+        "baseURL": "https://openrouter.ai/api/v1"
+      },
+      "models": {
+        "qwen/qwen3.6-plus-preview:free": { "name": "Qwen 3.6 Free" },
+        "google/gemini-3.1-pro-preview": { "name": "Gemini 3.1 Pro" }
+      }
+    },
+    "nvidia": {
+      "npm": "@ai-sdk/openai-compatible",
+      "options": {
+        "baseURL": "https://integrate.api.nvidia.com/v1"
+      },
+      "models": {
+        "moonshotai/kimi-k2.5": { "name": "Kimi K2.5" },
+        "zai/glm-5": { "name": "GLM 5" }
+      }
+    },
     "opencode-geminicli-a2a": {
       "npm": "opencode-geminicli-a2a",
       "options": {

@@ -1,0 +1,41 @@
+[project]
+name = "dotfiles-ai"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = []
+
+[tool.ruff]
+exclude = [
+    ".git",
+    ".ruff_cache",
+    ".mypy_cache",
+    ".worktrees",
+    "node_modules",
+    "codex",
+    "antigravity",
+    "claude",
+    "mcp",
+    "tmp",
+    ".tmp",
+]
+
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W"]
+ignore = [
+    "E501", # Line too long
+    "W293", # Blank line contains whitespace
+]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+check_untyped_defs = true
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "gemini.*"
+ignore_missing_imports = true
