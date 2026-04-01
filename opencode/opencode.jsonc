@@ -6,10 +6,18 @@
 
   // [1] 有効化するプロバイダーのホワイトリスト
   "enabled_providers": [
+    "opencode",
+    "poe",
+    "openrouter",
+    "github-copilot",
+    "github-models",
+    "google",
+    "nvidia-nim",
+    "opencode-geminicli-a2a",
+    "opencode-cursorcli-a2a",
     "google-vertex",
     "google-vertex-anthropic",
-    "openai",
-    "opencode-cursorcli-a2a"
+    "openai"
   ],
 
   // [Plugin]
@@ -59,22 +67,16 @@
     }
   },
   "experimental": { "batch_tool": true, "continue_loop_on_deny": false },
-  // [MCP]
   "mcp": {
-    "docker-mcp-gateway": {
-      "type": "remote",
-      "url": "http://127.0.0.1:10888/sse",
-      "enabled": true
-    }
+    "docker-mcp-gateway": { "type": "remote", "url": "http://127.0.0.1:10888/sse", "enabled": true }
   },
-  // [LSP]
   "lsp": {
     "bash-language-server": { "command": ["bash-language-server", "start"], "extensions": [".sh"], "disabled": false },
     "typescript-language-server": { "command": ["typescript-language-server", "--stdio"], "extensions": [".ts", ".tsx", ".js", ".jsx", ".mts", ".cts"], "disabled": false },
     "pyright": { "command": ["pyright-langserver", "--stdio"], "extensions": [".py"], "disabled": false }
   },
 
-  // プロバイダ設定
+  // プロバイダ設定 (Model Schema 準拠)
   "provider": {
     "opencode": {
       "whitelist": ["gpt-5-nano", "kimi-k2.5-free", "big-pickle", "minimax-m2.5-free"],
@@ -114,7 +116,7 @@
         "claude-3.5-sonnet": { "name": "Claude 3.5 Sonnet (Copilot Alt)" },
         "claude-3-5-sonnet": { "name": "Claude 3.5 Sonnet (Copilot Alt 2)" },
         "gpt-5.4": { "name": "GPT-5.4 (Copilot)" },
-        "gpt-5.3-codex": { "name": "GPT-5.3 Codex (Copilot)" },
+        "gpt-5.3-codex": { "name": "GPT 5.3 Codex (Copilot)" },
         "gemini-3.1-pro-preview": { "name": "Gemini 3.1 Pro (Copilot)" },
         "grok-code-fast-1": { "name": "Grok Code Fast 1 (Copilot)" }
       }
@@ -146,37 +148,21 @@
         "llama-3.3-70b-instruct": { "name": "Llama 3.3 70B" }
       }
     },
-    "opencode-geminicli-a2a-dev": {
-      "npm": "/home/y_ohi/program/private/opencode-geminicli-a2a/dist/index.cjs",
-      "options": {
-        "host": "127.0.0.1",
-        "port": 41242,
-        "protocol": "http",
-        "autoStart": {
-          "env": {
-            "USE_CCPA": "true",
-            "GEMINI_API_KEY": "dummy"
-          }
-        }
-      },
+    "opencode-geminicli-a2a": {
+      "whitelist": ["gemini-3.1-pro-preview", "gemini-3-flash-preview", "gemini-2.5-pro"],
+      "npm": "opencode-geminicli-a2a",
+      "options": { "host": "127.0.0.1", "port": 41242, "protocol": "http" },
       "models": { "gemini-3.1-pro-preview": {}, "gemini-3-flash-preview": {}, "gemini-2.5-pro": {} }
     },
     "opencode-cursorcli-a2a": {
-      "npm": "file:///home/y_ohi/program/private/opencode-cursorcli-a2a/dist/index.cjs",
       "name": "Cursor A2A",
       "whitelist" : ["auto", "claude-4.6-sonnet-medium"],
-      "models": {
-        "auto": {},
-        "claude-4.6-sonnet-medium": {},
-      },
-      "options": {
-        "port": 4937,
-        "autoStart": {}
-      }
+      "models": { "auto": {}, "claude-4.6-sonnet-medium": {} },
+      "options": { "port": 4937 }
     },
     "google-vertex": {
       "whitelist": ["gemini-3-flash-preview", "gemini-3.1-pro-preview"],
-      "models": { "gemini-3-flash-preview": {}, "gemini-3-pro-preview": {} }
+      "models": { "gemini-3-flash-preview": {}, "gemini-3.1-pro-preview": {} }
     },
     "openai": {
       "whitelist": ["gpt-5.4", "gpt-5.4-mini", "gpt-5.3-codex", "gpt-5.2"],

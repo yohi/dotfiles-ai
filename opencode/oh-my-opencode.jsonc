@@ -3,11 +3,8 @@
 
   /**
    * [1] 知能カテゴリー (Categories)
-   * 構成戦略: GPT を強力なバックアップ（ベース）として保持しつつ、
-   * 中華製無料枠モデルをフロント（第1優先）に立てることで GPT の消費比率を低減。
    */
   "categories": {
-    // 【最上位知能】品質担保のため GPT-5.4 をフロントに維持
     "ultrabrain": {
       "model": "openai/gpt-5.4",
       "fallback_models": [
@@ -18,27 +15,26 @@
       ],
       "temperature": 0.2
     },
-    // 【戦略・論理】Kimi をフロントに立て、GPT の比率を低減
     "deep": {
-      "model": "opencode/kimi-k2.5-free",
+      "model": "openai/gpt-5.4",
       "fallback_models": [
-        "openai/gpt-5.4",
-        "opencode/big-pickle",
+        "opencode/kimi-k2.5-free",
         "github-models/openai/gpt-5.4",
+        "opencode/big-pickle",
         "google/gemini-3.1-pro-preview"
       ],
       "temperature": 0.1
     },
-    // 【視覚・UI】GPT のビジョン機能を維持しつつ、GLM (Big Pickle) を上位へ
+    // 【視覚・UI】無料枠の big-pickle (GLM) をフロントへ
     "visual": {
-      "model": "openai/gpt-5.4",
+      "model": "opencode/big-pickle",
       "fallback_models": [
-        "opencode/big-pickle",
-        "google/gemini-3.1-pro-preview"
+        "google/gemini-3.1-pro-preview",
+        "openai/gpt-5.4",
+        "github-models/google/gemini-3.1-pro-preview"
       ],
       "parallel": 3
     },
-    // 【実装職人】Codex の前に Kimi を配置し、GPT 比率を抑制
     "craftsman": {
       "model": "opencode/kimi-k2.5-free",
       "fallback_models": [
@@ -48,7 +44,6 @@
       ],
       "temperature": 0.1
     },
-    // 【高速定型】MiniMax をフロントに。GPT Mini はフォールバックへ
     "quick": {
       "model": "opencode/minimax-m2.5-free",
       "fallback_models": [
@@ -58,7 +53,6 @@
       ],
       "temperature": 0.5
     },
-    // 【高速探索】MiniMax 主軸（GPT比率 0%）
     "fast": {
       "model": "opencode/minimax-m2.5-free",
       "fallback_models": [
@@ -68,9 +62,6 @@
     }
   },
 
-  /**
-   * [2] 規律あるエージェント (Agents)
-   */
   "agents": {
     "sisyphus": { "category": "ultrabrain" },
     "prometheus": { "category": "deep" },
@@ -84,9 +75,6 @@
     "multimodal-looker": { "category": "visual" }
   },
 
-  /**
-   * [3] 高度な機能設定 (Features)
-   */
   "features": {
     "hashline_edit": { "enabled": true, "strict_verification": true },
     "intent_gate": {
