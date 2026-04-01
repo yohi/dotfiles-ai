@@ -88,9 +88,22 @@ _cursor_link_settings:
 _cursor_download:
 	@echo "📦 方法1: 自動ダウンロードを試行中..."
 	@cd /tmp && \
+	API_URL="https://www.cursor.com/api/download?platform=linux-x64&releaseTrack=stable"; \
+	DOWNLOAD_URL=""; \
+	if command -v jq >/dev/null 2>&1; then \
+		API_RESPONSE=$$(curl -sL "$$API_URL" 2>/dev/null); \
+		if [ -n "$$API_RESPONSE" ] && echo "$$API_RESPONSE" | jq . >/dev/null 2>&1; then \
+			DOWNLOAD_URL=$$(echo "$$API_RESPONSE" | jq -r '.downloadUrl' 2>/dev/null); \
+		fi; \
+	fi; \
+	if [ -z "$$DOWNLOAD_URL" ] || [ "$$DOWNLOAD_URL" = "null" ]; then \
+		echo "⚠️  APIからのURL取得に失敗したため、直接ダウンロードリンクを使用します..."; \
+		DOWNLOAD_URL="https://downloader.cursor.sh/linux/appImage/x64"; \
+	fi; \
+	echo "🔗 ダウンロードURL: $$DOWNLOAD_URL"; \
 	if curl -L --user-agent "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36" \
 		--max-time 120 --retry 2 --retry-delay 3 \
-		-o cursor.AppImage "https://www.cursor.com/api/download?platform=linux-x64&releaseTrack=stable" 2>/dev/null; then \
+		-o cursor.AppImage "$$DOWNLOAD_URL" 2>/dev/null; then \
 		FILE_SIZE=$$( $(STAT_SIZE) cursor.AppImage 2>/dev/null || echo "0"); \
 		if [ "$$FILE_SIZE" -ge $(CURSOR_MIN_SIZE_BYTES) ] && [ "$$FILE_SIZE" -le $(CURSOR_MAX_SIZE_BYTES) ]; then \
 			echo "✅ ダウンロードが完了しました (サイズ: $$FILE_SIZE bytes)"; \
@@ -297,7 +310,7 @@ update-cursor:
 		\
 		if [ -z "$$DOWNLOAD_URL" ]; then \
 			echo "🔄 フォールバック: 直接ダウンロードを試行中..."; \
-			DOWNLOAD_URL="https://www.cursor.com/api/download?platform=linux-x64&releaseTrack=stable"; \
+			DOWNLOAD_URL="https://downloader.cursor.sh/linux/appImage/x64"; \
 		fi && \
 		\
 		echo "📥 ダウンロード中: $$DOWNLOAD_URL" && \
