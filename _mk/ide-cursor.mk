@@ -86,100 +86,66 @@ _cursor_link_settings:
 	@echo "✅ CursorのMCP設定リンクが完了しました (SSE via Docker MCP Gateway)"
 
 _cursor_download:
-        @echo "📦 方法1: 自動ダウンロードを試行中..."
-        @cd /tmp && \
-        verify_download_size() { \
-                min_size="$${1:-$(CURSOR_MIN_SIZE_BYTES)}"; \
-                max_size="$${2:-$(CURSOR_MAX_SIZE_BYTES)}"; \
-                file="$${3:-cursor.AppImage}"; \
-                file_size=$$( $(STAT_SIZE) "$$file" 2>/dev/null || echo "0"); \
-                if [ "$$file_size" -ge "$$min_size" ] && [ "$$file_size" -le "$$max_size" ]; then \
-                        echo "✅ サイズ検証に成功しました ($$file_size bytes)"; \
-                        echo "   (範囲: $$(($$min_size/$(BYTES_TO_MB)))MB - $$(($$max_size/$(BYTES_TO_MB)))MB)"; \
-                        return 0; \
-                else \
-                        echo "❌ ファイルのサイズが不正です ($$file_size bytes)"; \
-                        echo "   許容範囲: $$(($$min_size/$(BYTES_TO_MB)))MB - $$(($$max_size/$(BYTES_TO_MB)))MB"; \
-                        echo "   ファイルが破損しているか、改ざんされた可能性があります"; \
-                        return 1; \
-                fi; \
-        }; \
-        if curl -L --user-agent "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36" \
-                --max-time 120 --retry 2 --retry-delay 3 \
-                -o cursor.AppImage "https://www.cursor.com/api/download?platform=linux-x64" 2>/dev/null; then \
-                VALID_DOWNLOAD=0; \
-                echo "🔐 ダウンロードファイルの整合性を検証中 (SHA256)..."; \
-                ACTUAL_HASH=$$( $(SHA256_CMD) cursor.AppImage | awk '{print $$1}'); \
-                if [ -n "$(CURSOR_SHA256)" ]; then \
-                        if [ "$$ACTUAL_HASH" != "$(CURSOR_SHA256)" ]; then \
-                                echo "❌ ハッシュ不一致エラー"; \
-                                echo "   期待値: $(CURSOR_SHA256)"; \
-                                echo "   実際値: $$ACTUAL_HASH"; \
-                                echo "   (バージョンが更新された可能性があります。mk/cursor.mk の CURSOR_SHA256 を更新してください)"; \
-                                rm -f cursor.AppImage; \
-                                exit 1; \
-                        else \
-                                echo "✅ ハッシュ検証に成功しました"; \
-                                VALID_DOWNLOAD=1; \
-                        fi; \
-                else \
-                        echo "⚠️  【セキュリティ警告】SHA256チェックサムが設定されていません。サイズ検証のみ実行します。"; \
-                        if verify_download_size "$(CURSOR_MIN_SIZE_BYTES)" "$(CURSOR_MAX_SIZE_BYTES)" "cursor.AppImage"; then VALID_DOWNLOAD=1; else rm -f cursor.AppImage; exit 1; fi; \
-                fi; \
-                if [ "$$VALID_DOWNLOAD" -eq 1 ]; then \
-                        echo "✅ ダウンロード完了"; \
-                        chmod +x cursor.AppImage || exit 1; \
-                        sudo mkdir -p /opt/cursor || exit 1; \
-                        sudo mv cursor.AppImage /opt/cursor/cursor.AppImage || exit 1; \
-                        exit 0; \
-                fi; \
-        fi; \
-        echo "⚠️  自動ダウンロードに失敗しました (ホスト解決不可またはタイムアウト)"; \
-        echo "📦 方法2: ダウンロードフォルダから検索中..."; \
-        FOUND=false; \
-        for DIR in $(HOME_DIR)/Downloads $(HOME_DIR)/Desktop /tmp; do \
-                if [ -d "$$DIR" ]; then \
-                        for CURSOR_FILE in "$$DIR"/cursor*.AppImage; do \
-                                [ -f "$$CURSOR_FILE" ] || continue; \
-                                echo "✅ $$CURSOR_FILE が見つかりました"; \
-                                VALID_FILE=0; \
-                                echo "🔐 ローカルファイルの整合性を検証中 (SHA256)..."; \
-                                ACTUAL_HASH=$$( $(SHA256_CMD) "$$CURSOR_FILE" | awk '{print $$1}'); \
-                                if [ -n "$(CURSOR_SHA256)" ]; then \
-                                        if [ "$$ACTUAL_HASH" != "$(CURSOR_SHA256)" ]; then \
-                                                echo "❌ ハッシュ不一致エラー ($$CURSOR_FILE)"; \
-                                                echo "   期待値: $(CURSOR_SHA256)"; \
-                                                echo "   実際値: $$ACTUAL_HASH"; \
-                                        else \
-                                                echo "✅ ハッシュ検証に成功しました"; \
-                                                VALID_FILE=1; \
-                                        fi; \
-                                else \
-                                        echo "⚠️  【セキュリティ警告】SHA256チェックサムが設定されていません。サイズ検証のみ実行します。"; \
-                                        if verify_download_size "$(CURSOR_MIN_SIZE_BYTES)" "$(CURSOR_MAX_SIZE_BYTES)" "$$CURSOR_FILE"; then VALID_FILE=1; fi; \
-                                fi; \
-                                if [ "$$VALID_FILE" -eq 1 ]; then \
-                                        chmod +x "$$CURSOR_FILE" || exit 1; \
-                                        sudo mkdir -p /opt/cursor || exit 1; \
-                                        sudo cp "$$CURSOR_FILE" /opt/cursor/cursor.AppImage || exit 1; \
-                                        FOUND=true; \
-                                        break; \
-                                else \
-                                        echo "❌ $$CURSOR_FILE の検証に失敗しました。"; \
-                                fi; \
-                                done; \
-                                [ "$$FOUND" = "true" ] && break; \
-                                fi; \
-                                done; \
-                                if [ "$$FOUND" = "false" ]; then \
-                                echo "❌ Cursor IDEのインストールに失敗しました"; \
-                                echo ""; \
-                                echo "📥 手動インストール手順:"; \
-                                echo "1. ブラウザで https://www.cursor.com/ を開く"; \
-                                echo "2. 'Download for Linux' をクリック"; \
-                                echo "3. ダウンロード後、再度このコマンドを実行"; \
-                                exit 1; \
-                                fi
+	@echo "📦 方法1: 自動ダウンロードを試行中..."
+	@cd /tmp && \
+	if curl -L --user-agent "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36" \
+		--max-time 120 --retry 2 --retry-delay 3 \
+		-o cursor.AppImage "https://www.cursor.com/api/download?platform=linux-x64&releaseTrack=stable" 2>/dev/null; then \
+		FILE_SIZE=$$( $(STAT_SIZE) cursor.AppImage 2>/dev/null || echo "0"); \
+		if [ "$$FILE_SIZE" -ge $(CURSOR_MIN_SIZE_BYTES) ] && [ "$$FILE_SIZE" -le $(CURSOR_MAX_SIZE_BYTES) ]; then \
+			echo "✅ ダウンロードが完了しました (サイズ: $$FILE_SIZE bytes)"; \
+			ACTUAL_HASH=$$( $(SHA256_CMD) cursor.AppImage | awk '{print $$1}'); \
+			VALID_DOWNLOAD=0; \
+			if [ -n "$(CURSOR_SHA256)" ]; then \
+				if [ "$$ACTUAL_HASH" != "$(CURSOR_SHA256)" ]; then \
+					echo "❌ ハッシュ不一致エラー"; \
+					echo "   期待値: $(CURSOR_SHA256)"; \
+					echo "   実際値: $$ACTUAL_HASH"; \
+					rm -f cursor.AppImage; \
+					exit 1; \
+				else \
+					echo "✅ ハッシュ検証に成功しました"; \
+					VALID_DOWNLOAD=1; \
+				fi; \
+			elif [ "$(CURSOR_NO_VERIFY_HASH)" = "true" ]; then \
+				echo "⚠️  【セキュリティ警告】SHA256チェックサムが設定されていません。ハッシュ検証をスキップします。"; \
+				VALID_DOWNLOAD=1; \
+			else \
+				echo "❌ エラー: CURSOR_SHA256 が設定されていません"; \
+				echo "   セキュリティポリシーにより、整合性検証のないインストールはブロックされます。"; \
+				echo "   CURSOR_NO_VERIFY_HASH=true でスキップできます。"; \
+				rm -f cursor.AppImage; \
+				exit 1; \
+			fi; \
+			if [ "$$VALID_DOWNLOAD" -eq 1 ]; then \
+				chmod +x cursor.AppImage || exit 1; \
+				sudo mkdir -p /opt/cursor || exit 1; \
+				sudo mv cursor.AppImage /opt/cursor/cursor.AppImage || exit 1; \
+				exit 0; \
+			fi; \
+		else \
+			echo "❌ ダウンロードファイルのサイズが不正です ($$FILE_SIZE bytes)"; \
+			rm -f cursor.AppImage; \
+		fi; \
+	fi; \
+	echo "⚠️  自動ダウンロードに失敗しました (ホスト解決不可、タイムアウト、または検証失敗)"; \
+	echo "📦 方法2: ローカルディレクトリから検索中..."; \
+	LOCAL_FILE=$$(HOME_DIR=$(HOME_DIR) CURSOR_SHA256=$(CURSOR_SHA256) CURSOR_MIN_SIZE_BYTES=$(CURSOR_MIN_SIZE_BYTES) CURSOR_MAX_SIZE_BYTES=$(CURSOR_MAX_SIZE_BYTES) $(REPO_ROOT)/_scripts/find-local-cursor.sh); \
+	if [ -n "$$LOCAL_FILE" ] && [ -f "$$LOCAL_FILE" ]; then \
+		echo "✅ 妥当なローカルファイルが見つかりました: $$LOCAL_FILE"; \
+		sudo mkdir -p /opt/cursor || exit 1; \
+		sudo cp "$$LOCAL_FILE" /opt/cursor/cursor.AppImage || exit 1; \
+		sudo chmod +x /opt/cursor/cursor.AppImage || exit 1; \
+		exit 0; \
+	else \
+		echo "❌ Cursor IDEのインストールに失敗しました"; \
+		echo ""; \
+		echo "📥 手動インストール手順:"; \
+		echo "1. ブラウザで https://www.cursor.com/ を開く"; \
+		echo "2. 'Download for Linux' をクリック"; \
+		echo "3. ダウンロード後、再度このコマンドを実行 (または /opt/cursor/cursor.AppImage に配置)"; \
+		exit 1; \
+	fi
 
 _cursor_setup_desktop:
 	@echo "📝 デスクトップエントリーとアイコンを作成中..."
@@ -331,7 +297,7 @@ update-cursor:
 		\
 		if [ -z "$$DOWNLOAD_URL" ]; then \
 			echo "🔄 フォールバック: 直接ダウンロードを試行中..."; \
-			DOWNLOAD_URL="https://downloader.cursor.sh/linux/appImage/x64"; \
+			DOWNLOAD_URL="https://www.cursor.com/api/download?platform=linux-x64&releaseTrack=stable"; \
 		fi && \
 		\
 		echo "📥 ダウンロード中: $$DOWNLOAD_URL" && \
@@ -342,6 +308,7 @@ update-cursor:
 			if [ "$$FILE_SIZE" -ge $(CURSOR_MIN_SIZE_BYTES) ] && [ "$$FILE_SIZE" -le $(CURSOR_MAX_SIZE_BYTES) ]; then \
 				echo "✅ 新しいバージョンのダウンロードが完了しました (サイズ: $$FILE_SIZE bytes)"; \
 				ACTUAL_HASH=$$( $(SHA256_CMD) cursor-new.AppImage | awk '{print $$1}'); \
+				VALID_DOWNLOAD=0; \
 				if [ -n "$(CURSOR_SHA256)" ]; then \
 					if [ "$$ACTUAL_HASH" != "$(CURSOR_SHA256)" ]; then \
 						echo "❌ ハッシュ不一致エラー"; \
@@ -349,29 +316,36 @@ update-cursor:
 						echo "   実際値: $$ACTUAL_HASH"; \
 						rm -f cursor-new.AppImage; \
 						exit 1; \
+					else \
+						VALID_DOWNLOAD=1; \
 					fi; \
-				elif [ "$(CURSOR_NO_VERIFY_HASH)" != "true" ]; then \
+				elif [ "$(CURSOR_NO_VERIFY_HASH)" = "true" ]; then \
+					echo "⚠️  【セキュリティ警告】SHA256チェックサムが設定されていません。ハッシュ検証をスキップします。"; \
+					VALID_DOWNLOAD=1; \
+				else \
 					echo "❌ エラー: CURSOR_SHA256 が設定されていません"; \
 					echo "   セキュリティポリシーにより、整合性検証のないアップデートはブロックされます。"; \
 					echo "   CURSOR_NO_VERIFY_HASH=true でスキップできます。"; \
 					rm -f cursor-new.AppImage; \
 					exit 1; \
 				fi; \
-				echo "🔧 既存ファイルをバックアップ中..."; \
-				BACKUP_FILE="/opt/cursor/cursor.AppImage.backup.$$(date +%Y%m%d_%H%M%S)"; \
-				sudo cp /opt/cursor/cursor.AppImage "$$BACKUP_FILE" && \
-				echo "🧹 古いバックアップを整理中 (最新5件を保持)..."; \
-				BACKUP_LIST=$$(ls -t /opt/cursor/cursor.AppImage.backup.* 2>/dev/null | tail -n +6); \
-				if [ -n "$$BACKUP_LIST" ]; then \
-					echo "$$BACKUP_LIST" | xargs sudo rm -f; \
-				fi && \
-				chmod +x cursor-new.AppImage && \
-				sudo cp cursor-new.AppImage /opt/cursor/cursor.AppImage && \
-				sudo chown root:root /opt/cursor/cursor.AppImage && \
-				sudo chmod 755 /opt/cursor/cursor.AppImage && \
-				rm -f cursor-new.AppImage && \
-				CURSOR_UPDATED=true && \
-				echo "🎉 Cursor IDEのアップデートが完了しました"; \
+				if [ "$$VALID_DOWNLOAD" -eq 1 ]; then \
+					echo "🔧 既存ファイルをバックアップ中..."; \
+					BACKUP_FILE="/opt/cursor/cursor.AppImage.backup.$$(date +%Y%m%d_%H%M%S)"; \
+					sudo cp /opt/cursor/cursor.AppImage "$$BACKUP_FILE" && \
+					echo "🧹 古いバックアップを整理中 (最新5件を保持)..."; \
+					BACKUP_LIST=$$(ls -t /opt/cursor/cursor.AppImage.backup.* 2>/dev/null | tail -n +6); \
+					if [ -n "$$BACKUP_LIST" ]; then \
+						echo "$$BACKUP_LIST" | xargs sudo rm -f; \
+					fi && \
+					chmod +x cursor-new.AppImage && \
+					sudo cp cursor-new.AppImage /opt/cursor/cursor.AppImage && \
+					sudo chown root:root /opt/cursor/cursor.AppImage && \
+					sudo chmod 755 /opt/cursor/cursor.AppImage && \
+					rm -f cursor-new.AppImage && \
+					CURSOR_UPDATED=true && \
+					echo "🎉 Cursor IDEのアップデートが完了しました"; \
+				fi; \
 			else \
 				echo "❌ ダウンロードファイルが不完全または不正なサイズです ($$FILE_SIZE bytes)"; \
 				echo "   許容範囲: $$(($(CURSOR_MIN_SIZE_BYTES)/$(BYTES_TO_MB)))MB - $$(($(CURSOR_MAX_SIZE_BYTES)/$(BYTES_TO_MB)))MB"; \
@@ -387,7 +361,7 @@ update-cursor:
 	\
 	if [ "$$CURSOR_UPDATED" = "false" ]; then \
 		echo "💡 手動アップデート手順:"; \
-		echo "1. ブラウザで https://cursor.sh/ を開く"; \
+		echo "1. ブラウザで https://www.cursor.com/ を開く"; \
 		echo "2. 'Download for Linux' をクリック"; \
 		echo "3. ダウンロードしたファイルを /opt/cursor/cursor.AppImage に置き換え"; \
 		echo "4. sudo chmod +x /opt/cursor/cursor.AppImage でアクセス権を設定"; \
@@ -395,7 +369,6 @@ update-cursor:
 		echo "🔧 代替手順 (API経由):"; \
 		echo "curl -s 'https://www.cursor.com/api/download?platform=linux-x64&releaseTrack=stable' | jq -r '.downloadUrl'"; \
 	fi
-
 # Cursor IDEを停止
 stop-cursor:
 	@echo "🛑 Cursor IDEを停止しています..."
