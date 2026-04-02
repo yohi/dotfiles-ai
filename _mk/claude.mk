@@ -382,6 +382,8 @@ setup-claude: ## Claude Codeの設定を適用
 	@echo "📝 Claude Codeの設定を適用中..."
 	@mkdir -p "$(HOME_DIR)/.claude"
 	@ln -sf "$(REPO_ROOT)/global-rules/AGENTS.global.md" "$(HOME_DIR)/.claude/CLAUDE.md"
+	# Claude Codeが設定を上書きする場合、本リポジトリのファイルが変更されます(SSOT)。
+	# ツールによってはシンボリックリンクを削除して通常ファイルで上書きする可能性があります。
 	@ln -sf "$(REPO_ROOT)/claude/settings.json" "$(HOME_DIR)/.claude/settings.json"
 	@chmod +x "$(REPO_ROOT)/claude/statusline.sh"
 	@ln -sf "$(REPO_ROOT)/claude/statusline.sh" "$(HOME_DIR)/.claude/statusline.sh"
