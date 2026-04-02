@@ -31,17 +31,11 @@ if git -C "$cwd" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     fi
 fi
 
-# --- Model ---
-model=$(echo "$input" | jq -r '.model.display_name // empty')
-
-# --- Context usage ---
-used_pct=$(echo "$input" | jq -r '.context_window.used_percentage // empty')
-
-# --- Rate limits (Claude.ai subscription) ---
-five_hour=$(echo "$input" | jq -r '.rate_limits.five_hour.used_percentage // empty')
-
-# --- Vim mode ---
-vim_mode=$(echo "$input" | jq -r '.vim.mode // empty')
+# --- Extract data with a single jq call ---
+# (model, used_pct, five_hour, vim_mode)
+IFS='	' read -r model used_pct five_hour vim_mode <<EOF
+$(echo "$input" | jq -r '[.model.display_name, .context_window.used_percentage, .rate_limits.five_hour.used_percentage, .vim.mode] | map(. // "") | @tsv')
+EOF
 
 # --- Build output ---
 # Colors (ANSI, dimmed-friendly)
