@@ -391,7 +391,7 @@ setup-claude: ## Claude Codeの設定を適用
 
 uninstall-claude: ## Claude Codeの設定を削除
 	@echo "🗑️  Claude Codeの設定を削除中..."
-	@rm -f "$(HOME_DIR)/.claude/CLAUDE.md"
-	@rm -f "$(HOME_DIR)/.claude/settings.json"
-	@rm -f "$(HOME_DIR)/.claude/statusline.sh"
+	@if [ -L "$(HOME_DIR)/.claude/CLAUDE.md" ]; then rm -f "$(HOME_DIR)/.claude/CLAUDE.md"; fi
+	@if [ -L "$(HOME_DIR)/.claude/settings.json" ]; then rm -f "$(HOME_DIR)/.claude/settings.json"; fi
+	@if [ -L "$(HOME_DIR)/.claude/statusline.sh" ]; then rm -f "$(HOME_DIR)/.claude/statusline.sh"; fi
 	@echo "✅ Claude Codeの設定を削除しました"
