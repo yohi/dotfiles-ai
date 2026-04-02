@@ -380,11 +380,14 @@ install-claudia: install-packages-claudia  ## Claudiaをインストール(エ�
 
 setup-claude: ## Claude Codeの設定を適用
 	@echo "📝 Claude Codeの設定を適用中..."
-	@mkdir -p $(HOME_DIR)/.claude
-	@ln -sf $(REPO_ROOT)/global-rules/AGENTS.global.md $(HOME_DIR)/.claude/CLAUDE.md
+	@mkdir -p "$(HOME_DIR)/.claude"
+	@ln -sf "$(REPO_ROOT)/global-rules/AGENTS.global.md" "$(HOME_DIR)/.claude/CLAUDE.md"
+	@chmod +x "$(REPO_ROOT)/claude/statusline.sh"
+	@ln -sf "$(REPO_ROOT)/claude/statusline.sh" "$(HOME_DIR)/.claude/statusline.sh"
 	@echo "✅ Claude Codeの設定が完了しました"
 
 uninstall-claude: ## Claude Codeの設定を削除
 	@echo "🗑️  Claude Codeの設定を削除中..."
-	@rm -f $(HOME_DIR)/.claude/CLAUDE.md
+	@rm -f "$(HOME_DIR)/.claude/CLAUDE.md"
+	@rm -f "$(HOME_DIR)/.claude/statusline.sh"
 	@echo "✅ Claude Codeの設定を削除しました"
