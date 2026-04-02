@@ -13,7 +13,7 @@ cwd=$(echo "$input" | jq -r '.workspace.current_dir // .cwd // empty')
 
 # Shorten home directory to ~
 home_dir="$HOME"
-short_cwd=$(echo "$cwd" | sed "s|^${home_dir}|~|")
+short_cwd=$(case "$cwd" in "${home_dir}"*) printf '~%s' "${cwd#"$home_dir"}" ;; *) printf '%s' "$cwd" ;; esac)
 
 # --- Git branch ---
 git_branch=""
@@ -24,9 +24,9 @@ if git -C "$cwd" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     if [ -n "$branch" ]; then
         # Check dirty state (skip optional locks)
         if git -C "$cwd" --no-optional-locks status --porcelain 2>/dev/null | grep -q .; then
-            git_branch=" ${branch}*"
+            git_branch="${branch}*"
         else
-            git_branch=" ${branch}"
+            git_branch="${branch}"
         fi
     fi
 fi
@@ -98,4 +98,4 @@ if [ -n "$vim_mode" ]; then
     line="${line}  $(printf "${YELLOW}[%s]${RESET}" "$vim_mode")"
 fi
 
-printf "%b\n" "$line"
+printf "%s\n" "$line"
