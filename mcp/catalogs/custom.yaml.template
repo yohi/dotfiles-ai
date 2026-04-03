@@ -24,6 +24,9 @@ registry:
     title: Skillport
     type: server
     image: ghcr.io/yohi/skillport:latest
+    tools:
+      - name: search_skills
+      - name: load_skill
     command:
       - --skip-auto-reindex
     env:
