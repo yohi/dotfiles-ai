@@ -53,13 +53,16 @@ Each skill contains step-by-step instructions, templates, and scripts.
 
 ### ⚠️ CRITICAL: TOOL USAGE ONLY
 - **DO NOT** attempt to read skill files directly using `read_file` or `grep_search`.
-- **ALWAYS** use the `load_skill(id)` tool or execute `skillport show <id>` to retrieve skill instructions. This ensures you receive the most up-to-date, processed instructions and conserves context.
+- **MANDATORY**: AI agents MUST use the `load_skill(id)` MCP tool to retrieve skill instructions. This ensures you receive the most up-to-date, processed instructions and conserves context.
 
 ### Tips
-
-- After obtaining the `{path}` via `load_skill(id)`, you may use your native Read tool to access bundled templates/assets within that directory (e.g., `{path}/assets/template.md`).
 - Execute scripts via the provided path using shell commands, rather than reading them into context: `python {path}/scripts/run.py`
 - If search returns too many results, use more specific terms
+
+### Manual Operations (CLI)
+For manual inspection or CLI-based agents, use the following commands:
+- `skillport list` - List all available skills.
+- `skillport show <id>` - Display detailed instructions for a specific skill.
 
 <available_skills>
 <skill>
@@ -179,5 +182,6 @@ Regardless of task size, you MUST adhere to the core philosophy:
 - **Requirement:** Formal skills may be skipped for speed, but the final state MUST be verified and reported.
 
 ## Skill Integration (SkillPort)
-- **Tool-First:** Always use `load_skill` (MCP) or `skillport show` (CLI) to load skills — direct file path reads or direct access to skill files are strictly forbidden during runtime and for Pull Requests.
+- **Tool-First:** AI agents MUST use the `load_skill` (MCP) tool as the primary method for loading expert guidance. Direct file path reads or direct access to skill files are strictly forbidden during runtime and for Pull Requests.
+- **CLI Fallback:** Use `skillport show` only for manual operations or in non-MCP environments where specifically instructed.
 ## END Superpowers Workflow
