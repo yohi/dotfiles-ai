@@ -68,7 +68,7 @@ Each skill contains step-by-step instructions, templates, and scripts.
 ### Tools
 
 - `search_skills(query)` - Find skills by task description. Use `""` to list all.
-- `load_skill(id)` - Get full instructions.
+- `load_skill(id)` - Get full instructions for the specified skill.
 
 ### ⚠️ CRITICAL: TOOL USAGE ONLY
 - **DO NOT** attempt to read skill files directly using `read_file` or `grep_search`.
