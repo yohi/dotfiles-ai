@@ -168,12 +168,33 @@ Each skill contains step-by-step instructions, templates, and scripts.
 - **Restrictions**: `rm`, `ssh`, `sudo` are strictly blocked.
 
 ## BEGIN Superpowers Workflow
-# Superpowers Workflow
-This project employs the [obra/superpowers](https://github.com/obra/superpowers) workflow.
+# Superpowers Workflow (Adaptive Application)
+This project employs the [obra/superpowers](https://github.com/obra/superpowers) workflow. While its principles are mandatory, its execution MUST be **tailored to the task's complexity** to balance rigor and efficiency.
 
-## Core Rules
-- **Skill-First:** Before implementation/coding actions, you MUST call `search_skills("using-superpowers")` to find the skill ID and then call `load_skill(id)` to load/activate it. Follow this flow for any relevant skills you identify.
-- **Planning & Design:** Solidify the design with the `brainstorming` skill and create a detailed task list with `writing-plans` before implementation.
-- **TDD:** Follow the `test-driven-development` skill for all implementations by writing tests before implementation code.
-- **Verification:** Execute `verification-before-completion` before finishing a task and provide success reports based on empirical evidence.
+## Core Mandate: "Think, Plan, Verify"
+Regardless of task size, you MUST adhere to the core philosophy:
+1.  **Research & Design:** Understand context and constraints before acting (`brainstorming`).
+2.  **Structured Planning:** Define steps before execution (`writing-plans`).
+3.  **Empirical Verification:** Confirm outcomes with evidence (`verification-before-completion`).
+
+## Adaptive Execution Levels
+
+### 1. High Intensity (New Features / Complex Bug Fixes / Architecture)
+**Full adherence is MANDATORY.**
+- **Workflow:** `brainstorming` → `writing-plans` → `test-driven-development` → `verification-before-completion`.
+- **Requirement:** Detailed design docs, multi-checkpoint plans, and pre-implementation test cases.
+
+### 2. Medium Intensity (Improvements / Refactoring / Moderate Logic Changes)
+**Streamlined execution.**
+- **Workflow:** Combined (Brainstorm/Plan) → Implementation → `verification-before-completion`.
+- **Requirement:** A clear, concise implementation plan. TDD is recommended for core logic but can be adapted for non-critical paths.
+
+### 3. Low Intensity (Trivial Fixes / Documentation / Config Typos)
+**Rapid response.**
+- **Workflow:** Brief mental model check → Direct Act → Immediate Verification.
+- **Requirement:** Formal skills may be skipped for speed, but the final state MUST be verified and reported.
+
+## Skill Integration (SkillPort)
+- **Tool-First:** Always use `load_skill` (MCP) or `skillport show` (CLI) to load the relevant expert guidance before executing major workflows.
 ## END Superpowers Workflow
+
