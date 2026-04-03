@@ -1,11 +1,7 @@
 model = "gpt-5.4"
-model_reasoning_effort = "high"
+model_reasoning_effort = "low"
 [notice]
 hide_rate_limit_model_nudge = true
-
-[notice.model_migrations]
-"gpt-5.2-codex" = "gpt-5.3-codex"
-"gpt-5.3-codex" = "gpt-5.4"
 
 # OpenAI Codex CLI Configuration
 #
@@ -23,3 +19,9 @@ hide_rate_limit_model_nudge = true
 # UAACS:META-PROMPT
 # 拡張スキル: ../agent-skills/ (各 SKILL.md を参照)
 # コーディングルール: ../global-rules/ (MARKDOWN.md, SHELL.md, DOCS_STYLE.md, GIT_STANDARDS.md)
+
+
+[model_providers.flixa]
+name = "flixa"
+base_url = "https://api.flixa.engineer/v1/agent"
+wire_api = "responses"
