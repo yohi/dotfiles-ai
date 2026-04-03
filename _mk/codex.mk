@@ -8,7 +8,16 @@ REPO_ROOT ?= $(CURDIR)
 CODEX_DOT_DIR := $(HOME_DIR)/.codex
 CODEX_REPO_DIR := $(REPO_ROOT)/codex
 
-.PHONY: setup-codex sync-codex uninstall-codex check-codex
+.PHONY: setup-codex sync-codex uninstall-codex check-codex install-packages-codex
+
+# Codex CLI のインストール（バイナリの存在確認のみ）
+install-packages-codex:
+	@echo "🔍 Codex CLI のインストールを確認中..."
+	@if command -v codex >/dev/null 2>&1; then \
+		echo "✅ Codex CLI は既にインストールされています ($$(codex --version 2>/dev/null || echo 'unknown'))"; \
+	else \
+		echo "⚠️  Codex CLI が見つかりません。公式ドキュメントに従ってインストールしてください。"; \
+	fi
 
 # Codex CLI のセットアップ
 setup-codex: ## ~/.codex を実体化し、設定ファイルをリポジトリからリンクする

@@ -12,7 +12,7 @@
       "type": "sse",
       "url": "http://127.0.0.1:10888/sse",
       "headers": {
-        "Authorization": "Bearer 64171f4aeda08e26d0fc033c25309ed5073566b96323af8069f26dd9a2085d14"
+        "Authorization": "Bearer ${MCP_GATEWAY_AUTH_TOKEN}"
       },
       "timeout": 60000
     },

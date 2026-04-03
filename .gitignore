@@ -13,7 +13,6 @@ codex/*.sqlite-shm
 codex/*.sqlite-wal
 codex/*.json
 !codex/config.toml
-!codex/version.json
 codex/sessions/
 codex/log/
 codex/cache/
