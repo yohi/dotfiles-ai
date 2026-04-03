@@ -26,13 +26,14 @@ setup-codex: ## ~/.codex を実体化し、設定ファイルをリポジトリ�
 	@# 1. ~/.codex がシンボリックリンクなら、内容を待避して実体ディレクトリに置き換える
 	@if [ -L "$(CODEX_DOT_DIR)" ]; then \
 		echo "🔗 現在の ~/.codex はシンボリックリンクです。実体化を試みます..."; \
-		temp_dir="$$(mktemp -d)"; \
-		cp -a "$(CODEX_DOT_DIR)/." "$$temp_dir/"; \
-		rm -f "$(CODEX_DOT_DIR)"; \
-		mkdir -p "$(CODEX_DOT_DIR)"; \
-		cp -a "$$temp_dir/." "$(CODEX_DOT_DIR)/"; \
-		rm -rf "$$temp_dir"; \
-		echo "✅ ~/.codex を実体ディレクトリに変換しました"; \
+		(set -e; \
+		 temp_dir=$$(mktemp -d); \
+		 trap 'rm -rf "$$temp_dir"' EXIT; \
+		 cp -a "$(CODEX_DOT_DIR)/." "$$temp_dir/"; \
+		 rm -f "$(CODEX_DOT_DIR)"; \
+		 mkdir -p "$(CODEX_DOT_DIR)"; \
+		 cp -a "$$temp_dir/." "$(CODEX_DOT_DIR)/"; \
+		 echo "✅ ~/.codex を実体ディレクトリに変換しました"); \
 	else \
 		mkdir -p "$(CODEX_DOT_DIR)"; \
 		echo "✅ ~/.codex ディレクトリを確認しました"; \
@@ -80,11 +81,11 @@ sync-codex: ## リポジトリ内の設定ファイルを ~/.codex へ個別に�
 # アンインストール
 uninstall-codex: ## 設定ファイルのリンクを解除する（実体ファイルは残す）
 	@echo "🗑️  Codex 設定ファイルのリンクを解除中..."
-	@rm -f "$(CODEX_DOT_DIR)/config.toml"
-	@rm -f "$(CODEX_DOT_DIR)/AGENTS.md"
-	@rm -rf "$(CODEX_DOT_DIR)/rules"
-	@rm -f "$(CODEX_DOT_DIR)/.personality_migration"
-	@echo "✅ リンクを解除しました。~/.codex 内の実体データは保持されています"
+	@if [ -L "$(CODEX_DOT_DIR)/config.toml" ]; then rm -f "$(CODEX_DOT_DIR)/config.toml"; fi
+	@if [ -L "$(CODEX_DOT_DIR)/AGENTS.md" ]; then rm -f "$(CODEX_DOT_DIR)/AGENTS.md"; fi
+	@if [ -L "$(CODEX_DOT_DIR)/rules" ]; then rm -rf "$(CODEX_DOT_DIR)/rules"; fi
+	@if [ -L "$(CODEX_DOT_DIR)/.personality_migration" ]; then rm -f "$(CODEX_DOT_DIR)/.personality_migration"; fi
+	@echo "✅ リンクを解除しました。実体データは保持されています"
 
 # 状態確認
 check-codex: ## Codex の設定状態を確認
