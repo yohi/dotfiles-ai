@@ -68,11 +68,11 @@ Each skill contains step-by-step instructions, templates, and scripts.
 ### Tools
 
 - `search_skills(query)` - Find skills by task description. Use `""` to list all.
-- `load_skill(id)` - Get full instructions and the skill's filesystem path.
+- `load_skill(id)` - Get full instructions.
 
 ### ⚠️ CRITICAL: TOOL USAGE ONLY
 - **DO NOT** attempt to read skill files directly using `read_file` or `grep_search`.
-- **ALWAYS** use the `load_skill(id)` tool or execute `skillport show <id>` to retrieve skill instructions. This ensures you receive the most up-to-date, processed instructions and conserves context.
+- **MANDATORY**: AI agents MUST use the `load_skill(id)` MCP tool to retrieve skill instructions. This ensures you receive the most up-to-date, processed instructions and conserves context.
 
 <available_skills>
 <skill>
@@ -155,14 +155,35 @@ Each skill contains step-by-step instructions, templates, and scripts.
 <!-- SKILLPORT_END -->
 
 ## BEGIN Superpowers Workflow
-# Superpowers Workflow
-This project employs the [obra/superpowers](https://github.com/obra/superpowers) workflow.
+# Superpowers Workflow (Adaptive Application)
+This project employs the [obra/superpowers](https://github.com/obra/superpowers) workflow. While its principles are mandatory, its execution MUST be **tailored to the task's complexity** to balance rigor and efficiency.
 
-## Core Rules
-- **Skill-First:** Before implementation/coding actions, you MUST call `search_skills("using-superpowers")` to find the skill ID and then call `load_skill(skill_id)` to load/activate it. Follow this flow for any relevant skills you identify.
-- **Planning & Design:** Solidify the design with the `brainstorming` skill and create a detailed task list with `writing-plans` before implementation.
-- **TDD:** Follow the `test-driven-development` skill for all implementations by writing tests before implementation code.
-- **Verification:** Execute `verification-before-completion` before finishing a task and provide success reports based on empirical evidence.
+## Core Mandate: "Think, Plan, Verify"
+Regardless of task size, you MUST adhere to the core philosophy:
+1.  **Research & Design:** Understand context and constraints before acting (`superpowers/brainstorming`).
+2.  **Structured Planning:** Define steps before execution (`superpowers/writing-plans`).
+3.  **Empirical Verification:** Confirm outcomes with evidence (`superpowers/verification-before-completion`).
+
+## Adaptive Execution Levels
+
+### 1. High Intensity (New Features / Complex Bug Fixes / Architecture)
+**Full adherence is MANDATORY.**
+- **Workflow:** `superpowers/brainstorming` → `superpowers/writing-plans` → `superpowers/test-driven-development` → `superpowers/verification-before-completion`.
+- **Requirement:** Detailed design docs, multi-checkpoint plans, and pre-implementation test cases.
+
+### 2. Medium Intensity (Improvements / Refactoring / Moderate Logic Changes)
+**Streamlined execution.**
+- **Workflow:** Combined (Brainstorm/Plan) → Implementation → `superpowers/verification-before-completion`.
+- **Requirement:** A clear, concise implementation plan. TDD is recommended for core logic but can be adapted for non-critical paths.
+
+### 3. Low Intensity (Trivial Fixes / Documentation / Config Typos)
+**Rapid response.**
+- **Workflow:** Brief mental model check → Direct Act → Immediate Verification.
+- **Requirement:** Formal skills may be skipped for speed, but the final state MUST be verified and reported.
+
+## Skill Integration (SkillPort)
+- **Tool-First:** AI agents MUST use the `load_skill` (MCP) tool as the primary method for loading expert guidance. Direct file path reads or direct access to skill files are strictly forbidden during runtime and for Pull Requests.
+- **CLI Fallback:** Use `skillport show` only for manual operations or in non-MCP environments where specifically instructed.
 ## END Superpowers Workflow
 
 ## 単体使用時の注意点
