@@ -1,70 +1,95 @@
-#!/bin/bash
+#!/bin/sh
+# Claude Code statusLine script
+# Inspired by Powerlevel10k configuration (p10k lean style)
+# Displays: user@host  cwd  git  model  context%
 
-set -euo pipefail
-
-# Read JSON input from stdin
 input=$(cat)
 
-# Extract values from JSON
-current_dir=$(printf '%s\n' "$input" | jq -r '.workspace.current_dir // .cwd')
-model_name=$(printf '%s\n' "$input" | jq -r '.model.display_name // "Claude"')
-output_style=$(printf '%s\n' "$input" | jq -r '.output_style.name // ""')
-
-# Get current user and hostname
+# --- Core info ---
 user=$(whoami)
 host=$(hostname -s)
+cwd=$(echo "$input" | jq -r '.workspace.current_dir // .cwd // empty')
+[ -z "$cwd" ] && cwd=$(pwd)
 
-# Get git branch if in a git repository
+# Shorten home directory to ~
+home_dir="$HOME"
+short_cwd=$(case "$cwd" in "${home_dir}"*) printf '~%s' "${cwd#"$home_dir"}" ;; *) printf '%s' "$cwd" ;; esac)
+
+# --- Git branch ---
 git_branch=""
-if git -c core.fileMode=false rev-parse --git-dir > /dev/null 2>&1; then
-    git_branch=$(git -c core.fileMode=false branch --show-current 2>/dev/null || echo "")
-    if [ -n "$git_branch" ]; then
-        # Check for uncommitted changes (skip optional locks)
-        if ! git -c core.fileMode=false diff --quiet 2>/dev/null || ! git -c core.fileMode=false diff --cached --quiet 2>/dev/null; then
-            git_branch="${git_branch}*"
+if git -C "$cwd" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    branch=$(git -C "$cwd" symbolic-ref --short HEAD 2>/dev/null \
+             || git -C "$cwd" describe --tags --exact-match 2>/dev/null \
+             || git -C "$cwd" rev-parse --short HEAD 2>/dev/null)
+    if [ -n "$branch" ]; then
+        # Check dirty state (skip optional locks)
+        if git -C "$cwd" --no-optional-locks status --porcelain 2>/dev/null | grep -q .; then
+            git_branch="${branch}*"
+        else
+            git_branch="${branch}"
         fi
     fi
 fi
 
-# Get short directory path (replace home with ~)
-short_dir="${current_dir/#$HOME/~}"
+# --- Extract data with a single jq call ---
+# (model, used_pct, five_hour, vim_mode)
+IFS='	' read -r model used_pct five_hour vim_mode <<EOF
+$(echo "$input" | jq -r '[.model.display_name, .context_window.used_percentage, .rate_limits.five_hour.used_percentage, .vim.mode] | map(. // "") | @tsv')
+EOF
 
-# Build status line with colors (using printf for ANSI codes)
-status=""
+# --- Build output ---
+# Colors (ANSI, dimmed-friendly)
+RESET='\033[0m'
+CYAN='\033[36m'
+GREEN='\033[32m'
+YELLOW='\033[33m'
+BLUE='\033[34m'
+MAGENTA='\033[35m'
+RED='\033[31m'
 
-# Add user@host in blue
-status="${status}$(printf '\033[34m[%s@%s]\033[0m' "$user" "$host")"
+line=""
 
-# Add directory in default color
-status="${status} ${short_dir}"
+# user@host
+line="${line}$(printf "${CYAN}%s@%s${RESET}" "$user" "$host")"
 
-# Add git branch in green if available
+# cwd
+line="${line}  $(printf "${BLUE}%s${RESET}" "$short_cwd")"
+
+# git
 if [ -n "$git_branch" ]; then
-    status="${status} $(printf '\033[32m(%s)\033[0m' "$git_branch")"
+    line="${line}  $(printf "${GREEN}%s${RESET}" "$git_branch")"
 fi
 
-# Add model name in cyan
-status="${status} $(printf '\033[36m[%s]\033[0m' "$model_name")"
-
-# Add output style if set
-if [ -n "$output_style" ] && [ "$output_style" != "default" ]; then
-    status="${status} $(printf '\033[33m<%s>\033[0m' "$output_style")"
+# model
+if [ -n "$model" ]; then
+    line="${line}  $(printf "${MAGENTA}%s${RESET}" "$model")"
 fi
 
-# Try to add ccusage if available
-ccusage_info=""
-if ! command -v bun >/dev/null 2>&1 && [ -x "${HOME}/.bun/bin/bun" ]; then
-    export PATH="${HOME}/.bun/bin:${PATH}"
+# context usage
+if [ -n "$used_pct" ]; then
+    pct_int=$(printf '%.0f' "$used_pct")
+    if [ "$pct_int" -ge 80 ]; then
+        line="${line}  $(printf "${RED}ctx:%s%%${RESET}" "$pct_int")"
+    elif [ "$pct_int" -ge 50 ]; then
+        line="${line}  $(printf "${YELLOW}ctx:%s%%${RESET}" "$pct_int")"
+    else
+        line="${line}  ctx:${pct_int}%"
+    fi
 fi
 
-if command -v bunx >/dev/null 2>&1; then
-    ccusage_info=$(bunx -y ccusage statusline --visual-burn-rate emoji 2>/dev/null || echo "")
-elif command -v bun >/dev/null 2>&1; then
-    ccusage_info=$(bun x ccusage statusline --visual-burn-rate emoji 2>/dev/null || echo "")
+# 5-hour rate limit
+if [ -n "$five_hour" ]; then
+    five_int=$(printf '%.0f' "$five_hour")
+    if [ "$five_int" -ge 80 ]; then
+        line="${line}  $(printf "${RED}5h:%s%%${RESET}" "$five_int")"
+    else
+        line="${line}  5h:${five_int}%"
+    fi
 fi
 
-if [ -n "$ccusage_info" ]; then
-    status="${status} ${ccusage_info}"
+# vim mode
+if [ -n "$vim_mode" ]; then
+    line="${line}  $(printf "${YELLOW}[%s]${RESET}" "$vim_mode")"
 fi
 
-echo "$status"
+printf "%s\n" "$line"
