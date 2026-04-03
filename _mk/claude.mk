@@ -22,6 +22,10 @@ CLAUDIA_COMMIT := 70c16d8a4910db48cd9684aeacdd431caefd7d71
 .PHONY: install-packages-claude-code
 install-packages-claude-code:
 	@echo "🤖 Claude Code のバージョンを確認中..."
+	@if ! command -v npm >/dev/null 2>&1; then \
+		echo "❌ npm が見つかりません。先に Node.js/npm をインストールしてください"; \
+		exit 1; \
+	fi
 	@LATEST_VERSION=$$(npm show @anthropic-ai/claude-code version 2>/dev/null || echo "error"); \
 	CURRENT_VERSION=$$(claude --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "none"); \
 	if [ "$$LATEST_VERSION" = "error" ]; then \

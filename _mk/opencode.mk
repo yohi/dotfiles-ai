@@ -112,12 +112,17 @@ opencode: ## OpenCode(opencode)のインストールとセットアップ
 # OpenCode をインストール（公式インストーラ）
 install-packages-opencode: ## OpenCode（opencode）をインストール
 	@echo "📦 OpenCode のバージョンを確認中..."
-	@CURRENT_VERSION=$$( $(OPENCODE_BIN) --version 2>/dev/null || echo "none" ); \
-	if [ "$$CURRENT_VERSION" != "none" ]; then \
-		echo "✅ OpenCode は既にインストールされています (バージョン: $$CURRENT_VERSION)"; \
+	@LATEST_VERSION=$$(curl -sL --connect-timeout 10 --max-time 30 https://opencode.ai/api/version 2>/dev/null || echo "unknown"); \
+	CURRENT_VERSION=$$( $(OPENCODE_BIN) --version 2>/dev/null || echo "none" ); \
+	if [ "$$LATEST_VERSION" != "unknown" ] && [ "$$CURRENT_VERSION" = "$$LATEST_VERSION" ]; then \
+		echo "✅ OpenCode は既に最新バージョンです (バージョン: $$CURRENT_VERSION)"; \
 		exit 0; \
+	fi; \
+	if [ "$$CURRENT_VERSION" = "none" ]; then \
+		echo "📦 OpenCode を新規インストールします..."; \
+	else \
+		echo "🔄 OpenCode をアップデートします ($$CURRENT_VERSION -> $$LATEST_VERSION)..."; \
 	fi
-	@echo "📦 OpenCode を新規インストールします..."
 
 	@if ! command -v curl >/dev/null 2>&1; then \
 		echo "❌ curl が見つかりません。先に curl をインストールしてください"; \

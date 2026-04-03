@@ -79,9 +79,9 @@ lint: ## Run Ruff and Mypy on _scripts/
 init: install ## [初回] 依存パッケージのインストールと初期設定
 
 sync: ## [更新] リポジトリを最新にし、エージェントを同期する
-	@echo "🔄 リポジトリを最新に同期中..."
-	@git pull --rebase
-	@$(MAKE) sync-agents
+	 @echo "🔄 リポジトリを最新に同期中..."
+	 @git pull --rebase || (echo "❌ git pull --rebase に失敗しました。競合がある場合は 'git rebase --abort' で元に戻してください。"; exit 1)
+	 @$(MAKE) sync-agents
 
 secrets: ## [機密] BitwardenからAPIキー等の機密情報を取得 (このリポジトリでは未実装)
 	@echo "ℹ️  secrets: Bitwarden からの取得機能はこのリポジトリには実装されていません。"
@@ -94,3 +94,7 @@ status: ## [確認] 全コンポーネントの状態を一括表示
 	@echo "--- Agent Status ---"
 	@$(MAKE) -s check-skillport
 	@$(MAKE) -s check-opencode
+	@$(MAKE) -s check-superclaude
+	@$(MAKE) -s check-codex
+	@$(MAKE) -s check-antigravity
+	@$(MAKE) -s check-cursor-version
