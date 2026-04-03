@@ -7,9 +7,21 @@
 fix_all.sh
 agent-skills/superpowers/
 # Codex runtime files
-codex/.personality_migration
-codex/skills/.system/
+codex/*.jsonl
+codex/*.sqlite
+codex/*.sqlite-shm
+codex/*.sqlite-wal
+codex/*.json
+!codex/config.toml
+!codex/version.json
+codex/sessions/
+codex/log/
+codex/cache/
+codex/memories/
+codex/shell_snapshots/
 codex/tmp/
+codex/.tmp/
+codex/skills/.system/
 
 # OpenCode
 opencode/oh-my-opencode.json*

@@ -12,7 +12,7 @@
       "type": "sse",
       "url": "http://127.0.0.1:10888/sse",
       "headers": {
-        "Authorization": "Bearer 61b0b79357ba75ac8f81b6bacee85232"
+        "Authorization": "Bearer 64171f4aeda08e26d0fc033c25309ed5073566b96323af8069f26dd9a2085d14"
       },
       "timeout": 60000
     },
@@ -30,21 +30,41 @@
       "warningAcknowledged": true,
       "enabled": true,
       "maxAge": "120d"
+    },
+    "plan": {
+      "enabled": true
     }
   },
   "ui": {
+    "hideFooter": false,
+    "showFooter": true,
     "showMemoryUsage": true,
     "showCitations": true,
     "showModelInfoInChat": true,
     "footer": {
+      "hide": false,
       "showLabels": true,
       "hideCWD": false,
       "hideSandboxStatus": false,
       "hideModelInfo": false,
-      "hideContextPercentage": false
+      "hideContextPercentage": false,
+      "items": [
+        "workspace",
+        "git-branch",
+        "sandbox",
+        "model-name",
+        "context-used",
+        "quota",
+        "memory-usage",
+        "code-changes",
+        "token-count",
+        "session-id",
+        "auth"
+      ]
     }
   },
-  "experimental": {
-    "plan": true
+  "experimental": {},
+  "agents": {
+    "overrides": {}
   }
 }
