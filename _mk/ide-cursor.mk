@@ -22,7 +22,7 @@ setup-cursor: _cursor_link_settings ## Cursorの設定をセットアップ（�
 install-packages-cursor:
 	@echo "📝 Cursor IDE (.deb) のバージョンを確認中..."
 	@LATEST_VERSION=$$(curl -sL --connect-timeout 10 --max-time 30 "$(CURSOR_API_URL)" | jq -r '.version' 2>/dev/null || echo "error"); \
-	CURRENT_VERSION=$$(dpkg-query -W -f='$${Version}' cursor 2>/dev/null | cut -d'-' -f1 || echo "none"); \
+	CURRENT_VERSION=$$( (dpkg-query -W -f='$${Version}' cursor 2>/dev/null || echo "none") | cut -d'-' -f1 ); \
 	if [ "$$LATEST_VERSION" = "error" ]; then \
 		echo "⚠️  最新バージョンの取得に失敗しました。インストールを試行します..."; \
 		$(MAKE) _cursor_download; \
