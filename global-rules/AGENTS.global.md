@@ -49,14 +49,14 @@ Each skill contains step-by-step instructions, templates, and scripts.
 ### Tools
 
 - `search_skills(query)` - Find skills by task description. Use `""` to list all.
-- `load_skill(id)` - Get full instructions and the skill's filesystem path.
+- `load_skill(id)` - Get full instructions.
 
 ### ⚠️ CRITICAL: TOOL USAGE ONLY
 - **DO NOT** attempt to read skill files directly using `read_file` or `grep_search`.
 - **MANDATORY**: AI agents MUST use the `load_skill(id)` MCP tool to retrieve skill instructions. This ensures you receive the most up-to-date, processed instructions and conserves context.
 
 ### Tips
-- Execute scripts via the provided path using shell commands, rather than reading them into context: `python {path}/scripts/run.py`
+- Execute scripts as defined within the skill's instructions (e.g., via provided CLI commands or shell paths mentioned in the instructions). Do NOT assume or use native file paths unless explicitly provided by the tool's output.
 - If search returns too many results, use more specific terms
 
 ### Manual Operations (CLI)
