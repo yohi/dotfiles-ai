@@ -1,6 +1,6 @@
 prefix_rule(pattern=["curl", "-L", "https://github.com/pgbigm/pg_bigm/archive/refs/tags/v1.2-20240606.tar.gz", "-o", "/tmp/pg_bigm.tar.gz"], decision="allow")
 prefix_rule(pattern=["git", "add", ".env.example", ".gitignore", "docker/postgres/Dockerfile", "src/context_store/config.py", "src/context_store/logger.py", "src/context_store/models/__init__.py", "src/context_store/models/graph.py", "src/context_store/models/memory.py", "tests/unit/test_config.py", "tests/unit/test_logger.py"], decision="allow")
-prefix_rule(pattern=["git", "push", "origin"], decision="allow")
+prefix_rule(pattern=["git", "push", "origin", "HEAD"], decision="allow")
 prefix_rule(pattern=["gh", "run", "view"], decision="allow")
 prefix_rule(pattern=["git", "add", "src/context_store/config.py", "tests/unit/test_config.py"], decision="allow")
 prefix_rule(pattern=["git", "add", "docker-compose.yml"], decision="allow")
