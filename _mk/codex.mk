@@ -46,6 +46,7 @@ setup-codex: ## ~/.codex を実体化し、設定ファイルをリポジトリ�
 # 設定ファイルの同期（個別リンク作成）
 sync-codex: ## リポジトリ内の設定ファイルを ~/.codex へ個別にリンクする
 	@echo "🔄 Codex 設定ファイルの同期中..."
+	@mkdir -p "$(CODEX_DOT_DIR)"
 	
 	@# config.toml
 	@if [ -f "$(CODEX_REPO_DIR)/config.toml" ]; then \
@@ -61,14 +62,17 @@ sync-codex: ## リポジトリ内の設定ファイルを ~/.codex へ個別に�
 
 	@# rules/ (ディレクトリごとリンク)
 	@if [ -d "$(CODEX_REPO_DIR)/rules" ]; then \
+		if [ -d "$(CODEX_DOT_DIR)/rules" ] && [ ! -L "$(CODEX_DOT_DIR)/rules" ]; then \
+			rm -rf "$(CODEX_DOT_DIR)/rules"; \
+		fi; \
 		ln -sfn "$(CODEX_REPO_DIR)/rules" "$(CODEX_DOT_DIR)/rules"; \
 		echo "  ✅ rules/ -> $(CODEX_REPO_DIR)/rules"; \
 	fi
 
-	@# version.json
-	@if [ -f "$(CODEX_REPO_DIR)/version.json" ]; then \
-		ln -sf "$(CODEX_REPO_DIR)/version.json" "$(CODEX_DOT_DIR)/version.json"; \
-		echo "  ✅ version.json -> $(CODEX_REPO_DIR)/version.json"; \
+	@# .personality_migration
+	@if [ -f "$(CODEX_REPO_DIR)/.personality_migration" ]; then \
+		ln -sf "$(CODEX_REPO_DIR)/.personality_migration" "$(CODEX_DOT_DIR)/.personality_migration"; \
+		echo "  ✅ .personality_migration -> $(CODEX_REPO_DIR)/.personality_migration"; \
 	fi
 
 	@echo "✅ 同期が完了しました"
@@ -78,12 +82,12 @@ uninstall-codex: ## 設定ファイルのリンクを解除する（実体ファ
 	@echo "🗑️  Codex 設定ファイルのリンクを解除中..."
 	@rm -f "$(CODEX_DOT_DIR)/config.toml"
 	@rm -f "$(CODEX_DOT_DIR)/AGENTS.md"
-	@rm -f "$(CODEX_DOT_DIR)/rules"
-	@rm -f "$(CODEX_DOT_DIR)/version.json"
+	@rm -rf "$(CODEX_DOT_DIR)/rules"
+	@rm -f "$(CODEX_DOT_DIR)/.personality_migration"
 	@echo "✅ リンクを解除しました。~/.codex 内の実体データは保持されています"
 
 # 状態確認
 check-codex: ## Codex の設定状態を確認
 	@echo "🔍 Codex 設定状態の確認..."
 	@ls -ld "$(CODEX_DOT_DIR)"
-	@ls -l "$(CODEX_DOT_DIR)/config.toml" "$(CODEX_DOT_DIR)/AGENTS.md" "$(CODEX_DOT_DIR)/rules" 2>/dev/null || true
+	@ls -l "$(CODEX_DOT_DIR)/config.toml" "$(CODEX_DOT_DIR)/AGENTS.md" "$(CODEX_DOT_DIR)/rules" "$(CODEX_DOT_DIR)/.personality_migration" 2>/dev/null || true
