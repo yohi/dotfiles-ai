@@ -130,7 +130,7 @@ check-cursor-version:
 	fi
 	@echo "🌐 最新バージョンを確認中..."
 	@if command -v jq >/dev/null 2>&1; then \
-		API_RESPONSE=$$(curl -sL --connect-timeout 10 --max-time 30 "https://www.cursor.com/api/download?platform=linux-x64&format=deb&releaseTrack=stable" 2>/dev/null); \
+		API_RESPONSE=$$(curl -sL --connect-timeout 10 --max-time 30 "$(CURSOR_API_URL)" 2>/dev/null); \
 		if [ -n "$$API_RESPONSE" ] && echo "$$API_RESPONSE" | jq . >/dev/null 2>&1; then \
 			LATEST_VERSION=$$(echo "$$API_RESPONSE" | jq -r '.version' 2>/dev/null); \
 			echo "🆕 最新バージョン: $$LATEST_VERSION"; \
