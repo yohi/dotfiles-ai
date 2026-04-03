@@ -73,3 +73,24 @@ lint: ## Run Ruff and Mypy on _scripts/
 	else \
 		ruff check _scripts/ && mypy _scripts/; \
 	fi
+
+# --- Workflow Guide Targets (Help Integration & Parent Compatibility) ---
+
+init: install ## [初回] 依存パッケージのインストールと初期設定
+
+sync: ## [更新] リポジトリを最新にし、エージェントを同期する
+	@echo "🔄 リポジトリを最新に同期中..."
+	@git pull --rebase
+	@$(MAKE) sync-agents
+
+secrets: ## [機密] BitwardenからAPIキー等の機密情報を取得 (このリポジトリでは未実装)
+	@echo "ℹ️  secrets: Bitwarden からの取得機能はこのリポジトリには実装されていません。"
+	@echo "   手動で .env や API キーを確認してください。"
+
+status: ## [確認] 全コンポーネントの状態を一括表示
+	@echo "--- Repository Status ---"
+	@git status -s
+	@echo ""
+	@echo "--- Agent Status ---"
+	@$(MAKE) -s check-skillport
+	@$(MAKE) -s check-opencode

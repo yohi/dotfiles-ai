@@ -10,15 +10,26 @@ CODEX_REPO_DIR := $(REPO_ROOT)/codex
 
 .PHONY: setup-codex sync-codex uninstall-codex check-codex install-packages-codex
 
-# Codex CLI のインストール（バイナリの存在確認のみ）
+# Codex CLI のインストール
 install-packages-codex:
-	@echo "🔍 Codex CLI のインストールを確認中..."
-	@if command -v codex >/dev/null 2>&1; then \
-		echo "✅ Codex CLI は既にインストールされています ($$(codex --version 2>/dev/null || echo 'unknown'))"; \
+	@echo "🧠 Codex CLI のバージョンを確認中..."
+	@LATEST_VERSION=$$(npm show @openai/codex version 2>/dev/null || echo "error"); \
+	CURRENT_VERSION=$$(codex --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "none"); \
+	if [ "$$LATEST_VERSION" = "error" ]; then \
+		echo "⚠️  最新バージョンの取得に失敗しました。"; \
+	elif [ "$$CURRENT_VERSION" = "$$LATEST_VERSION" ]; then \
+		echo "✅ Codex CLI は既に最新バージョン ($$CURRENT_VERSION) がインストールされています。"; \
 	else \
-		echo "⚠️  Codex CLI が見つかりません。公式ドキュメントに従ってインストールしてください。"; \
+		if [ "$$CURRENT_VERSION" = "none" ]; then \
+			echo "📦 Codex CLI を新規インストールします (バージョン: $$LATEST_VERSION)"; \
+		else \
+			echo "🔄 Codex CLI をアップデートします ($$CURRENT_VERSION -> $$LATEST_VERSION)"; \
+		fi; \
+		if ! npm install -g @openai/codex; then \
+			echo "❌ Codex CLI のインストールに失敗しました"; \
+			exit 1; \
+		fi; \
 	fi
-
 # Codex CLI のセットアップ
 setup-codex: ## ~/.codex を実体化し、設定ファイルをリポジトリからリンクする
 	@echo "🚀 Codex CLI のセットアップを開始..."

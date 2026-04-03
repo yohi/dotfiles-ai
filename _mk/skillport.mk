@@ -14,21 +14,22 @@ skillport: ## SkillPortのインストールとセットアップ
 
 # SkillPort および SkillPort MCP サーバーのインストール
 install-skillport: ## SkillPort と SkillPort MCP をインストール
-	@if $(call check_marker,install-skillport); then \
-		echo "$(call IDEMPOTENCY_SKIP_MSG,install-skillport)"; \
-		exit 0; \
-	fi
-	@echo "📦 SkillPort をインストール中..."
-	@if command -v uv >/dev/null 2>&1; then \
-		uv tool install skillport@1.1.1 --force; \
-		uv tool install skillport-mcp@1.1.0 --force; \
+	@echo "📦 SkillPort のバージョンを確認中..."
+	@CURRENT_SP=$$(skillport --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || echo "none"); \
+	CURRENT_MCP=$$(skillport-mcp --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || echo "none"); \
+	if [ "$$CURRENT_SP" = "1.1.1" ] && [ "$$CURRENT_MCP" = "1.1.0" ]; then \
+		echo "✅ SkillPort (1.1.1) および skillport-mcp (1.1.0) は既にインストールされています。"; \
 	else \
-		echo "❌ uv が見つかりません。先に uv をインストールしてください"; \
-		exit 1; \
+		echo "📦 SkillPort をインストール/アップデート中..."; \
+		if command -v uv >/dev/null 2>&1; then \
+			uv tool install skillport@1.1.1 --force; \
+			uv tool install skillport-mcp@1.1.0 --force; \
+		else \
+			echo "❌ uv が見つかりません。先に uv をインストールしてください"; \
+			exit 1; \
+		fi; \
+		echo "✅ SkillPort のインストールが完了しました"; \
 	fi
-	@echo "✅ SkillPort のインストールが完了しました"
-	@$(call create_marker,install-skillport,1)
-
 # SkillPort の設定（ディレクトリ作成とリンク）
 setup-skillport: ## SkillPort のディレクトリ構成をセットアップ
 	@if $(call check_marker,setup-skillport); then \

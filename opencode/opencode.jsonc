@@ -86,44 +86,13 @@
       "enabled": true
     }
   },
-  // [LSP] 言語サーバー連携 (コードの構造的理解)
+  // [LSP]
   "lsp": {
-    "bash-language-server": {
-      "command": [
-        "bash-language-server",
-        "start"
-      ],
-      "extensions": [
-        ".sh"
-      ],
-      "disabled": false
-    },
-    "typescript-language-server": {
-      "command": [
-        "typescript-language-server",
-        "--stdio"
-      ],
-      "extensions": [
-        ".ts",
-        ".tsx",
-        ".js",
-        ".jsx",
-        ".mts",
-        ".cts"
-      ],
-      "disabled": false
-    },
-    "pyright": {
-      "command": [
-        "pyright-langserver",
-        "--stdio"
-      ],
-      "extensions": [
-        ".py"
-      ],
-      "disabled": false
-    }
+    "bash-language-server": { "command": ["bash-language-server", "start"], "extensions": [".sh"], "disabled": false },
+    "typescript-language-server": { "command": ["typescript-language-server", "--stdio"], "extensions": [".ts", ".tsx", ".js", ".jsx", ".mts", ".cts"], "disabled": false },
+    "pyright": { "command": ["pyright-langserver", "--stdio"], "extensions": [".py"], "disabled": false }
   },
+
   // プロバイダ設定
   "provider": {
     "openrouter": {

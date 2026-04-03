@@ -21,57 +21,28 @@ CLAUDIA_COMMIT := 70c16d8a4910db48cd9684aeacdd431caefd7d71
 # Claude Code のインストール
 .PHONY: install-packages-claude-code
 install-packages-claude-code:
-	@echo "🤖 Claude Code のインストールを開始..."
-
-	# Node.jsの確認
-	@$(MAKE) check-nodejs
-
-	# npmの確認
-	@echo "🔍 npm の確認中..."
-	@if ! command -v npm >/dev/null 2>&1; then \
-		echo "❌ npm がインストールされていません"; \
-		echo "ℹ️  通常はNode.jsと一緒にインストールされます"; \
-		exit 1; \
+	@echo "🤖 Claude Code のバージョンを確認中..."
+	@LATEST_VERSION=$$(npm show @anthropic-ai/claude-code version 2>/dev/null || echo "error"); \
+	CURRENT_VERSION=$$(claude --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "none"); \
+	if [ "$$LATEST_VERSION" = "error" ]; then \
+		echo "⚠️  最新バージョンの取得に失敗しました。インストールを試行します..."; \
+		npm install -g @anthropic-ai/claude-code; \
+	elif [ "$$CURRENT_VERSION" = "$$LATEST_VERSION" ]; then \
+		echo "✅ Claude Code は既に最新バージョン ($$CURRENT_VERSION) がインストールされています。"; \
 	else \
-		echo "✅ npm が見つかりました (バージョン: $$(npm --version))"; \
-	fi
-
-	# Claude Code のインストール確認
-	@echo "🔍 既存の Claude Code インストールを確認中..."
-	@if command -v claude >/dev/null 2>&1; then \
-		echo "✅ Claude Code は既にインストールされています"; \
-		echo "   バージョン: $$(claude --version 2>/dev/null || echo '取得できませんでした')"; \
-		echo ""; \
-		echo "🔄 アップデートを確認中..."; \
-		npm update -g @anthropic-ai/claude-code 2>/dev/null || true; \
-	else \
-		echo "📦 Claude Code をインストール中..."; \
-		echo "ℹ️  グローバルインストールを実行します: npm install -g @anthropic-ai/claude-code"; \
-		\
-		if npm install -g @anthropic-ai/claude-code; then \
-			echo "✅ Claude Code のインストールが完了しました"; \
+		if [ "$$CURRENT_VERSION" = "none" ]; then \
+			echo "📦 Claude Code を新規インストールします (バージョン: $$LATEST_VERSION)"; \
 		else \
+			echo "🔄 Claude Code をアップデートします ($$CURRENT_VERSION -> $$LATEST_VERSION)"; \
+		fi; \
+		if ! npm install -g @anthropic-ai/claude-code; then \
 			echo "❌ Claude Code のインストールに失敗しました"; \
-			echo ""; \
-			echo "🔧 トラブルシューティング:"; \
-			echo "1. 権限の問題: npm config set prefix $(HOME)/.local"; \
-			echo "2. WSLの場合: npm config set os linux"; \
-			echo "3. 強制インストール: npm install -g @anthropic-ai/claude-code --force"; \
-			echo ""; \
 			exit 1; \
 		fi; \
 	fi
-
-	# インストール確認
-	@echo "🔍 インストールの確認中..."
-	@if command -v claude >/dev/null 2>&1; then \
-		echo "✅ Claude Code が正常にインストールされました"; \
-		echo "   実行ファイル: $$(which claude)"; \
-		echo "   バージョン: $$(claude --version 2>/dev/null || echo '取得できませんでした')"; \
-	else \
-		echo "❌ Claude Code のインストール確認に失敗しました"; \
-		echo "ℹ️  PATH の問題の可能性があります"; \
-		echo "   手動確認: which claude"; \
+	@# インストール確認
+	@if ! command -v claude >/dev/null 2>&1; then \
+		echo "❌ Claude Code のインストール確認に失敗しました。PATH を確認してください。"; \
 		exit 1; \
 	fi
 

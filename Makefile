@@ -2,7 +2,7 @@ include _mk/core.mk
 include _mk/help.mk
 
 # .PHONY targets
-.PHONY: all clean test install setup install-ai setup-ai
+.PHONY: all clean test install setup install-ai setup-ai init sync secrets status
 
 # Include individual modules
 -include _mk/variables.mk
