@@ -62,7 +62,7 @@ Each skill contains step-by-step instructions, templates, and scripts.
 ### Workflow
 
 1. **Search** - Call `search_skills(query)` to find skills matching your task
-2. **Load** - Call `load_skill(skill_id)` to get full instructions and `path`
+2. **Load** - Call `load_skill(skill_id)` to get full instructions
 3. **Execute** - Follow the instructions using your available tools
 
 ### Tools
