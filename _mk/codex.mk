@@ -1,66 +1,94 @@
-.PHONY: codex install-packages-codex install-codex codex-update setup-codex
+# ============================================================
+# Codex CLI セットアップ用Makefile
+# ~/.codex ディレクトリの管理と設定ファイルの同期を担当
+# ============================================================
 
-codex: ## Install and setup Codex CLI
-	@if command -v codex >/dev/null 2>&1 && [ -L "$(HOME_DIR)/.codex" ] && [ -f "$(REPO_ROOT)/codex/config.toml" ]; then \
-		echo "$(call IDEMPOTENCY_SKIP_MSG,codex)"; \
-		exit 0; \
-	fi
-	@$(MAKE) install-packages-codex setup-codex
+HOME_DIR ?= $(HOME)
+REPO_ROOT ?= $(CURDIR)
+CODEX_DOT_DIR := $(HOME_DIR)/.codex
+CODEX_REPO_DIR := $(REPO_ROOT)/codex
 
-install-packages-codex: ## Install Codex CLI using npm
-	@echo "Uninstalling existing Codex CLI (if any)..."
-	@npm uninstall -g @openai/codex 2>/dev/null || true
-	@echo "Installing Codex CLI via npm..."
-	@npm install -g @openai/codex
+.PHONY: setup-codex sync-codex uninstall-codex check-codex install-packages-codex
 
-codex-update: ## Update Codex CLI using npm
-	@echo "Updating Codex CLI via npm..."
-	@npm update -g @openai/codex
-
-setup-codex: ## Setup Codex CLI configuration
-	@echo "Setting up Codex CLI configuration..."
-	@mkdir -p $(REPO_ROOT)/codex
-	@if [ ! -f "$(REPO_ROOT)/codex/config.toml" ]; then \
-		echo "Creating default config file at $(REPO_ROOT)/codex/config.toml"; \
-		printf '%s\n' \
-			'# OpenAI Codex CLI Configuration' \
-			'#' \
-			'# For more information on configuration options, see the official documentation.' \
-			'' \
-			'# Set the default model to use for requests.' \
-			'# model = "gpt-5"' \
-			'' \
-			'# Set the approval mode. Options are: suggest, auto-edit, full-auto' \
-			'# approval_policy = "on-request"' \
-			'' \
-			'# You can also configure a different model provider, like Ollama' \
-			'# model_provider = "ollama"' \
-			> $(REPO_ROOT)/codex/config.toml; \
-	fi
-	@echo "Creating symbolic link: $(HOME_DIR)/.codex -> $(REPO_ROOT)/codex"
-	@if [ -e "$(HOME_DIR)/.codex" ] && [ ! -L "$(HOME_DIR)/.codex" ]; then \
-		backup_dir="$(HOME_DIR)/.codex.backup.$$(date +%s)"; \
-		echo "Moving existing directory to backup: $$backup_dir"; \
-		mv "$(HOME_DIR)/.codex" "$$backup_dir"; \
-	fi
-	@ln -sfn $(REPO_ROOT)/codex $(HOME_DIR)/.codex
-	@echo "Codex CLI setup complete."
-
-# User-friendly alias
-install-codex: install-packages-codex
-
-.PHONY: uninstall-codex
-uninstall-codex: ## Codex CLI の設定を削除
-	@echo "🗑️  Codex CLI の設定を削除中..."
-	@if [ -L "$(HOME_DIR)/.codex" ]; then \
-		rm -f "$(HOME_DIR)/.codex"; \
-		echo "✅ シンボリックリンクを削除しました: $(HOME_DIR)/.codex"; \
-	elif [ -f "$(HOME_DIR)/.codex" ]; then \
-		rm -f "$(HOME_DIR)/.codex"; \
-		echo "✅ 設定ファイルを削除しました: $(HOME_DIR)/.codex"; \
-	elif [ -d "$(HOME_DIR)/.codex" ]; then \
-		echo "⚠️  $(HOME_DIR)/.codex はディレクトリとして存在するため削除されません。手動で確認してください。"; \
+# Codex CLI のインストール（バイナリの存在確認のみ）
+install-packages-codex:
+	@echo "🔍 Codex CLI のインストールを確認中..."
+	@if command -v codex >/dev/null 2>&1; then \
+		echo "✅ Codex CLI は既にインストールされています ($$(codex --version 2>/dev/null || echo 'unknown'))"; \
 	else \
-		echo "ℹ️  削除する設定はありません: $(HOME_DIR)/.codex"; \
+		echo "⚠️  Codex CLI が見つかりません。公式ドキュメントに従ってインストールしてください。"; \
 	fi
 
+# Codex CLI のセットアップ
+setup-codex: ## ~/.codex を実体化し、設定ファイルをリポジトリからリンクする
+	@echo "🚀 Codex CLI のセットアップを開始..."
+	
+	@# 1. ~/.codex がシンボリックリンクなら、内容を待避して実体ディレクトリに置き換える
+	@if [ -L "$(CODEX_DOT_DIR)" ]; then \
+		echo "🔗 現在の ~/.codex はシンボリックリンクです。実体化を試みます..."; \
+		(set -e; \
+		 temp_dir=$$(mktemp -d); \
+		 trap 'rm -rf "$$temp_dir"' EXIT; \
+		 cp -a "$(CODEX_DOT_DIR)/." "$$temp_dir/"; \
+		 rm -f "$(CODEX_DOT_DIR)"; \
+		 mkdir -p "$(CODEX_DOT_DIR)"; \
+		 cp -a "$$temp_dir/." "$(CODEX_DOT_DIR)/"; \
+		 echo "✅ ~/.codex を実体ディレクトリに変換しました"); \
+	else \
+		mkdir -p "$(CODEX_DOT_DIR)"; \
+		echo "✅ ~/.codex ディレクトリを確認しました"; \
+	fi
+
+	@# 2. 設定ファイルの同期（リンク作成）
+	@$(MAKE) sync-codex
+
+	@echo "🎉 Codex CLI のセットアップが完了しました"
+
+# 設定ファイルの同期（個別リンク作成）
+sync-codex: ## リポジトリ内の設定ファイルを ~/.codex へ個別にリンクする
+	@echo "🔄 Codex 設定ファイルの同期中..."
+	@mkdir -p "$(CODEX_DOT_DIR)"
+	
+	@# config.toml
+	@if [ -f "$(CODEX_REPO_DIR)/config.toml" ]; then \
+		ln -sf "$(CODEX_REPO_DIR)/config.toml" "$(CODEX_DOT_DIR)/config.toml"; \
+		echo "  ✅ config.toml -> $(CODEX_REPO_DIR)/config.toml"; \
+	fi
+
+	@# AGENTS.md (SSOT)
+	@if [ -f "$(CODEX_REPO_DIR)/AGENTS.md" ]; then \
+		ln -sf "$(CODEX_REPO_DIR)/AGENTS.md" "$(CODEX_DOT_DIR)/AGENTS.md"; \
+		echo "  ✅ AGENTS.md -> $(CODEX_REPO_DIR)/AGENTS.md"; \
+	fi
+
+	@# rules/ (ディレクトリごとリンク)
+	@if [ -d "$(CODEX_REPO_DIR)/rules" ]; then \
+		if [ -d "$(CODEX_DOT_DIR)/rules" ] && [ ! -L "$(CODEX_DOT_DIR)/rules" ]; then \
+			rm -rf "$(CODEX_DOT_DIR)/rules"; \
+		fi; \
+		ln -sfn "$(CODEX_REPO_DIR)/rules" "$(CODEX_DOT_DIR)/rules"; \
+		echo "  ✅ rules/ -> $(CODEX_REPO_DIR)/rules"; \
+	fi
+
+	@# .personality_migration
+	@if [ -f "$(CODEX_REPO_DIR)/.personality_migration" ]; then \
+		ln -sf "$(CODEX_REPO_DIR)/.personality_migration" "$(CODEX_DOT_DIR)/.personality_migration"; \
+		echo "  ✅ .personality_migration -> $(CODEX_REPO_DIR)/.personality_migration"; \
+	fi
+
+	@echo "✅ 同期が完了しました"
+
+# アンインストール
+uninstall-codex: ## 設定ファイルのリンクを解除する（実体ファイルは残す）
+	@echo "🗑️  Codex 設定ファイルのリンクを解除中..."
+	@if [ -L "$(CODEX_DOT_DIR)/config.toml" ]; then rm -f "$(CODEX_DOT_DIR)/config.toml"; fi
+	@if [ -L "$(CODEX_DOT_DIR)/AGENTS.md" ]; then rm -f "$(CODEX_DOT_DIR)/AGENTS.md"; fi
+	@if [ -L "$(CODEX_DOT_DIR)/rules" ]; then rm -rf "$(CODEX_DOT_DIR)/rules"; fi
+	@if [ -L "$(CODEX_DOT_DIR)/.personality_migration" ]; then rm -f "$(CODEX_DOT_DIR)/.personality_migration"; fi
+	@echo "✅ リンクを解除しました。実体データは保持されています"
+
+# 状態確認
+check-codex: ## Codex の設定状態を確認
+	@echo "🔍 Codex 設定状態の確認..."
+	@ls -ld "$(CODEX_DOT_DIR)"
+	@ls -l "$(CODEX_DOT_DIR)/config.toml" "$(CODEX_DOT_DIR)/AGENTS.md" "$(CODEX_DOT_DIR)/rules" "$(CODEX_DOT_DIR)/.personality_migration" 2>/dev/null || true
