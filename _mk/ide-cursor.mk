@@ -90,6 +90,7 @@ _cursor_download:
 			rm -f cursor.deb; \
 		else \
 			echo "❌ Cursor のインストール（dpkg/apt）に失敗しました"; \
+			rm -f cursor.deb; \
 			exit 1; \
 		fi; \
 	else \
