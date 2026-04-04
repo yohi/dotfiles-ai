@@ -73,7 +73,6 @@ Each skill contains step-by-step instructions, templates, and scripts.
 ### Tips
 
 - Use your native Read tool with `{path}/file` for templates/assets
-- If a skill includes scripts, execute them via their path (e.g., `python {path}/scripts/run.py`)
 - Replace `{path}` in instructions with the actual path from `load_skill`
 - If search returns too many results, use more specific terms
 
