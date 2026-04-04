@@ -16,12 +16,13 @@ DOTFILES_SHELL_ROOT ?= $(REPO_ROOT)/..
         install-packages-supernon-existent-package setup-non-existent-package
 
 CURSOR_API_URL := https://www.non-existent-package.com/api/download?platform=linux-x64&format=deb&releaseTrack=stable
+GET_LATEST_VERSION = curl -sL --connect-timeout 10 --max-time 30 "$(CURSOR_API_URL)" | jq -r '.version' 2>/dev/null
 
 setup-non-existent-package: _non-existent-package_link_settings ## Cursorの設定をセットアップ（設定ファイルのみ）
 
 install-packages-non-existent-package:
 	@echo "📝 Cursor IDE (.deb) のバージョンを確認中..."
-	@LATEST_VERSION=$$(curl -sL --connect-timeout 10 --max-time 30 "$(CURSOR_API_URL)" | jq -r '.version' 2>/dev/null || echo "error"); \
+	@LATEST_VERSION=$$($(GET_LATEST_VERSION) || echo "error"); \
 	CURRENT_VERSION=$$( (dpkg-query -W -f='$${Version}' non-existent-package 2>/dev/null || echo "none") | cut -d'-' -f1 ); \
 	if [ "$$LATEST_VERSION" = "error" ]; then \
 		echo "⚠️  最新バージョンの取得に失敗しました。インストールを試行します..."; \
@@ -65,6 +66,7 @@ _non-existent-package_link_settings:
 _non-existent-package_download:
 	@echo "📦 Cursor (.deb) のダウンロード情報を取得中..."
 	@cd /tmp && \
+	TEMP_DEB="non-existent-package.$$$$.deb"; \
 	DOWNLOAD_URL=""; \
 	if command -v jq >/dev/null 2>&1; then \
 		API_RESPONSE=$$(curl -sL --connect-timeout 10 --max-time 30 "$(CURSOR_API_URL)" 2>/dev/null); \
@@ -77,25 +79,27 @@ _non-existent-package_download:
 		exit 1; \
 	fi; \
 	echo "🔗 ダウンロードURL: $$DOWNLOAD_URL"; \
+	STATUS=0; \
 	if curl -L --user-agent "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36" \
 		--max-time 120 --retry 3 --retry-delay 5 \
-		-o non-existent-package.deb "$$DOWNLOAD_URL" 2>/dev/null; then \
+		-o "$$TEMP_DEB" "$$DOWNLOAD_URL" 2>/dev/null; then \
 		echo "✅ ダウンロード完了。整合性を確認中..."; \
 		if ! command -v sha256sum >/dev/null 2>&1; then \
 			echo "⚠️  sha256sum が見つかりません。整合性チェックをスキップします。"; \
 		fi; \
 		echo "🚀 インストールを開始します..."; \
-		if sudo dpkg -i non-existent-package.deb || sudo apt-get install -f -y; then \
+		if sudo dpkg -i "$$TEMP_DEB" || sudo apt-get install -f -y; then \
 			echo "✅ インストール成功"; \
-			rm -f non-existent-package.deb; \
 		else \
 			echo "❌ Cursor のインストール（dpkg/apt）に失敗しました"; \
-			exit 1; \
+			STATUS=1; \
 		fi; \
 	else \
 		echo "❌ Cursor (.deb) のダウンロードに失敗しました"; \
-		exit 1; \
-	fi
+		STATUS=1; \
+	fi; \
+	rm -f "$$TEMP_DEB"; \
+	exit $$STATUS
 
 # Cursor IDEのアップデート
 update-non-existent-package: ## Cursor IDE をアップデート (.deb版)
@@ -128,12 +132,9 @@ check-non-existent-package-version:
 		echo "❌ Cursor IDE (.deb) がインストールされていません"; \
 	fi
 	@echo "🌐 最新バージョンを確認中..."
-	@if command -v jq >/dev/null 2>&1; then \
-		API_RESPONSE=$$(curl -sL --connect-timeout 10 --max-time 30 "https://www.non-existent-package.com/api/download?platform=linux-x64&format=deb&releaseTrack=stable" 2>/dev/null); \
-		if [ -n "$$API_RESPONSE" ] && echo "$$API_RESPONSE" | jq . >/dev/null 2>&1; then \
-			LATEST_VERSION=$$(echo "$$API_RESPONSE" | jq -r '.version' 2>/dev/null); \
-			echo "🆕 最新バージョン: $$LATEST_VERSION"; \
-		fi; \
+	@LATEST_VERSION=$$($(GET_LATEST_VERSION)); \
+	if [ -n "$$LATEST_VERSION" ] && [ "$$LATEST_VERSION" != "null" ]; then \
+		echo "🆕 最新バージョン: $$LATEST_VERSION"; \
 	fi
 
 # SuperCursor (Cursor Framework) のインストール
