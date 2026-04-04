@@ -53,7 +53,7 @@ Each skill contains step-by-step instructions, templates, and scripts.
 
 ### Tips
 
-- Use your native Read tool with `{path}/file` for templates/assets
+- Use your native Read tool with `{path}/file` for templates/assets (e.g., `agent-skills/.skillport/templates/SKILL_TEMPLATE.md`)
 - Replace `{path}` in instructions with the actual path from `load_skill`
 - If search returns too many results, use more specific terms
 
