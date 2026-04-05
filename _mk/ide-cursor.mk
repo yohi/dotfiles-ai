@@ -106,11 +106,18 @@ _cursor_download:
 			echo "⚠️  【警告】信頼できるハッシュ値が見つからなかったため、整合性検証をスキップします。"; \
 		fi; \
 		echo "🚀 インストールを開始します..."; \
-		if sudo dpkg -i cursor.deb || sudo apt-get install -f -y; then \
+		if sudo dpkg -i cursor.deb; then \
+			INSTALL_SUCCESS=1; \
+		else \
+			echo "⚠️  依存関係の解決を試みています..."; \
+			sudo apt-get install -f -y && sudo dpkg -i cursor.deb; \
+			if [ $$? -eq 0 ]; then INSTALL_SUCCESS=1; else INSTALL_SUCCESS=0; fi; \
+		fi; \
+		if [ "$$INSTALL_SUCCESS" = "1" ] && dpkg -s cursor >/dev/null 2>&1; then \
 			echo "✅ インストール成功"; \
 			rm -f cursor.deb; \
 		else \
-			echo "❌ Cursor のインストール（dpkg/apt）に失敗しました"; \
+			echo "❌ Cursor のインストール（dpkg/apt）に失敗しました。パッケージが確認できません。"; \
 			rm -f cursor.deb; \
 			exit 1; \
 		fi; \

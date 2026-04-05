@@ -1,8 +1,15 @@
 export SHELL := /bin/sh
 
 # ============================================================
-# Cursor IDE セットアップ用Makefile (Debian/Ubuntu .deb 版)
-# Cursor IDEのインストール、アップデート、管理を担当
+# 【重要】このファイルはテスト/モック/テンプレート用です。
+# [IMPORTANT] This file is for test/mock/template purposes ONLY.
+# 
+# このファイルに含まれるターゲットやURLなどは、実際のビルドでは使用されません。
+# 本番環境では _mk/ide-cursor.mk を使用してください。
+# Mock targets, CURSOR_API_URL, and GET_LATEST_VERSION are intentionally
+# mocked and should NOT be used in production.
+# 
+# Cursor IDE セットアップ用Makefile (Mock版)
 # ============================================================
 
 # 変数のデフォルト定義 (親Makefileから渡されない場合のフォールバック)
