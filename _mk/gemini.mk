@@ -49,9 +49,24 @@ install-packages-gemini-cli:
 	@echo "";
 	@echo "✅ Gemini CLI のインストールが完了しました"
 
+GEMINI_GLOBAL_MD := $(HOME_DIR)/.gemini/GEMINI.md
+AGENTS_GLOBAL_MD := $(REPO_ROOT)/global-rules/AGENTS.global.md
+
+.PHONY: link-gemini-global-md
+link-gemini-global-md: ## GEMINI.md をグローバルルールにリンク
+	@echo "🔗 Linking Gemini global configuration..."
+	@mkdir -p $(dir $(GEMINI_GLOBAL_MD))
+	@if [ -f $(GEMINI_GLOBAL_MD) ] && [ ! -L $(GEMINI_GLOBAL_MD) ]; then \
+		echo "📦 Backing up existing GEMINI.md to .bak"; \
+		mv $(GEMINI_GLOBAL_MD) $(GEMINI_GLOBAL_MD).bak; \
+	fi
+	@ln -sf $(AGENTS_GLOBAL_MD) $(GEMINI_GLOBAL_MD)
+	@echo "✅ Linked $(GEMINI_GLOBAL_MD) -> $(AGENTS_GLOBAL_MD)"
+
 # SuperGemini (Gemini CLI Framework) のセットアップ
 .PHONY: setup-supergemini
 setup-supergemini:
+	@$(MAKE) link-gemini-global-md
 	@echo "🚀 SuperGemini (Gemini CLI Framework) のセットアップを開始..."
 
 	# Gemini CLI の確認
@@ -79,7 +94,6 @@ setup-supergemini:
 	ln -sfn $(REPO_ROOT)/gemini/Core $(HOME_DIR)/.gemini/core || true; \
 	ln -sf $(REPO_ROOT)/gemini/supergemini/Hooks $(HOME_DIR)/.gemini/hooks || true; \
 	# 重要なファイルへの直接リンク \
-	ln -sf $(REPO_ROOT)/global-rules/AGENTS.global.md $(HOME_DIR)/.gemini/GEMINI.md || true; \
 	\
 	echo "📝 カスタムツールファイルを作成中..."; \
 	cp -f $(REPO_ROOT)/gemini/supergemini/Commands/help.md $(HOME_DIR)/.gemini/user-tools/user-help.md 2>/dev/null || \
