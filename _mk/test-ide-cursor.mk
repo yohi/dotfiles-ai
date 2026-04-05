@@ -92,10 +92,12 @@ _non-existent-package_download:
 			echo "✅ インストール成功"; \
 		else \
 			echo "❌ Cursor のインストール（dpkg/apt）に失敗しました"; \
+			rm -f "$$TEMP_DEB"; \
 			STATUS=1; \
 		fi; \
 	else \
 		echo "❌ Cursor (.deb) のダウンロードに失敗しました"; \
+		rm -f "$$TEMP_DEB"; \
 		STATUS=1; \
 	fi; \
 	rm -f "$$TEMP_DEB"; \
