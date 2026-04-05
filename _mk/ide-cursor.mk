@@ -81,8 +81,29 @@ _cursor_download:
 		--max-time 120 --retry 3 --retry-delay 5 \
 		-o cursor.deb "$$DOWNLOAD_URL" 2>/dev/null; then \
 		echo "✅ ダウンロード完了。整合性を確認中..."; \
-		if ! command -v sha256sum >/dev/null 2>&1; then \
-			echo "⚠️  sha256sum が見つかりません。整合性チェックをスキップします。"; \
+		SHA256_CMD=$$( (command -v sha256sum >/dev/null 2>&1 && echo "sha256sum") || (command -v shasum >/dev/null 2>&1 && echo "shasum -a 256") || echo ""); \
+		if [ -z "$$SHA256_CMD" ]; then \
+			echo "❌ エラー: sha256sum または shasum が見つかりません。整合性検証を中断します。"; \
+			rm -f cursor.deb; exit 1; \
+		fi; \
+		SHA256_URL=$$(echo "$$DOWNLOAD_URL" | sed 's/$$/.sha256/'); \
+		EXPECTED_HASH=$$(curl -sLf --connect-timeout 5 --max-time 10 "$$SHA256_URL" 2>/dev/null | awk '{print $$1}'); \
+		if [ -z "$$EXPECTED_HASH" ] && [ -n "$$CURSOR_SHA256" ]; then \
+			EXPECTED_HASH="$$CURSOR_SHA256"; \
+			echo "ℹ️  外部 .sha256 が見つからなかったため、環境変数 CURSOR_SHA256 を使用します。"; \
+		fi; \
+		if [ -n "$$EXPECTED_HASH" ]; then \
+			ACTUAL_HASH=$$($$SHA256_CMD cursor.deb | awk '{print $$1}'); \
+			if [ "$$EXPECTED_HASH" != "$$ACTUAL_HASH" ]; then \
+				echo "❌ ハッシュ不一致エラー: 整合性を確認できませんでした。"; \
+				echo "   期待値: $$EXPECTED_HASH"; \
+				echo "   実際値: $$ACTUAL_HASH"; \
+				rm -f cursor.deb; exit 1; \
+			else \
+				echo "✅ ハッシュ検証に成功しました。"; \
+			fi; \
+		else \
+			echo "⚠️  【警告】信頼できるハッシュ値が見つからなかったため、整合性検証をスキップします。"; \
 		fi; \
 		echo "🚀 インストールを開始します..."; \
 		if sudo dpkg -i cursor.deb || sudo apt-get install -f -y; then \
