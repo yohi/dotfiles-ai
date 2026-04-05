@@ -22,6 +22,9 @@ OPENCODE_DOCS_PATH ?= $(OPENCODE_CONFIG_DIR)/docs
 OPENCODE_DOTFILES_DOCS ?= $(REPO_ROOT)/opencode/docs
 OPENCODE_INSTALLER_HASH ?= fc3c1b2123f49b6df545a7622e5127d21cd794b15134fc3b66e1ca49f7fb297e
 
+OPENCODE_API_URL := https://opencode.ai/api/version
+OPENCODE_INSTALL_URL := https://opencode.ai/install
+
 define link_config
 	if [ -e "$(1)" ]; then \
 		if [ -e "$(2)" ] && [ ! -L "$(2)" ]; then \
@@ -111,27 +114,34 @@ opencode: ## OpenCode(opencode)のインストールとセットアップ
 
 # OpenCode をインストール（公式インストーラ）
 install-packages-opencode: ## OpenCode（opencode）をインストール
-	@echo "📦 OpenCode（opencode）をインストール中..."
-	@if [ -x "$(OPENCODE_BIN)" ]; then \
-		echo "[SKIP] opencode is already installed: $(OPENCODE_BIN)"; \
+	@echo "📦 OpenCode のバージョンを確認中..."
+	@LATEST_VERSION=$$(curl -sL --connect-timeout 10 --max-time 30 "$(OPENCODE_API_URL)" 2>/dev/null || echo "unknown"); \
+	CURRENT_VERSION=$$( $(OPENCODE_BIN) --version 2>/dev/null || echo "none" ); \
+	if [ "$$LATEST_VERSION" != "unknown" ] && [ "$$CURRENT_VERSION" = "$$LATEST_VERSION" ]; then \
+		echo "✅ OpenCode は既に最新バージョンです (バージョン: $$CURRENT_VERSION)"; \
 		exit 0; \
+	fi; \
+	if [ "$$CURRENT_VERSION" = "none" ]; then \
+		echo "📦 OpenCode を新規インストールします..."; \
+	else \
+		echo "🔄 OpenCode をアップデートします ($$CURRENT_VERSION -> $$LATEST_VERSION)..."; \
 	fi
+
 	@if ! command -v curl >/dev/null 2>&1; then \
 		echo "❌ curl が見つかりません。先に curl をインストールしてください"; \
 		exit 1; \
 	fi
 	@bash -c 'set -euo pipefail; \
 		tmp="$$(mktemp)"; \
-		curl -fsSL https://opencode.ai/install -o "$$tmp"; \
+		trap "rm -f \"$$tmp\"" EXIT; \
+		curl -fsSL "$(OPENCODE_INSTALL_URL)" -o "$$tmp"; \
 		expected_hash="$(OPENCODE_INSTALLER_HASH)"; \
 		actual_hash=$$( (command -v sha256sum >/dev/null 2>&1 && sha256sum "$$tmp" | cut -d" " -f1) || shasum -a 256 "$$tmp" | cut -d" " -f1 ); \
 		if [ "$$actual_hash" != "$$expected_hash" ]; then \
 			echo "❌ Installer checksum mismatch"; \
-			rm -f "$$tmp"; \
 			exit 1; \
 		fi; \
-		yes | bash "$$tmp" || [ $${PIPESTATUS[1]} -eq 0 ]; \
-		rm -f "$$tmp"'
+		yes | bash "$$tmp" || [ $${PIPESTATUS[1]} -eq 0 ]'
 	@if [ ! -x "$(OPENCODE_BIN)" ]; then \
 		echo "❌ opencode のインストールに失敗しました: $(OPENCODE_BIN) が見つかりません"; \
 		exit 1; \
@@ -148,16 +158,15 @@ opencode-update: ## OpenCode（opencode）をアップデート
 	fi
 	@bash -c 'set -euo pipefail; \
 		tmp="$$(mktemp)"; \
-		curl -fsSL https://opencode.ai/install -o "$$tmp"; \
+		trap "rm -f \"$$tmp\"" EXIT; \
+		curl -fsSL "$(OPENCODE_INSTALL_URL)" -o "$$tmp"; \
 		expected_hash="$(OPENCODE_INSTALLER_HASH)"; \
 		actual_hash=$$( (command -v sha256sum >/dev/null 2>&1 && sha256sum "$$tmp" | cut -d" " -f1) || shasum -a 256 "$$tmp" | cut -d" " -f1 ); \
 		if [ "$$actual_hash" != "$$expected_hash" ]; then \
 			echo "❌ Installer checksum mismatch"; \
-			rm -f "$$tmp"; \
 			exit 1; \
 		fi; \
-		yes | bash "$$tmp" || [ $${PIPESTATUS[1]} -eq 0 ]; \
-		rm -f "$$tmp"'
+		yes | bash "$$tmp" || [ $${PIPESTATUS[1]} -eq 0 ]'
 	@if [ ! -x "$(OPENCODE_BIN)" ]; then \
 		echo "❌ opencode のアップデートに失敗しました: $(OPENCODE_BIN) が見つかりません"; \
 		exit 1; \
