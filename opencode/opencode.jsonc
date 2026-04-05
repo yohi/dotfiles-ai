@@ -72,6 +72,7 @@
   "mcp": {
     "docker-mcp-gateway": { "type": "remote", "url": "http://127.0.0.1:10888/sse", "enabled": true }
   },
+  // [LSP]
   "lsp": {
     "bash-language-server": { "command": ["bash-language-server", "start"], "extensions": [".sh"], "disabled": false },
     "typescript-language-server": { "command": ["typescript-language-server", "--stdio"], "extensions": [".ts", ".tsx", ".js", ".jsx", ".mts", ".cts"], "disabled": false },
