@@ -40,6 +40,11 @@ def replace_placeholders(value: Any, gateway_url: str) -> Any:
         env_vars = re.findall(r"\$\{([^}]+)\}", val)
         for var in env_vars:
             if var not in os.environ:
+                # Fallback for renamed MCP token
+                if var == "MCP_GATEWAY_TOKEN" and "MCP_AUTH_TOKEN" in os.environ:
+                    os.environ["MCP_GATEWAY_TOKEN"] = os.environ["MCP_AUTH_TOKEN"]
+                    continue
+
                 raise ValueError(
                     f"Required environment variable '{var}' is not set. "
                     "Please check your .env file or environment."
