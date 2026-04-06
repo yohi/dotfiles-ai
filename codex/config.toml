@@ -26,5 +26,5 @@ name = "flixa"
 base_url = "https://api.flixa.engineer/v1/agent"
 wire_api = "responses"
 
-[projects."/home/y_ohi/program/private/chronos-graph"]
+[projects."/home/y_ohi/program/nexus"]
 trust_level = "trusted"

@@ -6,7 +6,8 @@ mcpServers:
     args:
       - /home/y_ohi/dotfiles/components/dotfiles-ai
     volumes:
-      - /home/y_ohi/dotfiles/components/dotfiles-ai:/home/y_ohi/dotfiles/components/dotfiles-ai
+      - __REPO_ROOT__:__REPO_ROOT__
+      - __HOME__:__HOME__
   sequentialthinking:
     enabled: true
   skillport:
