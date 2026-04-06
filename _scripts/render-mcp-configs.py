@@ -108,10 +108,13 @@ def write_opencode_jsonc(path: Path, root_key: str, servers: dict[str, Any]) -> 
             print(f"Skipped {path.name} (no changes)")
             return False
     else:
-        # 新規作成またはマーカーが見つからない場合
+        # マーカーが見つからない場合
         if text:
             raise RuntimeError(f"Marker // [MCP] ... // [LSP] not found in {path}")
-        updated = f"{{\n{replacement}\n}}\n"
+        # ファイル自体が存在しない場合もエラーとして扱う (データロス防止)
+        raise RuntimeError(
+            f"{path} does not exist. Please restore from git before running this script."
+        )
 
     path.write_text(updated, encoding="utf-8")
     return True

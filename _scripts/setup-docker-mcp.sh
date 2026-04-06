@@ -60,13 +60,34 @@ if [ ! -f "$DOTENV_FILE" ]; then
     touch "$DOTENV_FILE"
 fi
 
-if ! grep -qE '^[[:space:]]*MCP_AUTH_TOKEN=' "$DOTENV_FILE"; then
-    # トークンを生成して .env に追加
-    NEW_TOKEN=$(openssl rand -hex 16)
-    echo "MCP_AUTH_TOKEN=$NEW_TOKEN" >> "$DOTENV_FILE"
-    echo "MCP_GATEWAY_AUTH_TOKEN=$NEW_TOKEN" >> "$DOTENV_FILE"
-    echo "MCP_GATEWAY_TOKEN=$NEW_TOKEN" >> "$DOTENV_FILE"
-    echo -e "${GREEN}✅ Generated new MCP_AUTH_TOKEN and added to .env${NC}"
+if ! grep -qE '^[[:space:]]*MCP_GATEWAY_TOKEN=' "$DOTENV_FILE"; then
+    # 既存の古いトークン名があるか確認
+    EXISTING_TOKEN=$(grep -E "^MCP_AUTH_TOKEN=" "$DOTENV_FILE" | cut -d'=' -f2- | sed -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//" | xargs)
+    
+    if [ -n "$EXISTING_TOKEN" ]; then
+        echo "MCP_GATEWAY_TOKEN=$EXISTING_TOKEN" >> "$DOTENV_FILE"
+        echo -e "${GREEN}✅ Migrated existing MCP_AUTH_TOKEN to MCP_GATEWAY_TOKEN in .env${NC}"
+    else
+        # 新しいトークンを生成 (32 bytes)
+        NEW_TOKEN=$(openssl rand -hex 32)
+        echo "MCP_GATEWAY_TOKEN=$NEW_TOKEN" >> "$DOTENV_FILE"
+        echo "MCP_GATEWAY_AUTH_TOKEN=$NEW_TOKEN" >> "$DOTENV_FILE"
+        echo "MCP_AUTH_TOKEN=$NEW_TOKEN" >> "$DOTENV_FILE"
+        echo -e "${GREEN}✅ Generated new MCP_GATEWAY_TOKEN and added to .env${NC}"
+    fi
+fi
+
+# 個別の変数が欠けている場合の補完 (既存の MCP_GATEWAY_TOKEN を基準にする)
+CURRENT_TOKEN=$(grep -E "^MCP_GATEWAY_TOKEN=" "$DOTENV_FILE" | cut -d'=' -f2- | sed -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//" | xargs)
+if [ -n "$CURRENT_TOKEN" ]; then
+    if ! grep -qE '^[[:space:]]*MCP_GATEWAY_AUTH_TOKEN=' "$DOTENV_FILE"; then
+        echo "MCP_GATEWAY_AUTH_TOKEN=$CURRENT_TOKEN" >> "$DOTENV_FILE"
+        echo -e "${GREEN}✅ Added missing MCP_GATEWAY_AUTH_TOKEN using current token${NC}"
+    fi
+    if ! grep -qE '^[[:space:]]*MCP_AUTH_TOKEN=' "$DOTENV_FILE"; then
+        echo "MCP_AUTH_TOKEN=$CURRENT_TOKEN" >> "$DOTENV_FILE"
+        echo -e "${GREEN}✅ Added missing MCP_AUTH_TOKEN (backward compatibility) using current token${NC}"
+    fi
 fi
 
 chmod 600 "$DOTENV_FILE"
