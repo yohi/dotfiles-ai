@@ -65,6 +65,7 @@ if ! grep -qE '^[[:space:]]*MCP_AUTH_TOKEN=' "$DOTENV_FILE"; then
     NEW_TOKEN=$(openssl rand -hex 16)
     echo "MCP_AUTH_TOKEN=$NEW_TOKEN" >> "$DOTENV_FILE"
     echo "MCP_GATEWAY_AUTH_TOKEN=$NEW_TOKEN" >> "$DOTENV_FILE"
+    echo "MCP_GATEWAY_TOKEN=$NEW_TOKEN" >> "$DOTENV_FILE"
     echo -e "${GREEN}✅ Generated new MCP_AUTH_TOKEN and added to .env${NC}"
 fi
 

@@ -52,6 +52,8 @@ if [ -f "$REPO_ROOT/.env" ] && [ -f "$SERVICE_FILE" ]; then
         # sed 用にトークンをエスケープ (バックスラッシュ, アンパサンド, スラッシュ)
         ESCAPED_TOKEN=$(printf '%s' "$TOKEN" | sed 's/[&/|]/\\&/g')
         sed -i "/Environment=\"MCP_GATEWAY_AUTH_TOKEN=/d" "$SERVICE_FILE"
+        sed -i "/Environment=\"MCP_GATEWAY_TOKEN=/d" "$SERVICE_FILE"
+        sed -i "/\[Service\]/a Environment=\"MCP_GATEWAY_TOKEN=$ESCAPED_TOKEN\"" "$SERVICE_FILE"
         sed -i "/\[Service\]/a Environment=\"MCP_GATEWAY_AUTH_TOKEN=$ESCAPED_TOKEN\"" "$SERVICE_FILE"
         systemctl --user daemon-reload
     fi
