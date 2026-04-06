@@ -12,7 +12,7 @@
       "type": "sse",
       "url": "http://127.0.0.1:10888/sse",
       "headers": {
-        "Authorization": "Bearer 61b0b79357ba75ac8f81b6bacee85232"
+        "Authorization": "Bearer d42bc6ec9a28fd4dfcf96d673f5ca40e"
       },
       "timeout": 60000
     },

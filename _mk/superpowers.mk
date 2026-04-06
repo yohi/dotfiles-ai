@@ -48,7 +48,10 @@ pin-superpowers: ## 現在の最新 HEAD をマニフェスト(Lock-file)に固�
 
 update-gemini-md-superpowers: ## ~/.gemini/GEMINI.md にワークフロー指示を追記
 	@echo "📝 superpowers: GEMINI.md を更新中..."
-	@if [ -f "$(HOME)/.gemini/GEMINI.md" ]; then \
+	@if [ -L "$(HOME)/.gemini/GEMINI.md" ]; then \
+		echo "ℹ️  ~/.gemini/GEMINI.md はシンボリックリンクです。リンクを維持するため直接の更新をスキップします。"; \
+		echo "   (Source of Truth である global-rules/AGENTS.global.md を確認してください)"; \
+	elif [ -f "$(HOME)/.gemini/GEMINI.md" ]; then \
 		if grep -q "## BEGIN Superpowers Workflow" "$(HOME)/.gemini/GEMINI.md"; then \
 			sed '/## BEGIN Superpowers Workflow/,/## END Superpowers Workflow/d' "$(HOME)/.gemini/GEMINI.md" > "$(HOME)/.gemini/GEMINI.md.tmp" && mv "$(HOME)/.gemini/GEMINI.md.tmp" "$(HOME)/.gemini/GEMINI.md"; \
 		fi; \
@@ -88,7 +91,9 @@ uninstall-superpowers: ## superpowers の統合を解除（GEMINI.md 復元）
 		exit 1; \
 	fi
 	@rm -rf "$(LOCAL_SUPERPOWERS_DIR)"
-	@if [ -f "$(HOME)/.gemini/GEMINI.md" ]; then \
+	@if [ -L "$(HOME)/.gemini/GEMINI.md" ]; then \
+		echo "ℹ️  ~/.gemini/GEMINI.md はシンボリックリンクです。リンク解除は行いません。"; \
+	elif [ -f "$(HOME)/.gemini/GEMINI.md" ]; then \
 		if grep -q "## BEGIN Superpowers Workflow" "$(HOME)/.gemini/GEMINI.md"; then \
 			sed '/## BEGIN Superpowers Workflow/,/## END Superpowers Workflow/d' "$(HOME)/.gemini/GEMINI.md" > "$(HOME)/.gemini/GEMINI.md.tmp" && mv "$(HOME)/.gemini/GEMINI.md.tmp" "$(HOME)/.gemini/GEMINI.md"; \
 		fi; \
