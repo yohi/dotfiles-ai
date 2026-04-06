@@ -62,7 +62,7 @@ fi
 
 if ! grep -qE '^[[:space:]]*MCP_GATEWAY_TOKEN=' "$DOTENV_FILE"; then
     # 既存の古いトークン名があるか確認
-    EXISTING_TOKEN=$(grep -E "^MCP_AUTH_TOKEN=" "$DOTENV_FILE" | cut -d'=' -f2- | sed -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//" | xargs)
+    EXISTING_TOKEN=$(grep -E "^[[:space:]]*MCP_AUTH_TOKEN=" "$DOTENV_FILE" | cut -d'=' -f2- | sed -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//" | xargs)
     
     if [ -n "$EXISTING_TOKEN" ]; then
         echo "MCP_GATEWAY_TOKEN=$EXISTING_TOKEN" >> "$DOTENV_FILE"
@@ -78,7 +78,7 @@ if ! grep -qE '^[[:space:]]*MCP_GATEWAY_TOKEN=' "$DOTENV_FILE"; then
 fi
 
 # 個別の変数が欠けている場合の補完 (既存の MCP_GATEWAY_TOKEN を基準にする)
-CURRENT_TOKEN=$(grep -E "^MCP_GATEWAY_TOKEN=" "$DOTENV_FILE" | cut -d'=' -f2- | sed -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//" | xargs)
+CURRENT_TOKEN=$(grep -E "^[[:space:]]*MCP_GATEWAY_TOKEN=" "$DOTENV_FILE" | cut -d'=' -f2- | sed -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//" | xargs)
 if [ -n "$CURRENT_TOKEN" ]; then
     if ! grep -qE '^[[:space:]]*MCP_GATEWAY_AUTH_TOKEN=' "$DOTENV_FILE"; then
         echo "MCP_GATEWAY_AUTH_TOKEN=$CURRENT_TOKEN" >> "$DOTENV_FILE"
