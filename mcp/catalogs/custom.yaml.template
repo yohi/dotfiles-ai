@@ -31,11 +31,12 @@ registry:
       - --skip-auto-reindex
     env:
       - name: SKILLPORT_SKILLS_DIR
-        value: __HOME__/.skillport/skills
+        value: __HOME__/.skillport/skills:__REPO_ROOT__/agent-skills
       - name: SKILLPORT_DB_PATH
         value: __HOME__/.skillport/db
     volumes:
       - __HOME__/.skillport:__HOME__/.skillport
+      - __REPO_ROOT__:__REPO_ROOT__
   playwright:
     description: Web browser automation and testing.
     title: Playwright
@@ -59,10 +60,10 @@ registry:
     type: server
     image: mcp/filesystem@sha256:35fcf0217ca0d5bf7b0a5bd68fb3b89e08174676c0e0b4f431604512cf7b3f67
     command:
-      - __HOME__/dotfiles/components/dotfiles-ai
+      - __REPO_ROOT__
       - __HOME__
     volumes:
-      - __HOME__/dotfiles/components/dotfiles-ai:__HOME__/dotfiles/components/dotfiles-ai
+      - __REPO_ROOT__:__REPO_ROOT__
       - __HOME__:__HOME__
   tavily:
     description: Tavily search MCP server.
