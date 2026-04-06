@@ -73,7 +73,6 @@
       "su *": "deny"
     }
   },
-
   "experimental": {
     "batch_tool": true, // [New] Enable batching for faster execution
     "continue_loop_on_deny": false // [New] Stop thinking on permission denial / do not continue

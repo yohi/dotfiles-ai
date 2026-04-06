@@ -24,7 +24,7 @@ agents:
         type: sse
         url: http://127.0.0.1:10888/sse
         headers:
-          Authorization: Bearer ${MCP_AUTH_TOKEN}
+          Authorization: Bearer ${MCP_GATEWAY_TOKEN}
         timeout: 60000
 
       atlassian:

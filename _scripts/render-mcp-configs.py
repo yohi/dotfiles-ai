@@ -39,9 +39,17 @@ def replace_placeholders(value: Any, gateway_url: str) -> Any:
         # (os.path.expandvars は未定義の変数を空文字に変換してしまうため)
         env_vars = re.findall(r"\$\{([^}]+)\}", val)
         for var in env_vars:
-            if var not in os.environ:
+            val_env = os.environ.get(var)
+            if not val_env:
+                # Fallback for renamed MCP token
+                if var == "MCP_GATEWAY_TOKEN":
+                    auth_token = os.environ.get("MCP_AUTH_TOKEN")
+                    if auth_token:
+                        os.environ["MCP_GATEWAY_TOKEN"] = auth_token
+                        continue
+
                 raise ValueError(
-                    f"Required environment variable '{var}' is not set. "
+                    f"Required environment variable '{var}' is not set or empty. "
                     "Please check your .env file or environment."
                 )
 
@@ -82,27 +90,39 @@ def write_opencode_jsonc(path: Path, root_key: str, servers: dict[str, Any]) -> 
     if path.exists():
         text = path.read_text(encoding="utf-8")
 
+    # [MCP] マーカーとそのインデントを検索
+    pattern = re.compile(
+        r'^(\s*)// \[MCP\]\r?\n.*?^(\s*)// \[LSP\]',
+        re.MULTILINE | re.DOTALL,
+    )
+    match = pattern.search(text) if text else None
+    
+    # インデントの検出 (デフォルトは 2 スペース)
+    indent = match.group(1) if match else "  "
+    
     raw_block = json.dumps(servers, indent=2, ensure_ascii=False)
     block_lines = raw_block.splitlines()
     block = block_lines[0]
     if len(block_lines) > 1:
-        block += "\n" + "\n".join(f"  {line}" for line in block_lines[1:])
-    replacement = f'  // [MCP]\n  "{root_key}": {block},\n  // [LSP]'
-    pattern = re.compile(
-        r'^  // \[MCP\]\n.*?^  // \[LSP\]',
-        re.MULTILINE | re.DOTALL,
-    )
+        # 各行にインデントを付与 (既存の 2 スペース + 検出されたインデント)
+        block += "\n" + "\n".join(f"{indent}{line}" for line in block_lines[1:])
+    
+    # 置換文字列を作成 (末尾カンマ付き)
+    replacement = f'{indent}// [MCP]\n{indent}"{root_key}": {block},\n{indent}// [LSP]'
 
-    if text:
-        updated, count = pattern.subn(replacement, text, count=1)
-        if count != 1:
-            raise RuntimeError(f"Failed to update MCP block in {path}")
+    if not (text and match):
+        # マーカーが見つからない場合
+        if text:
+            raise RuntimeError(f"Marker // [MCP] ... // [LSP] not found in {path}")
+        # ファイル自体が存在しない場合もエラーとして扱う (データロス防止)
+        raise RuntimeError(
+            f"{path} does not exist. Please restore from git before running this script."
+        )
 
-        if text == updated:
-            print(f"Skipped {path.name} (no changes)")
-            return False
-    else:
-        updated = f"{{\n{replacement}\n}}\n"
+    updated = text[:match.start()] + replacement + text[match.end():]
+    if text == updated:
+        print(f"Skipped {path.name} (no changes)")
+        return False
 
     path.write_text(updated, encoding="utf-8")
     return True
