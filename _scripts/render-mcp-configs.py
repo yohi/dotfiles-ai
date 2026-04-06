@@ -107,12 +107,7 @@ def write_opencode_jsonc(path: Path, root_key: str, servers: dict[str, Any]) -> 
     # 置換文字列を作成 (末尾カンマ付き)
     replacement = f'{indent}// [MCP]\n{indent}"{root_key}": {block},\n{indent}// [LSP]'
 
-    if text and match:
-        updated = text[:match.start()] + replacement + text[match.end():]
-        if text == updated:
-            print(f"Skipped {path.name} (no changes)")
-            return False
-    else:
+    if not (text and match):
         # マーカーが見つからない場合
         if text:
             raise RuntimeError(f"Marker // [MCP] ... // [LSP] not found in {path}")
@@ -120,6 +115,11 @@ def write_opencode_jsonc(path: Path, root_key: str, servers: dict[str, Any]) -> 
         raise RuntimeError(
             f"{path} does not exist. Please restore from git before running this script."
         )
+
+    updated = text[:match.start()] + replacement + text[match.end():]
+    if text == updated:
+        print(f"Skipped {path.name} (no changes)")
+        return False
 
     path.write_text(updated, encoding="utf-8")
     return True
