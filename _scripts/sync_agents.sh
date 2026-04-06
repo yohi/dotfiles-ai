@@ -49,27 +49,8 @@ TMP_FILE=$(mktemp)
 TMP_SOURCE=$(mktemp)
 trap 'rm -f "$TMP_FILE" "$TMP_SOURCE"' EXIT
 
-# AGENTS.md の内容から superpowers/ を除いたものを一時ファイルに作成
-# 行ベースで処理し、<name>superpowers/ を含む <skill> ブロックをスキップする
-awk '
-BEGIN { in_block = 0; block = "" }
-/<skill>/ { in_block = 1; block = $0 "\n"; next }
-/<\/skill>/ { 
-    if (in_block) {
-        block = block $0 "\n"
-        if (block !~ "<name>superpowers/") {
-            printf "%s", block
-        }
-        in_block = 0
-        block = ""
-    } else {
-        print
-    }
-    next
-}
-in_block { block = block $0 "\n"; next }
-{ print }
-' "$SOURCE_MD" > "$TMP_SOURCE"
+# AGENTS.md の内容をそのまま一時ファイルにコピー（将来的にフィルタリングが必要な場合はここで処理）
+cat "$SOURCE_MD" > "$TMP_SOURCE"
 
 # 4. 絶対パスを相対パスに変換する処理
 # 現在のプロジェクトルートの絶対パスを取得し、それを削除して相対パス化する

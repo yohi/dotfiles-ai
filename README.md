@@ -55,6 +55,9 @@ AIエージェント（Claude Code, Gemini CLI, OpenCode, Codex）の設定・�
 [SkillPort](https://github.com/gotalab/skillport) は、複数の AI エージェント間で再利用可能な「スキル」を一元管理するためのツールです。
 
 - **スキルの実体**: `agent-skills/` ディレクトリ配下に、各スキルの `SKILL.md`（インストラクション）が格納されています。
+- **外部スキルの管理 (Lock-file)**: `superpowers` などの高品質な外部スキルは、`agent-skills/EXTERNAL_SKILLS.md` でバージョン（コミットハッシュ）が固定（Lock）されています。
+  - 実体ファイルは `.gitignore` によりリポジトリには含まれません。
+  - `make setup-superpowers` を実行することで、マニフェストに基づいた正確なバージョンのスキルが各環境に展開されます。
 - **構成**: `.skillportrc` で設定され、`~/.skillport/skills` からリポジトリの `agent-skills/` へシンボリックリンクが張られます。
 - **コマンド**:
   - `make skillport`: SkillPort と `skillport-mcp` をインストールし、ディレクトリをセットアップします。

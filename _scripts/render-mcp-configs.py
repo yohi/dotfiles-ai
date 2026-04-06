@@ -84,22 +84,22 @@ def write_opencode_jsonc(path: Path, root_key: str, servers: dict[str, Any]) -> 
 
     # [MCP] マーカーとそのインデントを検索
     pattern = re.compile(
-        r'^(\s*)// \[MCP\]\n.*?^(\s*)// \[LSP\]',
+        r'^(\s*)// \[MCP\]\r?\n.*?^(\s*)// \[LSP\]',
         re.MULTILINE | re.DOTALL,
     )
     match = pattern.search(text) if text else None
     
-    # インデントの検出（デフォルトは 2 スペース）
+    # インデントの検出 (デフォルトは 2 スペース)
     indent = match.group(1) if match else "  "
     
     raw_block = json.dumps(servers, indent=2, ensure_ascii=False)
     block_lines = raw_block.splitlines()
     block = block_lines[0]
     if len(block_lines) > 1:
-        # 各行にインデントを付与（既存の 2 スペース + 検出されたインデント）
+        # 各行にインデントを付与 (既存の 2 スペース + 検出されたインデント)
         block += "\n" + "\n".join(f"{indent}{line}" for line in block_lines[1:])
     
-    # 置換文字列を作成（末尾カンマ付き）
+    # 置換文字列を作成 (末尾カンマ付き)
     replacement = f'{indent}// [MCP]\n{indent}"{root_key}": {block},\n{indent}// [LSP]'
 
     if text and match:

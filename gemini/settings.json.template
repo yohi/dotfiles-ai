@@ -7,21 +7,9 @@
   "privacy": {
     "usageStatisticsEnabled": false
   },
-  "mcpServers": {
-    "docker-mcp-gateway": {
-      "type": "sse",
-      "url": "http://127.0.0.1:10888/sse",
-      "headers": {
-        "Authorization": "Bearer ${MCP_GATEWAY_TOKEN}"
-      },
-      "timeout": 60000
-    },
-    "atlassian": {
-      "type": "sse",
-      "httpUrl": "https://mcp.atlassian.com/v1/mcp",
-      "timeout": 30000
-    }
-  },
+  // [MCP]
+  "mcpServers": {},
+  // [LSP]
   "customToolsDirectory": "~/.gemini/user-tools",
   "enableCustomTools": true,
   "general": {
@@ -36,7 +24,6 @@
     }
   },
   "ui": {
-    "hideFooter": false,
     "showFooter": true,
     "showMemoryUsage": true,
     "showCitations": true,
