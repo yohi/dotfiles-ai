@@ -49,20 +49,36 @@ TMP_FILE=$(mktemp)
 TMP_SOURCE=$(mktemp)
 trap 'rm -f "$TMP_FILE" "$TMP_SOURCE"' EXIT
 
-# AGENTS.md の内容から superpowers/ を除いたものを一時ファイルに作成 (絶対パスのまま)
-# <skill>...</skill> ブロック単位で処理し、<name>superpowers/ を含むブロックを除去
+# AGENTS.md の内容から superpowers/ を除いたものを一時ファイルに作成
+# 行ベースで処理し、<name>superpowers/ を含む <skill> ブロックをスキップする
 awk '
-BEGIN { RS="<skill>"; FS="</skill>" }
-NR==1 { printf "%s", $0; next }
-$0 !~ "<name>superpowers/" { printf "<skill>%s", $0 }
+BEGIN { in_block = 0; block = "" }
+/<skill>/ { in_block = 1; block = $0 "\n"; next }
+/<\/skill>/ { 
+    if (in_block) {
+        block = block $0 "\n"
+        if (block !~ "<name>superpowers/") {
+            printf "%s", block
+        }
+        in_block = 0
+        block = ""
+    } else {
+        print
+    }
+    next
+}
+in_block { block = block $0 "\n"; next }
+{ print }
 ' "$SOURCE_MD" > "$TMP_SOURCE"
 
-# 4. 絶対パスを相対パスに変換する処理 (SOURCE_MD のみ)
+# 4. 絶対パスを相対パスに変換する処理
 # 現在のプロジェクトルートの絶対パスを取得し、それを削除して相対パス化する
 REPO_ROOT=$(pwd)
 perl -pi -e "s|(<location>)\Q${REPO_ROOT}/\E|\$1|g" "$SOURCE_MD"
+perl -pi -e "s|(<location>)\Q${REPO_ROOT}/\E|\$1|g" "$TMP_SOURCE"
 
 # 5. TARGET_MD (global-rules/AGENTS.global.md) への同期
+
 # START_MARKER と END_MARKER が存在するかチェック
 if grep -qF "$START_MARKER" "$TARGET_MD" && grep -qF "$END_MARKER" "$TARGET_MD"; then
     # 既存のマーカー間をごっそり置換 (絶対パス版の TMP_SOURCE を使用)
