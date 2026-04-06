@@ -82,26 +82,35 @@ def write_opencode_jsonc(path: Path, root_key: str, servers: dict[str, Any]) -> 
     if path.exists():
         text = path.read_text(encoding="utf-8")
 
+    # [MCP] マーカーとそのインデントを検索
+    pattern = re.compile(
+        r'^(\s*)// \[MCP\]\n.*?^(\s*)// \[LSP\]',
+        re.MULTILINE | re.DOTALL,
+    )
+    match = pattern.search(text) if text else None
+    
+    # インデントの検出（デフォルトは 2 スペース）
+    indent = match.group(1) if match else "  "
+    
     raw_block = json.dumps(servers, indent=2, ensure_ascii=False)
     block_lines = raw_block.splitlines()
     block = block_lines[0]
     if len(block_lines) > 1:
-        block += "\n" + "\n".join(f"  {line}" for line in block_lines[1:])
-    replacement = f'  // [MCP]\n  "{root_key}": {block},\n  // [LSP]'
-    pattern = re.compile(
-        r'^  // \[MCP\]\n.*?^  // \[LSP\]',
-        re.MULTILINE | re.DOTALL,
-    )
+        # 各行にインデントを付与（既存の 2 スペース + 検出されたインデント）
+        block += "\n" + "\n".join(f"{indent}{line}" for line in block_lines[1:])
+    
+    # 置換文字列を作成（末尾カンマ付き）
+    replacement = f'{indent}// [MCP]\n{indent}"{root_key}": {block},\n{indent}// [LSP]'
 
-    if text:
-        updated, count = pattern.subn(replacement, text, count=1)
-        if count != 1:
-            raise RuntimeError(f"Failed to update MCP block in {path}")
-
+    if text and match:
+        updated = text[:match.start()] + replacement + text[match.end():]
         if text == updated:
             print(f"Skipped {path.name} (no changes)")
             return False
     else:
+        # 新規作成またはマーカーが見つからない場合
+        if text:
+            raise RuntimeError(f"Marker // [MCP] ... // [LSP] not found in {path}")
         updated = f"{{\n{replacement}\n}}\n"
 
     path.write_text(updated, encoding="utf-8")
