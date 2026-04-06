@@ -39,3 +39,4 @@ ide/cursor/mcp.json
 .worktrees/
 .worktrees
 claude/claude-settings.json
+gemini/settings.json
