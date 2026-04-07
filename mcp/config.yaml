@@ -12,3 +12,6 @@ mcpServers:
     enabled: true
   skillport:
     enabled: true
+  chronos-graph:
+    enabled: true
+

@@ -54,6 +54,36 @@ Never mix IDE styling configurations here, and never put AI instructions or MCP 
 - `make setup-docker-mcp`: Re-render MCP configurations and synchronize all agents.
 - `make sync-agents`: Propagate global rules and skill updates to all agent contexts.
 
+## 6. MCP Gateway Advanced Configuration
+
+When managing custom command-based MCP servers (e.g., `uv tool run`) using `docker-mcp-gateway`, please note the following technical requirements and workarounds.
+
+### ⚠️ Constraints and Workarounds for Custom Servers
+1.  **Mandatory `image` Field**: 
+    The gateway's validation schema often requires an `image` field even for command-based servers. If omitted, the server may be ignored. Use a valid lightweight image (e.g., `mcp/sequentialthinking@sha256:cd3174b2ecf37738654cf7671fb1b719a225c40a78274817da00c4241f465e5f`) as a dummy placeholder, and specify the actual host command (e.g., `uv`) in the `command` field.
+2.  **Manual Registration in `registry.yaml`**:
+    If a custom server in the catalog is not automatically detected, force its recognition by manually adding an entry to `~/.docker/mcp/registry.yaml`:
+    ```yaml
+    registry:
+      your-server-name:
+        ref: ""
+    ```
+3.  **Environment Variables & Volume Mounts**:
+    Host-side tools often require specific environment variables and filesystem access. Explicitly map these using the `env` and `volumes` sections in `mcp/catalogs/custom.yaml.template`.
+
+### 🛠️ Troubleshooting: "too many open files"
+A `too many open files` error in the gateway logs usually indicates resource exhaustion from orphaned MCP containers. Cleanup all managed containers using:
+```bash
+docker ps -q --filter "label=docker-mcp=true" | xargs -r docker stop
+docker container prune -f --filter "label=docker-mcp=true"
+```
+
+### 📚 References
+- [Docker MCP Gateway: Getting Started](https://docs.docker.com/ai/mcp-catalog-and-toolkit/mcp-gateway/)
+- [Docker MCP Gateway: FAQs & Troubleshooting](https://docs.docker.com/ai/mcp-catalog-and-toolkit/faqs/)
+- [GitHub: docker/mcp-gateway (Lifecycle Management)](https://github.com/docker/mcp-gateway#overview)
+- [Community Guide: Advanced Docker MCP Gateway Usage](https://qiita.com/moritalous/items/8789a37b7db451cc1dba)
+
 <!-- SKILLPORT_START -->
 ## SkillPort Skills
 
