@@ -5,4 +5,4 @@
 
 | Skill Namespace | Source Repository | Version (Commit Hash) | Pinned At | Note |
 | :--- | :--- | :--- | :--- | :--- |
-| superpowers | https://github.com/obra/superpowers | e4a2375cb705ca5800f0833528ce36a3faf9017a | 2026-03-03 | AI Agent Workflow |
+| superpowers | https://github.com/obra/superpowers | 917e5f53b16b115b70a3a355ed5f4993b9f8b73d | 2026-04-07 | AI Agent Workflow |

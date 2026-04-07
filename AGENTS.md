@@ -59,8 +59,8 @@ Never mix IDE styling configurations here, and never put AI instructions or MCP 
 When managing custom command-based MCP servers (e.g., `uv tool run`) using `docker-mcp-gateway`, please note the following technical requirements and workarounds.
 
 ### ⚠️ Constraints and Workarounds for Custom Servers
-1.  **Mandatory `image` Field**: 
-    The gateway's validation schema often requires an `image` field even for command-based servers. If omitted, the server may be ignored. Use a valid lightweight image (e.g., `mcp/sequentialthinking@sha256:cd3174b2ecf37738654cf7671fb1b719a225c40a78274817da00c4241f465e5f`) as a dummy placeholder, and specify the actual host command (e.g., `uv`) in the `command` field.
+1.  **Mandatory `image` Field (No Host Execution)**: 
+    The Docker MCP Gateway **always** executes servers within isolated Docker containers; it cannot execute commands directly on the host machine. When defining a command-based server (e.g., `uvx` or `npx`) in the catalog, you MUST specify a valid Docker image that contains the required execution environment (e.g., `ghcr.io/astral-sh/uv:python3.12-bookworm` for Python/uv, or `node:lts-slim` for Node/npx). Do NOT use a dummy placeholder image, as the command will fail if the dependencies (like `uv` or `git`) are missing inside the container.
 2.  **Manual Registration in `registry.yaml`**:
     If a custom server in the catalog is not automatically detected, force its recognition by manually adding an entry to `~/.docker/mcp/registry.yaml`:
     ```yaml
