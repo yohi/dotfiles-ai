@@ -94,7 +94,7 @@ registry:
     description: Context store and graph memory using chronos-graph.
     title: Chronos Graph
     type: server
-    image: mcp/sequentialthinking@sha256:cd3174b2ecf37738654cf7671fb1b719a225c40a78274817da00c4241f465e5f
+    image: ghcr.io/astral-sh/uv:python3.12-bookworm
     tools:
       - name: add_node
       - name: add_edge
@@ -107,7 +107,7 @@ registry:
       - tool
       - run
       - --from
-      - git+https://github.com/yohi/chronos-graph.git@4666e27f5486ea86c16d7b5a4ec1c58f20d279d6
+      - git+https://github.com/yohi/chronos-graph.git@37308f47837469d801abc1226ee65e4262093042
       - context-store
     env:
       - name: STORAGE_BACKEND
