@@ -47,11 +47,42 @@ Never mix IDE styling configurations here, and never put AI instructions or MCP 
 - **SSOT Enforcement**: Never edit symlinked files in home directories (e.g., `~/.gemini/GEMINI.md`). Always edit the Source of Truth within this repository.
 - **MCP Gateway**: Use the Unified SSE Gateway (`http://localhost:10888/sse`) for all tools. New MCP servers MUST be defined in `mcp/catalogs/custom.yaml.template`.
 - **Skill Management**: New AI capabilities MUST be implemented as SkillPort skills in `agent-skills/` and managed via MCP.
+- **External Skills (Lock-file)**: High-quality external skills (like `superpowers/`) are managed via `agent-skills/EXTERNAL_SKILLS.md`. These files are ignored by Git and synchronized across environments using `make setup-superpowers` or `make sync-agents`. This prevents duplicating external code while maintaining version consistency.
 
 ## 5. Tooling & Automation
 - `make setup`: Bootstrap the environment and create initial symlinks.
 - `make setup-docker-mcp`: Re-render MCP configurations and synchronize all agents.
 - `make sync-agents`: Propagate global rules and skill updates to all agent contexts.
+
+## 6. MCP Gateway Advanced Configuration
+
+When managing custom command-based MCP servers (e.g., `uv tool run`) using `docker-mcp-gateway`, please note the following technical requirements and workarounds.
+
+### ⚠️ Constraints and Workarounds for Custom Servers
+1.  **Mandatory `image` Field**: 
+    The gateway's validation schema often requires an `image` field even for command-based servers. If omitted, the server may be ignored. Use a valid lightweight image (e.g., `mcp/sequentialthinking@sha256:cd3174b2ecf37738654cf7671fb1b719a225c40a78274817da00c4241f465e5f`) as a dummy placeholder, and specify the actual host command (e.g., `uv`) in the `command` field.
+2.  **Manual Registration in `registry.yaml`**:
+    If a custom server in the catalog is not automatically detected, force its recognition by manually adding an entry to `~/.docker/mcp/registry.yaml`:
+    ```yaml
+    registry:
+      your-server-name:
+        ref: ""
+    ```
+3.  **Environment Variables & Volume Mounts**:
+    Host-side tools often require specific environment variables and filesystem access. Explicitly map these using the `env` and `volumes` sections in `mcp/catalogs/custom.yaml.template`.
+
+### 🛠️ Troubleshooting: "too many open files"
+A `too many open files` error in the gateway logs usually indicates resource exhaustion from orphaned MCP containers. Cleanup all managed containers using:
+```bash
+docker ps -q --filter "label=docker-mcp=true" | xargs -r docker stop
+docker container prune -f --filter "label=docker-mcp=true"
+```
+
+### 📚 References
+- [Docker MCP Gateway: Getting Started](https://docs.docker.com/ai/mcp-catalog-and-toolkit/mcp-gateway/)
+- [Docker MCP Gateway: FAQs & Troubleshooting](https://docs.docker.com/ai/mcp-catalog-and-toolkit/faqs/)
+- [GitHub: docker/mcp-gateway (Lifecycle Management)](https://github.com/docker/mcp-gateway#overview)
+- [Community Guide: Advanced Docker MCP Gateway Usage](https://qiita.com/moritalous/items/8789a37b7db451cc1dba)
 
 <!-- SKILLPORT_START -->
 ## SkillPort Skills
@@ -102,6 +133,76 @@ Each skill contains step-by-step instructions, templates, and scripts.
   <name>makefile-organization</name>
   <description>Guidelines for organizing and maintaining modular Makefiles. Use when refactoring, creating new .mk files, or ensuring consistency across the project's Makefile structure. Covers naming conventions, inclusion order, idempotency management, and error handling for a robust development environment.</description>
   <location>agent-skills/makefile-organization/SKILL.md</location>
+</skill>
+<skill>
+  <name>superpowers/brainstorming</name>
+  <description>You MUST use this before any creative work - creating features, building components, adding functionality, or modifying behavior. Explores user intent, requirements and design before implementation.</description>
+  <location>agent-skills/superpowers/brainstorming/SKILL.md</location>
+</skill>
+<skill>
+  <name>superpowers/dispatching-parallel-agents</name>
+  <description>Use when facing 2+ independent tasks that can be worked on without shared state or sequential dependencies</description>
+  <location>agent-skills/superpowers/dispatching-parallel-agents/SKILL.md</location>
+</skill>
+<skill>
+  <name>superpowers/executing-plans</name>
+  <description>Use when you have a written implementation plan to execute in a separate session with review checkpoints</description>
+  <location>agent-skills/superpowers/executing-plans/SKILL.md</location>
+</skill>
+<skill>
+  <name>superpowers/finishing-a-development-branch</name>
+  <description>Use when implementation is complete, all tests pass, and you need to decide how to integrate the work - guides completion of development work by presenting structured options for merge, PR, or cleanup</description>
+  <location>agent-skills/superpowers/finishing-a-development-branch/SKILL.md</location>
+</skill>
+<skill>
+  <name>superpowers/receiving-code-review</name>
+  <description>Use when receiving code review feedback, before implementing suggestions, especially if feedback seems unclear or technically questionable - requires technical rigor and verification, not performative agreement or blind implementation</description>
+  <location>agent-skills/superpowers/receiving-code-review/SKILL.md</location>
+</skill>
+<skill>
+  <name>superpowers/requesting-code-review</name>
+  <description>Use when completing tasks, implementing major features, or before merging to verify work meets requirements</description>
+  <location>agent-skills/superpowers/requesting-code-review/SKILL.md</location>
+</skill>
+<skill>
+  <name>superpowers/subagent-driven-development</name>
+  <description>Use when executing implementation plans with independent tasks in the current session</description>
+  <location>agent-skills/superpowers/subagent-driven-development/SKILL.md</location>
+</skill>
+<skill>
+  <name>superpowers/systematic-debugging</name>
+  <description>Use when encountering any bug, test failure, or unexpected behavior, before proposing fixes</description>
+  <location>agent-skills/superpowers/systematic-debugging/SKILL.md</location>
+</skill>
+<skill>
+  <name>superpowers/test-driven-development</name>
+  <description>Use when implementing any feature or bugfix, before writing implementation code</description>
+  <location>agent-skills/superpowers/test-driven-development/SKILL.md</location>
+</skill>
+<skill>
+  <name>superpowers/using-git-worktrees</name>
+  <description>Use when starting feature work that needs isolation from current workspace or before executing implementation plans - creates isolated git worktrees with smart directory selection and safety verification</description>
+  <location>agent-skills/superpowers/using-git-worktrees/SKILL.md</location>
+</skill>
+<skill>
+  <name>superpowers/using-superpowers</name>
+  <description>Use when starting any conversation - establishes how to find and use skills, requiring Skill tool invocation before ANY response including clarifying questions</description>
+  <location>agent-skills/superpowers/using-superpowers/SKILL.md</location>
+</skill>
+<skill>
+  <name>superpowers/verification-before-completion</name>
+  <description>Use when about to claim work is complete, fixed, or passing, before committing or creating PRs - requires running verification commands and confirming output before making any success claims; evidence before assertions always</description>
+  <location>agent-skills/superpowers/verification-before-completion/SKILL.md</location>
+</skill>
+<skill>
+  <name>superpowers/writing-plans</name>
+  <description>Use when you have a spec or requirements for a multi-step task, before touching code</description>
+  <location>agent-skills/superpowers/writing-plans/SKILL.md</location>
+</skill>
+<skill>
+  <name>superpowers/writing-skills</name>
+  <description>Use when creating new skills, editing existing skills, or verifying skills work before deployment</description>
+  <location>agent-skills/superpowers/writing-skills/SKILL.md</location>
 </skill>
 </available_skills>
 <!-- SKILLPORT_END -->

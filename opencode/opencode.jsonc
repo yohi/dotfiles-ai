@@ -68,7 +68,11 @@
       "su *": "deny"
     }
   },
-  "experimental": { "batch_tool": true, "continue_loop_on_deny": false },
+  "experimental": {
+    "batch_tool": true, // [New] Enable batching for faster execution
+    "continue_loop_on_deny": false // [New] Stop thinking on permission denial / do not continue
+  },
+  // [MCP]
   "mcp": {
     "docker-mcp-gateway": { "type": "remote", "url": "http://127.0.0.1:10888/sse", "enabled": true }
   },

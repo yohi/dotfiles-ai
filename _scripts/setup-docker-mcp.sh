@@ -9,6 +9,18 @@ BLUE='\033[0;34m'
 YELLOW='\033[0;33m'
 NC='\033[0m' # No Color
 
+# ヘルパー関数: .env から安全に値を取得する (キーがない場合や空の場合もエラーにせず空文字を返す)
+safe_dotenv_get() {
+    local key="$1"
+    local file="$2"
+    if [ ! -f "$file" ]; then
+        return 0
+    fi
+    # grep -m1 で最初の一致のみ取得し、sed でクォートを除去。
+    # パイプの最後で || true を置くことで grep が見つからなくてもエラーにしない。
+    grep -E "^[[:space:]]*${key}=" "$file" | head -n 1 | cut -d'=' -f2- | sed -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//" | xargs || true
+}
+
 echo -e "${BLUE}🐳 Starting Docker MCP setup...${NC}"
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
@@ -56,19 +68,49 @@ fi
 echo -e "${BLUE}🔑 Preparing shared .env for Docker MCP secrets...${NC}"
 DOTENV_FILE="$REPO_ROOT/.env"
 
+# 書き込み前に権限を制限する (作成時に 600 になるように)
 if [ ! -f "$DOTENV_FILE" ]; then
-    touch "$DOTENV_FILE"
+    (umask 077 && touch "$DOTENV_FILE")
+else
+    chmod 600 "$DOTENV_FILE"
 fi
 
-if ! grep -qE '^[[:space:]]*MCP_AUTH_TOKEN=' "$DOTENV_FILE"; then
-    # トークンを生成して .env に追加
-    NEW_TOKEN=$(openssl rand -hex 16)
-    echo "MCP_AUTH_TOKEN=$NEW_TOKEN" >> "$DOTENV_FILE"
-    echo "MCP_GATEWAY_AUTH_TOKEN=$NEW_TOKEN" >> "$DOTENV_FILE"
-    echo -e "${GREEN}✅ Generated new MCP_AUTH_TOKEN and added to .env${NC}"
+# トークンの存在確認と取得
+GATEWAY_TOKEN=$(safe_dotenv_get "MCP_GATEWAY_TOKEN" "$DOTENV_FILE")
+
+if [ -z "$GATEWAY_TOKEN" ]; then
+    # 既存の古いトークン名があるか確認
+    EXISTING_TOKEN=$(safe_dotenv_get "MCP_AUTH_TOKEN" "$DOTENV_FILE")
+    
+    if [ -n "$EXISTING_TOKEN" ]; then
+        echo "MCP_GATEWAY_TOKEN=$EXISTING_TOKEN" >> "$DOTENV_FILE"
+        echo -e "${GREEN}✅ Migrated existing MCP_AUTH_TOKEN to MCP_GATEWAY_TOKEN in .env${NC}"
+    else
+        # 新しいトークンを生成 (32 bytes)
+        NEW_TOKEN=$(openssl rand -hex 32)
+        echo "MCP_GATEWAY_TOKEN=$NEW_TOKEN" >> "$DOTENV_FILE"
+        echo "MCP_GATEWAY_AUTH_TOKEN=$NEW_TOKEN" >> "$DOTENV_FILE"
+        echo "MCP_AUTH_TOKEN=$NEW_TOKEN" >> "$DOTENV_FILE"
+        echo -e "${GREEN}✅ Generated new MCP_GATEWAY_TOKEN and added to .env${NC}"
+    fi
 fi
 
-chmod 600 "$DOTENV_FILE"
+# 個別の変数が欠けている場合の補完 (最新の MCP_GATEWAY_TOKEN を基準にする)
+CURRENT_TOKEN=$(safe_dotenv_get "MCP_GATEWAY_TOKEN" "$DOTENV_FILE")
+if [ -n "$CURRENT_TOKEN" ]; then
+    GATEWAY_AUTH_TOKEN=$(safe_dotenv_get "MCP_GATEWAY_AUTH_TOKEN" "$DOTENV_FILE")
+    if [ -z "$GATEWAY_AUTH_TOKEN" ]; then
+        echo "MCP_GATEWAY_AUTH_TOKEN=$CURRENT_TOKEN" >> "$DOTENV_FILE"
+        echo -e "${GREEN}✅ Added missing MCP_GATEWAY_AUTH_TOKEN using current token${NC}"
+    fi
+
+    AUTH_TOKEN=$(safe_dotenv_get "MCP_AUTH_TOKEN" "$DOTENV_FILE")
+    if [ -z "$AUTH_TOKEN" ]; then
+        echo "MCP_AUTH_TOKEN=$CURRENT_TOKEN" >> "$DOTENV_FILE"
+        echo -e "${GREEN}✅ Added missing MCP_AUTH_TOKEN (backward compatibility) using current token${NC}"
+    fi
+fi
+
 echo -e "${GREEN}✅ Shared .env file is ready.${NC}"
 
 # 設定ファイルの配置 (コピー & テンプレート処理)

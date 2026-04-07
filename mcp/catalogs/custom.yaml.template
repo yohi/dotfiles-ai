@@ -31,11 +31,12 @@ registry:
       - --skip-auto-reindex
     env:
       - name: SKILLPORT_SKILLS_DIR
-        value: __HOME__/.skillport/skills
+        value: __HOME__/.skillport/skills:__REPO_ROOT__/agent-skills
       - name: SKILLPORT_DB_PATH
         value: __HOME__/.skillport/db
     volumes:
       - __HOME__/.skillport:__HOME__/.skillport
+      - __REPO_ROOT__:__REPO_ROOT__
   playwright:
     description: Web browser automation and testing.
     title: Playwright
@@ -59,10 +60,10 @@ registry:
     type: server
     image: mcp/filesystem@sha256:35fcf0217ca0d5bf7b0a5bd68fb3b89e08174676c0e0b4f431604512cf7b3f67
     command:
-      - __HOME__/dotfiles/components/dotfiles-ai
+      - __REPO_ROOT__
       - __HOME__
     volumes:
-      - __HOME__/dotfiles/components/dotfiles-ai:__HOME__/dotfiles/components/dotfiles-ai
+      - __REPO_ROOT__:__REPO_ROOT__
       - __HOME__:__HOME__
   tavily:
     description: Tavily search MCP server.
@@ -89,3 +90,43 @@ registry:
     title: Chrome DevTools
     type: server
     image: mcp/chrome-devtools
+  chronos-graph:
+    description: Context store and graph memory using chronos-graph.
+    title: Chronos Graph
+    type: server
+    image: mcp/sequentialthinking@sha256:cd3174b2ecf37738654cf7671fb1b719a225c40a78274817da00c4241f465e5f
+    tools:
+      - name: add_node
+      - name: add_edge
+      - name: search_nodes
+      - name: query_graph
+      - name: store_memory
+      - name: retrieve_memory
+    command:
+      - uv
+      - tool
+      - run
+      - --from
+      - git+https://github.com/yohi/chronos-graph.git@4666e27f5486ea86c16d7b5a4ec1c58f20d279d6
+      - context-store
+    env:
+      - name: STORAGE_BACKEND
+        value: sqlite
+      - name: SQLITE_DB_PATH
+        value: __HOME__/.context-store/memories.db
+      - name: GRAPH_ENABLED
+        value: "true"
+      - name: EMBEDDING_PROVIDER
+        value: local-model
+      - name: LOCAL_MODEL_NAME
+        value: cl-nagoya/ruri-v3-310m
+    volumes:
+      - __HOME__/.context-store:__HOME__/.context-store
+
+
+
+
+
+
+
+

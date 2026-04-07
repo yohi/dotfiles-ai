@@ -4,30 +4,14 @@ mcpServers:
   filesystem:
     enabled: true
     args:
-      - __REPO_ROOT__
-      - __HOME__
+      - /home/y_ohi/dotfiles/components/dotfiles-ai
     volumes:
       - __REPO_ROOT__:__REPO_ROOT__
       - __HOME__:__HOME__
-  playwright:
-    enabled: true
-  tavily:
-    enabled: true
   sequentialthinking:
-    enabled: true
-  magic:
-    enabled: true
-  morphllm-fast-apply:
-    enabled: true
-  serena:
-    enabled: true
-  chrome-devtools:
-    enabled: true
-  github-official:
-    enabled: true
-  docker:
-    enabled: true
-  dockerhub:
     enabled: true
   skillport:
     enabled: true
+  chronos-graph:
+    enabled: true
+
