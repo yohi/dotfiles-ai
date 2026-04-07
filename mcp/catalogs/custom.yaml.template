@@ -94,7 +94,7 @@ registry:
     description: Context store and graph memory using chronos-graph.
     title: Chronos Graph
     type: server
-    image: mcp/sequentialthinking
+    image: mcp/sequentialthinking@sha256:cd3174b2ecf37738654cf7671fb1b719a225c40a78274817da00c4241f465e5f
     tools:
       - name: add_node
       - name: add_edge

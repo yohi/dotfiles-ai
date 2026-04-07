@@ -60,7 +60,7 @@ When managing custom command-based MCP servers (e.g., `uv tool run`) using `dock
 
 ### ⚠️ Constraints and Workarounds for Custom Servers
 1.  **Mandatory `image` Field**: 
-    The gateway's validation schema often requires an `image` field even for command-based servers. If omitted, the server may be ignored. Use a valid lightweight image (e.g., `mcp/sequentialthinking`) as a dummy placeholder, and specify the actual host command (e.g., `uv`) in the `command` field.
+    The gateway's validation schema often requires an `image` field even for command-based servers. If omitted, the server may be ignored. Use a valid lightweight image (e.g., `mcp/sequentialthinking@sha256:cd3174b2ecf37738654cf7671fb1b719a225c40a78274817da00c4241f465e5f`) as a dummy placeholder, and specify the actual host command (e.g., `uv`) in the `command` field.
 2.  **Manual Registration in `registry.yaml`**:
     If a custom server in the catalog is not automatically detected, force its recognition by manually adding an entry to `~/.docker/mcp/registry.yaml`:
     ```yaml
@@ -75,7 +75,7 @@ When managing custom command-based MCP servers (e.g., `uv tool run`) using `dock
 A `too many open files` error in the gateway logs usually indicates resource exhaustion from orphaned MCP containers. Cleanup all managed containers using:
 ```bash
 docker ps -q --filter "label=docker-mcp=true" | xargs -r docker stop
-docker container prune -f
+docker container prune -f --filter "label=docker-mcp=true"
 ```
 
 ### 📚 References
