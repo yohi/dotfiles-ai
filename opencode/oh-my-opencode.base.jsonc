@@ -18,7 +18,7 @@
     "opencode-openai-codex-auth@^1.0.0",
     "opencode-antigravity-auth@latest",
     "@yohi/opencode-codex-quota@^1.0.0",
-    "opencode-geminicli-a2a-provider"
+    "opencode-geminicli-a2a"
   ],
 
   // [Agents] エージェント個別設定（必要最小限）
