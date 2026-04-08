@@ -110,8 +110,8 @@ Each skill contains step-by-step instructions, templates, and scripts.
 
 <available_skills>
 <!-- NOTE: 外部スキル（anthropics/*, superpowers/*）を利用するには、事前に以下のコマンドで取得が必要です。 -->
-<!-- skillport add anthropics/skills skills/ --namespace anthropics --yes -->
-<!-- skillport add obra/superpowers skills/ --namespace superpowers --yes -->
+<!-- skillport add anthropics/skills agent-skills/ --namespace anthropics --yes -->
+<!-- skillport add obra/superpowers agent-skills/ --namespace superpowers --yes -->
 <skill>
   <name>agent-skill-architect</name>
   <description>Designs and generates best-practice-compliant SKILL.md files for OpenCode agent skills. Use when creating new agent skills, drafting skill definitions, or improving existing skill files. Guides through requirements discovery and outputs production-ready SKILL.md with proper YAML frontmatter, XML-structured instructions, and progressive disclosure patterns.</description>
