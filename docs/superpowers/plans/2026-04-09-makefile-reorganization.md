@@ -13,7 +13,7 @@
 
 ---
 
-### Task 1: `_mk/main.mk` の再構築
+## Task 1: `_mk/main.mk` の再構築
 
 **Files:**
 - Modify: `_mk/main.mk`
@@ -74,7 +74,7 @@ setup-ides:
 # ... (その他の既存ターゲット: mcp-render, link, clean-internal, lint, init, secrets, status は維持)
 ```
 
-- [ ] **Step 2: 変更の保存とコミット**
+- [ ] **Step 2: 変更의 保存とコミット**
 
 ```bash
 git add _mk/main.mk
@@ -83,7 +83,7 @@ git commit -m "refactor(make): consolidate core logic into _mk/main.mk"
 
 ---
 
-### Task 2: `Makefile` の簡素化
+## Task 2: `Makefile` の簡素化
 
 **Files:**
 - Modify: `Makefile`
@@ -129,7 +129,7 @@ git commit -m "refactor(make): simplify top-level Makefile to include-only struc
 
 ---
 
-### Task 3: `_mk/variables.mk` のクリーンアップ
+## Task 3: `_mk/variables.mk` のクリーンアップ
 
 **Files:**
 - Modify: `_mk/variables.mk`
@@ -157,7 +157,7 @@ git commit -m "refactor(make): cleanup .PHONY in variables.mk"
 
 ---
 
-### Task 4: 最終検証
+## Task 4: 最終検証
 
 **Files:**
 - None

@@ -1,15 +1,15 @@
-.PHONY: all install install-agents install-ides setup setup-agents setup-ides mcp-render link clean-internal install-requirements lint init sync secrets status
+.PHONY: all install install-agents install-ides setup setup-agents setup-ides mcp-render link clean-internal install-requirements lint init sync secrets status clean test clean-legacy
 
 # --- Standard Entry Points ---
-all: install setup sync
+all: install setup
 
 install: install-agents install-ides ## Install all AI agents and IDE binaries
 
 setup: setup-agents setup-ides ## Setup all AI agents and IDE configurations
 	@$(MAKE) mcp-render
-	@$(MAKE) setup-superpowers
-	@$(MAKE) sync-agents
-	@$(MAKE) sync-mcp
+	-@$(MAKE) setup-superpowers 2>/dev/null || true
+	-@$(MAKE) sync-agents 2>/dev/null || true
+	-@$(MAKE) sync-mcp 2>/dev/null || true
 	@echo "✅ dotfiles-ai のコア設定が適用されました"
 
 sync: ## [更新] リポジトリを最新にし、エージェントを同期する

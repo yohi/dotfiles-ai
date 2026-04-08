@@ -1,6 +1,6 @@
 # 1. Base Rules (Provided by parent or local)
-include _mk/core.mk
-include _mk/help.mk
+-include _mk/core.mk
+-include _mk/help.mk
 
 # 2. Variables & Idempotency
 -include _mk/variables.mk
