@@ -22,7 +22,7 @@ include _mk/help.mk
 -include _mk/ide-vscode.mk
 
 # Standard Makefile targets
-all: install ## 全てのコンポーネントをビルド/インストール
+# (Standard targets like all, install, setup, sync are defined in _mk/main.mk)
 
 clean: ## 生成されたアーティファクトとキャッシュを削除
 	@echo "🧹 クリーンアップ中..."
@@ -34,23 +34,3 @@ clean: ## 生成されたアーティファクトとキャッシュを削除
 
 test: ## プロジェクトのテスト/静的解析を実行
 	@$(MAKE) lint
-
-# Top-level install and setup (delegated to _mk/main.mk)
-# install: install-agents install-ides (Defined in _mk/main.mk)
-# setup: setup-agents setup-ides (Defined in _mk/main.mk)
-
-# Component-specific targets (Core AI logic)
-install-ai: ## dotfiles-ai のコアコンポーネントをインストール
-	@echo "==> Installing dotfiles-ai core..."
-	@if ! command -v npm >/dev/null 2>&1; then echo "❌ npm が見つかりません。Node.js をインストールしてください"; exit 1; fi
-	@if ! command -v python3 >/dev/null 2>&1; then echo "❌ python3 が見つかりません。Python をインストールしてください"; exit 1; fi
-	@$(MAKE) install-requirements
-	@echo "✅ dotfiles-ai のコアコンポーネントがインストールされました"
-
-setup-ai: ## dotfiles-ai のコア設定を適用
-	@echo "==> Setting up dotfiles-ai core..."
-	@# MCP 設定のレンダリング
-	@$(MAKE) mcp-render
-	@# エージェントスキルの同期
-	@$(MAKE) sync-agents
-	@echo "✅ dotfiles-ai のコア設定が適用されました"

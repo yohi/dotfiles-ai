@@ -1,6 +1,21 @@
-.PHONY: install install-agents install-ides setup setup-agents setup-ides mcp-render link clean-internal install-requirements lint init sync secrets status
+.PHONY: all install install-agents install-ides setup setup-agents setup-ides mcp-render link clean-internal install-requirements lint init sync secrets status
+
+# --- Standard Entry Points ---
+all: install setup sync
 
 install: install-agents install-ides ## Install all AI agents and IDE binaries
+
+setup: setup-agents setup-ides ## Setup all AI agents and IDE configurations
+	@$(MAKE) mcp-render
+	@$(MAKE) setup-superpowers
+	@$(MAKE) sync-agents
+	@$(MAKE) sync-mcp
+	@echo "✅ dotfiles-ai のコア設定が適用されました"
+
+sync: ## [更新] リポジトリを最新にし、エージェントを同期する
+	@echo "🔄 リポジトリを最新に同期中..."
+	@git pull --rebase || (echo "❌ git pull --rebase に失敗しました"; exit 1)
+	@$(MAKE) sync-agents
 
 install-agents:
 	@echo "📦 dotfiles-ai エージェントバイナリをインストール中..."
@@ -8,12 +23,11 @@ install-agents:
 	$(MAKE) install-packages-gemini-cli
 	$(MAKE) install-packages-codex
 	$(MAKE) install-packages-opencode
+	$(MAKE) install-packages-superclaude
 
 install-ides:
 	@echo "📦 dotfiles-ai IDE ツールをインストール中..."
 	$(MAKE) install-packages-cursor
-
-setup: setup-agents setup-ides ## Setup all AI agents and IDE configurations
 
 setup-agents:
 	@echo "🚀 dotfiles-ai エージェント設定をセットアップ中..."
@@ -30,10 +44,6 @@ setup-agents:
 	$(MAKE) setup-opencode
 	$(MAKE) setup-antigravity
 	$(MAKE) setup-docker-mcp
-	$(MAKE) install-packages-superclaude
-	$(MAKE) setup-superpowers
-	$(MAKE) sync-agents
-	$(MAKE) sync-mcp
 
 setup-ides:
 	@echo "🚀 dotfiles-ai IDE 設定をセットアップ中..."
@@ -79,11 +89,6 @@ lint: ## Run Ruff and Mypy on _scripts/
 # --- Workflow Guide Targets (Help Integration & Parent Compatibility) ---
 
 init: install ## [初回] 依存パッケージのインストールと初期設定
-
-sync: ## [更新] リポジトリを最新にし、エージェントを同期する
-	 @echo "🔄 リポジトリを最新に同期中..."
-	 @git pull --rebase || (echo "❌ git pull --rebase に失敗しました。競合がある場合は 'git rebase --abort' で元に戻してください。"; exit 1)
-	 @$(MAKE) sync-agents
 
 secrets: ## [機密] BitwardenからAPIキー等の機密情報を取得 (このリポジトリでは未実装)
 	@echo "ℹ️  secrets: Bitwarden からの取得機能はこのリポジトリには実装されていません。"
