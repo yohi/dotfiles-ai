@@ -1,3 +1,5 @@
+.PHONY: install install-agents install-ides setup setup-agents setup-ides mcp-render link clean-internal install-requirements lint init sync secrets status
+
 install: install-agents install-ides ## Install all AI agents and IDE binaries
 
 install-agents:
