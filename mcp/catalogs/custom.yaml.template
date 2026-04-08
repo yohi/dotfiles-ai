@@ -104,6 +104,7 @@ registry:
       - name: retrieve_memory
     command:
       - uv
+      - --quiet
       - tool
       - run
       - --from
