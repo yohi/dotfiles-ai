@@ -4,8 +4,6 @@ After=network.target docker.service
 
 [Service]
 Environment="PATH=/home/linuxbrew/.linuxbrew/bin:/usr/local/bin:/usr/bin:/bin"
-Environment="MCP_GATEWAY_AUTH_TOKEN=61b0b79357ba75ac8f81b6bacee85232"
-Environment="MCP_GATEWAY_TOKEN=61b0b79357ba75ac8f81b6bacee85232"
 Type=simple
 WorkingDirectory=__REPO_ROOT__
 EnvironmentFile=__REPO_ROOT__/.env
