@@ -38,7 +38,6 @@ agents:
     root_key: mcpServers
     servers:
       docker-mcp-gateway:
-        type: sse
         serverUrl: __GATEWAY_URL__
 
   cursor:

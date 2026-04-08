@@ -60,8 +60,10 @@ AIエージェント（Claude Code, Gemini CLI, OpenCode, Codex）の設定・�
   - `make setup-superpowers` を実行することで、マニフェストに基づいた正確なバージョンのスキルが各環境に展開されます。
 - **構成**: `.skillportrc` で設定され、`~/.skillport/skills` からリポジトリの `agent-skills/` へシンボリックリンクが張られます。
 - **コマンド**:
-  - `make skillport`: SkillPort と `skillport-mcp` をインストールし、ディレクトリをセットアップします。
+  - `make skillport`: SkillPort と `skillport-mcp` をインストールし、本環境の**初期セットアップ**を行います。
   - `make check-skillport`: インストール状態とシンボリックリンクの整合性を確認します。
+  - `skillport <command>`: スキルの追加・削除・更新などの**管理操作**は、`skillport` CLI を直接実行してください（`make` 経由ではありません）。
+    - 例: `skillport add anthropics/skills skills/ --namespace anthropics`
   - `skillport check`: スキル定義ファイル（.md）の構文や整合性をチェックします。
 
 ## Docker MCP Gateway (Unified SSE)

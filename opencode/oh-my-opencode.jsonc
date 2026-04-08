@@ -3,116 +3,94 @@
 
   /**
    * [1] 知能カテゴリー (Categories)
-   * モデルの実体とフォールバック、特性を一括管理します。
    */
   "categories": {
-    // 【最上位知能】複雑な論理、設計、監査
     "ultrabrain": {
-      "model": "anthropic/claude-opus-4-6",
+      "model": "openai/gpt-5.4",
       "fallback_models": [
-        "openai/gpt-5.4-thinking",
-        "anthropic/claude-sonnet-4-6",
-        "opencode/big-pickle"
+        "opencode/kimi-k2.5-free",
+        "opencode/big-pickle",
+        "github-models/openai/gpt-5.4",
+        "openrouter/anthropic/claude-opus-4-6"
       ],
       "temperature": 0.2
     },
-    // 【実装職人】高品質なコード生成、既存パターンの模倣
-    "craftsman": {
-      "model": "openai/gpt-5.3-codex",
+    "deep": {
+      "model": "openai/gpt-5.4",
       "fallback_models": [
-        "anthropic/claude-opus-4-6",
-        "opencode/nemotron-3-super-free"
+        "opencode/kimi-k2.5-free",
+        "github-models/openai/gpt-5.4",
+        "opencode/big-pickle",
+        "google/gemini-3.1-pro-preview"
       ],
       "temperature": 0.1
     },
-    // 【自律調査】大規模検索、並列探索、Agent Swarm
-    "deep": {
+    // 【視覚・UI】無料枠の big-pickle (GLM) をフロントへ
+    "visual": {
       "model": "opencode/big-pickle",
       "fallback_models": [
-        "opencode/mimo-v2-pro-free",
-        "google/gemini-3.1-pro"
+        "google/gemini-3.1-pro-preview",
+        "openai/gpt-5.4",
+        "github-models/google/gemini-3.1-pro-preview"
       ],
-      "parallel": 5 // 並列エージェントの同時稼働数
+      "parallel": 3
     },
-    // 【視覚・UI】マルチモーダル検証、デザイン確認
-    "visual": {
-      "model": "google/gemini-3.1-pro",
+    "craftsman": {
+      "model": "opencode/kimi-k2.5-free",
       "fallback_models": [
-        "anthropic/claude-sonnet-4-6"
-      ]
+        "openai/gpt-5.3-codex",
+        "github-copilot/gpt-5.3-codex",
+        "openrouter/anthropic/claude-opus-4-6"
+      ],
+      "temperature": 0.1
     },
-    // 【高速定型】単純修正、テスト量産、タイポ修正
     "quick": {
       "model": "opencode/minimax-m2.5-free",
       "fallback_models": [
-        "opencode/mimo-v2-omni-free",
-        "google/gemini-3.1-flash-lite"
+        "openai/gpt-5.4-mini",
+        "opencode/kimi-k2.5-free",
+        "opencode/gpt-5-nano"
       ],
       "temperature": 0.5
+    },
+    "fast": {
+      "model": "opencode/minimax-m2.5-free",
+      "fallback_models": [
+        "opencode/kimi-k2.5-free",
+        "opencode/gpt-5-nano"
+      ]
     }
   },
 
-  /**
-   * [2] 規律あるエージェント (Agents)
-   * 11種類の専門家をカテゴリーにマッピングします。
-   */
   "agents": {
-    // 司令塔
     "sisyphus": { "category": "ultrabrain" },
-    "prometheus": { "category": "ultrabrain" },
-    "metis": { "category": "ultrabrain" },
-    "momus": { "category": "ultrabrain" },
-
-    // 実装
+    "prometheus": { "category": "deep" },
+    "metis": { "category": "deep" },
     "hephaestus": { "category": "craftsman" },
-    "sisyphus-junior": { "category": "quick" },
-
-    // リサーチ
+    "atlas": { "category": "quick" },
     "oracle": { "category": "deep" },
-    "librarian": { "category": "deep" },
-    "explore": { "category": "deep" },
-    "atlas": { "category": "deep" },
-
-    // 視覚
+    "momus": { "category": "deep" },
+    "explore": { "category": "fast" },
+    "librarian": { "category": "fast" },
     "multimodal-looker": { "category": "visual" }
   },
 
-  /**
-   * [3] 高度な機能設定 (Features)
-   */
   "features": {
-    // ハッシュベースの精密編集 (Hashline)
-    "hashline_edit": {
-      "enabled": true,
-      "strict_verification": true
-    },
-    // 意図分析と自動ルーティング (Intent Gate)
+    "hashline_edit": { "enabled": true, "strict_verification": true },
     "intent_gate": {
       "enabled": true,
       "verbose": true,
       "routing_map": {
-        "research": "deep",
+        "research": "fast",
         "implementation": "craftsman",
         "ui_design": "visual",
         "fix": "quick",
-        "architecture": "ultrabrain"
+        "architecture": "deep"
       }
     },
-    // 並列バックグラウンド実行
-    "background_agent": {
-      "enabled": true,
-      "max_parallel": 5,
-      "auto_start": true
-    },
-    // Tmux 統合
-    "tmux": {
-      "enabled": true,
-      "layout": "main-vertical"
-    }
+    "background_agent": { "enabled": true, "max_parallel": 5, "auto_start": true },
+    "tmux": { "enabled": true, "layout": "main-vertical" }
   },
 
-  "claude_code": {
-    "use_standard_tools": true,
-    "theme": "dark"
-  }
+  "claude_code": { "use_standard_tools": true, "theme": "dark" }
 }
