@@ -30,15 +30,20 @@ cp agent-skills/.skillport/templates/SKILL_TEMPLATE.md agent-skills/my-new-skill
 
 ### 2. 外部スキルを導入する (GitHub等)
 
-GitHub 等で公開されているスキル（例: `superpowers`）をプロジェクトに導入します。
+GitHub 等で公開されているスキルをプロジェクトに導入します。
 
 ```bash
-# 1. 特定のディレクトリ配下のスキルを一括導入 (名前空間を推奨)
-uvx skillport add obra/superpowers skills/ --namespace superpowers --yes
+# 推奨: リポジトリ内の特定のディレクトリ (skills/ 等) を指定して導入
+uvx skillport add anthropics/skills skills/ --namespace anthropics --yes
 
-# 2. 単一のスキルを導入
+# 単一のスキルを導入
 uvx skillport add https://github.com/user/repo/path/to/skill
 ```
+
+> [!TIP]
+> **ディレクトリ指定の重要性**
+> リポジトリのルートを直接指定（例: `anthropics/skills`）すると、ルートにある `template` フォルダなどがバリデーションエラーを引き起こし、導入に失敗することがあります。
+> エラー（`frontmatter.name` の不一致など）が発生した場合は、リポジトリ内の有効なスキルが格納されているディレクトリ（通常は `skills/` や `src/`）を明示的に指定してください。
 
 *   `--namespace`: スキルをサブディレクトリ（例: `superpowers/brainstorming`）に整理します。
 *   `--force`: 既存のスキルを上書きする場合に指定。

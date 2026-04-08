@@ -6,6 +6,7 @@
 *.log
 fix_all.sh
 agent-skills/superpowers/
+agent-skills/anthropics/
 # Codex runtime files
 codex/*.jsonl
 codex/*.sqlite
