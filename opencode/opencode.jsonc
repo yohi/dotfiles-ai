@@ -19,8 +19,7 @@
     "opencode-geminicli-a2a-provider",
   ],
   // [Instruction]
-  "instructions": [
-  ],
+  "instructions": [],
   // [Watcher]
   "watcher": {
     "ignore": [
@@ -78,7 +77,6 @@
     "batch_tool": true, // [New] Enable batching for faster execution
     "continue_loop_on_deny": false // [New] Stop thinking on permission denial / do not continue
   },
-
   // [MCP]
   "mcp": {
     "docker-mcp-gateway": {
@@ -87,101 +85,15 @@
       "enabled": true
     }
   },
-
   // [LSP]
   "lsp": {
-    "bash-language-server": {
-      "command": [
-        "bash-language-server",
-        "start"
-      ],
-      "extensions": [
-        ".sh"
-      ],
-      "disabled": false
-    },
-    "typescript-language-server": {
-      "command": [
-        "typescript-language-server",
-        "--stdio"
-      ],
-      "extensions": [
-        ".ts",
-        ".tsx",
-        ".js",
-        ".jsx",
-        ".mts",
-        ".cts"
-      ],
-      "disabled": false
-    },
-    "pyright": {
-      "command": [
-        "pyright-langserver",
-        "--stdio"
-      ],
-      "extensions": [
-        ".py"
-      ],
-      "disabled": false
-    }
+    "bash-language-server": { "command": ["bash-language-server", "start"], "extensions": [".sh"], "disabled": false },
+    "typescript-language-server": { "command": ["typescript-language-server", "--stdio"], "extensions": [".ts", ".tsx", ".js", ".jsx", ".mts", ".cts"], "disabled": false },
+    "pyright": { "command": ["pyright-langserver", "--stdio"], "extensions": [".py"], "disabled": false }
   },
 
   // プロバイダ設定
   "provider": {
-    "opencode": {
-      "whitelist": [
-        "gpt-5-nano",
-        "big-pickle",
-        "mimo-v2-flash-free",
-        "mimo-v2-omni-free",
-        "mimo-v2-pro-free",
-        "nemotron-3-super-free",
-        "minimax-m2.5-free"
-      ],
-      "models": {
-        "gpt-5-nano": {
-          "name": "GPT-5 Nano (Zen Free)"
-        },
-        "big-pickle": {
-          "name": "Big Pickle (Zen Free)"
-        },
-        "mimo-v2-omni-free": {
-          "name": "Mimo V2 Omini (Zen Free)"
-        },
-        "mimo-v2-pro-free": {
-          "name": "Mimo V2 Pro (Zen Free)"
-        },
-        "nemotron-3-super-free": {
-          "name": "Nemotron 3 Super (Zen Free)"
-        },
-        "minimax-m2.5-free": {
-          "name": "MiniMax M2.5 (Zen Free)"
-        }
-      }
-    },
-    "poe": {
-      "npm": "@ai-sdk/openai-compatible",
-      "options": { 
-        "baseURL": "https://api.poe.com/v1"
-      },
-      "whitelist": [
-        "Claude-4.6-Sonnet",
-        "Claude-4-Opus",
-        "GPT-5-Pro"
-      ],
-      "models": {
-        "Claude-4.6-Sonnet": {
-          "name": "Claude 4.6 Sonnet (Poe)"
-        },
-        "Claude-4-Opus": { 
-          "name": "Claude 4 Opus (Poe)"
-        },
-        "GPT-5-Pro": {
-          "name": "GPT-5 Pro (Poe)"
-        }
-      }
-    },
     "openrouter": {
       "npm": "@ai-sdk/openai-compatible",
       "options": {
@@ -203,133 +115,83 @@
       }
     },
     "opencode-geminicli-a2a": {
-      "whitelist": [
-        "anthropic/claude-opus-4-6",
-        "anthropic/claude-4.6-sonnet",
-        "qwen/qwen3.6-plus-preview:free",
-        "google/gemini-3.1-pro-preview"
-      ],
-      "models": {
-        "anthropic/claude-opus-4-6": {
-          "name": "Claude Opus 4.6"
-        },
-        "anthropic/claude-4.6-sonnet": {
-          "name": "Claude 4.6 Sonnet"
-        },
-        "qwen/qwen3.6-plus-preview:free": {
-          "name": "Qwen 3.6 Free"
-        },
-        "google/gemini-3.1-pro-preview": {
-          "name": "Gemini 3.1 Pro"
-        }
-      }
-    },
-    "github-copilot": {
-      "whitelist": [
-        "claude-opus-4.6",
-        "claude-sonnet-4.6",
-        "claude-3.5-sonnet",
-        "claude-3-5-sonnet",
-        "gpt-5.4",
-        "gpt-5.3-codex",
-        "gemini-3.1-pro-preview",
-        "grok-code-fast-1"
-      ],
-      "models": {
-        "claude-opus-4.6": {
-          "name": "Claude Opus 4.6 (Copilot)"
-        },
-        "claude-sonnet-4.6": {
-          "name": "Claude Sonnet 4.6 (Copilot)"
-        },
-        "claude-3.5-sonnet": {
-          "name": "Claude 3.5 Sonnet (Copilot Alt)"
-        },
-        "claude-3-5-sonnet": {
-          "name": "Claude 3.5 Sonnet (Copilot Alt 2)"
-        },
-        "gpt-5.4": {
-          "name": "GPT-5.4 (Copilot)"
-        },
-        "gpt-5.3-codex": {
-          "name": "GPT 5.3 Codex (Copilot)"
-        },
-        "gemini-3.1-pro-preview": {
-          "name": "Gemini 3.1 Pro (Copilot)"
-        },
-        "grok-code-fast-1": {
-          "name": "Grok Code Fast 1 (Copilot)"
-        }
-      }
-    },
-    "github-models": {
-      "npm": "@ai-sdk/openai-compatible",
+      "npm": "opencode-geminicli-a2a",
       "options": {
-        "baseURL": "https://models.inference.ai.azure.com"
+        "host": "127.0.0.1",
+        "port": 41242,
+        "protocol": "http"
       },
-      "whitelist": [
-        "anthropic/claude-4.6-sonnet",
-        "openai/gpt-5.4",
-        "google/gemini-3.1-pro-preview"
-      ],
       "models": {
-        "anthropic/claude-4.6-sonnet": {
-          "name": "Claude 4.6 Sonnet (Models)"
+        "gemini-3.1-pro-preview": {},
+        "gemini-3-flash-preview": {},
+        "gemini-2.5-pro": {}
+      }
+    },
+    "stellar-gemini": {
+      "npm": "@ai-sdk/google",
+      "name": "Stellar Gemini (OAuth)",
+      "options": {
+        "apiKey": "not-needed",
+        "baseURL": "http://localhost:8742"
+      },
+      "models": {
+        "gemini-3.1-pro-preview": {
+          "name": "Gemini 3.1 Pro (Latest)",
+          "limit": { "context": 1048576, "output": 65536 }
         },
-        "openai/gpt-5.4": {
-          "name": "GPT-5.4 (Models)"
+        "gemini-3-flash-preview": {
+          "name": "Gemini 3 Flash",
+          "limit": { "context": 1000000, "output": 65536 }
         },
-        "google/gemini-3.1-pro-preview": {
-          "name": "Gemini 3.1 Pro (Models)"
+        "gemini-2.5-pro": {
+          "name": "Gemini 2.5 Pro",
+          "limit": { "context": 128000, "output": 65536 }
         }
       }
     },
-    "google": {
+    "zerogravity": {
       "npm": "@ai-sdk/google",
-      "whitelist": [
-        "gemini-3.1-pro-preview",
-        "gemini-3-flash"
-      ],
+      "name": "ZeroGravity (Gemini)",
+      "options": {
+        "apiKey": "not-needed",
+        "baseURL": "http://localhost:8741/v1beta",
+      },
       "models": {
-        "gemini-3.1-pro-preview": {
-          "name": "Gemini 3.1 Pro"
+        "gemini-3.1-pro": {
+          "name": "Gemini 3.1 Pro",
+          "limit": { "context": 1048576, "output": 65535 },
+          "modalities": { "input": ["text", "image", "pdf"], "output": ["text"] },
+          "variants": {
+            "low": { "thinkingLevel": "low" },
+            "high": { "thinkingLevel": "high" }
+          }
         },
         "gemini-3-flash": {
-          "name": "Gemini 3 Flash"
-        }
-      }
-    },
-    "nvidia-nim": {
-      "npm": "@ai-sdk/openai-compatible",
-      "options": {
-        "baseURL": "https://integrate.api.nvidia.com/v1"
-      },
-      "whitelist": [
-        "nemotron-3-nano-30b-a3b",
-        "llama-3.3-70b-instruct"
-      ],
-      "models": {
-        "nemotron-3-nano-30b-a3b": {
-          "name": "Nemotron-3 Nano"
+          "name": "Gemini 3 Flash",
+          "limit": { "context": 1048576, "output": 65536 },
+          "modalities": { "input": ["text", "image", "pdf"], "output": ["text"] },
+          "variants": {
+            "minimal": { "thinkingLevel": "minimal" },
+            "low": { "thinkingLevel": "low" },
+            "medium": { "thinkingLevel": "medium" },
+            "high": { "thinkingLevel": "high" }
+          }
         },
-        "llama-3.3-70b-instruct": {
-          "name": "Llama 3.3 70B"
-        }
-      }
-    },
-    "opencode-cursorcli-a2a": {
-      "name": "Cursor A2A",
-      "whitelist": [
-        "auto",
-        "claude-4.6-sonnet-medium"
-      ],
-      "models": {
-        "auto": {},
-        "claude-4.6-sonnet-medium": {}
+        "sonnet-4.6": {
+          "name": "Claude Sonnet 4.6",
+          "limit": { "context": 200000, "output": 64000 },
+          "modalities": { "input": ["text", "image", "pdf"], "output": ["text"] }
+        },
+        "opus-4.6": {
+          "name": "Claude Opus 4.6 Thinking",
+          "limit": { "context": 200000, "output": 64000 },
+          "modalities": { "input": ["text", "image", "pdf"], "output": ["text"] },
+          "variants": {
+            "low": { "thinkingConfig": { "thinkingBudget": 8192 } },
+            "max": { "thinkingConfig": { "thinkingBudget": 32768 } }
+          }
+        },
       },
-      "options": {
-        "port": 4937
-      }
     },
     // Vertex AI(Google)
     // [For LLM Context]
@@ -341,10 +203,6 @@
         "gemini-3.1-pro-preview": {},
         "gemini-3.1-pro-preview-customtools": {},
       },
-      "whitelist": [
-        "gemini-3-flash-preview",
-        "gemini-3.1-pro-preview"
-      ],
     },
     // Vertex AI Anthopic(Google)
     "google-vertex-anthropic": {
