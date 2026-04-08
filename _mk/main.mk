@@ -105,3 +105,14 @@ status: ## [確認] 全コンポーネントの状態を一括表示
 	@$(MAKE) -s check-codex
 	@$(MAKE) -s check-antigravity
 	@$(MAKE) -s check-cursor-version
+
+clean: ## 生成されたアーティファクトとキャッシュを削除
+	@echo "🧹 クリーンアップ中..."
+	@$(MAKE) -s clean-legacy 2>/dev/null || true
+	@# _mk/main.mk の clean-internal を呼び出し
+	@$(MAKE) -s clean-internal 2>/dev/null || true
+	@rm -rf build/ dist/ *.pyc __pycache__ .ruff_cache .mypy_cache
+	@echo "✅ クリーンアップが完了しました"
+
+test: ## プロジェクトのテスト/静的解析を実行
+	@$(MAKE) lint
