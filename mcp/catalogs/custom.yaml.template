@@ -94,7 +94,7 @@ registry:
     description: Context store and graph memory using chronos-graph.
     title: Chronos Graph
     type: server
-    image: ghcr.io/astral-sh/uv:python3.12-bookworm
+    image: ghcr.io/astral-sh/uv:python3.12-bookworm@sha256:85d4cb1afa769a7338e095b927bee941cf5ec92266c7424b3f6c0f2748567248
     tools:
       - name: add_node
       - name: add_edge
@@ -104,6 +104,7 @@ registry:
       - name: retrieve_memory
     command:
       - uv
+      - --quiet
       - tool
       - run
       - --from

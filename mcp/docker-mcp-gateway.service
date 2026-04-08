@@ -3,15 +3,17 @@ Description=Docker MCP Gateway
 After=network.target docker.service
 
 [Service]
+Environment="PATH=/home/linuxbrew/.linuxbrew/bin:/usr/local/bin:/usr/bin:/bin"
 Type=simple
 WorkingDirectory=__REPO_ROOT__
 EnvironmentFile=__REPO_ROOT__/.env
-ExecStartPre=/usr/bin/env make mcp-render
+ExecStartPre=/usr/bin/env bash _scripts/sync-mcp-configs.sh
 ExecStart=/usr/bin/env docker mcp gateway run \
   --transport sse \
   --port 10888 \
   --catalog %h/.docker/mcp/catalogs/bootstrap.yaml \
   --catalog %h/.docker/mcp/catalogs/custom.yaml \
+  --servers SQLite,chronos-graph,filesystem,github-official,sequentialthinking,skillport \
   --secrets __REPO_ROOT__/.env
 Restart=always
 RestartSec=5

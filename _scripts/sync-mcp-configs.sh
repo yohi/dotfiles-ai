@@ -13,27 +13,37 @@ ESCAPED_HOME=$(printf '%s' "$HOME" | sed 's/[&/|]/\\&/g')
 ESCAPED_REPO_ROOT=$(printf '%s' "$REPO_ROOT" | sed 's/[&/|]/\\&/g')
 
 echo "==> Rendering MCP catalogs..."
+mkdir -p "$REPO_ROOT/mcp/catalogs"
 sed -e "s|__HOME__|$ESCAPED_HOME|g" -e "s|__REPO_ROOT__|$ESCAPED_REPO_ROOT|g" "$REPO_ROOT/mcp/catalogs/custom.yaml.template" > "$REPO_ROOT/mcp/catalogs/custom.yaml"
+sed -e "s|__HOME__|$ESCAPED_HOME|g" -e "s|__REPO_ROOT__|$ESCAPED_REPO_ROOT|g" "$REPO_ROOT/mcp/catalog.json" > "$REPO_ROOT/mcp/catalog.json.rendered"
+sed -e "s|__HOME__|$ESCAPED_HOME|g" -e "s|__REPO_ROOT__|$ESCAPED_REPO_ROOT|g" "$REPO_ROOT/mcp/config.yaml" > "$REPO_ROOT/mcp/config.yaml.rendered"
 
 echo "==> Rendering centralized MCP client configs..."
 if [ -f "$REPO_ROOT/.env" ]; then
     # .env ファイルの内容を環境変数として安全にロード
-    while IFS= read -r line || [[ -n "$line" ]]; do
-        # 空行とコメントをスキップ
-        if [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]]; then
-            continue
-        fi
-        export "$line"
-    done < "$REPO_ROOT/.env"
+    set -o allexport
+    # shellcheck source=/dev/null
+    source "$REPO_ROOT/.env"
+    set +o allexport
 fi
 uv run --with-requirements "$REPO_ROOT/requirements.txt" "$REPO_ROOT/_scripts/render-mcp-configs.py"
 
 echo "==> Deploying Docker MCP catalog files..."
-mkdir -p "$HOME/.docker/mcp/catalogs"
-sed -e "s|__HOME__|$ESCAPED_HOME|g" -e "s|__REPO_ROOT__|$ESCAPED_REPO_ROOT|g" "$REPO_ROOT/mcp/catalog.json" > "$HOME/.docker/mcp/catalog.json"
-sed -e "s|__HOME__|$ESCAPED_HOME|g" -e "s|__REPO_ROOT__|$ESCAPED_REPO_ROOT|g" "$REPO_ROOT/mcp/config.yaml" > "$HOME/.docker/mcp/config.yaml"
-ln -sfn "$REPO_ROOT/mcp/catalogs/bootstrap.yaml" "$HOME/.docker/mcp/catalogs/bootstrap.yaml"
-ln -sfn "$REPO_ROOT/mcp/catalogs/custom.yaml" "$HOME/.docker/mcp/catalogs/custom.yaml"
+DOCKER_MCP_DIR="$HOME/.docker/mcp"
+mkdir -p "$DOCKER_MCP_DIR/catalogs"
+
+# Verify rendered files exist before copying
+for f in "catalog.json.rendered" "config.yaml.rendered"; do
+    if [ ! -f "$REPO_ROOT/mcp/$f" ]; then
+        echo "Error: Rendered file $REPO_ROOT/mcp/$f not found. Rendering failed." >&2
+        exit 1
+    fi
+done
+
+cp "$REPO_ROOT/mcp/catalog.json.rendered" "$DOCKER_MCP_DIR/catalog.json"
+cp "$REPO_ROOT/mcp/config.yaml.rendered" "$DOCKER_MCP_DIR/config.yaml"
+ln -sfn "$REPO_ROOT/mcp/catalogs/bootstrap.yaml" "$DOCKER_MCP_DIR/catalogs/bootstrap.yaml"
+ln -sfn "$REPO_ROOT/mcp/catalogs/custom.yaml" "$DOCKER_MCP_DIR/catalogs/custom.yaml"
 
 echo "==> Deploying Gemini CLI settings..."
 mkdir -p "$HOME/.gemini/shared"
