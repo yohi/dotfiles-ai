@@ -12,9 +12,11 @@ sys.path.append(str(REPO_ROOT / "_scripts"))
 spec = importlib.util.spec_from_file_location(
     "render_mcp_configs", str(REPO_ROOT / "_scripts/render-mcp-configs.py")
 )
+if spec is None or spec.loader is None:
+    raise ImportError("Could not load spec or loader for render_mcp_configs")
+
 render_mcp_configs = importlib.util.module_from_spec(spec)
-if spec.loader:
-    spec.loader.exec_module(render_mcp_configs)
+spec.loader.exec_module(render_mcp_configs)
 
 replace_placeholders = render_mcp_configs.replace_placeholders
 load_config = render_mcp_configs.load_config
@@ -40,7 +42,7 @@ def test_placeholders():
     print("PASS: Multiple placeholders replacement")
 
 def test_chronos_graph_rendering():
-    print("Testing chronos-graph rendering in output files...")
+    print("Testing chronos-graph absence in output files...")
     config = load_config()
     agents = config.get("agents", {})
     
@@ -57,20 +59,15 @@ def test_chronos_graph_rendering():
         elif agent_config["format"] == "jsonc":
             data = json5.loads(content)
         elif agent_config["format"] == "opencode_jsonc":
-            # Just check for existence as a quick test
-            assert '"chronos-graph": {' in content, f"chronos-graph missing in {agent_name}"
-            print(f"PASS: {agent_name} (opencode_jsonc) contains chronos-graph")
+            # Verify absence
+            assert '"chronos-graph": {' not in content, f"chronos-graph should be absent in {agent_name}"
+            print(f"PASS: {agent_name} (opencode_jsonc) does not contain chronos-graph")
             continue
             
         root_key = agent_config["root_key"]
         servers = data.get(root_key, {})
-        assert "chronos-graph" in servers, f"chronos-graph missing in {agent_name} ({path})"
-        
-        # Verify the content matches expected (uv tool run ...)
-        chronos = servers["chronos-graph"]
-        assert chronos["command"] == "uv", f"Invalid command in {agent_name}"
-        assert "git+https://github.com/yohi/chronos-graph.git" in "".join(chronos["args"]), f"Invalid args in {agent_name}"
-        print(f"PASS: {agent_name} rendered correctly.")
+        assert "chronos-graph" not in servers, f"chronos-graph should be absent in {agent_name} ({path})"
+        print(f"PASS: {agent_name} verified absence of chronos-graph.")
 
 if __name__ == "__main__":
     try:

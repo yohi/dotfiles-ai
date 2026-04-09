@@ -1,4 +1,4 @@
-export SHELL := /bin/sh
+export SHELL := /bin/bash
 
 # ============================================================
 # Cursor IDE セットアップ用Makefile (Debian/Ubuntu .deb 版)
