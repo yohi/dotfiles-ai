@@ -59,13 +59,15 @@ Each skill contains step-by-step instructions, templates, and scripts.
 - If search returns too many results, use more specific terms
 
 <available_skills>
-<!-- NOTE: 外部スキル（anthropics/*, superpowers/*）を利用するには、事前に以下のコマンドで取得が必要です。 -->
-<!-- skillport add anthropics/skills skills/ --namespace anthropics --yes -->
-<!-- skillport add obra/superpowers skills/ --namespace superpowers --yes -->
 <skill>
   <name>agent-skill-architect</name>
   <description>Designs and generates best-practice-compliant SKILL.md files for OpenCode agent skills. Use when creating new agent skills, drafting skill definitions, or improving existing skill files. Guides through requirements discovery and outputs production-ready SKILL.md with proper YAML frontmatter, XML-structured instructions, and progressive disclosure patterns.</description>
   <location>agent-skills/agent-skill-architect/SKILL.md</location>
+</skill>
+<skill>
+  <name>ai-api</name>
+  <description>Build apps with the Claude API or Anthropic SDK. TRIGGER when: code imports `anthropic`/`@anthropic-ai/sdk`/`claude_agent_sdk`, or user asks to use Claude API, Anthropic SDKs, or Agent SDK. DO NOT TRIGGER when: code imports `openai`/other AI SDK, general programming, or ML/data-science tasks.</description>
+  <location>agent-skills/ai-api/SKILL.md</location>
 </skill>
 <skill>
   <name>anthropics/algorithmic-art</name>
@@ -236,6 +238,11 @@ Each skill contains step-by-step instructions, templates, and scripts.
   <name>superpowers/writing-skills</name>
   <description>Use when creating new skills, editing existing skills, or verifying skills work before deployment</description>
   <location>agent-skills/superpowers/writing-skills/SKILL.md</location>
+</skill>
+<skill>
+  <name>template-skill</name>
+  <description>Replace with description of the skill and when Claude should use it.</description>
+  <location>agent-skills/template-skill/SKILL.md</location>
 </skill>
 </available_skills>
 <!-- SKILLPORT_END -->
