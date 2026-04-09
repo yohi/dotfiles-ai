@@ -80,7 +80,7 @@ _cursor_download:
 	fi; \
 	echo "🔗 ダウンロードURL: $$DOWNLOAD_URL"; \
 	if curl -L -A "$(CURSOR_USER_AGENT)" \
-		--max-time 120 --retry 3 --retry-delay 5 \
+		--fail --max-time 120 --retry 3 --retry-delay 5 \
 		-o cursor.deb "$$DOWNLOAD_URL"; then \
 		echo "✅ ダウンロード完了。整合性を確認中..."; \
 		SHA256_CMD=$$( (command -v sha256sum >/dev/null 2>&1 && echo "sha256sum") || (command -v shasum >/dev/null 2>&1 && echo "shasum -a 256") || echo ""); \
@@ -106,6 +106,8 @@ _cursor_download:
 			fi; \
 		else \
 			echo "⚠️  【警告】信頼できるハッシュ値が見つからなかったため、整合性検証をスキップします。"; \
+			echo "     インストールを中止するには Ctrl-C を押してください。5秒後に続行します..."; \
+			sleep 5; \
 		fi; \
 		echo "🚀 インストールを開始します..."; \
 		if sudo dpkg -i cursor.deb; then \
@@ -160,11 +162,23 @@ check-cursor-version:
 	fi
 	@echo "🌐 最新バージョンを確認中..."
 	@if command -v jq >/dev/null 2>&1; then \
-		API_RESPONSE=$$(curl -sL -A "$(CURSOR_USER_AGENT)" --connect-timeout 10 --max-time 30 "$(CURSOR_API_URL)" 2>/dev/null); \
-		if [ -n "$$API_RESPONSE" ] && echo "$$API_RESPONSE" | jq . >/dev/null 2>&1; then \
+		API_RESPONSE=$$(curl -sLf -A "$(CURSOR_USER_AGENT)" --connect-timeout 10 --max-time 30 "$(CURSOR_API_URL)" 2>/dev/null); \
+		if [ $$? -ne 0 ]; then \
+			echo "⚠️ 警告: Cursor API に接続できません"; \
+		elif [ -z "$$API_RESPONSE" ]; then \
+			echo "⚠️ 警告: Cursor バージョン情報が取得できません: 応答が空です"; \
+		elif ! echo "$$API_RESPONSE" | jq . >/dev/null 2>&1; then \
+			echo "⚠️ 警告: Cursor バージョン情報が取得できません: 不正なJSONです"; \
+		else \
 			LATEST_VERSION=$$(echo "$$API_RESPONSE" | jq -r '.version' 2>/dev/null); \
-			echo "🆕 最新バージョン: $$LATEST_VERSION"; \
+			if [ -z "$$LATEST_VERSION" ] || [ "$$LATEST_VERSION" = "null" ]; then \
+				echo "⚠️ 警告: Cursor バージョン情報が取得できません: .versionがnullです"; \
+			else \
+				echo "🆕 最新バージョン: $$LATEST_VERSION"; \
+			fi; \
 		fi; \
+	else \
+		echo "⚠️ 警告: jqコマンドがないため確認をスキップします"; \
 	fi
 
 # SuperCursor (Cursor Framework) のインストール
