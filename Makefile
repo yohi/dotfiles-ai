@@ -1,3 +1,5 @@
+SHELL := /bin/bash
+
 # 1. Base Rules (Provided by parent or local)
 -include _mk/core.mk
 -include _mk/help.mk

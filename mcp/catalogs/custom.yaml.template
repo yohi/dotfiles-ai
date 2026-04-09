@@ -90,39 +90,6 @@ registry:
     title: Chrome DevTools
     type: server
     image: mcp/chrome-devtools
-  chronos-graph:
-    description: Context store and graph memory using chronos-graph.
-    title: Chronos Graph
-    type: server
-    image: ghcr.io/astral-sh/uv:python3.12-bookworm@sha256:85d4cb1afa769a7338e095b927bee941cf5ec92266c7424b3f6c0f2748567248
-    tools:
-      - name: add_node
-      - name: add_edge
-      - name: search_nodes
-      - name: query_graph
-      - name: store_memory
-      - name: retrieve_memory
-    command:
-      - uv
-      - --quiet
-      - tool
-      - run
-      - --from
-      - git+https://github.com/yohi/chronos-graph.git@37308f47837469d801abc1226ee65e4262093042
-      - context-store
-    env:
-      - name: STORAGE_BACKEND
-        value: sqlite
-      - name: SQLITE_DB_PATH
-        value: __HOME__/.context-store/memories.db
-      - name: GRAPH_ENABLED
-        value: "true"
-      - name: EMBEDDING_PROVIDER
-        value: local-model
-      - name: LOCAL_MODEL_NAME
-        value: cl-nagoya/ruri-v3-310m
-    volumes:
-      - __HOME__/.context-store:__HOME__/.context-store
 
 
 

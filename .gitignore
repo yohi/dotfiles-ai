@@ -53,3 +53,14 @@ ide/cursor/mcp.json
 .worktrees
 claude/claude-settings.json
 gemini/settings.json
+ide/vscode/settings.json
+opencode/opencode.jsonc
+
+# Python environment
+__pycache__/
+.venv/
+.mypy_cache/
+.ruff_cache/
+*.pyc
+*.pyo
+*.pyd

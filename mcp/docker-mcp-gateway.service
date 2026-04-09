@@ -13,7 +13,8 @@ ExecStart=/usr/bin/env docker mcp gateway run \
   --port 10888 \
   --catalog %h/.docker/mcp/catalogs/bootstrap.yaml \
   --catalog %h/.docker/mcp/catalogs/custom.yaml \
-  --servers SQLite,chronos-graph,filesystem,github-official,sequentialthinking,skillport \
+  # chronos-graph is excluded here because it runs locally via 'uv' on each client.
+  --servers SQLite,filesystem,github-official,sequentialthinking,skillport \
   --secrets __REPO_ROOT__/.env
 Restart=always
 RestartSec=5
