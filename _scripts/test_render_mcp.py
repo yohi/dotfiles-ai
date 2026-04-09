@@ -56,18 +56,15 @@ def test_chronos_graph_rendering():
         # Handle different formats
         if agent_config["format"] in {"json", "generated_json"}:
             data = json.loads(content)
-        elif agent_config["format"] == "jsonc":
+        elif agent_config["format"] in {"jsonc", "opencode_jsonc"}:
             data = json5.loads(content)
-        elif agent_config["format"] == "opencode_jsonc":
-            # Verify absence
-            assert '"chronos-graph": {' not in content, f"chronos-graph should be absent in {agent_name}"
-            print(f"PASS: {agent_name} (opencode_jsonc) does not contain chronos-graph")
-            continue
+        else:
+            raise ValueError(f"Unknown format '{agent_config['format']}' for {agent_name}")
             
         root_key = agent_config["root_key"]
         servers = data.get(root_key, {})
         assert "chronos-graph" not in servers, f"chronos-graph should be absent in {agent_name} ({path})"
-        print(f"PASS: {agent_name} verified absence of chronos-graph.")
+        print(f"PASS: {agent_name} verified absence of chronos-graph via structured data.")
 
 if __name__ == "__main__":
     try:
