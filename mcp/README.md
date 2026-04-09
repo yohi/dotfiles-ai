@@ -20,7 +20,7 @@
 各クライアント（エージェント）側で `uv` を介して直接実行される MCP サーバーです。
 - **ステータス**: 有効（`mcp/servers.yaml` で全エージェントに共通設定）
 - **機能**: ローカル SQLite (`~/.context-store/memories.db`) をバックエンドとした、コンテキストの長期記憶とナレッジグラフ管理。
-- **実装**: `git+https://github.com/yohi/chronos-graph.git` を `uv tool run` で実行。
+- **実装**: `git+https://github.com/yohi/chronos-graph.git` を `uv tool run` で実行（最新の動作検証済みコミットハッシュによるピン留め情報は `mcp/servers.yaml` で管理）。
 
 ### Atlassian MCP (Direct / Streamable HTTP)
 Atlassian 製品（Jira, Confluence）用の公式 MCP サーバーです。
@@ -34,8 +34,8 @@ Atlassian 製品（Jira, Confluence）用の公式 MCP サーバーです。
 本プロジェクトでは、`mcp/servers.yaml` を **SSOT (Single Source of Truth)** としており、ここから各ツール固有の設定ファイルを自動生成します。
 
 - **`mcp/servers.yaml`**: 全 AI エージェント（Gemini, Claude, Cursor, VSCode, Antigravity, OpenCode 等）のマスター設定。
-- **プレースホルダー置換**: `__GATEWAY_URL__`, `__HOME__`, `__REPO_ROOT__` は生成時に動的に置換されます。
-- **差異の自動吸収**: 後述する各ツール特有のキー名の違いなどは、同期スクリプト（`_scripts/render-mcp-configs.py`）が自動的に処理します。
+- **プレースホルダー置換**: `__GATEWAY_URL__`, `__HOME__`, `__REPO_ROOT__` は生成時に動的に置換されます。また、`${VAR}` 形式の環境変数も `_scripts/render-mcp-configs.py` によって展開されます。
+- **差異の明示的な管理**: `serverUrl` と `url` のようなツールごとのキー名の違いは、`mcp/servers.yaml` 内でツールごとに定義されています。同期スクリプト（`_scripts/render-mcp-configs.py`）は、これらのキー構造を維持したまま値の展開のみを行います。
 
 ---
 
