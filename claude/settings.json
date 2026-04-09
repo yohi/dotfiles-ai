@@ -3,5 +3,6 @@
     "commit": "",
     "pr": ""
   },
-  "skipDangerousModePermissionPrompt": true
+  "skipDangerousModePermissionPrompt": true,
+  "model": "opus"
 }
