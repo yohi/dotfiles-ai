@@ -58,7 +58,7 @@ Each skill contains step-by-step instructions, templates, and scripts.
 - Replace `{path}` in instructions with the actual path from `load_skill`
 - If search returns too many results, use more specific terms
 
-<!-- NOTE: 外部スキルを取得するには `skillport add <source> agent-skills/<name>` を実行してください。 -->
+<!-- NOTE: To obtain external skills, run `skillport add <source> agent-skills/<name>`. -->
 <available_skills>
 <skill>
   <name>agent-skill-architect</name>
@@ -239,11 +239,6 @@ Each skill contains step-by-step instructions, templates, and scripts.
   <name>superpowers/writing-skills</name>
   <description>Use when creating new skills, editing existing skills, or verifying skills work before deployment</description>
   <location>agent-skills/superpowers/writing-skills/SKILL.md</location>
-</skill>
-<skill>
-  <name>template-skill</name>
-  <description>Replace with description of the skill and when Claude should use it.</description>
-  <location>agent-skills/template-skill/SKILL.md</location>
 </skill>
 </available_skills>
 <!-- SKILLPORT_END -->

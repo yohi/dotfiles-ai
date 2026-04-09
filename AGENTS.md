@@ -293,11 +293,6 @@ Each skill contains step-by-step instructions, templates, and scripts.
   <description>Use when creating new skills, editing existing skills, or verifying skills work before deployment</description>
   <location>agent-skills/superpowers/writing-skills/SKILL.md</location>
 </skill>
-<skill>
-  <name>template-skill</name>
-  <description>Replace with description of the skill and when Claude should use it.</description>
-  <location>agent-skills/template-skill/SKILL.md</location>
-</skill>
 </available_skills>
 <!-- SKILLPORT_END -->
 
