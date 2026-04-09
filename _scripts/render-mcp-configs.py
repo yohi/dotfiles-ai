@@ -32,8 +32,15 @@ def parse_jsonc(text: str) -> dict[str, Any]:
 
 def replace_placeholders(value: Any, gateway_url: str) -> Any:
     if isinstance(value, str):
-        # __GATEWAY_URL__ を置換
-        val = value.replace("__GATEWAY_URL__", gateway_url)
+        # 置換対象のマップ
+        placeholders = {
+            "__GATEWAY_URL__": gateway_url,
+            "__HOME__": str(Path.home()),
+            "__REPO_ROOT__": str(REPO_ROOT),
+        }
+        val = value
+        for k, v in placeholders.items():
+            val = val.replace(k, v)
 
         # ${VAR} 形式の環境変数を探し、存在を確認する
         # (os.path.expandvars は未定義の変数を空文字に変換してしまうため)

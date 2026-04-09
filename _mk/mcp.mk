@@ -1,4 +1,4 @@
-.PHONY: setup-docker-mcp sync-mcp mcp uninstall-mcp status-mcp start-mcp stop-mcp logs-mcp
+.PHONY: setup-docker-mcp sync-mcp mcp uninstall-mcp status-mcp start-mcp stop-mcp restart-mcp logs-mcp
 
 mcp: setup-docker-mcp
 
@@ -9,10 +9,7 @@ setup-docker-mcp:
 
 sync-mcp: ## Render and synchronize centralized MCP configs
 	@bash _scripts/sync-mcp-configs.sh
-	@if systemctl --user is-active docker-mcp-gateway.service > /dev/null 2>&1; then \
-		echo "🔄 Restarting Docker MCP Gateway to pick up changes..."; \
-		systemctl --user restart docker-mcp-gateway.service; \
-	fi
+	@$(MAKE) restart-mcp
 	@echo "✅ MCP synchronization complete."
 
 status-mcp: ## Docker MCP Gatewayのステータスを確認
@@ -33,6 +30,16 @@ stop-mcp: ## Docker MCP Gatewayを停止
 	@echo "🛑 Stopping Docker MCP Gateway..."
 	@systemctl --user stop docker-mcp-gateway.service
 	@echo "✅ Docker MCP Gateway stopped."
+
+restart-mcp: ## Docker MCP Gatewayを再起動
+	@echo "🔄 Restarting Docker MCP Gateway..."
+	@systemctl --user daemon-reload
+	@if systemctl --user is-active docker-mcp-gateway.service > /dev/null 2>&1; then \
+		systemctl --user restart docker-mcp-gateway.service; \
+	else \
+		systemctl --user start docker-mcp-gateway.service; \
+	fi
+	@$(MAKE) status-mcp
 
 logs-mcp: ## Docker MCP Gatewayのログを表示
 	@echo "📋 Docker MCP Gateway logs (last 50 lines):"
