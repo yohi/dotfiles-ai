@@ -51,10 +51,13 @@ ide/cursor/mcp.json
 # Worktrees
 .worktrees/
 .worktrees
+claude/settings.json
 claude/claude-settings.json
 gemini/settings.json
 ide/vscode/settings.json
 opencode/opencode.jsonc
+*.bk
+test.mk
 
 # Python environment
 __pycache__/
