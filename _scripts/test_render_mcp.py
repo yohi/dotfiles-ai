@@ -45,12 +45,11 @@ def test_chronos_graph_rendering():
     print("Testing chronos-graph absence in output files...")
     config = load_config()
     agents = config.get("agents", {})
+    assert agents, "No agents found in configuration"
     
     for agent_name, agent_config in agents.items():
         path = REPO_ROOT / agent_config["path"]
-        if not path.exists():
-            print(f"SKIP: {agent_name} output file {path} not found.")
-            continue
+        assert path.exists(), f"Output file {path} for {agent_name} not found"
             
         content = path.read_text(encoding="utf-8")
         # Handle different formats
@@ -62,7 +61,8 @@ def test_chronos_graph_rendering():
             raise ValueError(f"Unknown format '{agent_config['format']}' for {agent_name}")
             
         root_key = agent_config["root_key"]
-        servers = data.get(root_key, {})
+        assert root_key in data, f"root_key '{root_key}' missing in {agent_name} ({path})"
+        servers = data[root_key]
         assert "chronos-graph" not in servers, f"chronos-graph should be absent in {agent_name} ({path})"
         print(f"PASS: {agent_name} verified absence of chronos-graph via structured data.")
 
