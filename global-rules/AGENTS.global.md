@@ -58,6 +58,7 @@ Each skill contains step-by-step instructions, templates, and scripts.
 - Replace `{path}` in instructions with the actual path from `load_skill`
 - If search returns too many results, use more specific terms
 
+<!-- NOTE: 外部スキルを取得するには `skillport add <source> agent-skills/<name>` を実行してください。 -->
 <available_skills>
 <skill>
   <name>agent-skill-architect</name>

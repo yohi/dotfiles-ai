@@ -87,6 +87,10 @@ docker container prune -f --filter "label=docker-mcp=true"
 <!-- SKILLPORT_START -->
 ## SkillPort Skills
 
+<!-- NOTE: 外部スキル（anthropics/*, superpowers/*）を利用するには、事前に以下のコマンドで取得が必要です。 -->
+<!-- skillport add anthropics/skills agent-skills/anthropics --namespace anthropics --yes -->
+<!-- skillport add obra/superpowers agent-skills/superpowers --namespace superpowers --yes -->
+
 Skills are reusable expert knowledge that help you complete tasks effectively.
 Each skill contains step-by-step instructions, templates, and scripts.
 
