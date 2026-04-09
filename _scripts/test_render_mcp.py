@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import os
+import importlib.util
 import json
 import json5
 import sys
@@ -8,12 +8,14 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.append(str(REPO_ROOT / "_scripts"))
 
-import importlib.util
-
 # Load the module with hyphens
-spec = importlib.util.spec_from_file_location("render_mcp_configs", str(REPO_ROOT / "_scripts/render-mcp-configs.py"))
+spec = importlib.util.spec_from_file_location(
+    "render_mcp_configs", str(REPO_ROOT / "_scripts/render-mcp-configs.py")
+)
 render_mcp_configs = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(render_mcp_configs)
+if spec.loader:
+    spec.loader.exec_module(render_mcp_configs)
+
 replace_placeholders = render_mcp_configs.replace_placeholders
 load_config = render_mcp_configs.load_config
 
