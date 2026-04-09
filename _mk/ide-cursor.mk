@@ -15,16 +15,17 @@ DOTFILES_SHELL_ROOT ?= $(REPO_ROOT)/..
         update-cursor stop-cursor check-cursor-version \
         install-packages-supercursor setup-cursor
 
-CURSOR_API_URL := https://www.cursor.com/api/download?platform=linux-x64&format=deb&releaseTrack=stable
+CURSOR_API_URL := https://cursor.com/api/download?platform=linux-x64&format=deb&releaseTrack=stable
+CURSOR_USER_AGENT := Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36
 
 setup-cursor: _cursor_link_settings ## Cursorの設定をセットアップ（設定ファイルのみ）
 
 install-packages-cursor:
 	@echo "📝 Cursor IDE (.deb) のバージョンを確認中..."
-	@LATEST_VERSION=$$(curl -sL --connect-timeout 10 --max-time 30 "$(CURSOR_API_URL)" | jq -r '.version' 2>/dev/null || echo "error"); \
+	@LATEST_VERSION=$$(curl -sL -A "$(CURSOR_USER_AGENT)" --connect-timeout 10 --max-time 30 "$(CURSOR_API_URL)" | jq -r '.version' 2>/dev/null || echo "error"); \
 	CURRENT_VERSION=$$( (dpkg-query -W -f='$${Version}' cursor 2>/dev/null || echo "none") | cut -d'-' -f1 ); \
-	if [ "$$LATEST_VERSION" = "error" ]; then \
-		echo "⚠️  最新バージョンの取得に失敗しました。インストールを試行します..."; \
+	if [ "$$LATEST_VERSION" = "error" ] || [ -z "$$LATEST_VERSION" ] || [ "$$LATEST_VERSION" = "null" ]; then \
+		echo "⚠️  最新バージョンの取得に失敗しました (API応答が正しくない可能性があります)。"; \
 		$(MAKE) _cursor_download; \
 	elif [ "$$CURRENT_VERSION" = "$$LATEST_VERSION" ]; then \
 		echo "✅ Cursor IDE は既に最新バージョン ($$CURRENT_VERSION) がインストールされています。"; \
@@ -67,19 +68,20 @@ _cursor_download:
 	@cd /tmp && \
 	DOWNLOAD_URL=""; \
 	if command -v jq >/dev/null 2>&1; then \
-		API_RESPONSE=$$(curl -sL --connect-timeout 10 --max-time 30 "$(CURSOR_API_URL)" 2>/dev/null); \
+		API_RESPONSE=$$(curl -sL -A "$(CURSOR_USER_AGENT)" --connect-timeout 10 --max-time 30 "$(CURSOR_API_URL)" 2>/dev/null); \
 		if [ -n "$$API_RESPONSE" ] && echo "$$API_RESPONSE" | jq . >/dev/null 2>&1; then \
 			DOWNLOAD_URL=$$(echo "$$API_RESPONSE" | jq -r '.debUrl' 2>/dev/null); \
 		fi; \
 	fi; \
 	if [ -z "$$DOWNLOAD_URL" ] || [ "$$DOWNLOAD_URL" = "null" ]; then \
 		echo "❌ エラー: API からの .deb ダウンロード URL 取得に失敗しました。"; \
+		if [ -n "$$API_RESPONSE" ]; then echo "⚠️ APIレスポンス: $$API_RESPONSE"; else echo "⚠️ APIレスポンスが空です。"; fi; \
 		exit 1; \
 	fi; \
 	echo "🔗 ダウンロードURL: $$DOWNLOAD_URL"; \
-	if curl -L --user-agent "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36" \
-		--max-time 120 --retry 3 --retry-delay 5 \
-		-o cursor.deb "$$DOWNLOAD_URL" 2>/dev/null; then \
+	if curl -L -A "$(CURSOR_USER_AGENT)" \
+		--fail --max-time 120 --retry 3 --retry-delay 5 \
+		-o cursor.deb "$$DOWNLOAD_URL"; then \
 		echo "✅ ダウンロード完了。整合性を確認中..."; \
 		SHA256_CMD=$$( (command -v sha256sum >/dev/null 2>&1 && echo "sha256sum") || (command -v shasum >/dev/null 2>&1 && echo "shasum -a 256") || echo ""); \
 		if [ -z "$$SHA256_CMD" ]; then \
@@ -104,6 +106,8 @@ _cursor_download:
 			fi; \
 		else \
 			echo "⚠️  【警告】信頼できるハッシュ値が見つからなかったため、整合性検証をスキップします。"; \
+			echo "     インストールを中止するには Ctrl-C を押してください。5秒後に続行します..."; \
+			sleep 5; \
 		fi; \
 		echo "🚀 インストールを開始します..."; \
 		if sudo dpkg -i cursor.deb; then \
@@ -150,7 +154,7 @@ stop-cursor:
 # Cursor IDEのバージョン確認
 check-cursor-version:
 	@echo "🔍 Cursor IDEのバージョン情報を確認中..."
-	@if dpkg -l | grep -q "^ii  cursor"; then \
+	@if dpkg-query -W -f='$${Status}' cursor 2>/dev/null | grep -q "ok installed"; then \
 		CURRENT_VERSION=$$(dpkg-query -W -f='$${Version}' cursor); \
 		echo "💻 現在のバージョン: $$CURRENT_VERSION"; \
 	else \
@@ -158,11 +162,23 @@ check-cursor-version:
 	fi
 	@echo "🌐 最新バージョンを確認中..."
 	@if command -v jq >/dev/null 2>&1; then \
-		API_RESPONSE=$$(curl -sL --connect-timeout 10 --max-time 30 "$(CURSOR_API_URL)" 2>/dev/null); \
-		if [ -n "$$API_RESPONSE" ] && echo "$$API_RESPONSE" | jq . >/dev/null 2>&1; then \
+		API_RESPONSE=$$(curl -sLf -A "$(CURSOR_USER_AGENT)" --connect-timeout 10 --max-time 30 "$(CURSOR_API_URL)" 2>/dev/null); \
+		if [ $$? -ne 0 ]; then \
+			echo "⚠️ 警告: Cursor API に接続できません"; \
+		elif [ -z "$$API_RESPONSE" ]; then \
+			echo "⚠️ 警告: Cursor バージョン情報が取得できません: 応答が空です"; \
+		elif ! echo "$$API_RESPONSE" | jq . >/dev/null 2>&1; then \
+			echo "⚠️ 警告: Cursor バージョン情報が取得できません: 不正なJSONです"; \
+		else \
 			LATEST_VERSION=$$(echo "$$API_RESPONSE" | jq -r '.version' 2>/dev/null); \
-			echo "🆕 最新バージョン: $$LATEST_VERSION"; \
+			if [ -z "$$LATEST_VERSION" ] || [ "$$LATEST_VERSION" = "null" ]; then \
+				echo "⚠️ 警告: Cursor バージョン情報が取得できません: .versionがnullです"; \
+			else \
+				echo "🆕 最新バージョン: $$LATEST_VERSION"; \
+			fi; \
 		fi; \
+	else \
+		echo "⚠️ 警告: jqコマンドがないため確認をスキップします"; \
 	fi
 
 # SuperCursor (Cursor Framework) のインストール
@@ -217,3 +233,4 @@ uninstall-cursor:
 	@sudo rm -f /opt/cursor/cursor.AppImage
 	@sudo rm -f /usr/share/applications/cursor.desktop
 	@echo "✅ Cursor IDE のアンインストールが完了しました"
+	@echo "URL: $(CURSOR_API_URL)"
