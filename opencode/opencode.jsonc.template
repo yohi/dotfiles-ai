@@ -94,10 +94,7 @@
       "command": [
         "uv",
         "--quiet",
-        "tool",
         "run",
-        "--from",
-        "git+https://github.com/yohi/chronos-graph.git@37308f47837469d801abc1226ee65e4262093042",
         "context-store",
       ],
       "environment": {
@@ -365,7 +362,10 @@
     },
     "flixa": {
       "api": "responses",
-      "npm": "file:///home/y_ohi/program/private/opencode-flixa/opencode-flixa/dist/provider.js",
+      // NOTE: Replace with a distributable package name (e.g. "@opencode/provider-flixa")
+      // or a placeholder. Local file:// overrides must be set in your personal 
+      // opencode.jsonc and NOT in this template.
+      "npm": "<package-name>",
       // "npm": "@ai-sdk/openai-compatible",
       "options": {
         "baseURL": "https://api.flixa.engineer/v1/agent",
@@ -422,6 +422,11 @@
         },
       },
       "options": {
+        "port": 4937,
+      },
+    }, // End Provider
+  },
+}
         "port": 4937,
       },
     }, // End Provider

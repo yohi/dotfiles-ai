@@ -14,16 +14,20 @@ import yaml  # type: ignore[import-untyped]
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-CONFIG_PATH = REPO_ROOT / "mcp" / "servers.yaml"
+CLIENT_CONFIG_PATH = REPO_ROOT / "mcp" / "servers.yaml"
 
 
-def load_config() -> dict[str, Any]:
-    loaded = yaml.safe_load(CONFIG_PATH.read_text(encoding="utf-8"))
+def load_yaml_config(path: Path) -> dict[str, Any]:
+    loaded = yaml.safe_load(path.read_text(encoding="utf-8"))
     if not isinstance(loaded, dict):
         raise ValueError(
-            f"Malformed config at {CONFIG_PATH}: expected a mapping at the top level"
+            f"Malformed config at {path}: expected a mapping at the top level"
         )
     return loaded
+
+
+def load_client_config() -> dict[str, Any]:
+    return load_yaml_config(CLIENT_CONFIG_PATH)
 
 
 def parse_jsonc(text: str) -> dict[str, Any]:
@@ -119,12 +123,22 @@ def write_opencode_jsonc(path: Path, root_key: str, servers: dict[str, Any]) -> 
 
     if not (text and match):
         # マーカーが見つからない場合
-        if text:
+        if not text:
+            # ファイル自体が存在しない場合は最小構成で作成
+            path.parent.mkdir(parents=True, exist_ok=True)
+            text = f'{{\n  // [MCP]\n  "{root_key}": {{}},\n  // [LSP]\n}}\n'
+            path.write_text(text, encoding="utf-8")
+            match = pattern.search(text)
+        elif not match:
+            # マーカーがない場合は末尾の中括弧の前に挿入を試みる
+            if text.strip().endswith("}"):
+                pos = text.rfind("}")
+                text = text[:pos] + f'  // [MCP]\n  "{root_key}": {{}},\n  // [LSP]\n' + text[pos:]
+                path.write_text(text, encoding="utf-8")
+                match = pattern.search(text)
+
+        if not match:
             raise RuntimeError(f"Marker // [MCP] ... // [LSP] not found in {path}")
-        # ファイル自体が存在しない場合もエラーとして扱う (データロス防止)
-        raise RuntimeError(
-            f"{path} does not exist. Please restore from git before running this script."
-        )
 
     updated = text[:match.start()] + replacement + text[match.end():]
     if text == updated:
@@ -184,10 +198,22 @@ def find_object_span(text: str, open_brace_index: int) -> tuple[int, int]:
 
 
 def write_jsonc_object_key(path: Path, root_key: str, servers: dict[str, Any]) -> bool:
+    if not path.exists():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(f'{{\n  "{root_key}": {{}}\n}}\n', encoding="utf-8")
+
     text = path.read_text(encoding="utf-8")
     match = re.search(rf'"{re.escape(root_key)}"\s*:\s*\{{', text)
     if not match:
-        raise RuntimeError(f"Key '{root_key}' not found in {path}")
+        # キーがない場合は末尾の中括弧の前に挿入を試みる
+        if text.strip().endswith("}"):
+            pos = text.rfind("}")
+            text = text[:pos] + f'  "{root_key}": {{}},\n' + text[pos:]
+            path.write_text(text, encoding="utf-8")
+            match = re.search(rf'"{re.escape(root_key)}"\s*:\s*\{{', text)
+        
+        if not match:
+            raise RuntimeError(f"Key '{root_key}' not found in {path}")
 
     open_brace_index = text.find("{", match.start())
     _, object_end = find_object_span(text, open_brace_index)
@@ -214,12 +240,12 @@ def write_jsonc_object_key(path: Path, root_key: str, servers: dict[str, Any]) -
 
 
 def main() -> int:
-    config = load_config()
+    config = load_client_config()
     defaults = config.get("defaults", {})
     gateway_url = defaults.get("gateway_url")
     if not gateway_url:
         raise RuntimeError(
-            f"Missing required 'gateway_url' in {CONFIG_PATH} under defaults"
+            f"Missing required 'gateway_url' in {CLIENT_CONFIG_PATH} under defaults"
         )
 
     for agent_name, agent_config in config.get("agents", {}).items():

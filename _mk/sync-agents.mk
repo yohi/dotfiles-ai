@@ -36,10 +36,10 @@ sync-agents: ## SSOTのスキル群を各エージェントの設定ファイル
 	@echo "✅ sync-agents: 全エージェントへの同期が完了しました"
 
 # ============================================================
-# sync-skillport-doc: skillport doc の実行と AGENTS.global.md への同期
+# sync-skillport-doc: skillport doc の実行と各 AGENTS への直接反映
 # ============================================================
-sync-skillport-doc: ## _scripts/sync_agents.sh を実行し、スキル一覧の生成とグローバル設定への同期を行う
-	@echo "📝 skillport doc: スキルテーブルを更新・同期中..."
+sync-skillport-doc: ## _scripts/sync_agents.sh を実行し、agent-skills/ から AGENTS 群のスキル一覧を更新する
+	@echo "📝 skillport doc: agent-skills/ から AGENTS 群のスキル一覧を更新中..."
 	@bash "$(REPO_ROOT)/_scripts/sync_agents.sh"
 
 # ============================================================

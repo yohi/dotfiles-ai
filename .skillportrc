@@ -4,3 +4,4 @@
 skills_dir: ./agent-skills
 instructions:
   - AGENTS.md
+  - global-rules/AGENTS.global.md

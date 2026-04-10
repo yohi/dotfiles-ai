@@ -45,14 +45,14 @@ Never mix IDE styling configurations here, and never put AI instructions or MCP 
 
 ## 4. Development Workflow
 - **SSOT Enforcement**: Never edit symlinked files in home directories (e.g., `~/.gemini/GEMINI.md`). Always edit the Source of Truth within this repository.
-- **MCP Gateway**: Use the Unified SSE Gateway (`http://localhost:10888/sse`) for all tools. New MCP servers MUST be defined in `mcp/catalogs/custom.yaml.template`.
+- **MCP Gateway**: Use the Unified SSE Gateway (`http://localhost:10888/sse`) for all tools. New MCP servers MUST be defined in `mcp/catalogs/custom.yaml.template`, and the gateway-enabled server set MUST be managed in `mcp/config.yaml`.
 - **Skill Management**: New AI capabilities MUST be implemented as SkillPort skills in `agent-skills/` and managed via MCP.
 - **External Skills (Lock-file)**: High-quality external skills (like `superpowers/`) are managed via `agent-skills/EXTERNAL_SKILLS.md`. These files are ignored by Git and synchronized across environments using `make setup-superpowers` or `make sync-agents`. This prevents duplicating external code while maintaining version consistency.
 
 ## 5. Tooling & Automation
 - `make setup`: Bootstrap the environment and create initial symlinks.
-- `make setup-docker-mcp`: Re-render MCP configurations and synchronize all agents.
-- `make sync-agents`: Propagate global rules and skill updates to all agent contexts.
+- `make setup-docker-mcp`: Bootstrap Docker MCP Gateway service files and runtime environment.
+- `make sync-agents`: Refresh skill listings from `agent-skills/`, then propagate shared agent assets to each agent context.
 
 ## 6. MCP Gateway Advanced Configuration
 
