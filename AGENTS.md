@@ -109,8 +109,9 @@ Each skill contains step-by-step instructions, templates, and scripts.
 - If search returns too many results, use more specific terms
 
 <!-- NOTE: External skills (anthropics/*, superpowers/*) must be installed via:
-     skillport add anthropics/algorithmic-art anthropics/brand-guidelines ...
-     See README.md for the full list of external skills. -->
+     skillport add <pkg> agent-skills/<ns> --namespace <ns>
+     (e.g., skillport add anthropics/algorithmic-art agent-skills/anthropics --namespace anthropics)
+     See agent-skills/EXTERNAL_SKILLS.md for the authoritative external-skill lock file. -->
 <available_skills>
 <skill>
   <name>agent-skill-architect</name>
