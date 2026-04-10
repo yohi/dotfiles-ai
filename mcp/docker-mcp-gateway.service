@@ -1,5 +1,5 @@
 [Unit]
-Description=Docker MCP Gateway
+Description=Docker MCP Gateway (chronos-graph runs locally via uv on each client)
 After=network.target docker.service
 
 [Service]
@@ -14,7 +14,6 @@ ExecStart=/usr/bin/env docker mcp gateway run \
   --config %h/.docker/mcp/config.yaml \
   --catalog %h/.docker/mcp/catalogs/bootstrap.yaml \
   --catalog %h/.docker/mcp/catalogs/custom.yaml \
-  # chronos-graph is excluded here because it runs locally via 'uv' on each client.
   --servers __ENABLED_SERVERS__ \
   --secrets __REPO_ROOT__/.env
 Restart=always
