@@ -73,11 +73,12 @@ echo "✅ MCP configurations synchronized from mcp/servers.yaml and mcp/config.y
 SERVICE_FILE="$HOME/.config/systemd/user/docker-mcp-gateway.service"
 mkdir -p "$(dirname "$SERVICE_FILE")"
 ENABLED_SERVERS=$(
-    uv run --with-requirements "$REPO_ROOT/requirements.txt" python3 - <<'PY'
+    DOTFILES_AI_REPO_ROOT="$REPO_ROOT" uv run --with-requirements "$REPO_ROOT/requirements.txt" python3 - <<'PY'
 from pathlib import Path
+import os
 import yaml
 
-config = yaml.safe_load(Path("mcp/config.yaml").read_text(encoding="utf-8")) or {}
+config = yaml.safe_load(Path(os.environ["DOTFILES_AI_REPO_ROOT"]).joinpath("mcp/config.yaml").read_text(encoding="utf-8")) or {}
 servers = config.get("gateway", {}).get("enabled_servers", [])
 if not isinstance(servers, list) or not all(isinstance(item, str) for item in servers):
     raise SystemExit("Invalid mcp/config.yaml: gateway.enabled_servers must be a list of strings")
