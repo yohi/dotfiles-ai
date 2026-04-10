@@ -125,6 +125,7 @@ if [ "$SKIP_DOCKER_CHECK" = "true" ]; then
 fi
 
 # カタログの初期化（未初期化の場合のみ、docker-mcp.yaml を取得するため）
+MCP_CONFIG_DIR="$HOME/.docker/mcp"
 CATALOG_FILE="$MCP_CONFIG_DIR/catalogs/docker-mcp.yaml"
 if [[ ! -f "$CATALOG_FILE" ]]; then
     echo -e "${BLUE}📦 Initializing official MCP Catalog...${NC}"
@@ -145,9 +146,8 @@ if [[ ! -f "$CATALOG_FILE" ]]; then
 fi
 
 echo -e "${BLUE}⚙️  Setting up systemd service...${NC}"
-mkdir -p "$HOME/.config/systemd/user"
-# Replace __REPO_ROOT__ placeholder with actual path
-sed "s|__REPO_ROOT__|$REPO_ROOT|g" "$REPO_ROOT/mcp/docker-mcp-gateway.service" > "$HOME/.config/systemd/user/docker-mcp-gateway.service"
+# Service file is already written by sync-mcp-configs.sh (called above).
+# Only reload and enable/restart here.
 systemctl --user daemon-reload
 systemctl --user enable docker-mcp-gateway.service
 systemctl --user restart docker-mcp-gateway.service
