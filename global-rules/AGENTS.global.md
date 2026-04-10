@@ -58,17 +58,14 @@ Each skill contains step-by-step instructions, templates, and scripts.
 - Replace `{path}` in instructions with the actual path from `load_skill`
 - If search returns too many results, use more specific terms
 
-<!-- NOTE: To obtain external skills, run `skillport add <source> agent-skills/<name>`. -->
+<!-- NOTE: External skills (anthropics/*, superpowers/*) must be installed via:
+     skillport add anthropics/algorithmic-art anthropics/brand-guidelines ...
+     See README.md for the full list of external skills. -->
 <available_skills>
 <skill>
   <name>agent-skill-architect</name>
   <description>Designs and generates best-practice-compliant SKILL.md files for OpenCode agent skills. Use when creating new agent skills, drafting skill definitions, or improving existing skill files. Guides through requirements discovery and outputs production-ready SKILL.md with proper YAML frontmatter, XML-structured instructions, and progressive disclosure patterns.</description>
   <location>agent-skills/agent-skill-architect/SKILL.md</location>
-</skill>
-<skill>
-  <name>ai-api</name>
-  <description>Build apps with the Claude API or Anthropic SDK. TRIGGER when: code imports `anthropic`/`@anthropic-ai/sdk`/`claude_agent_sdk`, or user asks to use Claude API, Anthropic SDKs, or Agent SDK. DO NOT TRIGGER when: code imports `openai`/other AI SDK, general programming, or ML/data-science tasks.</description>
-  <location>agent-skills/ai-api/SKILL.md</location>
 </skill>
 <skill>
   <name>anthropics/algorithmic-art</name>
