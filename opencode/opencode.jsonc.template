@@ -17,7 +17,10 @@
   ],
 
   // [Instruction]
-  "instructions": [],
+  "instructions": [
+    "docs/global-rules/AGENTS.global.md",
+    "agent-skills/superpowers/using-superpowers/SKILL.md"
+  ],
 
   // [Watcher]
   "watcher": {
@@ -422,11 +425,6 @@
         },
       },
       "options": {
-        "port": 4937,
-      },
-    }, // End Provider
-  },
-}
         "port": 4937,
       },
     }, // End Provider
