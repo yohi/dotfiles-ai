@@ -63,6 +63,10 @@ if grep -q "__ENABLED_SERVERS__" "$SERVICE_FILE"; then
     echo "FAIL: Placeholder __ENABLED_SERVERS__ found in $SERVICE_FILE"
     exit 1
 fi
+if grep -q "__REPO_ROOT__" "$SERVICE_FILE"; then
+    echo "FAIL: Placeholder __REPO_ROOT__ found in $SERVICE_FILE"
+    exit 1
+fi
 
 ENABLED_SERVERS=$(
     DOTFILES_AI_REPO_ROOT="$REPO_ROOT" uv run --with-requirements "$REPO_ROOT/requirements.txt" python3 - <<'PY'

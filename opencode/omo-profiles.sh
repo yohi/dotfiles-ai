@@ -89,7 +89,11 @@ function omo-set-profile() {
   fi
 
   # 環境変数を展開して上書き生成 (対象変数のみを置換)
-  local vars_to_subst='$ULTRABRAIN_MODEL:$CRAFTSMAN_MODEL:$DEEP_MODEL:$VISUAL_MODEL:$QUICK_MODEL:$MCP_GATEWAY_TOKEN'
+  if [ -z "${FLIXA_NPM_PACKAGE:-}" ]; then
+    echo "❌ Error: FLIXA_NPM_PACKAGE is not set. Please set it to a valid npm package name for the flixa provider." >&2
+    return 1
+  fi
+  local vars_to_subst='$ULTRABRAIN_MODEL:$CRAFTSMAN_MODEL:$DEEP_MODEL:$VISUAL_MODEL:$QUICK_MODEL:$MCP_GATEWAY_TOKEN:$FLIXA_NPM_PACKAGE'
   
   if [ -f "$template_path" ]; then
     if envsubst "$vars_to_subst" < "$template_path" > "$output_path"; then

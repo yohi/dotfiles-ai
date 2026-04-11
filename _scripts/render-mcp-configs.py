@@ -133,7 +133,9 @@ def write_opencode_jsonc(path: Path, root_key: str, servers: dict[str, Any]) -> 
             # マーカーがない場合は末尾の中括弧の前に挿入を試みる
             if text.strip().endswith("}"):
                 pos = text.rfind("}")
-                text = text[:pos] + f'  // [MCP]\n  "{root_key}": {{}},\n  // [LSP]\n' + text[pos:]
+                last_char = text[:pos].rstrip()[-1:] if text[:pos].rstrip() else ""
+                prefix = "" if last_char in ("{", ",") else ",\n"
+                text = text[:pos] + f'{prefix}  // [MCP]\n  "{root_key}": {{}},\n  // [LSP]\n' + text[pos:]
                 path.write_text(text, encoding="utf-8")
                 match = pattern.search(text)
 
@@ -208,7 +210,8 @@ def write_jsonc_object_key(path: Path, root_key: str, servers: dict[str, Any]) -
         # キーがない場合は末尾の中括弧の前に挿入を試みる
         if text.strip().endswith("}"):
             pos = text.rfind("}")
-            prefix = "" if text[:pos].rstrip().endswith("{") else ",\n"
+            last_char = text[:pos].rstrip()[-1:] if text[:pos].rstrip() else ""
+            prefix = "" if last_char in ("{", ",") else ",\n"
             text = text[:pos] + f'{prefix}  "{root_key}": {{}},\n' + text[pos:]
             path.write_text(text, encoding="utf-8")
             match = re.search(rf'"{re.escape(root_key)}"\s*:\s*\{{', text)

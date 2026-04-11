@@ -380,7 +380,7 @@
       // NOTE: Replace with a distributable package name (e.g. "@opencode/provider-flixa")
       // or a placeholder. Local file:// overrides must be set in your personal 
       // opencode.jsonc and NOT in this template.
-      "npm": "<package-name>",
+      "npm": "${FLIXA_NPM_PACKAGE}",
       // "npm": "@ai-sdk/openai-compatible",
       "options": {
         "baseURL": "https://api.flixa.engineer/v1/agent",

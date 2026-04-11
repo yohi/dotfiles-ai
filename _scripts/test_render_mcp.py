@@ -44,6 +44,7 @@ def test_placeholders():
 def test_jsonc_markers():
     print("Testing jsonc markers insertion...")
     import tempfile
+    import json5
     
     with tempfile.NamedTemporaryFile(mode='w+', delete=False, suffix='.jsonc') as tmp:
         # Create a file without markers
@@ -60,11 +61,19 @@ def test_jsonc_markers():
         assert "// [LSP]" in content, "Missing [LSP] marker"
         assert '"mcp": {' in content, "Missing root_key insertion"
         
+        try:
+            parsed = json5.loads(content)
+        except Exception as e:
+            print(f"Error parsing content: {content}")
+            raise e
+        assert parsed["mcp"]["test-server"]["command"] == "echo", "JSONC parsed missing test-server command"
+        
         # Test updating existing markers
         servers_updated = {"test-server": {"command": "echo2"}}
         render_mcp_configs.write_opencode_jsonc(tmp_path, "mcp", servers_updated)
         content_updated = tmp_path.read_text(encoding="utf-8")
-        assert "echo2" in content_updated, "Failed to update existing markers block"
+        parsed_updated = json5.loads(content_updated)
+        assert parsed_updated["mcp"]["test-server"]["command"] == "echo2", "Failed to update existing markers block"
         
         print("PASS: jsonc markers inserted and updated correctly.")
     finally:

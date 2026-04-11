@@ -26,6 +26,7 @@ fi
 
 # Export dummy token
 export MCP_GATEWAY_TOKEN="test_token_123"
+export FLIXA_NPM_PACKAGE="test_package_123"
 
 # Run profile setter
 cd "$TMP_DIR"
@@ -33,6 +34,11 @@ source "omo-profiles.sh"
 omo-set-profile speed >/dev/null
 
 # Verify substitution
+if [ ! -f "opencode.jsonc" ]; then
+    echo "FAIL: opencode.jsonc not generated"
+    exit 1
+fi
+
 if [ -f "opencode.jsonc" ]; then
     if ! grep -q "test_token_123" "opencode.jsonc"; then
         echo "FAIL: Token substitution failed in opencode.jsonc"

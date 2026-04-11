@@ -56,7 +56,9 @@ restore_external_skills_note() {
     note='<!-- NOTE: External skills (anthropics/*, superpowers/*) must be installed via:
      skillport add <pkg> agent-skills/<ns> --namespace <ns>
      (e.g., skillport add anthropics/algorithmic-art agent-skills/anthropics --namespace anthropics)
-     See agent-skills/EXTERNAL_SKILLS.md for the authoritative external-skill lock file. -->'
+     See agent-skills/EXTERNAL_SKILLS.md for the authoritative external-skill lock file.
+     IMPORTANT: Custom skills are tracked in Git, but external namespaces must be ignored
+     in the project root .gitignore (blacklist strategy) to avoid polluting the repo. -->'
 
     if grep -E -q "^\s*<available_skills(\s|>)" "$file_path" && ! grep -qF "External skills (anthropics/*, superpowers/*)" "$file_path"; then
         tmp_file=$(mktemp)
