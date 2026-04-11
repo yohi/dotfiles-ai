@@ -68,11 +68,14 @@ install_namespace() {
         return 0
     fi
 
-    # 既にインストール済みかチェック
-    if [ -d "$target_dir" ] && [ ! "$FORCE" = true ]; then
-        # ディレクトリ内に SKILL.md が1つ以上存在すればインストール済みとみなす
-        if find "$target_dir" -maxdepth 3 -name "SKILL.md" | grep -q .; then
-            echo "  [SKIP] 既にインストール済み ($target_dir)"
+    local hash_file="$target_dir/.last_applied_hash"
+
+    # 既にインストール済みで、ハッシュが一致するかチェック
+    if [ -d "$target_dir" ] && [ ! "$FORCE" = true ] && [ -f "$hash_file" ]; then
+        local saved_hash
+        saved_hash=$(cat "$hash_file")
+        if [ "$saved_hash" = "$hash" ]; then
+            echo "  [SKIP] 既にインストール済み ($target_dir @ $hash)"
             return 0
         fi
     fi
@@ -114,6 +117,7 @@ install_namespace() {
     fi
 
     if $skillport_cmd add "$src_dir" --namespace "$ns" --yes --force; then
+        echo "$hash" > "$hash_file"
         echo "  ✅ [$ns] インストール完了"
     else
         echo "  ❌ [$ns] インストールに失敗しました" >&2
