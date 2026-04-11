@@ -78,14 +78,17 @@ restore_external_skills_note() {
 REPO_ROOT=$(pwd)
 
 for output_file in "${OUTPUT_FILES[@]}"; do
-    if [[ ! -f "$output_file" ]]; then
-        echo "Error: Output file '$output_file' not found." >&2
+    output_dir=$(dirname "$output_file")
+    if [[ ! -d "$output_dir" ]] || [[ ! -w "$output_dir" ]]; then
+        echo "Error: Output directory '$output_dir' does not exist or is not writable." >&2
         exit 1
     fi
 
-    if [[ ! -w "$output_file" ]] || [[ ! -r "$output_file" ]]; then
-        echo "Error: Output file '$output_file' is not accessible or writable." >&2
-        exit 1
+    if [[ -e "$output_file" ]]; then
+        if [[ ! -f "$output_file" ]] || [[ ! -w "$output_file" ]] || [[ ! -r "$output_file" ]]; then
+            echo "Error: Output file '$output_file' exists but is not a regular file or not accessible." >&2
+            exit 1
+        fi
     fi
 
     run_skillport_doc "$output_file"
