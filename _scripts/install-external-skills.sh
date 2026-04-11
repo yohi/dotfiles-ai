@@ -54,6 +54,12 @@ parse_manifest() {
 install_namespace() {
     local ns="$1" url="$2" hash="$3"
 
+    # Path traversal and safety checks
+    if [[ "$ns" == "." || "$ns" == ".." || "$ns" == *"/"* || "$ns" == *".."* ]]; then
+        echo "  ❌ セキュリティリスクまたは無効なネームスペース名です: $ns" >&2
+        return 1
+    fi
+
     if [[ ! "$ns" =~ ^[a-zA-Z0-9._-]+$ ]]; then
         echo "  ❌ 無効なネームスペース名です: $ns" >&2
         return 1
