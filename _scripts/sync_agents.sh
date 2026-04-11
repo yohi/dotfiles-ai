@@ -17,27 +17,31 @@ readonly OUTPUT_FILES=(
 
 run_skillport_doc() {
     local output_file="$1"
+    local tmp_file
+    tmp_file=$(mktemp)
 
     if command -v skillport >/dev/null 2>&1; then
         echo "Running skillport doc for ${output_file}..."
-        skillport doc --mode mcp --output "$output_file" --force || {
-            echo "Error: skillport doc failed for '$output_file'." >&2
-            exit 1
+        skillport doc --mode mcp --output "$tmp_file" --force || {
+            echo "Error: skillport doc failed." >&2; rm "$tmp_file"; exit 1
         }
-        return 0
-    fi
-
-    if command -v uvx >/dev/null 2>&1; then
+    elif command -v uvx >/dev/null 2>&1; then
         echo "Running uvx skillport doc for ${output_file}..."
-        uvx skillport doc --mode mcp --output "$output_file" --force || {
-            echo "Error: uvx skillport doc failed for '$output_file'." >&2
-            exit 1
+        uvx skillport doc --mode mcp --output "$tmp_file" --force || {
+            echo "Error: uvx skillport doc failed." >&2; rm "$tmp_file"; exit 1
         }
-        return 0
+    else
+        echo "Error: 'skillport' command not found." >&2; rm "$tmp_file"; exit 1
     fi
 
-    echo "Error: 'skillport' command not found. Please install it." >&2
-    exit 1
+    if [[ -f "$output_file" ]] && grep -q "<!-- SKILLPORT_START -->" "$output_file" && grep -q "<!-- SKILLPORT_END -->" "$output_file"; then
+        echo "Updating SkillPort section in existing ${output_file}..."
+        perl -0777 -i -pe "BEGIN{undef $/; open(F, '<', '$tmp_file') or die; \$s=<F>; close F;} s/<!-- SKILLPORT_START -->.*?<!-- SKILLPORT_END -->/\$s/gs" "$output_file"
+    else
+        echo "Writing initial skill listings to ${output_file}..."
+        cp "$tmp_file" "$output_file"
+    fi
+    rm "$tmp_file"
 }
 
 normalize_locations() {
