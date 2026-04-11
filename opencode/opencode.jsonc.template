@@ -16,6 +16,12 @@
     // "opencode-geminicli-a2a-provider",
   ],
 
+  "agent": {
+    "build": {
+      "model": "opencode/minimax-m2.5-free"
+    }
+  },
+
   // [Instruction]
   "instructions": [
     "docs/global-rules/AGENTS.global.md",
@@ -91,20 +97,26 @@
       "type": "remote",
       "url": "http://127.0.0.1:10888/sse",
       "enabled": true,
+      "headers": {
+        "Authorization": "Bearer ${MCP_GATEWAY_TOKEN}"
+      }
     },
     "chronos-graph": {
       "type": "local",
       "command": [
         "uv",
         "--quiet",
+        "tool",
         "run",
-        "context-store",
+        "--from",
+        "git+https://github.com/yohi/chronos-graph.git@37308f47837469d801abc1226ee65e4262093042",
+        "context-store"
       ],
       "environment": {
         "STORAGE_BACKEND": "sqlite",
         "SQLITE_DB_PATH": "/home/y_ohi/.context-store/memories.db",
-        "GRAPH_ENABLED": "true",
-      },
+        "GRAPH_ENABLED": "true"
+      }
     },
   },
 
