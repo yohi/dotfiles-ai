@@ -116,3 +116,5 @@ clean: ## 生成されたアーティファクトとキャッシュを削除
 
 test: ## プロジェクトのテスト/静的解析を実行
 	@$(MAKE) lint
+	@echo "🧪 Running profile substitution tests..."
+	@bash _scripts/test-omo-profiles.sh

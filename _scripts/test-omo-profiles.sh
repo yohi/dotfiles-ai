@@ -7,22 +7,20 @@ echo "Running oh-my-opencode profiles Tests..."
 
 # We will test substitution by creating a temporary directory to act as the opencode directory
 # so we don't mess up actual files or if they don't exist
-TMP_DIR=$(mktemp -d)
-trap 'rm -rf "$TMP_DIR"' EXIT
+TMP_PARENT=$(mktemp -d)
+trap 'rm -rf "$TMP_PARENT"' EXIT
 
-# Copy the script and template to the temporary directory
+# Create an isolated repo structure so ../.env resolution is safe
+TMP_REPO="$TMP_PARENT/repo"
+TMP_DIR="$TMP_REPO/opencode"
+mkdir -p "$TMP_DIR"
+
+# Copy the script to the temporary directory
 cp "$REPO_ROOT/opencode/omo-profiles.sh" "$TMP_DIR/"
-if [ -f "$REPO_ROOT/opencode/opencode.jsonc.template" ]; then
-    cp "$REPO_ROOT/opencode/opencode.jsonc.template" "$TMP_DIR/"
-else
-    echo '{"token": "${MCP_GATEWAY_TOKEN}", "package": "${FLIXA_NPM_PACKAGE}"}' > "$TMP_DIR/opencode.jsonc.template"
-fi
 
-if [ -f "$REPO_ROOT/opencode/oh-my-opencode.jsonc.template" ]; then
-    cp "$REPO_ROOT/opencode/oh-my-opencode.jsonc.template" "$TMP_DIR/"
-else
-    echo '{"token": "${MCP_GATEWAY_TOKEN}", "package": "${FLIXA_NPM_PACKAGE}"}' > "$TMP_DIR/oh-my-opencode.jsonc.template"
-fi
+# Create minimal test templates
+echo '{"token": "${MCP_GATEWAY_TOKEN}", "package": "${FLIXA_NPM_PACKAGE}"}' > "$TMP_DIR/opencode.jsonc.template"
+echo '{"token": "${MCP_GATEWAY_TOKEN}", "package": "${FLIXA_NPM_PACKAGE}"}' > "$TMP_DIR/oh-my-opencode.jsonc.template"
 
 # Export dummy token and package
 export MCP_GATEWAY_TOKEN="test_token_123"
@@ -42,17 +40,14 @@ fi
 if [ -f "opencode.jsonc" ]; then
     if ! grep -q "test_token_123" "opencode.jsonc"; then
         echo "FAIL: Token substitution failed in opencode.jsonc"
-        cat "opencode.jsonc"
         exit 1
     fi
     if ! grep -q "test_package_123" "opencode.jsonc"; then
         echo "FAIL: Package substitution failed in opencode.jsonc"
-        cat "opencode.jsonc"
         exit 1
     fi
     if grep -q "\${" "opencode.jsonc"; then
         echo "FAIL: Unresolved variable found in opencode.jsonc"
-        grep -o "\${[^}]*}" "opencode.jsonc"
         exit 1
     fi
     echo "PASS: Variable substitution verified in opencode.jsonc"

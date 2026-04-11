@@ -89,7 +89,11 @@ function omo-set-profile() {
     esac
     set -a
     # shellcheck source=/dev/null
-    source "$script_dir/../.env"
+    if ! source "$script_dir/../.env"; then
+      echo "❌ Error: Failed to source $script_dir/../.env" >&2
+      $restore_allexport
+      return 1
+    fi
     $restore_allexport
   fi
 
