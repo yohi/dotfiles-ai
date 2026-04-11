@@ -52,4 +52,30 @@ for f in "catalogs/bootstrap.yaml" "catalogs/custom.yaml"; do
     echo "PASS: Symlink $f verified."
 done
 
+# 4. Verify Systemd Service Rendering
+echo "==> Verifying Systemd Service..."
+SERVICE_FILE="$HOME/.config/systemd/user/docker-mcp-gateway.service"
+if [ ! -f "$SERVICE_FILE" ]; then
+    echo "FAIL: Service file $SERVICE_FILE does not exist."
+    exit 1
+fi
+if grep -q "__ENABLED_SERVERS__" "$SERVICE_FILE"; then
+    echo "FAIL: Placeholder __ENABLED_SERVERS__ found in $SERVICE_FILE"
+    exit 1
+fi
+
+ENABLED_SERVERS=$(
+    DOTFILES_AI_REPO_ROOT="$REPO_ROOT" uv run --with-requirements "$REPO_ROOT/requirements.txt" python3 - <<'PY'
+import os, yaml
+from pathlib import Path
+config = yaml.safe_load(Path(os.environ["DOTFILES_AI_REPO_ROOT"]).joinpath("mcp/config.yaml").read_text(encoding="utf-8")) or {}
+print(",".join(config.get("gateway", {}).get("enabled_servers", [])))
+PY
+)
+if ! grep -q -e "--servers $ENABLED_SERVERS" "$SERVICE_FILE"; then
+    echo "FAIL: Service file does not contain expected enabled servers: $ENABLED_SERVERS"
+    exit 1
+fi
+echo "PASS: Systemd service verified."
+
 echo "🎉 All MCP config sync tests passed successfully!"

@@ -19,7 +19,7 @@ render_mcp_configs = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(render_mcp_configs)
 
 replace_placeholders = render_mcp_configs.replace_placeholders
-load_config = render_mcp_configs.load_config
+load_config = render_mcp_configs.load_client_config
 
 def test_placeholders():
     print("Testing placeholders...")
@@ -41,8 +41,37 @@ def test_placeholders():
     assert multi_val == expected, f"Expected {expected}, got {multi_val}"
     print("PASS: Multiple placeholders replacement")
 
+def test_jsonc_markers():
+    print("Testing jsonc markers insertion...")
+    import tempfile
+    
+    with tempfile.NamedTemporaryFile(mode='w+', delete=False, suffix='.jsonc') as tmp:
+        # Create a file without markers
+        tmp.write('{\n  "existing": true\n}\n')
+        tmp_path = Path(tmp.name)
+    
+    try:
+        servers = {"test-server": {"command": "echo"}}
+        # Call the actual function
+        render_mcp_configs.write_opencode_jsonc(tmp_path, "mcp", servers)
+        
+        content = tmp_path.read_text(encoding="utf-8")
+        assert "// [MCP]" in content, "Missing [MCP] marker"
+        assert "// [LSP]" in content, "Missing [LSP] marker"
+        assert '"mcp": {' in content, "Missing root_key insertion"
+        
+        # Test updating existing markers
+        servers_updated = {"test-server": {"command": "echo2"}}
+        render_mcp_configs.write_opencode_jsonc(tmp_path, "mcp", servers_updated)
+        content_updated = tmp_path.read_text(encoding="utf-8")
+        assert "echo2" in content_updated, "Failed to update existing markers block"
+        
+        print("PASS: jsonc markers inserted and updated correctly.")
+    finally:
+        tmp_path.unlink(missing_ok=True)
+
 def test_chronos_graph_rendering():
-    print("Testing chronos-graph absence in output files...")
+    print("Testing chronos-graph presence in output files...")
     config = load_config()
     agents = config.get("agents", {})
     assert agents, "No agents found in configuration"
@@ -63,12 +92,13 @@ def test_chronos_graph_rendering():
         root_key = agent_config["root_key"]
         assert root_key in data, f"root_key '{root_key}' missing in {agent_name} ({path})"
         servers = data[root_key]
-        assert "chronos-graph" not in servers, f"chronos-graph should be absent in {agent_name} ({path})"
-        print(f"PASS: {agent_name} verified absence of chronos-graph via structured data.")
+        assert "chronos-graph" in servers, f"chronos-graph should be present in {agent_name} ({path})"
+        print(f"PASS: {agent_name} verified presence of chronos-graph via structured data.")
 
 if __name__ == "__main__":
     try:
         test_placeholders()
+        test_jsonc_markers()
         test_chronos_graph_rendering()
         print("\n🎉 All specific verification points passed!")
     except Exception as e:

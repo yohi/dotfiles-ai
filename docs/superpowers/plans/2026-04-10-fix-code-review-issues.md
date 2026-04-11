@@ -1,5 +1,7 @@
 # Fix Code Review Issues Implementation Plan
 
+> **前提:** このドキュメント内のコマンドはすべてリポジトリルート (`$REPO_ROOT`) から実行することを想定しています。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** コードレビューで発見された Critical 2件・Important 4件・Minor 1件の計7バグを修正し、`make setup-docker-mcp` が正常に動作する状態にする。

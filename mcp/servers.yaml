@@ -29,6 +29,8 @@ agents:
       docker-mcp-gateway:
         type: sse
         url: __GATEWAY_URL__
+        headers:
+          Authorization: Bearer ${MCP_GATEWAY_TOKEN}
 
       chronos-graph: *chronos_graph
 

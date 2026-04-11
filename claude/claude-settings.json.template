@@ -11,11 +11,16 @@
   "enabledPlugins": {
     "superpowers@superpowers-marketplace": true
   },
-  "skipDangerousModePermissionPrompt": true,
+  // SECURITY RISK: Setting skipDangerousModePermissionPrompt to true allows commands to run without confirmation.
+  // It should only be enabled in trusted/dev environments. Defaulting to false for safety.
+  "skipDangerousModePermissionPrompt": false,
   "mcpServers": {
     "docker-mcp-gateway": {
       "type": "sse",
-      "url": "http://127.0.0.1:10888/sse"
+      "url": "http://127.0.0.1:10888/sse",
+      "headers": {
+        "Authorization": "Bearer ${MCP_GATEWAY_TOKEN}"
+      }
     },
     "chronos-graph": {
       "command": "uv",

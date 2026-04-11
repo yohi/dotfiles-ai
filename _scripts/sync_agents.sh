@@ -58,10 +58,10 @@ restore_external_skills_note() {
      (e.g., skillport add anthropics/algorithmic-art agent-skills/anthropics --namespace anthropics)
      See agent-skills/EXTERNAL_SKILLS.md for the authoritative external-skill lock file. -->'
 
-    if grep -qF "<available_skills>" "$file_path" && ! grep -qF "External skills (anthropics/*, superpowers/*)" "$file_path"; then
+    if grep -E -q "^\s*<available_skills(\s|>)" "$file_path" && ! grep -qF "External skills (anthropics/*, superpowers/*)" "$file_path"; then
         tmp_file=$(mktemp)
         awk -v note="$note" '
-            $0 == "<available_skills>" {
+            $0 ~ /^\s*<available_skills(\s|>)/ {
                 print note
                 print
                 next

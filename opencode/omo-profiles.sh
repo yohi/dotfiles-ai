@@ -81,6 +81,13 @@ function omo-set-profile() {
   local base_template_path="${script_dir}/opencode.jsonc.template"
   local base_output_path="${script_dir}/opencode.jsonc"
   
+  if [ -f "$script_dir/../.env" ]; then
+    set -o allexport
+    # shellcheck source=/dev/null
+    source "$script_dir/../.env"
+    set +o allexport
+  fi
+
   # 環境変数を展開して上書き生成 (対象変数のみを置換)
   local vars_to_subst='$ULTRABRAIN_MODEL:$CRAFTSMAN_MODEL:$DEEP_MODEL:$VISUAL_MODEL:$QUICK_MODEL:$MCP_GATEWAY_TOKEN'
   

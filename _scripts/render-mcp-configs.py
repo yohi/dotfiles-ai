@@ -208,7 +208,8 @@ def write_jsonc_object_key(path: Path, root_key: str, servers: dict[str, Any]) -
         # キーがない場合は末尾の中括弧の前に挿入を試みる
         if text.strip().endswith("}"):
             pos = text.rfind("}")
-            text = text[:pos] + f'  "{root_key}": {{}},\n' + text[pos:]
+            prefix = "" if text[:pos].rstrip().endswith("{") else ",\n"
+            text = text[:pos] + f'{prefix}  "{root_key}": {{}},\n' + text[pos:]
             path.write_text(text, encoding="utf-8")
             match = re.search(rf'"{re.escape(root_key)}"\s*:\s*\{{', text)
         

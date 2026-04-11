@@ -114,7 +114,7 @@
       ],
       "environment": {
         "STORAGE_BACKEND": "sqlite",
-        "SQLITE_DB_PATH": "/home/y_ohi/.context-store/memories.db",
+        "SQLITE_DB_PATH": "__HOME__/.context-store/memories.db",
         "GRAPH_ENABLED": "true"
       }
     },
