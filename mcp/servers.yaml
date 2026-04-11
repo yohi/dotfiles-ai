@@ -3,7 +3,7 @@ defaults:
   gateway_url: http://127.0.0.1:10888/sse
 
 # chronos-graph is a local MCP server that runs via 'uv' on each client (not managed by Docker gateway)
-_chronos_graph: &chronos_graph
+_chronos_graph_legacy: &chronos_graph_legacy
   command: uv
   args:
     - --quiet
@@ -13,6 +13,21 @@ _chronos_graph: &chronos_graph
     - git+https://github.com/yohi/chronos-graph.git@37308f47837469d801abc1226ee65e4262093042
     - context-store
   env:
+    STORAGE_BACKEND: sqlite
+    SQLITE_DB_PATH: __HOME__/.context-store/memories.db
+    GRAPH_ENABLED: "true"
+
+_chronos_graph_modern: &chronos_graph_modern
+  type: local
+  command:
+    - uv
+    - --quiet
+    - tool
+    - run
+    - --from
+    - git+https://github.com/yohi/chronos-graph.git@37308f47837469d801abc1226ee65e4262093042
+    - context-store
+  environment:
     STORAGE_BACKEND: sqlite
     SQLITE_DB_PATH: __HOME__/.context-store/memories.db
     GRAPH_ENABLED: "true"
@@ -32,7 +47,7 @@ agents:
         headers:
           Authorization: Bearer ${MCP_GATEWAY_TOKEN}
 
-      chronos-graph: *chronos_graph
+      chronos-graph: *chronos_graph_legacy
 
   gemini:
     path: gemini/settings.json
@@ -51,7 +66,7 @@ agents:
         httpUrl: https://mcp.atlassian.com/v1/mcp
         timeout: 30000
 
-      chronos-graph: *chronos_graph
+      chronos-graph: *chronos_graph_legacy
 
   antigravity:
     path: antigravity/mcp_config.json
@@ -61,7 +76,7 @@ agents:
       docker-mcp-gateway:
         serverUrl: __GATEWAY_URL__
 
-      chronos-graph: *chronos_graph
+      chronos-graph: *chronos_graph_legacy
 
   cursor:
     path: ide/cursor/mcp.json
@@ -71,7 +86,7 @@ agents:
       docker-mcp-gateway:
         url: __GATEWAY_URL__
 
-      chronos-graph: *chronos_graph
+      chronos-graph: *chronos_graph_legacy
 
   vscode:
     path: ide/vscode/settings.json
@@ -81,7 +96,7 @@ agents:
       docker-mcp-gateway:
         url: __GATEWAY_URL__
 
-      chronos-graph: *chronos_graph
+      chronos-graph: *chronos_graph_legacy
 
   opencode:
     path: opencode/opencode.jsonc
@@ -95,4 +110,4 @@ agents:
         headers:
           Authorization: Bearer ${MCP_GATEWAY_TOKEN}
 
-      chronos-graph: *chronos_graph
+      chronos-graph: *chronos_graph_modern
