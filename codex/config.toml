@@ -1,5 +1,5 @@
 model = "gpt-5.4"
-model_reasoning_effort = "medium"
+model_reasoning_effort = "high"
 [notice]
 hide_rate_limit_model_nudge = true
 
@@ -27,4 +27,7 @@ base_url = "https://api.flixa.engineer/v1/agent"
 wire_api = "responses"
 
 [projects."/home/y_ohi/program/nexus"]
+trust_level = "trusted"
+
+[projects."/home/y_ohi/dotfiles/components/dotfiles-ai"]
 trust_level = "trusted"

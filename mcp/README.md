@@ -9,12 +9,12 @@
 - **ステータス**: 有効
 - **ゲートウェイ URL**: `http://127.0.0.1:10888/sse`
 - **リファレンス**: [docker/mcp-registry](https://github.com/docker/mcp-registry)
-- **含まれるツール (`mcp/config.yaml` で管理):**
+- **Gateway で有効化されるサーバー (`mcp/config.yaml` で管理):**
   - **Filesystem**: ワークスペースおよび HOME ディレクトリへのアクセス。
   - **SQLite**: ローカル DB 操作。
   - **Sequential Thinking**: 複雑な思考プロセスの補助。
   - **Skillport**: エージェントスキルの検索・ロード。
-  - **Chronos Graph**: (Docker 内) コンテキスト永続化およびグラフ管理。
+  - **GitHub Official**: GitHub 連携。
 
 ### Chronos Graph (Local / uv)
 各クライアント（エージェント）側で `uv` を介して直接実行される MCP サーバーです。
@@ -31,9 +31,10 @@ Atlassian 製品（Jira, Confluence）用の公式 MCP サーバーです。
 
 ## 2. 設定管理の仕組み (SSOT)
 
-本プロジェクトでは、`mcp/servers.yaml` を **SSOT (Single Source of Truth)** としており、ここから各ツール固有の設定ファイルを自動生成します。
+本プロジェクトでは、MCP 設定を用途別に 2 つの SSOT で管理しています。
 
 - **`mcp/servers.yaml`**: 全 AI エージェント（Gemini, Claude, Cursor, VSCode, Antigravity, OpenCode 等）のマスター設定。
+- **`mcp/config.yaml`**: Docker MCP Gateway で有効化するサーバー一覧の SSOT。同期時に systemd service の `--servers` 引数へ反映されます。
 - **プレースホルダー置換**: `__GATEWAY_URL__`, `__HOME__`, `__REPO_ROOT__` は生成時に動的に置換されます。また、`${VAR}` 形式の環境変数も `_scripts/render-mcp-configs.py` によって展開されます。
 - **差異の明示的な管理**: `serverUrl` と `url` のようなツールごとのキー名の違いは、`mcp/servers.yaml` 内でツールごとに定義されています。同期スクリプト（`_scripts/render-mcp-configs.py`）は、これらのキー構造を維持したまま値の展開のみを行います。
 
@@ -97,6 +98,6 @@ SSE 接続には **`url`** を使用します。なお、上位プロトコル�
 
 ## 4. メンテナンスコマンド
 
-- **`make sync-mcp`**: `servers.yaml` から各エージェント固有の設定ファイルへ同期を実行。
+- **`make sync-mcp`**: `servers.yaml` と `config.yaml` から各エージェント固有の設定ファイルと Gateway 実行設定を同期。
 - **`make setup-docker-mcp`**: Docker MCP Gateway の systemd サービスと環境をセットアップ。
 - **`_scripts/check-skillport-version.sh`**: Skillport イメージが PyPI の最新版と一致するか確認。

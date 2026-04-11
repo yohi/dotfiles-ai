@@ -40,6 +40,11 @@ uvx skillport add anthropics/skills skills/ --namespace anthropics --yes
 uvx skillport add https://github.com/user/repo/path/to/skill
 ```
 
+> [!IMPORTANT]
+> **Git 管理のルール (ブラックリスト方式)**
+> `agent-skills/` ディレクトリは、原則として**自作スキル（ローカル）を Git で管理する**運用となっています。
+> 外部から導入したスキル（`anthropics/` や `superpowers/` 等）の実体ファイルは Git のトラッキングから除外し、代わりに `EXTERNAL_SKILLS.md` でバージョン（Commit Hash）を管理します。
+> 新しいネームスペースの外部スキルを追加した場合は、プロジェクトルートの `.gitignore` に除外設定（例: `agent-skills/new-namespace/`）を必ず追記してください。
 > [!TIP]
 > **ディレクトリ指定の重要性**
 > リポジトリのルートを直接指定（例: `anthropics/skills`）すると、ルートにある `template` フォルダなどがバリデーションエラーを引き起こし、導入に失敗することがあります。
@@ -73,7 +78,7 @@ uvx skillport validate agent-skills/my-new-skill
 make sync-agents
 ```
 
-※ `make sync-agents` は内部で `uvx skillport doc --all` を実行し、`AGENTS.md` の `<!-- SKILLPORT_START -->` マーカー内にスキルリストを自動生成します。
+※ `make sync-agents` は内部で `skillport doc` を実行し、`agent-skills/` をソースとして `global-rules/AGENTS.global.md` の `<!-- SKILLPORT_START -->` マーカー内にスキルリストを直接反映します。ローカルの `AGENTS.md` はコンテキストの肥大化を避けるため同期対象外です。
 
 ## スキル設計の原則
 

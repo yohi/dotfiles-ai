@@ -1,17 +1,11 @@
-mcpServers:
-  SQLite:
-    enabled: true
-  filesystem:
-    enabled: true
-    args:
-      - /home/y_ohi/dotfiles/components/dotfiles-ai
-    volumes:
-      - __REPO_ROOT__:__REPO_ROOT__
-      - __HOME__:__HOME__
-  sequentialthinking:
-    enabled: true
-  skillport:
-    enabled: true
-  chronos-graph:
-    enabled: true
+mcpServers: {}
 
+gateway:
+  # Docker MCP Gateway で有効化するサーバー群。
+  # chronos-graph のようなクライアントローカル MCP は含めない。
+  enabled_servers:
+    - SQLite
+    - filesystem
+    - github-official
+    - sequentialthinking
+    - skillport

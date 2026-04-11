@@ -113,79 +113,10 @@ fi
 
 echo -e "${GREEN}✅ Shared .env file is ready.${NC}"
 
-# 設定ファイルの配置 (コピー & テンプレート処理)
-echo -e "${BLUE}🔗 Linking Docker MCP configuration files...${NC}"
-MCP_CONFIG_DIR="$HOME/.docker/mcp"
-
-mkdir -p "$MCP_CONFIG_DIR/catalogs"
-
-# 1. 既存のファイルがある場合はコピーに置き換え (ソースの存在を確認してから)
-FILES_TO_COPY=(
-    "catalog.json:$MCP_CONFIG_DIR/catalog.json"
-    "catalogs/bootstrap.yaml:$MCP_CONFIG_DIR/catalogs/bootstrap.yaml"
-    "catalogs/custom.yaml.template:$REPO_ROOT/mcp/catalogs/custom.yaml"
-)
-
-for pair in "${FILES_TO_COPY[@]}"; do
-    SRC="${pair%%:*}"
-    DST="${pair##*:}"
-
-    # Resolve source file path
-    SRC_FILE=""
-    if [[ -f "$REPO_ROOT/mcp/$SRC" ]]; then
-        SRC_FILE="$REPO_ROOT/mcp/$SRC"
-    elif [[ "$SRC" == "../antigravity/"* ]] && [[ -f "$REPO_ROOT/antigravity/$(basename "$SRC")" ]]; then
-        SRC_FILE="$REPO_ROOT/antigravity/$(basename "$SRC")"
-    fi
-
-    if [[ -z "$SRC_FILE" ]]; then
-        echo -e "${RED}❌ Source file not found: $SRC (checked in $REPO_ROOT/mcp and $REPO_ROOT/antigravity)${NC}"
-        exit 1
-    fi
-
-    # 一時ファイルへコピーしてからアトミックに移動
-    TMP_DST="$DST.tmp.$$"
-
-    # Escape $HOME for sed
-    ESCAPED_HOME=$(echo "$HOME" | sed 's/[&/|]/\\&/g')
-
-    # テンプレートファイルの場合は置換を行う
-    if [[ "$SRC" == *"template" ]]; then
-        sed -e "s|__HOME__|$ESCAPED_HOME|g" "$SRC_FILE" > "$TMP_DST"
-    else
-        cp -f "$SRC_FILE" "$TMP_DST"
-    fi
-
-    if ! mv "$TMP_DST" "$DST"; then
-        echo -e "${RED}❌ Failed to move $TMP_DST to $DST (Source: $SRC)${NC}"
-        rm -f "$TMP_DST"
-        exit 1
-    fi
-done
-
-ESCAPED_HOME=$(echo "$HOME" | sed 's/[&/|]/\\&/g')
-ESCAPED_REPO_ROOT=$(echo "$REPO_ROOT" | sed 's/[&/|]/\\&/g')
-sed -e "s|__HOME__|$ESCAPED_HOME|g" -e "s|__REPO_ROOT__|$ESCAPED_REPO_ROOT|g" "$REPO_ROOT/mcp/config.yaml" > "$MCP_CONFIG_DIR/config.yaml"
-
-# 2. custom.yaml はシンボリックリンクにする
-# これにより、リポジトリ内のファイルを編集して make mcp-render を実行するだけで、自動的に反映されるようになる
-echo -e "${BLUE}🔗 Creating symbolic link for custom.yaml...${NC}"
-CUSTOM_YAML_SRC="$REPO_ROOT/mcp/catalogs/custom.yaml"
-CUSTOM_YAML_DST="$MCP_CONFIG_DIR/catalogs/custom.yaml"
-
-if [[ -f "$CUSTOM_YAML_SRC" ]]; then
-    ln -sf "$CUSTOM_YAML_SRC" "$CUSTOM_YAML_DST"
-    echo -e "${GREEN}✅ Symbolic link created: $CUSTOM_YAML_DST -> $CUSTOM_YAML_SRC${NC}"
-else
-    echo -e "${RED}❌ Source file not found: $CUSTOM_YAML_SRC. Please run 'make mcp-render' first.${NC}"
-    exit 1
-fi
-
-# catalog.json 内の $HOME を実際のホームディレクトリに置換 (docker mcp が環境変数を展開しない場合のため)
-ESCAPED_HOME=$(echo "$HOME" | sed 's/[&/|]/\\&/g')
-sed -i.bak "s|\$HOME|$ESCAPED_HOME|g" "$MCP_CONFIG_DIR/catalog.json" && rm -f "$MCP_CONFIG_DIR/catalog.json.bak"
-
-echo -e "${GREEN}✅ Configuration files copied and paths updated in $MCP_CONFIG_DIR${NC}"
+# 設定ファイルの配置は sync-mcp-configs.sh に集約
+echo -e "${BLUE}🔗 Synchronizing Docker MCP configuration files...${NC}"
+bash "$REPO_ROOT/_scripts/sync-mcp-configs.sh"
+echo -e "${GREEN}✅ Configuration files synchronized.${NC}"
 
 # systemd ユーザーサービスの作成
 if [ "$SKIP_DOCKER_CHECK" = "true" ]; then
@@ -194,6 +125,7 @@ if [ "$SKIP_DOCKER_CHECK" = "true" ]; then
 fi
 
 # カタログの初期化（未初期化の場合のみ、docker-mcp.yaml を取得するため）
+MCP_CONFIG_DIR="$HOME/.docker/mcp"
 CATALOG_FILE="$MCP_CONFIG_DIR/catalogs/docker-mcp.yaml"
 if [[ ! -f "$CATALOG_FILE" ]]; then
     echo -e "${BLUE}📦 Initializing official MCP Catalog...${NC}"
@@ -214,9 +146,8 @@ if [[ ! -f "$CATALOG_FILE" ]]; then
 fi
 
 echo -e "${BLUE}⚙️  Setting up systemd service...${NC}"
-mkdir -p "$HOME/.config/systemd/user"
-# Replace __REPO_ROOT__ placeholder with actual path
-sed "s|__REPO_ROOT__|$REPO_ROOT|g" "$REPO_ROOT/mcp/docker-mcp-gateway.service" > "$HOME/.config/systemd/user/docker-mcp-gateway.service"
+# Service file is already written by sync-mcp-configs.sh (called above).
+# Only reload and enable/restart here.
 systemctl --user daemon-reload
 systemctl --user enable docker-mcp-gateway.service
 systemctl --user restart docker-mcp-gateway.service

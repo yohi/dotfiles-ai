@@ -19,7 +19,7 @@ render_mcp_configs = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(render_mcp_configs)
 
 replace_placeholders = render_mcp_configs.replace_placeholders
-load_config = render_mcp_configs.load_config
+load_config = render_mcp_configs.load_client_config
 
 def test_placeholders():
     print("Testing placeholders...")
@@ -27,29 +27,77 @@ def test_placeholders():
     
     # 1. Verify __HOME__
     home_val = replace_placeholders("__HOME__", gateway_url)
-    assert home_val == str(Path.home()), f"Expected {Path.home()}, got {home_val}"
+    if home_val != str(Path.home()):
+        raise AssertionError(f"Expected {Path.home()}, got {home_val}")
     print("PASS: __HOME__ replacement")
 
     # 2. Verify __REPO_ROOT__
     repo_val = replace_placeholders("__REPO_ROOT__", gateway_url)
-    assert repo_val == str(REPO_ROOT), f"Expected {REPO_ROOT}, got {repo_val}"
+    if repo_val != str(REPO_ROOT):
+        raise AssertionError(f"Expected {REPO_ROOT}, got {repo_val}")
     print("PASS: __REPO_ROOT__ replacement")
 
     # 3. Verify multiple placeholders
     multi_val = replace_placeholders("__REPO_ROOT__/__HOME__/__GATEWAY_URL__", gateway_url)
     expected = f"{REPO_ROOT}/{Path.home()}/{gateway_url}"
-    assert multi_val == expected, f"Expected {expected}, got {multi_val}"
+    if multi_val != expected:
+        raise AssertionError(f"Expected {expected}, got {multi_val}")
     print("PASS: Multiple placeholders replacement")
 
+def test_jsonc_markers():
+    print("Testing jsonc markers insertion...")
+    import tempfile
+    import json5
+    
+    with tempfile.NamedTemporaryFile(mode='w+', delete=False, suffix='.jsonc') as tmp:
+        # Create a file without markers
+        tmp.write('{\n  "existing": true\n}\n')
+        tmp_path = Path(tmp.name)
+    
+    try:
+        servers = {"test-server": {"command": "echo"}}
+        # Call the actual function
+        render_mcp_configs.write_opencode_jsonc(tmp_path, "mcp", servers)
+        
+        content = tmp_path.read_text(encoding="utf-8")
+        if "// [MCP]" not in content:
+            raise AssertionError("Missing [MCP] marker")
+        if "// [LSP]" not in content:
+            raise AssertionError("Missing [LSP] marker")
+        if '"mcp": {' not in content:
+            raise AssertionError("Missing root_key insertion")
+        
+        try:
+            parsed = json5.loads(content)
+        except Exception:
+            print(f"Error parsing content: {content}")
+            raise
+        if parsed["mcp"]["test-server"]["command"] != "echo":
+            raise AssertionError("JSONC parsed missing test-server command")
+        
+        # Test updating existing markers
+        servers_updated = {"test-server": {"command": "echo2"}}
+        render_mcp_configs.write_opencode_jsonc(tmp_path, "mcp", servers_updated)
+        content_updated = tmp_path.read_text(encoding="utf-8")
+        parsed_updated = json5.loads(content_updated)
+        if parsed_updated["mcp"]["test-server"]["command"] != "echo2":
+            raise AssertionError("Failed to update existing markers block")
+        
+        print("PASS: jsonc markers inserted and updated correctly.")
+    finally:
+        tmp_path.unlink(missing_ok=True)
+
 def test_chronos_graph_rendering():
-    print("Testing chronos-graph absence in output files...")
+    print("Testing chronos-graph presence in output files...")
     config = load_config()
     agents = config.get("agents", {})
-    assert agents, "No agents found in configuration"
+    if not agents:
+        raise AssertionError("No agents found in configuration")
     
     for agent_name, agent_config in agents.items():
         path = REPO_ROOT / agent_config["path"]
-        assert path.exists(), f"Output file {path} for {agent_name} not found"
+        if not path.exists():
+            raise AssertionError(f"Output file {path} for {agent_name} not found")
             
         content = path.read_text(encoding="utf-8")
         # Handle different formats
@@ -61,14 +109,17 @@ def test_chronos_graph_rendering():
             raise ValueError(f"Unknown format '{agent_config['format']}' for {agent_name}")
             
         root_key = agent_config["root_key"]
-        assert root_key in data, f"root_key '{root_key}' missing in {agent_name} ({path})"
+        if root_key not in data:
+            raise AssertionError(f"root_key '{root_key}' missing in {agent_name} ({path})")
         servers = data[root_key]
-        assert "chronos-graph" not in servers, f"chronos-graph should be absent in {agent_name} ({path})"
-        print(f"PASS: {agent_name} verified absence of chronos-graph via structured data.")
+        if "chronos-graph" not in servers:
+            raise AssertionError(f"chronos-graph should be present in {agent_name} ({path})")
+        print(f"PASS: {agent_name} verified presence of chronos-graph via structured data.")
 
 if __name__ == "__main__":
     try:
         test_placeholders()
+        test_jsonc_markers()
         test_chronos_graph_rendering()
         print("\n🎉 All specific verification points passed!")
     except Exception as e:

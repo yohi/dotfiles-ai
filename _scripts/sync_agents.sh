@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 #
 # _scripts/sync_agents.sh
-# description: skillport doc を実行して AGENTS.md を生成し、
-#              その内容を global-rules/AGENTS.global.md に上書き同期する。
+# description: skillport doc を実行して、agent-skills/ をソースに
+#              global-rules/AGENTS.global.md の skill 一覧を
+#              直接更新する。
 #
 
 set -euo pipefail
@@ -10,90 +11,95 @@ set -euo pipefail
 # プロジェクトルートディレクトリに移動（どこから実行されても動作するように）
 cd "$(dirname "$0")/.." || exit 1
 
-readonly SOURCE_MD="AGENTS.md"
-readonly TARGET_MD="global-rules/AGENTS.global.md"
-readonly START_MARKER="<!-- SKILLPORT_START -->"
-readonly END_MARKER="<!-- SKILLPORT_END -->"
+readonly OUTPUT_FILES=(
+    "global-rules/AGENTS.global.md"
+)
 
-# 1. skillport docの実行
-if command -v skillport >/dev/null 2>&1; then
-    echo "Running skillport doc..."
-    printf 'y\n' | skillport doc --mode mcp --all || {
-        echo "Error: skillport doc failed." >&2
-        exit 1
-    }
-elif command -v uvx >/dev/null 2>&1; then
-    echo "Running uvx skillport doc..."
-    printf 'y\n' | uvx skillport doc --mode mcp --all || {
-        echo "Error: uvx skillport doc failed." >&2
-        exit 1
-    }
-else
-    echo "Error: 'skillport' command not found. Please install it." >&2
-    exit 1
-fi
+run_skillport_doc() {
+    local output_file="$1"
+    local tmp_file
+    tmp_file=$(mktemp)
 
-# 2. ファイルの存在・権限チェック
-if [[ ! -f "$SOURCE_MD" ]]; then
-    echo "Error: Generated file '$SOURCE_MD' not found." >&2
-    exit 1
-fi
-
-if [[ ! -w "$TARGET_MD" ]] || [[ ! -r "$TARGET_MD" ]]; then
-    echo "Error: Target file '$TARGET_MD' is not accessible or writable." >&2
-    exit 1
-fi
-
-# 3. 置換ロジック (一時ファイルを利用して安全に更新)
-TMP_FILE=$(mktemp)
-TMP_SOURCE=$(mktemp)
-trap 'rm -f "$TMP_FILE" "$TMP_SOURCE"' EXIT
-
-# AGENTS.md の内容をそのまま一時ファイルにコピー（将来的にフィルタリングが必要な場合はここで処理）
-cat "$SOURCE_MD" > "$TMP_SOURCE"
-
-# 4. 絶対パスを相対パスに変換する処理
-# 現在のプロジェクトルートの絶対パスを取得し、それを削除して相対パス化する
-REPO_ROOT=$(pwd)
-perl -pi -e "s|(<location>)\Q${REPO_ROOT}/\E|\$1|g" "$SOURCE_MD"
-perl -pi -e "s|(<location>)\Q${REPO_ROOT}/\E|\$1|g" "$TMP_SOURCE"
-
-# 5. TARGET_MD (global-rules/AGENTS.global.md) への同期
-
-# START_MARKER と END_MARKER が存在するかチェック
-if grep -qF "$START_MARKER" "$TARGET_MD" && grep -qF "$END_MARKER" "$TARGET_MD"; then
-    # 既存のマーカー間をごっそり置換 (絶対パス版の TMP_SOURCE を使用)
-    awk -v start_m="$START_MARKER" -v end_m="$END_MARKER" \
-        -v src="$TMP_SOURCE" '
-    BEGIN { skip=0 }
-    $0 == start_m {
-        print start_m
-        in_block=0
-        while ((getline line < src) > 0) {
-            if (line == start_m) { in_block=1; continue }
-            if (line == end_m) { in_block=0; break }
-            if (in_block) print line
+    if command -v skillport >/dev/null 2>&1; then
+        echo "Running skillport doc for ${output_file}..."
+        skillport doc --mode mcp --output "$tmp_file" --force || {
+            echo "Error: skillport doc failed." >&2; rm "$tmp_file"; exit 1
         }
-        skip=1
-        next
-    }
-    $0 == end_m {
-        print end_m
-        skip=0
-        next
-    }
-    skip == 0 { print }
-    ' "$TARGET_MD" > "$TMP_FILE"
-else
-    # マーカーが存在しない場合は、ファイルの末尾に追記
-    cat "$TARGET_MD" > "$TMP_FILE"
-    echo "" >> "$TMP_FILE"
-    echo "$START_MARKER" >> "$TMP_FILE"
-    cat "$TMP_SOURCE" >> "$TMP_FILE"
-    echo "$END_MARKER" >> "$TMP_FILE"
-fi
+    elif command -v uvx >/dev/null 2>&1; then
+        echo "Running uvx skillport doc for ${output_file}..."
+        uvx skillport doc --mode mcp --output "$tmp_file" --force || {
+            echo "Error: uvx skillport doc failed." >&2; rm "$tmp_file"; exit 1
+        }
+    else
+        echo "Error: 'skillport' command not found." >&2; rm "$tmp_file"; exit 1
+    fi
 
-# 一時ファイルを上書きして確定
-mv "$TMP_FILE" "$TARGET_MD"
+    if [[ -f "$output_file" ]] && grep -q "<!-- SKILLPORT_START -->" "$output_file" && grep -q "<!-- SKILLPORT_END -->" "$output_file"; then
+        echo "Updating SkillPort section in existing ${output_file}..."
+        # Slurp the entire tmp_file into $s and perform a tag-based replacement in the output_file.
+        # This replaces everything between SKILLPORT_START and SKILLPORT_END tags.
+        perl -0777 -i -pe "BEGIN{undef $/; open(F, '<', '$tmp_file') or die; \$s=<F>; close F;} s/<!-- SKILLPORT_START -->.*?<!-- SKILLPORT_END -->/\$s/gs" "$output_file"
+    else
+        echo "Writing initial skill listings to ${output_file}..."
+        cp "$tmp_file" "$output_file"
+    fi
+    rm "$tmp_file"
+}
 
-echo "✅ Successfully synchronized $SOURCE_MD to $TARGET_MD."
+normalize_locations() {
+    local file_path="$1"
+    local repo_root="$2"
+
+    perl -0pi -e "s|(<location>)\Q${repo_root}/\E|\$1|g" "$file_path"
+}
+
+restore_external_skills_note() {
+    local file_path="$1"
+    local note
+    local tmp_file
+
+    note='<!-- NOTE: External skills (anthropics/*, superpowers/*) must be installed via:
+     skillport add <pkg> agent-skills/<ns> --namespace <ns>
+     (e.g., skillport add anthropics/algorithmic-art agent-skills/anthropics --namespace anthropics)
+     See agent-skills/EXTERNAL_SKILLS.md for the authoritative external-skill lock file.
+     IMPORTANT: Custom skills are tracked in Git, but external namespaces must be ignored
+     in the project root .gitignore (blacklist strategy) to avoid polluting the repo. -->'
+
+    if grep -Eq '^[[:space:]]*<available_skills([[:space:]]|>)' "$file_path" && ! grep -qF "External skills (anthropics/*, superpowers/*)" "$file_path"; then
+        tmp_file=$(mktemp)
+        trap 'rm -f "$tmp_file"' EXIT INT TERM
+        awk -v note="$note" '
+            $0 ~ /^[[:space:]]*<available_skills([[:space:]]|>)/ {
+                print note
+                print
+                next
+            }
+            { print }
+        ' "$file_path" > "$tmp_file"
+        mv "$tmp_file" "$file_path"
+        trap - EXIT INT TERM
+    fi
+}
+
+REPO_ROOT=$(pwd)
+
+for output_file in "${OUTPUT_FILES[@]}"; do
+    output_dir=$(dirname "$output_file")
+    if [[ ! -d "$output_dir" ]] || [[ ! -w "$output_dir" ]]; then
+        echo "Error: Output directory '$output_dir' does not exist or is not writable." >&2
+        exit 1
+    fi
+
+    if [[ -e "$output_file" ]]; then
+        if [[ ! -f "$output_file" ]] || [[ ! -w "$output_file" ]] || [[ ! -r "$output_file" ]]; then
+            echo "Error: Output file '$output_file' exists but is not a regular file or not accessible." >&2
+            exit 1
+        fi
+    fi
+
+    run_skillport_doc "$output_file"
+    normalize_locations "$output_file" "$REPO_ROOT"
+    restore_external_skills_note "$output_file"
+done
+
+echo "✅ Successfully synchronized skill listings to global-rules/AGENTS.global.md."

@@ -14,16 +14,20 @@ import yaml  # type: ignore[import-untyped]
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-CONFIG_PATH = REPO_ROOT / "mcp" / "servers.yaml"
+CLIENT_CONFIG_PATH = REPO_ROOT / "mcp" / "servers.yaml"
 
 
-def load_config() -> dict[str, Any]:
-    loaded = yaml.safe_load(CONFIG_PATH.read_text(encoding="utf-8"))
+def load_yaml_config(path: Path) -> dict[str, Any]:
+    loaded = yaml.safe_load(path.read_text(encoding="utf-8"))
     if not isinstance(loaded, dict):
         raise ValueError(
-            f"Malformed config at {CONFIG_PATH}: expected a mapping at the top level"
+            f"Malformed config at {path}: expected a mapping at the top level"
         )
     return loaded
+
+
+def load_client_config() -> dict[str, Any]:
+    return load_yaml_config(CLIENT_CONFIG_PATH)
 
 
 def parse_jsonc(text: str) -> dict[str, Any]:
@@ -90,43 +94,68 @@ def write_json_file(path: Path, root_key: str, servers: dict[str, Any]) -> bool:
     return True
 
 
+def _ensure_jsonc_key_exists(
+    path: Path, root_key: str, template_content: str, search_pattern: str | re.Pattern[str]
+) -> str:
+    """JSONCファイルにキーまたはマーカーが存在することを確認し、なければ挿入する。更新後のテキストを返す。"""
+    text = path.read_text(encoding="utf-8") if path.exists() else ""
+
+    if isinstance(search_pattern, str):
+        match = re.search(search_pattern, text)
+    else:
+        match = search_pattern.search(text)
+
+    if not match:
+        if not text:
+            # ファイルが空または存在しない場合
+            text = f"{{\n{template_content}\n}}\n"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(text, encoding="utf-8")
+        elif text.strip().endswith("}"):
+            # 末尾の中括弧の前に挿入
+            pos = text.rfind("}")
+            last_char = text[:pos].rstrip()[-1:] if text[:pos].rstrip() else ""
+            prefix = "" if last_char in ("{", ",") else ",\n"
+            text = text[:pos] + f"{prefix}{template_content}\n" + text[pos:]
+            path.write_text(text, encoding="utf-8")
+
+        # 再度検索
+        if isinstance(search_pattern, str):
+            match = re.search(search_pattern, text)
+        else:
+            match = search_pattern.search(text)
+
+        if not match:
+            raise RuntimeError(f"Could not ensure existence of pattern in {path}")
+
+    return text
+
+
 def write_opencode_jsonc(path: Path, root_key: str, servers: dict[str, Any]) -> bool:
-    path.parent.mkdir(parents=True, exist_ok=True)
-
-    text = ""
-    if path.exists():
-        text = path.read_text(encoding="utf-8")
-
-    # [MCP] マーカーとそのインデントを検索
-    pattern = re.compile(
-        r'^(\s*)// \[MCP\]\r?\n.*?^(\s*)// \[LSP\]',
+    marker_pattern = re.compile(
+        r"^(\s*)// \[MCP\]\r?\n.*?^(\s*)// \[LSP\]",
         re.MULTILINE | re.DOTALL,
     )
-    match = pattern.search(text) if text else None
-    
+    template = f'  // [MCP]\n  "{root_key}": {{}},\n  // [LSP]'
+    text = _ensure_jsonc_key_exists(path, root_key, template, marker_pattern)
+    match = marker_pattern.search(text)
+    if not match:
+        raise RuntimeError(f"Marker // [MCP] ... // [LSP] not found in {path}")
+
     # インデントの検出 (デフォルトは 2 スペース)
     indent = match.group(1) if match else "  "
-    
+
     raw_block = json.dumps(servers, indent=2, ensure_ascii=False)
     block_lines = raw_block.splitlines()
     block = block_lines[0]
     if len(block_lines) > 1:
         # 各行にインデントを付与 (既存の 2 スペース + 検出されたインデント)
         block += "\n" + "\n".join(f"{indent}{line}" for line in block_lines[1:])
-    
+
     # 置換文字列を作成 (末尾カンマ付き)
     replacement = f'{indent}// [MCP]\n{indent}"{root_key}": {block},\n{indent}// [LSP]'
 
-    if not (text and match):
-        # マーカーが見つからない場合
-        if text:
-            raise RuntimeError(f"Marker // [MCP] ... // [LSP] not found in {path}")
-        # ファイル自体が存在しない場合もエラーとして扱う (データロス防止)
-        raise RuntimeError(
-            f"{path} does not exist. Please restore from git before running this script."
-        )
-
-    updated = text[:match.start()] + replacement + text[match.end():]
+    updated = text[: match.start()] + replacement + text[match.end() :]
     if text == updated:
         print(f"Skipped {path.name} (no changes)")
         return False
@@ -184,8 +213,10 @@ def find_object_span(text: str, open_brace_index: int) -> tuple[int, int]:
 
 
 def write_jsonc_object_key(path: Path, root_key: str, servers: dict[str, Any]) -> bool:
-    text = path.read_text(encoding="utf-8")
-    match = re.search(rf'"{re.escape(root_key)}"\s*:\s*\{{', text)
+    key_pattern = rf'"{re.escape(root_key)}"\s*:\s*\{{'
+    template = f'  "{root_key}": {{}}'
+    text = _ensure_jsonc_key_exists(path, root_key, template, key_pattern)
+    match = re.search(key_pattern, text)
     if not match:
         raise RuntimeError(f"Key '{root_key}' not found in {path}")
 
@@ -214,12 +245,12 @@ def write_jsonc_object_key(path: Path, root_key: str, servers: dict[str, Any]) -
 
 
 def main() -> int:
-    config = load_config()
+    config = load_client_config()
     defaults = config.get("defaults", {})
     gateway_url = defaults.get("gateway_url")
     if not gateway_url:
         raise RuntimeError(
-            f"Missing required 'gateway_url' in {CONFIG_PATH} under defaults"
+            f"Missing required 'gateway_url' in {CLIENT_CONFIG_PATH} under defaults"
         )
 
     for agent_name, agent_config in config.get("agents", {}).items():
@@ -232,7 +263,6 @@ def main() -> int:
         if format_name in {"json", "generated_json"}:
             changed = write_json_file(path, root_key, servers)
         elif format_name == "jsonc":
-            path.parent.mkdir(parents=True, exist_ok=True)
             changed = write_jsonc_object_key(path, root_key, servers)
         elif format_name == "opencode_jsonc":
             changed = write_opencode_jsonc(path, root_key, servers)

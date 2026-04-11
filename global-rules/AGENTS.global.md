@@ -34,6 +34,10 @@ The following rules apply to **ALL** projects unless overridden by a local proje
 1. **Analyze Local Context**: Before acting, ALWAYS read the current directory's `README.md` or local `AGENTS.md` to understand the specific project constraints.
 2. **Resolve Paths**: Paths in Section 3 are relative to the Central Config Repo. Check accessibility before trying to resolve them.
 3. **Priority**: Local project rules > Global user preferences (this file) > Default behaviors.
+
+
+
+
 <!-- SKILLPORT_START -->
 ## SkillPort Skills
 
@@ -58,14 +62,22 @@ Each skill contains step-by-step instructions, templates, and scripts.
 - Replace `{path}` in instructions with the actual path from `load_skill`
 - If search returns too many results, use more specific terms
 
+<!-- NOTE: External skills (anthropics/*, superpowers/*) must be installed via:
+     skillport add <pkg> agent-skills/<ns> --namespace <ns>
+     (e.g., skillport add anthropics/algorithmic-art agent-skills/anthropics --namespace anthropics)
+     See agent-skills/EXTERNAL_SKILLS.md for the authoritative external-skill lock file.
+     IMPORTANT: Custom skills are tracked in Git, but external namespaces must be ignored
+     in the project root .gitignore (blacklist strategy) to avoid polluting the repo. -->
 <available_skills>
-<!-- NOTE: 外部スキル（anthropics/*, superpowers/*）を利用するには、事前に以下のコマンドで取得が必要です。 -->
-<!-- skillport add anthropics/skills skills/ --namespace anthropics --yes -->
-<!-- skillport add obra/superpowers skills/ --namespace superpowers --yes -->
 <skill>
   <name>agent-skill-architect</name>
   <description>Designs and generates best-practice-compliant SKILL.md files for OpenCode agent skills. Use when creating new agent skills, drafting skill definitions, or improving existing skill files. Guides through requirements discovery and outputs production-ready SKILL.md with proper YAML frontmatter, XML-structured instructions, and progressive disclosure patterns.</description>
   <location>agent-skills/agent-skill-architect/SKILL.md</location>
+</skill>
+<skill>
+  <name>anthropics/ai-api</name>
+  <description>Build apps with the Claude API or Anthropic SDK. TRIGGER when code imports 'anthropic', '@anthropic-ai/sdk', or 'claude_agent_sdk', or user asks to use Claude API, Anthropic SDKs, or Agent SDK. DO NOT TRIGGER when code imports 'openai' or other AI SDKs, general programming, or ML/data-science tasks.</description>
+  <location>agent-skills/anthropics/ai-api/SKILL.md</location>
 </skill>
 <skill>
   <name>anthropics/algorithmic-art</name>
@@ -239,6 +251,8 @@ Each skill contains step-by-step instructions, templates, and scripts.
 </skill>
 </available_skills>
 <!-- SKILLPORT_END -->
+
+
 
 ## 6. Agent-Specific Contexts (Unified)
 
