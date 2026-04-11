@@ -60,6 +60,11 @@ AIエージェント（Claude Code, Gemini CLI, OpenCode, Codex）の設定・�
 - **外部スキルの管理 (Lock-file)**: `superpowers` などの高品質な外部スキルは、`agent-skills/EXTERNAL_SKILLS.md` でバージョン（コミットハッシュ）が固定（Lock）されています。
   - 実体ファイルは `.gitignore` によりリポジトリには含まれません。
   - `make setup-superpowers` を実行することで、マニフェストに基づいた正確なバージョンのスキルが各環境に展開されます。
+  - **外部スキル一括インストール**: `make install-external-skills` で `agent-skills/EXTERNAL_SKILLS.md` に記載された
+    全外部スキル（anthropics, superpowers）をロックファイルのバージョンでインストールします。
+    - このターゲットは `make sync-agents` 実行時にも自動で呼ばれるため、通常は意識する必要はありません。
+    - 手動で再インストールする場合: `make install-external-skills`
+    - 強制再インストール: `bash _scripts/install-external-skills.sh --force`
 - **構成**: `.skillportrc` で設定され、`~/.skillport/skills` からリポジトリの `agent-skills/` へシンボリックリンクが張られます。
 - **コマンド**:
   - `make skillport`: SkillPort と `skillport-mcp` をインストールし、本環境の**初期セットアップ**を行います。
