@@ -14,7 +14,7 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.." || exit 1
 
-readonly MANIFEST_FILE="agent-skills/EXTERNAL_SKILLS.md"
+readonly MANIFEST_FILE="${MANIFEST_FILE:-agent-skills/EXTERNAL_SKILLS.md}"
 readonly SKILLS_DIR="agent-skills"
 
 DRY_RUN=false
@@ -29,8 +29,8 @@ for arg in "$@"; do
 done
 
 if [ ! -f "$MANIFEST_FILE" ]; then
-    echo "⚠️  $MANIFEST_FILE が見つかりません。外部スキルのインストールをスキップします。"
-    exit 0
+    echo "❌ $MANIFEST_FILE が見つかりません。外部スキルのインストールを中止します。" >&2
+    exit 1
 fi
 
 # EXTERNAL_SKILLS.md のテーブル行を解析
@@ -53,6 +53,12 @@ parse_manifest() {
 
 install_namespace() {
     local ns="$1" url="$2" hash="$3"
+
+    if [[ ! "$ns" =~ ^[a-zA-Z0-9._-]+$ ]]; then
+        echo "  ❌ 無効なネームスペース名です: $ns" >&2
+        return 1
+    fi
+
     local target_dir="$SKILLS_DIR/$ns"
 
     echo "📦 [$ns] $url@$hash"
@@ -65,7 +71,7 @@ install_namespace() {
     # 既にインストール済みかチェック
     if [ -d "$target_dir" ] && [ ! "$FORCE" = true ]; then
         # ディレクトリ内に SKILL.md が1つ以上存在すればインストール済みとみなす
-        if find "$target_dir" -name "SKILL.md" -maxdepth 3 | grep -q .; then
+        if find "$target_dir" -maxdepth 3 -name "SKILL.md" | grep -q .; then
             echo "  [SKIP] 既にインストール済み ($target_dir)"
             return 0
         fi
@@ -76,7 +82,7 @@ install_namespace() {
     trap 'rm -rf "$tmp_dir"' RETURN
 
     echo "  📥 リポジトリをクローン中..."
-    if ! git clone "$url" "$tmp_dir" --quiet 2>/dev/null; then
+    if ! git clone --filter=blob:none --no-single-branch "$url" "$tmp_dir" --quiet 2>/dev/null; then
         echo "  ❌ クローンに失敗しました: $url" >&2
         return 1
     fi
@@ -124,7 +130,7 @@ echo ""
 ERRORS=0
 while IFS='|' read -r ns url hash; do
     if ! install_namespace "$ns" "$url" "$hash"; then
-        ((ERRORS++))
+        ERRORS=$((ERRORS + 1))
     fi
     echo ""
 done < <(parse_manifest)

@@ -5,7 +5,20 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SCRIPT="$REPO_ROOT/_scripts/install-external-skills.sh"
-MANIFEST="$REPO_ROOT/agent-skills/EXTERNAL_SKILLS.md"
+
+# Mock Manifest file creation
+MANIFEST=$(mktemp)
+trap 'rm -f "$MANIFEST"' EXIT
+
+cat << 'EOF' > "$MANIFEST"
+| Skill Namespace | Source Repository | Version (Commit Hash) | Pinned At | Note |
+| :--- | :--- | :--- | :--- | :--- |
+| mock-skill-1 | https://github.com/mock/skill-1 | 1234567890abcdef | 2026-04-12 | Mock 1 |
+| mock-skill-2 | https://github.com/mock/skill-2 | fedcba0987654321 | 2026-04-12 | Mock 2 |
+EOF
+
+export MANIFEST_FILE="$MANIFEST"
+
 PASS=0
 FAIL=0
 
@@ -43,10 +56,30 @@ fi
 echo ""
 echo "=== Test: Dry-run mode parses manifest correctly ==="
 OUTPUT=$("$SCRIPT" --dry-run 2>&1 || true)
-assert_contains "superpowers namespace detected" "superpowers" "$OUTPUT"
-assert_contains "anthropics namespace detected" "anthropics" "$OUTPUT"
-assert_contains "obra/superpowers repo detected" "github.com/obra/superpowers" "$OUTPUT"
-assert_contains "anthropics/skills repo detected" "github.com/anthropics/skills" "$OUTPUT"
+
+MANIFEST_LINES=$(awk -F'|' 'NR > 1 && NF >= 5 {
+    ns = $2; gsub(/^[[:space:]]+|[[:space:]]+$/, "", ns)
+    url = $3; gsub(/^[[:space:]]+|[[:space:]]+$/, "", url)
+    hash = $4; gsub(/^[[:space:]]+|[[:space:]]+$/, "", hash)
+    if (ns == "" || ns == "Skill Namespace" || ns ~ /^:?-/) next
+    if (url == "" || hash == "") next
+    print ns "|" url
+}' "$MANIFEST")
+
+MANIFEST_COUNT=$(echo "$MANIFEST_LINES" | awk 'NF' | wc -l | tr -d ' ')
+if [ "$MANIFEST_COUNT" -gt 0 ]; then
+    echo "PASS: Manifest has $MANIFEST_COUNT entries"
+    PASS=$((PASS + 1))
+else
+    echo "FAIL: Manifest has 0 entries"
+    FAIL=$((FAIL + 1))
+fi
+
+while IFS='|' read -r ns url; do
+    [ -z "$ns" ] && continue
+    assert_contains "$ns namespace detected" "$ns" "$OUTPUT"
+    assert_contains "$url repo detected" "$url" "$OUTPUT"
+done <<< "$MANIFEST_LINES"
 
 echo ""
 echo "=== Test: --dry-run does not install anything ==="
