@@ -57,7 +57,7 @@ if [ -f "oh-my-opencode.jsonc" ]; then
         exit 1
     fi
     # Verify token is not empty
-    token_val=$(grep -oP '"token"\s*:\s*"\K[^"]*' "oh-my-opencode.jsonc" || true)
+    token_val=$(sed -n 's/.*"token"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "oh-my-opencode.jsonc" || true)
     if [ -z "$token_val" ]; then
         echo "FAIL: MCP_GATEWAY_TOKEN resolved to empty string"
         exit 1
