@@ -1,4 +1,6 @@
-# Fix Script Compatibility Implementation Plan
+# Fix Script Compatibility Implementation Plan (Completed)
+
+Status: ✅ Implemented (Commits: 450fe85, 4b6556b)
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -12,12 +14,12 @@
 
 ---
 
-### Task 1: Update `_scripts/sync_agents.sh` validation logic
+## Task 1: Update `_scripts/sync_agents.sh` validation logic
 
 **Files:**
 - Modify: `_scripts/sync_agents.sh`
 
-- [ ] **Step 1: Modify output file validation loop**
+- [x] **Step 1: Modify output file validation loop**
 
 Replace the existing validation block with a hierarchical directory-and-file check.
 
@@ -54,7 +56,7 @@ for output_file in "${OUTPUT_FILES[@]}"; do
 >>>>
 ```
 
-- [ ] **Step 2: Commit changes**
+- [x] **Step 2: Commit changes**
 
 ```bash
 git add _scripts/sync_agents.sh
@@ -63,12 +65,12 @@ git commit -m "fix: relax output file validation in sync_agents.sh to allow crea
 
 ---
 
-### Task 2: Update `_scripts/test-omo-profiles.sh` token extraction
+## Task 2: Update `_scripts/test-omo-profiles.sh` token extraction
 
 **Files:**
 - Modify: `_scripts/test-omo-profiles.sh`
 
-- [ ] **Step 1: Replace `grep -oP` with `sed`**
+- [x] **Step 1: Replace `grep -oP` with `sed`**
 
 Replace the GNU-specific grep command with a POSIX-compliant sed command.
 
@@ -82,7 +84,7 @@ Replace the GNU-specific grep command with a POSIX-compliant sed command.
 >>>>
 ```
 
-- [ ] **Step 2: Commit changes**
+- [x] **Step 2: Commit changes**
 
 ```bash
 git add _scripts/test-omo-profiles.sh
@@ -91,14 +93,14 @@ git commit -m "fix: replace GNU-specific grep with POSIX sed in test-omo-profile
 
 ---
 
-### Task 3: Verification
+## Task 3: Verification
 
-- [ ] **Step 1: Run `_scripts/sync_agents.sh` with existing files**
+- [x] **Step 1: Run `_scripts/sync_agents.sh` with existing files**
 
 Run: `bash _scripts/sync_agents.sh`
 Expected: Successfully synchronizes without error.
 
-- [ ] **Step 2: Run `_scripts/sync_agents.sh` with a missing file**
+- [x] **Step 2: Run `_scripts/sync_agents.sh` with a missing file**
 
 Run:
 ```bash
@@ -108,7 +110,7 @@ bash _scripts/sync_agents.sh
 ```
 Expected: Successfully creates `global-rules/AGENTS.global.md`.
 
-- [ ] **Step 3: Run `_scripts/test-omo-profiles.sh`**
+- [x] **Step 3: Run `_scripts/test-omo-profiles.sh`**
 
 Run: `bash _scripts/test-omo-profiles.sh`
 Expected: PASS all tests, including token extraction.

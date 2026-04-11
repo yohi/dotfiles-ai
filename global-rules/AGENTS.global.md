@@ -34,6 +34,8 @@ The following rules apply to **ALL** projects unless overridden by a local proje
 1. **Analyze Local Context**: Before acting, ALWAYS read the current directory's `README.md` or local `AGENTS.md` to understand the specific project constraints.
 2. **Resolve Paths**: Paths in Section 3 are relative to the Central Config Repo. Check accessibility before trying to resolve them.
 3. **Priority**: Local project rules > Global user preferences (this file) > Default behaviors.
+
+
 <!-- SKILLPORT_START -->
 ## SkillPort Skills
 
@@ -72,7 +74,7 @@ Each skill contains step-by-step instructions, templates, and scripts.
 </skill>
 <skill>
   <name>anthropics/ai-api</name>
-  <description>Build apps with the Claude API or Anthropic SDK. TRIGGER when code imports 'anthropic', '@anthropic-ai/sdk', or 'claude_agent_sdk', or user asks to use Claude API, Anthropic SDKs, or Agent SDK. DO NOT TRIGGER when code imports 'openai' or other AI SDKs, general programming, or ML/data-science tasks.</description>
+  <description></description>
   <location>agent-skills/anthropics/ai-api/SKILL.md</location>
 </skill>
 <skill>
@@ -247,6 +249,7 @@ Each skill contains step-by-step instructions, templates, and scripts.
 </skill>
 </available_skills>
 <!-- SKILLPORT_END -->
+
 
 ## 6. Agent-Specific Contexts (Unified)
 
