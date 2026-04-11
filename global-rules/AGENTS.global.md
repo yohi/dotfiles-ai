@@ -71,9 +71,9 @@ Each skill contains step-by-step instructions, templates, and scripts.
   <location>agent-skills/agent-skill-architect/SKILL.md</location>
 </skill>
 <skill>
-  <name>ai-api</name>
-  <description>Build apps with the Claude API or Anthropic SDK. TRIGGER when: code imports `anthropic`/`@anthropic-ai/sdk`/`claude_agent_sdk`, or user asks to use Claude API, Anthropic SDKs, or Agent SDK. DO NOT TRIGGER when: code imports `openai`/other AI SDK, general programming, or ML/data-science tasks.</description>
-  <location>agent-skills/ai-api/SKILL.md</location>
+  <name>anthropics/ai-api</name>
+  <description>Build apps with the Claude API or Anthropic SDK. TRIGGER when code imports 'anthropic', '@anthropic-ai/sdk', or 'claude_agent_sdk', or user asks to use Claude API, Anthropic SDKs, or Agent SDK. DO NOT TRIGGER when code imports 'openai' or other AI SDKs, general programming, or ML/data-science tasks.</description>
+  <location>agent-skills/anthropics/ai-api/SKILL.md</location>
 </skill>
 <skill>
   <name>anthropics/algorithmic-art</name>
