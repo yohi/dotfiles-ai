@@ -16,13 +16,16 @@ CODEX_CONFIG     := $(REPO_ROOT)/codex/config.toml
 
 .PHONY: sync-agents clean-legacy ai-setup \
         inject-meta-prompt-opencode inject-meta-prompt-codex \
-        sync-skillport-doc link-user-agents link-agent-commands
+        sync-skillport-doc link-user-agents link-agent-commands \
+        install-external-skills
 
 # ============================================================
 # sync-agents: メインの同期ターゲット (SPEC Feature #1, #2, #3)
 # ============================================================
 sync-agents: ## SSOTのスキル群を各エージェントの設定ファイルへ同期する
 	@echo "🔄 sync-agents: SSOT → 各エージェントへの同期を開始..."
+	@# Step 0: 外部スキルのインストール（EXTERNAL_SKILLS.md に基づく）
+	@$(MAKE) install-external-skills
 	@# Step 1: skillport doc でスキル一覧を instruction files へ反映
 	@$(MAKE) sync-skillport-doc
 	@# Step 2: ユーザーレベル AGENTS.global.md のシンボリックリンク配備
@@ -34,6 +37,19 @@ sync-agents: ## SSOTのスキル群を各エージェントの設定ファイル
 	@$(MAKE) inject-meta-prompt-opencode
 	@$(MAKE) inject-meta-prompt-codex
 	@echo "✅ sync-agents: 全エージェントへの同期が完了しました"
+
+# ============================================================
+# install-external-skills: 外部スキルの自動インストール
+# EXTERNAL_SKILLS.md に記載された全 namespace のスキルを取得
+# ============================================================
+install-external-skills: ## EXTERNAL_SKILLS.md に基づいて外部スキルをインストール
+	@echo "📦 install-external-skills: 外部スキルのインストールを確認中..."
+	@if [ -x "$(REPO_ROOT)/_scripts/install-external-skills.sh" ]; then \
+		bash "$(REPO_ROOT)/_scripts/install-external-skills.sh" || \
+			echo "⚠️  外部スキルのインストールに問題がありました（スキップして続行）"; \
+	else \
+		echo "⚠️  _scripts/install-external-skills.sh が見つかりません。スキップします"; \
+	fi
 
 # ============================================================
 # sync-skillport-doc: skillport doc の実行と各 AGENTS への直接反映
