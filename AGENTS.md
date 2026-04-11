@@ -119,6 +119,11 @@ Each skill contains step-by-step instructions, templates, and scripts.
   <location>agent-skills/agent-skill-architect/SKILL.md</location>
 </skill>
 <skill>
+  <name>ai-api</name>
+  <description>Build apps with the Claude API or Anthropic SDK. TRIGGER when: code imports `anthropic`/`@anthropic-ai/sdk`/`claude_agent_sdk`, or user asks to use Claude API, Anthropic SDKs, or Agent SDK. DO NOT TRIGGER when: code imports `openai`/other AI SDK, general programming, or ML/data-science tasks.</description>
+  <location>agent-skills/ai-api/SKILL.md</location>
+</skill>
+<skill>
   <name>anthropics/algorithmic-art</name>
   <description>Creating algorithmic art using p5.js with seeded randomness and interactive parameter exploration. Use this when users request creating art using code, generative art, algorithmic art, flow fields, or particle systems. Create original algorithmic art rather than copying existing artists' work to avoid copyright violations.</description>
   <location>agent-skills/anthropics/algorithmic-art/SKILL.md</location>
@@ -287,6 +292,11 @@ Each skill contains step-by-step instructions, templates, and scripts.
   <name>superpowers/writing-skills</name>
   <description>Use when creating new skills, editing existing skills, or verifying skills work before deployment</description>
   <location>agent-skills/superpowers/writing-skills/SKILL.md</location>
+</skill>
+<skill>
+  <name>template-skill</name>
+  <description>Replace with description of the skill and when Claude should use it.</description>
+  <location>agent-skills/template-skill/SKILL.md</location>
 </skill>
 </available_skills>
 <!-- SKILLPORT_END -->
