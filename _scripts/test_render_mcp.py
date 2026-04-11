@@ -27,20 +27,20 @@ def test_placeholders():
     
     # 1. Verify __HOME__
     home_val = replace_placeholders("__HOME__", gateway_url)
-    if not home_val == str(Path.home()):
+    if home_val != str(Path.home()):
         raise AssertionError(f"Expected {Path.home()}, got {home_val}")
     print("PASS: __HOME__ replacement")
 
     # 2. Verify __REPO_ROOT__
     repo_val = replace_placeholders("__REPO_ROOT__", gateway_url)
-    if not repo_val == str(REPO_ROOT):
+    if repo_val != str(REPO_ROOT):
         raise AssertionError(f"Expected {REPO_ROOT}, got {repo_val}")
     print("PASS: __REPO_ROOT__ replacement")
 
     # 3. Verify multiple placeholders
     multi_val = replace_placeholders("__REPO_ROOT__/__HOME__/__GATEWAY_URL__", gateway_url)
     expected = f"{REPO_ROOT}/{Path.home()}/{gateway_url}"
-    if not multi_val == expected:
+    if multi_val != expected:
         raise AssertionError(f"Expected {expected}, got {multi_val}")
     print("PASS: Multiple placeholders replacement")
 
@@ -60,11 +60,11 @@ def test_jsonc_markers():
         render_mcp_configs.write_opencode_jsonc(tmp_path, "mcp", servers)
         
         content = tmp_path.read_text(encoding="utf-8")
-        if not "// [MCP]" in content:
+        if "// [MCP]" not in content:
             raise AssertionError("Missing [MCP] marker")
-        if not "// [LSP]" in content:
+        if "// [LSP]" not in content:
             raise AssertionError("Missing [LSP] marker")
-        if not '"mcp": {' in content:
+        if '"mcp": {' not in content:
             raise AssertionError("Missing root_key insertion")
         
         try:
@@ -72,7 +72,7 @@ def test_jsonc_markers():
         except Exception:
             print(f"Error parsing content: {content}")
             raise
-        if not parsed["mcp"]["test-server"]["command"] == "echo":
+        if parsed["mcp"]["test-server"]["command"] != "echo":
             raise AssertionError("JSONC parsed missing test-server command")
         
         # Test updating existing markers
@@ -80,7 +80,7 @@ def test_jsonc_markers():
         render_mcp_configs.write_opencode_jsonc(tmp_path, "mcp", servers_updated)
         content_updated = tmp_path.read_text(encoding="utf-8")
         parsed_updated = json5.loads(content_updated)
-        if not parsed_updated["mcp"]["test-server"]["command"] == "echo2":
+        if parsed_updated["mcp"]["test-server"]["command"] != "echo2":
             raise AssertionError("Failed to update existing markers block")
         
         print("PASS: jsonc markers inserted and updated correctly.")
@@ -109,10 +109,10 @@ def test_chronos_graph_rendering():
             raise ValueError(f"Unknown format '{agent_config['format']}' for {agent_name}")
             
         root_key = agent_config["root_key"]
-        if not root_key in data:
+        if root_key not in data:
             raise AssertionError(f"root_key '{root_key}' missing in {agent_name} ({path})")
         servers = data[root_key]
-        if not "chronos-graph" in servers:
+        if "chronos-graph" not in servers:
             raise AssertionError(f"chronos-graph should be present in {agent_name} ({path})")
         print(f"PASS: {agent_name} verified presence of chronos-graph via structured data.")
 
