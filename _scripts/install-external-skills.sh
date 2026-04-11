@@ -128,12 +128,19 @@ fi
 echo ""
 
 ERRORS=0
+PROCESSED=0
 while IFS='|' read -r ns url hash; do
+    PROCESSED=$((PROCESSED + 1))
     if ! install_namespace "$ns" "$url" "$hash"; then
         ERRORS=$((ERRORS + 1))
     fi
     echo ""
 done < <(parse_manifest)
+
+if [ "$PROCESSED" -eq 0 ]; then
+    echo "❌ 外部スキルのマニフェストから有効なエントリが見つかりませんでした。" >&2
+    exit 1
+fi
 
 if [ "$ERRORS" -gt 0 ]; then
     echo "⚠️  $ERRORS 件のエラーが発生しました。"

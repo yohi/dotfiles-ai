@@ -46,9 +46,10 @@ install-external-skills: ## EXTERNAL_SKILLS.md に基づいて外部スキルを
 	@echo "📦 install-external-skills: 外部スキルのインストールを確認中..."
 	@if [ -x "$(REPO_ROOT)/_scripts/install-external-skills.sh" ]; then \
 		bash "$(REPO_ROOT)/_scripts/install-external-skills.sh" || \
-			echo "⚠️  外部スキルのインストールに問題がありました（スキップして続行）"; \
+			(echo "❌ 外部スキルのインストールに失敗しました"; exit 1); \
 	else \
-		echo "⚠️  _scripts/install-external-skills.sh が見つかりません。スキップします"; \
+		echo "❌ _scripts/install-external-skills.sh が見つからないか、実行権限がありません"; \
+		exit 1; \
 	fi
 
 # ============================================================

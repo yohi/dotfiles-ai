@@ -55,7 +55,10 @@ fi
 
 echo ""
 echo "=== Test: Dry-run mode parses manifest correctly ==="
-OUTPUT=$("$SCRIPT" --dry-run 2>&1 || true)
+STATUS=0
+OUTPUT=$("$SCRIPT" --dry-run 2>&1) || STATUS=$?
+
+assert_eq "Dry-run exits with 0" "0" "$STATUS"
 
 MANIFEST_LINES=$(awk -F'|' 'NR > 1 && NF >= 5 {
     ns = $2; gsub(/^[[:space:]]+|[[:space:]]+$/, "", ns)
