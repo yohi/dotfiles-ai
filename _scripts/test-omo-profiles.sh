@@ -37,25 +37,29 @@ if [ ! -f "opencode.jsonc" ]; then
     exit 1
 fi
 
-if [ -f "opencode.jsonc" ]; then
-    if ! grep -q "test_token_123" "opencode.jsonc"; then
-        echo "FAIL: Token substitution failed in opencode.jsonc"
-        exit 1
-    fi
-    if ! grep -q "test_package_123" "opencode.jsonc"; then
-        echo "FAIL: Package substitution failed in opencode.jsonc"
-        exit 1
-    fi
-    if grep -q "\${" "opencode.jsonc"; then
-        echo "FAIL: Unresolved variable found in opencode.jsonc"
-        exit 1
-    fi
-    echo "PASS: Variable substitution verified in opencode.jsonc"
+if ! grep -q "test_token_123" "opencode.jsonc"; then
+    echo "FAIL: Token substitution failed in opencode.jsonc"
+    exit 1
 fi
+if ! grep -q "test_package_123" "opencode.jsonc"; then
+    echo "FAIL: Package substitution failed in opencode.jsonc"
+    exit 1
+fi
+if grep -q "\${" "opencode.jsonc"; then
+    echo "FAIL: Unresolved variable found in opencode.jsonc"
+    exit 1
+fi
+echo "PASS: Variable substitution verified in opencode.jsonc"
 
 if [ -f "oh-my-opencode.jsonc" ]; then
     if ! grep -q "test_package_123" "oh-my-opencode.jsonc"; then
         echo "FAIL: Package substitution failed in oh-my-opencode.jsonc"
+        exit 1
+    fi
+    # Verify token is not empty
+    token_val=$(grep -oP '"token"\s*:\s*"\K[^"]*' "oh-my-opencode.jsonc" || true)
+    if [ -z "$token_val" ]; then
+        echo "FAIL: MCP_GATEWAY_TOKEN resolved to empty string"
         exit 1
     fi
     if grep -q "\${" "oh-my-opencode.jsonc"; then

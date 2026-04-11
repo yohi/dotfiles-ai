@@ -61,6 +61,7 @@ restore_external_skills_note() {
 
     if grep -Eq '^[[:space:]]*<available_skills([[:space:]]|>)' "$file_path" && ! grep -qF "External skills (anthropics/*, superpowers/*)" "$file_path"; then
         tmp_file=$(mktemp)
+        trap 'rm -f "$tmp_file"' EXIT INT TERM
         awk -v note="$note" '
             $0 ~ /^[[:space:]]*<available_skills([[:space:]]|>)/ {
                 print note
@@ -70,6 +71,7 @@ restore_external_skills_note() {
             { print }
         ' "$file_path" > "$tmp_file"
         mv "$tmp_file" "$file_path"
+        trap - EXIT INT TERM
     fi
 }
 

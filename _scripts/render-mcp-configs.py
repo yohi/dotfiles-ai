@@ -263,7 +263,6 @@ def main() -> int:
         if format_name in {"json", "generated_json"}:
             changed = write_json_file(path, root_key, servers)
         elif format_name == "jsonc":
-            path.parent.mkdir(parents=True, exist_ok=True)
             changed = write_jsonc_object_key(path, root_key, servers)
         elif format_name == "opencode_jsonc":
             changed = write_opencode_jsonc(path, root_key, servers)
