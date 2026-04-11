@@ -74,7 +74,7 @@ Each skill contains step-by-step instructions, templates, and scripts.
 </skill>
 <skill>
   <name>anthropics/ai-api</name>
-  <description></description>
+  <description>他モデルで対応できない長文要約や画像生成などAnthropic API固有の機能を使うときに利用。Claude APIやAnthropic SDKを活用したアプリ構築をサポートします。</description>
   <location>agent-skills/anthropics/ai-api/SKILL.md</location>
 </skill>
 <skill>

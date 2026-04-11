@@ -10,7 +10,7 @@
 
 ---
 
-### Task 1: Update `run_skillport_doc` function
+## Task 1: Update `run_skillport_doc` function
 
 **Files:**
 - Modify: `_scripts/sync_agents.sh`
@@ -57,7 +57,7 @@ git add _scripts/sync_agents.sh
 git commit -m "fix(sync): protect existing content in sync_agents.sh using tags"
 ```
 
-### Task 2: Update validation loop
+## Task 2: Update validation loop
 
 **Files:**
 - Modify: `_scripts/sync_agents.sh`
@@ -94,7 +94,7 @@ git add _scripts/sync_agents.sh
 git commit -m "fix(sync): improve output file and directory validation"
 ```
 
-### Task 3: Verification
+## Task 3: Verification
 
 - [ ] **Step 1: Run the sync script**
 
