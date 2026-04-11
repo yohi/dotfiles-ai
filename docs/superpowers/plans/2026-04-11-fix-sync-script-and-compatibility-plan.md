@@ -1,6 +1,6 @@
 # Fix Sync Script and Compatibility Implementation Plan (Completed)
 
-Status: ✅ Implemented (Commits: abf29e2, 4b6556b, 450fe85)
+Status: ✅ Implemented (Commits: abf29e2, 4b6556b, 450fe85, a0e287a, 907543d, 79290d3, 907543d)
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -25,54 +25,17 @@ Status: ✅ Implemented (Commits: abf29e2, 4b6556b, 450fe85)
 Update the function to output to a temporary file and then selectively update the target file using Perl.
 
 ```bash
-<<<<
-run_skillport_doc() {
-    local output_file="$1"
-
-    if command -v skillport >/dev/null 2>&1; then
-        echo "Running skillport doc for ${output_file}..."
-        skillport doc --mode mcp --output "$output_file" --force || {
-            echo "Error: skillport doc failed for '$output_file'." >&2
-            exit 1
-        }
-        return 0
-    fi
-
-    if command -v uvx >/dev/null 2>&1; then
-        echo "Running uvx skillport doc for ${output_file}..."
-        uvx skillport doc --mode mcp --output "$output_file" --force || {
-            echo "Error: uvx skillport doc failed for '$output_file'." >&2
-            exit 1
-        }
-        return 0
-    fi
-
-    echo "Error: 'skillport' command not found. Please install it." >&2
-    exit 1
-}
-====
 run_skillport_doc() {
     local output_file="$1"
     local tmp_file
     tmp_file=$(mktemp)
 
-    if command -v skillport >/dev/null 2>&1; then
-        echo "Running skillport doc for ${output_file}..."
-        skillport doc --mode mcp --output "$tmp_file" --force || {
-            echo "Error: skillport doc failed." >&2; rm "$tmp_file"; exit 1
-        }
-    elif command -v uvx >/dev/null 2>&1; then
-        echo "Running uvx skillport doc for ${output_file}..."
-        uvx skillport doc --mode mcp --output "$tmp_file" --force || {
-            echo "Error: uvx skillport doc failed." >&2; rm "$tmp_file"; exit 1
-        }
-    else
-        echo "Error: 'skillport' command not found." >&2; rm "$tmp_file"; exit 1
-    fi
+    # (Generation logic using skillport or uvx omitted for brevity)
 
     if [[ -f "$output_file" ]] && grep -q "<!-- SKILLPORT_START -->" "$output_file" && grep -q "<!-- SKILLPORT_END -->" "$output_file"; then
         echo "Updating SkillPort section in existing ${output_file}..."
-        # Extract the content between tags from the tmp file and replace it in output_file
+        # Slurp the entire tmp_file into $s and perform a tag-based replacement in the output_file.
+        # This replaces everything between SKILLPORT_START and SKILLPORT_END tags.
         perl -0777 -i -pe "BEGIN{undef $/; open(F, '<', '$tmp_file') or die; \$s=<F>; close F;} s/<!-- SKILLPORT_START -->.*?<!-- SKILLPORT_END -->/\$s/gs" "$output_file"
     else
         echo "Writing initial skill listings to ${output_file}..."
@@ -80,35 +43,16 @@ run_skillport_doc() {
     fi
     rm "$tmp_file"
 }
->>>>
 ```
 
 - [x] **Step 2: Modify output file validation loop**
 
-This is the original Task 1 fix. Ensure it is implemented correctly.
-
-```bash
-<<<<
-for output_file in "${OUTPUT_FILES[@]}"; do
-    output_dir=$(dirname "$output_file")
-    if [[ ! -d "$output_dir" ]] || [[ ! -w "$output_dir" ]]; then
-        echo "Error: Output directory '$output_dir' does not exist or is not writable." >&2
-        exit 1
-    fi
-
-    if [[ -e "$output_file" ]]; then
-        if [[ ! -f "$output_file" ]] || [[ ! -w "$output_file" ]] || [[ ! -r "$output_file" ]]; then
-            echo "Error: Output file '$output_file' exists but is not a regular file or not accessible." >&2
-            exit 1
-        fi
-    fi
-
-    run_skillport_doc "$output_file"
-====
-# (Keep current loop structure as per Step 1, ensuring the hierarchical check is applied)
-# If the previous implementer already did this, just verify it.
->>>>
-```
+**Verified and Validated:**
+- **Loop Structure:** Maintained the for loop iterating over `OUTPUT_FILES` (`for output_file in "${OUTPUT_FILES[@]}"`).
+- **Hierarchical Checks:**
+    - **Directory Level:** Added existence and writability checks for the parent directory using `dirname "$output_file"`. If the directory is missing or read-only, the script exits immediately to prevent invalid file creation attempts.
+    - **File Level:** If the target file already exists, confirmed it is a regular file with read and write permissions. If it doesn't exist, the script proceeds to create it (relaxed from previous "file must exist" requirement).
+- **Function Execution:** `run_skillport_doc` is invoked for each file, followed by `normalize_locations` (to ensure relative paths) and `restore_external_skills_note` (to maintain critical warnings).
 
 - [x] **Step 3: Commit changes**
 

@@ -36,6 +36,8 @@ The following rules apply to **ALL** projects unless overridden by a local proje
 3. **Priority**: Local project rules > Global user preferences (this file) > Default behaviors.
 
 
+
+
 <!-- SKILLPORT_START -->
 ## SkillPort Skills
 
@@ -74,7 +76,7 @@ Each skill contains step-by-step instructions, templates, and scripts.
 </skill>
 <skill>
   <name>anthropics/ai-api</name>
-  <description>他モデルで対応できない長文要約や画像生成などAnthropic API固有の機能を使うときに利用。Claude APIやAnthropic SDKを活用したアプリ構築をサポートします。</description>
+  <description>Build apps with the Claude API or Anthropic SDK. TRIGGER when code imports 'anthropic', '@anthropic-ai/sdk', or 'claude_agent_sdk', or user asks to use Claude API, Anthropic SDKs, or Agent SDK. DO NOT TRIGGER when code imports 'openai' or other AI SDKs, general programming, or ML/data-science tasks.</description>
   <location>agent-skills/anthropics/ai-api/SKILL.md</location>
 </skill>
 <skill>
@@ -249,6 +251,7 @@ Each skill contains step-by-step instructions, templates, and scripts.
 </skill>
 </available_skills>
 <!-- SKILLPORT_END -->
+
 
 
 ## 6. Agent-Specific Contexts (Unified)

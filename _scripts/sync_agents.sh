@@ -36,6 +36,8 @@ run_skillport_doc() {
 
     if [[ -f "$output_file" ]] && grep -q "<!-- SKILLPORT_START -->" "$output_file" && grep -q "<!-- SKILLPORT_END -->" "$output_file"; then
         echo "Updating SkillPort section in existing ${output_file}..."
+        # Slurp the entire tmp_file into $s and perform a tag-based replacement in the output_file.
+        # This replaces everything between SKILLPORT_START and SKILLPORT_END tags.
         perl -0777 -i -pe "BEGIN{undef $/; open(F, '<', '$tmp_file') or die; \$s=<F>; close F;} s/<!-- SKILLPORT_START -->.*?<!-- SKILLPORT_END -->/\$s/gs" "$output_file"
     else
         echo "Writing initial skill listings to ${output_file}..."
