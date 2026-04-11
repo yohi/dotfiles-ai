@@ -2,8 +2,8 @@
 #
 # _scripts/sync_agents.sh
 # description: skillport doc を実行して、agent-skills/ をソースに
-#              AGENTS.md と global-rules/AGENTS.global.md の skill 一覧を
-#              それぞれ直接更新する。
+#              global-rules/AGENTS.global.md の skill 一覧を
+#              直接更新する。
 #
 
 set -euo pipefail
@@ -59,10 +59,10 @@ restore_external_skills_note() {
      IMPORTANT: Custom skills are tracked in Git, but external namespaces must be ignored
      in the project root .gitignore (blacklist strategy) to avoid polluting the repo. -->'
 
-    if grep -E -q "^\s*<available_skills(\s|>)" "$file_path" && ! grep -qF "External skills (anthropics/*, superpowers/*)" "$file_path"; then
+    if grep -Eq '^[[:space:]]*<available_skills([[:space:]]|>)' "$file_path" && ! grep -qF "External skills (anthropics/*, superpowers/*)" "$file_path"; then
         tmp_file=$(mktemp)
         awk -v note="$note" '
-            $0 ~ /^\s*<available_skills(\s|>)/ {
+            $0 ~ /^[[:space:]]*<available_skills([[:space:]]|>)/ {
                 print note
                 print
                 next
@@ -92,4 +92,3 @@ for output_file in "${OUTPUT_FILES[@]}"; do
 done
 
 echo "✅ Successfully synchronized skill listings to global-rules/AGENTS.global.md."
- to AGENTS.md and global-rules/AGENTS.global.md."
