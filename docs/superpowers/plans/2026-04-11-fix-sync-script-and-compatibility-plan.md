@@ -1,6 +1,6 @@
 # Fix Sync Script and Compatibility Implementation Plan (Completed)
 
-Status: ✅ Implemented (Commits: abf29e2, 4b6556b, 450fe85, a0e287a, 907543d, 79290d3, 907543d)
+Status: ✅ Implemented (Commits: abf29e2, 4b6556b, 450fe85, a0e287a, 907543d, 79290d3)
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -71,13 +71,11 @@ git commit -m "fix(sync): protect existing content in sync_agents.sh using tags"
 - [x] **Step 1: Replace `grep -oP` with `sed`**
 
 ```bash
-<<<<
-    # Verify token is not empty
-    token_val=$(grep -oP '"token"\s*:\s*"\K[^"]*' "oh-my-opencode.jsonc" || true)
-====
-    # Verify token is not empty
-    token_val=$(sed -n 's/.*"token"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "oh-my-opencode.jsonc" || true)
->>>>
+# 旧実装:
+token_val=$(grep -oP '"token"\s*:\s*"\K[^"]*' "oh-my-opencode.jsonc" || true)
+
+# 新実装:
+token_val=$(sed -n 's/.*"token"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "oh-my-opencode.jsonc" || true)
 ```
 
 - [x] **Step 2: Commit changes**
