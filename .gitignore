@@ -6,7 +6,6 @@
 *.log
 fix_all.sh
 # Agent Skills (Exclude external/fetched skills managed by EXTERNAL_SKILLS.md)
-agent-skills/ai-api/
 agent-skills/anthropics/
 agent-skills/superpowers/
 
