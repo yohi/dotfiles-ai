@@ -94,55 +94,68 @@ def write_json_file(path: Path, root_key: str, servers: dict[str, Any]) -> bool:
     return True
 
 
+def _ensure_jsonc_key_exists(
+    path: Path, root_key: str, template_content: str, search_pattern: str | re.Pattern[str]
+) -> str:
+    """JSONCファイルにキーまたはマーカーが存在することを確認し、なければ挿入する。更新後のテキストを返す。"""
+    text = path.read_text(encoding="utf-8") if path.exists() else ""
+
+    if isinstance(search_pattern, str):
+        match = re.search(search_pattern, text)
+    else:
+        match = search_pattern.search(text)
+
+    if not match:
+        if not text:
+            # ファイルが空または存在しない場合
+            text = f"{{\n{template_content}\n}}\n"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(text, encoding="utf-8")
+        elif text.strip().endswith("}"):
+            # 末尾の中括弧の前に挿入
+            pos = text.rfind("}")
+            last_char = text[:pos].rstrip()[-1:] if text[:pos].rstrip() else ""
+            prefix = "" if last_char in ("{", ",") else ",\n"
+            text = text[:pos] + f"{prefix}{template_content}\n" + text[pos:]
+            path.write_text(text, encoding="utf-8")
+
+        # 再度検索
+        if isinstance(search_pattern, str):
+            match = re.search(search_pattern, text)
+        else:
+            match = search_pattern.search(text)
+
+        if not match:
+            raise RuntimeError(f"Could not ensure existence of pattern in {path}")
+
+    return text
+
+
 def write_opencode_jsonc(path: Path, root_key: str, servers: dict[str, Any]) -> bool:
-    path.parent.mkdir(parents=True, exist_ok=True)
-
-    text = ""
-    if path.exists():
-        text = path.read_text(encoding="utf-8")
-
-    # [MCP] マーカーとそのインデントを検索
-    pattern = re.compile(
-        r'^(\s*)// \[MCP\]\r?\n.*?^(\s*)// \[LSP\]',
+    marker_pattern = re.compile(
+        r"^(\s*)// \[MCP\]\r?\n.*?^(\s*)// \[LSP\]",
         re.MULTILINE | re.DOTALL,
     )
-    match = pattern.search(text) if text else None
-    
+    template = f'  // [MCP]\n  "{root_key}": {{}},\n  // [LSP]'
+    text = _ensure_jsonc_key_exists(path, root_key, template, marker_pattern)
+    match = marker_pattern.search(text)
+    if not match:
+        raise RuntimeError(f"Marker // [MCP] ... // [LSP] not found in {path}")
+
     # インデントの検出 (デフォルトは 2 スペース)
     indent = match.group(1) if match else "  "
-    
+
     raw_block = json.dumps(servers, indent=2, ensure_ascii=False)
     block_lines = raw_block.splitlines()
     block = block_lines[0]
     if len(block_lines) > 1:
         # 各行にインデントを付与 (既存の 2 スペース + 検出されたインデント)
         block += "\n" + "\n".join(f"{indent}{line}" for line in block_lines[1:])
-    
+
     # 置換文字列を作成 (末尾カンマ付き)
     replacement = f'{indent}// [MCP]\n{indent}"{root_key}": {block},\n{indent}// [LSP]'
 
-    if not (text and match):
-        # マーカーが見つからない場合
-        if not text:
-            # ファイル自体が存在しない場合は最小構成で作成
-            path.parent.mkdir(parents=True, exist_ok=True)
-            text = f'{{\n  // [MCP]\n  "{root_key}": {{}},\n  // [LSP]\n}}\n'
-            path.write_text(text, encoding="utf-8")
-            match = pattern.search(text)
-        elif not match:
-            # マーカーがない場合は末尾の中括弧の前に挿入を試みる
-            if text.strip().endswith("}"):
-                pos = text.rfind("}")
-                last_char = text[:pos].rstrip()[-1:] if text[:pos].rstrip() else ""
-                prefix = "" if last_char in ("{", ",") else ",\n"
-                text = text[:pos] + f'{prefix}  // [MCP]\n  "{root_key}": {{}},\n  // [LSP]\n' + text[pos:]
-                path.write_text(text, encoding="utf-8")
-                match = pattern.search(text)
-
-        if not match:
-            raise RuntimeError(f"Marker // [MCP] ... // [LSP] not found in {path}")
-
-    updated = text[:match.start()] + replacement + text[match.end():]
+    updated = text[: match.start()] + replacement + text[match.end() :]
     if text == updated:
         print(f"Skipped {path.name} (no changes)")
         return False
@@ -200,24 +213,12 @@ def find_object_span(text: str, open_brace_index: int) -> tuple[int, int]:
 
 
 def write_jsonc_object_key(path: Path, root_key: str, servers: dict[str, Any]) -> bool:
-    if not path.exists():
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(f'{{\n  "{root_key}": {{}}\n}}\n', encoding="utf-8")
-
-    text = path.read_text(encoding="utf-8")
-    match = re.search(rf'"{re.escape(root_key)}"\s*:\s*\{{', text)
+    key_pattern = rf'"{re.escape(root_key)}"\s*:\s*\{{'
+    template = f'  "{root_key}": {{}}'
+    text = _ensure_jsonc_key_exists(path, root_key, template, key_pattern)
+    match = re.search(key_pattern, text)
     if not match:
-        # キーがない場合は末尾の中括弧の前に挿入を試みる
-        if text.strip().endswith("}"):
-            pos = text.rfind("}")
-            last_char = text[:pos].rstrip()[-1:] if text[:pos].rstrip() else ""
-            prefix = "" if last_char in ("{", ",") else ",\n"
-            text = text[:pos] + f'{prefix}  "{root_key}": {{}},\n' + text[pos:]
-            path.write_text(text, encoding="utf-8")
-            match = re.search(rf'"{re.escape(root_key)}"\s*:\s*\{{', text)
-        
-        if not match:
-            raise RuntimeError(f"Key '{root_key}' not found in {path}")
+        raise RuntimeError(f"Key '{root_key}' not found in {path}")
 
     open_brace_index = text.find("{", match.start())
     _, object_end = find_object_span(text, open_brace_index)

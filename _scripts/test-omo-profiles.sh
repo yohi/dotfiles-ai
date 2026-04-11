@@ -63,6 +63,9 @@ if [ -f "oh-my-opencode.jsonc" ]; then
         exit 1
     fi
     echo "PASS: Variable substitution verified in oh-my-opencode.jsonc"
+else
+    echo "FAIL: oh-my-opencode.jsonc not generated"
+    exit 1
 fi
 
 echo "🎉 All oh-my-opencode profiles tests passed successfully!"
