@@ -82,10 +82,15 @@ function omo-set-profile() {
   local base_output_path="${script_dir}/opencode.jsonc"
   
   if [ -f "$script_dir/../.env" ]; then
-    set -o allexport
+    # allexport の現在の状態を保存
+    case "$-" in
+      *a*) local restore_allexport="set -a" ;;
+      *) local restore_allexport="set +a" ;;
+    esac
+    set -a
     # shellcheck source=/dev/null
     source "$script_dir/../.env"
-    set +o allexport
+    $restore_allexport
   fi
 
   # 環境変数を展開して上書き生成 (対象変数のみを置換)
@@ -115,4 +120,4 @@ function omo-set-profile() {
 }
 
 # 読み込み時にデフォルトをセット
-omo-set-profile hybrid
+# omo-set-profile hybrid は、環境変数が準備できた段階で明示的に呼び出す必要があります。

@@ -63,9 +63,9 @@ def test_jsonc_markers():
         
         try:
             parsed = json5.loads(content)
-        except Exception as e:
+        except Exception:
             print(f"Error parsing content: {content}")
-            raise e
+            raise
         assert parsed["mcp"]["test-server"]["command"] == "echo", "JSONC parsed missing test-server command"
         
         # Test updating existing markers

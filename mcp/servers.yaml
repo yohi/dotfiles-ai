@@ -92,5 +92,7 @@ agents:
         type: remote
         url: __GATEWAY_URL__
         enabled: true
+        headers:
+          Authorization: Bearer ${MCP_GATEWAY_TOKEN}
 
       chronos-graph: *chronos_graph

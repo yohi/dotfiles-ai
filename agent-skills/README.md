@@ -45,7 +45,6 @@ uvx skillport add https://github.com/user/repo/path/to/skill
 > `agent-skills/` ディレクトリは、原則として**自作スキル（ローカル）を Git で管理する**運用となっています。
 > 外部から導入したスキル（`anthropics/` や `superpowers/` 等）の実体ファイルは Git のトラッキングから除外し、代わりに `EXTERNAL_SKILLS.md` でバージョン（Commit Hash）を管理します。
 > 新しいネームスペースの外部スキルを追加した場合は、プロジェクトルートの `.gitignore` に除外設定（例: `agent-skills/new-namespace/`）を必ず追記してください。
-
 > [!TIP]
 > **ディレクトリ指定の重要性**
 > リポジトリのルートを直接指定（例: `anthropics/skills`）すると、ルートにある `template` フォルダなどがバリデーションエラーを引き起こし、導入に失敗することがあります。
