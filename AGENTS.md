@@ -93,10 +93,12 @@ docker container prune -f --filter "label=docker-mcp=true"
 <!-- SKILLPORT_END -->
 
 ## Superpowers Workflow
-このプロジェクトは `global-rules/AGENTS.global.md` に定義された **Superpowers Workflow** を遵守します。
+This project adheres to the **Superpowers Workflow** as defined in [`global-rules/AGENTS.global.md`](global-rules/AGENTS.global.md). All Skill Integration rules, mandatory MCP tool usage, and workflow principles defined in the global reference apply here to balance rigor and efficiency based on task complexity.
 
 ### Project Application Level
-AI エージェント設定の中央権威であるため、基本的には **Level 1 (High Intensity)** での運用を原則とします。ただし、ドキュメントの微修正や軽微な設定変更には **Level 3 (Low Intensity)** を適用し、効率を優先します。
+As the central authority for AI agent configurations, **Level 1 (High Intensity)** is the default for most tasks.
+- **Level 2 (Medium Intensity)** may be applied for refactoring, improvements, or moderate logic changes.
+- **Level 3 (Low Intensity)** is reserved for minor documentation edits or trivial configuration changes to ensure a rapid response without sacrificing essential validation.
 
 ## 単体使用時の注意点
 
