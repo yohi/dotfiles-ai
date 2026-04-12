@@ -88,40 +88,15 @@ docker container prune -f --filter "label=docker-mcp=true"
 <!--
   NOTE: Global skills are maintained in global-rules/AGENTS.global.md.
   To avoid context bloating, common skills are not listed in this project's local AGENTS.md.
+  Refer to the global rules for the full available skill list.
 -->
 <!-- SKILLPORT_END -->
 
-## BEGIN Superpowers Workflow
-# Superpowers Workflow (Adaptive Application)
-This project employs the [obra/superpowers](https://github.com/obra/superpowers) workflow. While its principles are mandatory, its execution MUST be **tailored to the task's complexity** to balance rigor and efficiency.
+## Superpowers Workflow
+このプロジェクトは `global-rules/AGENTS.global.md` に定義された **Superpowers Workflow** を遵守します。
 
-## Core Mandate: "Think, Plan, Verify"
-Regardless of task size, you MUST adhere to the core philosophy:
-1.  **Research & Design:** Understand context and constraints before acting (`superpowers/brainstorming`).
-2.  **Structured Planning:** Define steps before execution (`superpowers/writing-plans`).
-3.  **Empirical Verification:** Confirm outcomes with evidence (`superpowers/verification-before-completion`).
-
-## Adaptive Execution Levels
-
-### 1. High Intensity (New Features / Complex Bug Fixes / Architecture)
-**Full adherence is MANDATORY.**
-- **Workflow:** `superpowers/brainstorming` → `superpowers/writing-plans` → `superpowers/test-driven-development` → `superpowers/verification-before-completion`.
-- **Requirement:** Detailed design docs, multi-checkpoint plans, and pre-implementation test cases.
-
-### 2. Medium Intensity (Improvements / Refactoring / Moderate Logic Changes)
-**Streamlined execution.**
-- **Workflow:** Combined (Brainstorm/Plan) → Implementation → `superpowers/verification-before-completion`.
-- **Requirement:** A clear, concise implementation plan. TDD is recommended for core logic but can be adapted for non-critical paths.
-
-### 3. Low Intensity (Trivial Fixes / Documentation / Config Typos)
-**Rapid response.**
-- **Workflow:** Brief mental model check → Direct Act → Immediate Verification.
-- **Requirement:** Formal skills may be skipped for speed, but the final state MUST be verified and reported.
-
-## Skill Integration (SkillPort)
-- **Tool-First:** AI agents MUST use the `load_skill` (MCP) tool as the primary method for loading expert guidance. Direct file path reads or direct access to skill files are strictly forbidden during runtime and for Pull Requests.
-- **CLI Fallback:** Use `skillport show` only for manual operations or in non-MCP environments where specifically instructed.
-## END Superpowers Workflow
+### Project Application Level
+AI エージェント設定の中央権威であるため、基本的には **Level 1 (High Intensity)** での運用を原則とします。ただし、ドキュメントの微修正や軽微な設定変更には **Level 3 (Low Intensity)** を適用し、効率を優先します。
 
 ## 単体使用時の注意点
 
