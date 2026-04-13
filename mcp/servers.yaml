@@ -43,6 +43,14 @@ _nexus: &nexus
   env:
     NEXUS_STORAGE_ROOT_DIR: __HOME__/program/private/nexus/.nexus
 
+_nexus_modern: &nexus_modern
+  type: local
+  command:
+    - node
+    - __HOME__/program/private/nexus/dist/bin/nexus.js
+  environment:
+    NEXUS_STORAGE_ROOT_DIR: __HOME__/program/private/nexus/.nexus
+
 notes:
   codex: Codex CLI MCP configuration is not managed here because this repository does not currently contain a supported Codex MCP config surface.
 
@@ -127,4 +135,4 @@ agents:
           Authorization: Bearer ${MCP_GATEWAY_TOKEN}
 
       chronos-graph: *chronos_graph_modern
-      nexus: *nexus
+      nexus: *nexus_modern
