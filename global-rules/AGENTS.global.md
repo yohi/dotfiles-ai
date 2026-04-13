@@ -292,6 +292,7 @@ Regardless of task size, you MUST adhere to the core philosophy:
 - **Requirement:** Formal skills may be skipped for speed, but the final state MUST be verified and reported.
 
 ## Skill Integration (SkillPort)
-- **Tool-First:** AI agents MUST use the `load_skill` (MCP) tool as the primary method for loading expert guidance. Direct file path reads or direct access to skill files are strictly forbidden during runtime and for Pull Requests.
+- **Tool-First (Exclusive):** AI agents MUST use the `load_skill` (MCP) tool as the **exclusive** method for loading expert guidance. Direct file path reads or direct access to skill files are strictly forbidden during runtime and for Pull Requests.
+- **No Fallback & Termination:** If the `load_skill` tool fails, or the SkillPort MCP server is unavailable, the agent MUST NOT attempt any fallback (such as direct file reads). The agent MUST terminate the current task and report the error immediately.
 - **CLI Fallback:** Use `skillport show` only for manual operations or in non-MCP environments where specifically instructed.
 ## END Superpowers Workflow

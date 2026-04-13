@@ -16,6 +16,8 @@ _chronos_graph_legacy: &chronos_graph_legacy
     STORAGE_BACKEND: sqlite
     SQLITE_DB_PATH: __HOME__/.context-store/memories.db
     GRAPH_ENABLED: "true"
+    EMBEDDING_PROVIDER: local
+    LOCAL_MODEL_NAME: "cl-nagoya/ruri-v3-310m"
 
 _chronos_graph_modern: &chronos_graph_modern
   type: local
@@ -31,6 +33,8 @@ _chronos_graph_modern: &chronos_graph_modern
     STORAGE_BACKEND: sqlite
     SQLITE_DB_PATH: __HOME__/.context-store/memories.db
     GRAPH_ENABLED: "true"
+    EMBEDDING_PROVIDER: local
+    LOCAL_MODEL_NAME: "cl-nagoya/ruri-v3-310m"
 
 notes:
   codex: Codex CLI MCP configuration is not managed here because this repository does not currently contain a supported Codex MCP config surface.

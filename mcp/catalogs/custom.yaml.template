@@ -33,10 +33,11 @@ registry:
       - name: SKILLPORT_SKILLS_DIR
         value: __HOME__/.skillport/skills:__REPO_ROOT__/agent-skills
       - name: SKILLPORT_DB_PATH
-        value: __HOME__/.skillport/db
+        value: /mcp/db
     volumes:
+      - skillport-db:/mcp
       - __HOME__/.skillport:__HOME__/.skillport
-      - __REPO_ROOT__:__REPO_ROOT__
+      - __REPO_ROOT__:__REPO_ROOT__:ro
   playwright:
     description: Web browser automation and testing.
     title: Playwright
@@ -90,11 +91,3 @@ registry:
     title: Chrome DevTools
     type: server
     image: mcp/chrome-devtools
-
-
-
-
-
-
-
-
