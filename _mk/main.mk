@@ -78,12 +78,12 @@ install-requirements:
 		pip install -r requirements.txt; \
 	fi
 
-lint: ## Run Ruff and Mypy on _scripts/
-	@echo "🔍 _scripts/ に対して Ruff と Mypy を実行中..."
+lint: ## Run Ruff and Mypy on .
+	@echo "🔍 . に対して Ruff と Mypy を実行中..."
 	@if command -v uv >/dev/null 2>&1; then \
-		$(PYTHON) ruff check _scripts/ && $(PYTHON) mypy _scripts/; \
+		$(PYTHON) ruff check . && $(PYTHON) mypy .; \
 	else \
-		ruff check _scripts/ && mypy _scripts/; \
+		ruff check . && mypy .; \
 	fi
 
 # --- Workflow Guide Targets (Help Integration & Parent Compatibility) ---
@@ -118,3 +118,5 @@ test: ## プロジェクトのテスト/静的解析を実行
 	@$(MAKE) lint
 	@echo "🧪 Running profile substitution tests..."
 	@bash _scripts/test-omo-profiles.sh
+	@echo "🧪 Running MCP Make target tests..."
+	@bash _scripts/test-mcp-make-targets.sh

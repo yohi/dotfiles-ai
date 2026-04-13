@@ -17,7 +17,9 @@ jobs:
         enable-cache: true
     - name: Set up Python via uv
       run: uv python install 3.10
-    - name: Run Linters
+    - name: Install system dependencies
       run: |
-        uv run --python 3.10 --with-requirements requirements.txt ruff check .
-        uv run --python 3.10 --with-requirements requirements.txt mypy .
+        sudo apt-get update
+        sudo apt-get install -y gettext
+    - name: Run Makefile Tests
+      run: make test
