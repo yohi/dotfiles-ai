@@ -40,6 +40,12 @@ The following rules apply to **ALL** projects unless overridden by a local proje
 
 
 
+
+
+
+
+
+
 <!-- SKILLPORT_START -->
 ## SkillPort Skills
 
@@ -75,6 +81,11 @@ Each skill contains step-by-step instructions, templates, and scripts.
   <name>agent-skill-architect</name>
   <description>Designs and generates best-practice-compliant SKILL.md files for OpenCode agent skills. Use when creating new agent skills, drafting skill definitions, or improving existing skill files. Guides through requirements discovery and outputs production-ready SKILL.md with proper YAML frontmatter, XML-structured instructions, and progressive disclosure patterns.</description>
   <location>agent-skills/agent-skill-architect/SKILL.md</location>
+</skill>
+<skill>
+  <name>anthropics/ai-api</name>
+  <description>Build apps with the Claude API or Anthropic SDK. TRIGGER when code imports 'anthropic', '@anthropic-ai/sdk', or 'claude_agent_sdk', or user asks to use Claude API, Anthropic SDKs, or Agent SDK. DO NOT TRIGGER when code imports 'openai' or other AI SDKs, general programming, or ML/data-science tasks.</description>
+  <location>agent-skills/anthropics/ai-api/SKILL.md</location>
 </skill>
 <skill>
   <name>anthropics/algorithmic-art</name>
@@ -248,6 +259,9 @@ Each skill contains step-by-step instructions, templates, and scripts.
 </skill>
 </available_skills>
 <!-- SKILLPORT_END -->
+
+
+
 
 
 
