@@ -37,14 +37,7 @@ def parse_jsonc(text: str) -> dict[str, Any]:
 def replace_placeholders(value: Any, gateway_url: str) -> Any:
     if isinstance(value, str):
         # 置換対象のマップ
-        placeholders = {
-            "__GATEWAY_URL__": gateway_url,
-            "__HOME__": str(Path.home()),
-            "__REPO_ROOT__": str(REPO_ROOT),
-        }
         val = value
-        for k, v in placeholders.items():
-            val = val.replace(k, v)
 
         # ${VAR} または ${VAR:-default} 形式の環境変数を探し、展開する
         def env_replacer(match: re.Match[str]) -> str:
@@ -71,10 +64,11 @@ def replace_placeholders(value: Any, gateway_url: str) -> Any:
 
         # ${VAR:-default} 形式にマッチする正規表現
         env_pattern = re.compile(r"\$\{([^}:-]+)(?::-(.*))?\}")
-        val = env_pattern.sub(env_replacer, value)
+        val = env_pattern.sub(env_replacer, val)
 
-        # プレースホルダの置換 (HOME 等)
+        # プレースホルダの置換
         placeholders = {
+            "__GATEWAY_URL__": gateway_url,
             "__HOME__": str(Path.home()),
             "__REPO_ROOT__": str(REPO_ROOT),
         }
