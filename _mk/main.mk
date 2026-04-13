@@ -118,3 +118,5 @@ test: ## プロジェクトのテスト/静的解析を実行
 	@$(MAKE) lint
 	@echo "🧪 Running profile substitution tests..."
 	@bash _scripts/test-omo-profiles.sh
+	@echo "🧪 Running MCP Make target tests..."
+	@bash _scripts/test-mcp-make-targets.sh

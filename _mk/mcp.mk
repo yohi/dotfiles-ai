@@ -15,7 +15,7 @@ sync-mcp: ## Render and synchronize centralized MCP configs
 status-mcp: ## Docker MCP Gatewayのステータスを確認
 	@echo "📊 Docker MCP Gateway status:"
 	@if systemctl --user is-active docker-mcp-gateway.service > /dev/null 2>&1; then \
-		systemctl --user status docker-mcp-gateway.service; \
+		systemctl --user --no-pager status docker-mcp-gateway.service; \
 	else \
 		echo "❌ Docker MCP Gateway is not running."; \
 		exit 1; \
