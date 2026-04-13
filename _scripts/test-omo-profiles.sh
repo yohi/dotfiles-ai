@@ -3,6 +3,13 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+
+# Ensure envsubst is available
+if ! command -v envsubst >/dev/null 2>&1; then
+    echo "❌ Error: envsubst command not found. Please install gettext package." >&2
+    exit 1
+fi
+
 echo "Running oh-my-opencode profiles Tests..."
 
 # We will test substitution by creating a temporary directory to act as the opencode directory
