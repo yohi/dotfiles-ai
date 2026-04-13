@@ -33,7 +33,7 @@ registry:
       - name: SKILLPORT_SKILLS_DIR
         value: __HOME__/.skillport/skills:__REPO_ROOT__/agent-skills
       - name: SKILLPORT_DB_PATH
-        value: /mcp/db
+        value: /mcp/db # NOTE: If migrating from __HOME__/.skillport/db, manual 'cp' to the 'skillport-db' volume may be required.
     volumes:
       - skillport-db:/mcp
       - __HOME__/.skillport:__HOME__/.skillport
