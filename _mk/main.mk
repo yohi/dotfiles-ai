@@ -1,4 +1,4 @@
-.PHONY: all install install-agents install-ides setup setup-agents setup-ides mcp-render link clean-internal install-requirements lint init sync secrets status clean test clean-legacy
+.PHONY: all install install-agents install-ides setup setup-agents setup-ides mcp-render link clean-internal install-requirements lint init sync secrets status clean test clean-legacy configure-git-ignore
 
 # --- Standard Entry Points ---
 all: install setup
@@ -120,3 +120,11 @@ test: ## プロジェクトのテスト/静的解析を実行
 	@bash _scripts/test-omo-profiles.sh
 	@echo "🧪 Running MCP Make target tests..."
 	@bash _scripts/test-mcp-make-targets.sh
+
+# --- Local Git Ignore Configuration ---
+configure-git-ignore: ## [.git] .gitignore_template をグローバル設定に同期する
+	@echo "🔄 グローバル gitignore を同期中..."
+	@mkdir -p $(HOME)/.config/git
+	@cp .gitignore_template $(HOME)/.config/git/ignore
+	@git config --global core.excludesfile $(HOME)/.config/git/ignore
+	@echo "✅ グローバル除外設定を同期しました: $(HOME)/.config/git/ignore"
