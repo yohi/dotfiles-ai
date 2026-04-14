@@ -55,7 +55,12 @@ setup-skillport: ## SkillPort のディレクトリ構成をセットアップ
 	fi
 	@ln -sfn "$(AGENT_SKILLS_REPO_ROOT)" "$(SKILLPORT_SKILLS_DIR)"
 	@echo "✅ セットアップが完了しました: $(SKILLPORT_SKILLS_DIR) -> $(AGENT_SKILLS_REPO_ROOT)"
+	$(Q_ECHO) "💡 使い方を確認するには 'make help-skillport' を実行してください。"
 	@$(call create_marker,setup-skillport,1)
+
+.PHONY: help-skillport
+help-skillport: ## SkillPort の使い方を表示
+	$(call show-guide,$(REPO_ROOT)/_docs/guides/skillport.md)
 
 # SkillPort の状態確認
 check-skillport: ## SkillPort の状態を確認
