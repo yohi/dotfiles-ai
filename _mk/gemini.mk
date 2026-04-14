@@ -114,17 +114,13 @@ setup-supergemini:
 	ln -sf "$(REPO_ROOT)/gemini/settings.json" "$(HOME_DIR)/.gemini/settings.json"; \
 	\
 	echo "✅ SuperGemini フレームワークのシンボリックリンク設定が完了しました";
-	@echo ""
-	@echo "✨ SuperGemini のセットアップが完了しました！"
-	@echo "💡 使い方を確認するには 'make help-gemini' を実行してください。"
+	$(Q_ECHO) ""
+	$(Q_ECHO) "✨ SuperGemini のセットアップが完了しました！"
+	$(Q_ECHO) "💡 使い方を確認するには 'make help-gemini' を実行してください。"
 
 .PHONY: help-gemini
 help-gemini: ## Gemini の使い方を表示
-	@if [ -f "$(REPO_ROOT)/_docs/guides/gemini.md" ]; then \
-		cat "$(REPO_ROOT)/_docs/guides/gemini.md"; \
-	else \
-		echo "⚠️  ガイドファイルが見つかりません: _docs/guides/gemini.md"; \
-	fi
+	$(call show-guide,$(REPO_ROOT)/_docs/guides/gemini.md)
 
 # Gemini エコシステム一括インストール
 install-gemini-ecosystem:

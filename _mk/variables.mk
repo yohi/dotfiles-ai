@@ -14,6 +14,16 @@ else
   Q_ECHO = @echo
 endif
 
+# Macro to show guide from Markdown file
+# Usage: $(call show-guide,_docs/guides/xxx.md)
+define show-guide
+	@if [ -f "$(1)" ]; then \
+		cat "$(1)"; \
+	else \
+		echo "⚠️  ガイドファイルが見つかりません: $(1)"; \
+	fi
+endef
+
 # Common paths
 HOME_DIR := $(HOME)
 REPO_ROOT := $(CURDIR)

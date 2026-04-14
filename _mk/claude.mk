@@ -50,16 +50,12 @@ install-packages-claude-code:
 		exit 1; \
 	fi
 
-	@echo "✅ Claude Code のインストールが完了しました"
-	@echo "💡 使い方を確認するには 'make help-claude' を実行してください。"
+	$(Q_ECHO) "✅ Claude Code のインストールが完了しました"
+	$(Q_ECHO) "💡 使い方を確認するには 'make help-claude' を実行してください。"
 
 .PHONY: help-claude
 help-claude: ## Claude Code の使い方を表示
-	@if [ -f "$(REPO_ROOT)/_docs/guides/claude.md" ]; then \
-		cat "$(REPO_ROOT)/_docs/guides/claude.md"; \
-	else \
-		echo "⚠️  ガイドファイルが見つかりません: _docs/guides/claude.md"; \
-	fi
+	$(call show-guide,$(REPO_ROOT)/_docs/guides/claude.md)
 
 # Claudia (Claude Code GUI) のインストール
 .PHONY: install-packages-claudia

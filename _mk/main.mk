@@ -1,4 +1,4 @@
-.PHONY: all install install-agents install-ides setup setup-agents setup-ides mcp-render link clean-internal install-requirements lint init sync secrets status clean test clean-legacy configure-git-ignore
+.PHONY: all install install-agents install-ides setup setup-agents setup-ides mcp-render link clean-internal install-requirements lint init sync secrets status clean test clean-legacy configure-git-ignore doctor
 
 # --- Standard Entry Points ---
 all: install setup
@@ -10,7 +10,7 @@ setup: setup-agents setup-ides ## Setup all AI agents and IDE configurations
 	-@$(MAKE) setup-superpowers 2>/dev/null || true
 	-@$(MAKE) sync-agents 2>/dev/null || true
 	-@$(MAKE) sync-mcp 2>/dev/null || true
-	@echo "✅ dotfiles-ai のコア設定が適用されました"
+	$(Q_ECHO) "✅ dotfiles-ai のコア設定が適用されました"
 
 sync: ## [更新] リポジトリを最新にし、エージェントを同期する
 	@echo "🔄 リポジトリを最新に同期中..."
@@ -110,17 +110,23 @@ status: ## [確認] 全コンポーネントの状態を一括表示
 	@$(MAKE) -s doctor
 
 doctor: ## [診断] 設定の不備や同期が必要な箇所を特定し、解決策を提示する
-	@echo "🩺 システム診断を実行中..."
+	$(Q_ECHO) "🩺 システム診断を実行中..."
 	@# 1. .env check
 	@if [ ! -f .env ]; then \
 		echo "❌ [ACTION REQUIRED] .env ファイルが見つかりません。'make init-env' を実行してください。"; \
 	fi
 	@# 2. Sync check (skills vs agents)
-	@LATEST_SKILL=$$(find agent-skills -type f -name "*.md" -printf "%T@ %p\n" | sort -n | tail -1 | cut -d' ' -f1); \
-	LATEST_CMD=$$(find agent-commands -type f -name "*.md" -printf "%T@ %p\n" | sort -n | tail -1 | cut -d' ' -f1); \
+	@LATEST_SKILL=$$(find agent-skills -type f -name "*.md" -printf "%T@ %p\n" 2>/dev/null | sort -n | tail -1 | cut -d' ' -f1); \
+	LATEST_CMD=$$(find agent-commands -type f -name "*.md" -printf "%T@ %p\n" 2>/dev/null | sort -n | tail -1 | cut -d' ' -f1); \
 	LAST_SYNC=$$(find opencode/commands -type l -printf "%T@ %p\n" 2>/dev/null | sort -n | tail -1 | cut -d' ' -f1); \
-	if [ -z "$$LAST_SYNC" ] || [ $$(echo "$$LATEST_SKILL > $$LAST_SYNC" | bc -l) -eq 1 ] || [ $$(echo "$$LATEST_CMD > $$LAST_SYNC" | bc -l) -eq 1 ]; then \
-		echo "⚠️  [ACTION REQUIRED] スキルまたはコマンドが変更されています。'make sync-agents' を実行してください。"; \
+	if [ -n "$$LAST_SYNC" ]; then \
+		if [ -n "$$LATEST_SKILL" ] && [ $$(echo "$$LATEST_SKILL > $$LAST_SYNC" | bc -l) -eq 1 ]; then \
+			echo "⚠️  [ACTION REQUIRED] スキルが変更されています。'make sync-agents' を実行してください。"; \
+		elif [ -n "$$LATEST_CMD" ] && [ $$(echo "$$LATEST_CMD > $$LAST_SYNC" | bc -l) -eq 1 ]; then \
+			echo "⚠️  [ACTION REQUIRED] コマンドが変更されています。'make sync-agents' を実行してください。"; \
+		fi; \
+	elif [ -n "$$LATEST_SKILL" ] || [ -n "$$LATEST_CMD" ]; then \
+		echo "⚠️  [ACTION REQUIRED] 同期が一度も実行されていません。'make sync-agents' を実行してください。"; \
 	fi
 	@# 3. Component specific checks
 	@if [ ! -L "$(HOME)/.claude/CLAUDE.md" ]; then \
@@ -132,10 +138,12 @@ doctor: ## [診断] 設定の不備や同期が必要な箇所を特定し、解
 	@if ! command -v skillport >/dev/null 2>&1; then \
 		echo "⚠️  [ACTION REQUIRED] SkillPort がインストールされていません。'make install-skillport' を実行してください。"; \
 	fi
-	@if ! systemctl --user is-active docker-mcp-gateway.service > /dev/null 2>&1; then \
+	@if ! systemctl --user list-unit-files docker-mcp-gateway.service >/dev/null 2>&1; then \
+		echo "❌ [ACTION REQUIRED] Docker MCP Gateway がセットアップされていません。'make setup-docker-mcp' を実行してください。"; \
+	elif ! systemctl --user is-active docker-mcp-gateway.service > /dev/null 2>&1; then \
 		echo "ℹ️  [INFO] Docker MCP Gateway が起動していません。'make start-mcp' で起動できます。"; \
 	fi
-	@echo "✅ 診断完了"
+	$(Q_ECHO) "✅ 診断完了"
 
 clean: ## 生成されたアーティファクトとキャッシュを削除
 	@echo "🧹 クリーンアップ中..."

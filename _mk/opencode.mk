@@ -194,18 +194,15 @@ setup-opencode: ## OpenCode（opencode）の設定ファイルを適用
 	@# _docs/ の設定
 	@$(call link_config,$(OPENCODE_DOTFILES_DOCS),$(OPENCODE_DOCS_PATH),docs)
 	@$(call create_marker,setup-opencode,1)
-	@echo "✅ OpenCode（opencode）の設定を適用しました"
-	@echo "💡 使い方を確認するには 'make help-opencode' を実行してください。"
+	$(Q_ECHO) "✅ OpenCode（opencode）の設定を適用しました"
+	$(Q_ECHO) "💡 使い方を確認するには 'make help-opencode' を実行してください。"
 
-.PHONY: help-opencode
-help-opencode: ## OpenCode の使い方を表示
-	@if [ -f "$(REPO_ROOT)/_docs/guides/opencode.md" ]; then \
-		cat "$(REPO_ROOT)/_docs/guides/opencode.md"; \
-	else \
-		echo "⚠️  ガイドファイルが見つかりません: _docs/guides/opencode.md"; \
-	fi
+	.PHONY: help-opencode
+	help-opencode: ## OpenCode の使い方を表示
+	$(call show-guide,$(REPO_ROOT)/_docs/guides/opencode.md)
 
-# User-friendly alias
+	# User-friendly alias
+
 install-opencode: install-packages-opencode
 
 # OpenCode の状態確認

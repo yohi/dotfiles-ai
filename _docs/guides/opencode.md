@@ -21,5 +21,11 @@
 - **AGENTS**: `~/.config/opencode/AGENTS.md`
 - **docs**: `~/.config/opencode/docs`
 
-## 📚 詳細情報:
+## 🩺 トラブルシューティング
+設定に不備があると感じた場合は、ターミナルで以下を実行してください。
+```bash
+make doctor
+```
+
+## 📚 詳細情報
 プロジェクトルートの `opencode/README.md` を参照してください。

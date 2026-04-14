@@ -16,5 +16,11 @@
 - **実体**: `agent-skills/`
 - **リンク**: `~/.skillport/skills` -> `agent-skills/`
 
-## 🔄 スキルの同期:
+## 🩺 トラブルシューティング
+設定に不備があると感じた場合は、ターミナルで以下を実行してください。
+```bash
+make doctor
+```
+
+## 🔄 スキルの同期
 `make sync-agents` を実行することで、`agent-skills/` 内の変更が各エージェント（Claude, Gemini, OpenCode等）に反映されます。
