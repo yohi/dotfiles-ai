@@ -20,7 +20,13 @@ init-env: ## Interactive setup for .env file (essential secrets only)
 	# 2. GitHub Secrets (Personal) \
 	read -p "GitHub Token (GH_TOKEN): " github_token; \
 	\
-	# 3. Internal / Auto-derived variables \
+	# 3. Path Settings \
+	read -p "Nexus Path [~/program/nexus]: " nexus_path; \
+	nexus_path=$${nexus_path:-~/program/nexus}; \
+	read -p "Chronos-Graph Path [~/program/private/chronos-graph]: " chronos_graph_path; \
+	chronos_graph_path=$${chronos_graph_path:-~/program/private/chronos-graph}; \
+	\
+	# 4. Internal / Auto-derived variables \
 	# MCP_AUTH can be used to supply a stable secret for CI/production. \
 	# For local development, a random token is generated if MCP_AUTH is unset. \
 	repo_root=$$(pwd); \
@@ -40,12 +46,15 @@ init-env: ## Interactive setup for .env file (essential secrets only)
 	echo "GH_TOKEN=$$github_token" >> .env; \
 	echo "GITHUB_TOKEN=$$github_token" >> .env; \
 	echo "" >> .env; \
+	echo "# --- Path Settings ---" >> .env; \
+	echo "NEXUS_PATH=$$nexus_path" >> .env; \
+	echo "CHRONOS_GRAPH_PATH=$$chronos_graph_path" >> .env; \
+	echo "" >> .env; \
 	echo "# --- Project Internals (Auto-derived or defaults) ---" >> .env; \
 	echo "DOTFILES_AI_REPO_ROOT=$$repo_root" >> .env; \
 	echo "MCP_AUTH_TOKEN=$$mcp_auth" >> .env; \
 	echo "MCP_GATEWAY_AUTH_TOKEN=$$mcp_auth" >> .env; \
 	echo "MCP_GATEWAY_TOKEN=$$mcp_auth" >> .env; \
-	echo "# NEXUS_PATH=~/program/nexus" >> .env; \
 	chmod 600 .env; \
 	\
 	echo "✅ .env file has been created with essential secrets."

@@ -8,16 +8,20 @@ _chronos_graph_legacy: &chronos_graph_legacy
   command: uv
   args:
     - --quiet
-    - tool
     - run
-    - --from
-    - git+https://github.com/yohi/chronos-graph.git@37308f47837469d801abc1226ee65e4262093042
-    - context-store
+    - --project
+    - ${CHRONOS_GRAPH_PATH:-__HOME__/program/private/chronos-graph}
+    - python
+    - -m
+    - context_store
   env:
     STORAGE_BACKEND: sqlite
     SQLITE_DB_PATH: __HOME__/.context-store/memories.db
     GRAPH_ENABLED: "true"
-    EMBEDDING_PROVIDER: local
+    DECAY_HALF_LIFE_DAYS: "30"
+    SIMILARITY_THRESHOLD: "0.70"
+    DEDUP_THRESHOLD: "0.90"
+    EMBEDDING_PROVIDER: local-model
     LOCAL_MODEL_NAME: "cl-nagoya/ruri-v3-310m"
 
 _chronos_graph_modern: &chronos_graph_modern
@@ -25,16 +29,20 @@ _chronos_graph_modern: &chronos_graph_modern
   command:
     - uv
     - --quiet
-    - tool
     - run
-    - --from
-    - git+https://github.com/yohi/chronos-graph.git@37308f47837469d801abc1226ee65e4262093042
-    - context-store
+    - --project
+    - ${CHRONOS_GRAPH_PATH:-__HOME__/program/private/chronos-graph}
+    - python
+    - -m
+    - context_store
   environment:
     STORAGE_BACKEND: sqlite
     SQLITE_DB_PATH: __HOME__/.context-store/memories.db
     GRAPH_ENABLED: "true"
-    EMBEDDING_PROVIDER: local
+    DECAY_HALF_LIFE_DAYS: "30"
+    SIMILARITY_THRESHOLD: "0.70"
+    DEDUP_THRESHOLD: "0.90"
+    EMBEDDING_PROVIDER: local-model
     LOCAL_MODEL_NAME: "cl-nagoya/ruri-v3-310m"
 
 _nexus: &nexus

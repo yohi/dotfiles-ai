@@ -36,6 +36,7 @@ sync-agents: ## SSOTのスキル群を各エージェントの設定ファイル
 	@# NOTE: Claude / Gemini は AGENTS.global.md を自動参照するため個別注入不要
 	@$(MAKE) inject-meta-prompt-opencode
 	@$(MAKE) inject-meta-prompt-codex
+	@touch "$(REPO_ROOT)/.last_sync"
 	@echo "✅ sync-agents: 全エージェントへの同期が完了しました"
 
 # ============================================================
