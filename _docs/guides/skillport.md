@@ -1,0 +1,20 @@
+# SkillPort 使用ガイド
+
+🛠️ SkillPort のセットアップが完了しました！
+
+## 📦 インストールされているツール:
+- `skillport`: スキル管理 CLI
+- `skillport-mcp`: スキルを LLM に提供する MCP サーバー
+
+## 📋 利用可能なコマンド例:
+- `skillport list`                - 登録済みスキルの一覧表示
+- `skillport info <skill-id>`     - スキルの詳細表示
+- `skillport lint`                - スキルのバリデーション
+- `skillport search <query>`      - スキルの検索
+
+## 📂 スキルディレクトリ:
+- **実体**: `agent-skills/`
+- **リンク**: `~/.skillport/skills` -> `agent-skills/`
+
+## 🔄 スキルの同期:
+`make sync-agents` を実行することで、`agent-skills/` 内の変更が各エージェント（Claude, Gemini, OpenCode等）に反映されます。

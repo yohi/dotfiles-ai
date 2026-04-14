@@ -6,6 +6,15 @@ setup-docker-mcp:
 	@echo "🐳 Docker MCPの設定をセットアップ中..."
 	@bash _scripts/setup-docker-mcp.sh
 	@echo "✅ Docker MCPの設定が完了しました。"
+	@echo "💡 使い方を確認するには 'make help-mcp' を実行してください。"
+
+.PHONY: help-mcp
+help-mcp: ## MCP の使い方を表示
+	@if [ -f "$(REPO_ROOT)/_docs/guides/mcp.md" ]; then \
+		cat "$(REPO_ROOT)/_docs/guides/mcp.md"; \
+	else \
+		echo "⚠️  ガイドファイルが見つかりません: _docs/guides/mcp.md"; \
+	fi
 
 sync-mcp: ## Render and synchronize centralized MCP configs
 	@bash _scripts/sync-mcp-configs.sh

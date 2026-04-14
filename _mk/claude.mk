@@ -50,20 +50,16 @@ install-packages-claude-code:
 		exit 1; \
 	fi
 
-	@echo ""
-	@echo "🎉 Claude Code のセットアップガイド:"
-	@echo "1. プロジェクトディレクトリに移動: cd your-project-directory"
-	@echo "2. Claude Code を開始: claude"
-	@echo "3. 認証方法を選択:"
-	@echo "   - Anthropic Console (デフォルト)"
-	@echo "   - Claude App (ProまたはMaxプラン)"
-	@echo "   - エンタープライズプラットフォーム"
-	@echo "4. 初回セットアップコマンド:"
-	@echo "   > summarize this project"
-	@echo "   > /init"
-	@echo ""
-	@echo "📚 詳細なドキュメント: https://docs.anthropic.com/claude-code"
 	@echo "✅ Claude Code のインストールが完了しました"
+	@echo "💡 使い方を確認するには 'make help-claude' を実行してください。"
+
+.PHONY: help-claude
+help-claude: ## Claude Code の使い方を表示
+	@if [ -f "$(REPO_ROOT)/_docs/guides/claude.md" ]; then \
+		cat "$(REPO_ROOT)/_docs/guides/claude.md"; \
+	else \
+		echo "⚠️  ガイドファイルが見つかりません: _docs/guides/claude.md"; \
+	fi
 
 # Claudia (Claude Code GUI) のインストール
 .PHONY: install-packages-claudia
@@ -227,29 +223,8 @@ install-packages-claudia:
 	@echo "🧹 一時ファイルをクリーンアップ中..."
 	@rm -rf /tmp/claudia-build 2>/dev/null || true
 
-	@echo ""
-	@echo "🎉 Claudia のセットアップが完了しました！"
-	@echo ""
-	@echo "🚀 使用方法:"
-	@echo "1. アプリケーションメニューから 'Claudia' を起動"
-	@echo "2. または、ターミナルから: /opt/claudia/claudia"
-	@echo "3. 初回起動時にClaude Codeディレクトリ（~/.claude）が自動検出されます"
-	@echo ""
-	@echo "✨ Claudia の主要機能:"
-	@echo "- 📁 プロジェクト & セッション管理（~/.claude/projects/）"
-	@echo "- 🤖 カスタムAIエージェント作成・実行"
-	@echo "- 📊 使用状況分析ダッシュボード（コスト・トークン追跡）"
-	@echo "- 🔌 MCP サーバー管理（Model Context Protocol）"
-	@echo "- ⏰ タイムライン & チェックポイント（セッション履歴）"
-	@echo "- 📝 CLAUDE.md ファイル管理・編集"
-	@echo ""
-	@echo "📚 詳細なドキュメント: https://github.com/getAsterisk/claudia"
-	@echo "🔗 公式サイト: https://claudiacode.com"
-	@echo ""
-	@echo "💡 次のステップ:"
-	@echo "- Claude Code でプロジェクトを作成してから Claudia で管理"
-	@echo "- カスタムエージェントを作成して開発タスクを自動化"
 	@echo "✅ Claudia のインストールが完了しました"
+	@echo "💡 使い方を確認するには 'make help-claude' を実行してください。"
 
 # Claude Code エコシステム一括インストール
 .PHONY: install-claude-ecosystem
@@ -302,46 +277,7 @@ install-claude-ecosystem:
 
 	@echo ""
 	@echo "🎉 Claude Code エコシステムのインストールが完了しました！"
-	@echo ""
-	@echo "🚀 使用開始ガイド:"
-	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-	@echo ""
-	@echo "💻 Claude Code (CLI):"
-	@echo "  コマンド: claude"
-	@echo "  使用例: プロジェクトディレクトリで 'claude' を実行"
-	@echo ""
-	@echo "🚀 SuperClaude (フレームワーク):"
-	@echo "  Claude Code内で以下のコマンドが利用可能:"
-	@echo "    /sc:implement <機能>     - 機能実装"
-	@echo "    /sc:design <UI>          - UI/UXデザイン"
-	@echo "    /sc:analyze <コード>     - コード分析"
-	@echo "    /sc:test <テスト>        - テストスイート"
-	@echo "    /sc:improve <コード>     - コード改善"
-	@echo ""
-	@echo "🖥️  Claudia (GUI):"
-	@echo "  起動方法: アプリケーションメニューから 'Claudia' を選択"
-	@echo "  または: /opt/claudia/claudia"
-	@echo "  機能: プロジェクト管理、使用状況分析、MCPサーバー管理等"
-	@echo ""
-	@echo "🎭 利用可能なペルソナ (SuperClaude):"
-	@echo "  🏗️  architect - システム設計"
-	@echo "  🎨 frontend  - UI/UX開発"
-	@echo "  ⚙️  backend   - API/インフラ"
-	@echo "  🔍 analyzer  - デバッグ・分析"
-	@echo "  🛡️  security  - セキュリティ"
-	@echo "  ✍️  scribe    - ドキュメント"
-	@echo ""
-	@echo "📚 ドキュメント:"
-	@echo "  Claude Code: https://docs.anthropic.com/claude-code"
-	@echo "  SuperClaude: https://superclaude-org.github.io/"
-	@echo "  Claudia: https://github.com/getAsterisk/claudia"
-	@echo ""
-	@echo "✨ おすすめワークフロー:"
-	@echo "  1. 'claude' でプロジェクトを開始"
-	@echo "  2. '/sc:implement' で機能を実装"
-	@echo "  3. Claudia でプロジェクト管理・分析"
-	@echo ""
-	@echo "✅ Claude Code エコシステムの一括インストールが完了しました"
+	@echo "💡 使い方を確認するには 'make help-claude' を実行してください。"
 
 # ========================================
 # エイリアス
@@ -357,8 +293,8 @@ setup-claude: ## Claude Codeの設定を適用
 	@echo "📝 Claude Codeの設定を適用中..."
 	@mkdir -p "$(HOME_DIR)/.claude"
 	@ln -sf "$(REPO_ROOT)/global-rules/AGENTS.global.md" "$(HOME_DIR)/.claude/CLAUDE.md"
-	# Claude Codeが設定を上書きする場合、本リポジトリのファイルが変更されます(SSOT)。
-	# ツールによってはシンボリックリンクを削除して通常ファイルで上書きする可能性があります。
+	@# Claude Codeが設定を上書きする場合、本リポジトリのファイルが変更されます(SSOT)。
+	@# ツールによってはシンボリックリンクを削除して通常ファイルで上書きする可能性があります。
 	@ln -sf "$(REPO_ROOT)/claude/settings.json" "$(HOME_DIR)/.claude/settings.json"
 	@chmod +x "$(REPO_ROOT)/claude/statusline.sh"
 	@ln -sf "$(REPO_ROOT)/claude/statusline.sh" "$(HOME_DIR)/.claude/statusline.sh"

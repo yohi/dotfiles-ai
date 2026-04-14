@@ -114,38 +114,17 @@ setup-supergemini:
 	ln -sf "$(REPO_ROOT)/gemini/settings.json" "$(HOME_DIR)/.gemini/settings.json"; \
 	\
 	echo "✅ SuperGemini フレームワークのシンボリックリンク設定が完了しました";
-	@echo "";
-	@echo "🎉 SuperGemini のセットアップが完了しました！"
-	@echo "";
-	@echo "🚀 使用方法:"
-	@echo "1. Gemini CLI を起動: gemini"
-	@echo "2. SuperGemini コマンドを使用:"
-	@echo "";
-	@echo "📋 利用可能なコマンド例:"
-	@echo "   /user-implement <feature>    - 機能の実装"
-	@echo "   /user-build                  - ビルド・パッケージング"
-	@echo "   /user-design <ui>            - UI/UXデザイン"
-	@echo "   /user-analyze <code>         - コード分析"
-	@echo "   /user-troubleshoot <issue>   - 問題のデバッグ"
-	@echo "   /user-test <suite>           - テストスイート"
-	@echo "   /user-improve <code>         - コード改善"
-	@echo "   /user-cleanup                - コードクリーンアップ"
-	@echo "   /user-document <code>        - ドキュメント生成"
-	@echo "   /user-git <operation>        - Git操作"
-	@echo "   /user-estimate <task>        - 時間見積もり"
-	@echo "   /user-task <management>      - タスク管理"
-	@echo "";
-	@echo "🎭 スマートペルソナ:"
-	@echo "   🏗️  architect   - システム設計・アーキテクチャ"
-	@echo "   🎨 frontend    - UI/UX・アクセシビリティ"
-	@echo "   ⚙️  backend     - API・インフラストラクチャ"
-	@echo "   🔍 analyzer    - デバッグ・問題解決"
-	@echo "   🛡️  security    - セキュリティ・脆弱性評価"
-	@echo "   ✍️  scribe      - ドキュメント・技術文書"
-	@echo "";
-	@echo "📝 注意: カスタムツールを再読み込みするには /reload-user-tools コマンドを使用します"
-	@echo "";
-	@echo "✅ SuperGemini のセットアップが完了しました"
+	@echo ""
+	@echo "✨ SuperGemini のセットアップが完了しました！"
+	@echo "💡 使い方を確認するには 'make help-gemini' を実行してください。"
+
+.PHONY: help-gemini
+help-gemini: ## Gemini の使い方を表示
+	@if [ -f "$(REPO_ROOT)/_docs/guides/gemini.md" ]; then \
+		cat "$(REPO_ROOT)/_docs/guides/gemini.md"; \
+	else \
+		echo "⚠️  ガイドファイルが見つかりません: _docs/guides/gemini.md"; \
+	fi
 
 # Gemini エコシステム一括インストール
 install-gemini-ecosystem:

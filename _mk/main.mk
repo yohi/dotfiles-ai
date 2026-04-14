@@ -105,6 +105,37 @@ status: ## [確認] 全コンポーネントの状態を一括表示
 	@$(MAKE) -s check-codex
 	@$(MAKE) -s check-antigravity
 	@$(MAKE) -s check-cursor-version
+	@echo ""
+	@echo "--- Action Required Check ---"
+	@$(MAKE) -s doctor
+
+doctor: ## [診断] 設定の不備や同期が必要な箇所を特定し、解決策を提示する
+	@echo "🩺 システム診断を実行中..."
+	@# 1. .env check
+	@if [ ! -f .env ]; then \
+		echo "❌ [ACTION REQUIRED] .env ファイルが見つかりません。'make init-env' を実行してください。"; \
+	fi
+	@# 2. Sync check (skills vs agents)
+	@LATEST_SKILL=$$(find agent-skills -type f -name "*.md" -printf "%T@ %p\n" | sort -n | tail -1 | cut -d' ' -f1); \
+	LATEST_CMD=$$(find agent-commands -type f -name "*.md" -printf "%T@ %p\n" | sort -n | tail -1 | cut -d' ' -f1); \
+	LAST_SYNC=$$(find opencode/commands -type l -printf "%T@ %p\n" 2>/dev/null | sort -n | tail -1 | cut -d' ' -f1); \
+	if [ -z "$$LAST_SYNC" ] || [ $$(echo "$$LATEST_SKILL > $$LAST_SYNC" | bc -l) -eq 1 ] || [ $$(echo "$$LATEST_CMD > $$LAST_SYNC" | bc -l) -eq 1 ]; then \
+		echo "⚠️  [ACTION REQUIRED] スキルまたはコマンドが変更されています。'make sync-agents' を実行してください。"; \
+	fi
+	@# 3. Component specific checks
+	@if [ ! -L "$(HOME)/.claude/CLAUDE.md" ]; then \
+		echo "⚠️  [ACTION REQUIRED] Claude の設定が未完了です。'make setup-claude' を実行してください。"; \
+	fi
+	@if [ ! -L "$(HOME)/.gemini/settings.json" ]; then \
+		echo "⚠️  [ACTION REQUIRED] Gemini の設定が未完了です。'make setup-supergemini' を実行してください。"; \
+	fi
+	@if ! command -v skillport >/dev/null 2>&1; then \
+		echo "⚠️  [ACTION REQUIRED] SkillPort がインストールされていません。'make install-skillport' を実行してください。"; \
+	fi
+	@if ! systemctl --user is-active docker-mcp-gateway.service > /dev/null 2>&1; then \
+		echo "ℹ️  [INFO] Docker MCP Gateway が起動していません。'make start-mcp' で起動できます。"; \
+	fi
+	@echo "✅ 診断完了"
 
 clean: ## 生成されたアーティファクトとキャッシュを削除
 	@echo "🧹 クリーンアップ中..."
