@@ -7,6 +7,9 @@ PYTHON := uv run --with-requirements requirements.txt
 # Verbosity control
 QUIET ?= 0
 
+# OS detection
+OS_NAME := $(shell uname -s)
+
 # Helper for conditional echo
 ifeq ($(QUIET),1)
   Q_ECHO = @:
@@ -15,12 +18,13 @@ else
 endif
 
 # Macro to show guide from Markdown file
-# Usage: $(call show-guide,_docs/guides/xxx.md)
+# Usage: $(call show-guide,path,fallback_message)
 define show-guide
 	@if [ -f "$(1)" ]; then \
 		cat "$(1)"; \
 	else \
-		echo "⚠️  ガイドファイルが見つかりません: $(1)"; \
+		msg="$(2)"; \
+		echo "$${msg:-⚠️  ガイドファイルが見つかりません: $(1)}"; \
 	fi
 endef
 

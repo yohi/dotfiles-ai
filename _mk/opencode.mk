@@ -197,11 +197,11 @@ setup-opencode: ## OpenCode（opencode）の設定ファイルを適用
 	$(Q_ECHO) "✅ OpenCode（opencode）の設定を適用しました"
 	$(Q_ECHO) "💡 使い方を確認するには 'make help-opencode' を実行してください。"
 
-	.PHONY: help-opencode
-	help-opencode: ## OpenCode の使い方を表示
+.PHONY: help-opencode
+help-opencode: ## OpenCode の使い方を表示
 	$(call show-guide,$(REPO_ROOT)/_docs/guides/opencode.md)
 
-	# User-friendly alias
+# User-friendly alias
 
 install-opencode: install-packages-opencode
 

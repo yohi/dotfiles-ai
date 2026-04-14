@@ -13,12 +13,12 @@ setup: setup-agents setup-ides ## Setup all AI agents and IDE configurations
 	$(Q_ECHO) "✅ dotfiles-ai のコア設定が適用されました"
 
 sync: ## [更新] リポジトリを最新にし、エージェントを同期する
-	@echo "🔄 リポジトリを最新に同期中..."
+	$(Q_ECHO) "🔄 リポジトリを最新に同期中..."
 	@git pull --rebase || (echo "❌ git pull --rebase に失敗しました"; exit 1)
 	@$(MAKE) sync-agents
 
 install-agents:
-	@echo "📦 dotfiles-ai エージェントバイナリをインストール中..."
+	$(Q_ECHO) "📦 dotfiles-ai エージェントバイナリをインストール中..."
 	$(MAKE) install-packages-claude-code
 	$(MAKE) install-packages-gemini-cli
 	$(MAKE) install-packages-codex
@@ -26,11 +26,11 @@ install-agents:
 	$(MAKE) install-packages-superclaude
 
 install-ides:
-	@echo "📦 dotfiles-ai IDE ツールをインストール中..."
+	$(Q_ECHO) "📦 dotfiles-ai IDE ツールをインストール中..."
 	$(MAKE) install-packages-cursor
 
 setup-agents:
-	@echo "🚀 dotfiles-ai エージェント設定をセットアップ中..."
+	$(Q_ECHO) "🚀 dotfiles-ai エージェント設定をセットアップ中..."
 	@if [ ! -d node_modules ]; then \
 		if [ -f package-lock.json ]; then \
 			npm ci; \
@@ -46,7 +46,7 @@ setup-agents:
 	$(MAKE) setup-docker-mcp
 
 setup-ides:
-	@echo "🚀 dotfiles-ai IDE 設定をセットアップ中..."
+	$(Q_ECHO) "🚀 dotfiles-ai IDE 設定をセットアップ中..."
 	$(MAKE) setup-cursor
 	$(MAKE) setup-vscode
 
@@ -90,7 +90,7 @@ lint: ## Run Ruff and Mypy on .
 
 init: install ## [初回] 依存パッケージのインストールと初期設定
 
-secrets: ## [機密] BitwardenからAPIキー等の機密情報を取得 (このリポジトリでは未実装)
+secrets: ## [機密] BitワードenからAPIキー等の機密情報を取得 (このリポジトリでは未実装)
 	@echo "ℹ️  secrets: Bitwarden からの取得機能はこのリポジトリには実装されていません。"
 	@echo "   手動で .env や API キーを確認してください。"
 
@@ -116,13 +116,13 @@ doctor: ## [診断] 設定の不備や同期が必要な箇所を特定し、解
 		echo "❌ [ACTION REQUIRED] .env ファイルが見つかりません。'make init-env' を実行してください。"; \
 	fi
 	@# 2. Sync check (skills vs agents)
-	@LATEST_SKILL=$$(find agent-skills -type f -name "*.md" -printf "%T@ %p\n" 2>/dev/null | sort -n | tail -1 | cut -d' ' -f1); \
-	LATEST_CMD=$$(find agent-commands -type f -name "*.md" -printf "%T@ %p\n" 2>/dev/null | sort -n | tail -1 | cut -d' ' -f1); \
-	LAST_SYNC=$$(find opencode/commands -type l -printf "%T@ %p\n" 2>/dev/null | sort -n | tail -1 | cut -d' ' -f1); \
+	@LATEST_SKILL=$$(find agent-skills -type f -name "*.md" 2>/dev/null | xargs ls -t 2>/dev/null | head -1); \
+	LATEST_CMD=$$(find agent-commands -type f -name "*.md" 2>/dev/null | xargs ls -t 2>/dev/null | head -1); \
+	LAST_SYNC=$$(find opencode/commands -type l 2>/dev/null | xargs ls -t 2>/dev/null | head -1); \
 	if [ -n "$$LAST_SYNC" ]; then \
-		if [ -n "$$LATEST_SKILL" ] && [ $$(echo "$$LATEST_SKILL > $$LAST_SYNC" | bc -l) -eq 1 ]; then \
+		if [ -n "$$LATEST_SKILL" ] && [ "$$LATEST_SKILL" -nt "$$LAST_SYNC" ]; then \
 			echo "⚠️  [ACTION REQUIRED] スキルが変更されています。'make sync-agents' を実行してください。"; \
-		elif [ -n "$$LATEST_CMD" ] && [ $$(echo "$$LATEST_CMD > $$LAST_SYNC" | bc -l) -eq 1 ]; then \
+		elif [ -n "$$LATEST_CMD" ] && [ "$$LATEST_CMD" -nt "$$LAST_SYNC" ]; then \
 			echo "⚠️  [ACTION REQUIRED] コマンドが変更されています。'make sync-agents' を実行してください。"; \
 		fi; \
 	elif [ -n "$$LATEST_SKILL" ] || [ -n "$$LATEST_CMD" ]; then \
@@ -138,10 +138,17 @@ doctor: ## [診断] 設定の不備や同期が必要な箇所を特定し、解
 	@if ! command -v skillport >/dev/null 2>&1; then \
 		echo "⚠️  [ACTION REQUIRED] SkillPort がインストールされていません。'make install-skillport' を実行してください。"; \
 	fi
-	@if ! systemctl --user list-unit-files docker-mcp-gateway.service >/dev/null 2>&1; then \
-		echo "❌ [ACTION REQUIRED] Docker MCP Gateway がセットアップされていません。'make setup-docker-mcp' を実行してください。"; \
-	elif ! systemctl --user is-active docker-mcp-gateway.service > /dev/null 2>&1; then \
-		echo "ℹ️  [INFO] Docker MCP Gateway が起動していません。'make start-mcp' で起動できます。"; \
+	@# 4. OS-aware MCP check
+	@if [ "$(OS_NAME)" = "Linux" ]; then \
+		if ! systemctl --user list-unit-files docker-mcp-gateway.service >/dev/null 2>&1; then \
+			echo "❌ [ACTION REQUIRED] Docker MCP Gateway がセットアップされていません。'make setup-docker-mcp' を実行してください。"; \
+		elif ! systemctl --user is-active docker-mcp-gateway.service > /dev/null 2>&1; then \
+			echo "ℹ️  [INFO] Docker MCP Gateway が起動していません。'make start-mcp' で起動できます。"; \
+		fi; \
+	elif [ "$(OS_NAME)" = "Darwin" ]; then \
+		echo "ℹ️  [INFO] macOS (Darwin) 環境です。Docker MCP Gateway の自動起動診断は現在制限されています。"; \
+	else \
+		echo "ℹ️  [INFO] $(OS_NAME) 環境です。Docker MCP Gateway の自動診断はスキップされました。"; \
 	fi
 	$(Q_ECHO) "✅ 診断完了"
 
