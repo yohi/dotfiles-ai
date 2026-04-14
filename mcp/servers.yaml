@@ -64,6 +64,17 @@ _nexus_modern: &nexus_modern
 notes:
   codex: Codex CLI MCP configuration is not managed here because this repository does not currently contain a supported Codex MCP config surface.
 
+_skillport: &skillport
+  type: stdio
+  command: uvx
+  args:
+    - --quiet
+    - skillport-mcp
+    - --skip-auto-reindex
+  env:
+    SKILLPORT_SKILLS_DIR: __REPO_ROOT__/agent-skills
+    SKILLPORT_DB_PATH: __HOME__/.skillport/db
+
 agents:
   claude:
     path: claude/claude-settings.json
@@ -76,6 +87,7 @@ agents:
         headers:
           Authorization: Bearer ${MCP_GATEWAY_TOKEN}
 
+      skillport: *skillport
       chronos-graph: *chronos_graph_legacy
       nexus: *nexus
 
@@ -91,6 +103,7 @@ agents:
           Authorization: Bearer ${MCP_GATEWAY_TOKEN}
         timeout: 60000
 
+      skillport: *skillport
       atlassian:
         type: sse
         httpUrl: https://mcp.atlassian.com/v1/mcp

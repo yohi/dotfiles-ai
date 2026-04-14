@@ -68,6 +68,37 @@ mkdir -p "$HOME/.gemini/shared"
 ln -sfn "$REPO_ROOT/gemini/settings.json" "$HOME/.gemini/settings.json"
 ln -sfn "$REPO_ROOT/gemini/settings.json" "$HOME/.gemini/shared/settings.json"
 
+echo "==> Deploying Claude Desktop MCP settings..."
+case "$(uname)" in
+    Darwin)
+        CLAUDE_CONFIG_DIR="$HOME/Library/Application Support/Claude"
+        ;;
+    Linux)
+        CLAUDE_CONFIG_DIR="$HOME/.config/Claude"
+        ;;
+    MINGW*|MSYS*|CYGWIN*)
+        CLAUDE_CONFIG_DIR="$APPDATA/Claude"
+        ;;
+    *)
+        echo "Warning: Unknown OS for Claude Desktop config. Skipping." >&2
+        CLAUDE_CONFIG_DIR=""
+        ;;
+esac
+
+if [ -n "$CLAUDE_CONFIG_DIR" ]; then
+    mkdir -p "$CLAUDE_CONFIG_DIR"
+    # シンボリックリンクを試み、失敗したらコピーする（OSやファイルシステムによる制限のため）
+    ln -sfn "$REPO_ROOT/claude/claude-settings.json" "$CLAUDE_CONFIG_DIR/claude_desktop_config.json" || \
+    cp "$REPO_ROOT/claude/claude-settings.json" "$CLAUDE_CONFIG_DIR/claude_desktop_config.json"
+    echo "✅ Claude Desktop config deployed to $CLAUDE_CONFIG_DIR/claude_desktop_config.json"
+fi
+
+echo "==> Deploying Claude Code (CLI) MCP settings..."
+# Claude Code uses ~/.claude.json for global MCP settings
+ln -sfn "$REPO_ROOT/claude/claude-settings.json" "$HOME/.claude.json" || \
+cp "$REPO_ROOT/claude/claude-settings.json" "$HOME/.claude.json"
+echo "✅ Claude Code config deployed to $HOME/.claude.json"
+
 echo "✅ MCP configurations synchronized from mcp/servers.yaml and mcp/config.yaml"
 
 SERVICE_FILE="$HOME/.config/systemd/user/docker-mcp-gateway.service"
