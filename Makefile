@@ -6,6 +6,7 @@ SHELL := /bin/bash
 
 # 2. Variables & Idempotency
 -include _mk/variables.mk
+-include _mk/setup.mk
 -include _mk/idempotency.mk
 
 # 3. Orchestrator (Main Workflow)

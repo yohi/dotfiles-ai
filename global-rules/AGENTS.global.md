@@ -40,6 +40,24 @@ The following rules apply to **ALL** projects unless overridden by a local proje
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 <!-- SKILLPORT_START -->
 ## SkillPort Skills
 
@@ -162,6 +180,11 @@ Each skill contains step-by-step instructions, templates, and scripts.
   <location>agent-skills/config-modernizer/SKILL.md</location>
 </skill>
 <skill>
+  <name>doc-sync-verifier</name>
+  <description>A specialized skill for verifying document consistency in a multi-phase review pipeline. Use this skill when you need to validate Phase 1 review findings (e.g., from Gemini) against actual project documentation files, applying strict evidence-based judgment without touching source code. Trigger whenever the user provides a review_results block with issue IDs to verify, asks to "裏取り" (fact-check) review findings, or mentions "DocSync Verifier", "整合性検証", "ドキュメント照合", or "指摘事項の検証". Also trigger when the user wants to cross-reference YAML frontmatter, Mermaid diagrams, or Markdown tables between documents.</description>
+  <location>agent-skills/doc-sync-verifier/SKILL.md</location>
+</skill>
+<skill>
   <name>dotfiles-guidelines</name>
   <description>Core principles, persona definitions, and command workflows for the dotfiles project. Use when seeking development guidance, selecting an appropriate expert persona (Architect, Developer, Tester, DevOps, Analyst), or following standard project commands (analyze, implement, design, etc.). Ensures consistency, quality, and adherence to project-wide best practices.</description>
   <location>agent-skills/dotfiles-guidelines/SKILL.md</location>
@@ -248,6 +271,15 @@ Each skill contains step-by-step instructions, templates, and scripts.
 </skill>
 </available_skills>
 <!-- SKILLPORT_END -->
+
+
+
+
+
+
+
+
+
 
 
 

@@ -37,35 +37,46 @@ def parse_jsonc(text: str) -> dict[str, Any]:
 def replace_placeholders(value: Any, gateway_url: str) -> Any:
     if isinstance(value, str):
         # 置換対象のマップ
+        val = value
+
+        # ${VAR} または ${VAR:-default} 形式の環境変数を探し、展開する
+        def env_replacer(match: re.Match[str]) -> str:
+            var_name = match.group(1)
+            default_val = match.group(2)
+
+            val_env = os.environ.get(var_name)
+            if val_env:
+                return val_env
+
+            # Fallback for renamed MCP token
+            if var_name == "MCP_GATEWAY_TOKEN":
+                auth_token = os.environ.get("MCP_AUTH_TOKEN")
+                if auth_token:
+                    return auth_token
+
+            if default_val is not None:
+                return default_val
+
+            raise ValueError(
+                f"Required environment variable '{var_name}' is not set and no default provided. "
+                "Please check your .env file or environment."
+            )
+
+        # ${VAR:-default} 形式にマッチする正規表現
+        env_pattern = re.compile(r"\$\{([^}:-]+)(?::-(.*))?\}")
+        val = env_pattern.sub(env_replacer, val)
+
+        # プレースホルダの置換
         placeholders = {
             "__GATEWAY_URL__": gateway_url,
             "__HOME__": str(Path.home()),
             "__REPO_ROOT__": str(REPO_ROOT),
         }
-        val = value
         for k, v in placeholders.items():
             val = val.replace(k, v)
 
-        # ${VAR} 形式の環境変数を探し、存在を確認する
-        # (os.path.expandvars は未定義の変数を空文字に変換してしまうため)
-        env_vars = re.findall(r"\$\{([^}]+)\}", val)
-        for var in env_vars:
-            val_env = os.environ.get(var)
-            if not val_env:
-                # Fallback for renamed MCP token
-                if var == "MCP_GATEWAY_TOKEN":
-                    auth_token = os.environ.get("MCP_AUTH_TOKEN")
-                    if auth_token:
-                        os.environ["MCP_GATEWAY_TOKEN"] = auth_token
-                        continue
+        return val
 
-                raise ValueError(
-                    f"Required environment variable '{var}' is not set or empty. "
-                    "Please check your .env file or environment."
-                )
-
-        # すべて存在することが確認できたら展開
-        return os.path.expandvars(val)
     if isinstance(value, list):
         return [replace_placeholders(item, gateway_url) for item in value]
     if isinstance(value, dict):
