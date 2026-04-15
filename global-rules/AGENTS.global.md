@@ -66,6 +66,8 @@ The following rules apply to **ALL** projects unless overridden by a local proje
 
 
 
+
+
 <!-- SKILLPORT_START -->
 ## SkillPort Skills
 
@@ -296,6 +298,7 @@ Each skill contains step-by-step instructions, templates, and scripts.
 
 
 
+
 ## 6. Agent-Specific Contexts (Unified)
 
 - **CI/CD**: Default to **Bitbucket Pipelines** (`bitbucket-pipelines.yml`).
@@ -305,6 +308,10 @@ Each skill contains step-by-step instructions, templates, and scripts.
 ### OpenCode
 - **Role**: Sisyphus (Manager), Hephaestus (Coder), Oracle (Advisor).
 - **Restrictions**: `rm`, `ssh`, `sudo` are strictly blocked.
+- **Configuration Files**:
+  - `oh-my-opencode.jsonc`: User-specific or extended configuration. **This file takes precedence if it exists.**
+  - `opencode.jsonc`: Standard project configuration.
+  - When applying patterns or updating settings, always check for the existence of `oh-my-opencode.jsonc` first.
 
 ## BEGIN Superpowers Workflow
 # Superpowers Workflow (Adaptive Application)
