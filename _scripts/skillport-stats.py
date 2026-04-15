@@ -16,6 +16,11 @@ def main():
     skills = data.get("skills", [])
     total = data.get("total", len(skills))
 
+    import os
+    mcp_gateway_status = os.environ.get("MCP_GATEWAY_STATUS", "unknown")
+    skillport_mcp_version = os.environ.get("SKILLPORT_MCP_VERSION", "unknown")
+    skillport_mcp_status = os.environ.get("SKILLPORT_MCP_STATUS", "unknown")
+
     namespace_counts = Counter()
     root_skills = []
     
@@ -31,6 +36,16 @@ def main():
     print(f"\n📊 SkillPort Stats")
     print(f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
     print(f"Total Skills: {total}")
+    print(f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    print(f"Service Status")
+    print(f"────────────────────────────────────────")
+    
+    gateway_icon = "✅" if mcp_gateway_status == "active" else "❌"
+    mcp_icon = "✅" if "active" in skillport_mcp_status else "❌"
+    
+    print(f"Docker MCP Gateway: {gateway_icon} {mcp_gateway_status}")
+    print(f"SkillPort MCP Status: {mcp_icon} {skillport_mcp_status}")
+    print(f"SkillPort MCP Tool:   📦 {skillport_mcp_version}")
     print(f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
     print(f"{'Namespace':<25} {'Count':<5}")
     print(f"────────────────────────────────────────")
