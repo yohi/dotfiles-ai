@@ -54,7 +54,7 @@ check-superclaude: ## SuperClaudeフレームワークのインストール状�
 .PHONY: install-packages-superclaude
 install-packages-superclaude: ## SuperClaudeフレームワークをClaude Code向けにインストール
 	@BOOL_LINK_CHECK=0; if [ -L "$(CLAUDE_DIR)/CLAUDE.md" ] && [ "$$(readlink "$(CLAUDE_DIR)/CLAUDE.md")" = "$(DOTFILES_CLAUDE_DIR)/CLAUDE.md" ]; then BOOL_LINK_CHECK=1; fi; \
-	BOOL_SETTINGS_LINK=0; if [ -L "$(CLAUDE_DIR)/settings.json" ] && [ "$$(readlink "$(CLAUDE_DIR)/settings.json")" = "$(DOTFILES_CLAUDE_DIR)/claude-settings.json" ] && [ -L "$(CLAUDE_DIR)/claude-settings.json" ] && [ "$$(readlink "$(CLAUDE_DIR)/claude-settings.json")" = "$(DOTFILES_CLAUDE_DIR)/claude-settings.json" ]; then BOOL_SETTINGS_LINK=1; fi; \
+	BOOL_SETTINGS_LINK=0; if [ -L "$(CLAUDE_DIR)/settings.json" ] && [ "$$(readlink "$(CLAUDE_DIR)/settings.json")" = "$(DOTFILES_CLAUDE_DIR)/settings.json" ] && [ -L "$(CLAUDE_DIR)/claude-settings.json" ] && [ "$$(readlink "$(CLAUDE_DIR)/claude-settings.json")" = "$(DOTFILES_CLAUDE_DIR)/settings.json" ]; then BOOL_SETTINGS_LINK=1; fi; \
 	BOOL_SUPERCLAUDE_CMD=0; if command -v SuperClaude >/dev/null 2>&1; then BOOL_SUPERCLAUDE_CMD=1; fi; \
 	BOOL_REQUIRED_FILES=0; if [ -f "$(CLAUDE_DIR)/MODE_Brainstorming.md" ] && [ -f "$(CLAUDE_DIR)/PRINCIPLES.md" ]; then BOOL_REQUIRED_FILES=1; fi; \
 	if [ "$$BOOL_LINK_CHECK" = "1" ] && [ "$$BOOL_SETTINGS_LINK" = "1" ] && [ "$$BOOL_SUPERCLAUDE_CMD" = "1" ] && [ "$$BOOL_REQUIRED_FILES" = "1" ]; then \
@@ -149,9 +149,9 @@ install-packages-superclaude: ## SuperClaudeフレームワークをClaude Code�
 		mv "$(CLAUDE_DIR)/claude-settings.json" "$(CLAUDE_DIR)/claude-settings.json.backup.$$(date +%Y%m%d_%H%M%S)"; \
 		echo "📋 既存の claude-settings.json をバックアップしました"; \
 	fi
-	@ln -sf "$(DOTFILES_CLAUDE_DIR)/claude-settings.json" "$(CLAUDE_DIR)/settings.json"
-	@ln -sf "$(DOTFILES_CLAUDE_DIR)/claude-settings.json" "$(CLAUDE_DIR)/claude-settings.json"
-	@echo "✅ settings.json & claude-settings.json → $(DOTFILES_CLAUDE_DIR)/claude-settings.json"
+	@ln -sf "$(DOTFILES_CLAUDE_DIR)/settings.json" "$(CLAUDE_DIR)/settings.json"
+	@ln -sf "$(DOTFILES_CLAUDE_DIR)/settings.json" "$(CLAUDE_DIR)/claude-settings.json"
+	@echo "✅ settings.json & claude-settings.json → $(DOTFILES_CLAUDE_DIR)/settings.json"
 	@echo ""
 	@$(MAKE) check-superclaude
 

@@ -63,7 +63,7 @@ help-skillport: ## SkillPort の使い方を表示
 	$(call show-guide,$(REPO_ROOT)/_docs/guides/skillport.md)
 
 # SkillPort の状態確認
-check-skillport: ## SkillPort の状態を確認
+check-skillport: ## SkillPort の状態確認
 	@$(MAKE) check-skillport-version || true
 	@echo "🔍 SkillPort の状態確認..."
 	@if command -v skillport >/dev/null 2>&1; then \
@@ -98,6 +98,16 @@ check-skillport: ## SkillPort の状態を確認
 	else \
 		echo "⚠️  skills: $(SKILLPORT_SKILLS_DIR) is not a symlink"; \
 	fi
+
+.PHONY: stats-skillport
+stats-skillport: ## SkillPort の統計情報を表示
+	@if command -v skillport >/dev/null 2>&1; then \
+		skillport list --json | python3 _scripts/skillport-stats.py; \
+	else \
+		echo "❌ skillport が見つかりません"; \
+		exit 1; \
+	fi
+
 
 # SkillPort のバージョン確認 (GHCR vs PyPI)
 check-skillport-version: ## SkillPort のコンテナと PyPI のバージョンを比較

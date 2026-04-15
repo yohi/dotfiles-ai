@@ -19,7 +19,7 @@ declare -A TEMPLATES=(
     ["opencode/opencode.jsonc.template"]="opencode/opencode.jsonc"
     ["opencode/oh-my-opencode.jsonc.template"]="opencode/oh-my-opencode.jsonc"
     ["ide/vscode/settings.json.template"]="ide/vscode/settings.json"
-    ["claude/claude-settings.json.template"]="claude/claude-settings.json"
+    ["claude/settings.json.template"]="claude/settings.json"
 )
 
 for src in "${!TEMPLATES[@]}"; do
@@ -88,16 +88,18 @@ esac
 if [ -n "$CLAUDE_CONFIG_DIR" ]; then
     mkdir -p "$CLAUDE_CONFIG_DIR"
     # シンボリックリンクを試み、失敗したらコピーする（OSやファイルシステムによる制限のため）
-    ln -sfn "$REPO_ROOT/claude/claude-settings.json" "$CLAUDE_CONFIG_DIR/claude_desktop_config.json" || \
-    cp "$REPO_ROOT/claude/claude-settings.json" "$CLAUDE_CONFIG_DIR/claude_desktop_config.json"
+    ln -sfn "$REPO_ROOT/claude/settings.json" "$CLAUDE_CONFIG_DIR/claude_desktop_config.json" || \
+    cp "$REPO_ROOT/claude/settings.json" "$CLAUDE_CONFIG_DIR/claude_desktop_config.json"
     echo "✅ Claude Desktop config deployed to $CLAUDE_CONFIG_DIR/claude_desktop_config.json"
 fi
 
-echo "==> Deploying Claude Code (CLI) MCP settings..."
-# Claude Code uses ~/.claude.json for global MCP settings
-ln -sfn "$REPO_ROOT/claude/claude-settings.json" "$HOME/.claude.json" || \
-cp "$REPO_ROOT/claude/claude-settings.json" "$HOME/.claude.json"
-echo "✅ Claude Code config deployed to $HOME/.claude.json"
+echo "==> Deploying Claude Code (CLI) settings..."
+mkdir -p "$HOME/.claude"
+ln -sfn "$REPO_ROOT/claude/settings.json" "$HOME/.claude/settings.json" || \
+cp "$REPO_ROOT/claude/settings.json" "$HOME/.claude/settings.json"
+ln -sfn "$REPO_ROOT/claude/settings.json" "$HOME/.claude.json" || \
+cp "$REPO_ROOT/claude/settings.json" "$HOME/.claude.json"
+echo "✅ Claude Code config deployed to $HOME/.claude/settings.json and $HOME/.claude.json"
 
 echo "✅ MCP configurations synchronized from mcp/servers.yaml and mcp/config.yaml"
 

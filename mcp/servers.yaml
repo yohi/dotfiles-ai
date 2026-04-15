@@ -5,13 +5,8 @@ defaults:
 # chronos-graph is a local MCP server that runs via 'uv' on each client (not managed by Docker gateway)
 _chronos_graph_legacy: &chronos_graph_legacy
   type: stdio
-  command: uv
+  command: /home/y_ohi/program/private/chronos-graph/.venv/bin/python
   args:
-    - --quiet
-    - run
-    - --project
-    - ${CHRONOS_GRAPH_PATH:-__HOME__/program/private/chronos-graph}
-    - python
     - -m
     - context_store
   env:
@@ -27,12 +22,7 @@ _chronos_graph_legacy: &chronos_graph_legacy
 _chronos_graph_modern: &chronos_graph_modern
   type: local
   command:
-    - uv
-    - --quiet
-    - run
-    - --project
-    - ${CHRONOS_GRAPH_PATH:-__HOME__/program/private/chronos-graph}
-    - python
+    - /home/y_ohi/program/private/chronos-graph/.venv/bin/python
     - -m
     - context_store
   environment:
@@ -52,6 +42,38 @@ _nexus: &nexus
     - ${NEXUS_PATH:-__HOME__/program/nexus}/dist/bin/nexus.js
   env:
     NEXUS_STORAGE_ROOT_DIR: ${NEXUS_PATH:-__HOME__/program/nexus}/.nexus
+    NEXUS_WATCHER_IGNORE_PATHS: node_modules,.git,.nexus,dist,gemini
+    NO_PROXY: 127.0.0.1,localhost
+
+_nexus_opencode: &nexus_opencode
+  type: local
+  enabled: true
+  command:
+    - /usr/bin/node
+    - ${NEXUS_PATH:-__HOME__/program/nexus}/dist/bin/nexus.js
+    - --project-root
+    - __REPO_ROOT__
+  environment:
+    NEXUS_STORAGE_ROOT_DIR: ${NEXUS_PATH:-__HOME__/program/nexus}/.nexus
+    NEXUS_WATCHER_IGNORE_PATHS: node_modules,.git,.nexus,dist,gemini
+    NO_PROXY: 127.0.0.1,localhost
+
+_chronos_graph_opencode: &chronos_graph_opencode
+  type: local
+  enabled: true
+  command:
+    - /home/y_ohi/program/private/chronos-graph/.venv/bin/python
+    - -m
+    - context_store
+  environment:
+    STORAGE_BACKEND: sqlite
+    SQLITE_DB_PATH: __HOME__/.context-store/memories.db
+    GRAPH_ENABLED: "true"
+    DECAY_HALF_LIFE_DAYS: "30"
+    SIMILARITY_THRESHOLD: "0.70"
+    DEDUP_THRESHOLD: "0.90"
+    EMBEDDING_PROVIDER: local-model
+    LOCAL_MODEL_NAME: "cl-nagoya/ruri-v3-310m"
 
 _nexus_modern: &nexus_modern
   type: local
@@ -77,7 +99,7 @@ _skillport: &skillport
 
 agents:
   claude:
-    path: claude/claude-settings.json
+    path: claude/settings.json
     format: json
     root_key: mcpServers
     servers:
@@ -157,5 +179,5 @@ agents:
         headers:
           Authorization: Bearer ${MCP_GATEWAY_TOKEN}
 
-      chronos-graph: *chronos_graph_modern
-      nexus: *nexus_modern
+      chronos_graph: *chronos_graph_opencode
+      nexus: *nexus_opencode
