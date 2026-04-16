@@ -72,6 +72,30 @@ def replace_placeholders(value: Any, gateway_url: str) -> Any:
             "__HOME__": str(Path.home()),
             "__REPO_ROOT__": str(REPO_ROOT),
         }
+
+        # __PROGRAM__ プレースホルダのスマート置換
+        # ~/program/path と ~/program/private/path のうち、存在する方を優先する
+        if "__PROGRAM__" in val:
+            home = Path.home()
+            # __PROGRAM__/project/path -> project/path
+            rel_path = val.replace("__PROGRAM__", "").lstrip("/")
+            
+            # 候補1: ~/program/project/path
+            cand1 = home / "program" / rel_path
+            # 候補2: ~/program/private/project/path
+            cand2 = home / "program" / "private" / rel_path
+            
+            # プロジェクトのルートディレクトリ（rel_pathの最初のセグメント）で存在確認
+            project_name = rel_path.split("/")[0] if rel_path else ""
+            if project_name:
+                if (home / "program" / "private" / project_name).is_dir():
+                    val = val.replace("__PROGRAM__", str(home / "program" / "private"))
+                else:
+                    val = val.replace("__PROGRAM__", str(home / "program"))
+            else:
+                # パスが空の場合はデフォルトとして ~/program を使用
+                val = val.replace("__PROGRAM__", str(home / "program"))
+
         for k, v in placeholders.items():
             val = val.replace(k, v)
 

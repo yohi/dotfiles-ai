@@ -112,6 +112,15 @@ deploy_config "$REPO_ROOT/claude/settings.json" "$HOME/.claude.json" "Claude Cod
 
 echo "✅ MCP configurations synchronized from mcp/servers.yaml and mcp/config.yaml"
 
+echo "==> Validating Skillport skills..."
+if command -v skillport > /dev/null 2>&1; then
+    skillport --skills-dir "$REPO_ROOT/agent-skills" list
+elif command -v uvx > /dev/null 2>&1; then
+    uvx --quiet skillport --skills-dir "$REPO_ROOT/agent-skills" list
+else
+    echo "Warning: skillport command not found. Skipping validation." >&2
+fi
+
 SERVICE_FILE="$HOME/.config/systemd/user/docker-mcp-gateway.service"
 mkdir -p "$(dirname "$SERVICE_FILE")"
 ENABLED_SERVERS=$(

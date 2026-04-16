@@ -5,8 +5,11 @@ defaults:
 # chronos-graph is a local MCP server that runs via 'uv' on each client (not managed by Docker gateway)
 _chronos_graph_legacy: &chronos_graph_legacy
   type: stdio
-  command: /home/y_ohi/program/private/chronos-graph/.venv/bin/python
+  command: uv
   args:
+    - run
+    - --project
+    - ${CHRONOS_GRAPH_PATH:-__PROGRAM__/chronos-graph}
     - -m
     - context_store
   env:
@@ -22,7 +25,10 @@ _chronos_graph_legacy: &chronos_graph_legacy
 _chronos_graph_modern: &chronos_graph_modern
   type: local
   command:
-    - /home/y_ohi/program/private/chronos-graph/.venv/bin/python
+    - uv
+    - run
+    - --project
+    - ${CHRONOS_GRAPH_PATH:-__PROGRAM__/chronos-graph}
     - -m
     - context_store
   environment:
@@ -39,30 +45,37 @@ _nexus: &nexus
   type: stdio
   command: node
   args:
-    - ${NEXUS_PATH:-__HOME__/program/nexus}/dist/bin/nexus.js
+    - ${NEXUS_PATH:-__PROGRAM__/nexus}/dist/bin/nexus.js
   env:
-    NEXUS_STORAGE_ROOT_DIR: ${NEXUS_PATH:-__HOME__/program/nexus}/.nexus
-    NEXUS_WATCHER_IGNORE_PATHS: node_modules,.git,.nexus,dist,gemini
+    NEXUS_STORAGE_ROOT_DIR: ${NEXUS_PATH:-__PROGRAM__/nexus}/.nexus
+    NEXUS_WATCHER_IGNORE_PATHS: node_modules,.git,.nexus,dist,gemini,.worktrees,.venv,target,.mypy_cache,.ruff_cache,build
+    CHOKIDAR_USEPOLLING: "true"
+    CHOKIDAR_INTERVAL: "2000"
     NO_PROXY: 127.0.0.1,localhost
 
 _nexus_opencode: &nexus_opencode
   type: local
   enabled: true
   command:
-    - /usr/bin/node
-    - ${NEXUS_PATH:-__HOME__/program/nexus}/dist/bin/nexus.js
+    - node
+    - ${NEXUS_PATH:-__PROGRAM__/nexus}/dist/bin/nexus.js
     - --project-root
     - __REPO_ROOT__
   environment:
-    NEXUS_STORAGE_ROOT_DIR: ${NEXUS_PATH:-__HOME__/program/nexus}/.nexus
-    NEXUS_WATCHER_IGNORE_PATHS: node_modules,.git,.nexus,dist,gemini
+    NEXUS_STORAGE_ROOT_DIR: ${NEXUS_PATH:-__PROGRAM__/nexus}/.nexus
+    NEXUS_WATCHER_IGNORE_PATHS: node_modules,.git,.nexus,dist,gemini,.worktrees,.venv,target,.mypy_cache,.ruff_cache,build
+    CHOKIDAR_USEPOLLING: "true"
+    CHOKIDAR_INTERVAL: "2000"
     NO_PROXY: 127.0.0.1,localhost
 
 _chronos_graph_opencode: &chronos_graph_opencode
   type: local
   enabled: true
   command:
-    - /home/y_ohi/program/private/chronos-graph/.venv/bin/python
+    - uv
+    - run
+    - --project
+    - ${CHRONOS_GRAPH_PATH:-__PROGRAM__/chronos-graph}
     - -m
     - context_store
   environment:
@@ -79,9 +92,9 @@ _nexus_modern: &nexus_modern
   type: local
   command:
     - node
-    - ${NEXUS_PATH:-__HOME__/program/nexus}/dist/bin/nexus.js
+    - ${NEXUS_PATH:-__PROGRAM__/nexus}/dist/bin/nexus.js
   environment:
-    NEXUS_STORAGE_ROOT_DIR: ${NEXUS_PATH:-__HOME__/program/nexus}/.nexus
+    NEXUS_STORAGE_ROOT_DIR: ${NEXUS_PATH:-__PROGRAM__/nexus}/.nexus
 
 notes:
   codex: Codex CLI MCP configuration is not managed here because this repository does not currently contain a supported Codex MCP config surface.
@@ -92,7 +105,6 @@ _skillport: &skillport
   args:
     - --quiet
     - skillport-mcp
-    - --skip-auto-reindex
   env:
     SKILLPORT_SKILLS_DIR: __REPO_ROOT__/agent-skills
     SKILLPORT_DB_PATH: __HOME__/.skillport/db

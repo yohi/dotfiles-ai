@@ -1,15 +1,13 @@
 .PHONY: all install install-agents install-ides setup setup-agents setup-ides mcp-render link clean-internal install-requirements lint init sync secrets status clean test clean-legacy configure-git-ignore doctor
 
 # --- Standard Entry Points ---
-all: install setup
+all: install init-env setup sync-mcp ## [完全セットアップ] インストール、環境構築、設定、MCP同期をすべて行う
 
-install: install-agents install-ides ## Install all AI agents and IDE binaries
+install: install-requirements install-agents install-ides ## Install all AI agents and IDE binaries
 
 setup: setup-agents setup-ides ## Setup all AI agents and IDE configurations
-	@$(MAKE) mcp-render
 	-@$(MAKE) setup-superpowers 2>/dev/null || true
 	-@$(MAKE) sync-agents 2>/dev/null || true
-	-@$(MAKE) sync-mcp 2>/dev/null || true
 	$(Q_ECHO) "✅ dotfiles-ai のコア設定が適用されました"
 
 sync: ## [更新] リポジトリを最新にし、エージェントを同期する
@@ -73,9 +71,9 @@ clean-internal:
 install-requirements:
 	@echo "📦 依存関係をインストール中..."
 	@if command -v uv >/dev/null 2>&1; then \
-		uv pip install --system -r requirements.txt; \
+		uv sync; \
 	else \
-		pip install -r requirements.txt; \
+		pip install -r requirements.txt || echo "⚠️  pip install failed, but continuing..."; \
 	fi
 
 lint: ## Run Ruff and Mypy on .
