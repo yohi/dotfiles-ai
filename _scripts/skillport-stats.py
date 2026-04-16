@@ -1,16 +1,16 @@
 import json
 import sys
-from collections import Counter, defaultdict
+from collections import Counter
 
 def main():
     try:
         input_data = sys.stdin.read()
         if not input_data:
-            print("No input data received.")
-            return
+            sys.stderr.write("No input data received.\n")
+            sys.exit(1)
         data = json.loads(input_data)
     except json.JSONDecodeError as e:
-        print(f"Error: Invalid JSON input: {e}")
+        sys.stderr.write(f"Error: Invalid JSON input: {e}\n")
         sys.exit(1)
 
     skills = data.get("skills", [])
@@ -33,34 +33,35 @@ def main():
             namespace_counts["(root)"] += 1
             root_skills.append(skill_id)
 
-    print(f"\n📊 SkillPort Stats")
-    print(f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    print("\n📊 SkillPort Stats")
+    print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
     print(f"Total Skills: {total}")
-    print(f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-    print(f"Service Status")
-    print(f"────────────────────────────────────────")
+    print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    print("Service Status")
+    print("────────────────────────────────────────")
     
     gateway_icon = "✅" if mcp_gateway_status == "active" else "❌"
-    mcp_icon = "✅" if "active" in skillport_mcp_status else "❌"
+    # "active (Gateway)" なども許容するため startswith("active") を使用
+    mcp_icon = "✅" if skillport_mcp_status.startswith("active") else "❌"
     
     print(f"Docker MCP Gateway: {gateway_icon} {mcp_gateway_status}")
     print(f"SkillPort MCP Status: {mcp_icon} {skillport_mcp_status}")
     print(f"SkillPort MCP Tool:   📦 {skillport_mcp_version}")
-    print(f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
     print(f"{'Namespace':<25} {'Count':<5}")
-    print(f"────────────────────────────────────────")
+    print("────────────────────────────────────────")
     
     # カテゴリごとのカウントを表示（降順、(root)は最後または先頭にするなど調整可能）
     for ns, count in sorted(namespace_counts.items(), key=lambda x: (-x[1], x[0])):
         print(f"{ns:<25} {count:<5}")
         
     if root_skills:
-        print(f"────────────────────────────────────────")
-        print(f"Individual Skills (root):")
+        print("────────────────────────────────────────")
+        print("Individual Skills (root):")
         for skill_id in sorted(root_skills):
             print(f"  - {skill_id}")
             
-    print(f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
+    print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
 
 if __name__ == "__main__":
     main()

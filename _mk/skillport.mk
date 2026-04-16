@@ -104,7 +104,7 @@ stats-skillport: ## SkillPort の統計情報と MCP の起動状況を表示
 	@if command -v skillport >/dev/null 2>&1; then \
 		MCP_GATEWAY_STATUS=$$(systemctl --user is-active docker-mcp-gateway.service 2>/dev/null || echo "not-running"); \
 		SKILLPORT_MCP_VERSION=$$(uv tool list 2>/dev/null | grep -A 1 "skillport-mcp" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n 1 || echo "not-installed"); \
-		if [ "$$MCP_GATEWAY_STATUS" = "active" ] && grep -q "skillport" mcp/config.yaml 2>/dev/null; then \
+		if [ "$$MCP_GATEWAY_STATUS" = "active" ] && yq '.gateway.enabled_servers[]' mcp/config.yaml 2>/dev/null | grep -qx "skillport"; then \
 			SKILLPORT_MCP_STATUS="active (Gateway)"; \
 		elif pgrep -f "skillport-mcp" >/dev/null 2>&1; then \
 			SKILLPORT_MCP_STATUS="active (local)"; \

@@ -59,3 +59,5 @@ __pycache__/
 *.pyo
 *.pyd
 .npmrc
+# Local sync state (machine-specific)
+.last_sync

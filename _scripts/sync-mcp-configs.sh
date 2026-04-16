@@ -12,6 +12,24 @@ REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 ESCAPED_HOME=$(printf '%s' "$HOME" | sed 's/[&/|]/\\&/g')
 ESCAPED_REPO_ROOT=$(printf '%s' "$REPO_ROOT" | sed 's/[&/|]/\\&/g')
 
+# Helper function for symlinking or copying config files
+deploy_config() {
+    local src="$1"
+    local dst="$2"
+    local name="$3"
+    local dst_dir
+    dst_dir=$(dirname "$dst")
+    mkdir -p "$dst_dir"
+    if ln -sfn "$src" "$dst" 2>/dev/null; then
+        echo "✅ $name config deployed to $dst"
+    elif cp "$src" "$dst" 2>/dev/null; then
+        echo "✅ $name config deployed (fallback to copy) to $dst"
+    else
+        echo "❌ Failed to deploy $name config to $dst" >&2
+        return 1
+    fi
+}
+
 echo "==> Preparing config files from templates..."
 # Template to actual file mapping (only if actual file doesn't exist)
 declare -A TEMPLATES=(
@@ -64,9 +82,8 @@ ln -sfn "$REPO_ROOT/mcp/catalogs/bootstrap.yaml" "$DOCKER_MCP_DIR/catalogs/boots
 ln -sfn "$REPO_ROOT/mcp/catalogs/custom.yaml" "$DOCKER_MCP_DIR/catalogs/custom.yaml"
 
 echo "==> Deploying Gemini CLI settings..."
-mkdir -p "$HOME/.gemini/shared"
-ln -sfn "$REPO_ROOT/gemini/settings.json" "$HOME/.gemini/settings.json"
-ln -sfn "$REPO_ROOT/gemini/settings.json" "$HOME/.gemini/shared/settings.json"
+deploy_config "$REPO_ROOT/gemini/settings.json" "$HOME/.gemini/settings.json" "Gemini CLI"
+deploy_config "$REPO_ROOT/gemini/settings.json" "$HOME/.gemini/shared/settings.json" "Gemini CLI Shared"
 
 echo "==> Deploying Claude Desktop MCP settings..."
 case "$(uname)" in
@@ -77,29 +94,21 @@ case "$(uname)" in
         CLAUDE_CONFIG_DIR="$HOME/.config/Claude"
         ;;
     MINGW*|MSYS*|CYGWIN*)
-        CLAUDE_CONFIG_DIR="$APPDATA/Claude"
+        CLAUDE_CONFIG_DIR="${APPDATA:-$HOME/AppData/Roaming}/Claude"
         ;;
     *)
-        echo "Warning: Unknown OS for Claude Desktop config. Skipping." >&2
+        echo "Warning: Unknown OS '$(uname)' for Claude Desktop config. Skipping." >&2
         CLAUDE_CONFIG_DIR=""
         ;;
 esac
 
 if [ -n "$CLAUDE_CONFIG_DIR" ]; then
-    mkdir -p "$CLAUDE_CONFIG_DIR"
-    # シンボリックリンクを試み、失敗したらコピーする（OSやファイルシステムによる制限のため）
-    ln -sfn "$REPO_ROOT/claude/settings.json" "$CLAUDE_CONFIG_DIR/claude_desktop_config.json" || \
-    cp "$REPO_ROOT/claude/settings.json" "$CLAUDE_CONFIG_DIR/claude_desktop_config.json"
-    echo "✅ Claude Desktop config deployed to $CLAUDE_CONFIG_DIR/claude_desktop_config.json"
+    deploy_config "$REPO_ROOT/claude/settings.json" "$CLAUDE_CONFIG_DIR/claude_desktop_config.json" "Claude Desktop"
 fi
 
 echo "==> Deploying Claude Code (CLI) settings..."
-mkdir -p "$HOME/.claude"
-ln -sfn "$REPO_ROOT/claude/settings.json" "$HOME/.claude/settings.json" || \
-cp "$REPO_ROOT/claude/settings.json" "$HOME/.claude/settings.json"
-ln -sfn "$REPO_ROOT/claude/settings.json" "$HOME/.claude.json" || \
-cp "$REPO_ROOT/claude/settings.json" "$HOME/.claude.json"
-echo "✅ Claude Code config deployed to $HOME/.claude/settings.json and $HOME/.claude.json"
+deploy_config "$REPO_ROOT/claude/settings.json" "$HOME/.claude/settings.json" "Claude Code"
+deploy_config "$REPO_ROOT/claude/settings.json" "$HOME/.claude.json" "Claude Code Legacy"
 
 echo "✅ MCP configurations synchronized from mcp/servers.yaml and mcp/config.yaml"
 
