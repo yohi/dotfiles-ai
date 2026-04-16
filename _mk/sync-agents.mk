@@ -14,30 +14,39 @@ GLOBAL_AGENTS_MD := $(GLOBAL_RULES_DIR)/AGENTS.global.md
 OPENCODE_DOCS    := $(REPO_ROOT)/opencode/docs
 CODEX_CONFIG     := $(REPO_ROOT)/codex/config.toml
 
-.PHONY: sync-agents clean-legacy ai-setup \
+.PHONY: sync-agents clean ai-setup \
         inject-meta-prompt-opencode inject-meta-prompt-codex \
         sync-skillport-doc link-user-agents link-agent-commands \
-        install-external-skills
+        install-external-skills clean-legacy
 
 # ============================================================
 # sync-agents: メインの同期ターゲット (SPEC Feature #1, #2, #3)
 # ============================================================
 sync-agents: ## SSOTのスキル群を各エージェントの設定ファイルへ同期する
 	@echo "🔄 sync-agents: SSOT → 各エージェントへの同期を開始..."
-	@# Step 0: 外部スキルのインストール（EXTERNAL_SKILLS.md に基づく）
+	@rm -f "$(REPO_ROOT)/.last_sync"
 	@$(MAKE) install-external-skills
-	@# Step 1: skillport doc でスキル一覧を instruction files へ反映
 	@$(MAKE) sync-skillport-doc
-	@# Step 2: ユーザーレベル AGENTS.global.md のシンボリックリンク配備
 	@$(MAKE) link-user-agents
-	@# Step 3: 共通コマンドのシンボリックリンク配備
 	@$(MAKE) link-agent-commands
-	@# Step 4: 各エージェントへメタプロンプトを注入
-	@# NOTE: Claude / Gemini は AGENTS.global.md を自動参照するため個別注入不要
 	@$(MAKE) inject-meta-prompt-opencode
 	@$(MAKE) inject-meta-prompt-codex
 	@touch "$(REPO_ROOT)/.last_sync"
 	@echo "✅ sync-agents: 全エージェントへの同期が完了しました"
+
+# ============================================================
+# clean: 同期状態のリセット
+# ============================================================
+clean: ## 同期マーカーおよび生成されたリンク・コマンドファイルを削除する
+	@echo "🧹 clean: 同期状態をリセット中..."
+	rm -f "$(REPO_ROOT)/.last_sync"
+	@# OpenCode/Claude/Cursor 等のシンボリックリンクをクリーンアップ
+	rm -rf "$(REPO_ROOT)/opencode/commands"
+	rm -rf "$(REPO_ROOT)/claude/commands"
+	rm -rf "$(REPO_ROOT)/ide/cursor/commands/agent"
+	rm -f "$(REPO_ROOT)/.cursor/rules"/*.md
+	rm -rf "$(REPO_ROOT)/gemini/commands"
+	@echo "✅ clean: 同期状態がリセットされました"
 
 # ============================================================
 # install-external-skills: 外部スキルの自動インストール
