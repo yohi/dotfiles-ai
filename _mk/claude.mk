@@ -14,8 +14,6 @@ define create_desktop_entry
 endef
 
 # Claudia (Claude Code GUI) のバージョン固定
-export PATH := $(HOME)/.bun/bin:$(PATH)
-
 CLAUDIA_COMMIT := 70c16d8a4910db48cd9684aeacdd431caefd7d71
 
 # Claude Code のインストール
