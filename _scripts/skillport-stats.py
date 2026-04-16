@@ -21,7 +21,7 @@ def main():
     skillport_mcp_version = os.environ.get("SKILLPORT_MCP_VERSION", "unknown")
     skillport_mcp_status = os.environ.get("SKILLPORT_MCP_STATUS", "unknown")
 
-    namespace_counts = Counter()
+    namespace_counts: Counter[str] = Counter()
     root_skills = []
     
     for skill in skills:
