@@ -35,28 +35,28 @@ _chronos_graph_modern: &chronos_graph_modern
     EMBEDDING_PROVIDER: local-model
     LOCAL_MODEL_NAME: "cl-nagoya/ruri-v3-310m"
 
-# _nexus: &nexus
-#   type: stdio
-#   command: node
-#   args:
-#     - ${NEXUS_PATH:-__HOME__/program/nexus}/dist/bin/nexus.js
-#   env:
-#     NEXUS_STORAGE_ROOT_DIR: ${NEXUS_PATH:-__HOME__/program/nexus}/.nexus
-#     NEXUS_WATCHER_IGNORE_PATHS: node_modules,.git,.nexus,dist,gemini
-#     NO_PROXY: 127.0.0.1,localhost
+_nexus: &nexus
+  type: stdio
+  command: node
+  args:
+    - ${NEXUS_PATH:-__HOME__/program/nexus}/dist/bin/nexus.js
+  env:
+    NEXUS_STORAGE_ROOT_DIR: ${NEXUS_PATH:-__HOME__/program/nexus}/.nexus
+    NEXUS_WATCHER_IGNORE_PATHS: node_modules,.git,.nexus,dist,gemini
+    NO_PROXY: 127.0.0.1,localhost
 
-# _nexus_opencode: &nexus_opencode
-#   type: local
-#   enabled: true
-#   command:
-#     - /usr/bin/node
-#     - ${NEXUS_PATH:-__HOME__/program/nexus}/dist/bin/nexus.js
-#     - --project-root
-#     - __REPO_ROOT__
-#   environment:
-#     NEXUS_STORAGE_ROOT_DIR: ${NEXUS_PATH:-__HOME__/program/nexus}/.nexus
-#     NEXUS_WATCHER_IGNORE_PATHS: node_modules,.git,.nexus,dist,gemini
-#     NO_PROXY: 127.0.0.1,localhost
+_nexus_opencode: &nexus_opencode
+  type: local
+  enabled: true
+  command:
+    - /usr/bin/node
+    - ${NEXUS_PATH:-__HOME__/program/nexus}/dist/bin/nexus.js
+    - --project-root
+    - __REPO_ROOT__
+  environment:
+    NEXUS_STORAGE_ROOT_DIR: ${NEXUS_PATH:-__HOME__/program/nexus}/.nexus
+    NEXUS_WATCHER_IGNORE_PATHS: node_modules,.git,.nexus,dist,gemini
+    NO_PROXY: 127.0.0.1,localhost
 
 _chronos_graph_opencode: &chronos_graph_opencode
   type: local
@@ -75,13 +75,13 @@ _chronos_graph_opencode: &chronos_graph_opencode
     EMBEDDING_PROVIDER: local-model
     LOCAL_MODEL_NAME: "cl-nagoya/ruri-v3-310m"
 
-# _nexus_modern: &nexus_modern
-#   type: local
-#   command:
-#     - node
-#     - ${NEXUS_PATH:-__HOME__/program/nexus}/dist/bin/nexus.js
-#   environment:
-#     NEXUS_STORAGE_ROOT_DIR: ${NEXUS_PATH:-__HOME__/program/nexus}/.nexus
+_nexus_modern: &nexus_modern
+  type: local
+  command:
+    - node
+    - ${NEXUS_PATH:-__HOME__/program/nexus}/dist/bin/nexus.js
+  environment:
+    NEXUS_STORAGE_ROOT_DIR: ${NEXUS_PATH:-__HOME__/program/nexus}/.nexus
 
 notes:
   codex: Codex CLI MCP configuration is not managed here because this repository does not currently contain a supported Codex MCP config surface.
@@ -111,7 +111,7 @@ agents:
 
       skillport: *skillport
       chronos-graph: *chronos_graph_legacy
-      # nexus: *nexus
+      nexus: *nexus
 
   gemini:
     path: gemini/settings.json
@@ -131,7 +131,7 @@ agents:
         timeout: 30000
 
       chronos-graph: *chronos_graph_legacy
-      # nexus: *nexus
+      nexus: *nexus
 
   antigravity:
     path: antigravity/mcp_config.json
@@ -142,7 +142,7 @@ agents:
         serverUrl: __GATEWAY_URL__
 
       chronos-graph: *chronos_graph_legacy
-      # nexus: *nexus
+      nexus: *nexus
 
   cursor:
     path: ide/cursor/mcp.json
@@ -153,7 +153,7 @@ agents:
         url: __GATEWAY_URL__
 
       chronos-graph: *chronos_graph_legacy
-      # nexus: *nexus
+      nexus: *nexus
 
   vscode:
     path: ide/vscode/settings.json
@@ -164,7 +164,7 @@ agents:
         url: __GATEWAY_URL__
 
       chronos-graph: *chronos_graph_legacy
-      # nexus: *nexus
+      nexus: *nexus
 
   opencode:
     path: opencode/opencode.jsonc
@@ -179,4 +179,4 @@ agents:
           Authorization: Bearer ${MCP_GATEWAY_TOKEN}
 
       chronos_graph: *chronos_graph_opencode
-      # nexus: *nexus_opencode
+      nexus: *nexus_opencode
