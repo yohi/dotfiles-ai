@@ -4,11 +4,11 @@ mcpServers:
     image: ghcr.io/yohi/skillport:latest
     env:
       - name: SKILLPORT_SKILLS_DIR
-        value: /home/y_ohi/.skillport/skills:/home/y_ohi/dotfiles/components/dotfiles-ai/agent-skills
+        value: /home/y_ohi/dotfiles/components/dotfiles-ai/agent-skills
       - name: SKILLPORT_DB_PATH
         value: /mcp/db
     volumes:
-      - skillport-db:/mcp
+      - /home/y_ohi/.skillport/db:/mcp/db
       - /home/y_ohi/.skillport:/home/y_ohi/.skillport
       - /home/y_ohi/dotfiles/components/dotfiles-ai:/home/y_ohi/dotfiles/components/dotfiles-ai:ro
 

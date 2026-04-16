@@ -13,7 +13,15 @@ def main():
         sys.stderr.write(f"Error: Invalid JSON input: {e}\n")
         sys.exit(1)
 
+    if not isinstance(data, dict):
+        sys.stderr.write("Error: Input data is not a JSON object (dict).\n")
+        sys.exit(1)
+
     skills = data.get("skills", [])
+    if not isinstance(skills, list):
+        sys.stderr.write("Error: 'skills' in JSON input is not a list.\n")
+        sys.exit(1)
+
     total = data.get("total", len(skills))
 
     import os
@@ -25,7 +33,15 @@ def main():
     root_skills = []
     
     for skill in skills:
+        if not isinstance(skill, dict):
+            sys.stderr.write(f"Error: skill entry is not a dict: {skill}\n")
+            sys.exit(1)
+        
         skill_id = skill.get("id", "")
+        if not isinstance(skill_id, str):
+            sys.stderr.write(f"Error: skill id is not a string: {skill_id}\n")
+            sys.exit(1)
+
         if "/" in skill_id:
             ns = skill_id.split("/")[0]
             namespace_counts[ns] += 1
@@ -51,7 +67,7 @@ def main():
     print(f"{'Namespace':<25} {'Count':<5}")
     print("────────────────────────────────────────")
     
-    # カテゴリごとのカウントを表示（降順、(root)は最後または先頭にするなど調整可能）
+    # カテゴリごとのカウントを表示(降順、(root)は最後または先頭にするなど調整可能)
     for ns, count in sorted(namespace_counts.items(), key=lambda x: (-x[1], x[0])):
         print(f"{ns:<25} {count:<5}")
         

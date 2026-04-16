@@ -125,7 +125,6 @@ agents:
           Authorization: Bearer ${MCP_GATEWAY_TOKEN}
         timeout: 60000
 
-      skillport: *skillport
       atlassian:
         type: sse
         httpUrl: https://mcp.atlassian.com/v1/mcp

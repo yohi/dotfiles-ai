@@ -116,8 +116,8 @@ doctor: ## [診断] 設定の不備や同期が必要な箇所を特定し、解
 		echo "❌ [ACTION REQUIRED] .env ファイルが見つかりません。'make init-env' を実行してください。"; \
 	fi
 	@# 2. Sync check (skills vs agents)
-	@LATEST_SKILL=$$(find agent-skills -type f -name "*.md" 2>/dev/null | xargs -r ls -t 2>/dev/null | head -1); \
-	LATEST_CMD=$$(find agent-commands -type f -name "*.md" 2>/dev/null | xargs -r ls -t 2>/dev/null | head -1); \
+	@LATEST_SKILL=$$(find agent-skills -type f -name "*.md" -exec ls -t {} + 2>/dev/null | head -1); \
+	LATEST_CMD=$$(find agent-commands -type f -name "*.md" -exec ls -t {} + 2>/dev/null | head -1); \
 	LAST_SYNC_FILE="$(REPO_ROOT)/.last_sync"; \
 	if [ -f "$$LAST_SYNC_FILE" ]; then \
 		if [ -n "$$LATEST_SKILL" ] && [ "$$LATEST_SKILL" -nt "$$LAST_SYNC_FILE" ]; then \
