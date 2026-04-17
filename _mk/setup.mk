@@ -69,4 +69,7 @@ init-env: ## Interactive setup for .env file (essential secrets only)
 .PHONY: install-ollama
 install-ollama: ## Install Ollama using official script
 	@echo "🦙 Installing Ollama..."
-	@curl -fsSL https://ollama.com/install.sh | sh
+	@tmpfile=$$(mktemp); \
+	curl -fsSL https://ollama.com/install.sh -o "$$tmpfile"; \
+	sh "$$tmpfile"; \
+	rm -f "$$tmpfile"

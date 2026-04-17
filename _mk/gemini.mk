@@ -79,8 +79,7 @@ setup-supergemini:
 
 	# SuperGeminiフレームワークのセットアップ
 	@echo "⚙️  SuperGemini フレームワークをセットアップ中..."
-	@export PATH="$$HOME/.local/bin:$$PATH"; \
-	echo "🔧 SuperGemini セットアップ準備中..."; \
+	@echo "🔧 SuperGemini セットアップ準備中..."; \
 	echo "ℹ️  フレームワークファイル、ユーザーツール、Gemini CLI設定をシンボリックリンクで構成します"; \
 	\
 	echo "📁 必要なディレクトリを作成中..."; \
@@ -141,8 +140,7 @@ install-gemini-ecosystem:
 
 	# 最終確認
 	@echo "🔍 インストール結果の確認中..."
-	@export PATH="$$HOME/.local/bin:$$PATH"; \
-	if command -v gemini >/dev/null 2>&1; then \
+	@if command -v gemini >/dev/null 2>&1; then \
 		echo "Gemini CLI: ✅ $$(gemini --version 2>/dev/null || echo "インストール済み")"; \
 	else \
 		echo "Gemini CLI: ❌ 未確認"; \

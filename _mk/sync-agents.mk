@@ -14,7 +14,7 @@ GLOBAL_AGENTS_MD := $(GLOBAL_RULES_DIR)/AGENTS.global.md
 OPENCODE_DOCS    := $(REPO_ROOT)/opencode/docs
 CODEX_CONFIG     := $(REPO_ROOT)/codex/config.toml
 
-.PHONY: sync-agents clean ai-setup \
+.PHONY: sync-agents clean-sync-artifacts ai-setup \
         inject-meta-prompt-opencode inject-meta-prompt-codex \
         sync-skillport-doc link-user-agents link-agent-commands \
         install-external-skills clean-legacy
@@ -35,10 +35,10 @@ sync-agents: ## SSOTのスキル群を各エージェントの設定ファイル
 	@echo "✅ sync-agents: 全エージェントへの同期が完了しました"
 
 # ============================================================
-# clean: 同期状態のリセット
+# clean-sync-artifacts: 同期状態のリセット
 # ============================================================
-clean: ## 同期マーカーおよび生成されたリンク・コマンドファイルを削除する
-	@echo "🧹 clean: 同期状態をリセット中..."
+clean-sync-artifacts: ## 同期マーカーおよび生成されたリンク・コマンドファイルを削除する
+	@echo "🧹 clean-sync-artifacts: 同期状態をリセット中..."
 	rm -f "$(REPO_ROOT)/.last_sync"
 	@# OpenCode/Claude/Cursor 等のシンボリックリンクをクリーンアップ
 	rm -rf "$(REPO_ROOT)/opencode/commands"
@@ -46,8 +46,7 @@ clean: ## 同期マーカーおよび生成されたリンク・コマンドフ�
 	rm -rf "$(REPO_ROOT)/ide/cursor/commands/agent"
 	rm -f "$(REPO_ROOT)/.cursor/rules"/*.md
 	rm -rf "$(REPO_ROOT)/gemini/commands"
-	@echo "✅ clean: 同期状態がリセットされました"
-
+	@echo "✅ clean-sync-artifacts: 同期状態がリセットされました"
 # ============================================================
 # install-external-skills: 外部スキルの自動インストール
 # EXTERNAL_SKILLS.md に記載された全 namespace のスキルを取得

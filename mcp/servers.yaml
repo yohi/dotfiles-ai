@@ -121,7 +121,6 @@ agents:
         headers:
           Authorization: Bearer ${MCP_GATEWAY_TOKEN}
 
-      skillport: *skillport
       chronos-graph: *chronos_graph_legacy
       nexus: *nexus
 

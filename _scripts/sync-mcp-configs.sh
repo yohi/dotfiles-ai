@@ -108,7 +108,7 @@ fi
 
 echo "==> Deploying Claude Code (CLI) settings..."
 deploy_config "$REPO_ROOT/claude/settings.json" "$HOME/.claude/settings.json" "Claude Code"
-deploy_config "$REPO_ROOT/claude/settings.json" "$HOME/.claude.json" "Claude Code Legacy"
+# deploy_config "$REPO_ROOT/claude/settings.json" "$HOME/.claude.json" "Claude Code Legacy"
 
 echo "✅ MCP configurations synchronized from mcp/servers.yaml and mcp/config.yaml"
 
@@ -116,6 +116,7 @@ echo "==> Validating Skillport skills..."
 if command -v skillport > /dev/null 2>&1; then
     skillport --skills-dir "$REPO_ROOT/agent-skills" list
 elif command -v uvx > /dev/null 2>&1; then
+    echo "Warning: skillport not on PATH; using uvx as a fallback — ensure skillport is installed" >&2
     uvx --quiet skillport --skills-dir "$REPO_ROOT/agent-skills" list
 else
     echo "Warning: skillport command not found. Skipping validation." >&2

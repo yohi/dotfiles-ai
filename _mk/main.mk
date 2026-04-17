@@ -114,9 +114,8 @@ doctor: ## [診断] 設定の不備や同期が必要な箇所を特定し、解
 		echo "❌ [ACTION REQUIRED] .env ファイルが見つかりません。'make init-env' を実行してください。"; \
 	fi
 	@# 2. Sync check (skills vs agents)
-	@LATEST_SKILL=$$(find agent-skills -type f -name "*.md" -exec ls -t {} + 2>/dev/null | head -1); \
-	LATEST_CMD=$$(find agent-commands -type f -name "*.md" -exec ls -t {} + 2>/dev/null | head -1); \
-	LAST_SYNC_FILE="$(REPO_ROOT)/.last_sync"; \
+	@LATEST_SKILL=$$(find agent-skills -type f -name "*.md" -printf '%%T@ %%p\n' 2>/dev/null | sort -n | tail -1 | cut -d' ' -f2-); \
+	LATEST_CMD=$$(find agent-commands -type f -name "*.md" -printf '%%T@ %%p\n' 2>/dev/null | sort -n | tail -1 | cut -d' ' -f2-); \	LAST_SYNC_FILE="$(REPO_ROOT)/.last_sync"; \
 	if [ -f "$$LAST_SYNC_FILE" ]; then \
 		if [ -n "$$LATEST_SKILL" ] && [ "$$LATEST_SKILL" -nt "$$LAST_SYNC_FILE" ]; then \
 			echo "⚠️  [ACTION REQUIRED] スキルが変更されています。'make sync-agents' を実行してください。"; \
@@ -153,11 +152,12 @@ doctor: ## [診断] 設定の不備や同期が必要な箇所を特定し、解
 clean: ## 生成されたアーティファクトとキャッシュを削除
 	@echo "🧹 クリーンアップ中..."
 	@$(MAKE) -s clean-legacy 2>/dev/null || true
+	@$(MAKE) -s clean-sync-artifacts 2>/dev/null || true
 	@# _mk/main.mk の clean-internal を呼び出し
 	@$(MAKE) -s clean-internal 2>/dev/null || true
 	@rm -rf build/ dist/ *.pyc __pycache__ .ruff_cache .mypy_cache
-	@rm -f "$(REPO_ROOT)/.last_sync"
 	@echo "✅ クリーンアップが完了しました"
+
 test: ## プロジェクトのテスト/静的解析を実行
 	@$(MAKE) lint
 	@echo "🧪 Running profile substitution tests..."
