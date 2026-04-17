@@ -73,7 +73,7 @@ install-requirements:
 	@if command -v uv >/dev/null 2>&1; then \
 		uv sync; \
 	else \
-		pip install -r requirements.txt || echo "⚠️  pip install failed, but continuing..."; \
+		pip install -r requirements.txt; \
 	fi
 
 lint: ## Run Ruff and Mypy on .

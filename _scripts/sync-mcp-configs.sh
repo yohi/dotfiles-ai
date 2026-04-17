@@ -125,10 +125,10 @@ echo "✅ MCP configurations synchronized from mcp/servers.yaml and mcp/config.y
 
 echo "==> Validating Skillport skills..."
 if command -v skillport > /dev/null 2>&1; then
-    skillport --skills-dir "$REPO_ROOT/agent-skills" list
+    skillport --skills-dir "$REPO_ROOT/agent-skills" list || true
 elif command -v uvx > /dev/null 2>&1; then
     echo "Warning: skillport not on PATH; using uvx as a fallback — ensure skillport is installed" >&2
-    uvx --quiet skillport --skills-dir "$REPO_ROOT/agent-skills" list
+    uvx --quiet skillport --skills-dir "$REPO_ROOT/agent-skills" list || true
 else
     echo "Warning: skillport command not found. Skipping validation." >&2
 fi

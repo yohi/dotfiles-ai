@@ -20,12 +20,18 @@ def parse_input() -> Tuple[List[Dict[str, Any]], int]:
         sys.stderr.write("Error: Input data is not a JSON object (dict).\n")
         sys.exit(1)
 
-    skills = data.get("skills", [])
+    if "skills" not in data:
+        raise ValueError("Missing required field 'skills' in JSON input")
+    skills = data["skills"]
     if not isinstance(skills, list):
-        sys.stderr.write("Error: 'skills' in JSON input is not a list.\n")
-        sys.exit(1)
+        raise ValueError("'skills' in JSON input must be a list")
 
-    total = data.get("total", len(skills))
+    if "total" not in data:
+        raise ValueError("Missing required field 'total' in JSON input")
+    total = data["total"]
+    if not isinstance(total, int) or total < 0:
+        raise ValueError("'total' in JSON input must be a non-negative integer")
+
     return skills, total
 
 
@@ -70,7 +76,7 @@ def print_stats(
     print("Service Status")
     print("────────────────────────────────────────")
 
-    gateway_icon = "✅" if mcp_gateway_status == "active" else "❌"
+    gateway_icon = "✅" if mcp_gateway_status.startswith("active") else "❌"
     # "active (Gateway)" なども許容するため startswith("active") を使用
     mcp_icon = "✅" if skillport_mcp_status.startswith("active") else "❌"
 
