@@ -160,6 +160,8 @@ clean: ## 生成されたアーティファクトとキャッシュを削除
 
 test: ## プロジェクトのテスト/静的解析を実行
 	@$(MAKE) lint
+	@echo "🧪 Running Python unit tests..."
+	@PYTHONPATH=_scripts $(PYTHON) -m unittest discover -p "test_*.py" _scripts
 	@echo "🧪 Running profile substitution tests..."
 	@bash _scripts/test-omo-profiles.sh
 	@echo "🧪 Running MCP Make target tests..."

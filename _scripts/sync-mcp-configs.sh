@@ -18,6 +18,17 @@ deploy_config() {
     local dst="$2"
     local name="$3"
     local dst_dir
+
+    if [ ! -e "$src" ]; then
+        echo "❌ Error: Source file '$src' for $name does not exist." >&2
+        return 1
+    fi
+
+    if [ -d "$dst" ] && [ ! -L "$dst" ]; then
+        echo "❌ Error: Destination '$dst' for $name is a directory." >&2
+        return 1
+    fi
+
     dst_dir=$(dirname "$dst")
     mkdir -p "$dst_dir"
     if ln -sfn "$src" "$dst" 2>/dev/null; then
