@@ -1,15 +1,13 @@
 .PHONY: all install install-agents install-ides setup setup-agents setup-ides mcp-render link clean-internal install-requirements lint init sync secrets status clean test clean-legacy configure-git-ignore doctor
 
 # --- Standard Entry Points ---
-all: install setup
+all: install init-env setup sync-mcp ## [完全セットアップ] インストール、環境構築、設定、MCP同期をすべて行う
 
-install: install-agents install-ides ## Install all AI agents and IDE binaries
+install: install-requirements install-agents install-ides ## Install all AI agents and IDE binaries
 
 setup: setup-agents setup-ides ## Setup all AI agents and IDE configurations
-	@$(MAKE) mcp-render
 	-@$(MAKE) setup-superpowers 2>/dev/null || true
 	-@$(MAKE) sync-agents 2>/dev/null || true
-	-@$(MAKE) sync-mcp 2>/dev/null || true
 	$(Q_ECHO) "✅ dotfiles-ai のコア設定が適用されました"
 
 sync: ## [更新] リポジトリを最新にし、エージェントを同期する
@@ -73,7 +71,7 @@ clean-internal:
 install-requirements:
 	@echo "📦 依存関係をインストール中..."
 	@if command -v uv >/dev/null 2>&1; then \
-		uv pip install --system -r requirements.txt; \
+		uv sync; \
 	else \
 		pip install -r requirements.txt; \
 	fi
@@ -116,13 +114,12 @@ doctor: ## [診断] 設定の不備や同期が必要な箇所を特定し、解
 		echo "❌ [ACTION REQUIRED] .env ファイルが見つかりません。'make init-env' を実行してください。"; \
 	fi
 	@# 2. Sync check (skills vs agents)
-	@LATEST_SKILL=$$(find agent-skills -type f -name "*.md" 2>/dev/null | xargs ls -t 2>/dev/null | head -1); \
-	LATEST_CMD=$$(find agent-commands -type f -name "*.md" 2>/dev/null | xargs ls -t 2>/dev/null | head -1); \
-	LAST_SYNC=$$(find opencode/commands -type l 2>/dev/null | xargs ls -t 2>/dev/null | head -1); \
-	if [ -n "$$LAST_SYNC" ]; then \
-		if [ -n "$$LATEST_SKILL" ] && [ "$$LATEST_SKILL" -nt "$$LAST_SYNC" ]; then \
+	@LATEST_SKILL=$$(find agent-skills -type f -name "*.md" -printf '%%T@ %%p\n' 2>/dev/null | sort -n | tail -1 | cut -d' ' -f2-); \
+	LATEST_CMD=$$(find agent-commands -type f -name "*.md" -printf '%%T@ %%p\n' 2>/dev/null | sort -n | tail -1 | cut -d' ' -f2-); \	LAST_SYNC_FILE="$(REPO_ROOT)/.last_sync"; \
+	if [ -f "$$LAST_SYNC_FILE" ]; then \
+		if [ -n "$$LATEST_SKILL" ] && [ "$$LATEST_SKILL" -nt "$$LAST_SYNC_FILE" ]; then \
 			echo "⚠️  [ACTION REQUIRED] スキルが変更されています。'make sync-agents' を実行してください。"; \
-		elif [ -n "$$LATEST_CMD" ] && [ "$$LATEST_CMD" -nt "$$LAST_SYNC" ]; then \
+		elif [ -n "$$LATEST_CMD" ] && [ "$$LATEST_CMD" -nt "$$LAST_SYNC_FILE" ]; then \
 			echo "⚠️  [ACTION REQUIRED] コマンドが変更されています。'make sync-agents' を実行してください。"; \
 		fi; \
 	elif [ -n "$$LATEST_SKILL" ] || [ -n "$$LATEST_CMD" ]; then \
@@ -155,6 +152,7 @@ doctor: ## [診断] 設定の不備や同期が必要な箇所を特定し、解
 clean: ## 生成されたアーティファクトとキャッシュを削除
 	@echo "🧹 クリーンアップ中..."
 	@$(MAKE) -s clean-legacy 2>/dev/null || true
+	@$(MAKE) -s clean-sync-artifacts 2>/dev/null || true
 	@# _mk/main.mk の clean-internal を呼び出し
 	@$(MAKE) -s clean-internal 2>/dev/null || true
 	@rm -rf build/ dist/ *.pyc __pycache__ .ruff_cache .mypy_cache
@@ -162,6 +160,8 @@ clean: ## 生成されたアーティファクトとキャッシュを削除
 
 test: ## プロジェクトのテスト/静的解析を実行
 	@$(MAKE) lint
+	@echo "🧪 Running Python unit tests..."
+	@PYTHONPATH=_scripts $(PYTHON) -m unittest discover -p "test_*.py" _scripts
 	@echo "🧪 Running profile substitution tests..."
 	@bash _scripts/test-omo-profiles.sh
 	@echo "🧪 Running MCP Make target tests..."

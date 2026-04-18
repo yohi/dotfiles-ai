@@ -14,8 +14,6 @@ define create_desktop_entry
 endef
 
 # Claudia (Claude Code GUI) のバージョン固定
-export PATH := $(HOME)/.bun/bin:$(PATH)
-
 CLAUDIA_COMMIT := 70c16d8a4910db48cd9684aeacdd431caefd7d71
 
 # Claude Code のインストール
@@ -123,7 +121,6 @@ install-packages-claudia:
 		echo "📦 Bun をインストール中..."; \
 		curl -fsSL https://bun.sh/install | bash; \
 		echo "🔄 Bunのパスを更新中..."; \
-		export PATH="$$HOME/.bun/bin:$$PATH"; \
 		if ! command -v bun >/dev/null 2>&1; then \
 			echo "⚠️  Bunのインストールが完了しましたが、現在のセッションで認識されていません"; \
 			echo "   新しいターミナルセッションで再実行するか、以下を実行してください:"; \
@@ -145,7 +142,6 @@ install-packages-claudia:
 		cd "$$CLAUDIA_DIR" && \
 		\
 		echo "📦 フロントエンド依存関係をインストール中..."; \
-		export PATH="$$HOME/.bun/bin:$$PATH"; \
 		if command -v bun >/dev/null 2>&1; then \
 			bun install; \
 		else \
@@ -259,8 +255,7 @@ install-claude-ecosystem:
 
 	# 最終確認
 	@echo "🔍 インストール結果の確認中..."
-	@export PATH="$$HOME/.local/bin:$$PATH"; \
-	if command -v claude >/dev/null 2>&1; then \
+	@if command -v claude >/dev/null 2>&1; then \
 		echo "Claude Code: ✅ $$(claude --version 2>/dev/null)"; \
 	else \
 		echo "Claude Code: ❌ 未確認"; \

@@ -7,58 +7,111 @@ _chronos_graph_legacy: &chronos_graph_legacy
   type: stdio
   command: uv
   args:
-    - --quiet
-    - tool
     - run
-    - --from
-    - git+https://github.com/yohi/chronos-graph.git@37308f47837469d801abc1226ee65e4262093042
-    - context-store
+    - --project
+    - ${CHRONOS_GRAPH_PATH:-__PROGRAM__/chronos-graph}
+    - -m
+    - context_store
   env:
     STORAGE_BACKEND: sqlite
     SQLITE_DB_PATH: __HOME__/.context-store/memories.db
     GRAPH_ENABLED: "true"
-    EMBEDDING_PROVIDER: local
+    DECAY_HALF_LIFE_DAYS: "30"
+    SIMILARITY_THRESHOLD: "0.70"
+    DEDUP_THRESHOLD: "0.90"
+    EMBEDDING_PROVIDER: local-model
     LOCAL_MODEL_NAME: "cl-nagoya/ruri-v3-310m"
 
 _chronos_graph_modern: &chronos_graph_modern
   type: local
   command:
     - uv
-    - --quiet
-    - tool
     - run
-    - --from
-    - git+https://github.com/yohi/chronos-graph.git@37308f47837469d801abc1226ee65e4262093042
-    - context-store
+    - --project
+    - ${CHRONOS_GRAPH_PATH:-__PROGRAM__/chronos-graph}
+    - -m
+    - context_store
   environment:
     STORAGE_BACKEND: sqlite
     SQLITE_DB_PATH: __HOME__/.context-store/memories.db
     GRAPH_ENABLED: "true"
-    EMBEDDING_PROVIDER: local
+    DECAY_HALF_LIFE_DAYS: "30"
+    SIMILARITY_THRESHOLD: "0.70"
+    DEDUP_THRESHOLD: "0.90"
+    EMBEDDING_PROVIDER: local-model
     LOCAL_MODEL_NAME: "cl-nagoya/ruri-v3-310m"
 
 _nexus: &nexus
   type: stdio
   command: node
   args:
-    - ${NEXUS_PATH:-__HOME__/program/nexus}/dist/bin/nexus.js
+    - ${NEXUS_PATH:-__PROGRAM__/nexus}/dist/bin/nexus.js
   env:
-    NEXUS_STORAGE_ROOT_DIR: ${NEXUS_PATH:-__HOME__/program/nexus}/.nexus
+    NEXUS_STORAGE_ROOT_DIR: ${NEXUS_PATH:-__PROGRAM__/nexus}/.nexus
+    NEXUS_WATCHER_IGNORE_PATHS: node_modules,.git,.nexus,dist,gemini,.worktrees,.venv,target,.mypy_cache,.ruff_cache,build
+    CHOKIDAR_USEPOLLING: "true"
+    CHOKIDAR_INTERVAL: "2000"
+    NO_PROXY: 127.0.0.1,localhost
+
+_nexus_opencode: &nexus_opencode
+  type: local
+  enabled: true
+  command:
+    - node
+    - ${NEXUS_PATH:-__PROGRAM__/nexus}/dist/bin/nexus.js
+    - --project-root
+    - __REPO_ROOT__
+  environment:
+    NEXUS_STORAGE_ROOT_DIR: ${NEXUS_PATH:-__PROGRAM__/nexus}/.nexus
+    NEXUS_WATCHER_IGNORE_PATHS: node_modules,.git,.nexus,dist,gemini,.worktrees,.venv,target,.mypy_cache,.ruff_cache,build
+    CHOKIDAR_USEPOLLING: "true"
+    CHOKIDAR_INTERVAL: "2000"
+    NO_PROXY: 127.0.0.1,localhost
+
+_chronos_graph_opencode: &chronos_graph_opencode
+  type: local
+  enabled: true
+  command:
+    - uv
+    - run
+    - --project
+    - ${CHRONOS_GRAPH_PATH:-__PROGRAM__/chronos-graph}
+    - -m
+    - context_store
+  environment:
+    STORAGE_BACKEND: sqlite
+    SQLITE_DB_PATH: __HOME__/.context-store/memories.db
+    GRAPH_ENABLED: "true"
+    DECAY_HALF_LIFE_DAYS: "30"
+    SIMILARITY_THRESHOLD: "0.70"
+    DEDUP_THRESHOLD: "0.90"
+    EMBEDDING_PROVIDER: local-model
+    LOCAL_MODEL_NAME: "cl-nagoya/ruri-v3-310m"
 
 _nexus_modern: &nexus_modern
   type: local
   command:
     - node
-    - ${NEXUS_PATH:-__HOME__/program/nexus}/dist/bin/nexus.js
+    - ${NEXUS_PATH:-__PROGRAM__/nexus}/dist/bin/nexus.js
   environment:
-    NEXUS_STORAGE_ROOT_DIR: ${NEXUS_PATH:-__HOME__/program/nexus}/.nexus
+    NEXUS_STORAGE_ROOT_DIR: ${NEXUS_PATH:-__PROGRAM__/nexus}/.nexus
 
 notes:
   codex: Codex CLI MCP configuration is not managed here because this repository does not currently contain a supported Codex MCP config surface.
 
+_skillport: &skillport
+  type: stdio
+  command: uvx
+  args:
+    - --quiet
+    - skillport-mcp
+  env:
+    SKILLPORT_SKILLS_DIR: __REPO_ROOT__/agent-skills
+    SKILLPORT_DB_PATH: __HOME__/.skillport/db
+
 agents:
   claude:
-    path: claude/claude-settings.json
+    path: claude/settings.json
     format: json
     root_key: mcpServers
     servers:
@@ -136,5 +189,5 @@ agents:
         headers:
           Authorization: Bearer ${MCP_GATEWAY_TOKEN}
 
-      chronos-graph: *chronos_graph_modern
-      nexus: *nexus_modern
+      chronos_graph: *chronos_graph_opencode
+      nexus: *nexus_opencode

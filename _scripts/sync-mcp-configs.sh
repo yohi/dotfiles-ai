@@ -12,6 +12,35 @@ REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 ESCAPED_HOME=$(printf '%s' "$HOME" | sed 's/[&/|]/\\&/g')
 ESCAPED_REPO_ROOT=$(printf '%s' "$REPO_ROOT" | sed 's/[&/|]/\\&/g')
 
+# Helper function for symlinking or copying config files
+deploy_config() {
+    local src="$1"
+    local dst="$2"
+    local name="$3"
+    local dst_dir
+
+    if [ ! -e "$src" ]; then
+        echo "❌ Error: Source file '$src' for $name does not exist." >&2
+        return 1
+    fi
+
+    if [ -d "$dst" ] && [ ! -L "$dst" ]; then
+        echo "❌ Error: Destination '$dst' for $name is a directory." >&2
+        return 1
+    fi
+
+    dst_dir=$(dirname "$dst")
+    mkdir -p "$dst_dir"
+    if ln -sfn "$src" "$dst" 2>/dev/null; then
+        echo "✅ $name config deployed to $dst"
+    elif cp "$src" "$dst" 2>/dev/null; then
+        echo "✅ $name config deployed (fallback to copy) to $dst"
+    else
+        echo "❌ Failed to deploy $name config to $dst" >&2
+        return 1
+    fi
+}
+
 echo "==> Preparing config files from templates..."
 # Template to actual file mapping (only if actual file doesn't exist)
 declare -A TEMPLATES=(
@@ -19,7 +48,7 @@ declare -A TEMPLATES=(
     ["opencode/opencode.jsonc.template"]="opencode/opencode.jsonc"
     ["opencode/oh-my-opencode.jsonc.template"]="opencode/oh-my-opencode.jsonc"
     ["ide/vscode/settings.json.template"]="ide/vscode/settings.json"
-    ["claude/claude-settings.json.template"]="claude/claude-settings.json"
+    ["claude/settings.json.template"]="claude/settings.json"
 )
 
 for src in "${!TEMPLATES[@]}"; do
@@ -64,11 +93,45 @@ ln -sfn "$REPO_ROOT/mcp/catalogs/bootstrap.yaml" "$DOCKER_MCP_DIR/catalogs/boots
 ln -sfn "$REPO_ROOT/mcp/catalogs/custom.yaml" "$DOCKER_MCP_DIR/catalogs/custom.yaml"
 
 echo "==> Deploying Gemini CLI settings..."
-mkdir -p "$HOME/.gemini/shared"
-ln -sfn "$REPO_ROOT/gemini/settings.json" "$HOME/.gemini/settings.json"
-ln -sfn "$REPO_ROOT/gemini/settings.json" "$HOME/.gemini/shared/settings.json"
+deploy_config "$REPO_ROOT/gemini/settings.json" "$HOME/.gemini/settings.json" "Gemini CLI"
+deploy_config "$REPO_ROOT/gemini/settings.json" "$HOME/.gemini/shared/settings.json" "Gemini CLI Shared"
+
+echo "==> Deploying Claude Desktop MCP settings..."
+case "$(uname)" in
+    Darwin)
+        CLAUDE_CONFIG_DIR="$HOME/Library/Application Support/Claude"
+        ;;
+    Linux)
+        CLAUDE_CONFIG_DIR="$HOME/.config/Claude"
+        ;;
+    MINGW*|MSYS*|CYGWIN*)
+        CLAUDE_CONFIG_DIR="${APPDATA:-$HOME/AppData/Roaming}/Claude"
+        ;;
+    *)
+        echo "Warning: Unknown OS '$(uname)' for Claude Desktop config. Skipping." >&2
+        CLAUDE_CONFIG_DIR=""
+        ;;
+esac
+
+if [ -n "$CLAUDE_CONFIG_DIR" ]; then
+    deploy_config "$REPO_ROOT/claude/settings.json" "$CLAUDE_CONFIG_DIR/claude_desktop_config.json" "Claude Desktop"
+fi
+
+echo "==> Deploying Claude Code (CLI) settings..."
+deploy_config "$REPO_ROOT/claude/settings.json" "$HOME/.claude/settings.json" "Claude Code"
+# deploy_config "$REPO_ROOT/claude/settings.json" "$HOME/.claude.json" "Claude Code Legacy"
 
 echo "✅ MCP configurations synchronized from mcp/servers.yaml and mcp/config.yaml"
+
+echo "==> Validating Skillport skills..."
+if command -v skillport > /dev/null 2>&1; then
+    skillport --skills-dir "$REPO_ROOT/agent-skills" list || true
+elif command -v uvx > /dev/null 2>&1; then
+    echo "Warning: skillport not on PATH; using uvx as a fallback — ensure skillport is installed" >&2
+    uvx --quiet skillport --skills-dir "$REPO_ROOT/agent-skills" list || true
+else
+    echo "Warning: skillport command not found. Skipping validation." >&2
+fi
 
 SERVICE_FILE="$HOME/.config/systemd/user/docker-mcp-gateway.service"
 mkdir -p "$(dirname "$SERVICE_FILE")"

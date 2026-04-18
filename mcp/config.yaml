@@ -1,4 +1,16 @@
-mcpServers: {}
+mcpServers:
+  skillport:
+    type: server
+    image: ghcr.io/yohi/skillport:latest
+    env:
+      - name: SKILLPORT_SKILLS_DIR
+        value: __REPO_ROOT__/agent-skills
+      - name: SKILLPORT_DB_PATH
+        value: /mcp/db
+    volumes:
+      - __HOME__/.skillport/db:/mcp/db
+      - __HOME__/.skillport:__HOME__/.skillport
+      - __REPO_ROOT__:__REPO_ROOT__:ro
 
 gateway:
   # Docker MCP Gateway で有効化するサーバー群。

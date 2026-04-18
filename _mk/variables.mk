@@ -4,6 +4,10 @@ SHELL := /bin/bash
 .SHELLFLAGS := -o pipefail -c
 PYTHON := uv run --with-requirements requirements.txt
 
+# Path Configuration
+export PATH := $(HOME)/.npm-global/bin:$(HOME)/.bun/bin:$(HOME)/.local/bin:$(PATH)
+export NPM_CONFIG_PREFIX := $(HOME)/.npm-global
+
 # Verbosity control
 QUIET ?= 0
 

@@ -1,7 +1,10 @@
 FROM ghcr.io/astral-sh/uv:python3.11-bookworm-slim
 
-# 非ルートユーザーの作成
-RUN groupadd -r skillport && useradd -r -g skillport skillport
+# 非ルートユーザーの作成とホームディレクトリの準備
+RUN groupadd -r skillport && \
+    useradd -r -g skillport -d /home/skillport -m skillport && \
+    mkdir -p /home/skillport/.skillport/db && \
+    chown -R skillport:skillport /home/skillport
 
 # skillport-mcp をインストール
 RUN uv pip install --system skillport-mcp

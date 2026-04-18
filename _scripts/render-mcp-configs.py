@@ -34,6 +34,28 @@ def parse_jsonc(text: str) -> dict[str, Any]:
     return cast(dict[str, Any], json5.loads(text))
 
 
+def _resolve_program_placeholder(val: str) -> str:
+    """__PROGRAM__ プレースホルダのスマート置換を行う。
+    ~/program/path と ~/program/private/path のうち、存在する方を優先する。"""
+    if "__PROGRAM__" not in val:
+        return val
+
+    home = Path.home()
+    # __PROGRAM__/project/path -> project/path
+    rel_path = val.replace("__PROGRAM__", "").lstrip("/")
+
+    # プロジェクトのルートディレクトリ(rel_pathの最初のセグメント)で存在確認
+    project_name = rel_path.split("/")[0] if rel_path else ""
+    if project_name:
+        if (home / "program" / "private" / project_name).is_dir():
+            return val.replace("__PROGRAM__", str(home / "program" / "private"))
+        else:
+            return val.replace("__PROGRAM__", str(home / "program"))
+    else:
+        # パスが空の場合はデフォルトとして ~/program を使用
+        return val.replace("__PROGRAM__", str(home / "program"))
+
+
 def replace_placeholders(value: Any, gateway_url: str) -> Any:
     if isinstance(value, str):
         # 置換対象のマップ
@@ -72,6 +94,10 @@ def replace_placeholders(value: Any, gateway_url: str) -> Any:
             "__HOME__": str(Path.home()),
             "__REPO_ROOT__": str(REPO_ROOT),
         }
+
+        # __PROGRAM__ プレースホルダのスマート置換
+        val = _resolve_program_placeholder(val)
+
         for k, v in placeholders.items():
             val = val.replace(k, v)
 
