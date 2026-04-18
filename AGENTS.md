@@ -79,6 +79,7 @@ docker container prune -f --filter "label=docker-mcp=true"
 ```
 
 ### 📚 References
+- [MCP Client 設定ガイド (Unified SSE Gateway)](./_docs/mcp-settings.md)
 - [Docker MCP Gateway: Getting Started](https://docs.docker.com/ai/mcp-catalog-and-toolkit/mcp-gateway/)
 - [Docker MCP Gateway: FAQs & Troubleshooting](https://docs.docker.com/ai/mcp-catalog-and-toolkit/faqs/)
 - [GitHub: docker/mcp-gateway (Lifecycle Management)](https://github.com/docker/mcp-gateway#overview)
