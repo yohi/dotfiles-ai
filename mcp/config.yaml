@@ -1,4 +1,24 @@
 mcpServers:
+  SQLite:
+    type: server
+    image: ghcr.io/yohi/mcp-sqlite:latest
+    volumes:
+      - "__HOME__/.mcp/sqlite:/mcp"
+  filesystem:
+    type: server
+    image: ghcr.io/yohi/mcp-filesystem:latest
+    volumes:
+      - "__HOME__:/home/y_ohi"
+      - "__REPO_ROOT__:__REPO_ROOT__"
+  github-official:
+    type: server
+    image: mcp/github:latest
+    env:
+      - name: GITHUB_PERSONAL_ACCESS_TOKEN
+        value: "${GITHUB_TOKEN}"
+  sequentialthinking:
+    type: server
+    image: mcp/sequentialthinking:latest
   skillport:
     type: server
     image: ghcr.io/yohi/skillport:latest
@@ -6,17 +26,17 @@ mcpServers:
       - --reindex
     env:
       - name: SKILLPORT_SKILLS_DIR
-        value: __REPO_ROOT__/agent-skills
+        value: "__REPO_ROOT__/agent-skills"
       - name: SKILLS_DIR
-        value: __REPO_ROOT__/agent-skills
+        value: "__REPO_ROOT__/agent-skills"
       - name: SKILLPORT_DB_PATH
-        value: /mcp/db
+        value: "/mcp/db"
       - name: DB_PATH
-        value: /mcp/db
+        value: "/mcp/db"
     volumes:
-      - __HOME__/.skillport/db:/mcp/db
-      - __HOME__/.skillport:__HOME__/.skillport
-      - __REPO_ROOT__:__REPO_ROOT__:ro
+      - "__HOME__/.skillport/db:/mcp/db"
+      - "__HOME__/.skillport:__HOME__/.skillport"
+      - "__REPO_ROOT__:__REPO_ROOT__:ro"
 
 gateway:
   enabled_servers:
