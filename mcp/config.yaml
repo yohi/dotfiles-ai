@@ -2,10 +2,16 @@ mcpServers:
   skillport:
     type: server
     image: ghcr.io/yohi/skillport:latest
+    command:
+      - --reindex
     env:
       - name: SKILLPORT_SKILLS_DIR
         value: __REPO_ROOT__/agent-skills
+      - name: SKILLS_DIR
+        value: __REPO_ROOT__/agent-skills
       - name: SKILLPORT_DB_PATH
+        value: /mcp/db
+      - name: DB_PATH
         value: /mcp/db
     volumes:
       - __HOME__/.skillport/db:/mcp/db
@@ -13,8 +19,6 @@ mcpServers:
       - __REPO_ROOT__:__REPO_ROOT__:ro
 
 gateway:
-  # Docker MCP Gateway で有効化するサーバー群。
-  # chronos-graph のようなクライアントローカル MCP は含めない。
   enabled_servers:
     - SQLite
     - filesystem

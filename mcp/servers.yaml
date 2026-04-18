@@ -1,193 +1,54 @@
 defaults:
-  gateway_name: docker-mcp-gateway
-  gateway_url: http://127.0.0.1:10888/sse
+  gateway_url: "http://127.0.0.1:10888/sse"
 
-# chronos-graph is a local MCP server that runs via 'uv' on each client (not managed by Docker gateway)
-_chronos_graph_legacy: &chronos_graph_legacy
-  type: stdio
-  command: uv
-  args:
-    - run
-    - --project
-    - ${CHRONOS_GRAPH_PATH:-__PROGRAM__/chronos-graph}
-    - -m
-    - context_store
-  env:
-    STORAGE_BACKEND: sqlite
-    SQLITE_DB_PATH: __HOME__/.context-store/memories.db
-    GRAPH_ENABLED: "true"
-    DECAY_HALF_LIFE_DAYS: "30"
-    SIMILARITY_THRESHOLD: "0.70"
-    DEDUP_THRESHOLD: "0.90"
-    EMBEDDING_PROVIDER: local-model
-    LOCAL_MODEL_NAME: "cl-nagoya/ruri-v3-310m"
-
-_chronos_graph_modern: &chronos_graph_modern
-  type: local
-  command:
-    - uv
-    - run
-    - --project
-    - ${CHRONOS_GRAPH_PATH:-__PROGRAM__/chronos-graph}
-    - -m
-    - context_store
-  environment:
-    STORAGE_BACKEND: sqlite
-    SQLITE_DB_PATH: __HOME__/.context-store/memories.db
-    GRAPH_ENABLED: "true"
-    DECAY_HALF_LIFE_DAYS: "30"
-    SIMILARITY_THRESHOLD: "0.70"
-    DEDUP_THRESHOLD: "0.90"
-    EMBEDDING_PROVIDER: local-model
-    LOCAL_MODEL_NAME: "cl-nagoya/ruri-v3-310m"
-
-_nexus: &nexus
-  type: stdio
-  command: node
-  args:
-    - ${NEXUS_PATH:-__PROGRAM__/nexus}/dist/bin/nexus.js
-  env:
-    NEXUS_STORAGE_ROOT_DIR: ${NEXUS_PATH:-__PROGRAM__/nexus}/.nexus
-    NEXUS_WATCHER_IGNORE_PATHS: node_modules,.git,.nexus,dist,gemini,.worktrees,.venv,target,.mypy_cache,.ruff_cache,build
-    CHOKIDAR_USEPOLLING: "true"
-    CHOKIDAR_INTERVAL: "2000"
-    NO_PROXY: 127.0.0.1,localhost
-
-_nexus_opencode: &nexus_opencode
-  type: local
-  enabled: true
-  command:
-    - node
-    - ${NEXUS_PATH:-__PROGRAM__/nexus}/dist/bin/nexus.js
-    - --project-root
-    - __REPO_ROOT__
-  environment:
-    NEXUS_STORAGE_ROOT_DIR: ${NEXUS_PATH:-__PROGRAM__/nexus}/.nexus
-    NEXUS_WATCHER_IGNORE_PATHS: node_modules,.git,.nexus,dist,gemini,.worktrees,.venv,target,.mypy_cache,.ruff_cache,build
-    CHOKIDAR_USEPOLLING: "true"
-    CHOKIDAR_INTERVAL: "2000"
-    NO_PROXY: 127.0.0.1,localhost
-
-_chronos_graph_opencode: &chronos_graph_opencode
-  type: local
-  enabled: true
-  command:
-    - uv
-    - run
-    - --project
-    - ${CHRONOS_GRAPH_PATH:-__PROGRAM__/chronos-graph}
-    - -m
-    - context_store
-  environment:
-    STORAGE_BACKEND: sqlite
-    SQLITE_DB_PATH: __HOME__/.context-store/memories.db
-    GRAPH_ENABLED: "true"
-    DECAY_HALF_LIFE_DAYS: "30"
-    SIMILARITY_THRESHOLD: "0.70"
-    DEDUP_THRESHOLD: "0.90"
-    EMBEDDING_PROVIDER: local-model
-    LOCAL_MODEL_NAME: "cl-nagoya/ruri-v3-310m"
-
-_nexus_modern: &nexus_modern
-  type: local
-  command:
-    - node
-    - ${NEXUS_PATH:-__PROGRAM__/nexus}/dist/bin/nexus.js
-  environment:
-    NEXUS_STORAGE_ROOT_DIR: ${NEXUS_PATH:-__PROGRAM__/nexus}/.nexus
-
-notes:
-  codex: Codex CLI MCP configuration is not managed here because this repository does not currently contain a supported Codex MCP config surface.
-
-_skillport: &skillport
-  type: stdio
-  command: uvx
-  args:
-    - --quiet
-    - skillport-mcp
-  env:
-    SKILLPORT_SKILLS_DIR: __REPO_ROOT__/agent-skills
-    SKILLPORT_DB_PATH: __HOME__/.skillport/db
+servers:
+  SQLite:
+    type: server
+    image: ghcr.io/yohi/mcp-sqlite:latest
+    volumes:
+      - "__HOME__/.mcp/sqlite:/mcp"
+  filesystem:
+    type: server
+    image: ghcr.io/yohi/mcp-filesystem:latest
+    volumes:
+      - "__HOME__:/home/y_ohi"
+      - "__REPO_ROOT__:__REPO_ROOT__"
+  github-official:
+    type: server
+    image: mcp/github:latest
+    env:
+      - name: GITHUB_PERSONAL_ACCESS_TOKEN
+        value: "${GITHUB_TOKEN}"
+  sequentialthinking:
+    type: server
+    image: mcp/sequentialthinking:latest
+  skillport:
+    type: server
+    image: ghcr.io/yohi/skillport:latest
+    command:
+      - --reindex
+    env:
+      - name: SKILLPORT_SKILLS_DIR
+        value: "__REPO_ROOT__/agent-skills"
+      - name: SKILLS_DIR
+        value: "__REPO_ROOT__/agent-skills"
+      - name: SKILLPORT_DB_PATH
+        value: "/mcp/db"
+      - name: DB_PATH
+        value: "/mcp/db"
+    volumes:
+      - "__HOME__/.skillport/db:/mcp/db"
+      - "__HOME__/.skillport:__HOME__/.skillport"
+      - "__REPO_ROOT__:__REPO_ROOT__:ro"
 
 agents:
-  claude:
-    path: claude/settings.json
-    format: json
-    root_key: mcpServers
-    servers:
-      docker-mcp-gateway:
-        type: sse
-        url: __GATEWAY_URL__
-        headers:
-          Authorization: Bearer ${MCP_GATEWAY_TOKEN}
-
-      chronos-graph: *chronos_graph_legacy
-      nexus: *nexus
-
   gemini:
-    path: gemini/settings.json
-    format: json
-    root_key: mcpServers
+    path: "gemini/settings.json"
+    format: "json"
+    root_key: "mcpServers"
     servers:
-      docker-mcp-gateway:
-        type: sse
-        url: http://127.0.0.1:10888/sse
-        headers:
-          Authorization: Bearer ${MCP_GATEWAY_TOKEN}
-        timeout: 60000
-
-      atlassian:
-        type: sse
-        httpUrl: https://mcp.atlassian.com/v1/mcp
-        timeout: 30000
-
-      chronos-graph: *chronos_graph_legacy
-      nexus: *nexus
-
-  antigravity:
-    path: antigravity/mcp_config.json
-    format: generated_json
-    root_key: mcpServers
-    servers:
-      docker-mcp-gateway:
-        serverUrl: __GATEWAY_URL__
-
-      chronos-graph: *chronos_graph_legacy
-      nexus: *nexus
-
-  cursor:
-    path: ide/cursor/mcp.json
-    format: generated_json
-    root_key: mcpServers
-    servers:
-      docker-mcp-gateway:
-        url: __GATEWAY_URL__
-
-      chronos-graph: *chronos_graph_legacy
-      nexus: *nexus
-
-  vscode:
-    path: ide/vscode/settings.json
-    format: jsonc
-    root_key: mcpServers
-    servers:
-      docker-mcp-gateway:
-        url: __GATEWAY_URL__
-
-      chronos-graph: *chronos_graph_legacy
-      nexus: *nexus
-
-  opencode:
-    path: opencode/opencode.jsonc
-    format: opencode_jsonc
-    root_key: mcp
-    servers:
-      docker-mcp-gateway:
-        type: remote
-        url: __GATEWAY_URL__
-        enabled: true
-        headers:
-          Authorization: Bearer ${MCP_GATEWAY_TOKEN}
-
-      chronos_graph: *chronos_graph_opencode
-      nexus: *nexus_opencode
+      SQLite: { inherit: "SQLite" }
+      filesystem: { inherit: "filesystem" }
+      github-official: { inherit: "github-official" }
+      sequentialthinking: { inherit: "sequentialthinking" }
+      skillport: { inherit: "skillport" }

@@ -5,5 +5,5 @@
 
 | Skill Namespace | Source Repository | Version (Commit Hash) | Pinned At | Note |
 | :--- | :--- | :--- | :--- | :--- |
-| superpowers | https://github.com/obra/superpowers | c4bbe651cb1bc5e7bec6f7effae2b946571f3258 | 2026-04-17 | AI Agent Workflow |
+| superpowers | https://github.com/obra/superpowers | b55764852ac78870e65c6565fb585b6cd8b3c5c9 | 2026-04-19 | AI Agent Workflow |
 | anthropics | https://github.com/anthropics/skills | 98669c11ca63e9c81c11501e1437e5c47b556621 | 2026-04-09 | Official Anthropic Skills |

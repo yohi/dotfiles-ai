@@ -294,7 +294,24 @@ def main() -> int:
         path = REPO_ROOT / agent_config["path"]
         format_name = agent_config["format"]
         root_key = agent_config["root_key"]
-        servers = replace_placeholders(agent_config["servers"], gateway_url)
+        
+        # 継承(inherit)を展開する
+        raw_servers = agent_config.get("servers", {})
+        processed_servers = {}
+        for s_name, s_cfg in raw_servers.items():
+            if "inherit" in s_cfg:
+                base = config.get("servers", {}).get(s_cfg["inherit"], {})
+                # ゲートウェイ経由のSSE設定を構築
+                processed_servers[s_name] = {
+                    "url": f"{gateway_url}?server={s_name}",
+                    "headers": {
+                        "Authorization": f"Bearer {os.environ.get('MCP_GATEWAY_AUTH_TOKEN', '')}"
+                    }
+                }
+            else:
+                processed_servers[s_name] = s_cfg
+
+        servers = replace_placeholders(processed_servers, gateway_url)
 
         changed = False
         if format_name in {"json", "generated_json"}:
