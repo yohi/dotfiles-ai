@@ -1,28 +1,100 @@
 defaults:
   gateway_url: "http://127.0.0.1:10888/sse"
-
 servers:
   SQLite:
+    title: "SQLite"
+    description: "SQLite database access and management."
     type: server
-    image: ghcr.io/yohi/mcp-sqlite:latest
+    image: mcp/sqlite:latest
+    args:
+      - "/mcp/sqlite.db"
     volumes:
       - "__HOME__/.mcp/sqlite:/mcp"
   filesystem:
+    title: "Filesystem"
+    description: "Local filesystem access with restricted paths."
     type: server
-    image: ghcr.io/yohi/mcp-filesystem:latest
+    image: docker.io/mcp/filesystem:latest
+    command:
+      - "/home/y_ohi"
+      - "__REPO_ROOT__"
     volumes:
       - "__HOME__:/home/y_ohi"
       - "__REPO_ROOT__:__REPO_ROOT__"
   github-official:
+
+    description: "Official GitHub MCP server for repository management."
     type: server
     image: mcp/github:latest
     env:
       - name: GITHUB_PERSONAL_ACCESS_TOKEN
-        value: "${GITHUB_TOKEN}"
+        value: "${GITHUB_TOKEN:-}"
   sequentialthinking:
+    title: "Sequential Thinking"
+    description: "A tool for sequential problem solving and logical reasoning."
     type: server
     image: mcp/sequentialthinking:latest
+  chronos-graph:
+    title: "ChronosGraph"
+    description: "Long-term memory and knowledge graph system."
+    type: local
+    command:
+      - uv
+      - run
+      - --project
+      - "${CHRONOS_GRAPH_PATH:-__PROGRAM__/chronos-graph}"
+      - -m
+      - context_store
+    env:
+      - name: STORAGE_BACKEND
+        value: "sqlite"
+      - name: SQLITE_DB_PATH
+        value: "__HOME__/.context-store/memories.db"
+      - name: GRAPH_ENABLED
+        value: "true"
+      - name: DECAY_HALF_LIFE_DAYS
+        value: "30"
+      - name: SIMILARITY_THRESHOLD
+        value: "0.70"
+      - name: DEDUP_THRESHOLD
+        value: "0.90"
+      - name: EMBEDDING_PROVIDER
+        value: "local-model"
+      - name: LOCAL_MODEL_NAME
+        value: "cl-nagoya/ruri-v3-310m"
+
+  nexus:
+    title: "Nexus"
+    description: "Local knowledge base and indexer."
+    type: local
+    command:
+      - node
+      - "__PROGRAM__/nexus/dist/bin/nexus.js"
+    env:
+      - name: NEXUS_STORAGE_ROOT_DIR
+        value: "__PROGRAM__/nexus/.nexus"
+      - name: NEXUS_WATCHER_IGNORE_PATHS
+        value: "node_modules,.git,.nexus,dist,gemini,.worktrees,.venv,target,.mypy_cache,.ruff_cache,build,.serena,.cache,__pycache__,*.db,*.sqlite,*.log"
+      - name: CHOKIDAR_USEPOLLING
+        value: "false"
+      - name: CHOKIDAR_INTERVAL
+        value: "2000"
+      - name: NO_PROXY
+        value: "127.0.0.1,localhost"
+
+  atlassian:
+    title: "Atlassian"
+    description: "Atlassian (Jira/Confluence) official MCP server."
+    type: sse
+    # Atlassian はゲートウェイを通さず直接接続する(OAuth安定性のため)
+    # ですが、SSOT管理のためここに定義します。
+    # 実際には agent 側で inherit せず直接定義するか、特例として扱います。
+    url: "https://mcp.atlassian.com/v1/mcp"
+
   skillport:
+
+    title: "Skillport"
+    description: "Professional development and AI skill management toolkit."
     type: server
     image: ghcr.io/yohi/skillport:latest
     command:
@@ -50,5 +122,90 @@ agents:
       SQLite: { inherit: "SQLite" }
       filesystem: { inherit: "filesystem" }
       github-official: { inherit: "github-official" }
+      atlassian: { inherit: "atlassian" }
       sequentialthinking: { inherit: "sequentialthinking" }
+      chronos-graph: { inherit: "chronos-graph" }
+      nexus: { inherit: "nexus" }
+      skillport: { inherit: "skillport" }
+
+  claude:
+    path: ".claude.json"
+    format: "json"
+    # Claude Code requires servers to be under projects.[path].mcpServers
+    project_key: "/home/y_ohi/dotfiles/components/dotfiles-ai"
+    root_key: "mcpServers"
+    servers:
+      SQLite: { inherit: "SQLite" }
+      filesystem: { inherit: "filesystem" }
+      github-official: { inherit: "github-official" }
+      atlassian: { inherit: "atlassian" }
+      sequentialthinking: { inherit: "sequentialthinking" }
+      chronos-graph: { inherit: "chronos-graph" }
+      nexus: { inherit: "nexus" }
+      skillport: { inherit: "skillport" }
+
+  opencode:
+    path: "opencode/opencode.jsonc"
+    format: "opencode_jsonc"
+    root_key: "mcp"
+    servers:
+      SQLite: { inherit: "SQLite" }
+      filesystem: { inherit: "filesystem" }
+      github-official: { inherit: "github-official" }
+      sequentialthinking: { inherit: "sequentialthinking" }
+      chronos_graph: { inherit: "chronos-graph" }
+      nexus: { inherit: "nexus" }
+      skillport: { inherit: "skillport" }
+
+  vscode:
+    path: "ide/vscode/settings.json"
+    format: "json"
+    root_key: "mcpServers"
+    servers:
+      SQLite: { inherit: "SQLite" }
+      filesystem: { inherit: "filesystem" }
+      github-official: { inherit: "github-official" }
+      sequentialthinking: { inherit: "sequentialthinking" }
+      chronos-graph: { inherit: "chronos-graph" }
+      nexus: { inherit: "nexus" }
+      skillport: { inherit: "skillport" }
+
+  cursor:
+    path: ".cursor/mcp.json"
+    format: "json"
+    root_key: "mcpServers"
+    servers:
+      SQLite: { inherit: "SQLite" }
+      filesystem: { inherit: "filesystem" }
+      github-official: { inherit: "github-official" }
+      sequentialthinking: { inherit: "sequentialthinking" }
+      chronos-graph: { inherit: "chronos-graph" }
+      nexus: { inherit: "nexus" }
+      skillport: { inherit: "skillport" }
+
+  antigravity:
+    path: ".gemini/antigravity/mcp_config.json"
+    format: "json"
+    root_key: "mcpServers"
+    url_key: "serverUrl"
+    servers:
+      SQLite: { inherit: "SQLite" }
+      filesystem: { inherit: "filesystem" }
+      github-official: { inherit: "github-official" }
+      sequentialthinking: { inherit: "sequentialthinking" }
+      chronos-graph: { inherit: "chronos-graph" }
+      nexus: { inherit: "nexus" }
+      skillport: { inherit: "skillport" }
+
+  codex:
+    path: "codex/config.toml"
+    format: "toml"
+    root_key: "mcp_servers"
+    servers:
+      SQLite: { inherit: "SQLite" }
+      filesystem: { inherit: "filesystem" }
+      github-official: { inherit: "github-official" }
+      sequentialthinking: { inherit: "sequentialthinking" }
+      chronos-graph: { inherit: "chronos-graph" }
+      nexus: { inherit: "nexus" }
       skillport: { inherit: "skillport" }

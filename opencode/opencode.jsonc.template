@@ -92,33 +92,7 @@
   },
 
   // [MCP]
-  "mcp": {
-    "docker-mcp-gateway": {
-      "type": "remote",
-      "url": "http://127.0.0.1:10888/sse",
-      "enabled": true,
-      "headers": {
-        "Authorization": "Bearer ${MCP_GATEWAY_TOKEN}"
-      }
-    },
-    "chronos-graph": {
-      "type": "local",
-      "command": [
-        "uv",
-        "--quiet",
-        "tool",
-        "run",
-        "--from",
-        "git+https://github.com/yohi/chronos-graph.git@37308f47837469d801abc1226ee65e4262093042",
-        "context-store"
-      ],
-      "environment": {
-        "STORAGE_BACKEND": "sqlite",
-        "SQLITE_DB_PATH": "__HOME__/.context-store/memories.db",
-        "GRAPH_ENABLED": "true"
-      }
-    },
-  },
+  "mcp": {},
 
   // [LSP]
   "lsp": {

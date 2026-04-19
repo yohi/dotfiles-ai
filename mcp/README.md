@@ -31,70 +31,51 @@ Atlassian 製品（Jira, Confluence）用の公式 MCP サーバーです。
 
 ## 2. 設定管理の仕組み (SSOT)
 
-本プロジェクトでは、MCP 設定を用途別に 2 つの SSOT で管理しています。
+本プロジェクトでは、MCP 設定を **`mcp/servers.yaml`** を唯一の正解（Single Source of Truth）として管理しています。
 
-- **`mcp/servers.yaml`**: 全 AI エージェント（Gemini, Claude, Cursor, VSCode, Antigravity, OpenCode 等）のマスター設定。
-- **`mcp/config.yaml`**: Docker MCP Gateway で有効化するサーバー一覧の SSOT。同期時に systemd service の `--servers` 引数へ反映されます。
+- **`mcp/servers.yaml`**: 
+  - 全 AI エージェント（Gemini, Claude, Cursor, VSCode, Antigravity, OpenCode, Codex 等）のマスター設定。
+  - 各サーバーの定義（Docker イメージ、環境変数、ボリュームマウント等）と、各エージェントがどのサーバーを利用するかを定義します。
+- **自動生成されるファイル**:
+  - `make sync-mcp` を実行すると、`_scripts/render-mcp-configs.py` によって以下のファイルが自動生成・更新されます。
+    - **`mcp/config.yaml`**: Docker MCP Gateway で有効化するサーバー一覧。
+    - **`mcp/catalogs/custom.yaml`**: Docker MCP Gateway のカスタムカタログ定義。
+    - **各エージェントの設定ファイル**: `gemini/settings.json`, `claude/settings.json`, `opencode/opencode.jsonc`, `.cursor/mcp.json`, `codex/config.toml` 等。
 - **プレースホルダー置換**: `__GATEWAY_URL__`, `__HOME__`, `__REPO_ROOT__` は生成時に動的に置換されます。また、`${VAR}` 形式の環境変数も `_scripts/render-mcp-configs.py` によって展開されます。
-- **差異の明示的な管理**: `serverUrl` と `url` のようなツールごとのキー名の違いは、`mcp/servers.yaml` 内でツールごとに定義されています。同期スクリプト（`_scripts/render-mcp-configs.py`）は、これらのキー構造を維持したまま値の展開のみを行います。
 
 ---
 
 ## 3. 各ツールの接続仕様リファレンス
 
-ツールによって、SSE 接続時に使用する設定キーが異なります。手動で設定を確認・修正する際の参考にしてください。本ガイドは旧 `mcp-support.md` の内容を完全に統合しています。
+本プロジェクトでは **Unified SSE Gateway** パターンを採用しており、各ツールは `http://127.0.0.1:10888/sse?server=サーバー名` という形式で個別のサーバーに接続します。
 
 ### 接続設定キー・対応一覧
 
-| ツール名 | SSE/Remote 対応 | 正しいキー名 | 設定ファイル (例) |
-| :--- | :---: | :--- | :--- |
-| **Antigravity (IDE)** | ◎ | **`serverUrl`** | `~/.gemini/antigravity/mcp_config.json` |
-| **Gemini CLI** | ◎ | **`url`** / `httpUrl` | `~/.gemini/settings.json` |
-| **Claude Code** | ◎ | **`url`** | `~/.claude/config.json` |
-| **Cursor** | 〇 | **`url`** | `.cursor/mcp.json` |
-| **OpenCode** | 〇 | **`url`** | `opencode.json` |
+| ツール名 | SSE/Remote 対応 | 正しいキー名 | 設定ファイル (例) | 形式 |
+| :--- | :---: | :--- | :--- | :--- |
+| **Antigravity (IDE)** | ◎ | **`serverUrl`** | `~/.gemini/antigravity/mcp_config.json` | JSON |
+| **Gemini CLI** | ◎ | **`url`** | `~/.gemini/settings.json` | JSON |
+| **Claude Code** | ◎ | **`url`** | `~/.claude/settings.json` | JSON |
+| **Cursor** | 〇 | **`url`** | `.cursor/mcp.json` | JSON |
+| **VSCode** | 〇 | **`url`** | `ide/vscode/settings.json` | JSON |
+| **OpenCode** | 〇 | **`url`** | `opencode/opencode.jsonc` | JSONC |
+| **Codex CLI** | 〇 | **`command`** | `~/.codex/config.toml` | TOML |
 
-### 各ツールの正確な設定コード例
+### 特筆すべき設定仕様
 
-#### ■ Antigravity (Google IDE)
-Google のエージェント特化型 IDE。一貫して **`serverUrl`** を使用します。`url` では認識されないため注意が必要です。
-```json
-{
-  "mcpServers": {
-    "docker-mcp-gateway": {
-      "serverUrl": "http://127.0.0.1:10888/sse",
-      "type": "sse"
-    }
-  }
-}
+#### ■ Codex CLI (TOML)
+Codex CLI は現在 SSE にネイティブ対応していないため、`curl` をブリッジとして使用する設定を自動生成します。
+```toml
+[mcp_servers.SQLite]
+command = "curl"
+args = ["-s", "http://127.0.0.1:10888/sse?server=SQLite", "-H", "Authorization: Bearer ..."]
 ```
 
-#### ■ Gemini CLI
-SSE 接続には **`url`** を使用します。なお、上位プロトコルである Streamable HTTP を使用する場合は `httpUrl` を指定します。
-```json
-{
-  "mcpServers": {
-    "docker-mcp-gateway": {
-      "url": "http://127.0.0.1:10888/sse"
-    }
-  }
-}
-```
-
-#### ■ Claude Code (Anthropic)
-標準 MCP 仕様に準拠。`type: "sse"` と **`url`** を組み合わせます。
-```json
-{
-  "mcpServers": {
-    "docker-mcp-gateway": {
-      "type": "sse",
-      "url": "http://127.0.0.1:10888/sse"
-    }
-  }
-}
-```
+#### ■ ChronosGraph (Local)
+`chronos-graph` はゲートウェイを経由せず、各エージェントから直接 `uv tool run` で実行されます。この設定も `servers.yaml` から各エージェントの設定ファイルに直接埋め込まれます。
 
 ---
+
 
 ## 4. メンテナンスコマンド
 

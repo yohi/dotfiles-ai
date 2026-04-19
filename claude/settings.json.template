@@ -14,30 +14,6 @@
   // SECURITY RISK: Setting skipDangerousModePermissionPrompt to true allows commands to run without confirmation.
   // It should only be enabled in trusted/dev environments. Defaulting to false for safety.
   "skipDangerousModePermissionPrompt": false,
-  "mcpServers": {
-    "docker-mcp-gateway": {
-      "type": "sse",
-      "url": "http://127.0.0.1:10888/sse",
-      "headers": {
-        "Authorization": "Bearer ${MCP_GATEWAY_TOKEN}"
-      }
-    },
-    "chronos-graph": {
-      "command": "uv",
-      "args": [
-        "--quiet",
-        "tool",
-        "run",
-        "--from",
-        "git+https://github.com/yohi/chronos-graph.git@37308f47837469d801abc1226ee65e4262093042",
-        "context-store"
-      ],
-      "env": {
-        "STORAGE_BACKEND": "sqlite",
-        "SQLITE_DB_PATH": "__HOME__/.context-store/memories.db",
-        "GRAPH_ENABLED": "true"
-      }
-    }
-  },
+  "mcpServers": {},
   "model": "opus"
 }

@@ -78,18 +78,19 @@ AIエージェント（Claude Code, Gemini CLI, OpenCode, Codex）の設定・�
 
 [Docker MCP Gateway](https://docs.docker.com/ai/mcp-catalog-and-toolkit/mcp-gateway/) は、複数の MCP サーバーを統合し、共通の **SSE (Server-Sent Events)** エンドポイントを提供します。
 
-- **役割**: Claude Code, Gemini CLI, Antigravity, Cursor, OpenCode, VSCode から、単一の URL (`http://127.0.0.1:10888/sse`) 経由で複数の MCP サーバーにアクセス可能にします。
+- **役割**: Claude Code, Gemini CLI, Antigravity, Cursor, OpenCode, VSCode, Codex から、単一の URL (`http://127.0.0.1:10888/sse`) 経由で複数の MCP サーバーにアクセス可能にします。
 - **管理 (Systemd)**: バックグラウンドサービスとして常駐します。
   - `make start-mcp`: ゲートウェイを起動。
   - `make stop-mcp`: ゲートウェイを停止。
   - `make setup-docker-mcp`: Docker MCP Gateway 自体のセットアップを行います。
-  - `make sync-mcp`: `mcp/servers.yaml` と `mcp/config.yaml` から各エージェント/IDE 向け設定と Gateway 実行設定を再生成し、Gateway を再読み込みします。
+  - `make sync-mcp`: `mcp/servers.yaml` から各エージェント/IDE 向け設定と Gateway 実行設定を再生成し、Gateway を再読み込みします。
 - **Source of Truth**: 
-  - **`mcp/catalogs/custom.yaml.template`**: Docker MCP Gateway の custom catalog 定義です。
-  - **`mcp/config.yaml`**: Docker MCP Gateway で有効化するサーバー一覧の SSOT です。同期時に systemd service の `--servers` 引数へ反映されます。
-  - **`mcp/servers.yaml`**: 各エージェント/IDE に配る MCP クライアント設定の SSOT です。
-- **初期セットアップ**: `make setup-docker-mcp` を実行すると、catalog と service 設定を含む Gateway の初期配置が完了します。
-- **自動同期**: `mcp/servers.yaml`、`mcp/config.yaml`、または catalog/template を編集したら `make sync-mcp` を実行してください。
+  - **`mcp/servers.yaml`**: 全ての MCP 設定（サーバー定義およびクライアント接続設定）の **SSOT** です。
+- **自動生成されるファイル**: `make sync-mcp` を実行すると、以下のファイルが `mcp/servers.yaml` から自動生成されます。
+  - `mcp/config.yaml`: Docker MCP Gateway で有効化するサーバー一覧。
+  - `mcp/catalogs/custom.yaml`: Docker MCP Gateway のカスタムカタログ定義。
+- **初期セットアップ**: `make setup-docker-mcp` を実行すると、service 設定を含む Gateway の初期配置が完了します。
+- **自動同期**: `mcp/servers.yaml` を編集したら `make sync-mcp` を実行してください。
 
 ## SkillPort & MCP の統合
 
@@ -132,12 +133,10 @@ AIエージェント（Claude Code, Gemini CLI, OpenCode, Codex）の設定・�
 - **ルールの編集**: 
   - ユーザー共通設定は `global-rules/AGENTS.global.md` を編集。
   - 個別のスキルは `agent-skills/*/SKILL.md` を編集。
-  - **MCP サーバーの追加**は `mcp/catalogs/custom.yaml.template` を編集.
-  - **Gateway で有効化するサーバー変更**は `mcp/config.yaml` を編集。
-  - **エージェント/IDE の接続設定変更**は `mcp/servers.yaml` を編集。
+  - **MCP サーバーの追加・変更・有効化**、および**エージェント/IDE の接続設定変更**は、全て **`mcp/servers.yaml`** を編集してください。
 - **同期コマンド**:
   - `make setup-docker-mcp`: Docker MCP Gateway のセットアップ。
-  - `make sync-mcp`: MCP クライアント設定の再生成と同期。
+  - `make sync-mcp`: MCP 設定の再生成と同期。
   - `make sync-agents`: `agent-skills/` から各 AGENTS instruction file のスキル一覧を同期。
 
 ## 技術スタック
