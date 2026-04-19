@@ -119,14 +119,10 @@ agents:
     format: "json"
     root_key: "mcpServers"
     servers:
-      SQLite: { inherit: "SQLite" }
-      filesystem: { inherit: "filesystem" }
-      github-official: { inherit: "github-official" }
+      docker-mcp: { url: "http://127.0.0.1:10888/sse" }
       atlassian: { inherit: "atlassian", url_key: "httpUrl" }
-      sequentialthinking: { inherit: "sequentialthinking" }
       chronos-graph: { inherit: "chronos-graph" }
       nexus: { inherit: "nexus" }
-      skillport: { inherit: "skillport" }
 
   claude:
     path: ".claude.json"
@@ -134,53 +130,39 @@ agents:
     root_key: "mcpServers"
     project_key: "__REPO_ROOT__"
     servers:
-      SQLite: { inherit: "SQLite" }
-      filesystem: { inherit: "filesystem" }
-      github-official: { inherit: "github-official" }
+      docker-mcp: { url: "http://127.0.0.1:10888/sse" }
       atlassian: { inherit: "atlassian" }
-      sequentialthinking: { inherit: "sequentialthinking" }
       chronos-graph: { inherit: "chronos-graph" }
       nexus: { inherit: "nexus" }
-      skillport: { inherit: "skillport" }
 
   opencode:
     path: "opencode/opencode.jsonc"
     format: "opencode_jsonc"
     root_key: "mcp"
     servers:
-      SQLite: { inherit: "SQLite" }
-      filesystem: { inherit: "filesystem" }
-      github-official: { inherit: "github-official" }
-      sequentialthinking: { inherit: "sequentialthinking" }
+      docker-mcp: { url: "http://127.0.0.1:10888/sse", type: "remote" }
       chronos_graph: { inherit: "chronos-graph" }
       nexus: { inherit: "nexus" }
-      skillport: { inherit: "skillport" }
 
   vscode:
     path: "ide/vscode/settings.json"
     format: "json"
     root_key: "mcpServers"
     servers:
-      SQLite: { inherit: "SQLite" }
-      filesystem: { inherit: "filesystem" }
+      docker-mcp: { url: "http://127.0.0.1:10888/sse" }
       github-official: { inherit: "github-official" }
       sequentialthinking: { inherit: "sequentialthinking" }
       chronos-graph: { inherit: "chronos-graph" }
       nexus: { inherit: "nexus" }
-      skillport: { inherit: "skillport" }
 
   cursor:
     path: ".cursor/mcp.json"
     format: "json"
     root_key: "mcpServers"
     servers:
-      SQLite: { inherit: "SQLite" }
-      filesystem: { inherit: "filesystem" }
-      github-official: { inherit: "github-official" }
-      sequentialthinking: { inherit: "sequentialthinking" }
+      docker-mcp: { url: "http://127.0.0.1:10888/sse" }
       chronos-graph: { inherit: "chronos-graph" }
       nexus: { inherit: "nexus" }
-      skillport: { inherit: "skillport" }
 
   antigravity:
     path: ".gemini/antigravity/mcp_config.json"
@@ -188,23 +170,15 @@ agents:
     root_key: "mcpServers"
     url_key: "serverUrl"
     servers:
-      SQLite: { inherit: "SQLite" }
-      filesystem: { inherit: "filesystem" }
-      github-official: { inherit: "github-official" }
-      sequentialthinking: { inherit: "sequentialthinking" }
+      docker-mcp: { url: "http://127.0.0.1:10888/sse" }
       chronos-graph: { inherit: "chronos-graph" }
       nexus: { inherit: "nexus" }
-      skillport: { inherit: "skillport" }
 
   codex:
     path: "codex/config.toml"
     format: "toml"
     root_key: "mcp_servers"
     servers:
-      SQLite: { inherit: "SQLite" }
-      filesystem: { inherit: "filesystem" }
-      github-official: { inherit: "github-official" }
-      sequentialthinking: { inherit: "sequentialthinking" }
+      docker-mcp: { url: "http://127.0.0.1:10888/sse" }
       chronos-graph: { inherit: "chronos-graph" }
       nexus: { inherit: "nexus" }
-      skillport: { inherit: "skillport" }

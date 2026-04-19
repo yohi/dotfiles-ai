@@ -137,15 +137,11 @@ def write_json_file(path: Path, root_key: str, servers: dict[str, Any], project_
         if project_key not in data["projects"]:
             data["projects"][project_key] = {}
         
-        # 名前空間化された設定にマージ
-        deep_merge(data["projects"][project_key], {root_key: servers})
-        
-        # トップレベルに同じキーがあれば、混乱を避けるために削除
-        if root_key in data:
-            del data[root_key]
+        # 指定されたプロジェクト配下の root_key を完全に置換
+        data["projects"][project_key][root_key] = servers
     else:
-        # 再帰的にマージ
-        deep_merge(data, {root_key: servers})
+        # トップレベルの root_key を完全に置換
+        data[root_key] = servers
 
     new_content = json.dumps(data, indent=2, ensure_ascii=False) + "\n"
     if existing_content is not None and existing_content == new_content:

@@ -25,7 +25,7 @@ mcpServers:
     image: mcp/github:latest
     env:
     - name: GITHUB_PERSONAL_ACCESS_TOKEN
-      value: ''
+      value: dummy_token_to_avoid_error
   sequentialthinking:
     title: Sequential Thinking
     description: A tool for sequential problem solving and logical reasoning.
