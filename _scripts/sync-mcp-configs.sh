@@ -9,8 +9,6 @@ if ! command -v uv > /dev/null 2>&1; then
 fi
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-ESCAPED_HOME=$(printf '%s' "$HOME" | sed 's/[&/|]/\\&/g')
-ESCAPED_REPO_ROOT=$(printf '%s' "$REPO_ROOT" | sed 's/[&/|]/\\&/g')
 
 # Helper function for symlinking or copying config files
 deploy_config() {
@@ -48,7 +46,7 @@ declare -A TEMPLATES=(
     ["opencode/opencode.jsonc.template"]="opencode/opencode.jsonc"
     ["opencode/oh-my-opencode.jsonc.template"]="opencode/oh-my-opencode.jsonc"
     ["ide/vscode/settings.json.template"]="ide/vscode/settings.json"
-    ["claude/settings.json.template"]="claude/settings.json"
+    ["claude/settings.json.template"]=".claude.json"
 )
 
 for src in "${!TEMPLATES[@]}"; do
@@ -58,12 +56,6 @@ for src in "${!TEMPLATES[@]}"; do
         echo "✅ Created $dst from template."
     fi
 done
-
-echo "==> Rendering MCP catalogs..."
-mkdir -p "$REPO_ROOT/mcp/catalogs"
-sed -e "s|__HOME__|$ESCAPED_HOME|g" -e "s|__REPO_ROOT__|$ESCAPED_REPO_ROOT|g" "$REPO_ROOT/mcp/catalogs/custom.yaml.template" > "$REPO_ROOT/mcp/catalogs/custom.yaml"
-sed -e "s|__HOME__|$ESCAPED_HOME|g" -e "s|__REPO_ROOT__|$ESCAPED_REPO_ROOT|g" "$REPO_ROOT/mcp/catalog.json" > "$REPO_ROOT/mcp/catalog.json.rendered"
-sed -e "s|__HOME__|$ESCAPED_HOME|g" -e "s|__REPO_ROOT__|$ESCAPED_REPO_ROOT|g" "$REPO_ROOT/mcp/config.yaml" > "$REPO_ROOT/mcp/config.yaml.rendered"
 
 echo "==> Rendering centralized MCP configs..."
 if [ -f "$REPO_ROOT/.env" ]; then
@@ -79,16 +71,17 @@ echo "==> Deploying Docker MCP catalog files..."
 DOCKER_MCP_DIR="$HOME/.docker/mcp"
 mkdir -p "$DOCKER_MCP_DIR/catalogs"
 
-# Verify rendered files exist before copying
-for f in "catalog.json.rendered" "config.yaml.rendered"; do
-    if [ ! -f "$REPO_ROOT/mcp/$f" ]; then
-        echo "Error: Rendered file $REPO_ROOT/mcp/$f not found. Rendering failed." >&2
-        exit 1
-    fi
-done
+# Verify generated config exists
+if [ ! -f "$REPO_ROOT/mcp/config.yaml" ]; then
+    echo "Error: Generated file $REPO_ROOT/mcp/config.yaml not found. Rendering failed." >&2
+    exit 1
+fi
 
-cp "$REPO_ROOT/mcp/catalog.json.rendered" "$DOCKER_MCP_DIR/catalog.json"
-cp "$REPO_ROOT/mcp/config.yaml.rendered" "$DOCKER_MCP_DIR/config.yaml"
+cp "$REPO_ROOT/mcp/config.yaml" "$DOCKER_MCP_DIR/config.yaml"
+# catalog.json is optional/static for now, if it doesn't exist just touch it or copy template
+if [ -f "$REPO_ROOT/mcp/catalog.json" ]; then
+    cp "$REPO_ROOT/mcp/catalog.json" "$DOCKER_MCP_DIR/catalog.json"
+fi
 ln -sfn "$REPO_ROOT/mcp/catalogs/bootstrap.yaml" "$DOCKER_MCP_DIR/catalogs/bootstrap.yaml"
 ln -sfn "$REPO_ROOT/mcp/catalogs/custom.yaml" "$DOCKER_MCP_DIR/catalogs/custom.yaml"
 
@@ -114,12 +107,15 @@ case "$(uname)" in
 esac
 
 if [ -n "$CLAUDE_CONFIG_DIR" ]; then
-    deploy_config "$REPO_ROOT/claude/settings.json" "$CLAUDE_CONFIG_DIR/claude_desktop_config.json" "Claude Desktop"
+    deploy_config "$REPO_ROOT/.claude.json" "$CLAUDE_CONFIG_DIR/claude_desktop_config.json" "Claude Desktop"
 fi
 
 echo "==> Deploying Claude Code (CLI) settings..."
-deploy_config "$REPO_ROOT/claude/settings.json" "$HOME/.claude/settings.json" "Claude Code"
+deploy_config "$REPO_ROOT/.claude.json" "$HOME/.claude.json" "Claude Code"
 # deploy_config "$REPO_ROOT/claude/settings.json" "$HOME/.claude.json" "Claude Code Legacy"
+
+echo "==> Deploying Codex CLI settings..."
+deploy_config "$REPO_ROOT/codex/config.toml" "$HOME/.codex/config.toml" "Codex CLI"
 
 echo "✅ MCP configurations synchronized from mcp/servers.yaml and mcp/config.yaml"
 

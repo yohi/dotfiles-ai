@@ -67,13 +67,13 @@ def replace_placeholders(value: Any, gateway_url: str) -> Any:
             default_val = match.group(2)
 
             val_env = os.environ.get(var_name)
-            if val_env:
+            if val_env is not None:
                 return val_env
 
             # Fallback for renamed MCP token
             if var_name == "MCP_GATEWAY_TOKEN":
                 auth_token = os.environ.get("MCP_AUTH_TOKEN")
-                if auth_token:
+                if auth_token is not None:
                     return auth_token
 
             if default_val is not None:
@@ -113,14 +113,39 @@ def replace_placeholders(value: Any, gateway_url: str) -> Any:
     return value
 
 
-def write_json_file(path: Path, root_key: str, servers: dict[str, Any]) -> bool:
+def deep_merge(base: dict[str, Any], update: dict[str, Any]) -> dict[str, Any]:
+    """再帰的に辞書をマージする。"""
+    for key, value in update.items():
+        if isinstance(value, dict) and key in base and isinstance(base[key], dict):
+            deep_merge(base[key], value)
+        else:
+            base[key] = value
+    return base
+
+
+def write_json_file(path: Path, root_key: str, servers: dict[str, Any], project_key: str | None = None) -> bool:
     path.parent.mkdir(parents=True, exist_ok=True)
     existing_content: str | None = None
     data: dict[str, Any] = {}
     if path.exists():
         existing_content = path.read_text(encoding="utf-8")
         data = parse_jsonc(existing_content)
-    data[root_key] = servers
+
+    if project_key:
+        if "projects" not in data:
+            data["projects"] = {}
+        if project_key not in data["projects"]:
+            data["projects"][project_key] = {}
+        
+        # 名前空間化された設定にマージ
+        deep_merge(data["projects"][project_key], {root_key: servers})
+        
+        # トップレベルに同じキーがあれば、混乱を避けるために削除
+        if root_key in data:
+            del data[root_key]
+    else:
+        # 再帰的にマージ
+        deep_merge(data, {root_key: servers})
 
     new_content = json.dumps(data, indent=2, ensure_ascii=False) + "\n"
     if existing_content is not None and existing_content == new_content:
@@ -281,6 +306,90 @@ def write_jsonc_object_key(path: Path, root_key: str, servers: dict[str, Any]) -
     return True
 
 
+def to_toml_inline_table(val: dict[str, Any]) -> str:
+    """辞書を TOML インラインテーブル形式 { k = "v" } に変換する。"""
+    parts = []
+    for k, v in val.items():
+        if isinstance(v, str):
+            v_str = json.dumps(v)
+        elif isinstance(v, (int, float, bool)):
+            v_str = str(v).lower() if isinstance(v, bool) else str(v)
+        elif isinstance(v, list):
+            items = []
+            for i in v:
+                if isinstance(i, str):
+                    items.append(json.dumps(i))
+                elif isinstance(i, bool):
+                    items.append(str(i).lower())
+                else:
+                    items.append(str(i))
+            v_str = "[" + ", ".join(items) + "]"
+        elif isinstance(v, dict):
+            v_str = to_toml_inline_table(v)
+        else:
+            v_str = json.dumps(str(v))
+        parts.append(f'{k} = {v_str}')
+    return "{ " + ", ".join(parts) + " }"
+
+
+def write_toml_file(path: Path, root_key: str, servers: dict[str, Any]) -> bool:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    # 簡易的な TOML 書き出し (Codex の mcp_servers 形式に特化)
+    lines = []
+    for name, cfg in servers.items():
+        lines.append(f"[{root_key}.{name}]")
+        for k, v in cfg.items():
+            if isinstance(v, str):
+                lines.append(f'{k} = {json.dumps(v)}')
+            elif isinstance(v, (int, float, bool)):
+                v_str = str(v).lower() if isinstance(v, bool) else str(v)
+                lines.append(f"{k} = {v_str}")
+            elif isinstance(v, list):
+                items = []
+                for i in v:
+                    if isinstance(i, str):
+                        items.append(json.dumps(i))
+                    elif isinstance(i, bool):
+                        items.append(str(i).lower())
+                    else:
+                        items.append(str(i))
+                v_str = ", ".join(items)
+                lines.append(f"{k} = [{v_str}]")
+            elif isinstance(v, dict):
+                v_str = to_toml_inline_table(v)
+                lines.append(f"{k} = {v_str}")
+            else:
+                raise TypeError(f"Unsupported value type {type(v)} for key '{k}' in TOML writer")
+        lines.append("")
+
+    sections_block = "\n".join(lines).strip()
+    
+    existing_content = None
+    if path.exists():
+        existing_content = path.read_text(encoding="utf-8")
+        if f"[{root_key}." in existing_content:
+            # 既存の同一ルートキーセクションを置換
+            pattern = re.compile(rf"\[{re.escape(root_key)}\..*?(?=\n\[|\Z)", re.DOTALL)
+            new_content = pattern.sub("", existing_content).strip()
+            if new_content:
+                new_content += "\n\n" + sections_block
+            else:
+                new_content = sections_block
+        else:
+            new_content = existing_content.strip() + "\n\n" + sections_block
+    else:
+        new_content = sections_block
+
+    new_content = new_content.strip() + "\n"
+
+    if existing_content == new_content:
+        print(f"Skipped {path.name} (no changes)")
+        return False
+
+    path.write_text(new_content, encoding="utf-8")
+    return True
+
+
 def main() -> int:
     config = load_client_config()
     defaults = config.get("defaults", {})
@@ -290,15 +399,202 @@ def main() -> int:
             f"Missing required 'gateway_url' in {CLIENT_CONFIG_PATH} under defaults"
         )
 
+    # 1. Generate mcp/config.yaml (Gateway config)
+    # プレースホルダ置換済みのサーバー定義を取得
+    all_servers = replace_placeholders(config.get("servers", {}), gateway_url)
+    
+    # ゲートウェイ用には "server" タイプのサーバーのみを抽出
+    gateway_servers = {
+        name: cfg for name, cfg in all_servers.items()
+        if cfg.get("type") == "server"
+    }
+
+    gateway_config = {
+        "mcpServers": gateway_servers,
+        "gateway": {
+            "enabled_servers": list(gateway_servers.keys())
+        }
+    }
+    config_yaml_path = REPO_ROOT / "mcp" / "config.yaml"
+    config_yaml_path.write_text(
+        yaml.dump(gateway_config, indent=2, sort_keys=False, allow_unicode=True),
+        encoding="utf-8"
+    )
+    print(f"Generated gateway config: {config_yaml_path.relative_to(REPO_ROOT)}")
+
+    # 2. Generate mcp/catalogs/custom.yaml (Catalog config)
+    # カタログには全てのサーバー (sse, local 等含む) を含める
+    catalog_config = {
+        "version": 3,
+        "name": "custom",
+        "displayName": "Custom Servers",
+        "registry": all_servers
+    }
+    # Catalog 用に title と description が欠けている場合に補完する
+    for name, cfg in catalog_config["registry"].items():
+        if "title" not in cfg:
+            cfg["title"] = name.capitalize()
+        if "description" not in cfg:
+            cfg["description"] = f"{cfg['title']} MCP server"
+
+    custom_yaml_path = REPO_ROOT / "mcp" / "catalogs" / "custom.yaml"
+    custom_yaml_path.parent.mkdir(parents=True, exist_ok=True)
+    custom_yaml_path.write_text(
+        yaml.dump(catalog_config, indent=2, sort_keys=False, allow_unicode=True),
+        encoding="utf-8"
+    )
+    print(f"Generated catalog config: {custom_yaml_path.relative_to(REPO_ROOT)}")
+
+    # 3. Render each agent's config
     for agent_name, agent_config in config.get("agents", {}).items():
         path = REPO_ROOT / agent_config["path"]
         format_name = agent_config["format"]
         root_key = agent_config["root_key"]
-        servers = replace_placeholders(agent_config["servers"], gateway_url)
+        project_key = agent_config.get("project_key")
+        # project_key のプレースホルダ置換
+        if project_key:
+            project_key = replace_placeholders(project_key, gateway_url)
+        url_key = agent_config.get("url_key", "url")
+        
+        # 継承(inherit)を展開する
+        raw_servers = agent_config.get("servers", {})
+        processed_servers = {}
+        for s_name, s_cfg in raw_servers.items():
+            if "inherit" in s_cfg:
+                base_name = s_cfg["inherit"]
+                if base_name not in config.get("servers", {}):
+                    raise RuntimeError(
+                        f"Undefined inherit target '{base_name}' referenced by agent '{agent_name}' server '{s_name}'"
+                    )
+                base_cfg = config.get("servers", {})[base_name]
+                
+                # 個別の url_key 指定があれば優先する
+                actual_url_key = s_cfg.get("url_key", url_key)
+
+                if base_cfg.get("type") == "local":
+                    # ローカル実行サーバーはそのままコピー
+                    env_data = {e["name"]: e["value"] for e in base_cfg.get("env", [])} if "env" in base_cfg else {}
+                    processed_servers[s_name] = {
+                        "command": base_cfg.get("command", []),
+                        "args": base_cfg.get("args", []),
+                    }
+                    
+                    # 共通: args キーがなければ空リストで初期化
+                    processed_servers[s_name].setdefault("args", [])
+
+                    # OpenCode 用の調整
+                    if format_name == "opencode_jsonc":
+                        processed_servers[s_name]["environment"] = env_data
+                        processed_servers[s_name]["enabled"] = True
+                        processed_servers[s_name]["type"] = "local"
+                        # OpenCode は command 配列に全て含める必要がある
+                        full_command = []
+                        orig_command = processed_servers[s_name].get("command", [])
+                        if isinstance(orig_command, list):
+                            full_command.extend(orig_command)
+                        else:
+                            full_command.append(orig_command)
+                        
+                        full_command.extend(processed_servers[s_name].get("args", []))
+                        processed_servers[s_name]["command"] = full_command
+                        # args キーを削除
+                        processed_servers[s_name].pop("args", None)
+                    else:
+                        processed_servers[s_name]["env"] = env_data
+
+                    # OpenCode 以外: command がリストなら先頭をコマンド名、残りを引数にする
+                    if format_name != "opencode_jsonc":
+                        c = processed_servers[s_name].get("command", [])
+                        a = processed_servers[s_name].get("args", [])
+                        if isinstance(c, list) and len(c) > 1 and not a:
+                            processed_servers[s_name]["command"] = c[0]
+                            processed_servers[s_name]["args"] = c[1:]
+                elif any(key in base_cfg for key in ["url", "httpUrl", "serverUrl"]):
+                    # 基底定義に既にURLがある場合はそれを使用 (例: Atlassian 直接接続)
+                    processed_servers[s_name] = base_cfg.copy()
+                    
+                    # 元の値を抽出
+                    url_val = base_cfg.get("url") or base_cfg.get("httpUrl") or base_cfg.get("serverUrl")
+                    
+                    # 既存のURL関連キーを一旦削除
+                    for k in ["url", "httpUrl", "serverUrl"]:
+                        processed_servers[s_name].pop(k, None)
+                    
+                    processed_servers[s_name][actual_url_key] = url_val
+                    
+                    if "type" not in processed_servers[s_name]:
+                        processed_servers[s_name]["type"] = "sse"
+                else:
+                    # ゲートウェイ経由のSSE設定を構築
+                    if format_name == "toml":
+                        # Codex の SSE 形式: npx mcp-remote を推奨 (curl は永続接続に不向き)
+                        processed_servers[s_name] = {
+                            "command": "npx",
+                            "args": ["-y", "mcp-remote", f"{gateway_url}?server={s_name}"]
+                        }
+                    else:
+                        processed_servers[s_name] = {
+                            actual_url_key: f"{gateway_url}?server={s_name}",
+                        }
+                        
+                        # エージェントの形式に合わせて type を設定
+                        if format_name == "opencode_jsonc":
+                            processed_servers[s_name]["type"] = "remote"
+                            processed_servers[s_name]["enabled"] = True
+                        elif format_name in {"json", "jsonc"}:
+                            # Gemini, Claude, VSCode, Cursor, Antigravity 等
+                            processed_servers[s_name]["type"] = "sse"
+                        
+                        # 明示的にゲートウェイ経由であることをマーク (内部判定用)
+                        processed_servers[s_name]["_generated_by"] = "gateway"
+                    
+                    # Authorization ヘッダーが必要な場合
+                    gateway_token = (
+                        os.environ.get('MCP_GATEWAY_AUTH_TOKEN') or
+                        os.environ.get('MCP_GATEWAY_TOKEN') or
+                        os.environ.get('MCP_AUTH_TOKEN')
+                    )
+                    
+                    if gateway_token and processed_servers[s_name].get("_generated_by") == "gateway":
+                        if format_name != "toml":
+                            processed_servers[s_name].setdefault("headers", {})
+                            processed_servers[s_name]["headers"]["Authorization"] = f"Bearer {gateway_token}"
+                        else:
+                            # Codex/mcp-remote の場合は引数に追加
+                            processed_servers[s_name].setdefault("args", [])
+                            processed_servers[s_name]["args"].extend(["-H", f"Authorization: Bearer {gateway_token}"])
+                    
+                    # 内部判定用キーを削除
+                    processed_servers[s_name].pop("_generated_by", None)
+
+                # エージェント側の個別設定で上書き (inherit, url_key 以外)
+                overrides = {k: v for k, v in s_cfg.items() if k not in {"inherit", "url_key"}}
+                if overrides:
+                    deep_merge(processed_servers[s_name], overrides)
+            else:
+                processed_servers[s_name] = s_cfg
+
+        # プレースホルダ置換
+        servers = replace_placeholders(processed_servers, gateway_url)
+
+        # 不要なキー (title, description 等) を削除してクライアントをクリーンに保つ
+        standard_keys = {
+            "command", "args", "env", "type", "url", "httpUrl", "serverUrl",
+            "headers", "enabled", "environment", "timeout", "root_key"
+        }
+        # エージェント固有の url_key も許可リストに加える
+        allowed_keys = standard_keys | {url_key}
+
+        for s_name, s_cfg in servers.items():
+            if isinstance(s_cfg, dict):
+                filtered_cfg = {k: v for k, v in s_cfg.items() if k in allowed_keys}
+                servers[s_name] = filtered_cfg
 
         changed = False
         if format_name in {"json", "generated_json"}:
-            changed = write_json_file(path, root_key, servers)
+            changed = write_json_file(path, root_key, servers, project_key=project_key)
+        elif format_name == "toml":
+            changed = write_toml_file(path, root_key, servers)
         elif format_name == "jsonc":
             changed = write_jsonc_object_key(path, root_key, servers)
         elif format_name == "opencode_jsonc":

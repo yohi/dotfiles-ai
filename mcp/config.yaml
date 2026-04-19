@@ -1,23 +1,60 @@
 mcpServers:
+  SQLite:
+    title: SQLite
+    description: SQLite database access and management.
+    type: server
+    image: mcp/sqlite:latest
+    args:
+    - /mcp/sqlite.db
+    volumes:
+    - /home/y_ohi/.mcp/sqlite:/mcp
+  filesystem:
+    title: Filesystem
+    description: Local filesystem access with restricted paths.
+    type: server
+    image: docker.io/mcp/filesystem:latest
+    command:
+    - /home/y_ohi
+    - /home/y_ohi/dotfiles/components/dotfiles-ai
+    volumes:
+    - /home/y_ohi:/home/y_ohi
+    - /home/y_ohi/dotfiles/components/dotfiles-ai:/home/y_ohi/dotfiles/components/dotfiles-ai
+  github-official:
+    description: Official GitHub MCP server for repository management.
+    type: server
+    image: mcp/github:latest
+    env:
+    - name: GITHUB_PERSONAL_ACCESS_TOKEN
+      value: ''
+  sequentialthinking:
+    title: Sequential Thinking
+    description: A tool for sequential problem solving and logical reasoning.
+    type: server
+    image: mcp/sequentialthinking:latest
   skillport:
+    title: Skillport
+    description: Professional development and AI skill management toolkit.
     type: server
     image: ghcr.io/yohi/skillport:latest
+    command:
+    - --reindex
     env:
-      - name: SKILLPORT_SKILLS_DIR
-        value: __REPO_ROOT__/agent-skills
-      - name: SKILLPORT_DB_PATH
-        value: /mcp/db
+    - name: SKILLPORT_SKILLS_DIR
+      value: /home/y_ohi/dotfiles/components/dotfiles-ai/agent-skills
+    - name: SKILLS_DIR
+      value: /home/y_ohi/dotfiles/components/dotfiles-ai/agent-skills
+    - name: SKILLPORT_DB_PATH
+      value: /mcp/db
+    - name: DB_PATH
+      value: /mcp/db
     volumes:
-      - __HOME__/.skillport/db:/mcp/db
-      - __HOME__/.skillport:__HOME__/.skillport
-      - __REPO_ROOT__:__REPO_ROOT__:ro
-
+    - /home/y_ohi/.skillport/db:/mcp/db
+    - /home/y_ohi/.skillport:/home/y_ohi/.skillport
+    - /home/y_ohi/dotfiles/components/dotfiles-ai:/home/y_ohi/dotfiles/components/dotfiles-ai:ro
 gateway:
-  # Docker MCP Gateway で有効化するサーバー群。
-  # chronos-graph のようなクライアントローカル MCP は含めない。
   enabled_servers:
-    - SQLite
-    - filesystem
-    - github-official
-    - sequentialthinking
-    - skillport
+  - SQLite
+  - filesystem
+  - github-official
+  - sequentialthinking
+  - skillport

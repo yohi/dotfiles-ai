@@ -10,7 +10,7 @@ bash "$REPO_ROOT/_scripts/sync-mcp-configs.sh"
 
 # 2. Verify Rendering
 echo "==> Verifying Rendering..."
-for f in "mcp/catalog.json.rendered" "mcp/config.yaml.rendered" "mcp/catalogs/custom.yaml"; do
+for f in "mcp/catalog.json" "mcp/config.yaml" "mcp/catalogs/custom.yaml"; do
     if [ ! -f "$REPO_ROOT/$f" ]; then
         echo "FAIL: Rendered file $f does not exist."
         exit 1
@@ -37,7 +37,7 @@ for f in "catalog.json" "config.yaml"; do
         exit 1
     fi
     # Compare with rendered source
-    if ! diff "$REPO_ROOT/mcp/$f.rendered" "$DOCKER_MCP_DIR/$f" > /dev/null; then
+    if ! diff "$REPO_ROOT/mcp/$f" "$DOCKER_MCP_DIR/$f" > /dev/null; then
         echo "FAIL: Deployed file $f does not match rendered source."
         exit 1
     fi
