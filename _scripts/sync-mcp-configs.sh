@@ -116,6 +116,9 @@ echo "==> Deploying Claude Code (CLI) settings..."
 deploy_config "$REPO_ROOT/.claude.json" "$HOME/.claude.json" "Claude Code"
 # deploy_config "$REPO_ROOT/claude/settings.json" "$HOME/.claude.json" "Claude Code Legacy"
 
+echo "==> Deploying Codex CLI settings..."
+deploy_config "$REPO_ROOT/codex/config.toml" "$HOME/.codex/config.toml" "Codex CLI"
+
 echo "✅ MCP configurations synchronized from mcp/servers.yaml and mcp/config.yaml"
 
 echo "==> Validating Skillport skills..."

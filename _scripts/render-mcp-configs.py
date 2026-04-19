@@ -67,7 +67,7 @@ def replace_placeholders(value: Any, gateway_url: str) -> Any:
             default_val = match.group(2)
 
             val_env = os.environ.get(var_name)
-            if val_env:
+            if val_env is not None:
                 return val_env
 
             # Fallback for renamed MCP token
@@ -318,18 +318,28 @@ def write_toml_file(path: Path, root_key: str, servers: dict[str, Any]) -> bool:
                 lines.append(f"{k} = {v_str}")
         lines.append("")
 
-    new_content = "\n".join(lines)
+    sections_block = "\n".join(lines).strip()
     
     existing_content = None
     if path.exists():
         existing_content = path.read_text(encoding="utf-8")
         if f"[{root_key}." in existing_content:
+            # 既存の同一ルートキーセクションを置換
             pattern = re.compile(rf"\[{re.escape(root_key)}\..*?(?=\n\[|\Z)", re.DOTALL)
-            new_content = pattern.sub("", existing_content).strip() + "\n\n" + new_content
+            new_content = pattern.sub("", existing_content).strip()
+            if new_content:
+                new_content += "\n\n" + sections_block
+            else:
+                new_content = sections_block
         else:
-            new_content = existing_content.strip() + "\n\n" + new_content
+            new_content = existing_content.strip() + "\n\n" + sections_block
+    else:
+        new_content = sections_block
+
+    new_content = new_content.strip() + "\n"
 
     if existing_content == new_content:
+        print(f"Skipped {path.name} (no changes)")
         return False
 
     path.write_text(new_content, encoding="utf-8")
