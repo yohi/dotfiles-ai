@@ -16,10 +16,10 @@ servers:
     type: server
     image: docker.io/mcp/filesystem:latest
     command:
-      - "/home/y_ohi"
+      - "__HOME__"
       - "__REPO_ROOT__"
     volumes:
-      - "__HOME__:/home/y_ohi"
+      - "__HOME__:__HOME__"
       - "__REPO_ROOT__:__REPO_ROOT__"
   github-official:
 
@@ -122,7 +122,7 @@ agents:
       SQLite: { inherit: "SQLite" }
       filesystem: { inherit: "filesystem" }
       github-official: { inherit: "github-official" }
-      atlassian: { inherit: "atlassian" }
+      atlassian: { inherit: "atlassian", url_key: "httpUrl" }
       sequentialthinking: { inherit: "sequentialthinking" }
       chronos-graph: { inherit: "chronos-graph" }
       nexus: { inherit: "nexus" }
@@ -132,6 +132,7 @@ agents:
     path: ".claude.json"
     format: "json"
     root_key: "mcpServers"
+    project_key: "__REPO_ROOT__"
     servers:
       SQLite: { inherit: "SQLite" }
       filesystem: { inherit: "filesystem" }

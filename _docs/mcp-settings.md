@@ -27,7 +27,7 @@ Claude Code は CLI コマンドまたは設定ファイルで SSE サーバー�
   ```bash
   claude mcp add --transport sse <name> http://localhost:10888/sse?server=<name>
   ```
-- **設定ファイルの場所**: `~/.claude/config.json`
+- **設定ファイルの場所**: `.claude.json` (プロジェクトルート)
 
 ## 3. Codex CLI
 Codex CLI は TOML 形式の設定ファイルを使用します。

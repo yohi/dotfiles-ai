@@ -113,6 +113,16 @@ def replace_placeholders(value: Any, gateway_url: str) -> Any:
     return value
 
 
+def deep_merge(base: dict[str, Any], update: dict[str, Any]) -> dict[str, Any]:
+    """再帰的に辞書をマージする。"""
+    for key, value in update.items():
+        if isinstance(value, dict) and key in base and isinstance(base[key], dict):
+            deep_merge(base[key], value)
+        else:
+            base[key] = value
+    return base
+
+
 def write_json_file(path: Path, root_key: str, servers: dict[str, Any], project_key: str | None = None) -> bool:
     path.parent.mkdir(parents=True, exist_ok=True)
     existing_content: str | None = None
@@ -126,9 +136,11 @@ def write_json_file(path: Path, root_key: str, servers: dict[str, Any], project_
             data["projects"] = {}
         if project_key not in data["projects"]:
             data["projects"][project_key] = {}
-        data["projects"][project_key][root_key] = servers
+        # 再帰的にマージ
+        deep_merge(data["projects"][project_key], {root_key: servers})
     else:
-        data[root_key] = servers
+        # 再帰的にマージ
+        deep_merge(data, {root_key: servers})
 
     new_content = json.dumps(data, indent=2, ensure_ascii=False) + "\n"
     if existing_content is not None and existing_content == new_content:
@@ -384,6 +396,9 @@ def main() -> int:
         format_name = agent_config["format"]
         root_key = agent_config["root_key"]
         project_key = agent_config.get("project_key")
+        # project_key のプレースホルダ置換
+        if project_key:
+            project_key = replace_placeholders(project_key, gateway_url)
         url_key = agent_config.get("url_key", "url")
         
         # 継承(inherit)を展開する
@@ -394,6 +409,9 @@ def main() -> int:
                 base_name = s_cfg["inherit"]
                 base_cfg = config.get("servers", {}).get(base_name, {})
                 
+                # 個別の url_key 指定があれば優先する
+                actual_url_key = s_cfg.get("url_key", url_key)
+
                 if base_cfg.get("type") == "local":
                     # ローカル実行サーバーはそのままコピー
                     env_data = {e["name"]: e["value"] for e in base_cfg.get("env", [])} if "env" in base_cfg else {}
@@ -443,11 +461,6 @@ def main() -> int:
                     for k in ["url", "httpUrl", "serverUrl"]:
                         processed_servers[s_name].pop(k, None)
                     
-                    # Gemini かつ Atlassian の場合のみ httpUrl を使用 (Streamable HTTP)
-                    actual_url_key = url_key
-                    if agent_name == "gemini" and s_name == "atlassian":
-                        actual_url_key = "httpUrl"
-                    
                     processed_servers[s_name][actual_url_key] = url_val
                     
                     if "type" not in processed_servers[s_name]:
@@ -462,7 +475,7 @@ def main() -> int:
                         }
                     else:
                         processed_servers[s_name] = {
-                            url_key: f"{gateway_url}?server={s_name}",
+                            actual_url_key: f"{gateway_url}?server={s_name}",
                         }
                         
                         # エージェントの形式に合わせて type を設定
