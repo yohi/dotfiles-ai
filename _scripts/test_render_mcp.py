@@ -105,15 +105,30 @@ def test_chronos_graph_rendering():
             data = json.loads(content)
         elif agent_config["format"] in {"jsonc", "opencode_jsonc"}:
             data = json5.loads(content)
+        elif agent_config["format"] == "toml":
+            # For toml, just do a simple check via string
+            if "chronos-graph" not in content and "chronos_graph" not in content:
+                raise AssertionError(f"chronos-graph should be present in {agent_name} ({path})")
+            print(f"PASS: {agent_name} verified presence of chronos-graph via text data.")
+            continue
         else:
             raise ValueError(f"Unknown format '{agent_config['format']}' for {agent_name}")
             
         root_key = agent_config["root_key"]
-        if root_key not in data:
-            raise AssertionError(f"root_key '{root_key}' missing in {agent_name} ({path})")
-        servers = data[root_key]
-        if "chronos-graph" not in servers:
-            raise AssertionError(f"chronos-graph should be present in {agent_name} ({path})")
+        project_key = agent_config.get("project_key")
+        
+        if project_key:
+            # Resolving project_key since it might contain placeholders like __REPO_ROOT__
+            project_key = replace_placeholders(project_key, "http://localhost:10888/sse")
+            if "projects" not in data or project_key not in data["projects"] or root_key not in data["projects"][project_key]:
+                raise AssertionError(f"root_key '{root_key}' missing under project '{project_key}' in {agent_name} ({path})")
+            servers = data["projects"][project_key][root_key]
+        else:
+            if root_key not in data:
+                raise AssertionError(f"root_key '{root_key}' missing in {agent_name} ({path})")
+            servers = data[root_key]
+        if "chronos-graph" not in servers and "chronos_graph" not in servers:
+            raise AssertionError(f"chronos-graph (or chronos_graph) should be present in {agent_name} ({path})")
         print(f"PASS: {agent_name} verified presence of chronos-graph via structured data.")
 
 if __name__ == "__main__":
