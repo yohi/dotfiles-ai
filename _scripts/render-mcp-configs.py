@@ -333,12 +333,17 @@ def write_toml_file(path: Path, root_key: str, servers: dict[str, Any]) -> bool:
         for k, v in cfg.items():
             if isinstance(v, str):
                 lines.append(f'{k} = "{v}"')
+            elif isinstance(v, (int, float, bool)):
+                v_str = str(v).lower() if isinstance(v, bool) else str(v)
+                lines.append(f"{k} = {v_str}")
             elif isinstance(v, list):
-                v_str = ", ".join(f'"{i}"' for i in v)
+                v_str = ", ".join(f'"{i}"' if isinstance(i, str) else str(i) for i in v)
                 lines.append(f"{k} = [{v_str}]")
             elif isinstance(v, dict):
                 v_str = to_toml_inline_table(v)
                 lines.append(f"{k} = {v_str}")
+            else:
+                raise TypeError(f"Unsupported value type {type(v)} for key '{k}' in TOML writer")
         lines.append("")
 
     sections_block = "\n".join(lines).strip()
@@ -402,7 +407,7 @@ def main() -> int:
     print(f"Generated gateway config: {config_yaml_path.relative_to(REPO_ROOT)}")
 
     # 2. Generate mcp/catalogs/custom.yaml (Catalog config)
-    # カタログには全てのサーバー（sse, local 等含む）を含める
+    # カタログには全てのサーバー (sse, local 等含む) を含める
     catalog_config = {
         "version": 3,
         "name": "custom",
