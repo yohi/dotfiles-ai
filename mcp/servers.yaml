@@ -131,8 +131,6 @@ agents:
   claude:
     path: ".claude.json"
     format: "json"
-    # Claude Code requires servers to be under projects.[path].mcpServers
-    project_key: "/home/y_ohi/dotfiles/components/dotfiles-ai"
     root_key: "mcpServers"
     servers:
       SQLite: { inherit: "SQLite" }
