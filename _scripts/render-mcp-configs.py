@@ -315,7 +315,15 @@ def to_toml_inline_table(val: dict[str, Any]) -> str:
         elif isinstance(v, (int, float, bool)):
             v_str = str(v).lower() if isinstance(v, bool) else str(v)
         elif isinstance(v, list):
-            v_str = "[" + ", ".join(f'"{i}"' if isinstance(i, str) else str(i) for i in v) + "]"
+            items = []
+            for i in v:
+                if isinstance(i, str):
+                    items.append(f'"{i}"')
+                elif isinstance(i, bool):
+                    items.append(str(i).lower())
+                else:
+                    items.append(str(i))
+            v_str = "[" + ", ".join(items) + "]"
         elif isinstance(v, dict):
             v_str = to_toml_inline_table(v)
         else:
@@ -337,7 +345,15 @@ def write_toml_file(path: Path, root_key: str, servers: dict[str, Any]) -> bool:
                 v_str = str(v).lower() if isinstance(v, bool) else str(v)
                 lines.append(f"{k} = {v_str}")
             elif isinstance(v, list):
-                v_str = ", ".join(f'"{i}"' if isinstance(i, str) else str(i) for i in v)
+                items = []
+                for i in v:
+                    if isinstance(i, str):
+                        items.append(f'"{i}"')
+                    elif isinstance(i, bool):
+                        items.append(str(i).lower())
+                    else:
+                        items.append(str(i))
+                v_str = ", ".join(items)
                 lines.append(f"{k} = [{v_str}]")
             elif isinstance(v, dict):
                 v_str = to_toml_inline_table(v)
@@ -528,16 +544,28 @@ def main() -> int:
                         elif format_name in {"json", "jsonc"}:
                             # Gemini, Claude, VSCode, Cursor, Antigravity 等
                             processed_servers[s_name]["type"] = "sse"
+                        
+                        # 明示的にゲートウェイ経由であることをマーク (内部判定用)
+                        processed_servers[s_name]["_generated_by"] = "gateway"
                     
                     # Authorization ヘッダーが必要な場合
-                    token = os.environ.get('MCP_GATEWAY_AUTH_TOKEN') or os.environ.get('MCP_GATEWAY_TOKEN') or os.environ.get('MCP_AUTH_TOKEN')
-                    if token and format_name != "toml":
-                        processed_servers[s_name]["headers"] = {
-                            "Authorization": f"Bearer {token}"
-                        }
-                    elif token and format_name == "toml":
-                        # Codex/mcp-remote の場合は引数に追加 (mcp-remote の仕様に合わせる)
-                        processed_servers[s_name]["args"].extend(["-H", f"Authorization: Bearer {token}"])
+                    gateway_token = (
+                        os.environ.get('MCP_GATEWAY_AUTH_TOKEN') or 
+                        os.environ.get('MCP_GATEWAY_TOKEN') or 
+                        os.environ.get('MCP_AUTH_TOKEN')
+                    )
+                    
+                    if gateway_token and processed_servers[s_name].get("_generated_by") == "gateway":
+                        if format_name != "toml":
+                            processed_servers[s_name].setdefault("headers", {})
+                            processed_servers[s_name]["headers"]["Authorization"] = f"Bearer {gateway_token}"
+                        else:
+                            # Codex/mcp-remote の場合は引数に追加
+                            processed_servers[s_name].setdefault("args", [])
+                            processed_servers[s_name]["args"].extend(["-H", f"Authorization: Bearer {gateway_token}"])
+                    
+                    # 内部判定用キーを削除
+                    processed_servers[s_name].pop("_generated_by", None)
             else:
                 processed_servers[s_name] = s_cfg
 
