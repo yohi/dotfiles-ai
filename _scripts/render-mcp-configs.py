@@ -539,9 +539,9 @@ def main() -> int:
         # プレースホルダ置換
         servers = replace_placeholders(processed_servers, gateway_url)
 
-        # 不要なキー（title, description等）を削除してクライアントをクリーンに保つ
+        # 不要なキー (title, description 等) を削除してクライアントをクリーンに保つ
         standard_keys = {
-            "command", "args", "env", "type", "url", "httpUrl", "serverUrl", 
+            "command", "args", "env", "type", "url", "httpUrl", "serverUrl",
             "headers", "enabled", "environment", "timeout", "root_key"
         }
         for s_name, s_cfg in servers.items():

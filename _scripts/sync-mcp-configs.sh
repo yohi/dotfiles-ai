@@ -9,8 +9,6 @@ if ! command -v uv > /dev/null 2>&1; then
 fi
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-ESCAPED_HOME=$(printf '%s' "$HOME" | sed 's/[&/|]/\\&/g')
-ESCAPED_REPO_ROOT=$(printf '%s' "$REPO_ROOT" | sed 's/[&/|]/\\&/g')
 
 # Helper function for symlinking or copying config files
 deploy_config() {
