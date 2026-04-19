@@ -37,10 +37,10 @@ Codex CLI は TOML 形式の設定ファイルを使用します。
   `[mcp_servers.<name>]` セクションを追加します。
   ```toml
   [mcp_servers.my-server]
-  command = "curl"
-  args = ["-s", "http://localhost:10888/sse?server=my-server"]
+  command = "npx"
+  args = ["-y", "mcp-remote", "http://localhost:10888/sse?server=my-server"]
   ```
-  *(注: Codex の SSE ネイティブ対応状況により、ブリッジコマンドが必要な場合があります)*
+  *(注: Codex CLI 等の stdio 専用クライアントで SSE サーバーを利用する場合、`mcp-remote` などのブリッジツールが必要です)*
 
 ## 4. OpenCode (oh-my-opencode)
 OpenCode は JSONC 形式の設定ファイルを使用します。

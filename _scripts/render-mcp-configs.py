@@ -73,7 +73,7 @@ def replace_placeholders(value: Any, gateway_url: str) -> Any:
             # Fallback for renamed MCP token
             if var_name == "MCP_GATEWAY_TOKEN":
                 auth_token = os.environ.get("MCP_AUTH_TOKEN")
-                if auth_token:
+                if auth_token is not None:
                     return auth_token
 
             if default_val is not None:
@@ -136,8 +136,13 @@ def write_json_file(path: Path, root_key: str, servers: dict[str, Any], project_
             data["projects"] = {}
         if project_key not in data["projects"]:
             data["projects"][project_key] = {}
-        # 再帰的にマージ
+        
+        # 名前空間化された設定にマージ
         deep_merge(data["projects"][project_key], {root_key: servers})
+        
+        # トップレベルに同じキーがあれば、混乱を避けるために削除
+        if root_key in data:
+            del data[root_key]
     else:
         # 再帰的にマージ
         deep_merge(data, {root_key: servers})
@@ -301,6 +306,24 @@ def write_jsonc_object_key(path: Path, root_key: str, servers: dict[str, Any]) -
     return True
 
 
+def to_toml_inline_table(val: dict[str, Any]) -> str:
+    """辞書を TOML インラインテーブル形式 { k = "v" } に変換する。"""
+    parts = []
+    for k, v in val.items():
+        if isinstance(v, str):
+            v_str = f'"{v}"'
+        elif isinstance(v, (int, float, bool)):
+            v_str = str(v).lower() if isinstance(v, bool) else str(v)
+        elif isinstance(v, list):
+            v_str = "[" + ", ".join(f'"{i}"' if isinstance(i, str) else str(i) for i in v) + "]"
+        elif isinstance(v, dict):
+            v_str = to_toml_inline_table(v)
+        else:
+            v_str = f'"{v}"'
+        parts.append(f'{k} = {v_str}')
+    return "{ " + ", ".join(parts) + " }"
+
+
 def write_toml_file(path: Path, root_key: str, servers: dict[str, Any]) -> bool:
     path.parent.mkdir(parents=True, exist_ok=True)
     # 簡易的な TOML 書き出し (Codex の mcp_servers 形式に特化)
@@ -314,7 +337,7 @@ def write_toml_file(path: Path, root_key: str, servers: dict[str, Any]) -> bool:
                 v_str = ", ".join(f'"{i}"' for i in v)
                 lines.append(f"{k} = [{v_str}]")
             elif isinstance(v, dict):
-                v_str = json.dumps(v, ensure_ascii=False)
+                v_str = to_toml_inline_table(v)
                 lines.append(f"{k} = {v_str}")
         lines.append("")
 
@@ -379,11 +402,12 @@ def main() -> int:
     print(f"Generated gateway config: {config_yaml_path.relative_to(REPO_ROOT)}")
 
     # 2. Generate mcp/catalogs/custom.yaml (Catalog config)
+    # カタログには全てのサーバー（sse, local 等含む）を含める
     catalog_config = {
         "version": 3,
         "name": "custom",
         "displayName": "Custom Servers",
-        "registry": gateway_servers
+        "registry": all_servers
     }
     # Catalog 用に title と description が欠けている場合に補完する
     for name, cfg in catalog_config["registry"].items():
@@ -417,7 +441,11 @@ def main() -> int:
         for s_name, s_cfg in raw_servers.items():
             if "inherit" in s_cfg:
                 base_name = s_cfg["inherit"]
-                base_cfg = config.get("servers", {}).get(base_name, {})
+                if base_name not in config.get("servers", {}):
+                    raise RuntimeError(
+                        f"Undefined inherit target '{base_name}' referenced by agent '{agent_name}' server '{s_name}'"
+                    )
+                base_cfg = config.get("servers", {})[base_name]
                 
                 # 個別の url_key 指定があれば優先する
                 actual_url_key = s_cfg.get("url_key", url_key)
@@ -478,10 +506,10 @@ def main() -> int:
                 else:
                     # ゲートウェイ経由のSSE設定を構築
                     if format_name == "toml":
-                        # Codex の SSE 形式: curl を使用
+                        # Codex の SSE 形式: npx mcp-remote を推奨 (curl は永続接続に不向き)
                         processed_servers[s_name] = {
-                            "command": "curl",
-                            "args": ["-s", f"{gateway_url}?server={s_name}"]
+                            "command": "npx",
+                            "args": ["-y", "mcp-remote", f"{gateway_url}?server={s_name}"]
                         }
                     else:
                         processed_servers[s_name] = {
@@ -497,13 +525,13 @@ def main() -> int:
                             processed_servers[s_name]["type"] = "sse"
                     
                     # Authorization ヘッダーが必要な場合
-                    token = os.environ.get('MCP_GATEWAY_AUTH_TOKEN') or os.environ.get('MCP_GATEWAY_TOKEN')
+                    token = os.environ.get('MCP_GATEWAY_AUTH_TOKEN') or os.environ.get('MCP_GATEWAY_TOKEN') or os.environ.get('MCP_AUTH_TOKEN')
                     if token and format_name != "toml":
                         processed_servers[s_name]["headers"] = {
                             "Authorization": f"Bearer {token}"
                         }
                     elif token and format_name == "toml":
-                        # Codex/curl の場合は引数に追加
+                        # Codex/mcp-remote の場合は引数に追加 (mcp-remote の仕様に合わせる)
                         processed_servers[s_name]["args"].extend(["-H", f"Authorization: Bearer {token}"])
             else:
                 processed_servers[s_name] = s_cfg

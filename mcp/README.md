@@ -33,6 +33,10 @@ Atlassian 製品（Jira, Confluence）用の公式 MCP サーバーです。
 
 本プロジェクトでは、MCP 設定を **`mcp/servers.yaml`** を唯一の正解（Single Source of Truth）として管理しています。
 
+> [!WARNING]
+> **`mcp/config.yaml` や各エージェントの設定ファイルを直接編集しないでください。**
+> これらのファイルは `make sync-mcp` 実行時に `mcp/servers.yaml` から自動生成されるため、手動の変更は上書きされます。設定を変更する場合は必ず `mcp/servers.yaml` を修正し、`make sync-mcp` を実行してください。
+
 - **`mcp/servers.yaml`**: 
   - 全 AI エージェント（Gemini, Claude, Cursor, VSCode, Antigravity, OpenCode, Codex 等）のマスター設定。
   - 各サーバーの定義（Docker イメージ、環境変数、ボリュームマウント等）と、各エージェントがどのサーバーを利用するかを定義します。
@@ -64,11 +68,11 @@ Atlassian 製品（Jira, Confluence）用の公式 MCP サーバーです。
 ### 特筆すべき設定仕様
 
 #### ■ Codex CLI (TOML)
-Codex CLI は現在 SSE にネイティブ対応していないため、`curl` をブリッジとして使用する設定を自動生成します。
+Codex CLI は現在 SSE にネイティブ対応していないため、`npx mcp-remote` をブリッジとして使用する設定を自動生成します。
 ```toml
 [mcp_servers.SQLite]
-command = "curl"
-args = ["-s", "http://127.0.0.1:10888/sse?server=SQLite", "-H", "Authorization: Bearer ..."]
+command = "npx"
+args = ["-y", "mcp-remote", "http://127.0.0.1:10888/sse?server=SQLite", "-H", "Authorization: Bearer ..."]
 ```
 
 #### ■ ChronosGraph (Local)
