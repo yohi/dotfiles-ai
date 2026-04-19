@@ -520,6 +520,10 @@ def main() -> int:
                     
                     if "type" not in processed_servers[s_name]:
                         processed_servers[s_name]["type"] = "sse"
+                    
+                    # 基底定義で明示的にゲートウェイ認証が必要とされている場合
+                    if base_cfg.get("_generated_by") == "gateway":
+                        processed_servers[s_name]["_generated_by"] = "gateway"
                 else:
                     # ゲートウェイ経由のSSE設定を構築
                     if format_name == "toml":
@@ -544,24 +548,24 @@ def main() -> int:
                         # 明示的にゲートウェイ経由であることをマーク (内部判定用)
                         processed_servers[s_name]["_generated_by"] = "gateway"
                     
-                    # Authorization ヘッダーが必要な場合
-                    gateway_token = (
-                        os.environ.get('MCP_GATEWAY_AUTH_TOKEN') or
-                        os.environ.get('MCP_GATEWAY_TOKEN') or
-                        os.environ.get('MCP_AUTH_TOKEN')
-                    )
-                    
-                    if gateway_token and processed_servers[s_name].get("_generated_by") == "gateway":
-                        if format_name != "toml":
-                            processed_servers[s_name].setdefault("headers", {})
-                            processed_servers[s_name]["headers"]["Authorization"] = f"Bearer {gateway_token}"
-                        else:
-                            # Codex/mcp-remote の場合は引数に追加
-                            processed_servers[s_name].setdefault("args", [])
-                            processed_servers[s_name]["args"].extend(["-H", f"Authorization: Bearer {gateway_token}"])
-                    
-                    # 内部判定用キーを削除
-                    processed_servers[s_name].pop("_generated_by", None)
+                # Authorization ヘッダーが必要な場合
+                gateway_token = (
+                    os.environ.get('MCP_GATEWAY_AUTH_TOKEN') or
+                    os.environ.get('MCP_GATEWAY_TOKEN') or
+                    os.environ.get('MCP_AUTH_TOKEN')
+                )
+                
+                if gateway_token and processed_servers[s_name].get("_generated_by") == "gateway":
+                    if format_name != "toml":
+                        processed_servers[s_name].setdefault("headers", {})
+                        processed_servers[s_name]["headers"]["Authorization"] = f"Bearer {gateway_token}"
+                    else:
+                        # Codex/mcp-remote の場合は引数に追加
+                        processed_servers[s_name].setdefault("args", [])
+                        processed_servers[s_name]["args"].extend(["-H", f"Authorization: Bearer {gateway_token}"])
+                
+                # 内部判定用キーを削除
+                processed_servers[s_name].pop("_generated_by", None)
 
                 # エージェント側の個別設定で上書き (inherit, url_key 以外)
                 overrides = {k: v for k, v in s_cfg.items() if k not in {"inherit", "url_key"}}
