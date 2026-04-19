@@ -61,3 +61,6 @@ __pycache__/
 .npmrc
 # Local sync state (machine-specific)
 .last_sync
+
+# Generated config files
+.claude.json
