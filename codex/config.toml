@@ -31,3 +31,33 @@ trust_level = "trusted"
 
 [projects."/home/y_ohi/dotfiles/components/dotfiles-ai"]
 trust_level = "trusted"
+
+[mcp_servers.SQLite]
+command = "curl"
+args = ["-s", "http://127.0.0.1:10888/sse?server=SQLite", "-H", "Authorization: Bearer bffee63ef308d35719428f43d4750d22"]
+
+[mcp_servers.filesystem]
+command = "curl"
+args = ["-s", "http://127.0.0.1:10888/sse?server=filesystem", "-H", "Authorization: Bearer bffee63ef308d35719428f43d4750d22"]
+
+[mcp_servers.github-official]
+command = "curl"
+args = ["-s", "http://127.0.0.1:10888/sse?server=github-official", "-H", "Authorization: Bearer bffee63ef308d35719428f43d4750d22"]
+
+[mcp_servers.sequentialthinking]
+command = "curl"
+args = ["-s", "http://127.0.0.1:10888/sse?server=sequentialthinking", "-H", "Authorization: Bearer bffee63ef308d35719428f43d4750d22"]
+
+[mcp_servers.chronos-graph]
+command = "uv"
+args = ["run", "--project", "/home/y_ohi/program/chronos-graph", "-m", "context_store"]
+env = {"STORAGE_BACKEND": "sqlite", "SQLITE_DB_PATH": "/home/y_ohi/.context-store/memories.db", "GRAPH_ENABLED": "true", "DECAY_HALF_LIFE_DAYS": "30", "SIMILARITY_THRESHOLD": "0.70", "DEDUP_THRESHOLD": "0.90", "EMBEDDING_PROVIDER": "local-model", "LOCAL_MODEL_NAME": "cl-nagoya/ruri-v3-310m"}
+
+[mcp_servers.nexus]
+command = "node"
+args = ["/home/y_ohi/program/nexus/dist/bin/nexus.js"]
+env = {"NEXUS_STORAGE_ROOT_DIR": "/home/y_ohi/program/nexus/.nexus", "NEXUS_WATCHER_IGNORE_PATHS": "node_modules,.git,.nexus,dist,gemini,.worktrees,.venv,target,.mypy_cache,.ruff_cache,build,.serena,.cache,__pycache__,*.db,*.sqlite,*.log", "CHOKIDAR_USEPOLLING": "false", "CHOKIDAR_INTERVAL": "2000", "NO_PROXY": "127.0.0.1,localhost"}
+
+[mcp_servers.skillport]
+command = "curl"
+args = ["-s", "http://127.0.0.1:10888/sse?server=skillport", "-H", "Authorization: Bearer bffee63ef308d35719428f43d4750d22"]
