@@ -574,6 +574,32 @@ def main() -> int:
             else:
                 processed_servers[s_name] = s_cfg
 
+        # Identify if the gateway is used by this agent
+        uses_gateway = any(
+            s_name in {"docker-mcp", "docker-mcp-local"}
+            for s_name in raw_servers.keys()
+        )
+
+        # Gateway-hosted servers are those with type "server" in the main config
+        gateway_hosted_servers = {
+            name for name, cfg in all_servers.items() if isinstance(cfg, dict) and cfg.get("type") == "server"
+        }
+
+        # Deduplicate: if gateway is used, remove servers that the gateway already provides
+        if uses_gateway:
+            servers_to_remove = []
+            for s_name in processed_servers.keys():
+                # Don't remove the gateway itself
+                if s_name in {"docker-mcp", "docker-mcp-local"}:
+                    continue
+                # If the server is hosted by the gateway, mark for removal
+                if s_name in gateway_hosted_servers:
+                    servers_to_remove.append(s_name)
+                    print(f"Skipping '{s_name}' for agent '{agent_name}' because it is provided by the Gateway.")
+            
+            for s_name in servers_to_remove:
+                processed_servers.pop(s_name, None)
+
         # プレースホルダ置換
         servers = replace_placeholders(processed_servers, gateway_url)
 
