@@ -311,14 +311,14 @@ def to_toml_inline_table(val: dict[str, Any]) -> str:
     parts = []
     for k, v in val.items():
         if isinstance(v, str):
-            v_str = f'"{v}"'
+            v_str = json.dumps(v)
         elif isinstance(v, (int, float, bool)):
             v_str = str(v).lower() if isinstance(v, bool) else str(v)
         elif isinstance(v, list):
             items = []
             for i in v:
                 if isinstance(i, str):
-                    items.append(f'"{i}"')
+                    items.append(json.dumps(i))
                 elif isinstance(i, bool):
                     items.append(str(i).lower())
                 else:
@@ -327,7 +327,7 @@ def to_toml_inline_table(val: dict[str, Any]) -> str:
         elif isinstance(v, dict):
             v_str = to_toml_inline_table(v)
         else:
-            v_str = f'"{v}"'
+            v_str = json.dumps(str(v))
         parts.append(f'{k} = {v_str}')
     return "{ " + ", ".join(parts) + " }"
 
@@ -340,7 +340,7 @@ def write_toml_file(path: Path, root_key: str, servers: dict[str, Any]) -> bool:
         lines.append(f"[{root_key}.{name}]")
         for k, v in cfg.items():
             if isinstance(v, str):
-                lines.append(f'{k} = "{v}"')
+                lines.append(f'{k} = {json.dumps(v)}')
             elif isinstance(v, (int, float, bool)):
                 v_str = str(v).lower() if isinstance(v, bool) else str(v)
                 lines.append(f"{k} = {v_str}")
@@ -348,7 +348,7 @@ def write_toml_file(path: Path, root_key: str, servers: dict[str, Any]) -> bool:
                 items = []
                 for i in v:
                     if isinstance(i, str):
-                        items.append(f'"{i}"')
+                        items.append(json.dumps(i))
                     elif isinstance(i, bool):
                         items.append(str(i).lower())
                     else:
@@ -550,8 +550,8 @@ def main() -> int:
                     
                     # Authorization ヘッダーが必要な場合
                     gateway_token = (
-                        os.environ.get('MCP_GATEWAY_AUTH_TOKEN') or 
-                        os.environ.get('MCP_GATEWAY_TOKEN') or 
+                        os.environ.get('MCP_GATEWAY_AUTH_TOKEN') or
+                        os.environ.get('MCP_GATEWAY_TOKEN') or
                         os.environ.get('MCP_AUTH_TOKEN')
                     )
                     
@@ -566,6 +566,11 @@ def main() -> int:
                     
                     # 内部判定用キーを削除
                     processed_servers[s_name].pop("_generated_by", None)
+
+                # エージェント側の個別設定で上書き (inherit, url_key 以外)
+                overrides = {k: v for k, v in s_cfg.items() if k not in {"inherit", "url_key"}}
+                if overrides:
+                    deep_merge(processed_servers[s_name], overrides)
             else:
                 processed_servers[s_name] = s_cfg
 
@@ -577,9 +582,12 @@ def main() -> int:
             "command", "args", "env", "type", "url", "httpUrl", "serverUrl",
             "headers", "enabled", "environment", "timeout", "root_key"
         }
+        # エージェント固有の url_key も許可リストに加える
+        allowed_keys = standard_keys | {url_key}
+
         for s_name, s_cfg in servers.items():
             if isinstance(s_cfg, dict):
-                filtered_cfg = {k: v for k, v in s_cfg.items() if k in standard_keys}
+                filtered_cfg = {k: v for k, v in s_cfg.items() if k in allowed_keys}
                 servers[s_name] = filtered_cfg
 
         changed = False
