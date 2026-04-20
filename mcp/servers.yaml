@@ -22,7 +22,6 @@ servers:
       - "__HOME__:__HOME__"
       - "__REPO_ROOT__:__REPO_ROOT__"
   github-official:
-
     description: "Official GitHub MCP server for repository management."
     type: server
     image: mcp/github:latest
@@ -42,7 +41,7 @@ servers:
       - uv
       - run
       - --project
-      - "${CHRONOS_GRAPH_PATH:-__PROGRAM__/chronos-graph}"
+      - "${CHRONOS_GRAPH_PATH:-/home/y_ohi/program/private/chronos-graph}"
       - -m
       - context_store
     env:
@@ -69,10 +68,13 @@ servers:
     type: local
     command:
       - node
-      - "__PROGRAM__/nexus/dist/bin/nexus.js"
+      - "/home/y_ohi/program/private/nexus/dist/bin/nexus.js"
+    args:
+      - "--project-root"
+      - "/home/y_ohi/program/private/nexus"
     env:
       - name: NEXUS_STORAGE_ROOT_DIR
-        value: "__PROGRAM__/nexus/.nexus"
+        value: "/home/y_ohi/program/private/nexus/.nexus"
       - name: NEXUS_WATCHER_IGNORE_PATHS
         value: "node_modules,.git,.nexus,dist,gemini,.worktrees,.venv,target,.mypy_cache,.ruff_cache,build,.serena,.cache,__pycache__,*.db,*.sqlite,*.log"
       - name: CHOKIDAR_USEPOLLING
@@ -86,9 +88,6 @@ servers:
     title: "Atlassian"
     description: "Atlassian (Jira/Confluence) official MCP server."
     type: sse
-    # Atlassian はゲートウェイを通さず直接接続する(OAuth安定性のため)
-    # ですが、SSOT管理のためここに定義します。
-    # 実際には agent 側で inherit せず直接定義するか、特例として扱います。
     url: "https://mcp.atlassian.com/v1/mcp"
 
   skillport:
@@ -205,4 +204,3 @@ agents:
       docker-mcp: { inherit: "docker-mcp" }
       chronos-graph: { inherit: "chronos-graph" }
       nexus: { inherit: "nexus" }
-

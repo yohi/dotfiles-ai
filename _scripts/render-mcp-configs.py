@@ -30,8 +30,11 @@ def load_client_config() -> dict[str, Any]:
     return load_yaml_config(CLIENT_CONFIG_PATH)
 
 
-def parse_jsonc(text: str) -> dict[str, Any]:
-    return cast(dict[str, Any], json5.loads(text))
+def parse_jsonc(text: str, filename: str = "<string>") -> dict[str, Any]:
+    try:
+        return cast(dict[str, Any], json5.loads(text))
+    except Exception as e:
+        raise RuntimeError(f"Failed to parse JSONC in {filename}: {e}") from e
 
 
 def _resolve_program_placeholder(val: str) -> str:
@@ -129,7 +132,7 @@ def write_json_file(path: Path, root_key: str, servers: dict[str, Any], project_
     data: dict[str, Any] = {}
     if path.exists():
         existing_content = path.read_text(encoding="utf-8")
-        data = parse_jsonc(existing_content)
+        data = parse_jsonc(existing_content, path.name)
 
     if project_key:
         if "projects" not in data:
@@ -502,9 +505,13 @@ def main() -> int:
                     if format_name != "opencode_jsonc":
                         c = processed_servers[s_name].get("command", [])
                         a = processed_servers[s_name].get("args", [])
-                        if isinstance(c, list) and len(c) > 1 and not a:
+                        if isinstance(c, list) and len(c) > 0:
                             processed_servers[s_name]["command"] = c[0]
-                            processed_servers[s_name]["args"] = c[1:]
+                            # 既存の args があれば、command の残りの要素を先頭に追加
+                            new_args = c[1:]
+                            if a:
+                                new_args.extend(a)
+                            processed_servers[s_name]["args"] = new_args
                 elif any(key in base_cfg for key in ["url", "httpUrl", "serverUrl"]):
                     # 基底定義に既にURLがある場合はそれを使用 (例: Atlassian 直接接続)
                     processed_servers[s_name] = base_cfg.copy()
