@@ -22,13 +22,12 @@ servers:
       - "__HOME__:__HOME__"
       - "__REPO_ROOT__:__REPO_ROOT__"
   github-official:
-
     description: "Official GitHub MCP server for repository management."
     type: server
     image: mcp/github:latest
     env:
       - name: GITHUB_PERSONAL_ACCESS_TOKEN
-        value: "${GITHUB_TOKEN:-}"
+        value: "${GITHUB_TOKEN:-placeholder_set_GITHUB_TOKEN_in_env}"
   sequentialthinking:
     title: "Sequential Thinking"
     description: "A tool for sequential problem solving and logical reasoning."
@@ -42,7 +41,7 @@ servers:
       - uv
       - run
       - --project
-      - "${CHRONOS_GRAPH_PATH:-__PROGRAM__/chronos-graph}"
+      - "${CHRONOS_GRAPH_PATH:-/home/y_ohi/program/private/chronos-graph}"
       - -m
       - context_store
     env:
@@ -69,10 +68,13 @@ servers:
     type: local
     command:
       - node
-      - "__PROGRAM__/nexus/dist/bin/nexus.js"
+      - "/home/y_ohi/program/private/nexus/dist/bin/nexus.js"
+    args:
+      - "--project-root"
+      - "/home/y_ohi/program/private/nexus"
     env:
       - name: NEXUS_STORAGE_ROOT_DIR
-        value: "__PROGRAM__/nexus/.nexus"
+        value: "/home/y_ohi/program/private/nexus/.nexus"
       - name: NEXUS_WATCHER_IGNORE_PATHS
         value: "node_modules,.git,.nexus,dist,gemini,.worktrees,.venv,target,.mypy_cache,.ruff_cache,build,.serena,.cache,__pycache__,*.db,*.sqlite,*.log"
       - name: CHOKIDAR_USEPOLLING
@@ -86,13 +88,9 @@ servers:
     title: "Atlassian"
     description: "Atlassian (Jira/Confluence) official MCP server."
     type: sse
-    # Atlassian はゲートウェイを通さず直接接続する(OAuth安定性のため)
-    # ですが、SSOT管理のためここに定義します。
-    # 実際には agent 側で inherit せず直接定義するか、特例として扱います。
     url: "https://mcp.atlassian.com/v1/mcp"
 
   skillport:
-
     title: "Skillport"
     description: "Professional development and AI skill management toolkit."
     type: server
@@ -105,13 +103,37 @@ servers:
       - name: SKILLS_DIR
         value: "__REPO_ROOT__/agent-skills"
       - name: SKILLPORT_DB_PATH
-        value: "/mcp/db"
+        value: "/mcp/db/skills"
       - name: DB_PATH
-        value: "/mcp/db"
+        value: "/mcp/db/skills"
     volumes:
       - "__HOME__/.skillport/db:/mcp/db"
       - "__HOME__/.skillport:__HOME__/.skillport"
       - "__REPO_ROOT__:__REPO_ROOT__:ro"
+
+  docker-mcp:
+    title: "Docker MCP Gateway"
+    description: "SSE gateway for containerized MCP servers."
+    type: sse
+    url: "__GATEWAY_URL__"
+    _generated_by: "gateway"
+
+  docker-mcp-local:
+    title: "Docker MCP Gateway (Local)"
+    description: "Local stdio gateway for containerized MCP servers."
+    type: local
+    command:
+      - docker
+      - mcp
+      - gateway
+      - run
+    args:
+      - "--config"
+      - "__HOME__/.docker/mcp/config.yaml"
+      - "--catalog"
+      - "__HOME__/.docker/mcp/catalogs/bootstrap.yaml"
+      - "--catalog"
+      - "__HOME__/.docker/mcp/catalogs/custom.yaml"
 
 agents:
   gemini:
@@ -119,14 +141,10 @@ agents:
     format: "json"
     root_key: "mcpServers"
     servers:
-      SQLite: { inherit: "SQLite" }
-      filesystem: { inherit: "filesystem" }
-      github-official: { inherit: "github-official" }
+      docker-mcp: { inherit: "docker-mcp" }
       atlassian: { inherit: "atlassian", url_key: "httpUrl" }
-      sequentialthinking: { inherit: "sequentialthinking" }
       chronos-graph: { inherit: "chronos-graph" }
       nexus: { inherit: "nexus" }
-      skillport: { inherit: "skillport" }
 
   claude:
     path: ".claude.json"
@@ -134,53 +152,37 @@ agents:
     root_key: "mcpServers"
     project_key: "__REPO_ROOT__"
     servers:
-      SQLite: { inherit: "SQLite" }
-      filesystem: { inherit: "filesystem" }
-      github-official: { inherit: "github-official" }
+      docker-mcp: { inherit: "docker-mcp" }
       atlassian: { inherit: "atlassian" }
-      sequentialthinking: { inherit: "sequentialthinking" }
       chronos-graph: { inherit: "chronos-graph" }
       nexus: { inherit: "nexus" }
-      skillport: { inherit: "skillport" }
 
   opencode:
     path: "opencode/opencode.jsonc"
     format: "opencode_jsonc"
     root_key: "mcp"
     servers:
-      SQLite: { inherit: "SQLite" }
-      filesystem: { inherit: "filesystem" }
-      github-official: { inherit: "github-official" }
-      sequentialthinking: { inherit: "sequentialthinking" }
+      docker-mcp: { inherit: "docker-mcp-local" }
       chronos_graph: { inherit: "chronos-graph" }
       nexus: { inherit: "nexus" }
-      skillport: { inherit: "skillport" }
 
   vscode:
     path: "ide/vscode/settings.json"
     format: "json"
     root_key: "mcpServers"
     servers:
-      SQLite: { inherit: "SQLite" }
-      filesystem: { inherit: "filesystem" }
-      github-official: { inherit: "github-official" }
-      sequentialthinking: { inherit: "sequentialthinking" }
+      docker-mcp: { inherit: "docker-mcp" }
       chronos-graph: { inherit: "chronos-graph" }
       nexus: { inherit: "nexus" }
-      skillport: { inherit: "skillport" }
 
   cursor:
     path: ".cursor/mcp.json"
     format: "json"
     root_key: "mcpServers"
     servers:
-      SQLite: { inherit: "SQLite" }
-      filesystem: { inherit: "filesystem" }
-      github-official: { inherit: "github-official" }
-      sequentialthinking: { inherit: "sequentialthinking" }
+      docker-mcp: { inherit: "docker-mcp" }
       chronos-graph: { inherit: "chronos-graph" }
       nexus: { inherit: "nexus" }
-      skillport: { inherit: "skillport" }
 
   antigravity:
     path: ".gemini/antigravity/mcp_config.json"
@@ -188,23 +190,15 @@ agents:
     root_key: "mcpServers"
     url_key: "serverUrl"
     servers:
-      SQLite: { inherit: "SQLite" }
-      filesystem: { inherit: "filesystem" }
-      github-official: { inherit: "github-official" }
-      sequentialthinking: { inherit: "sequentialthinking" }
+      docker-mcp: { inherit: "docker-mcp" }
       chronos-graph: { inherit: "chronos-graph" }
       nexus: { inherit: "nexus" }
-      skillport: { inherit: "skillport" }
 
   codex:
     path: "codex/config.toml"
     format: "toml"
     root_key: "mcp_servers"
     servers:
-      SQLite: { inherit: "SQLite" }
-      filesystem: { inherit: "filesystem" }
-      github-official: { inherit: "github-official" }
-      sequentialthinking: { inherit: "sequentialthinking" }
+      docker-mcp: { inherit: "docker-mcp" }
       chronos-graph: { inherit: "chronos-graph" }
       nexus: { inherit: "nexus" }
-      skillport: { inherit: "skillport" }

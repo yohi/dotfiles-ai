@@ -86,6 +86,18 @@ The following rules apply to **ALL** projects unless overridden by a local proje
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 <!-- SKILLPORT_START -->
 ## SkillPort Skills
 
@@ -121,11 +133,6 @@ Each skill contains step-by-step instructions, templates, and scripts.
   <name>agent-skill-architect</name>
   <description>Designs and generates best-practice-compliant SKILL.md files for OpenCode agent skills. Use when creating new agent skills, drafting skill definitions, or improving existing skill files. Guides through requirements discovery and outputs production-ready SKILL.md with proper YAML frontmatter, XML-structured instructions, and progressive disclosure patterns.</description>
   <location>agent-skills/agent-skill-architect/SKILL.md</location>
-</skill>
-<skill>
-  <name>anthropics/ai-api</name>
-  <description>Build apps with the Claude API or Anthropic SDK. TRIGGER when code imports 'anthropic', '@anthropic-ai/sdk', or 'claude_agent_sdk', or user asks to use Claude API, Anthropic SDKs, or Agent SDK. DO NOT TRIGGER when code imports 'openai' or other AI SDKs, general programming, or ML/data-science tasks.</description>
-  <location>agent-skills/anthropics/ai-api/SKILL.md</location>
 </skill>
 <skill>
   <name>anthropics/algorithmic-art</name>
@@ -331,6 +338,12 @@ Each skill contains step-by-step instructions, templates, and scripts.
 
 
 
+
+
+
+
+
+
 ## 6. Agent-Specific Contexts (Unified)
 
 - **CI/CD**: Default to **Bitbucket Pipelines** (`bitbucket-pipelines.yml`).
@@ -347,15 +360,18 @@ Each skill contains step-by-step instructions, templates, and scripts.
 
 ## BEGIN Superpowers Workflow
 # Superpowers Workflow (Adaptive Application)
-This project employs the [obra/superpowers](https://github.com/obra/superpowers) workflow. While its principles are mandatory, its execution MUST be **tailored to the task's complexity** to balance rigor and efficiency.
+This project employs the [obra/superpowers](https://github.com/obra/superpowers) workflow. While its principles are mandatory, its execution MUST be **tailored to the task's complexity** to balance rigor and efficiency. This adaptive approach minimizes unnecessary tool calls and response paths for non-engineering interactions, thereby reducing the risk of MCP-related errors and tool duplication issues.
 
 ## Core Mandate: "Think, Plan, Verify"
-Regardless of task size, you MUST adhere to the core philosophy:
-1.  **Research & Design:** Understand context and constraints before acting (`superpowers/brainstorming`).
-2.  **Structured Planning:** Define steps before execution (`superpowers/writing-plans`).
-3.  **Empirical Verification:** Confirm outcomes with evidence (`superpowers/verification-before-completion`).
+- **Engineering Tasks**: Adhere to the core philosophy (Research → Plan → Verify).
+- **Non-Engineering Interactions**: For greetings, simple questions about status, or conversational filler, **Bypass the workflow** and respond directly. This separation ensures that simple interactions do not trigger complex toolchains, enhancing reliability and responsiveness.
 
 ## Adaptive Execution Levels
+
+### 0. Zero Intensity (Greetings / Chitchat / Direct Inquiries)
+**Immediate response.**
+- **Workflow:** None.
+- **Requirement:** Skip all formal skills and planning. Proceed to direct response. Note: This level is an explicit exception to the Mandatory MCP Priority rule; SkillPort connections should be ignored for Level 0 tasks.
 
 ### 1. High Intensity (New Features / Complex Bug Fixes / Architecture)
 **Full adherence is MANDATORY.**
@@ -373,7 +389,7 @@ Regardless of task size, you MUST adhere to the core philosophy:
 - **Requirement:** Formal skills may be skipped for speed, but the final state MUST be verified and reported.
 
 ## Skill Integration (SkillPort)
-- **Mandatory MCP Priority:** Agents MUST always use the `load_skill` tool whenever a SkillPort MCP connection is available and MUST immediately terminate the task and report an error without any automatic fallback if `load_skill` fails or the SkillPort MCP server is unavailable; the use of `skillport show` via CLI is permitted only for manual operations by human operators in explicitly identified non-MCP environments.
+- **Mandatory MCP Priority:** Agents MUST always use the `load_skill` tool whenever a SkillPort MCP connection is available and MUST immediately terminate the task and report an error without any automatic fallback if `load_skill` fails or the SkillPort MCP server is unavailable; the use of `skillport show` via CLI is permitted only for manual operations by human operators in explicitly identified non-MCP environments. **EXCEPTION**: This requirement does NOT apply to Level 0 (Zero Intensity) tasks, which must skip formal skills and proceed directly to response.
 - **Prohibited Access:** Direct file path reads or direct access to skill files are strictly forbidden during runtime and for Pull Requests.
 ## END Superpowers Workflow
 

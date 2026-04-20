@@ -30,8 +30,11 @@ def load_client_config() -> dict[str, Any]:
     return load_yaml_config(CLIENT_CONFIG_PATH)
 
 
-def parse_jsonc(text: str) -> dict[str, Any]:
-    return cast(dict[str, Any], json5.loads(text))
+def parse_jsonc(text: str, filename: str = "<string>") -> dict[str, Any]:
+    try:
+        return cast(dict[str, Any], json5.loads(text))
+    except Exception as e:
+        raise RuntimeError(f"Failed to parse JSONC in {filename}: {e}") from e
 
 
 def _resolve_program_placeholder(val: str) -> str:
@@ -129,7 +132,7 @@ def write_json_file(path: Path, root_key: str, servers: dict[str, Any], project_
     data: dict[str, Any] = {}
     if path.exists():
         existing_content = path.read_text(encoding="utf-8")
-        data = parse_jsonc(existing_content)
+        data = parse_jsonc(existing_content, path.name)
 
     if project_key:
         if "projects" not in data:
@@ -137,19 +140,17 @@ def write_json_file(path: Path, root_key: str, servers: dict[str, Any], project_
         if project_key not in data["projects"]:
             data["projects"][project_key] = {}
         
-        # 名前空間化された設定にマージ
-        deep_merge(data["projects"][project_key], {root_key: servers})
-        
-        # トップレベルに同じキーがあれば、混乱を避けるために削除
+        # 指定されたプロジェクト配下の root_key を完全に置換
+        data["projects"][project_key][root_key] = servers
+        # 重複を防ぐため、トップレベルに同名のキーがあれば削除
         if root_key in data:
             del data[root_key]
     else:
-        # 再帰的にマージ
-        deep_merge(data, {root_key: servers})
+        # トップレベルの root_key を完全に置換
+        data[root_key] = servers
 
     new_content = json.dumps(data, indent=2, ensure_ascii=False) + "\n"
     if existing_content is not None and existing_content == new_content:
-        print(f"Skipped {path.name} (no changes)")
         return False
 
     path.write_text(new_content, encoding="utf-8")
@@ -368,8 +369,8 @@ def write_toml_file(path: Path, root_key: str, servers: dict[str, Any]) -> bool:
     if path.exists():
         existing_content = path.read_text(encoding="utf-8")
         if f"[{root_key}." in existing_content:
-            # 既存の同一ルートキーセクションを置換
-            pattern = re.compile(rf"\[{re.escape(root_key)}\..*?(?=\n\[|\Z)", re.DOTALL)
+            # 既存の同一ルートキーセクションを置換 (行頭の [ または EOF まで)
+            pattern = re.compile(rf"^\[{re.escape(root_key)}\..*?(?=\n^\[|\Z)", re.DOTALL | re.MULTILINE)
             new_content = pattern.sub("", existing_content).strip()
             if new_content:
                 new_content += "\n\n" + sections_block
@@ -506,9 +507,13 @@ def main() -> int:
                     if format_name != "opencode_jsonc":
                         c = processed_servers[s_name].get("command", [])
                         a = processed_servers[s_name].get("args", [])
-                        if isinstance(c, list) and len(c) > 1 and not a:
+                        if isinstance(c, list) and len(c) > 0:
                             processed_servers[s_name]["command"] = c[0]
-                            processed_servers[s_name]["args"] = c[1:]
+                            # 既存の args があれば、command の残りの要素を先頭に追加
+                            new_args = c[1:]
+                            if a:
+                                new_args.extend(a)
+                            processed_servers[s_name]["args"] = new_args
                 elif any(key in base_cfg for key in ["url", "httpUrl", "serverUrl"]):
                     # 基底定義に既にURLがある場合はそれを使用 (例: Atlassian 直接接続)
                     processed_servers[s_name] = base_cfg.copy()
@@ -524,6 +529,10 @@ def main() -> int:
                     
                     if "type" not in processed_servers[s_name]:
                         processed_servers[s_name]["type"] = "sse"
+                    
+                    # 基底定義で明示的にゲートウェイ認証が必要とされている場合
+                    if base_cfg.get("_generated_by") == "gateway":
+                        processed_servers[s_name]["_generated_by"] = "gateway"
                 else:
                     # ゲートウェイ経由のSSE設定を構築
                     if format_name == "toml":
@@ -548,31 +557,61 @@ def main() -> int:
                         # 明示的にゲートウェイ経由であることをマーク (内部判定用)
                         processed_servers[s_name]["_generated_by"] = "gateway"
                     
-                    # Authorization ヘッダーが必要な場合
-                    gateway_token = (
-                        os.environ.get('MCP_GATEWAY_AUTH_TOKEN') or
-                        os.environ.get('MCP_GATEWAY_TOKEN') or
-                        os.environ.get('MCP_AUTH_TOKEN')
-                    )
-                    
-                    if gateway_token and processed_servers[s_name].get("_generated_by") == "gateway":
-                        if format_name != "toml":
-                            processed_servers[s_name].setdefault("headers", {})
-                            processed_servers[s_name]["headers"]["Authorization"] = f"Bearer {gateway_token}"
-                        else:
-                            # Codex/mcp-remote の場合は引数に追加
-                            processed_servers[s_name].setdefault("args", [])
-                            processed_servers[s_name]["args"].extend(["-H", f"Authorization: Bearer {gateway_token}"])
-                    
-                    # 内部判定用キーを削除
-                    processed_servers[s_name].pop("_generated_by", None)
-
+                # Authorization ヘッダーが必要な場合
+                gateway_token = (
+                    os.environ.get('MCP_GATEWAY_AUTH_TOKEN') or
+                    os.environ.get('MCP_GATEWAY_TOKEN') or
+                    os.environ.get('MCP_AUTH_TOKEN')
+                )
+                
+                if gateway_token and processed_servers[s_name].get("_generated_by") == "gateway":
+                    if format_name != "toml":
+                        processed_servers[s_name].setdefault("headers", {})
+                        processed_servers[s_name]["headers"]["Authorization"] = f"Bearer {gateway_token}"
+                    else:
+                        # Codex/mcp-remote の場合は引数に追加
+                        processed_servers[s_name].setdefault("args", [])
+                        processed_servers[s_name]["args"].extend(["-H", f"Authorization: Bearer {gateway_token}"])
+                
                 # エージェント側の個別設定で上書き (inherit, url_key 以外)
                 overrides = {k: v for k, v in s_cfg.items() if k not in {"inherit", "url_key"}}
                 if overrides:
                     deep_merge(processed_servers[s_name], overrides)
             else:
-                processed_servers[s_name] = s_cfg
+                # 静的エントリにも url_key 変換を適用する
+                processed_servers[s_name] = s_cfg.copy()
+                # url_key 指定があれば、既存の url 関連キーをそのキーに置換する
+                url_val = s_cfg.get("url") or s_cfg.get("httpUrl") or s_cfg.get("serverUrl")
+                if url_val:
+                    for k in ["url", "httpUrl", "serverUrl"]:
+                        processed_servers[s_name].pop(k, None)
+                    processed_servers[s_name][url_key] = url_val
+
+        # Identify if the gateway is used by this agent
+        uses_gateway = any(
+            s_name in {"docker-mcp", "docker-mcp-local"}
+            for s_name in raw_servers.keys()
+        )
+
+        # Gateway-hosted servers are those with type "server" in the main config
+        gateway_hosted_servers = {
+            name for name, cfg in all_servers.items() if isinstance(cfg, dict) and cfg.get("type") == "server"
+        }
+
+        # Deduplicate: if gateway is used, remove servers that the gateway already provides
+        if uses_gateway:
+            servers_to_remove = []
+            for s_name in processed_servers.keys():
+                # Don't remove the gateway itself
+                if s_name in {"docker-mcp", "docker-mcp-local"}:
+                    continue
+                # If the server is hosted by the gateway AND it was generated by the gateway (no user overrides that changed its origin), mark for removal
+                if s_name in gateway_hosted_servers and processed_servers[s_name].get("_generated_by") == "gateway":
+                    servers_to_remove.append(s_name)
+                    print(f"Skipping '{s_name}' for agent '{agent_name}' because it is provided by the Gateway and has no custom overrides.")
+            
+            for s_name in servers_to_remove:
+                processed_servers.pop(s_name, None)
 
         # プレースホルダ置換
         servers = replace_placeholders(processed_servers, gateway_url)
@@ -587,6 +626,8 @@ def main() -> int:
 
         for s_name, s_cfg in servers.items():
             if isinstance(s_cfg, dict):
+                # 内部判定用キーを削除
+                s_cfg.pop("_generated_by", None)
                 filtered_cfg = {k: v for k, v in s_cfg.items() if k in allowed_keys}
                 servers[s_name] = filtered_cfg
 
