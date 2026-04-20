@@ -23,7 +23,7 @@ init-env: ## Interactive setup for .env file (essential secrets only)
 	# 3. Path Settings \
 	read -p "Nexus Path [~/program/nexus]: " nexus_path; \
 	nexus_path=$${nexus_path:-$${HOME}/program/nexus}; \
-	nexus_path=$$(echo "$$nexus_path" | sed "s|^~|$$HOME|"); \
+	nexus_path=$$(echo "$$nexus_path" | sed "s|^~\(/\|$$\)|$$HOME\1|"); \
 	\
 	# Chronos-Graph Path detection \
 	if [ -d "$${HOME}/program/private/chronos-graph" ]; then \
@@ -33,7 +33,7 @@ init-env: ## Interactive setup for .env file (essential secrets only)
 	fi; \
 	read -p "Chronos-Graph Path [$$cg_default]: " chronos_graph_path; \
 	chronos_graph_path=$${chronos_graph_path:-$$cg_default}; \
-	chronos_graph_path=$$(echo "$$chronos_graph_path" | sed "s|^~|$$HOME|"); \
+	chronos_graph_path=$$(echo "$$chronos_graph_path" | sed "s|^~\(/\|$$\)|$$HOME\1|"); \
 	\
 	# 4. Internal / Auto-derived variables \
 	# MCP_AUTH can be used to supply a stable secret for CI/production. \

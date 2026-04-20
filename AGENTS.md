@@ -294,6 +294,7 @@ This project adheres to the **Superpowers Workflow** as defined in [`global-rule
 As the central authority for AI agent configurations, **Level 1 (High Intensity)** is the default for most tasks.
 - **Level 2 (Medium Intensity)** may be applied for refactoring, improvements, or moderate logic changes.
 - **Level 3 (Low Intensity)** is reserved for minor documentation edits or trivial configuration changes to ensure a rapid response without sacrificing essential validation.
+- **Level 0 (Zero Intensity)** is for greetings, chitchat, or direct inquiries. Skip all formal skills (including `load_skill`) and proceed directly to response.
 
 ## 単体使用時の注意点
 

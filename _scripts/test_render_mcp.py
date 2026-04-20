@@ -3,7 +3,7 @@ import importlib.util
 import json
 import json5
 import sys
-import toml
+import toml  # type: ignore[import-untyped]
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -113,15 +113,16 @@ def test_chronos_graph_rendering():
             if toml:
                 try:
                     data = toml.loads(content)
-                    # Walk the dict to find chronos-graph
-                    root_key = agent_config["root_key"]
-                    servers = data.get(root_key, {})
-                    if "chronos-graph" not in servers and "chronos_graph" not in servers:
-                        raise AssertionError(f"chronos-graph missing in parsed TOML for {agent_name}")
-                    print(f"PASS: {agent_name} verified presence of chronos-graph via parsed TOML.")
-                    continue
                 except Exception as e:
-                    raise AssertionError(f"Failed to parse TOML for {agent_name} at {path}: {e}")
+                    raise AssertionError(f"Failed to parse rendered TOML for {agent_name} at {path}: {e}") from e
+
+                # Walk the dict to find chronos-graph
+                root_key = agent_config["root_key"]
+                servers = data.get(root_key, {})
+                if "chronos-graph" not in servers and "chronos_graph" not in servers:
+                    raise AssertionError(f"chronos-graph missing in parsed TOML for {agent_name}")
+                print(f"PASS: {agent_name} verified presence of chronos-graph via parsed TOML.")
+                continue
             else:
                 # Fallback to simple check if toml lib is missing
                 if "chronos-graph" not in content and "chronos_graph" not in content:

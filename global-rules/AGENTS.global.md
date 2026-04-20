@@ -360,18 +360,18 @@ Each skill contains step-by-step instructions, templates, and scripts.
 
 ## BEGIN Superpowers Workflow
 # Superpowers Workflow (Adaptive Application)
-This project employs the [obra/superpowers](https://github.com/obra/superpowers) workflow. While its principles are mandatory, its execution MUST be **tailored to the task's complexity** to balance rigor and efficiency.
+This project employs the [obra/superpowers](https://github.com/obra/superpowers) workflow. While its principles are mandatory, its execution MUST be **tailored to the task's complexity** to balance rigor and efficiency. This adaptive approach minimizes unnecessary tool calls and response paths for non-engineering interactions, thereby reducing the risk of MCP-related errors and tool duplication issues.
 
 ## Core Mandate: "Think, Plan, Verify"
 - **Engineering Tasks**: Adhere to the core philosophy (Research → Plan → Verify).
-- **Non-Engineering Interactions**: For greetings, simple questions about status, or conversational filler, **Bypass the workflow** and respond directly.
+- **Non-Engineering Interactions**: For greetings, simple questions about status, or conversational filler, **Bypass the workflow** and respond directly. This separation ensures that simple interactions do not trigger complex toolchains, enhancing reliability and responsiveness.
 
 ## Adaptive Execution Levels
 
 ### 0. Zero Intensity (Greetings / Chitchat / Direct Inquiries)
 **Immediate response.**
 - **Workflow:** None.
-- **Requirement:** Skip all formal skills and planning. Proceed to direct response.
+- **Requirement:** Skip all formal skills and planning. Proceed to direct response. Note: This level is an explicit exception to the Mandatory MCP Priority rule; SkillPort connections should be ignored for Level 0 tasks.
 
 ### 1. High Intensity (New Features / Complex Bug Fixes / Architecture)
 **Full adherence is MANDATORY.**
@@ -389,7 +389,7 @@ This project employs the [obra/superpowers](https://github.com/obra/superpowers)
 - **Requirement:** Formal skills may be skipped for speed, but the final state MUST be verified and reported.
 
 ## Skill Integration (SkillPort)
-- **Mandatory MCP Priority:** Agents MUST always use the `load_skill` tool whenever a SkillPort MCP connection is available and MUST immediately terminate the task and report an error without any automatic fallback if `load_skill` fails or the SkillPort MCP server is unavailable; the use of `skillport show` via CLI is permitted only for manual operations by human operators in explicitly identified non-MCP environments.
+- **Mandatory MCP Priority:** Agents MUST always use the `load_skill` tool whenever a SkillPort MCP connection is available and MUST immediately terminate the task and report an error without any automatic fallback if `load_skill` fails or the SkillPort MCP server is unavailable; the use of `skillport show` via CLI is permitted only for manual operations by human operators in explicitly identified non-MCP environments. **EXCEPTION**: This requirement does NOT apply to Level 0 (Zero Intensity) tasks, which must skip formal skills and proceed directly to response.
 - **Prohibited Access:** Direct file path reads or direct access to skill files are strictly forbidden during runtime and for Pull Requests.
 ## END Superpowers Workflow
 
