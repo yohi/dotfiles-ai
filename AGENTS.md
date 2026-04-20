@@ -110,11 +110,6 @@ Each skill contains step-by-step instructions, templates, and scripts.
   <location>/home/y_ohi/dotfiles/components/dotfiles-ai/agent-skills/agent-skill-architect/SKILL.md</location>
 </skill>
 <skill>
-  <name>anthropics/ai-api</name>
-  <description>Build apps with the Claude API or Anthropic SDK. TRIGGER when code imports 'anthropic', '@anthropic-ai/sdk', or 'claude_agent_sdk', or user asks to use Claude API, Anthropic SDKs, or Agent SDK. DO NOT TRIGGER when code imports 'openai' or other AI SDKs, general programming, or ML/data-science tasks.</description>
-  <location>/home/y_ohi/dotfiles/components/dotfiles-ai/agent-skills/anthropics/ai-api/SKILL.md</location>
-</skill>
-<skill>
   <name>anthropics/algorithmic-art</name>
   <description>Creating algorithmic art using p5.js with seeded randomness and interactive parameter exploration. Use this when users request creating art using code, generative art, algorithmic art, flow fields, or particle systems. Create original algorithmic art rather than copying existing artists' work to avoid copyright violations.</description>
   <location>/home/y_ohi/dotfiles/components/dotfiles-ai/agent-skills/anthropics/algorithmic-art/SKILL.md</location>

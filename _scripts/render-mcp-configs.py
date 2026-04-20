@@ -142,13 +142,15 @@ def write_json_file(path: Path, root_key: str, servers: dict[str, Any], project_
         
         # 指定されたプロジェクト配下の root_key を完全に置換
         data["projects"][project_key][root_key] = servers
+        # 重複を防ぐため、トップレベルに同名のキーがあれば削除
+        if root_key in data:
+            del data[root_key]
     else:
         # トップレベルの root_key を完全に置換
         data[root_key] = servers
 
     new_content = json.dumps(data, indent=2, ensure_ascii=False) + "\n"
     if existing_content is not None and existing_content == new_content:
-        print(f"Skipped {path.name} (no changes)")
         return False
 
     path.write_text(new_content, encoding="utf-8")
@@ -367,8 +369,8 @@ def write_toml_file(path: Path, root_key: str, servers: dict[str, Any]) -> bool:
     if path.exists():
         existing_content = path.read_text(encoding="utf-8")
         if f"[{root_key}." in existing_content:
-            # 既存の同一ルートキーセクションを置換
-            pattern = re.compile(rf"\[{re.escape(root_key)}\..*?(?=\n\[|\Z)", re.DOTALL)
+            # 既存の同一ルートキーセクションを置換 (セクション末尾の余白を明示的に含める)
+            pattern = re.compile(rf"\[{re.escape(root_key)}\..*?(?=\n{{1,2}}\[|\Z)", re.DOTALL)
             new_content = pattern.sub("", existing_content).strip()
             if new_content:
                 new_content += "\n\n" + sections_block
@@ -579,7 +581,14 @@ def main() -> int:
                 if overrides:
                     deep_merge(processed_servers[s_name], overrides)
             else:
-                processed_servers[s_name] = s_cfg
+                # 静的エントリにも url_key 変換を適用する
+                processed_servers[s_name] = s_cfg.copy()
+                # url_key 指定があれば、既存の url 関連キーをそのキーに置換する
+                url_val = s_cfg.get("url") or s_cfg.get("httpUrl") or s_cfg.get("serverUrl")
+                if url_val:
+                    for k in ["url", "httpUrl", "serverUrl"]:
+                        processed_servers[s_name].pop(k, None)
+                    processed_servers[s_name][url_key] = url_val
 
         # Identify if the gateway is used by this agent
         uses_gateway = any(

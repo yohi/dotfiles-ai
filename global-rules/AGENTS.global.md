@@ -94,6 +94,10 @@ The following rules apply to **ALL** projects unless overridden by a local proje
 
 
 
+
+
+
+
 <!-- SKILLPORT_START -->
 ## SkillPort Skills
 
@@ -287,7 +291,7 @@ Each skill contains step-by-step instructions, templates, and scripts.
 </skill>
 <skill>
   <name>superpowers/using-superpowers</name>
-  <description>Use when starting a technical task or project-related discussion. Establishes how to find and use skills for engineering work.</description>
+  <description>Use when starting any conversation - establishes how to find and use skills, requiring Skill tool invocation before ANY response including clarifying questions</description>
   <location>agent-skills/superpowers/using-superpowers/SKILL.md</location>
 </skill>
 <skill>
@@ -307,6 +311,8 @@ Each skill contains step-by-step instructions, templates, and scripts.
 </skill>
 </available_skills>
 <!-- SKILLPORT_END -->
+
+
 
 
 

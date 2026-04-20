@@ -27,7 +27,7 @@ servers:
     image: mcp/github:latest
     env:
       - name: GITHUB_PERSONAL_ACCESS_TOKEN
-        value: "${GITHUB_TOKEN:-}"
+        value: "${GITHUB_TOKEN:-placeholder_set_GITHUB_TOKEN_in_env}"
   sequentialthinking:
     title: "Sequential Thinking"
     description: "A tool for sequential problem solving and logical reasoning."
@@ -172,8 +172,6 @@ agents:
     root_key: "mcpServers"
     servers:
       docker-mcp: { inherit: "docker-mcp" }
-      github-official: { inherit: "github-official" }
-      sequentialthinking: { inherit: "sequentialthinking" }
       chronos-graph: { inherit: "chronos-graph" }
       nexus: { inherit: "nexus" }
 
