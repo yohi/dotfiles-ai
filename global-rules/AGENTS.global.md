@@ -287,7 +287,7 @@ Each skill contains step-by-step instructions, templates, and scripts.
 </skill>
 <skill>
   <name>superpowers/using-superpowers</name>
-  <description>Use when starting any conversation - establishes how to find and use skills, requiring Skill tool invocation before ANY response including clarifying questions</description>
+  <description>Use when starting a technical task or project-related discussion. Establishes how to find and use skills for engineering work.</description>
   <location>agent-skills/superpowers/using-superpowers/SKILL.md</location>
 </skill>
 <skill>
@@ -357,12 +357,15 @@ Each skill contains step-by-step instructions, templates, and scripts.
 This project employs the [obra/superpowers](https://github.com/obra/superpowers) workflow. While its principles are mandatory, its execution MUST be **tailored to the task's complexity** to balance rigor and efficiency.
 
 ## Core Mandate: "Think, Plan, Verify"
-Regardless of task size, you MUST adhere to the core philosophy:
-1.  **Research & Design:** Understand context and constraints before acting (`superpowers/brainstorming`).
-2.  **Structured Planning:** Define steps before execution (`superpowers/writing-plans`).
-3.  **Empirical Verification:** Confirm outcomes with evidence (`superpowers/verification-before-completion`).
+- **Engineering Tasks**: Adhere to the core philosophy (Research → Plan → Verify).
+- **Non-Engineering Interactions**: For greetings, simple questions about status, or conversational filler, **Bypass the workflow** and respond directly.
 
 ## Adaptive Execution Levels
+
+### 0. Zero Intensity (Greetings / Chitchat / Direct Inquiries)
+**Immediate response.**
+- **Workflow:** None.
+- **Requirement:** Skip all formal skills and planning. Proceed to direct response.
 
 ### 1. High Intensity (New Features / Complex Bug Fixes / Architecture)
 **Full adherence is MANDATORY.**
