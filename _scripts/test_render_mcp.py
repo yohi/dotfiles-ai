@@ -3,10 +3,7 @@ import importlib.util
 import json
 import json5
 import sys
-try:
-    import toml
-except ImportError:
-    toml = None
+import toml
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
