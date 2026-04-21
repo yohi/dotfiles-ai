@@ -4,8 +4,7 @@ FROM ghcr.io/astral-sh/uv:python3.11-bookworm-slim
 RUN groupadd -r -g 1000 skillport && \
     useradd -r -u 1000 -g 1000 -d /home/skillport -m skillport && \
     mkdir -p /home/skillport/.skillport/db && \
-    mkdir -p /mcp/db && \
-    chown -R skillport:skillport /home/skillport /mcp
+    chown -R skillport:skillport /home/skillport
 
 # skillport-mcp をインストール
 RUN uv pip install --system skillport-mcp

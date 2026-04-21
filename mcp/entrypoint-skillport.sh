@@ -1,19 +1,15 @@
 #!/usr/bin/env bash
 set -e
 
-# マウントされたディレクトリの所有権を skillport ユーザーに変更
-# (root で実行されていることを前提とする)
-if [ -d "/home/skillport/.skillport/db" ]; then
-    chown -R skillport:skillport /home/skillport/.skillport/db
+# マウントされたディレクトリの所有権を skillport ユーザーに包括的に変更
+if [ -d "/home/skillport/.skillport" ]; then
+    chown -R skillport:skillport /home/skillport/.skillport
 fi
 
-# uv を使用してバージョン情報を取得
-VERSION=$(su skillport -c "uv pip show skillport-mcp 2>/dev/null" | grep Version | awk '{print $2}' || true)
-if [ -z "$VERSION" ]; then
-    VERSION="unknown"
-fi
-
+# バージョン情報の出力 (stderr)
+VERSION=$(su skillport -c "skillport-mcp --version 2>/dev/null" || echo "unknown")
 echo "[skillport] Version: $VERSION" >&2
 
 # skillport ユーザーとしてメインプロセスを実行
+# 標準出力は MCP 通信用に保護される
 exec su skillport -c "skillport-mcp $*"
