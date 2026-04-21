@@ -76,7 +76,7 @@ class TestConfigIntegrity(unittest.TestCase):
         except (subprocess.CalledProcessError, FileNotFoundError):
             # Fallback to manual walk if not in a git repo or git is missing
             tracked_files = []
-            for root, dirs, files in os.walk(self.PROJECT_ROOT):
+            for root, _dirs, files in os.walk(self.PROJECT_ROOT):
                 for file in files:
                     tracked_files.append(os.path.relpath(os.path.join(root, file), self.PROJECT_ROOT))
 
@@ -96,13 +96,10 @@ class TestConfigIntegrity(unittest.TestCase):
                         content = f.read()
                         if self.HOME_PATH in content:
                             found_paths.append(rel_path)
-                except (UnicodeDecodeError, FileNotFoundError, OSError) as e:
+                except FileNotFoundError:
+                    continue
+                except (UnicodeDecodeError, OSError) as e:
                     read_errors.append(f"{rel_path}: {str(e)}")
-
-        if read_errors:
-            # Report errors but don't fail immediately unless found_paths also has issues
-            # Or should we fail on read errors? Usually yes.
-            pass
 
         msg = f"Hardcoded personal paths ({self.HOME_PATH}) found in tracked files: {found_paths}"
         if read_errors:
