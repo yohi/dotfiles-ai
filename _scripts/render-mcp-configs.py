@@ -101,6 +101,10 @@ def replace_placeholders(value: Any, gateway_url: str) -> Any:
         # __PROGRAM__ プレースホルダのスマート置換
         val = _resolve_program_placeholder(val)
 
+        # チルダ展開 (~/ で始まる場合)
+        if val.startswith("~/"):
+            val = val.replace("~", str(Path.home()), 1)
+
         for k, v in placeholders.items():
             val = val.replace(k, v)
 
