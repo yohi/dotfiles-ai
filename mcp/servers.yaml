@@ -67,14 +67,14 @@ servers:
     description: "Local knowledge base and indexer."
     type: local
     command:
-      - "/usr/bin/node"
-      - "/home/y_ohi/program/private/nexus/dist/bin/nexus.js"
+      - "node"
+      - "__HOME__/program/private/nexus/dist/bin/nexus.js"
     args:
       - "--project-root"
-      - "/home/y_ohi/program/private/nexus"
+      - "__HOME__/program/private/nexus"
     env:
       - name: NEXUS_STORAGE_ROOT_DIR
-        value: "/home/y_ohi/program/private/nexus/.nexus"
+        value: "__HOME__/program/private/nexus/.nexus"
       - name: NEXUS_WATCHER_IGNORE_PATHS
         value: "node_modules,.git,.nexus,dist,gemini,.worktrees,.venv,target,.mypy_cache,.ruff_cache,build,.serena,.cache,__pycache__,*.db,*.sqlite,*.log,out,bundle,vendor,package-lock.json,yarn.lock,pnpm-lock.yaml"
       - name: CHOKIDAR_USEPOLLING
@@ -95,7 +95,7 @@ servers:
     description: "Professional development and AI skill management toolkit."
     type: local
     command:
-      - "/home/y_ohi/.local/bin/skillport-mcp"
+      - "__HOME__/.local/bin/skillport-mcp"
     env:
       - name: SKILLPORT_SKILLS_DIR
         value: "__REPO_ROOT__/agent-skills"
