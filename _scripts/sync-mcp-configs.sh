@@ -7,6 +7,12 @@ USE_UV=true
 if ! command -v uv > /dev/null 2>&1; then
     echo "Warning: 'uv' is not installed. Falling back to standard python execution." >&2
     USE_UV=false
+    # CodeRabbit: Ensure dependencies exist for fallback path (yaml, json5)
+    if ! python3 -c "import yaml, json5" > /dev/null 2>&1; then
+        echo "❌ Error: Required Python packages (PyYAML, json5) are missing for the fallback path." >&2
+        echo "   Please install them via: pip install PyYAML json5" >&2
+        exit 1
+    fi
 fi
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -141,24 +147,38 @@ ENABLED_SERVERS=$(
         DOTFILES_AI_REPO_ROOT="$REPO_ROOT" uv run --with-requirements "$REPO_ROOT/requirements.txt" python3 - <<'PY'
 from pathlib import Path
 import os
-import yaml
+import sys
+
+try:
+    import yaml
+except ImportError:
+    print("Error: 'PyYAML' is required but not installed.", file=sys.stderr)
+    sys.exit(1)
 
 config = yaml.safe_load(Path(os.environ["DOTFILES_AI_REPO_ROOT"]).joinpath("mcp/config.yaml").read_text(encoding="utf-8")) or {}
 servers = config.get("gateway", {}).get("enabled_servers", [])
 if not isinstance(servers, list) or not all(isinstance(item, str) for item in servers):
-    raise SystemExit("Invalid mcp/config.yaml: gateway.enabled_servers must be a list of strings")
+    print("Invalid mcp/config.yaml: gateway.enabled_servers must be a list of strings", file=sys.stderr)
+    sys.exit(1)
 print(",".join(servers))
 PY
     else
         DOTFILES_AI_REPO_ROOT="$REPO_ROOT" python3 - <<'PY'
 from pathlib import Path
 import os
-import yaml
+import sys
+
+try:
+    import yaml
+except ImportError:
+    print("Error: 'PyYAML' is required but not installed. Please install it via 'pip install PyYAML'.", file=sys.stderr)
+    sys.exit(1)
 
 config = yaml.safe_load(Path(os.environ["DOTFILES_AI_REPO_ROOT"]).joinpath("mcp/config.yaml").read_text(encoding="utf-8")) or {}
 servers = config.get("gateway", {}).get("enabled_servers", [])
 if not isinstance(servers, list) or not all(isinstance(item, str) for item in servers):
-    raise SystemExit("Invalid mcp/config.yaml: gateway.enabled_servers must be a list of strings")
+    print("Invalid mcp/config.yaml: gateway.enabled_servers must be a list of strings", file=sys.stderr)
+    sys.exit(1)
 print(",".join(servers))
 PY
     fi
