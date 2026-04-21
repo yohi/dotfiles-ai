@@ -531,7 +531,10 @@ def main() -> int:
                     
                     processed_servers[s_name][actual_url_key] = url_val
                     
-                    if "type" not in processed_servers[s_name]:
+                    if format_name == "opencode_jsonc":
+                        processed_servers[s_name]["type"] = "remote"
+                        processed_servers[s_name]["enabled"] = True
+                    elif "type" not in processed_servers[s_name]:
                         processed_servers[s_name]["type"] = "sse"
                     
                     # 基底定義で明示的にゲートウェイ認証が必要とされている場合

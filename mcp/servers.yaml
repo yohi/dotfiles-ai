@@ -95,16 +95,12 @@ servers:
     description: "Professional development and AI skill management toolkit."
     type: local
     command:
-      - "__HOME__/.local/bin/skillport-mcp"
+      - "uvx"
+    args:
+      - "skillport-mcp"
     env:
       - name: SKILLPORT_SKILLS_DIR
         value: "__REPO_ROOT__/agent-skills"
-      - name: SKILLS_DIR
-        value: "__REPO_ROOT__/agent-skills"
-      - name: SKILLPORT_DB_PATH
-        value: "__HOME__/.skillport/db/skills"
-      - name: DB_PATH
-        value: "__HOME__/.skillport/db/skills"
 
   docker-mcp:
     title: "Docker MCP Gateway"
@@ -159,7 +155,7 @@ agents:
     format: "opencode_jsonc"
     root_key: "mcp"
     servers:
-      docker-mcp: { inherit: "docker-mcp-local" }
+      docker-mcp: { inherit: "docker-mcp" }
       skillport: { inherit: "skillport" }
       chronos_graph: { inherit: "chronos-graph" }
       nexus: { inherit: "nexus" }

@@ -38,9 +38,9 @@ url = "http://127.0.0.1:10888/sse"
 args = ["-H", "Authorization: Bearer ceba07f89532f3ba19d226ed4108b4b4"]
 
 [mcp_servers.skillport]
-command = "/home/y_ohi/.local/bin/skillport-mcp"
-args = []
-env = { SKILLPORT_SKILLS_DIR = "/home/y_ohi/dotfiles/components/dotfiles-ai/agent-skills", SKILLS_DIR = "/home/y_ohi/dotfiles/components/dotfiles-ai/agent-skills", SKILLPORT_DB_PATH = "/home/y_ohi/.skillport/db/skills", DB_PATH = "/home/y_ohi/.skillport/db/skills" }
+command = "uvx"
+args = ["skillport-mcp"]
+env = { SKILLPORT_SKILLS_DIR = "/home/y_ohi/dotfiles/components/dotfiles-ai/agent-skills" }
 
 [mcp_servers.chronos-graph]
 command = "uv"
