@@ -125,7 +125,6 @@ class TestConfigIntegrity(unittest.TestCase):
                 if HAS_JSON5:
                     json5.loads(content)
                 else:
-                    import json
                     json.loads(content)
             except FileNotFoundError:
                 continue
