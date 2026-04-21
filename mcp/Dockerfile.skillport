@@ -1,10 +1,11 @@
 FROM ghcr.io/astral-sh/uv:python3.11-bookworm-slim
 
 # 非ルートユーザーの作成とホームディレクトリの準備
-RUN groupadd -r skillport && \
-    useradd -r -g skillport -d /home/skillport -m skillport && \
+RUN groupadd -r -g 1000 skillport && \
+    useradd -r -u 1000 -g 1000 -d /home/skillport -m skillport && \
     mkdir -p /home/skillport/.skillport/db && \
-    chown -R skillport:skillport /home/skillport
+    mkdir -p /mcp/db && \
+    chown -R skillport:skillport /home/skillport /mcp
 
 # skillport-mcp をインストール
 RUN uv pip install --system skillport-mcp
@@ -12,10 +13,7 @@ RUN uv pip install --system skillport-mcp
 # 起動用エントリポイントスクリプトのコピー
 COPY entrypoint-skillport.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh && \
-    chown skillport:skillport /usr/local/bin/entrypoint.sh
-
-# ユーザーの切り替え
-USER skillport
+    chown root:root /usr/local/bin/entrypoint.sh
 
 # 実行コマンドの設定
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

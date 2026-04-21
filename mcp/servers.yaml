@@ -103,11 +103,11 @@ servers:
       - name: SKILLS_DIR
         value: "__REPO_ROOT__/agent-skills"
       - name: SKILLPORT_DB_PATH
-        value: "/mcp/db/skills"
+        value: "/home/skillport/.skillport/db/skills"
       - name: DB_PATH
-        value: "/mcp/db/skills"
+        value: "/home/skillport/.skillport/db/skills"
     volumes:
-      - "__HOME__/.skillport/db:/mcp/db"
+      - "__HOME__/.skillport/db:/home/skillport/.skillport/db"
       - "__HOME__/.skillport:__HOME__/.skillport"
       - "__REPO_ROOT__:__REPO_ROOT__:ro"
 
