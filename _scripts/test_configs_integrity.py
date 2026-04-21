@@ -2,6 +2,8 @@ import unittest
 import os
 import re
 import json
+import subprocess
+import shutil
 
 def strip_jsonc_comments(text):
     """Remove // and /* */ comments from JSONC text, preserving layout with spaces and newlines."""
@@ -23,6 +25,25 @@ def strip_jsonc_comments(text):
 class TestConfigIntegrity(unittest.TestCase):
     PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     HOME_PATH = os.path.expanduser('~')
+    GIT_BIN = shutil.which('git') or 'git'
+
+    def _get_tracked_files(self, pattern=None):
+        """Get list of files tracked by Git, with fallback to manual walk."""
+        try:
+            cmd = [self.GIT_BIN, 'ls-files']
+            if pattern:
+                cmd.append(pattern)
+            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+            return result.stdout.splitlines()
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            files_list = []
+            for root, _dirs, files in os.walk(self.PROJECT_ROOT):
+                for file in files:
+                    rel_path = os.path.relpath(os.path.join(root, file), self.PROJECT_ROOT)
+                    if pattern and not rel_path.endswith(pattern.replace('*', '')):
+                        continue
+                    files_list.append(rel_path)
+            return files_list
 
     def test_agents_global_md_integrity(self):
         """Verify that AGENTS.global.md has required sections and follows mandates."""
@@ -67,39 +88,28 @@ class TestConfigIntegrity(unittest.TestCase):
 
     def test_no_hardcoded_personal_paths_in_repo(self):
         """Scan for current HOME path in critical files tracked by Git."""
-        import subprocess
-        
-        try:
-            # Get list of files tracked by Git
-            result = subprocess.run(['git', 'ls-files'], capture_output=True, text=True, check=True)
-            tracked_files = result.stdout.splitlines()
-        except (subprocess.CalledProcessError, FileNotFoundError):
-            # Fallback to manual walk if not in a git repo or git is missing
-            tracked_files = []
-            for root, _dirs, files in os.walk(self.PROJECT_ROOT):
-                for file in files:
-                    tracked_files.append(os.path.relpath(os.path.join(root, file), self.PROJECT_ROOT))
-
+        tracked_files = self._get_tracked_files()
         extensions_to_check = ('.md', '.json', '.jsonc', '.template', '.sh', '.py', '.mk')
         
         found_paths = []
         read_errors = []
         for rel_path in tracked_files:
-            if rel_path.endswith(extensions_to_check):
-                full_path = os.path.join(self.PROJECT_ROOT, rel_path)
-                # Skip the test file itself
-                if os.path.abspath(full_path) == os.path.abspath(__file__):
-                    continue
+            if not rel_path.endswith(extensions_to_check):
+                continue
                 
-                try:
-                    with open(full_path, 'r', encoding='utf-8') as f:
-                        content = f.read()
-                        if self.HOME_PATH in content:
-                            found_paths.append(rel_path)
-                except FileNotFoundError:
-                    continue
-                except (UnicodeDecodeError, OSError) as e:
-                    read_errors.append(f"{rel_path}: {str(e)}")
+            full_path = os.path.join(self.PROJECT_ROOT, rel_path)
+            # Skip the test file itself
+            if os.path.abspath(full_path) == os.path.abspath(__file__):
+                continue
+            
+            try:
+                with open(full_path, 'r', encoding='utf-8') as f:
+                    if self.HOME_PATH in f.read():
+                        found_paths.append(rel_path)
+            except FileNotFoundError:
+                continue
+            except (UnicodeDecodeError, OSError) as e:
+                read_errors.append(f"{rel_path}: {str(e)}")
 
         msg = f"Hardcoded personal paths ({self.HOME_PATH}) found in tracked files: {found_paths}"
         if read_errors:
@@ -110,15 +120,11 @@ class TestConfigIntegrity(unittest.TestCase):
 
     def test_json_templates_validity(self):
         """Verify that .template files are valid JSON/JSONC."""
-        # Only check tracked template files
-        import subprocess
-        try:
-            result = subprocess.run(['git', 'ls-files', '*.template', '*.jsonc'], capture_output=True, text=True, check=True)
-            template_files = [os.path.join(self.PROJECT_ROOT, f) for f in result.stdout.splitlines()]
-        except (subprocess.CalledProcessError, FileNotFoundError):
-            template_files = []
+        # Check tracked template and jsonc files
+        template_files = self._get_tracked_files('*.template') + self._get_tracked_files('*.jsonc')
 
-        for path in template_files:
+        for rel_path in template_files:
+            path = os.path.join(self.PROJECT_ROOT, rel_path)
             with open(path, 'r', encoding='utf-8') as f:
                 content = f.read()
                 

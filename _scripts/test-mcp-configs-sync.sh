@@ -68,14 +68,25 @@ if grep -q "__REPO_ROOT__" "$SERVICE_FILE"; then
     exit 1
 fi
 
-ENABLED_SERVERS=$(
-    DOTFILES_AI_REPO_ROOT="$REPO_ROOT" uv run --with-requirements "$REPO_ROOT/requirements.txt" python3 - <<'PY'
+if command -v uv > /dev/null 2>&1; then
+    ENABLED_SERVERS=$(
+        DOTFILES_AI_REPO_ROOT="$REPO_ROOT" uv run --with-requirements "$REPO_ROOT/requirements.txt" python3 - <<'PY'
 import os, yaml
 from pathlib import Path
 config = yaml.safe_load(Path(os.environ["DOTFILES_AI_REPO_ROOT"]).joinpath("mcp/config.yaml").read_text(encoding="utf-8")) or {}
 print(",".join(config.get("gateway", {}).get("enabled_servers", [])))
 PY
-)
+    )
+else
+    ENABLED_SERVERS=$(
+        DOTFILES_AI_REPO_ROOT="$REPO_ROOT" python3 - <<'PY'
+import os, yaml
+from pathlib import Path
+config = yaml.safe_load(Path(os.environ["DOTFILES_AI_REPO_ROOT"]).joinpath("mcp/config.yaml").read_text(encoding="utf-8")) or {}
+print(",".join(config.get("gateway", {}).get("enabled_servers", [])))
+PY
+    )
+fi
 if ! grep -q -e "--servers $ENABLED_SERVERS" "$SERVICE_FILE"; then
     echo "FAIL: Service file does not contain expected enabled servers: $ENABLED_SERVERS"
     exit 1
