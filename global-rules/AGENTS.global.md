@@ -36,74 +36,11 @@ The following rules apply to **ALL** projects unless overridden by a local proje
 - **Agent Skills**: Reusable skill definitions for specialized tasks.
   - Reference: `agent-skills/` directory
 
-## 4. Workflow & Context Awareness
+## 5. Workflow & Context Awareness
 
 1. **Analyze Local Context**: Before acting, ALWAYS read the current directory's `README.md` or local `AGENTS.md` to understand the specific project constraints.
 2. **Resolve Paths**: Paths in Section 3 are relative to the Central Config Repo. Check accessibility before trying to resolve them.
 3. **Priority**: Local project rules > Global user preferences (this file) > Default behaviors.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 <!-- SKILLPORT_START -->
 ## SkillPort Skills
@@ -318,38 +255,6 @@ Each skill contains step-by-step instructions, templates, and scripts.
 </skill>
 </available_skills>
 <!-- SKILLPORT_END -->
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 ## 6. Agent-Specific Contexts (Unified)
 

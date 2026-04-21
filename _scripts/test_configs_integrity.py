@@ -32,21 +32,31 @@ class TestConfigIntegrity(unittest.TestCase):
         with open(path, 'r', encoding='utf-8') as f:
             content = f.read()
 
-        # Required Headers
-        required_headers = [
-            "# User Global Instructions (System Wide)",
-            "## 1. Identity & Core Philosophy",
-            "## 2. Language Policy (CRITICAL)",
-            "## 3. Universal Mandates (CRITICAL)",
-            "## 4. Universal Coding Standards",
-            "## 4. Workflow & Context Awareness",
-            "## SkillPort Skills",
-            "## 6. Agent-Specific Contexts (Unified)",
-            "## BEGIN Superpowers Workflow",
-            "## 7. ChronosGraph Memory System (Autonomous)"
+        # Required Headers (Check titles only, ignoring numeric prefixes)
+        required_titles = [
+            "User Global Instructions (System Wide)",
+            "Identity & Core Philosophy",
+            "Language Policy (CRITICAL)",
+            "Universal Mandates (CRITICAL)",
+            "Universal Coding Standards",
+            "Workflow & Context Awareness",
+            "SkillPort Skills",
+            "Agent-Specific Contexts (Unified)",
+            "BEGIN Superpowers Workflow",
+            "ChronosGraph Memory System (Autonomous)"
         ]
-        for header in required_headers:
-            self.assertIn(header, content, f"Missing required header: {header}")
+        
+        # Parse headers: remove leading markdown (###) and numeric prefix (1.)
+        parsed_headers = []
+        for line in content.splitlines():
+            line = line.strip()
+            if line.startswith('#'):
+                # Strip #s and initial numbering like "## 4."
+                title = re.sub(r'^#+\s*(\d+\.)?\s*', '', line).strip()
+                parsed_headers.append(title)
+        
+        for title in required_titles:
+            self.assertTrue(any(title in h for h in parsed_headers), f"Missing required section title: {title}")
 
         # Mandate specific checks
         self.assertIn("- **No Absolute Paths**:", content)
@@ -63,8 +73,8 @@ class TestConfigIntegrity(unittest.TestCase):
             # Get list of files tracked by Git
             result = subprocess.run(['git', 'ls-files'], capture_output=True, text=True, check=True)
             tracked_files = result.stdout.splitlines()
-        except subprocess.CalledProcessError:
-            # Fallback to manual walk if not in a git repo
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            # Fallback to manual walk if not in a git repo or git is missing
             tracked_files = []
             for root, dirs, files in os.walk(self.PROJECT_ROOT):
                 for file in files:
@@ -73,6 +83,7 @@ class TestConfigIntegrity(unittest.TestCase):
         extensions_to_check = ('.md', '.json', '.jsonc', '.template', '.sh', '.py', '.mk')
         
         found_paths = []
+        read_errors = []
         for rel_path in tracked_files:
             if rel_path.endswith(extensions_to_check):
                 full_path = os.path.join(self.PROJECT_ROOT, rel_path)
@@ -84,14 +95,21 @@ class TestConfigIntegrity(unittest.TestCase):
                     with open(full_path, 'r', encoding='utf-8') as f:
                         content = f.read()
                         if self.HOME_PATH in content:
-                            # AGENTS.md and global AGENTS mentions examples like /home/username/
-                            # but we should still alert if the REAL current HOME path is present.
-                            # We only ignore the literal string "/home/y_ohi/" if it's in AGENTS.md for example.
                             found_paths.append(rel_path)
-                except Exception:
-                    pass
+                except (UnicodeDecodeError, FileNotFoundError, OSError) as e:
+                    read_errors.append(f"{rel_path}: {str(e)}")
 
-        self.assertEqual(found_paths, [], f"Hardcoded personal paths ({self.HOME_PATH}) found in tracked files: {found_paths}")
+        if read_errors:
+            # Report errors but don't fail immediately unless found_paths also has issues
+            # Or should we fail on read errors? Usually yes.
+            pass
+
+        msg = f"Hardcoded personal paths ({self.HOME_PATH}) found in tracked files: {found_paths}"
+        if read_errors:
+            msg += f"\nRead errors encountered: {read_errors}"
+        
+        self.assertEqual(found_paths, [], msg)
+        self.assertEqual(read_errors, [], msg)
 
     def test_json_templates_validity(self):
         """Verify that .template files are valid JSON/JSONC."""
@@ -100,7 +118,7 @@ class TestConfigIntegrity(unittest.TestCase):
         try:
             result = subprocess.run(['git', 'ls-files', '*.template', '*.jsonc'], capture_output=True, text=True, check=True)
             template_files = [os.path.join(self.PROJECT_ROOT, f) for f in result.stdout.splitlines()]
-        except subprocess.CalledProcessError:
+        except (subprocess.CalledProcessError, FileNotFoundError):
             template_files = []
 
         for path in template_files:
