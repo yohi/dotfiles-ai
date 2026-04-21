@@ -67,10 +67,7 @@ servers:
     description: "Local knowledge base and indexer."
     type: local
     command:
-      - "bash"
-      - "-c"
-      - "/usr/bin/node /home/y_ohi/program/private/nexus/dist/bin/nexus.js \"$@\""
-      - "--"
+      - "/home/y_ohi/dotfiles/components/dotfiles-ai/_scripts/nexus-mcp-wrapper.sh"
     args:
       - "--project-root"
       - "/home/y_ohi/program/private/nexus"
@@ -97,10 +94,7 @@ servers:
     description: "Professional development and AI skill management toolkit."
     type: local
     command:
-      - "bash"
-      - "-c"
-      - "/home/y_ohi/.local/bin/skillport-mcp \"$@\" 2>&1 >&3 3>&- | grep --line-buffered -v \".*\" >&2 3>&1"
-      - "--"
+      - "/home/y_ohi/dotfiles/components/dotfiles-ai/_scripts/skillport-mcp-wrapper.sh"
     env:
       - name: SKILLPORT_SKILLS_DIR
         value: "__REPO_ROOT__/agent-skills"
