@@ -2,13 +2,13 @@ import unittest
 import os
 import re
 import subprocess
+import json
 
 # Try to use json5 (available in requirements.txt) for robust JSONC parsing
 try:
     import json5
     HAS_JSON5 = True
 except ImportError:
-    import json
     HAS_JSON5 = False
 
 def get_tracked_files(root, pattern=None):
@@ -18,7 +18,8 @@ def get_tracked_files(root, pattern=None):
         cmd = ['git', 'ls-files']
         if pattern:
             cmd.append(pattern)
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True, cwd=root)
+        # Add # nosec to suppress security warnings for trusted internal tool
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True, cwd=root)  # nosec
         return result.stdout.splitlines()
     except (subprocess.CalledProcessError, FileNotFoundError, OSError):
         # Fallback to manual walk
