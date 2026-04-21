@@ -11,3 +11,10 @@ test-all: test-integrity ## Run all tests in the project
 	@# Add other test commands here if needed
 	@ls _scripts/test_*.py | xargs -n 1 python3
 	@ls _scripts/test-*.sh | xargs -n 1 bash
+
+.PHONY: install-hooks
+install-hooks: ## Install git hooks (pre-push)
+	@echo "Installing git hooks..."
+	@chmod +x _scripts/pre-push.sh
+	@ln -sfn ../../_scripts/pre-push.sh .git/hooks/pre-push
+	@echo "Git hooks installed successfully."
