@@ -396,6 +396,12 @@ def write_toml_file(path: Path, root_key: str, servers: dict[str, Any]) -> bool:
     return True
 
 
+def _normalize_opencode_remote(server_cfg: dict[str, Any]):
+    """OpenCode 用にリモートサーバー設定を正規化する"""
+    server_cfg["type"] = "remote"
+    server_cfg["enabled"] = True
+
+
 def main() -> int:
     config = load_client_config()
     defaults = config.get("defaults", {})
@@ -534,8 +540,7 @@ def main() -> int:
                     processed_servers[s_name][actual_url_key] = url_val
                     
                     if format_name == "opencode_jsonc":
-                        processed_servers[s_name]["type"] = "remote"
-                        processed_servers[s_name]["enabled"] = True
+                        _normalize_opencode_remote(processed_servers[s_name])
                     elif "type" not in processed_servers[s_name]:
                         processed_servers[s_name]["type"] = "sse"
                     
@@ -557,8 +562,7 @@ def main() -> int:
                         
                         # エージェントの形式に合わせて type を設定
                         if format_name == "opencode_jsonc":
-                            processed_servers[s_name]["type"] = "remote"
-                            processed_servers[s_name]["enabled"] = True
+                            _normalize_opencode_remote(processed_servers[s_name])
                         elif format_name in {"json", "jsonc"}:
                             # Gemini, Claude, VSCode, Cursor, Antigravity 等
                             processed_servers[s_name]["type"] = "sse"
@@ -591,8 +595,7 @@ def main() -> int:
                 if format_name == "opencode_jsonc":
                     if processed_servers[s_name].get("_generated_by") == "gateway" or \
                        any(key in base_cfg for key in ["url", "httpUrl", "serverUrl"]):
-                        processed_servers[s_name]["type"] = "remote"
-                        processed_servers[s_name]["enabled"] = True
+                        _normalize_opencode_remote(processed_servers[s_name])
             else:
                 # 静的エントリにも url_key 変換を適用する
                 processed_servers[s_name] = s_cfg.copy()

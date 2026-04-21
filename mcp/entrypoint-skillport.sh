@@ -1,9 +1,17 @@
 #!/usr/bin/env bash
 set -e
 
-# マウントされたディレクトリの所有権を skillport ユーザーに包括的に変更 (再帰的に適用)
+# マウントされたディレクトリの所有権を skillport ユーザーに包括的に変更 (必要な場合のみ)
+# recursive chown は大規模なボリュームで非常に遅くなる可能性があるため、
+# 所有権の不一致が検出された場合にのみ実行する
 if [ -d "/home/skillport/.skillport" ]; then
-    chown -R skillport:skillport /home/skillport/.skillport
+    # ディレクトリ自体の所有者を確認、または配下に skillport 以外が所有するファイルがあるか確認
+    # (ここでは高速化のため、ディレクトリ自体の所有者と代表的なサブディレクトリを確認する簡易チェックを行う)
+    CURRENT_OWNER=$(stat -c %u:%g /home/skillport/.skillport)
+    if [ "$CURRENT_OWNER" != "1000:1000" ] || [ -n "$(find /home/skillport/.skillport ! -user skillport -print -quit)" ]; then
+        echo "[skillport] Ownership mismatch detected. Applying chown -R skillport:skillport /home/skillport/.skillport ..." >&2
+        chown -R skillport:skillport /home/skillport/.skillport
+    fi
 fi
 
 # バージョン情報の出力 (stderr)

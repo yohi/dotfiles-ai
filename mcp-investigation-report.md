@@ -12,7 +12,7 @@ Gemini CLI の MCP モードにおいて、プロジェクト固有のスキル�
 
 ### ② MCP カタログ（Volume/環境変数）の欠落
 *   **不備**: `skillport` MCP サーバーの設定（`custom.yaml`）において、プロジェクトディレクトリが Docker コンテナにマウントされていなかった。
-*   **原因**: グローバルな Skillport 設定が `/home/y_ohi/.skillport/skills` のみを参照しており、プロジェクト内の `agent-skills/` をスキャン対象に含めていなかった。
+*   **原因**: グローバルな Skillport 設定が `__HOME__/.skillport/skills` のみを参照しており、プロジェクト内の `agent-skills/` をスキャン対象に含めていなかった。
 
 ### ③ Docker イメージのビルド失敗
 *   **不備**: `skillport` サーバーが使用する Docker イメージ (`ghcr.io/yohi/skillport:latest`) が環境に存在せず、ビルドも失敗していた。
