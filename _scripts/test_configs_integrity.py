@@ -72,28 +72,39 @@ class TestConfigIntegrity(unittest.TestCase):
         except FileNotFoundError:
             pass # Skip if rule file is missing in this environment
 
+    def _scan_file_for_leaks(self, rel_path, exts):
+        """Helper to scan a single file for leaks. Returns (leak_info, error_info)."""
+        if not rel_path.endswith(exts):
+            return None, None
+            
+        fpath = os.path.join(self.PROJECT_ROOT, rel_path)
+        # Skip this script itself
+        if os.path.abspath(fpath) == os.path.abspath(__file__):
+            return None, None
+            
+        try:
+            with open(fpath, 'r', encoding='utf-8') as f:
+                leak = check_path_leak(f.read(), self.home_candidates, self.HOME_REGEX)
+                if leak:
+                    return f"{rel_path} ({leak})", None
+        except FileNotFoundError:
+            return None, None
+        except (UnicodeDecodeError, OSError) as e:
+            return None, f"{rel_path}: {e}"
+        return None, None
+
     def test_no_hardcoded_personal_paths_in_repo(self):
         """Scan for absolute personal paths in all critical tracked files."""
         files = get_tracked_files(self.PROJECT_ROOT)
         exts = ('.md', '.json', '.jsonc', '.template', '.sh', '.py', '.mk')
-        this_file = os.path.abspath(__file__)
         
         leaks, errors = [], []
         for rel in files:
-            if not rel.endswith(exts):
-                continue
-            fpath = os.path.join(self.PROJECT_ROOT, rel)
-            if os.path.abspath(fpath) == this_file:
-                continue
-            try:
-                with open(fpath, 'r', encoding='utf-8') as f:
-                    leak = check_path_leak(f.read(), self.home_candidates, self.HOME_REGEX)
-                    if leak:
-                        leaks.append(f"{rel} ({leak})")
-            except FileNotFoundError:
-                continue # Skip broken symlinks or missing files
-            except (UnicodeDecodeError, OSError) as e:
-                errors.append(f"{rel}: {e}")
+            leak, error = self._scan_file_for_leaks(rel, exts)
+            if leak:
+                leaks.append(leak)
+            if error:
+                errors.append(error)
 
         msg = f"Leaks found: {leaks}\nRead errors: {errors}"
         self.assertEqual(leaks, [], msg)
