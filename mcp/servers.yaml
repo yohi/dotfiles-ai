@@ -67,7 +67,7 @@ servers:
     description: "Local knowledge base and indexer."
     type: local
     command:
-      - node
+      - "/usr/bin/node"
       - "/home/y_ohi/program/private/nexus/dist/bin/nexus.js"
     args:
       - "--project-root"
@@ -76,7 +76,7 @@ servers:
       - name: NEXUS_STORAGE_ROOT_DIR
         value: "/home/y_ohi/program/private/nexus/.nexus"
       - name: NEXUS_WATCHER_IGNORE_PATHS
-        value: "node_modules,.git,.nexus,dist,gemini,.worktrees,.venv,target,.mypy_cache,.ruff_cache,build,.serena,.cache,__pycache__,*.db,*.sqlite,*.log"
+        value: "node_modules,.git,.nexus,dist,gemini,.worktrees,.venv,target,.mypy_cache,.ruff_cache,build,.serena,.cache,__pycache__,*.db,*.sqlite,*.log,out,bundle,vendor,package-lock.json,yarn.lock,pnpm-lock.yaml"
       - name: CHOKIDAR_USEPOLLING
         value: "false"
       - name: CHOKIDAR_INTERVAL
@@ -93,23 +93,18 @@ servers:
   skillport:
     title: "Skillport"
     description: "Professional development and AI skill management toolkit."
-    type: server
-    image: ghcr.io/yohi/skillport:latest
+    type: local
     command:
-      - --reindex
+      - "/home/y_ohi/.local/bin/skillport-mcp"
     env:
       - name: SKILLPORT_SKILLS_DIR
         value: "__REPO_ROOT__/agent-skills"
       - name: SKILLS_DIR
         value: "__REPO_ROOT__/agent-skills"
       - name: SKILLPORT_DB_PATH
-        value: "/home/skillport/.skillport/db/skills"
+        value: "__HOME__/.skillport/db/skills"
       - name: DB_PATH
-        value: "/home/skillport/.skillport/db/skills"
-    volumes:
-      - "__HOME__/.skillport/db:/home/skillport/.skillport/db"
-      - "__HOME__/.skillport:__HOME__/.skillport"
-      - "__REPO_ROOT__:__REPO_ROOT__:ro"
+        value: "__HOME__/.skillport/db/skills"
 
   docker-mcp:
     title: "Docker MCP Gateway"
@@ -142,6 +137,7 @@ agents:
     root_key: "mcpServers"
     servers:
       docker-mcp: { inherit: "docker-mcp" }
+      skillport: { inherit: "skillport" }
       atlassian: { inherit: "atlassian", url_key: "httpUrl" }
       chronos-graph: { inherit: "chronos-graph" }
       nexus: { inherit: "nexus" }
@@ -153,6 +149,7 @@ agents:
     project_key: "__REPO_ROOT__"
     servers:
       docker-mcp: { inherit: "docker-mcp" }
+      skillport: { inherit: "skillport" }
       atlassian: { inherit: "atlassian" }
       chronos-graph: { inherit: "chronos-graph" }
       nexus: { inherit: "nexus" }
@@ -163,6 +160,7 @@ agents:
     root_key: "mcp"
     servers:
       docker-mcp: { inherit: "docker-mcp-local" }
+      skillport: { inherit: "skillport" }
       chronos_graph: { inherit: "chronos-graph" }
       nexus: { inherit: "nexus" }
 
@@ -172,6 +170,7 @@ agents:
     root_key: "mcpServers"
     servers:
       docker-mcp: { inherit: "docker-mcp" }
+      skillport: { inherit: "skillport" }
       chronos-graph: { inherit: "chronos-graph" }
       nexus: { inherit: "nexus" }
 
@@ -181,6 +180,7 @@ agents:
     root_key: "mcpServers"
     servers:
       docker-mcp: { inherit: "docker-mcp" }
+      skillport: { inherit: "skillport" }
       chronos-graph: { inherit: "chronos-graph" }
       nexus: { inherit: "nexus" }
 
@@ -191,6 +191,7 @@ agents:
     url_key: "serverUrl"
     servers:
       docker-mcp: { inherit: "docker-mcp" }
+      skillport: { inherit: "skillport" }
       chronos-graph: { inherit: "chronos-graph" }
       nexus: { inherit: "nexus" }
 
@@ -200,5 +201,6 @@ agents:
     root_key: "mcp_servers"
     servers:
       docker-mcp: { inherit: "docker-mcp" }
+      skillport: { inherit: "skillport" }
       chronos-graph: { inherit: "chronos-graph" }
       nexus: { inherit: "nexus" }
