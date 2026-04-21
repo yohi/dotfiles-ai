@@ -44,11 +44,11 @@ mcpServers:
     - name: SKILLS_DIR
       value: /home/y_ohi/dotfiles/components/dotfiles-ai/agent-skills
     - name: SKILLPORT_DB_PATH
-      value: /mcp/db/skills
+      value: /home/skillport/.skillport/db/skills
     - name: DB_PATH
-      value: /mcp/db/skills
+      value: /home/skillport/.skillport/db/skills
     volumes:
-    - /home/y_ohi/.skillport/db:/mcp/db
+    - /home/y_ohi/.skillport/db:/home/skillport/.skillport/db
     - /home/y_ohi/.skillport:/home/y_ohi/.skillport
     - /home/y_ohi/dotfiles/components/dotfiles-ai:/home/y_ohi/dotfiles/components/dotfiles-ai:ro
 gateway:

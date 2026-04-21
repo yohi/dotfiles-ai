@@ -35,14 +35,14 @@ trust_level = "trusted"
 [mcp_servers.docker-mcp]
 type = "sse"
 url = "http://127.0.0.1:10888/sse"
-args = ["-H", "Authorization: Bearer 46c5ff5bde55316eb2c3ee1240b3c307"]
+args = ["-H", "Authorization: Bearer ceba07f89532f3ba19d226ed4108b4b4"]
 
 [mcp_servers.chronos-graph]
 command = "uv"
-args = ["run", "--project", "/home/y_ohi/program/chronos-graph", "-m", "context_store"]
+args = ["run", "--project", "/home/y_ohi/program/private/chronos-graph", "-m", "context_store"]
 env = { STORAGE_BACKEND = "sqlite", SQLITE_DB_PATH = "/home/y_ohi/.context-store/memories.db", GRAPH_ENABLED = "true", DECAY_HALF_LIFE_DAYS = "30", SIMILARITY_THRESHOLD = "0.70", DEDUP_THRESHOLD = "0.90", EMBEDDING_PROVIDER = "local-model", LOCAL_MODEL_NAME = "cl-nagoya/ruri-v3-310m" }
 
 [mcp_servers.nexus]
 command = "node"
-args = ["/home/y_ohi/program/nexus/dist/bin/nexus.js"]
-env = { NEXUS_STORAGE_ROOT_DIR = "/home/y_ohi/program/nexus/.nexus", NEXUS_WATCHER_IGNORE_PATHS = "node_modules,.git,.nexus,dist,gemini,.worktrees,.venv,target,.mypy_cache,.ruff_cache,build,.serena,.cache,__pycache__,*.db,*.sqlite,*.log", CHOKIDAR_USEPOLLING = "false", CHOKIDAR_INTERVAL = "2000", NO_PROXY = "127.0.0.1,localhost" }
+args = ["/home/y_ohi/program/private/nexus/dist/bin/nexus.js", "--project-root", "/home/y_ohi/program/private/nexus"]
+env = { NEXUS_STORAGE_ROOT_DIR = "/home/y_ohi/program/private/nexus/.nexus", NEXUS_WATCHER_IGNORE_PATHS = "node_modules,.git,.nexus,dist,gemini,.worktrees,.venv,target,.mypy_cache,.ruff_cache,build,.serena,.cache,__pycache__,*.db,*.sqlite,*.log", CHOKIDAR_USEPOLLING = "false", CHOKIDAR_INTERVAL = "2000", NO_PROXY = "127.0.0.1,localhost" }
