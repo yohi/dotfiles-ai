@@ -11,26 +11,41 @@ try:
 except ImportError:
     HAS_JSON5 = False
 
+def strip_jsonc_comments(content):
+    """Simple regex-based JSONC comment stripper for environments without json5."""
+    # Remove block comments
+    content = re.sub(r'/\*.*?\*/', '', content, flags=re.DOTALL)
+    # Remove single line comments
+    content = re.sub(r'//.*$', '', content, flags=re.MULTILINE)
+    return content
+
 def get_tracked_files(root, pattern=None):
     """Get list of files tracked by Git, or fallback to manual walk."""
     try:
-        # Use literal list for security scanners (Codacy/Bandit)
-        cmd = ['git', 'ls-files']
+        # Use explicit list for security scanners (Codacy/Bandit)
+        # shell=False is default but explicitly provided for clarity
         if pattern:
-            cmd.append(pattern)
-        # Add # nosec to suppress security warnings for trusted internal tool
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True, cwd=root)  # nosec
+            cmd = ['git', 'ls-files', pattern]
+        else:
+            cmd = ['git', 'ls-files']
+            
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True, cwd=root, shell=False)  # nosec
         return result.stdout.splitlines()
     except (subprocess.CalledProcessError, FileNotFoundError, OSError):
         # Fallback to manual walk
-        files = []
-        for r, _, fs in os.walk(root):
-            for f in fs:
-                rel = os.path.relpath(os.path.join(r, f), root)
-                if pattern and not rel.endswith(pattern.replace('*', '')):
-                    continue
-                files.append(rel)
-        return files
+        return _manual_walk_files(root, pattern)
+
+def _manual_walk_files(root, pattern):
+    """Helper for fallback manual file walk."""
+    files = []
+    suffix = pattern.replace('*', '') if pattern else ''
+    for r, _, fs in os.walk(root):
+        for f in fs:
+            rel = os.path.relpath(os.path.join(r, f), root)
+            if not rel.endswith(suffix):
+                continue
+            files.append(rel)
+    return files
 
 def check_path_leak(content, candidates, regex):
     """Check for personal path leaks in content. Returns found path or None."""
@@ -64,13 +79,13 @@ class TestConfigIntegrity(unittest.TestCase):
     def test_agents_global_md_integrity(self):
         """Verify that AGENTS.global.md is free of personal path leaks."""
         path = os.path.join(self.PROJECT_ROOT, 'global-rules', 'AGENTS.global.md')
-        try:
-            with open(path, 'r', encoding='utf-8') as f:
-                content = f.read()
-            leak = check_path_leak(content, self.home_candidates, self.HOME_REGEX)
-            self.assertIsNone(leak, f"Path leak in AGENTS.global.md: {leak}")
-        except FileNotFoundError:
-            pass # Skip if rule file is missing in this environment
+        if not os.path.exists(path):
+            return
+            
+        with open(path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        leak = check_path_leak(content, self.home_candidates, self.HOME_REGEX)
+        self.assertIsNone(leak, f"Path leak in AGENTS.global.md: {leak}")
 
     def _scan_file_for_leaks(self, rel_path, exts):
         """Helper to scan a single file for leaks. Returns (leak_info, error_info)."""
@@ -122,11 +137,13 @@ class TestConfigIntegrity(unittest.TestCase):
                     content = f.read()
                 if not content.strip():
                     continue
+                
                 if HAS_JSON5:
                     json5.loads(content)
                 else:
-                    json.loads(content)
-            except FileNotFoundError:
+                    # Fallback for environments without json5
+                    json.loads(strip_jsonc_comments(content))
+            except (FileNotFoundError, PermissionError):
                 continue
             except Exception as e:
                 self.fail(f"Invalid JSON/JSONC in {rel}: {e}")
