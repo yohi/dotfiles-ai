@@ -27,3 +27,6 @@ include _mk/main.mk
 -include _mk/ide-vscode.mk
 -include _mk/test.mk
 # -include _mk/test-ide-cursor.mk
+
+.PHONY: test
+test: test-all ## Run all tests

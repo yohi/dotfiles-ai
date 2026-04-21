@@ -7,19 +7,23 @@ on:
     branches: [ master ]
 
 jobs:
-  lint:
-    runs-on: ubuntu-slim
+  test:
+    name: Integrity & Regression Checks
+    runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
-    - name: Install uv and Python
-      uses: astral-sh/setup-uv@v5
       with:
-        enable-cache: true
-    - name: Set up Python via uv
-      run: uv python install 3.10
-    - name: Install system dependencies
+        fetch-depth: 0 # Git history is needed for test_no_hardcoded_personal_paths_in_repo (git ls-files)
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Run Integrity Tests
       run: |
-        sudo apt-get update
-        sudo apt-get install -y gettext
-    - name: Run Makefile Tests
-      run: make test
+        make test-integrity
+
+    - name: Run All Tests
+      run: |
+        make test
