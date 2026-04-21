@@ -1,271 +1,194 @@
 {
-  // Config Modernized: 2026-02-20
-  // Based on oh-my-opencode v3.7.4
+  // Config Modernized: 2026-04-21
+  // Based on oh-my-opencode v3.17.4
+
   // スキーマ定義：エディタでの補完とバリデーションを有効化
-  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
+  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/master/assets/oh-my-opencode.schema.json",
 
-  // [Sisyphus Agent] エージェント自律設定
-  // Prometheus (Planner) を有効化し、複雑なタスクの計画立案能力を強化
+  // --------------------------------------------------------------------------
+  // 1. Sisyphus Agent: オーケストレーションの中核
+  // --------------------------------------------------------------------------
   "sisyphus_agent": {
-    "disabled": false,
-    "planner_enabled": true,
-    "replace_plan": true,
-    "default_builder_enabled": false
+    "disabled": false,                // Sisyphus自律オーケストレーションを有効化
+    "planner_enabled": true,          // Prometheus (Planner) を有効化。タスク分解と並列戦略の要
+    "replace_plan": true,             // 標準の計画エージェントを高度なプランナーに置き換え
+    "default_builder_enabled": true   // 新規製造時にディレクトリ構造を自動構築するビルダーを有効化
   },
 
-  "plugin": [
-    "oh-my-openagent@latest",
-    "opencode-openai-codex-auth@^1.0.0",
-    "opencode-antigravity-auth@latest",
-    "@yohi/opencode-codex-quota@^1.0.0",
-    "opencode-geminicli-a2a"
-  ],
-
-  // [Agents] エージェント個別設定（必要最小限）
+  // --------------------------------------------------------------------------
+  // 2. Agents: 4大コア + 専門家エージェントの定義
+  // --------------------------------------------------------------------------
   "agents": {
+    // 【司令塔: Sisyphus】 全体の品質管理と最終意思決定
     "sisyphus": {
-      "category": "anthropic"
-    },
-    "oracle": {
-      "category": "ultrabrain"
-    },
-    "explore": {
-      "category": "fast"
-    },
-    "atlas": {
-      "category": "quick"
-    },
-    "librarian": {
-      "category": "fast"
-    },
-    "multimodal-looker": {
-      "category": "visual-engineering"
-    }
-  },
-
-  // [Categories] モデルグループ一括設定
-  "categories": {
-    "anthropic": {
-      "model": "openrouter/anthropic/claude-4.6-sonnet",
-      "fallback_models": [
-        "poe/Claude-4.6-Sonnet",
-        "github-copilot/claude-sonnet-4.6",
-        "opencode/claude-opus-4-6",
-        "opencode-go/kimi-k2.5"
-      ]
-    },
-    "ultrabrain": {
-      "model": "openrouter/anthropic/claude-4.6-sonnet",
-      "fallback_models": [
-        "poe/Claude-4.6-Sonnet",
-        "github-copilot/claude-opus-4.6",
-        "opencode/claude-opus-4-6",
-        "openai/gpt-5.4"
-      ]
-    },
-    "deep": {
       "model": "openai/gpt-5.4",
-      "fallback_models": [
-        "github-copilot/gpt-5.4",
-        "opencode/gpt-5.4",
-        "opencode-go/kimi-k2.5"
-      ]
+      "variant": "medium",
+      "ultrawork": { "model": "openai/gpt-5.4", "variant": "high" }
     },
-    "quick": {
-      "model": "openai/gpt-5.4-mini",
-      "fallback_models": [
-        "opencode/gpt-5-nano",
-        "anthropic/claude-haiku-4.5"
-      ]
+
+    // 【戦略家: Prometheus】 並列タスク（Agent Swarm）の分解と割り当て
+    "prometheus": {
+      "model": "openai/gpt-5.4",
+      "variant": "high",
+      "prompt_append": "Strategy: Maximize parallel backend file edits. Partition tasks to avoid merge conflicts."
     },
-    "fast": {
-      "model": "github-copilot/grok-code-fast-1",
-      "fallback_models": [
-        "opencode-go/minimax-m2.7-highspeed",
-        "opencode/minimax-m2.7",
-        "opencode/gpt-5-nano"
-      ]
+
+    // 【現場監督: Atlas】 環境管理・ツール操作・コンテキスト維持
+    "atlas": {
+      "model": "openai/gpt-5.4",
+      "variant": "medium",
+      "description": "Orchestrates Tmux, Playwright, and server states. Ensures environment consistency."
     },
-    "visual-engineering": {
-      "model": "google/gemini-3.1-pro",
-      "fallback_models": [
-        "openai/gpt-5.4",
-        "opencode-go/kimi-k2.5"
-      ]
+
+    // 【製造担当: Hephaestus】 ロジックの実装、リファクタリング
+    "hephaestus": {
+      "model": "openai/gpt-5.4",
+      "variant": "medium",
+      "prompt_append": "Code: High-performance logic. Prioritize error handling, type safety, and modularity."
     },
-    "unspecified-low": {
-      "model": "opencode/gpt-5-nano"
+
+    // 【視覚アナリスト: Multimodal-Looker】 デザイン分析とUIデバッグ
+    "multimodal-looker": {
+      "model": "openai/gpt-5.4",
+      "variant": "medium",
+      "description": "Visual Intelligence. Analyzes UI designs for API generation and debugs browser test failures."
     },
-    "unspecified-high": {
-      "model": "anthropic/claude-4.6-sonnet",
-      "fallback_models": [
-        "opencode-go/kimi-k2.5",
-        "zai-coding-plan/glm-5"
-      ]
+
+    // 【高速プロトタイプ: Explore】 Big Pickle
+    // 自律ウェブ検索を活用し、最新のAPI仕様に基づいた足場固めを爆速で実行
+    "explore": {
+      "model": "opencode/big-pickle",
+      "description": "Rapid scaffolding using autonomous web search for latest technical specs."
+    },
+
+    // 【超高速補助: Librarian】 Nemotron 3 Super
+    // $0.10/1M の低コストと MTP 技術により、バックグラウンドでの調査を「思考税」なしで実行
+    "librarian": {
+      "model": "nvidia/nemotron-3-super",
+      "temperature": 0.1,
+      "description": "Ultra-fast background research with minimal token cost."
+    },
+
+    // 【大規模解析・監査: Oracle】 MiniMax M2.7
+    // 200K超のコンテキストで、大規模リポジトリの全容把握や膨大なログ解析を担当
+    "oracle": {
+      "model": "minimax/m2.7",
+      "prompt_append": "Audit: Trace dependencies across the entire repository. Provide high-density, professional summaries."
     }
   },
 
-  // ================================================================================
-  // グローバル設定 (Global Configuration)
-  // ================================================================================
+  // --------------------------------------------------------------------------
+  // 3. Categories: タスクの種類に応じたモデルの自動ルーティング
+  // --------------------------------------------------------------------------
+  "categories": {
+    "ultrabrain": { "model": "openai/gpt-5.4", "variant": "xhigh" }, // 難解なアルゴリズム・設計
+    "deep": { "model": "opencode/big-pickle" },                     // 新規製造・プロトタイプ
+    "quick": { "model": "nvidia/nemotron-3-super" },                // 単純修正・型定義
+    "writing": { "model": "minimax/m2.7" },                         // 仕様書・長文ドキュメント
+    "unspecified-low": { "model": "alibaba/qwen-3.6-plus" },        // 保守・補助タスク
+    "visual-engineering": { "model": "openai/gpt-5.4" }             // デザインからのAPI生成
+  },
 
+  // --------------------------------------------------------------------------
+  // 4. Experimental: 最新・実験的機能の最適化
+  // --------------------------------------------------------------------------
   "experimental": {
-    // OpenCodeのTodo UIと同期されず、TodoWriteが無効になりTUIに表示されなくなるため無効化（既知のUX低下）
-    "task_system": false,
-    // [Hashline Edit] ハッシュ検証付きの安全なファイル編集機能 (v3.7.0追加)
-    "hashline_edit": true,
-    // [Performance] 大規模タスク最適化
+    "task_system": true,                // セッションを跨いだタスク管理
+    "hashline_edit": true,              // ハッシュ検証付きの安全なファイル編集 (v3.7.0+)
+    "hashline_diff_enhancer": true,     // 編集差分の可視化強化
     "aggressive_truncation": true,      // コンテキスト溢れ防止
     "auto_resume": true,                // エラー時の自動リトライ
-    "preemptive_compaction_threshold": 0.85 // 85%で圧縮開始
+    "preemptive_compaction_threshold": 0.85 // 85%でコンテキスト圧縮を開始
   },
 
-  // [Security] グローバルセキュリティ設定
-  "google_auth": false,   // 不要な認証ポップアップ抑制
+  // --------------------------------------------------------------------------
+  // 5. Features: 外部ツール・連携機能
+  // --------------------------------------------------------------------------
 
-  "share": "disabled",    // 誤操作による共有防止
-
-  // パフォーマンスと安定性のための最適化設定
-  "disabled_hooks": [
-    // "startup-toast",           // 起動時の通知が不要な場合は有効化
-    // "tasks-todowrite-disabler" // AIにTODOリストを直接更新させたい場合は有効化（通常は安全のためブロック）
-    "auto-update-checker",        // 起動ごとのアップデート通知を停止
-    "comment-checker"             // AIによるコメント指摘を停止（Linterに任せる）
-  ],
-  "disabled_mcps": [
-  ],
-  "disabled_agents": [
-  ],
-  "disabled_skills": [
-  ],
-
-  // ================================================================================
-  // 機能・挙動設定 (Features & Behaviors)
-  // ================================================================================
-
-  // [Tmux] ターミナル多重化連携
-  // エージェントの思考プロセスやバックグラウンドタスクを別ペインで可視化します
+  // [Tmux] ターミナル多重化連携：エージェントの動きを別ペインでリアルタイム監視
   "tmux": {
     "enabled": true,
-    "layout": "main-vertical", // "main-vertical" (左メイン), "even-horizontal" (均等) など
-    "main_pane_size": 60
+    "layout": "main-vertical",
+    "main_pane_size": 65
   },
 
-  // [Browser Automation] ブラウザ操作エンジン
+  // [Browser Automation] 軽量CLIプロバイダを使用してブラウザテストを実行
   "browser_automation_engine": {
-    "provider": "playwright-cli", // v3.7.0追加の軽量CLIプロバイダ (MCP版より軽量)
+    "provider": "playwright-cli"
   },
 
-  // [Background Task] バックグラウンドタスク管理
-  // 調査や重い処理を非同期で実行する際の並列数制御
+  // [Background Task] 並列実行のスループット制御
   "background_task": {
-    "defaultConcurrency": 5,
-    "staleTimeoutMs": 180000,
+    "defaultConcurrency": 10,
     "providerConcurrency": {
+      "openai": 5,                // 4大コア + Looker 用
+      "nvidia": 10,               // 補助エージェントはフル回転
+      "minimax": 5,
       "google": 20,
-      "openai": 10,
       "anthropic": 5
-    },
-    "modelConcurrency": {
-      // いちばん高いモデルは1並列に抑えるのが安全
-      "zerogravity/opus-4-6": 1,
-      "openai/gpt-5.3-codex": 1
-    },
+    }
   },
 
-  // [Git Master] コミット操作設定
-  "git_master": {
-    "commit_footer": false, // trueにすると "Ultraworked with Sisyphus" を付与
-    "include_co_authored_by": false, // trueにするとCo-authored-byを付与
-  },
-
-  // [Ralph Loop] 自律改善ループ (自律的な修正・改善の繰り返し)
+  // [Ralph Loop] 自律改善ループ：一度の指示で最大20回の修正・テストを繰り返す
   "ralph_loop": {
     "enabled": true,
-    "default_max_iterations": 20,
+    "default_max_iterations": 20
   },
 
-  // [Boulder State] エージェント状態保存 (Sisyphusの作業状態)
-  // タスク中断時に進捗を保存し、次回起動時に "resume" で再開できるようにします
+  // [Boulder State] 作業状態の保存と再開
   "boulder_state": {
     "enabled": true,
-    "storage_path": ".sisyphus/boulder_state.json",
+    "storage_path": ".sisyphus/boulder_state.json"
   },
 
-  // [Session Recovery] セッション復旧 (チャット履歴の保全)
-  // クラッシュや予期せぬ終了時に直前の会話状態を復元します
+  // [Session Recovery] クラッシュ時等の会話復元
   "session_recovery": {
     "enabled": true,
-    "storage_path": ".sisyphus/session_recovery.json",
+    "max_age_minutes": 1440       // 24時間以内のセッションを復元
   },
 
-  // [Interactive Bash] 持続的シェルセッション
-  // AIが状態を持つシェル（cdの結果を保持するなど）を利用する設定
+  // [Interactive Bash] cd等の状態を保持する持続的シェル
   "interactive_bash": {
     "enabled": true,
-    "timeout_ms": 300000, // 5分間操作がないとセッションを閉じる
+    "timeout_ms": 300000
   },
 
-  // [Auto Slash Command] コマンド自動検出
-  // "/help" ではなく単に "help" と入力してもコマンドとして解釈する機能
+  "git_master": {
+    "commit_footer": false,
+    "include_co_authored_by": false
+  },
+
+  "comment_checker": {
+    "enabled": true               // AIによるコード品質の自動チェックを有効化
+  },
+
+  // --------------------------------------------------------------------------
+  // 6. Security & Hooks: 挙動の微調整
+  // --------------------------------------------------------------------------
+  "disabled_hooks": [
+    "auto-update-checker"         // 起動時の更新チェックを停止して初速を改善
+  ],
+
+  "rules_injector": {
+    "enabled": true               // .cursorrules 等の自動読み込み
+  },
+
   "auto_slash_command": {
-    "enabled": true
+    "enabled": true               // スラッシュなしでもコマンドを解釈
   },
 
+  // [Custom Commands] 独自のショートカットコマンド
   "commands": {
     "git-pr-flow": {
-      "description": "Git PR Flow",
+      "description": "Git PR Flow with full-skill access",
       "prompt": "./commands/git-pr-flow.md",
-      "skills": {
-        "git-master": {
-          "enabled": true,
-          "allow": [
-            "git_add",
-            "git_commit",
-            "git_push",
-            "git_status",
-            "git_diff",
-            "git_log",
-            "git_checkout",
-            "git_branch"
-          ]
-        }
-      }
+      "skills": { "git-master": { "enabled": true } }
     },
     "build-skill": {
       "description": "Agent Skill Builder",
       "prompt": "./commands/build-skill.md",
-      "skills": {
-        "agent-skill-architect": {
-          "enabled": true
-        }
-      }
+      "skills": { "agent-skill-architect": { "enabled": true } }
     }
-  },
-
-  // [Rules Injector] ルール注入
-  // .cursorrules や CONTEXT.md などをプロンプトに自動挿入する設定
-  // NOTE: oh-my-opencode の rules-injector はハードコードされたパスのみ参照する
-  //       (.claude/rules, .cursor/rules, .sisyphus/rules, ~/.claude/rules)
-  //       カスタム search_paths は未実装のため、グローバルルールを追加したい場合は
-  //       シンボリックリンクで対応すること:
-  //       ln -sfn ~/.config/opencode/docs/global ~/.claude/rules
-  "rules_injector": {
-    "enabled": true
-  },
-
-  "hooks": {
-    "PermissionRequest": [
-      "_scripts/auto-approve-git.sh"
-    ]
-  },
-
-  // ================================================================================
-  // パターン設定 (Pattern Configuration)
-  // このファイルには共通設定のみを記載し、
-  // agents/categories は opencode/patterns/*.jsonc の断片を注入する
-  // ================================================================================
-
-  // @pattern:start
-  // @pattern:end
+  }
 }
+
