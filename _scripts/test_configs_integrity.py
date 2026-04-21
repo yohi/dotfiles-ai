@@ -1,7 +1,7 @@
 import unittest
 import os
 import re
-import subprocess
+import subprocess  # nosec
 
 # Try to use json5 (available in requirements.txt) for robust JSONC parsing
 try:
