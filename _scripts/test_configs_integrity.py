@@ -2,7 +2,6 @@ import unittest
 import os
 import re
 import subprocess
-import json
 
 # Try to use json5 (available in requirements.txt) for robust JSONC parsing
 try:
@@ -12,9 +11,9 @@ except ImportError:
     HAS_JSON5 = False
 
 def get_tracked_files(root, pattern=None):
-    """Get list of files tracked by Git using static command strings for security scanners."""
+    """Get list of files tracked by Git using static command strings."""
     try:
-        # Explicit static lists satisfy Codacy's 'run without a static string' check
+        # Static lists satisfy Codacy/Bandit
         if pattern == '*.template':
             return subprocess.run(['git', 'ls-files', '*.template'], capture_output=True, text=True, check=True, cwd=root).stdout.splitlines()  # nosec
         if pattern == '*.jsonc':
@@ -32,21 +31,19 @@ def _manual_walk_files(root, pattern):
     for r, _, fs in os.walk(root):
         for f in fs:
             rel = os.path.relpath(os.path.join(r, f), root)
-            if not rel.endswith(suffix):
-                continue
-            files.append(rel)
+            if rel.endswith(suffix):
+                files.append(rel)
     return files
 
 def check_path_leak(content, candidates, regex):
-    """Check for personal path leaks in content. Returns found path or None."""
-    # Exclude common placeholders before scanning
+    """Check for personal path leaks in content."""
     clean = content.replace('${HOME}', '').replace('__HOME__', '')
     if regex.search(clean):
-        return "Regex pattern match"
+        return True
     for home in candidates:
         if re.search(re.escape(home) + r'([/\s"\'\\]|$)', content):
-            return home
-    return None
+            return True
+    return False
 
 class TestConfigIntegrity(unittest.TestCase):
     PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -59,14 +56,16 @@ class TestConfigIntegrity(unittest.TestCase):
             self.home_candidates.add(os.path.normpath(os.path.join(p, user)))
 
     def test_personal_path_leaks(self):
-        """Scan for absolute personal paths in all critical tracked files."""
+        """Scan for absolute personal paths in tracked files."""
         files = get_tracked_files(self.PROJECT_ROOT)
         exts = ('.md', '.json', '.jsonc', '.template', '.sh', '.py', '.mk')
         leaks = []
         for rel in files:
-            if not rel.endswith(exts): continue
+            if not rel.endswith(exts):
+                continue
             fpath = os.path.join(self.PROJECT_ROOT, rel)
-            if os.path.abspath(fpath) == os.path.abspath(__file__): continue
+            if os.path.abspath(fpath) == os.path.abspath(__file__):
+                continue
             try:
                 with open(fpath, 'r', encoding='utf-8') as f:
                     if check_path_leak(f.read(), self.home_candidates, self.HOME_REGEX):
@@ -76,10 +75,9 @@ class TestConfigIntegrity(unittest.TestCase):
         self.assertEqual(leaks, [], f"Leaks found in: {leaks}")
 
     def test_json_validity(self):
-        """Verify that .template and .jsonc files are valid JSON/JSONC."""
+        """Verify .template and .jsonc files via json5."""
         if not HAS_JSON5:
-            return # Skip if json5 is not available (CI has it)
-            
+            return
         files = get_tracked_files(self.PROJECT_ROOT, '*.template') + get_tracked_files(self.PROJECT_ROOT, '*.jsonc')
         for rel in files:
             path = os.path.join(self.PROJECT_ROOT, rel)
