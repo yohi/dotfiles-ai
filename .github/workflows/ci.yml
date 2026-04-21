@@ -33,6 +33,10 @@ jobs:
         python -m pip install --upgrade pip
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
+    - name: Install external skills
+      run: |
+        make install-external-skills
+
     - name: Render MCP Configs
       run: |
         # Generate initial config files from templates and render placeholders
