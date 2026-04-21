@@ -63,3 +63,5 @@ __pycache__/
 
 # Generated config files
 .claude.json
+mcp/config.yaml
+codex/config.toml

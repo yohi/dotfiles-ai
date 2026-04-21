@@ -412,8 +412,8 @@ def main() -> int:
         )
 
     # 1. Generate mcp/config.yaml (Gateway config)
-    # プレースホルダを維持したまま (expand_paths=False) ゲートウェイ用のサーバー定義を取得
-    gateway_servers_raw = replace_placeholders(config.get("servers", {}), gateway_url, expand_paths=False)
+    # ゲートウェイ用のサーバー定義を取得
+    gateway_servers_raw = replace_placeholders(config.get("servers", {}), gateway_url, expand_paths=True)
     
     # ゲートウェイ用には "server" タイプのサーバーのみを抽出
     gateway_servers = {
