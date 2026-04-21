@@ -59,7 +59,7 @@ def _resolve_program_placeholder(val: str) -> str:
         return val.replace("__PROGRAM__", str(home / "program"))
 
 
-def replace_placeholders(value: Any, gateway_url: str) -> Any:
+def replace_placeholders(value: Any, gateway_url: str, expand_paths: bool = True) -> Any:
     if isinstance(value, str):
         # 置換対象のマップ
         val = value
@@ -91,30 +91,31 @@ def replace_placeholders(value: Any, gateway_url: str) -> Any:
         env_pattern = re.compile(r"\$\{([^}:-]+)(?::-(.*))?\}")
         val = env_pattern.sub(env_replacer, val)
 
-        # プレースホルダの置換
-        placeholders = {
-            "__GATEWAY_URL__": gateway_url,
-            "__HOME__": str(Path.home()),
-            "__REPO_ROOT__": str(REPO_ROOT),
-        }
+        if expand_paths:
+            # プレースホルダの置換
+            placeholders = {
+                "__GATEWAY_URL__": gateway_url,
+                "__HOME__": str(Path.home()),
+                "__REPO_ROOT__": str(REPO_ROOT),
+            }
 
-        # __PROGRAM__ プレースホルダのスマート置換
-        val = _resolve_program_placeholder(val)
+            # __PROGRAM__ プレースホルダのスマート置換
+            val = _resolve_program_placeholder(val)
 
-        # チルダ展開 (~/ で始まる場合)
-        if val.startswith("~/"):
-            val = val.replace("~", str(Path.home()), 1)
+            # チルダ展開 (~/ で始まる場合)
+            if val.startswith("~/"):
+                val = str(Path(val).expanduser())
 
-        for k, v in placeholders.items():
-            val = val.replace(k, v)
+            for k, v in placeholders.items():
+                val = val.replace(k, v)
 
         return val
 
     if isinstance(value, list):
-        return [replace_placeholders(item, gateway_url) for item in value]
+        return [replace_placeholders(item, gateway_url, expand_paths) for item in value]
     if isinstance(value, dict):
         return {
-            key: replace_placeholders(item, gateway_url)
+            key: replace_placeholders(item, gateway_url, expand_paths)
             for key, item in value.items()
         }
     return value
@@ -405,8 +406,8 @@ def main() -> int:
         )
 
     # 1. Generate mcp/config.yaml (Gateway config)
-    # プレースホルダ置換済みのサーバー定義を取得
-    all_servers = replace_placeholders(config.get("servers", {}), gateway_url)
+    # プレースホルダを維持したまま (expand_paths=False) サーバー定義を取得
+    all_servers = replace_placeholders(config.get("servers", {}), gateway_url, expand_paths=False)
     
     # ゲートウェイ用には "server" タイプのサーバーのみを抽出
     gateway_servers = {

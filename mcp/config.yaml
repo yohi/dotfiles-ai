@@ -7,18 +7,17 @@ mcpServers:
     args:
     - /mcp/sqlite.db
     volumes:
-    - /home/y_ohi/.mcp/sqlite:/mcp
+    - __HOME__/.mcp/sqlite:/mcp
   filesystem:
     title: Filesystem
     description: Local filesystem access with restricted paths.
     type: server
     image: docker.io/mcp/filesystem:latest
     command:
-    - /home/y_ohi
-    - /home/y_ohi/dotfiles/components/dotfiles-ai
+    - __HOME__
+    - __REPO_ROOT__
     volumes:
-    - /home/y_ohi:/home/y_ohi
-    - /home/y_ohi/dotfiles/components/dotfiles-ai:/home/y_ohi/dotfiles/components/dotfiles-ai
+    - __HOME__:__HOME__
   github-official:
     description: Official GitHub MCP server for repository management.
     type: server

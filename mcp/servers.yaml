@@ -20,7 +20,6 @@ servers:
       - "__REPO_ROOT__"
     volumes:
       - "__HOME__:__HOME__"
-      - "__REPO_ROOT__:__REPO_ROOT__"
   github-official:
     description: "Official GitHub MCP server for repository management."
     type: server
