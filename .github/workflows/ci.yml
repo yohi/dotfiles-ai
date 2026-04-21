@@ -25,6 +25,12 @@ jobs:
         python -m pip install --upgrade pip
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
+    - name: Render MCP Configs
+      run: |
+        # Generate initial config files from templates and render placeholders
+        # We skip the full 'make sync-mcp' because it tries to restart systemd services
+        bash _scripts/sync-mcp-configs.sh || true # Ignore systemd restart failures in CI
+
     - name: Run Integrity Tests
       run: |
         make test-integrity

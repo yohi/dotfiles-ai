@@ -2,10 +2,11 @@
 # _scripts/sync-mcp-configs.sh
 set -euo pipefail
 
-# Preflight check for uv
+# Preflight check for uv (optional in CI)
+USE_UV=true
 if ! command -v uv > /dev/null 2>&1; then
-    echo "Error: 'uv' is not installed. Please install it to proceed." >&2
-    exit 1
+    echo "Warning: 'uv' is not installed. Falling back to standard python execution." >&2
+    USE_UV=false
 fi
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -65,7 +66,11 @@ if [ -f "$REPO_ROOT/.env" ]; then
     source "$REPO_ROOT/.env"
     set +o allexport
 fi
-uv run --with-requirements "$REPO_ROOT/requirements.txt" "$REPO_ROOT/_scripts/render-mcp-configs.py"
+if [ "$USE_UV" = true ]; then
+    uv run --with-requirements "$REPO_ROOT/requirements.txt" "$REPO_ROOT/_scripts/render-mcp-configs.py"
+else
+    python3 "$REPO_ROOT/_scripts/render-mcp-configs.py"
+fi
 
 echo "==> Deploying Docker MCP catalog files..."
 DOCKER_MCP_DIR="$HOME/.docker/mcp"
@@ -132,7 +137,8 @@ fi
 SERVICE_FILE="$HOME/.config/systemd/user/docker-mcp-gateway.service"
 mkdir -p "$(dirname "$SERVICE_FILE")"
 ENABLED_SERVERS=$(
-    DOTFILES_AI_REPO_ROOT="$REPO_ROOT" uv run --with-requirements "$REPO_ROOT/requirements.txt" python3 - <<'PY'
+    if [ "$USE_UV" = true ]; then
+        DOTFILES_AI_REPO_ROOT="$REPO_ROOT" uv run --with-requirements "$REPO_ROOT/requirements.txt" python3 - <<'PY'
 from pathlib import Path
 import os
 import yaml
@@ -143,6 +149,19 @@ if not isinstance(servers, list) or not all(isinstance(item, str) for item in se
     raise SystemExit("Invalid mcp/config.yaml: gateway.enabled_servers must be a list of strings")
 print(",".join(servers))
 PY
+    else
+        DOTFILES_AI_REPO_ROOT="$REPO_ROOT" python3 - <<'PY'
+from pathlib import Path
+import os
+import yaml
+
+config = yaml.safe_load(Path(os.environ["DOTFILES_AI_REPO_ROOT"]).joinpath("mcp/config.yaml").read_text(encoding="utf-8")) or {}
+servers = config.get("gateway", {}).get("enabled_servers", [])
+if not isinstance(servers, list) or not all(isinstance(item, str) for item in servers):
+    raise SystemExit("Invalid mcp/config.yaml: gateway.enabled_servers must be a list of strings")
+print(",".join(servers))
+PY
+    fi
 )
 ESCAPED_ENABLED_SERVERS=$(printf '%s' "$ENABLED_SERVERS" | sed 's/[&/|]/\\&/g')
 sed \
