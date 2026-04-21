@@ -22,6 +22,7 @@ def strip_jsonc_comments(text):
 
 class TestConfigIntegrity(unittest.TestCase):
     PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    HOME_PATH = os.path.expanduser('~')
 
     def test_agents_global_md_integrity(self):
         """Verify that AGENTS.global.md has required sections and follows mandates."""
@@ -51,11 +52,11 @@ class TestConfigIntegrity(unittest.TestCase):
         self.assertIn("- **No Absolute Paths**:", content)
         self.assertIn("- **Credential Protection**:", content)
 
-        # Ensure no personal paths (vague check for /home/y_ohi/)
-        self.assertNotIn("/home/y_ohi/", content, "Personal absolute path detected in AGENTS.global.md")
+        # Ensure no personal paths (Dynamic check for current HOME)
+        self.assertNotIn(self.HOME_PATH, content, f"Personal absolute path ({self.HOME_PATH}) detected in AGENTS.global.md")
 
     def test_no_hardcoded_personal_paths_in_repo(self):
-        """Scan for /home/y_ohi/ in critical files tracked by Git."""
+        """Scan for current HOME path in critical files tracked by Git."""
         import subprocess
         
         try:
@@ -63,7 +64,7 @@ class TestConfigIntegrity(unittest.TestCase):
             result = subprocess.run(['git', 'ls-files'], capture_output=True, text=True, check=True)
             tracked_files = result.stdout.splitlines()
         except subprocess.CalledProcessError:
-            # Fallback to manual walk if not in a git repo (unlikely here)
+            # Fallback to manual walk if not in a git repo
             tracked_files = []
             for root, dirs, files in os.walk(self.PROJECT_ROOT):
                 for file in files:
@@ -82,15 +83,15 @@ class TestConfigIntegrity(unittest.TestCase):
                 try:
                     with open(full_path, 'r', encoding='utf-8') as f:
                         content = f.read()
-                        if "/home/y_ohi/" in content:
-                            # AGENTS.md and global AGENTS mentions it as an example
-                            if "AGENTS" in rel_path and "e.g., `/home/y_ohi/...`" in content:
-                                continue
+                        if self.HOME_PATH in content:
+                            # AGENTS.md and global AGENTS mentions examples like /home/username/
+                            # but we should still alert if the REAL current HOME path is present.
+                            # We only ignore the literal string "/home/y_ohi/" if it's in AGENTS.md for example.
                             found_paths.append(rel_path)
                 except Exception:
                     pass
 
-        self.assertEqual(found_paths, [], f"Hardcoded personal paths found in tracked files: {found_paths}")
+        self.assertEqual(found_paths, [], f"Hardcoded personal paths ({self.HOME_PATH}) found in tracked files: {found_paths}")
 
     def test_json_templates_validity(self):
         """Verify that .template files are valid JSON/JSONC."""
