@@ -41,7 +41,7 @@ servers:
       - uv
       - run
       - --project
-      - "${CHRONOS_GRAPH_PATH:-/home/y_ohi/program/private/chronos-graph}"
+      - "${CHRONOS_GRAPH_PATH:-__PROGRAM__/chronos-graph}"
       - -m
       - context_store
     env:
@@ -68,13 +68,13 @@ servers:
     type: local
     command:
       - "node"
-      - "__HOME__/program/private/nexus/dist/bin/nexus.js"
+      - "__PROGRAM__/nexus/dist/bin/nexus.js"
     args:
       - "--project-root"
-      - "__HOME__/program/private/nexus"
+      - "__PROGRAM__/nexus"
     env:
       - name: NEXUS_STORAGE_ROOT_DIR
-        value: "__HOME__/program/private/nexus/.nexus"
+        value: "__PROGRAM__/nexus/.nexus"
       - name: NEXUS_WATCHER_IGNORE_PATHS
         value: "node_modules,.git,.nexus,dist,gemini,.worktrees,.venv,target,.mypy_cache,.ruff_cache,build,.serena,.cache,__pycache__,*.db,*.sqlite,*.log,out,bundle,vendor,package-lock.json,yarn.lock,pnpm-lock.yaml"
       - name: CHOKIDAR_USEPOLLING
