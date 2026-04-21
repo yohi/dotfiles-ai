@@ -20,7 +20,6 @@ servers:
       - "__REPO_ROOT__"
     volumes:
       - "__HOME__:__HOME__"
-      - "__REPO_ROOT__:__REPO_ROOT__"
   github-official:
     description: "Official GitHub MCP server for repository management."
     type: server
@@ -41,7 +40,7 @@ servers:
       - uv
       - run
       - --project
-      - "${CHRONOS_GRAPH_PATH:-/home/y_ohi/program/private/chronos-graph}"
+      - "${CHRONOS_GRAPH_PATH:-__PROGRAM__/chronos-graph}"
       - -m
       - context_store
     env:
@@ -67,16 +66,16 @@ servers:
     description: "Local knowledge base and indexer."
     type: local
     command:
-      - node
-      - "/home/y_ohi/program/private/nexus/dist/bin/nexus.js"
+      - "node"
+      - "__PROGRAM__/nexus/dist/bin/nexus.js"
     args:
       - "--project-root"
-      - "/home/y_ohi/program/private/nexus"
+      - "__PROGRAM__/nexus"
     env:
       - name: NEXUS_STORAGE_ROOT_DIR
-        value: "/home/y_ohi/program/private/nexus/.nexus"
+        value: "__PROGRAM__/nexus/.nexus"
       - name: NEXUS_WATCHER_IGNORE_PATHS
-        value: "node_modules,.git,.nexus,dist,gemini,.worktrees,.venv,target,.mypy_cache,.ruff_cache,build,.serena,.cache,__pycache__,*.db,*.sqlite,*.log"
+        value: "node_modules,.git,.nexus,dist,gemini,.worktrees,.venv,target,.mypy_cache,.ruff_cache,build,.serena,.cache,__pycache__,*.db,*.sqlite,*.log,out,bundle,vendor,package-lock.json,yarn.lock,pnpm-lock.yaml"
       - name: CHOKIDAR_USEPOLLING
         value: "false"
       - name: CHOKIDAR_INTERVAL
@@ -93,23 +92,14 @@ servers:
   skillport:
     title: "Skillport"
     description: "Professional development and AI skill management toolkit."
-    type: server
-    image: ghcr.io/yohi/skillport:latest
+    type: local
     command:
-      - --reindex
+      - "uvx"
+    args:
+      - "skillport-mcp"
     env:
       - name: SKILLPORT_SKILLS_DIR
         value: "__REPO_ROOT__/agent-skills"
-      - name: SKILLS_DIR
-        value: "__REPO_ROOT__/agent-skills"
-      - name: SKILLPORT_DB_PATH
-        value: "/mcp/db/skills"
-      - name: DB_PATH
-        value: "/mcp/db/skills"
-    volumes:
-      - "__HOME__/.skillport/db:/mcp/db"
-      - "__HOME__/.skillport:__HOME__/.skillport"
-      - "__REPO_ROOT__:__REPO_ROOT__:ro"
 
   docker-mcp:
     title: "Docker MCP Gateway"
@@ -142,6 +132,7 @@ agents:
     root_key: "mcpServers"
     servers:
       docker-mcp: { inherit: "docker-mcp" }
+      skillport: { inherit: "skillport" }
       atlassian: { inherit: "atlassian", url_key: "httpUrl" }
       chronos-graph: { inherit: "chronos-graph" }
       nexus: { inherit: "nexus" }
@@ -153,6 +144,7 @@ agents:
     project_key: "__REPO_ROOT__"
     servers:
       docker-mcp: { inherit: "docker-mcp" }
+      skillport: { inherit: "skillport" }
       atlassian: { inherit: "atlassian" }
       chronos-graph: { inherit: "chronos-graph" }
       nexus: { inherit: "nexus" }
@@ -162,7 +154,8 @@ agents:
     format: "opencode_jsonc"
     root_key: "mcp"
     servers:
-      docker-mcp: { inherit: "docker-mcp-local" }
+      docker-mcp: { inherit: "docker-mcp" }
+      skillport: { inherit: "skillport" }
       chronos_graph: { inherit: "chronos-graph" }
       nexus: { inherit: "nexus" }
 
@@ -172,6 +165,7 @@ agents:
     root_key: "mcpServers"
     servers:
       docker-mcp: { inherit: "docker-mcp" }
+      skillport: { inherit: "skillport" }
       chronos-graph: { inherit: "chronos-graph" }
       nexus: { inherit: "nexus" }
 
@@ -181,6 +175,7 @@ agents:
     root_key: "mcpServers"
     servers:
       docker-mcp: { inherit: "docker-mcp" }
+      skillport: { inherit: "skillport" }
       chronos-graph: { inherit: "chronos-graph" }
       nexus: { inherit: "nexus" }
 
@@ -191,6 +186,7 @@ agents:
     url_key: "serverUrl"
     servers:
       docker-mcp: { inherit: "docker-mcp" }
+      skillport: { inherit: "skillport" }
       chronos-graph: { inherit: "chronos-graph" }
       nexus: { inherit: "nexus" }
 
@@ -200,5 +196,6 @@ agents:
     root_key: "mcp_servers"
     servers:
       docker-mcp: { inherit: "docker-mcp" }
+      skillport: { inherit: "skillport" }
       chronos-graph: { inherit: "chronos-graph" }
       nexus: { inherit: "nexus" }

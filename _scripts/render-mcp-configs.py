@@ -59,7 +59,7 @@ def _resolve_program_placeholder(val: str) -> str:
         return val.replace("__PROGRAM__", str(home / "program"))
 
 
-def replace_placeholders(value: Any, gateway_url: str) -> Any:
+def replace_placeholders(value: Any, gateway_url: str, expand_paths: bool = True) -> Any:
     if isinstance(value, str):
         # 置換対象のマップ
         val = value
@@ -91,26 +91,31 @@ def replace_placeholders(value: Any, gateway_url: str) -> Any:
         env_pattern = re.compile(r"\$\{([^}:-]+)(?::-(.*))?\}")
         val = env_pattern.sub(env_replacer, val)
 
-        # プレースホルダの置換
-        placeholders = {
-            "__GATEWAY_URL__": gateway_url,
-            "__HOME__": str(Path.home()),
-            "__REPO_ROOT__": str(REPO_ROOT),
-        }
+        if expand_paths:
+            # プレースホルダの置換
+            placeholders = {
+                "__GATEWAY_URL__": gateway_url,
+                "__HOME__": str(Path.home()),
+                "__REPO_ROOT__": str(REPO_ROOT),
+            }
 
-        # __PROGRAM__ プレースホルダのスマート置換
-        val = _resolve_program_placeholder(val)
+            # __PROGRAM__ プレースホルダのスマート置換
+            val = _resolve_program_placeholder(val)
 
-        for k, v in placeholders.items():
-            val = val.replace(k, v)
+            # チルダ展開 (~/ で始まる場合)
+            if val.startswith("~/"):
+                val = str(Path(val).expanduser())
+
+            for k, v in placeholders.items():
+                val = val.replace(k, v)
 
         return val
 
     if isinstance(value, list):
-        return [replace_placeholders(item, gateway_url) for item in value]
+        return [replace_placeholders(item, gateway_url, expand_paths) for item in value]
     if isinstance(value, dict):
         return {
-            key: replace_placeholders(item, gateway_url)
+            key: replace_placeholders(item, gateway_url, expand_paths)
             for key, item in value.items()
         }
     return value
@@ -391,6 +396,12 @@ def write_toml_file(path: Path, root_key: str, servers: dict[str, Any]) -> bool:
     return True
 
 
+def _normalize_opencode_remote(server_cfg: dict[str, Any]):
+    """OpenCode 用にリモートサーバー設定を正規化する"""
+    server_cfg["type"] = "remote"
+    server_cfg["enabled"] = True
+
+
 def main() -> int:
     config = load_client_config()
     defaults = config.get("defaults", {})
@@ -401,12 +412,12 @@ def main() -> int:
         )
 
     # 1. Generate mcp/config.yaml (Gateway config)
-    # プレースホルダ置換済みのサーバー定義を取得
-    all_servers = replace_placeholders(config.get("servers", {}), gateway_url)
+    # ゲートウェイ用のサーバー定義を取得
+    gateway_servers_raw = replace_placeholders(config.get("servers", {}), gateway_url, expand_paths=True)
     
     # ゲートウェイ用には "server" タイプのサーバーのみを抽出
     gateway_servers = {
-        name: cfg for name, cfg in all_servers.items()
+        name: cfg for name, cfg in gateway_servers_raw.items()
         if cfg.get("type") == "server"
     }
 
@@ -424,12 +435,13 @@ def main() -> int:
     print(f"Generated gateway config: {config_yaml_path.relative_to(REPO_ROOT)}")
 
     # 2. Generate mcp/catalogs/custom.yaml (Catalog config)
-    # カタログには全てのサーバー (sse, local 等含む) を含める
+    # カタログには全てのサーバー (sse, local 等含む) を展開済みパス (expand_paths=True) で含める
+    catalog_servers = replace_placeholders(config.get("servers", {}), gateway_url, expand_paths=True)
     catalog_config = {
         "version": 3,
         "name": "custom",
         "displayName": "Custom Servers",
-        "registry": all_servers
+        "registry": catalog_servers
     }
     # Catalog 用に title と description が欠けている場合に補完する
     for name, cfg in catalog_config["registry"].items():
@@ -527,7 +539,9 @@ def main() -> int:
                     
                     processed_servers[s_name][actual_url_key] = url_val
                     
-                    if "type" not in processed_servers[s_name]:
+                    if format_name == "opencode_jsonc":
+                        _normalize_opencode_remote(processed_servers[s_name])
+                    elif "type" not in processed_servers[s_name]:
                         processed_servers[s_name]["type"] = "sse"
                     
                     # 基底定義で明示的にゲートウェイ認証が必要とされている場合
@@ -548,8 +562,7 @@ def main() -> int:
                         
                         # エージェントの形式に合わせて type を設定
                         if format_name == "opencode_jsonc":
-                            processed_servers[s_name]["type"] = "remote"
-                            processed_servers[s_name]["enabled"] = True
+                            _normalize_opencode_remote(processed_servers[s_name])
                         elif format_name in {"json", "jsonc"}:
                             # Gemini, Claude, VSCode, Cursor, Antigravity 等
                             processed_servers[s_name]["type"] = "sse"
@@ -577,6 +590,12 @@ def main() -> int:
                 overrides = {k: v for k, v in s_cfg.items() if k not in {"inherit", "url_key"}}
                 if overrides:
                     deep_merge(processed_servers[s_name], overrides)
+                
+                # 正規化 (Normalization): deep_merge による意図しない上書きを防止
+                if format_name == "opencode_jsonc":
+                    if processed_servers[s_name].get("_generated_by") == "gateway" or \
+                       any(key in base_cfg for key in ["url", "httpUrl", "serverUrl"]):
+                        _normalize_opencode_remote(processed_servers[s_name])
             else:
                 # 静的エントリにも url_key 変換を適用する
                 processed_servers[s_name] = s_cfg.copy()
@@ -595,7 +614,7 @@ def main() -> int:
 
         # Gateway-hosted servers are those with type "server" in the main config
         gateway_hosted_servers = {
-            name for name, cfg in all_servers.items() if isinstance(cfg, dict) and cfg.get("type") == "server"
+            name for name, cfg in catalog_servers.items() if isinstance(cfg, dict) and cfg.get("type") == "server"
         }
 
         # Deduplicate: if gateway is used, remove servers that the gateway already provides
