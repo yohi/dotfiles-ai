@@ -1,5 +1,9 @@
 FROM ghcr.io/astral-sh/uv:python3.11-bookworm-slim
 
+# 依存関係のインストール (gosu)
+RUN apt-get update && apt-get install -y --no-install-recommends gosu && \
+    rm -rf /var/lib/apt/lists/*
+
 # 非ルートユーザーの作成とホームディレクトリの準備
 RUN groupadd -r -g 1000 skillport && \
     useradd -r -u 1000 -g 1000 -d /home/skillport -m skillport && \

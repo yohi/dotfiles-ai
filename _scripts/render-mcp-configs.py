@@ -406,12 +406,12 @@ def main() -> int:
         )
 
     # 1. Generate mcp/config.yaml (Gateway config)
-    # プレースホルダを維持したまま (expand_paths=False) サーバー定義を取得
-    all_servers = replace_placeholders(config.get("servers", {}), gateway_url, expand_paths=False)
+    # プレースホルダを維持したまま (expand_paths=False) ゲートウェイ用のサーバー定義を取得
+    gateway_servers_raw = replace_placeholders(config.get("servers", {}), gateway_url, expand_paths=False)
     
     # ゲートウェイ用には "server" タイプのサーバーのみを抽出
     gateway_servers = {
-        name: cfg for name, cfg in all_servers.items()
+        name: cfg for name, cfg in gateway_servers_raw.items()
         if cfg.get("type") == "server"
     }
 
@@ -429,12 +429,13 @@ def main() -> int:
     print(f"Generated gateway config: {config_yaml_path.relative_to(REPO_ROOT)}")
 
     # 2. Generate mcp/catalogs/custom.yaml (Catalog config)
-    # カタログには全てのサーバー (sse, local 等含む) を含める
+    # カタログには全てのサーバー (sse, local 等含む) を展開済みパス (expand_paths=True) で含める
+    catalog_servers = replace_placeholders(config.get("servers", {}), gateway_url, expand_paths=True)
     catalog_config = {
         "version": 3,
         "name": "custom",
         "displayName": "Custom Servers",
-        "registry": all_servers
+        "registry": catalog_servers
     }
     # Catalog 用に title と description が欠けている場合に補完する
     for name, cfg in catalog_config["registry"].items():
@@ -585,6 +586,13 @@ def main() -> int:
                 overrides = {k: v for k, v in s_cfg.items() if k not in {"inherit", "url_key"}}
                 if overrides:
                     deep_merge(processed_servers[s_name], overrides)
+                
+                # 正規化 (Normalization): deep_merge による意図しない上書きを防止
+                if format_name == "opencode_jsonc":
+                    if processed_servers[s_name].get("_generated_by") == "gateway" or \
+                       any(key in base_cfg for key in ["url", "httpUrl", "serverUrl"]):
+                        processed_servers[s_name]["type"] = "remote"
+                        processed_servers[s_name]["enabled"] = True
             else:
                 # 静的エントリにも url_key 変換を適用する
                 processed_servers[s_name] = s_cfg.copy()
@@ -603,7 +611,7 @@ def main() -> int:
 
         # Gateway-hosted servers are those with type "server" in the main config
         gateway_hosted_servers = {
-            name for name, cfg in all_servers.items() if isinstance(cfg, dict) and cfg.get("type") == "server"
+            name for name, cfg in catalog_servers.items() if isinstance(cfg, dict) and cfg.get("type") == "server"
         }
 
         # Deduplicate: if gateway is used, remove servers that the gateway already provides
