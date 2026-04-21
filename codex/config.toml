@@ -37,6 +37,11 @@ type = "sse"
 url = "http://127.0.0.1:10888/sse"
 args = ["-H", "Authorization: Bearer ceba07f89532f3ba19d226ed4108b4b4"]
 
+[mcp_servers.skillport]
+command = "/home/y_ohi/.local/bin/skillport-mcp"
+args = []
+env = { SKILLPORT_SKILLS_DIR = "/home/y_ohi/dotfiles/components/dotfiles-ai/agent-skills", SKILLS_DIR = "/home/y_ohi/dotfiles/components/dotfiles-ai/agent-skills", SKILLPORT_DB_PATH = "/home/y_ohi/.skillport/db/skills", DB_PATH = "/home/y_ohi/.skillport/db/skills" }
+
 [mcp_servers.chronos-graph]
 command = "uv"
 args = ["run", "--project", "/home/y_ohi/program/private/chronos-graph", "-m", "context_store"]
@@ -45,4 +50,4 @@ env = { STORAGE_BACKEND = "sqlite", SQLITE_DB_PATH = "/home/y_ohi/.context-store
 [mcp_servers.nexus]
 command = "node"
 args = ["/home/y_ohi/program/private/nexus/dist/bin/nexus.js", "--project-root", "/home/y_ohi/program/private/nexus"]
-env = { NEXUS_STORAGE_ROOT_DIR = "/home/y_ohi/program/private/nexus/.nexus", NEXUS_WATCHER_IGNORE_PATHS = "node_modules,.git,.nexus,dist,gemini,.worktrees,.venv,target,.mypy_cache,.ruff_cache,build,.serena,.cache,__pycache__,*.db,*.sqlite,*.log", CHOKIDAR_USEPOLLING = "false", CHOKIDAR_INTERVAL = "2000", NO_PROXY = "127.0.0.1,localhost" }
+env = { NEXUS_STORAGE_ROOT_DIR = "/home/y_ohi/program/private/nexus/.nexus", NEXUS_WATCHER_IGNORE_PATHS = "node_modules,.git,.nexus,dist,gemini,.worktrees,.venv,target,.mypy_cache,.ruff_cache,build,.serena,.cache,__pycache__,*.db,*.sqlite,*.log,out,bundle,vendor,package-lock.json,yarn.lock,pnpm-lock.yaml", CHOKIDAR_USEPOLLING = "false", CHOKIDAR_INTERVAL = "2000", NO_PROXY = "127.0.0.1,localhost" }
