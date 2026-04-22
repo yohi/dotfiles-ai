@@ -96,7 +96,7 @@ class TestConfigIntegrity(unittest.TestCase):
                     content = f.read()
                 if content.strip():
                     json5.loads(content)
-            except (FileNotFoundError, PermissionError):
+            except FileNotFoundError:
                 continue
             except Exception as e:
                 self.fail(f"Invalid JSON/JSONC in {rel}: {e}")

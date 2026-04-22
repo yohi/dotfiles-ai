@@ -147,34 +147,14 @@ fi
 SERVICE_FILE="$HOME/.config/systemd/user/docker-mcp-gateway.service"
 mkdir -p "$(dirname "$SERVICE_FILE")"
 ENABLED_SERVERS=$(
+    export DOTFILES_AI_REPO_ROOT="$REPO_ROOT"
     if [ "$USE_UV" = true ]; then
-        DOTFILES_AI_REPO_ROOT="$REPO_ROOT" uv run --with-requirements "$REPO_ROOT/requirements.txt" python3 - <<'PY'
-from pathlib import Path
-import os
-import sys
-
-try:
-    import yaml
-except ImportError:
-    print("Error: 'PyYAML' is required but not installed.", file=sys.stderr)
-    sys.exit(1)
-
-config = yaml.safe_load(Path(os.environ["DOTFILES_AI_REPO_ROOT"]).joinpath("mcp/config.yaml").read_text(encoding="utf-8")) or {}
-if not isinstance(config, dict):
-    print("Invalid mcp/config.yaml: YAML root must be a dictionary", file=sys.stderr)
-    sys.exit(1)
-gateway = config.get("gateway", {})
-if not isinstance(gateway, dict):
-    print("Invalid mcp/config.yaml: 'gateway' section must be a dictionary", file=sys.stderr)
-    sys.exit(1)
-servers = gateway.get("enabled_servers", [])
-if not isinstance(servers, list) or not all(isinstance(item, str) for item in servers):
-    print("Invalid mcp/config.yaml: gateway.enabled_servers must be a list of strings", file=sys.stderr)
-    sys.exit(1)
-print(",".join(servers))
-PY
+        PY_CMD="uv run --with-requirements $REPO_ROOT/requirements.txt python3"
     else
-        DOTFILES_AI_REPO_ROOT="$REPO_ROOT" python3 - <<'PY'
+        PY_CMD="python3"
+    fi
+
+    $PY_CMD - <<'PY'
 from pathlib import Path
 import os
 import sys
@@ -182,7 +162,10 @@ import sys
 try:
     import yaml
 except ImportError:
-    print("Error: 'PyYAML' is required but not installed. Please install it via 'pip install PyYAML'.", file=sys.stderr)
+    msg = "Error: 'PyYAML' is required but not installed."
+    if "uv run" not in os.environ.get("PY_CMD", ""): # シンプルな判定
+         msg += " Please install it via 'pip install PyYAML'."
+    print(msg, file=sys.stderr)
     sys.exit(1)
 
 config = yaml.safe_load(Path(os.environ["DOTFILES_AI_REPO_ROOT"]).joinpath("mcp/config.yaml").read_text(encoding="utf-8")) or {}
@@ -199,7 +182,6 @@ if not isinstance(servers, list) or not all(isinstance(item, str) for item in se
     sys.exit(1)
 print(",".join(servers))
 PY
-    fi
 )
 ESCAPED_ENABLED_SERVERS=$(printf '%s' "$ENABLED_SERVERS" | sed 's/[&/|]/\\&/g')
 sed \
