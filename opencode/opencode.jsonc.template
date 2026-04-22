@@ -9,10 +9,21 @@
   // 1. コアモデル設定: 最新のフラグシップモデルを配置
   //    タスクの難易度に応じて適切なモデルを使い分けるための基本設定です。
   // --------------------------------------------------------------------------
-  "model": "openai/gpt-5.4-pro", // メインの思考エンジン。複雑なロジック構築や全体設計を担当。
-  "small_model": "google/gemini-3-flash-preview", // 高速な要約、型チェックの修正提案、単純な置換タスク用。
+  // "model": "openai/gpt-5.4-pro", // メインの思考エンジン。複雑なロジック構築や全体設計を担当。
+  // "small_model": "google/gemini-3-flash-preview", // 高速な要約、型チェックの修正提案、単純な置換タスク用。
   "default_agent": "sisyphus", // OMO (Oh-My-OpenCode) オーケストレーションの司令塔となるエージェント。
 
+  // [Plugin]
+  "plugin": [
+    "oh-my-opencode@dev",
+    // "opencode-geminicli-a2a-provider",
+  ],
+
+  "agent": {
+    "build": {
+      "model": "opencode/minimax-m2.5-free"
+    }
+  },
 
   // --------------------------------------------------------------------------
   // 2. 権限とセキュリティ: 「自律」と「安全」の黄金律
