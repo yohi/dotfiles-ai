@@ -7,7 +7,11 @@ USE_UV=true
 if ! command -v uv > /dev/null 2>&1; then
     echo "Warning: 'uv' is not installed. Falling back to standard python execution." >&2
     USE_UV=false
-    # CodeRabbit: Ensure dependencies exist for fallback path (yaml, json5)
+    # CodeRabbit: Ensure python3 exists and dependencies exist for fallback path (yaml, json5)
+    if ! command -v python3 > /dev/null 2>&1; then
+        echo "❌ Error: python3 is not installed." >&2
+        exit 1
+    fi
     if ! python3 -c "import yaml, json5" > /dev/null 2>&1; then
         echo "❌ Error: Required Python packages (PyYAML, json5) are missing for the fallback path." >&2
         echo "   Please install them via: pip install PyYAML json5" >&2
