@@ -47,8 +47,7 @@ gemini/settings.json
 ide/vscode/settings.json
 opencode/opencode.jsonc
 *.bk
-test.mk
-
+# test.mk (Removed to allow git tracking)
 # Python environment
 __pycache__/
 .venv/
