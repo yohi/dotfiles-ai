@@ -2,6 +2,7 @@ import unittest
 import os
 import re
 import subprocess  # nosec
+import shutil
 
 # Try to use json5 (available in requirements.txt) for robust JSONC parsing
 try:
@@ -12,14 +13,18 @@ except ImportError:
 
 def get_tracked_files(root, pattern=None):
     """Get list of files tracked by Git using static command strings."""
+    git_path = shutil.which('git')
+    if not git_path:
+        return _manual_walk_files(root, pattern)
+
     try:
         # Static lists satisfy Codacy/Bandit
         if pattern == '*.template':
-            return subprocess.run(['git', 'ls-files', '*.template'], capture_output=True, text=True, check=True, cwd=root).stdout.splitlines()  # nosec
+            return subprocess.run([git_path, 'ls-files', '--', '*.template'], capture_output=True, text=True, check=True, cwd=root).stdout.splitlines()  # nosec
         if pattern == '*.jsonc':
-            return subprocess.run(['git', 'ls-files', '*.jsonc'], capture_output=True, text=True, check=True, cwd=root).stdout.splitlines()  # nosec
+            return subprocess.run([git_path, 'ls-files', '--', '*.jsonc'], capture_output=True, text=True, check=True, cwd=root).stdout.splitlines()  # nosec
         if pattern is None:
-            return subprocess.run(['git', 'ls-files'], capture_output=True, text=True, check=True, cwd=root).stdout.splitlines()  # nosec
+            return subprocess.run([git_path, 'ls-files'], capture_output=True, text=True, check=True, cwd=root).stdout.splitlines()  # nosec
     except (subprocess.CalledProcessError, FileNotFoundError, OSError):
         pass
     return _manual_walk_files(root, pattern)
@@ -47,7 +52,7 @@ def check_path_leak(content, candidates, regex):
 
 class TestConfigIntegrity(unittest.TestCase):
     PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    HOME_REGEX = re.compile(r'(?:/home/|/Users/|C:\\Users\\)(?!username|user|<[^>]+>|skillport)[^/\s"\'\\]+')
+    HOME_REGEX = re.compile(r'(?:/home/|/Users/|C:\\Users\\)(?!(?:username|user|<[^>]+>|skillport)(?:[/\s"\'\\`,.:;()（）]|$))[^/\s"\'\\`,.:;()（）]+')
 
     def setUp(self):
         user = os.environ.get('USER') or os.environ.get('USERNAME') or 'user'
