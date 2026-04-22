@@ -13,18 +13,17 @@ except ImportError:
 
 def get_tracked_files(root, pattern=None):
     """Get list of files tracked by Git using static command strings."""
-    git_path = shutil.which('git')
-    if not git_path:
+    if not shutil.which('git'):
         return _manual_walk_files(root, pattern)
 
     try:
-        # Static lists satisfy Codacy/Bandit
+        # Static lists satisfy Codacy/Bandit (B603)
         if pattern == '*.template':
-            return subprocess.run([git_path, 'ls-files', '--', '*.template'], capture_output=True, text=True, check=True, cwd=root).stdout.splitlines()  # nosec
+            return subprocess.run(['git', 'ls-files', '--', '*.template'], capture_output=True, text=True, check=True, cwd=root).stdout.splitlines()  # nosec
         if pattern == '*.jsonc':
-            return subprocess.run([git_path, 'ls-files', '--', '*.jsonc'], capture_output=True, text=True, check=True, cwd=root).stdout.splitlines()  # nosec
+            return subprocess.run(['git', 'ls-files', '--', '*.jsonc'], capture_output=True, text=True, check=True, cwd=root).stdout.splitlines()  # nosec
         if pattern is None:
-            return subprocess.run([git_path, 'ls-files'], capture_output=True, text=True, check=True, cwd=root).stdout.splitlines()  # nosec
+            return subprocess.run(['git', 'ls-files'], capture_output=True, text=True, check=True, cwd=root).stdout.splitlines()  # nosec
     except (subprocess.CalledProcessError, FileNotFoundError, OSError):
         pass
     return _manual_walk_files(root, pattern)
