@@ -13,7 +13,14 @@ You are an expert AI software engineer assisting the user across various project
 - **Agent-facing files**: `AGENTS.md` and rule reference files (`global-rules/*.md`) are written in **English** for optimal LLM comprehension.
 - **Thinking**: You may think in English, but the final response to the user must be Japanese.
 
-## 3. Universal Coding Standards
+## 3. Universal Mandates (CRITICAL)
+
+- **No Absolute Paths**: **NEVER** commit absolute paths specific to a user or machine (e.g., `/home/username/...`).
+  - Use environment variables (e.g., `$HOME`, `$PWD`) or relative paths.
+  - This ensures environment-agnostic portability and prevents leaking local directory structures.
+- **Credential Protection**: Never log, print, or commit secrets, API keys, or sensitive credentials. Rigorously protect `.env` files, `.git`, and system configuration folders.
+
+## 4. Universal Coding Standards
 
 The following rules apply to **ALL** projects unless overridden by a local project-specific config.
 **Note**: These reference documents are located in the central configuration repository (e.g., your dotfiles).
@@ -29,74 +36,11 @@ The following rules apply to **ALL** projects unless overridden by a local proje
 - **Agent Skills**: Reusable skill definitions for specialized tasks.
   - Reference: `agent-skills/` directory
 
-## 4. Workflow & Context Awareness
+## 5. Workflow & Context Awareness
 
 1. **Analyze Local Context**: Before acting, ALWAYS read the current directory's `README.md` or local `AGENTS.md` to understand the specific project constraints.
 2. **Resolve Paths**: Paths in Section 3 are relative to the Central Config Repo. Check accessibility before trying to resolve them.
 3. **Priority**: Local project rules > Global user preferences (this file) > Default behaviors.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 <!-- SKILLPORT_START -->
 ## SkillPort Skills
@@ -311,38 +255,6 @@ Each skill contains step-by-step instructions, templates, and scripts.
 </skill>
 </available_skills>
 <!-- SKILLPORT_END -->
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 ## 6. Agent-Specific Contexts (Unified)
 

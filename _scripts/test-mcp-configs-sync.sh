@@ -69,14 +69,33 @@ if grep -q "__REPO_ROOT__" "$SERVICE_FILE"; then
 fi
 
 ENABLED_SERVERS=$(
-    DOTFILES_AI_REPO_ROOT="$REPO_ROOT" uv run --with-requirements "$REPO_ROOT/requirements.txt" python3 - <<'PY'
-import os, yaml
+    if command -v uv > /dev/null 2>&1; then
+        DOTFILES_AI_REPO_ROOT="$REPO_ROOT" uv run --with-requirements "$REPO_ROOT/requirements.txt" python3 - <<'PY'
+import os, yaml, sys
 from pathlib import Path
-config = yaml.safe_load(Path(os.environ["DOTFILES_AI_REPO_ROOT"]).joinpath("mcp/config.yaml").read_text(encoding="utf-8")) or {}
-print(",".join(config.get("gateway", {}).get("enabled_servers", [])))
+config_path = Path(os.environ["DOTFILES_AI_REPO_ROOT"]).joinpath("mcp/config.yaml")
+config = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
+enabled = config.get("gateway", {}).get("enabled_servers")
+if enabled is not None and (not isinstance(enabled, list) or not all(isinstance(i, str) for i in enabled)):
+    print(f"Error: gateway.enabled_servers in {config_path} must be a list of strings", file=sys.stderr)
+    sys.exit(1)
+print(",".join(enabled or []))
 PY
+    else
+        DOTFILES_AI_REPO_ROOT="$REPO_ROOT" python3 - <<'PY'
+import os, yaml, sys
+from pathlib import Path
+config_path = Path(os.environ["DOTFILES_AI_REPO_ROOT"]).joinpath("mcp/config.yaml")
+config = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
+enabled = config.get("gateway", {}).get("enabled_servers")
+if enabled is not None and (not isinstance(enabled, list) or not all(isinstance(i, str) for i in enabled)):
+    print(f"Error: gateway.enabled_servers in {config_path} must be a list of strings", file=sys.stderr)
+    sys.exit(1)
+print(",".join(enabled or []))
+PY
+    fi
 )
-if ! grep -q -e "--servers $ENABLED_SERVERS" "$SERVICE_FILE"; then
+if ! grep -Fq -e "--servers $ENABLED_SERVERS" "$SERVICE_FILE"; then
     echo "FAIL: Service file does not contain expected enabled servers: $ENABLED_SERVERS"
     exit 1
 fi

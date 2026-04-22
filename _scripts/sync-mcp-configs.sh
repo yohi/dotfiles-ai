@@ -2,10 +2,21 @@
 # _scripts/sync-mcp-configs.sh
 set -euo pipefail
 
-# Preflight check for uv
+# Preflight check for uv (optional in CI)
+USE_UV=true
 if ! command -v uv > /dev/null 2>&1; then
-    echo "Error: 'uv' is not installed. Please install it to proceed." >&2
-    exit 1
+    echo "Warning: 'uv' is not installed. Falling back to standard python execution." >&2
+    USE_UV=false
+    # CodeRabbit: Ensure python3 exists and dependencies exist for fallback path (yaml, json5)
+    if ! command -v python3 > /dev/null 2>&1; then
+        echo "❌ Error: python3 is not installed." >&2
+        exit 1
+    fi
+    if ! python3 -c "import yaml, json5" > /dev/null 2>&1; then
+        echo "❌ Error: Required Python packages (PyYAML, json5) are missing for the fallback path." >&2
+        echo "   Please install them via: pip install PyYAML json5" >&2
+        exit 1
+    fi
 fi
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -65,7 +76,11 @@ if [ -f "$REPO_ROOT/.env" ]; then
     source "$REPO_ROOT/.env"
     set +o allexport
 fi
-uv run --with-requirements "$REPO_ROOT/requirements.txt" "$REPO_ROOT/_scripts/render-mcp-configs.py"
+if [ "$USE_UV" = true ]; then
+    uv run --with-requirements "$REPO_ROOT/requirements.txt" "$REPO_ROOT/_scripts/render-mcp-configs.py"
+else
+    python3 "$REPO_ROOT/_scripts/render-mcp-configs.py"
+fi
 
 echo "==> Deploying Docker MCP catalog files..."
 DOCKER_MCP_DIR="$HOME/.docker/mcp"
@@ -132,15 +147,42 @@ fi
 SERVICE_FILE="$HOME/.config/systemd/user/docker-mcp-gateway.service"
 mkdir -p "$(dirname "$SERVICE_FILE")"
 ENABLED_SERVERS=$(
-    DOTFILES_AI_REPO_ROOT="$REPO_ROOT" uv run --with-requirements "$REPO_ROOT/requirements.txt" python3 - <<'PY'
+    export DOTFILES_AI_REPO_ROOT="$REPO_ROOT"
+    if [ "$USE_UV" = true ]; then
+        PY_CMD=(uv run --with-requirements "$REPO_ROOT/requirements.txt" python3)
+        export DOTFILES_PY_INVOKER_USE_UV=true
+    else
+        PY_CMD=(python3)
+        export DOTFILES_PY_INVOKER_USE_UV=false
+    fi
+
+    "${PY_CMD[@]}" - <<'PY'
 from pathlib import Path
 import os
-import yaml
+import sys
 
-config = yaml.safe_load(Path(os.environ["DOTFILES_AI_REPO_ROOT"]).joinpath("mcp/config.yaml").read_text(encoding="utf-8")) or {}
-servers = config.get("gateway", {}).get("enabled_servers", [])
+try:
+    import yaml
+except ImportError:
+    msg = "Error: 'PyYAML' is required but not installed."
+    if os.environ.get("DOTFILES_PY_INVOKER_USE_UV") != "true":
+         msg += " Please install it via 'pip install PyYAML'."
+    print(msg, file=sys.stderr)
+    sys.exit(1)
+
+res = yaml.safe_load(Path(os.environ["DOTFILES_AI_REPO_ROOT"]).joinpath("mcp/config.yaml").read_text(encoding="utf-8"))
+config = res if res is not None else {}
+if not isinstance(config, dict):
+    print("Invalid mcp/config.yaml: YAML root must be a dictionary", file=sys.stderr)
+    sys.exit(1)
+gateway = config.get("gateway", {})
+if not isinstance(gateway, dict):
+    print("Invalid mcp/config.yaml: 'gateway' section must be a dictionary", file=sys.stderr)
+    sys.exit(1)
+servers = gateway.get("enabled_servers", [])
 if not isinstance(servers, list) or not all(isinstance(item, str) for item in servers):
-    raise SystemExit("Invalid mcp/config.yaml: gateway.enabled_servers must be a list of strings")
+    print("Invalid mcp/config.yaml: gateway.enabled_servers must be a list of strings", file=sys.stderr)
+    sys.exit(1)
 print(",".join(servers))
 PY
 )
