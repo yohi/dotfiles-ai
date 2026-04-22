@@ -160,7 +160,14 @@ except ImportError:
     sys.exit(1)
 
 config = yaml.safe_load(Path(os.environ["DOTFILES_AI_REPO_ROOT"]).joinpath("mcp/config.yaml").read_text(encoding="utf-8")) or {}
-servers = config.get("gateway", {}).get("enabled_servers", [])
+if not isinstance(config, dict):
+    print("Invalid mcp/config.yaml: YAML root must be a dictionary", file=sys.stderr)
+    sys.exit(1)
+gateway = config.get("gateway", {})
+if not isinstance(gateway, dict):
+    print("Invalid mcp/config.yaml: 'gateway' section must be a dictionary", file=sys.stderr)
+    sys.exit(1)
+servers = gateway.get("enabled_servers", [])
 if not isinstance(servers, list) or not all(isinstance(item, str) for item in servers):
     print("Invalid mcp/config.yaml: gateway.enabled_servers must be a list of strings", file=sys.stderr)
     sys.exit(1)
@@ -179,7 +186,14 @@ except ImportError:
     sys.exit(1)
 
 config = yaml.safe_load(Path(os.environ["DOTFILES_AI_REPO_ROOT"]).joinpath("mcp/config.yaml").read_text(encoding="utf-8")) or {}
-servers = config.get("gateway", {}).get("enabled_servers", [])
+if not isinstance(config, dict):
+    print("Invalid mcp/config.yaml: YAML root must be a dictionary", file=sys.stderr)
+    sys.exit(1)
+gateway = config.get("gateway", {})
+if not isinstance(gateway, dict):
+    print("Invalid mcp/config.yaml: 'gateway' section must be a dictionary", file=sys.stderr)
+    sys.exit(1)
+servers = gateway.get("enabled_servers", [])
 if not isinstance(servers, list) or not all(isinstance(item, str) for item in servers):
     print("Invalid mcp/config.yaml: gateway.enabled_servers must be a list of strings", file=sys.stderr)
     sys.exit(1)
