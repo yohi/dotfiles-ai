@@ -21,11 +21,11 @@ def get_tracked_files(root, pattern=None):
         # Static strings satisfy Codacy/Bandit (B603).
         # S607 is mitigated by the shutil.which check above.
         if pattern == '*.template':
-            return subprocess.run(['git', 'ls-files', '--', '*.template'], capture_output=True, text=True, check=True, cwd=root).stdout.splitlines()  # nosec B603 B607
+            return subprocess.run([git_path, 'ls-files', '--', '*.template'], capture_output=True, text=True, check=True, cwd=root).stdout.splitlines()  # nosec B603 B607
         if pattern == '*.jsonc':
-            return subprocess.run(['git', 'ls-files', '--', '*.jsonc'], capture_output=True, text=True, check=True, cwd=root).stdout.splitlines()  # nosec B603 B607
+            return subprocess.run([git_path, 'ls-files', '--', '*.jsonc'], capture_output=True, text=True, check=True, cwd=root).stdout.splitlines()  # nosec B603 B607
         if pattern is None:
-            return subprocess.run(['git', 'ls-files'], capture_output=True, text=True, check=True, cwd=root).stdout.splitlines()  # nosec B603 B607
+            return subprocess.run([git_path, 'ls-files'], capture_output=True, text=True, check=True, cwd=root).stdout.splitlines()  # nosec B603 B607
     except (subprocess.CalledProcessError, FileNotFoundError, OSError):
         pass
     return _manual_walk_files(root, pattern)

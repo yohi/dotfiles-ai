@@ -149,12 +149,14 @@ mkdir -p "$(dirname "$SERVICE_FILE")"
 ENABLED_SERVERS=$(
     export DOTFILES_AI_REPO_ROOT="$REPO_ROOT"
     if [ "$USE_UV" = true ]; then
-        PY_CMD="uv run --with-requirements $REPO_ROOT/requirements.txt python3"
+        PY_CMD=(uv run --with-requirements "$REPO_ROOT/requirements.txt" python3)
+        export DOTFILES_PY_INVOKER_USE_UV=true
     else
-        PY_CMD="python3"
+        PY_CMD=(python3)
+        export DOTFILES_PY_INVOKER_USE_UV=false
     fi
 
-    $PY_CMD - <<'PY'
+    "${PY_CMD[@]}" - <<'PY'
 from pathlib import Path
 import os
 import sys
@@ -163,12 +165,13 @@ try:
     import yaml
 except ImportError:
     msg = "Error: 'PyYAML' is required but not installed."
-    if "uv run" not in os.environ.get("PY_CMD", ""): # シンプルな判定
+    if os.environ.get("DOTFILES_PY_INVOKER_USE_UV") != "true":
          msg += " Please install it via 'pip install PyYAML'."
     print(msg, file=sys.stderr)
     sys.exit(1)
 
-config = yaml.safe_load(Path(os.environ["DOTFILES_AI_REPO_ROOT"]).joinpath("mcp/config.yaml").read_text(encoding="utf-8")) or {}
+res = yaml.safe_load(Path(os.environ["DOTFILES_AI_REPO_ROOT"]).joinpath("mcp/config.yaml").read_text(encoding="utf-8"))
+config = res if res is not None else {}
 if not isinstance(config, dict):
     print("Invalid mcp/config.yaml: YAML root must be a dictionary", file=sys.stderr)
     sys.exit(1)
