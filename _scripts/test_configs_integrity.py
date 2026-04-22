@@ -18,7 +18,7 @@ def get_tracked_files(root, pattern=None):
         return _manual_walk_files(root, pattern)
 
     try:
-        # Static strings satisfy Codacy/Bandit (B603). 
+        # Static strings satisfy Codacy/Bandit (B603).
         # S607 is mitigated by the shutil.which check above.
         if pattern == '*.template':
             return subprocess.run(['git', 'ls-files', '--', '*.template'], capture_output=True, text=True, check=True, cwd=root).stdout.splitlines()  # nosec B603 B607
