@@ -204,441 +204,54 @@
   "provider": {
     "opencode": {
       "whitelist": [
-        "big-pickle",
         "minimax-m2.5-free",
-        "ling-2.6-flash-free",
-        "hy3-preview-free",
+        "big-pickle",
         "nemotron-3-super-free",
+        // ---
+        "glm-4.7-free",
+        "glm-5-free",
         "gpt-5-nano",
+        "grok-code",
+        "kimi-k2.5-free",
+        "minimax-m2.1-free",
+        "qwen3.6-plus-free",
+        "trinity-large-preview-free",
+        "ling-2.6-flash-free",
+        "mimo-v2-flash-free",
+        "mimo-v2-omni-free",
+        "mimo-v2-pro-free"
       ]
     },
     "openai": {
       "whitelist": [
-        "gpt-5.5",
         "gpt-5.4",
         "gpt-5.4-pro",
         "gpt-5.4-mini",
-        "gpt-5.3-codex",
+        "gpt-5.3-codex"
       ]
     },
-    // "github-models": {
-    //   "whitelist": [
-    //     "ai21-labs/ai21-jamba-1.5-large",
-    //     "ai21-labs/ai21-jamba-1.5-mini",
-    //     "cohere/cohere-command-a",
-    //     "cohere/cohere-command-r",
-    //     "cohere/cohere-command-r-08-2024",
-    //     "cohere/cohere-command-r-plus",
-    //     "cohere/cohere-command-r-plus-08-2024",
-    //     "core42/jais-30b-chat",
-    //     "deepseek/deepseek-r1",
-    //     "deepseek/deepseek-r1-0528",
-    //     "deepseek/deepseek-v3-0324",
-    //     "meta/llama-3.2-11b-vision-instruct",
-    //     "meta/llama-3.2-90b-vision-instruct",
-    //     "meta/llama-3.3-70b-instruct",
-    //     "meta/llama-4-maverick-17b-128e-instruct-fp8",
-    //     "meta/llama-4-scout-17b-16e-instruct",
-    //     "meta/meta-llama-3-70b-instruct",
-    //     "meta/meta-llama-3-8b-instruct",
-    //     "meta/meta-llama-3.1-405b-instruct",
-    //     "meta/meta-llama-3.1-70b-instruct",
-    //     "meta/meta-llama-3.1-8b-instruct",
-    //     "microsoft/mai-ds-r1",
-    //     "microsoft/phi-3-medium-128k-instruct",
-    //     "microsoft/phi-3-medium-4k-instruct",
-    //     "microsoft/phi-3-mini-128k-instruct",
-    //     "microsoft/phi-3-mini-4k-instruct",
-    //     "microsoft/phi-3-small-128k-instruct",
-    //     "microsoft/phi-3-small-8k-instruct",
-    //     "microsoft/phi-3.5-mini-instruct",
-    //     "microsoft/phi-3.5-moe-instruct",
-    //     "microsoft/phi-3.5-vision-instruct",
-    //     "microsoft/phi-4",
-    //     "microsoft/phi-4-mini-instruct",
-    //     "microsoft/phi-4-mini-reasoning",
-    //     "microsoft/phi-4-multimodal-instruct",
-    //     "microsoft/phi-4-reasoning",
-    //     "mistral-ai/codestral-2501",
-    //     "mistral-ai/ministral-3b",
-    //     "mistral-ai/mistral-large-2411",
-    //     "mistral-ai/mistral-medium-2505",
-    //     "mistral-ai/mistral-nemo",
-    //     "mistral-ai/mistral-small-2503",
-    //     "openai/gpt-4.1",
-    //     "openai/gpt-4.1-mini",
-    //     "openai/gpt-4.1-nano",
-    //     "openai/gpt-4o",
-    //     "openai/gpt-4o-mini",
-    //     "openai/o1",
-    //     "openai/o1-mini",
-    //     "openai/o1-preview",
-    //     "openai/o3",
-    //     "openai/o3-mini",
-    //     "openai/o4-mini",
-    //     "xai/grok-3",
-    //     "xai/grok-3-mini",
-    //   ]
-    // },
+    "aihubmix": {
+      "whitelist": [
+        "coding-glm-4.7-free",
+        "coding-glm-5-free",
+        "aihubmix/coding-minimax-m2.1-free"
+      ]
+    },
     "nvidia": {
       "whitelist": [
-        // "google/codegemma-1.1-7b",
-        // "google/codegemma-7b",
-        // "meta/codellama-70b",
-        // "mistralai/codestral-22b-instruct-v0.1",
-        // "deepseek-ai/deepseek-coder-6.7b-instruct",
-        // "deepseek-ai/deepseek-r1",
-        // "deepseek-ai/deepseek-r1-0528",
-        // "mistralai/devstral-2-123b-instruct-2512",
-        // "google/gemma-2-27b-it",
-        // "google/gemma-2-2b-it",
-        // "google/gemma-3-12b-it",
-        // "google/gemma-3-1b-it",
-        // "google/gemma-3n-e2b-it",
-        // "google/gemma-3n-e4b-it",
-        // "google/gemma-4-31b-it",
-        // "z-ai/glm4.7",
         "z-ai/glm-5.1",
         "z-ai/glm5",
-        // "moonshotai/kimi-k2-instruct-0905",
-        // "moonshotai/kimi-k2-thinking",
         "moonshotai/kimi-k2.5",
-        // "meta/llama-3.1-405b-instruct",
-        // "meta/llama-3.1-70b-instruct",
-        // "meta/llama-3.2-11b-vision-instruct",
-        // "meta/llama-3.2-1b-instruct",
-        // "meta/llama-3.3-70b-instruct",
-        // "meta/llama-4-maverick-17b-128e-instruct",
-        // "meta/llama-4-scout-17b-16e-instruct",
-        // "meta/llama3-70b-instruct",
-        // "meta/llama3-8b-instruct",
-        // "mistralai/mamba-codestral-7b-v0.1",
-        // "minimaxai/minimax-m2.1",
         "minimaxai/minimax-m2.5",
         "minimaxai/minimax-m2.7",
-        // "mistralai/ministral-14b-instruct-2512",
-        // "mistralai/mistral-large-2-instruct",
-        // "mistralai/mistral-large-3-675b-instruct-2512",
-        // "mistralai/mistral-small-3.1-24b-instruct-2503",
         "nvidia/nemotron-3-nano-30b-a3b",
         "nvidia/nvidia-nemotron-nano-9b-v2",
         "nvidia/nemotron-4-340b-instruct",
-        // "microsoft/phi-3-medium-128k-instruct",
-        // "microsoft/phi-3-medium-4k-instruct",
-        // "microsoft/phi-3-small-128k-instruct",
-        // "microsoft/phi-3-small-8k-instruct",
-        // "microsoft/phi-3-vision-128k-instruct",
-        // "microsoft/phi-3.5-moe-instruct",
-        // "microsoft/phi-3.5-vision-instruct",
-        // "qwen/qwen2.5-coder-32b-instruct",
-        // "qwen/qwen2.5-coder-7b-instruct",
-        // "qwen/qwen3-next-80b-a3b-thinking",
-        "qwen/qwen3.5-397b-a17b",
-        // "qwen/qwq-32b",
-        // "stepfun-ai/step-3.5-flash",
-        // "openai/whisper-large-v3",
+        "qwen/qwen3.5-397b-a17b"
       ]
     }
-    // "github-copilot": {
-    //   "whitelist": [
-    //     "anthropic/claude-3-7-sonnet-20250219",
-    //     "anthropic/claude-sonnet-4-6",
-    //     "openai/gpt-5.4-pro",
-    //     "google/gemini-3.1-pro-preview"
-    //   ]
-    // },
-    // "openrouter": {
-    //   "options": {
-    //     "baseURL": "https://openrouter.ai/api/v1"
-    //   },
-    //   "whitelist": [
-    //     "anthropic/claude-sonnet-4-6",
-    //     "google/gemini-3.1-pro-preview"
-    //   ]
-    // }
   },
-  // // プロバイダ設定
-  // "provider": {
-  //   "opencode": {
-  //     "whitelist": [
-  //       "gpt-5-nano",
-  //       "kimi-k2.5-free",
-  //       "big-pickle",
-  //       "minimax-m2.5-free",
-  //       "mimo-v2-pro-free",
-  //       "mimo-v2-omni-free",
-  //       "qwen-3.6-plus-free",
-  //       "nemotron-3-super-free",
-  //     ],
-  //     "models": {
-  //       "gpt-5-nano": {
-  //         "name": "GPT-5 Nano (Zen Free)",
-  //       },
-  //       "kimi-k2.5-free": {
-  //         "name": "Kimi K2.5 (Zen Free)",
-  //       },
-  //       "big-pickle": {
-  //         "name": "Big Pickle (Zen Free GLM)",
-  //       },
-  //       "minimax-m2.5-free": {
-  //         "name": "MiniMax M2.5 (Zen Free)",
-  //       },
-  //       "mimo-v2-pro-free": {
-  //         "name": "MiMo V2 Pro (Zen Free)",
-  //       },
-  //       "mimo-v2-omni-free": {
-  //         "name": "MiMo V2 Omni (Zen Free)",
-  //       },
-  //       "qwen-3.6-plus-free": {
-  //         "name": "Qwen 3.6 Plus (Zen Free)",
-  //       },
-  //       "nemotron-3-super-free": {
-  //         "name": "Nemotron 3 Super (Zen Free)",
-  //       },
-  //     },
-  //   },
-  //   "poe": {
-  //     "npm": "@ai-sdk/openai-compatible",
-  //     "options": {
-  //       "baseURL": "https://api.poe.com/v1",
-  //     },
-  //     "whitelist": [
-  //       "Claude-4.6-Sonnet",
-  //       "Claude-4-Opus",
-  //       "GPT-5-Pro",
-  //     ],
-  //     "models": {
-  //       "Claude-4.6-Sonnet": {
-  //         "name": "Claude 4.6 Sonnet (Poe)",
-  //       },
-  //       "Claude-4-Opus": {
-  //         "name": "Claude 4 Opus (Poe)",
-  //       },
-  //       "GPT-5-Pro": {
-  //         "name": "GPT-5 Pro (Poe)",
-  //       },
-  //     },
-  //   },
-  //   "openrouter": {
-  //     "npm": "@ai-sdk/openai-compatible",
-  //     "options": {
-  //       "baseURL": "https://openrouter.ai/api/v1",
-  //     },
-  //     "whitelist": [
-  //       "anthropic/claude-opus-4-6",
-  //       "anthropic/claude-4.6-sonnet",
-  //       "qwen/qwen3.6-plus-preview:free",
-  //       "google/gemini-3.1-pro-preview",
-  //     ],
-  //     "models": {
-  //       "anthropic/claude-opus-4-6": {
-  //         "name": "Claude Opus 4.6",
-  //       },
-  //       "anthropic/claude-4.6-sonnet": {
-  //         "name": "Claude 4.6 Sonnet",
-  //       },
-  //       "qwen/qwen3.6-plus-preview:free": {
-  //         "name": "Qwen 3.6 Free",
-  //       },
-  //       "google/gemini-3.1-pro-preview": {
-  //         "name": "Gemini 3.1 Pro",
-  //       },
-  //     },
-  //   },
-  //   "github-copilot": {
-  //     "whitelist": [
-  //       "claude-opus-4.6",
-  //       "claude-sonnet-4.6",
-  //       "claude-3.5-sonnet",
-  //       "claude-3-5-sonnet",
-  //       "gpt-5.4",
-  //       "gpt-5.3-codex",
-  //       "gemini-3.1-pro-preview",
-  //       "grok-code-fast-1",
-  //     ],
-  //     "models": {
-  //       "claude-opus-4.6": {
-  //         "name": "Claude Opus 4.6 (Copilot)",
-  //       },
-  //       "claude-sonnet-4.6": {
-  //         "name": "Claude Sonnet 4.6 (Copilot)",
-  //       },
-  //       "claude-3.5-sonnet": {
-  //         "name": "Claude 3.5 Sonnet (Copilot Alt)",
-  //       },
-  //       "claude-3-5-sonnet": {
-  //         "name": "Claude 3.5 Sonnet (Copilot Alt 2)",
-  //       },
-  //       "gpt-5.4": {
-  //         "name": "GPT-5.4 (Copilot)",
-  //       },
-  //       "gpt-5.3-codex": {
-  //         "name": "GPT 5.3 Codex (Copilot)",
-  //       },
-  //       "gemini-3.1-pro-preview": {
-  //         "name": "Gemini 3.1 Pro (Copilot)",
-  //       },
-  //       "grok-code-fast-1": {
-  //         "name": "Grok Code Fast 1 (Copilot)",
-  //       },
-  //     },
-  //   },
-  //   "github-models": {
-  //     "npm": "@ai-sdk/openai-compatible",
-  //     "options": {
-  //       "baseURL": "https://models.inference.ai.azure.com",
-  //     },
-  //     "whitelist": [
-  //       "anthropic/claude-4.6-sonnet",
-  //       "openai/gpt-5.4",
-  //       "google/gemini-3.1-pro-preview",
-  //     ],
-  //     "models": {
-  //       "anthropic/claude-4.6-sonnet": {
-  //         "name": "Claude 4.6 Sonnet (Models)",
-  //       },
-  //       "openai/gpt-5.4": {
-  //         "name": "GPT-5.4 (Models)",
-  //       },
-  //       "google/gemini-3.1-pro-preview": {
-  //         "name": "Gemini 3.1 Pro (Models)",
-  //       },
-  //     },
-  //   },
-  //   "google": {
-  //     "npm": "@ai-sdk/google",
-  //     "whitelist": [
-  //       "gemini-3.1-pro-preview",
-  //       "gemini-3-flash",
-  //     ],
-  //     "models": {
-  //       "gemini-3.1-pro-preview": {
-  //         "name": "Gemini 3.1 Pro",
-  //       },
-  //       "gemini-3-flash": {
-  //         "name": "Gemini 3 Flash",
-  //       },
-  //     },
-  //   },
-  //   "nvidia-nim": {
-  //     "npm": "@ai-sdk/openai-compatible",
-  //     "options": {
-  //       "baseURL": "https://integrate.api.nvidia.com/v1",
-  //     },
-  //     "whitelist": [
-  //       "nemotron-3-nano-30b-a3b",
-  //       "llama-3.3-70b-instruct",
-  //     ],
-  //     "models": {
-  //       "nemotron-3-nano-30b-a3b": {
-  //         "name": "Nemotron-3 Nano",
-  //       },
-  //       "llama-3.3-70b-instruct": {
-  //         "name": "Llama 3.3 70B",
-  //       },
-  //     },
-  //   },
-  //   "google-vertex": {
-  //     "whitelist": [
-  //       "gemini-3-flash-preview",
-  //       "gemini-3.1-pro-preview",
-  //     ],
-  //     "models": {
-  //       "gemini-3-flash-preview": {
-  //       },
-  //       "gemini-3.1-pro-preview": {
-  //       },
-  //     },
-  //   },
-  //   "openai": {
-  //     "whitelist": [
-  //       "gpt-5.4",
-  //       "gpt-5.4-mini",
-  //       "gpt-5.3-codex",
-  //       "gpt-5.2",
-  //     ],
-  //     "models": {
-  //       "gpt-5.4": {
-  //         "name": "GPT 5.4",
-  //       },
-  //       "gpt-5.4-mini": {
-  //         "name": "GPT 5.4 Mini",
-  //       },
-  //       "gpt-5.3-codex": {
-  //         "name": "GPT 5.3 Codex",
-  //       },
-  //       "gpt-5.2": {
-  //         "name": "GPT 5.2",
-  //       },
-  //     },
-  //   },
-  //   "flixa": {
-  //     "api": "responses",
-  //     // NOTE: Replace with a distributable package name (e.g. "@opencode/provider-flixa")
-  //     // or a placeholder. Local file:// overrides must be set in your personal 
-  //     // opencode.jsonc and NOT in this template.
-  //     "npm": "${FLIXA_NPM_PACKAGE}",
-  //     // "npm": "@ai-sdk/openai-compatible",
-  //     "options": {
-  //       "baseURL": "https://api.flixa.engineer/v1/agent",
-  //     },
-  //     "models": {
-  //       "openai/gpt-5.4": {
-  //         "name": "GPT-5.4",
-  //       },
-  //       "anthropic/claude-sonnet-4.6": {
-  //         "name": "Claude Sonnet 4.6",
-  //       },
-  //       "anthropic/claude-opus-4.6": {
-  //         "name": "Claude Opus 4.6",
-  //       },
-  //       "google/gemini-3.1-pro": {
-  //         "name": "Gemini 3.1 Pro",
-  //       },
-  //       "google/gemini-3-flash": {
-  //         "name": "Gemini 3 Flash",
-  //       },
-  //     },
-  //   },
-  //   "opencode-geminicli-a2a": {
-  //     "whitelist": [
-  //       "gemini-3.1-pro-preview",
-  //       "gemini-3-flash-preview",
-  //       "gemini-2.5-pro",
-  //     ],
-  //     "npm": "opencode-geminicli-a2a",
-  //     "options": {
-  //       "host": "127.0.0.1",
-  //       "port": 41242,
-  //       "protocol": "http",
-  //     },
-  //     "models": {
-  //       "gemini-3.1-pro-preview": {
-  //       },
-  //       "gemini-3-flash-preview": {
-  //       },
-  //       "gemini-2.5-pro": {
-  //       },
-  //     },
-  //   },
-  //   "opencode-cursorcli-a2a": {
-  //     "name": "Cursor A2A",
-  //     "whitelist": [
-  //       "auto",
-  //       "claude-4.6-sonnet-medium",
-  //     ],
-  //     "models": {
-  //       "auto": {
-  //       },
-  //       "claude-4.6-sonnet-medium": {
-  //       },
-  //     },
-  //     "options": {
-  //       "port": 4937,
-  //     },
-  //   }, // End Provider
   // [MCP]
   "mcp": {
   }
-
 }
