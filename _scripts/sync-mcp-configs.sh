@@ -186,11 +186,17 @@ if not isinstance(servers, list) or not all(isinstance(item, str) for item in se
 print(",".join(servers))
 PY
 )
+ESCAPED_REPO_ROOT=$(printf '%s' "$REPO_ROOT" | sed 's/[\\&|]/\\&/g')
 ESCAPED_ENABLED_SERVERS=$(printf '%s' "$ENABLED_SERVERS" | sed 's/[&/|]/\\&/g')
 sed \
-    -e "s|__REPO_ROOT__|$REPO_ROOT|g" \
+    -e "s|__REPO_ROOT__|$ESCAPED_REPO_ROOT|g" \
     -e "s|__ENABLED_SERVERS__|$ESCAPED_ENABLED_SERVERS|g" \
     "$REPO_ROOT/mcp/docker-mcp-gateway.service" > "$SERVICE_FILE"
+
+WATCHDOG_SERVICE_FILE="$HOME/.config/systemd/user/mcp-watchdog.service"
+sed \
+    -e "s|__REPO_ROOT__|$ESCAPED_REPO_ROOT|g" \
+    "$REPO_ROOT/mcp/mcp-watchdog.service" > "$WATCHDOG_SERVICE_FILE"
 
 # Update systemd service with current token if it exists
 if [ -f "$REPO_ROOT/.env" ] && [ -f "$SERVICE_FILE" ]; then

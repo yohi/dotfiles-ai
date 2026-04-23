@@ -151,7 +151,9 @@ echo -e "${BLUE}⚙️  Setting up systemd service...${NC}"
 systemctl --user daemon-reload
 systemctl --user enable docker-mcp-gateway.service
 systemctl --user restart docker-mcp-gateway.service
-echo -e "${GREEN}✅ systemd service enabled and started.${NC}"
+systemctl --user enable mcp-watchdog.service
+systemctl --user restart mcp-watchdog.service
+echo -e "${GREEN}✅ systemd services (gateway & watchdog) enabled and started.${NC}"
 
 echo -e "${GREEN}✅ Docker MCP setup completed successfully.${NC}"
 echo -e "${BLUE}Docker MCP Gateway is now running as an SSE server at http://localhost:10888/sse${NC}"
