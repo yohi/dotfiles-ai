@@ -5,7 +5,7 @@ After=docker-mcp-gateway.service
 [Service]
 Type=simple
 WorkingDirectory=__REPO_ROOT__
-ExecStart=/usr/bin/env bash _scripts/mcp-watchdog.sh
+ExecStart=/usr/bin/env bash __REPO_ROOT__/_scripts/mcp-watchdog.sh
 Restart=always
 RestartSec=10
 

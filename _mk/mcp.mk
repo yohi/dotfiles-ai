@@ -1,4 +1,4 @@
-.PHONY: setup-docker-mcp sync-mcp mcp uninstall-mcp status-mcp start-mcp stop-mcp restart-mcp logs-mcp
+.PHONY: setup-docker-mcp sync-mcp mcp uninstall-mcp status-mcp start-mcp stop-mcp restart-mcp logs-mcp status-watchdog logs-watchdog
 
 mcp: setup-docker-mcp
 
@@ -55,7 +55,7 @@ status-watchdog: ## MCP Watchdogのステータスを確認
 	@if systemctl --user is-active mcp-watchdog.service > /dev/null 2>&1; then \
 		systemctl --user --no-pager status mcp-watchdog.service; \
 	else \
-		echo "❌ MCP Watchdog is not running."; \
+		echo "❌ MCP Watchdog is not running."; exit 1; \
 	fi
 
 logs-watchdog: ## MCP Watchdogのログを表示
