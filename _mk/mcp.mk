@@ -1,4 +1,4 @@
-.PHONY: setup-docker-mcp sync-mcp mcp uninstall-mcp status-mcp start-mcp stop-mcp restart-mcp logs-mcp
+.PHONY: setup-docker-mcp sync-mcp mcp uninstall-mcp status-mcp start-mcp stop-mcp restart-mcp logs-mcp status-watchdog logs-watchdog
 
 mcp: setup-docker-mcp
 
@@ -50,20 +50,35 @@ logs-mcp: ## Docker MCP Gatewayのログを表示
 	@echo "📋 Docker MCP Gateway logs (last 50 lines):"
 	@journalctl --user --no-pager -u docker-mcp-gateway.service -n 50 -f
 
+status-watchdog: ## MCP Watchdogのステータスを確認
+	@echo "📊 MCP Watchdog status:"
+	@if systemctl --user is-active mcp-watchdog.service > /dev/null 2>&1; then \
+		systemctl --user --no-pager status mcp-watchdog.service; \
+	else \
+		echo "❌ MCP Watchdog is not running."; exit 1; \
+	fi
+
+logs-watchdog: ## MCP Watchdogのログを表示
+	@echo "📋 MCP Watchdog logs (last 50 lines):"
+	@journalctl --user --no-pager -u mcp-watchdog.service -n 50 -f
+
 uninstall-mcp:
 	@echo "🗑️ Docker MCPの設定を削除中..."
 	@set -e; \
 	MCP_CONFIG_DIR="$$HOME/.docker/mcp"; \
 	SERVICE_FILE="$$HOME/.config/systemd/user/docker-mcp-gateway.service"; \
+	WATCHDOG_SERVICE_FILE="$$HOME/.config/systemd/user/mcp-watchdog.service"; \
 	if systemctl --user --no-pager status > /dev/null 2>&1; then \
-		echo "Stopping and disabling systemd service..."; \
+		echo "Stopping and disabling systemd services..."; \
+		systemctl --user --no-pager stop mcp-watchdog.service || true; \
+		systemctl --user --no-pager disable mcp-watchdog.service || true; \
 		systemctl --user --no-pager stop docker-mcp-gateway.service || true; \
 		systemctl --user --no-pager disable docker-mcp-gateway.service || true; \
-		rm -f "$$SERVICE_FILE"; \
+		rm -f "$$SERVICE_FILE" "$$WATCHDOG_SERVICE_FILE"; \
 		systemctl --user --no-pager daemon-reload; \
 	else \
 		echo "Systemd user session not available, skipping service cleanup."; \
-		rm -f "$$SERVICE_FILE"; \
+		rm -f "$$SERVICE_FILE" "$$WATCHDOG_SERVICE_FILE"; \
 	fi; \
 	echo "Removing configuration directory: $$MCP_CONFIG_DIR"; \
 	rm -rf "$$MCP_CONFIG_DIR"; \
