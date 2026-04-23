@@ -192,6 +192,11 @@ sed \
     -e "s|__ENABLED_SERVERS__|$ESCAPED_ENABLED_SERVERS|g" \
     "$REPO_ROOT/mcp/docker-mcp-gateway.service" > "$SERVICE_FILE"
 
+WATCHDOG_SERVICE_FILE="$HOME/.config/systemd/user/mcp-watchdog.service"
+sed \
+    -e "s|__REPO_ROOT__|$REPO_ROOT|g" \
+    "$REPO_ROOT/mcp/mcp-watchdog.service" > "$WATCHDOG_SERVICE_FILE"
+
 # Update systemd service with current token if it exists
 if [ -f "$REPO_ROOT/.env" ] && [ -f "$SERVICE_FILE" ]; then
     # トークンを抽出 (grep がマッチしなくても pipefail で落ちないように || true を追加)
