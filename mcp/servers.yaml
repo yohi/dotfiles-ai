@@ -106,7 +106,8 @@ servers:
     description: "SSE gateway for containerized MCP servers."
     type: sse
     url: "__GATEWAY_URL__"
-    _generated_by: "gateway"
+    headers:
+      Authorization: "Bearer ${MCP_GATEWAY_TOKEN}"
 
   docker-mcp-local:
     title: "Docker MCP Gateway (Local)"

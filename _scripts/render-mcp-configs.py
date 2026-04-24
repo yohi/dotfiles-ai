@@ -436,7 +436,12 @@ def main() -> int:
 
     # 2. Generate mcp/catalogs/custom.yaml (Catalog config)
     # カタログには全てのサーバー (sse, local 等含む) を展開済みパス (expand_paths=True) で含める
-    catalog_servers = replace_placeholders(config.get("servers", {}), gateway_url, expand_paths=True)
+    # ただし、ゲートウェイ自身 (docker-mcp, docker-mcp-local) は除外する
+    all_servers = replace_placeholders(config.get("servers", {}), gateway_url, expand_paths=True)
+    catalog_servers = {
+        name: cfg for name, cfg in all_servers.items()
+        if name not in {"docker-mcp", "docker-mcp-local"}
+    }
     catalog_config = {
         "version": 3,
         "name": "custom",

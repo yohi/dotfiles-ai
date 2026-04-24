@@ -3,8 +3,8 @@
 # Monitors logs.json size and sends SIGHUP to docker-mcp-gateway to prevent handshake deadlocks.
 set -euo pipefail
 
-MAX_LOG_SIZE=512000 # 500KB
-INTERVAL=300        # 5 minutes
+MAX_LOG_SIZE=1024000 # 1MB
+INTERVAL=3600        # 1 hour
 
 echo "🚀 Starting MCP Watchdog (MAX_LOG_SIZE=${MAX_LOG_SIZE} bytes, INTERVAL=${INTERVAL}s)..."
 
