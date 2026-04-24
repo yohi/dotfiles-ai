@@ -1,8 +1,8 @@
 // vim: ft=jsonc
 {
-  // Config Modernized: 2026-02-20
-  // Target OpenCode Version: v1.3.x
-  // Based on oh-my-opencode v3.7.4
+  // Config Modernized: 2026-04-24
+  // Target OpenCode Version: v1.14.22
+  // Based on oh-my-opencode v3.17.4
   "$schema": "https://opencode.ai/config.json",
 
   // --------------------------------------------------------------------------
@@ -204,37 +204,20 @@
   "provider": {
     "opencode": {
       "whitelist": [
-        "minimax-m2.5-free",
         "big-pickle",
-        "nemotron-3-super-free",
-        // ---
-        "glm-4.7-free",
-        "glm-5-free",
-        "gpt-5-nano",
-        "grok-code",
-        "kimi-k2.5-free",
-        "minimax-m2.1-free",
-        "qwen3.6-plus-free",
-        "trinity-large-preview-free",
+        "minimax-m2.5-free",
         "ling-2.6-flash-free",
-        "mimo-v2-flash-free",
-        "mimo-v2-omni-free",
-        "mimo-v2-pro-free"
+        "hy3-preview-free",
+        "nemotron-3-super-free",
+        "gpt-5-nano",
       ]
     },
     "openai": {
       "whitelist": [
+        "gpt-5.5",
         "gpt-5.4",
-        "gpt-5.4-pro",
         "gpt-5.4-mini",
         "gpt-5.3-codex"
-      ]
-    },
-    "aihubmix": {
-      "whitelist": [
-        "coding-glm-4.7-free",
-        "coding-glm-5-free",
-        "aihubmix/coding-minimax-m2.1-free"
       ]
     },
     "nvidia": {

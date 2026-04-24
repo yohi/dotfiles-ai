@@ -119,8 +119,23 @@ function omo-set-profile() {
   if [ -f "$base_template_path" ]; then
     if envsubst "$vars_to_subst" < "$base_template_path" > "$base_output_path"; then
       echo "📄 Base Config generated: $base_output_path"
+      # マージ処理: oh-my-opencode.jsonc から agents セクションを抽出し、
+      # opencode.jsonc の "agent": { セクション内にマージする
+      if [ -f "$output_path" ]; then
+        echo "🔗 Merging agents from $output_path into 'agent' section of $base_output_path..."
+        # 既存の "agent": { の次の行に、抽出したエージェント定義を挿入
+        # 一時ファイルを使ってエージェント内容を抽出
+        sed -n '/"agents": {/,/^  }/p' "$output_path" | sed '1d' | sed '$d' > agents_to_merge.tmp
+        # 最後の要素にカンマが必要な場合があるので調整
+        sed -i 's/    }/    },/' agents_to_merge.tmp
+        # 挿入実行
+        sed -i '/"agent": {/r agents_to_merge.tmp' "$base_output_path"
+        rm agents_to_merge.tmp
+        # カンマ重複（,,）を修正
+        sed -i 's/},,/},/g' "$base_output_path"
+      fi
     else
-      echo "❌ Error: Failed to generate $base_output_path" >&2
+      echo "❌ Error: Failed to generate $base_output_path"
       return 1
     fi
   fi
