@@ -449,7 +449,7 @@ def main() -> int:
         "registry": catalog_servers
     }
     # Catalog 用に title と description が欠けている場合に補完する
-    for name, cfg in catalog_config["registry"].items():
+    for name, cfg in cast(dict[str, Any], catalog_config["registry"]).items():
         if "title" not in cfg:
             cfg["title"] = name.capitalize()
         if "description" not in cfg:
