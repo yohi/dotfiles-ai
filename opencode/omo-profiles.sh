@@ -102,8 +102,8 @@ function omo-set-profile() {
   
   if [ -f "$template_path" ] || [ -f "$base_template_path" ]; then
     if [ -z "${FLIXA_NPM_PACKAGE:-}" ]; then
-      echo "❌ Error: FLIXA_NPM_PACKAGE is not set. Please set it to a valid npm package name for the flixa provider." >&2
-      return 1
+      echo "⚠️  Warning: FLIXA_NPM_PACKAGE is not set. Using 'dummy' for substitution." >&2
+      export FLIXA_NPM_PACKAGE="dummy"
     fi
   fi
 
