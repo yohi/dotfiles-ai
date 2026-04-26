@@ -51,24 +51,40 @@
       "curl*|sh": "deny", // 外部スクリプトの直接実行は高リスク
 
       // --- 許可設定 (Allow): エージェントが自律的に繰り返す「試行錯誤」を加速 ---
+      "ls*": "allow", // ファイル一覧の確認
+      "cat*": "allow", // ファイル内容の確認
+      "head*": "allow", // ファイル冒頭の確認
+      "tail*": "allow", // ログやファイル末尾の確認
+      "mkdir*": "allow", // ディレクトリ作成
+      "touch*": "allow", // ファイル作成
+      "cp*": "allow", // ファイルコピー
+      "mv*": "allow", // ファイル移動・リネーム
+      "make*": "allow", // Makefileターゲットの実行
+      "uv*": "allow", // uvによるPython環境操作
+      "uvx*": "allow", // uvxによるツール実行
+      "python*": "allow", // Pythonスクリプトの実行
+      "node*": "allow", // Node.js実行
+      "bun*": "allow", // Bun関連操作
       "git status*": "allow", // リポジトリの状態確認
       "git log*": "allow", // コミット履歴の確認
-      "tail*": "allow", // ログファイルの末尾確認
+      "git diff*": "allow", // 変更内容の確認
+      "git branch*": "allow", // ブランチ一覧・作成
+      "git checkout*": "allow", // ブランチ切り替え・ファイル復元
+      "git add*": "allow", // 指定されたファイルのステージング
+      "git commit*": "allow", // ローカルでの作業保存
+      "bash _scripts/*": "allow", // プロジェクト固有スクリプトの実行
       "bun run lint*": "allow", // 静的解析による品質確認
       "bun run typecheck*": "allow", // 型チェックによる検証
       "bun run test*": "allow", // テスト実行による動作検証
-      "bun run build*": "allow", // ビルド確認（構文エラーの最終確認）
+      "bun run build*": "allow", // ビルド確認
       "dmypy*": "allow", // mypyデーモンによる高速な型チェック
       "shellcheck*": "allow", // シェルスクリプトの文法確認
       "eslint*": "allow", // JS/TSのスタイル・バグ確認
-      "git add*": "allow", // 指定されたファイルのステージング
-      "git commit*": "allow", // ローカルでの作業保存（メッセージ生成込み）
 
       // --- 確認設定 (Ask): 外部影響やコンテキストの大きな変化を伴う操作 ---
       "git push*": "ask", // リモートへの反映は最終的な人間の承認が必要
       "git reset*": "ask", // 作業内容の巻き戻しは意図を確認する
       "git clean*": "ask", // 未追跡ファイルの削除
-      "git checkout*": "ask", // ブランチ切り替え（エージェントのコンテキストが変わるため）
       "git pull*": "ask", // コンフリクトのリスクがあるため確認
       "gh pr create*": "ask" // プルリクエスト作成は外部向けの意思表示
     }
@@ -100,7 +116,18 @@
         ".tsx",
         ".js",
         ".jsx"
-      ]
+      ],
+      "initialization": {
+        "preferences": {
+          "includeInlayParameterNameHints": "all",
+          "includeInlayVariableTypeHints": true,
+          "includeInlayFunctionParameterTypeHints": true,
+          "disableSuggestions": false
+        },
+        "diagnostics": {
+          "ignoredCodes": [6133] // 未使用変数の警告コード（ESLintで管理するため重複を避ける）
+        }
+      }
     },
     "bash-language-server": {
       "command": [
@@ -118,7 +145,16 @@
       ],
       "extensions": [
         ".py"
-      ]
+      ],
+      "initialization": {
+        "python": {
+          "analysis": {
+            "typeCheckingMode": "strict", // Codacyの型エラーを事前に防ぐ
+            "autoSearchPaths": true,
+            "useLibraryCodeForTypes": true
+          }
+        }
+      }
     },
     "markdownlint": {
       "command": [
@@ -129,14 +165,13 @@
       ]
     },
     "mypy": {
-      // dmypy (daemon mypy) を使用することで、大規模プロジェクトでも高速に型診断を行い、
-      // AIがエラーを即座に修正できるようにします。
       "command": [
         "dmypy",
         "run",
         "--",
         "--ignore-missing-imports",
         "--follow-imports=silent",
+        "--strict", // より厳格な型チェック
         "."
       ],
       "extensions": [
@@ -147,7 +182,8 @@
       "command": [
         "shellcheck",
         "-f",
-        "gcc" // OpenCodeがエラー箇所を正確に把握しやすいgcc形式を指定
+        "gcc",
+        "--severity=style" // スタイルに関する指摘も拾う
       ],
       "extensions": [
         ".sh"
@@ -157,7 +193,8 @@
       "command": [
         "eslint",
         "--format",
-        "compact" // 出力を簡潔にし、コンテキストの圧迫を防ぎつつ正確な情報を伝達
+        "compact",
+        "--max-warnings", "0" // 警告も許容しない
       ],
       "extensions": [
         ".ts",

@@ -415,11 +415,30 @@ def main() -> int:
     # ゲートウェイ用のサーバー定義を取得
     gateway_servers_raw = replace_placeholders(config.get("servers", {}), gateway_url, expand_paths=True)
     
-    # ゲートウェイ用には "server" タイプのサーバーのみを抽出
-    gateway_servers = {
-        name: cfg for name, cfg in gateway_servers_raw.items()
-        if cfg.get("type") == "server"
-    }
+    # ゲートウェイ用には "server" (Docker) と "local" (stdio) タイプのサーバーを抽出
+    gateway_servers = {}
+    for name, cfg in gateway_servers_raw.items():
+        if cfg.get("type") == "server":
+            gateway_servers[name] = cfg
+        elif cfg.get("type") == "local":
+            # Gateway 用に stdio 形式に変換
+            env_data = {}
+            if "env" in cfg:
+                if isinstance(cfg["env"], list):
+                    env_data = {e["name"]: e["value"] for e in cfg["env"]}
+                else:
+                    env_data = cfg["env"]
+
+            stdio_cfg = {
+                "type": "stdio",
+                "command": cfg.get("command", []),
+                "args": cfg.get("args", []),
+                "env": env_data
+            }
+            # OpenCode 形式への正規化と同様、command 配列の先頭を分離する場合がある
+            # ただし Gateway は command が配列でも文字列でも受け取れる場合が多いため、
+            # ここでは元の構造を維持しつつ、必要ならエージェント側で調整する
+            gateway_servers[name] = stdio_cfg
 
     gateway_config = {
         "mcpServers": gateway_servers,
@@ -612,10 +631,8 @@ def main() -> int:
             for s_name in raw_servers.keys()
         )
 
-        # Gateway-hosted servers are those with type "server" in the main config
-        gateway_hosted_servers = {
-            name for name, cfg in catalog_servers.items() if isinstance(cfg, dict) and cfg.get("type") == "server"
-        }
+        # Gateway-hosted servers are those with type "server" or "stdio" (from "local") in the generated gateway config
+        gateway_hosted_servers = set(gateway_servers.keys())
 
         # Deduplicate: if gateway is used, remove servers that the gateway already provides
         if uses_gateway:
