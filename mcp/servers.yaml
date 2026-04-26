@@ -138,10 +138,12 @@ agents:
     path: ".claude.json"
     format: "json"
     root_key: "mcpServers"
-    project_key: "__REPO_ROOT__"
     servers:
       docker-mcp-local: { inherit: "docker-mcp-local" }
       atlassian: { inherit: "atlassian" }
+      skillport: { inherit: "skillport" }
+      chronos-graph: { inherit: "chronos-graph" }
+      nexus: { inherit: "nexus" }
 
   opencode:
     path: "opencode/opencode.jsonc"
