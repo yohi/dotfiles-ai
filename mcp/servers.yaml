@@ -108,63 +108,49 @@ servers:
     url: "__GATEWAY_URL__"
     _generated_by: "gateway"
 
-  docker-mcp-local:
-    title: "Docker MCP Gateway (Local)"
-    description: "Local stdio gateway for containerized MCP servers."
-    type: local
-    command:
-      - docker
-      - mcp
-      - gateway
-      - run
-    args:
-      - "--config"
-      - "__HOME__/.docker/mcp/config.yaml"
-      - "--catalog"
-      - "__HOME__/.docker/mcp/catalogs/bootstrap.yaml"
-      - "--catalog"
-      - "__HOME__/.docker/mcp/catalogs/custom.yaml"
-
 agents:
   gemini:
     path: "gemini/settings.json"
     format: "json"
     root_key: "mcpServers"
     servers:
-      docker-mcp-local: { inherit: "docker-mcp-local" }
-      atlassian: { inherit: "atlassian", url_key: "httpUrl" }
+      docker-mcp: { inherit: "docker-mcp" }
 
   claude:
     path: ".claude.json"
     format: "json"
     root_key: "mcpServers"
     servers:
-      docker-mcp-local: { inherit: "docker-mcp-local" }
+      docker-mcp: { inherit: "docker-mcp" }
       atlassian: { inherit: "atlassian" }
-      skillport: { inherit: "skillport" }
-      chronos-graph: { inherit: "chronos-graph" }
-      nexus: { inherit: "nexus" }
 
   opencode:
     path: "opencode/opencode.jsonc"
     format: "opencode_jsonc"
     root_key: "mcp"
     servers:
-      docker-mcp-local: { inherit: "docker-mcp-local" }
+      docker-mcp: { inherit: "docker-mcp" }
+
+  oh-my-opencode:
+    path: "opencode/oh-my-opencode.jsonc"
+    format: "opencode_jsonc"
+    root_key: "mcp"
+    servers:
+      docker-mcp: { inherit: "docker-mcp" }
 
   vscode:
     path: "ide/vscode/settings.json"
     format: "json"
     root_key: "mcpServers"
     servers:
-      docker-mcp-local: { inherit: "docker-mcp-local" }
+      docker-mcp: { inherit: "docker-mcp" }
 
   cursor:
     path: ".cursor/mcp.json"
     format: "json"
     root_key: "mcpServers"
     servers:
-      docker-mcp-local: { inherit: "docker-mcp-local" }
+      docker-mcp: { inherit: "docker-mcp" }
 
   antigravity:
     path: ".gemini/antigravity/mcp_config.json"
@@ -172,11 +158,11 @@ agents:
     root_key: "mcpServers"
     url_key: "serverUrl"
     servers:
-      docker-mcp-local: { inherit: "docker-mcp-local" }
+      docker-mcp: { inherit: "docker-mcp" }
 
   codex:
     path: "codex/config.toml"
     format: "toml"
     root_key: "mcp_servers"
     servers:
-      docker-mcp-local: { inherit: "docker-mcp-local" }
+      docker-mcp: { inherit: "docker-mcp" }

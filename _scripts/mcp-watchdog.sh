@@ -1,34 +1,28 @@
 #!/usr/bin/env bash
 # _scripts/mcp-watchdog.sh
-# Monitors logs.json size and sends SIGHUP to docker-mcp-gateway to prevent handshake deadlocks.
-set -euo pipefail
 
-MAX_LOG_SIZE=512000 # 500KB
-INTERVAL=300        # 5 minutes
+GATEWAY_URL="http://127.0.0.1:10888/sse"
+CHECK_INTERVAL=300
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-echo "🚀 Starting MCP Watchdog (MAX_LOG_SIZE=${MAX_LOG_SIZE} bytes, INTERVAL=${INTERVAL}s)..."
+# トークンの取得
+if [ -f "$REPO_ROOT/.env" ]; then
+    TOKEN=$(grep "^MCP_GATEWAY_TOKEN=" "$REPO_ROOT/.env" | cut -d'=' -f2- | tr -d '"' | tr -d "'")
+fi
+
+echo "🛡️ MCP Watchdog started (Target: $GATEWAY_URL)"
 
 while true; do
-  # 1. Rotate large logs.json files in ~/.gemini/tmp/
-  # We use printf '[]' to keep it as a valid JSON array.
-  # We find files larger than MAX_LOG_SIZE bytes.
-  find "$HOME/.gemini/tmp/" -name "logs.json" -type f -size +"${MAX_LOG_SIZE}c" 2>/dev/null | while read -r logfile; do
-    SIZE=$(stat -c%s "$logfile" 2>/dev/null || stat -f%z "$logfile" 2>/dev/null)
-    echo "⚠️  Rotating large log file ($SIZE bytes): $logfile"
-    # Atomic rotation using tmp file and mv
-    printf '[]' > "${logfile}.tmp" && mv "${logfile}.tmp" "$logfile"
-  done
+    # 認証ヘッダーを付けて死活監視
+    HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 \
+        -H "Authorization: Bearer $TOKEN" \
+        "$GATEWAY_URL")
 
-  # 2. Refresh Docker MCP Gateway process with SIGHUP
-  # This helps clear logical deadlocks in the gateway memory.
-  # Get MainPID directly from systemd for reliability.
-  GATEWAY_PID=$(systemctl --user show -p MainPID --value docker-mcp-gateway.service 2>/dev/null || echo "0")
-  if [[ "$GATEWAY_PID" =~ ^[0-9]+$ ]] && [ "$GATEWAY_PID" -gt 0 ]; then
-    echo "🔄 Sending SIGHUP to Docker MCP Gateway process (PID: $GATEWAY_PID)"
-    kill -HUP "$GATEWAY_PID"
-  else
-    echo "ℹ️  Docker MCP Gateway process not found. Skipping SIGHUP."
-  fi
+    if [ "$HTTP_CODE" != "200" ] && [ "$HTTP_CODE" != "405" ]; then
+        # 405 Method Not Allowed は SSE エンドポイントに対する GET 時に返ることがあるが疎通はしている
+        echo "⚠️  Docker MCP Gateway is not responding (HTTP $HTTP_CODE). Attempting to restart..."
+        systemctl --user restart docker-mcp-gateway.service
+    fi
 
-  sleep "$INTERVAL"
+    sleep "$CHECK_INTERVAL"
 done
