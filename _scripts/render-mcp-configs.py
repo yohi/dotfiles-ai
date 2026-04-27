@@ -82,7 +82,6 @@ def write_json_config(path: Path, root_key: str, servers: dict[str, Any], projec
         if "projects" not in data: data["projects"] = {}
         if project_key not in data["projects"]: data["projects"][project_key] = {}
         data["projects"][project_key][root_key] = servers
-        if root_key in data: del data[root_key]
     else: data[root_key] = servers
     new_text = json.dumps(data, indent=2, ensure_ascii=False) + "\n"
     if path.exists() and path.read_text(encoding="utf-8") == new_text: return False
