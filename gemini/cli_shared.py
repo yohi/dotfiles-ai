@@ -9,13 +9,13 @@ def setup_environment():
     """
     from . import GEMINI_HOME, SHARED_DIR, COMMANDS_DIR, GEMINI_MD
     
-    os.makedirs(gemini_home, exist_ok=True)
-    os.makedirs(shared_dir, exist_ok=True)
-    os.makedirs(commands_dir, exist_ok=True)
+    os.makedirs(GEMINI_HOME, exist_ok=True)
+    os.makedirs(SHARED_DIR, exist_ok=True)
+    os.makedirs(COMMANDS_DIR, exist_ok=True)
     
-    if not os.path.exists(gemini_md):
+    if not os.path.exists(GEMINI_MD):
         try:
-            with open(gemini_md, 'w', encoding='utf-8') as f:
+            with open(GEMINI_MD, 'w', encoding='utf-8') as f:
                 f.write("# Gemini CLI\n\n")
                 f.write("Gemini CLI のための設定ファイルです。\n")
         except Exception:

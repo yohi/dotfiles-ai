@@ -4,7 +4,6 @@ Gemini CLI
 """
 
 import argparse
-import logging
 from . import cli_shared
 
 def create_parser():
