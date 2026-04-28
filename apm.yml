@@ -1,0 +1,23 @@
+# apm.yml
+name: dotfiles-ai
+version: 1.0.0
+description: "AI Agent settings, skills, and unified MCP configuration for dotfiles"
+
+dependencies:
+  apm:
+    - "obra/superpowers#main"
+    - "anthropics/skills#main"
+
+  mcp:
+    - name: docker-mcp-gateway
+      transport: sse
+      url: "http://127.0.0.1:10888/sse"
+
+exports:
+  skills:
+    - "agent-skills/**"
+
+hooks:
+  post_install:
+    - command: "make sync-mcp"
+      description: "Re-rendering Docker MCP Gateway backend configs and restarting service."
