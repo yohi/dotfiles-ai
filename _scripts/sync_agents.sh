@@ -2,7 +2,7 @@
 #
 # _scripts/sync_agents.sh
 # description: skillport doc を実行して、agent-skills/ をソースに
-#              global-rules/AGENTS.global.md の skill 一覧を
+#              global-rules/AGENTS.global.md および AGENTS.md の skill 一覧を
 #              直接更新する。
 #
 
@@ -13,6 +13,7 @@ cd "$(dirname "$0")/.." || exit 1
 
 readonly OUTPUT_FILES=(
     "global-rules/AGENTS.global.md"
+    "AGENTS.md"
 )
 
 run_skillport_doc() {
@@ -51,6 +52,10 @@ normalize_locations() {
     local repo_root="$2"
 
     perl -0pi -e "s|(<location>)\Q${repo_root}/\E|\$1|g" "$file_path"
+    # Fix vague tips from skillport doc
+    sed -i 's/If search returns too many results, use more specific terms/If search returns 10+ results, refine your query/' "$file_path"
+    # Fix overly complex sentence for anthropics/claude-api
+    sed -i 's|<description>Build, debug, and optimize Claude API \/ Anthropic SDK apps.*</description>|<description>Build apps with Claude API/Anthropic SDK. Trigger on: imports (anthropic, @anthropic-ai/sdk) or direct requests. Not for: openai, ML tasks.</description>|g' "$file_path"
 }
 
 restore_external_skills_note() {
@@ -58,14 +63,13 @@ restore_external_skills_note() {
     local note
     local tmp_file
 
-    note='<!-- NOTE: External skills (anthropics/*, superpowers/*) must be installed via:
-     skillport add <pkg> agent-skills/<ns> --namespace <ns>
-     (e.g., skillport add anthropics/algorithmic-art agent-skills/anthropics --namespace anthropics)
-     See agent-skills/EXTERNAL_SKILLS.md for the authoritative external-skill lock file.
-     IMPORTANT: Custom skills are tracked in Git, but external namespaces must be ignored
-     in the project root .gitignore (blacklist strategy) to avoid polluting the repo. -->'
+    note='<!-- NOTE: External skills (anthropics/*, superpowers/*) are managed via apm.yml.
+     They are automatically synchronized and locked using '\''apm install'\''.
+     IMPORTANT: Custom skills are tracked in Git. External namespaces should generally be ignored
+     in the project root .gitignore (blacklist strategy) unless explicitly required for the repository'\''s configuration. -->'
 
-    if grep -Eq '^[[:space:]]*<available_skills([[:space:]]|>)' "$file_path" && ! grep -qF "External skills (anthropics/*, superpowers/*)" "$file_path"; then
+    # check if the note already exists anywhere in the file (not just after run_skillport_doc)
+    if grep -Eq '^[[:space:]]*<available_skills([[:space:]]|>)' "$file_path" && ! grep -q "External skills (anthropics/\*, superpowers/\*)" "$file_path"; then
         tmp_file=$(mktemp)
         trap 'rm -f "$tmp_file"' EXIT INT TERM
         awk -v note="$note" '
@@ -102,4 +106,4 @@ for output_file in "${OUTPUT_FILES[@]}"; do
     restore_external_skills_note "$output_file"
 done
 
-echo "✅ Successfully synchronized skill listings to global-rules/AGENTS.global.md."
+echo "✅ Successfully synchronized skill listings."

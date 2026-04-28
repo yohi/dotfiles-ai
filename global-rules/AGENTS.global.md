@@ -48,6 +48,24 @@ The following rules apply to **ALL** projects unless overridden by a local proje
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 <!-- SKILLPORT_START -->
 ## SkillPort Skills
 
@@ -67,17 +85,15 @@ Each skill contains step-by-step instructions, templates, and scripts.
 
 ### Tips
 
-- Use your native Read tool with `{path}/file` for templates/assets
+- Request skill outputs via SkillPort instead of directly reading files (e.g., `{path}/file`) to ensure compliance with access policies.
 - Execute scripts via path, don't read them into context: `python {path}/scripts/run.py`
 - Replace `{path}` in instructions with the actual path from `load_skill`
-- If search returns too many results, use more specific terms
+- If search returns 10+ results, refine your query
 
-<!-- NOTE: External skills (anthropics/*, superpowers/*) must be installed via:
-     skillport add <pkg> agent-skills/<ns> --namespace <ns>
-     (e.g., skillport add anthropics/algorithmic-art agent-skills/anthropics --namespace anthropics)
-     See agent-skills/EXTERNAL_SKILLS.md for the authoritative external-skill lock file.
-     IMPORTANT: Custom skills are tracked in Git, but external namespaces must be ignored
-     in the project root .gitignore (blacklist strategy) to avoid polluting the repo. -->
+<!-- NOTE: External skills (anthropics/*, superpowers/*) are managed via apm.yml.
+     They are automatically synchronized and locked using 'apm install'.
+     IMPORTANT: Custom skills are tracked in Git. External namespaces should generally be ignored
+     in the project root .gitignore (blacklist strategy) unless explicitly required for the repository's configuration. -->
 <available_skills>
 <skill>
   <name>agent-skill-architect</name>
@@ -98,6 +114,11 @@ Each skill contains step-by-step instructions, templates, and scripts.
   <name>anthropics/canvas-design</name>
   <description>Create beautiful visual art in .png and .pdf documents using design philosophy. You should use this skill when the user asks to create a poster, piece of art, design, or other static piece. Create original visual designs, never copying existing artists' work to avoid copyright violations.</description>
   <location>agent-skills/anthropics/canvas-design/SKILL.md</location>
+</skill>
+<skill>
+  <name>anthropics/claude-api</name>
+  <description>Build apps with Claude API/Anthropic SDK. Trigger on: imports (anthropic, @anthropic-ai/sdk) or direct requests. Not for: openai, ML tasks.</description>
+  <location>agent-skills/anthropics/claude-api/SKILL.md</location>
 </skill>
 <skill>
   <name>anthropics/doc-coauthoring</name>
@@ -261,6 +282,15 @@ Each skill contains step-by-step instructions, templates, and scripts.
 </skill>
 </available_skills>
 <!-- SKILLPORT_END -->
+
+
+
+
+
+
+
+
+
 
 
 

@@ -1,3 +1,94 @@
+# APM Migration Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Migrate dotfiles-ai from custom sync scripts to Microsoft APM for declarative, portable AI agent configuration.
+
+**Architecture:** Use APM (`apm.yml`) as the Single Source of Truth for dependencies and client config injection, while retaining Docker MCP Gateway for backend server management.
+
+**Tech Stack:** Microsoft APM, Python, Makefile, Bash
+
+---
+
+## Task 1: Create APM Manifest
+
+**Files:**
+- Create: `apm.yml`
+
+- [ ] **Step 1: Write the `apm.yml` configuration**
+
+```yaml
+# apm.yml
+name: dotfiles-ai
+version: 1.0.0
+description: "AI Agent settings, skills, and unified MCP configuration for dotfiles"
+
+dependencies:
+  apm:
+    - "obra/superpowers#6efe32c9e2dd002d0c394e861e0529675d1ab32e"
+    - "anthropics/skills#5128e1865d670f5d6c9cef000e6dfc4e951fb5b9"
+
+  mcp:
+    - name: docker-mcp-gateway
+      transport: sse
+      url: "http://127.0.0.1:10888/sse"
+
+scripts:
+  sync-mcp: "make sync-mcp"
+```
+
+- [ ] **Step 2: Commit**
+
+```bash
+git add apm.yml
+git commit -m "feat: add apm manifest for centralized agent configuration"
+```
+
+---
+
+## Task 2: Delete Obsolete Files
+
+**Files:**
+- Delete: Multiple obsolete files replaced by APM
+
+- [ ] **Step 1: Remove external skills manager and templates**
+
+```bash
+git rm agent-skills/EXTERNAL_SKILLS.md
+git rm _scripts/install-external-skills.sh
+git rm _scripts/sync-mcp-configs.sh
+git rm claude/settings.json.template
+git rm gemini/settings.json.template
+git rm ide/cursor/mcp.json.template
+git rm ide/vscode/settings.json.template
+# If these files don't exist because of earlier cleanup, use rm -f and ignore git rm errors
+```
+
+- [ ] **Step 2: Remove obsolete Makefiles**
+
+```bash
+git rm _mk/superpowers.mk
+```
+
+- [ ] **Step 3: Commit**
+
+```bash
+git commit -m "chore: remove obsolete scripts and templates replaced by apm"
+```
+
+---
+
+## Task 3: Refactor Gateway Config Renderer
+
+**Files:**
+- Modify: `_scripts/render-mcp-configs.py`
+
+- [ ] **Step 1: Overwrite python script to remove client config generation**
+
+Note: `get_gateway_token()` has been removed. The token should be provided via environment variables (`MCP_GATEWAY_TOKEN`).
+
+```bash
+cat << 'EOF' > _scripts/render-mcp-configs.py
 #!/usr/bin/env python3
 
 from __future__ import annotations
@@ -6,7 +97,7 @@ import re
 import sys
 import shutil
 from pathlib import Path
-from typing import Any, cast, Match, Dict
+from typing import Any, cast, Match, Dict, List
 import yaml
 
 def load_client_config() -> dict[str, Any]:
@@ -55,8 +146,7 @@ def replace_placeholders(data: Any, gateway_url: str, expand_paths: bool = False
 
 def deploy_systemd_service(src_path: Path, dest_dir: Path, repo_root: str, enabled_servers: str) -> None:
     if not src_path.exists():
-        print(f"Error: systemd unit template not found at {src_path}", file=sys.stderr)
-        sys.exit(1)
+        return
     
     content = src_path.read_text(encoding="utf-8")
     content = content.replace("__REPO_ROOT__", repo_root)
@@ -156,14 +246,11 @@ def main() -> int:
     
     # Bootstrap symlink if it exists in repo
     bootstrap_src = repo_root / "mcp" / "catalogs" / "bootstrap.yaml"
-    bootstrap_dest = dot_docker_catalogs / "bootstrap.yaml"
     if bootstrap_src.exists():
-        if bootstrap_dest.is_symlink() or bootstrap_dest.exists():
+        bootstrap_dest = dot_docker_catalogs / "bootstrap.yaml"
+        if bootstrap_dest.is_symlink() || bootstrap_dest.exists():
             bootstrap_dest.unlink()
         bootstrap_dest.symlink_to(bootstrap_src)
-    else:
-        if bootstrap_dest.is_symlink() or bootstrap_dest.exists():
-            bootstrap_dest.unlink()
 
     print(f"✅ Configs deployed to {dot_docker_mcp}")
 
@@ -194,3 +281,99 @@ if __name__ == "__main__":
         import traceback
         traceback.print_exc()
         sys.exit(1)
+EOF
+```
+
+- [ ] **Step 2: Verify the script executes successfully**
+
+```bash
+python3 _scripts/render-mcp-configs.py
+```
+Expected: "✅ Gateway backend configuration rendered locally."
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add _scripts/render-mcp-configs.py
+git commit -m "refactor: remove client config rendering logic, keep gateway only"
+```
+
+---
+
+## Task 4: Refactor Makefile Workflow
+
+**Files:**
+- Modify: `_mk/main.mk`
+
+- [ ] **Step 1: Replace setup target in `_mk/main.mk`**
+
+Perform a manual edit of the `setup` target in `_mk/main.mk`. Use the markers below to identify the block.
+
+**Before:**
+```makefile
+setup: install-requirements
+	$(Q_ECHO) "🚀 APMによるエージェント設定の自動セットアップを実行中..."
+	@if command -v apm >/dev/null 2>&1; then \
+		apm install; \
+	else \
+		echo "❌ APMがインストールされていません。 https://github.com/microsoft/apm に従いインストールしてください。"; \
+		exit 1; \
+	fi
+	$(Q_ECHO) "✅ dotfiles-ai のコア設定が適用されました"
+```
+
+**After:**
+```makefile
+# APM-SETUP-BEGIN
+setup: install-requirements
+	$(Q_ECHO) "🚀 APMによるエージェント設定の自動セットアップを実行中..."
+	@if command -v apm >/dev/null 2>&1; then \
+		apm install; \
+	else \
+		echo "❌ APMがインストールされていません。 https://github.com/microsoft/apm に従いインストールしてください。"; \
+		exit 1; \
+	fi
+	@$(MAKE) sync-agents
+	$(Q_ECHO) "✅ dotfiles-ai のコア設定が適用されました"
+# APM-SETUP-END
+```
+
+- [ ] **Step 2: Clean up obsolete Makefile includes**
+
+Remove the `-include _mk/superpowers.mk` line since the file was deleted.
+
+- [ ] **Step 3: Test Make Setup**
+
+```bash
+make setup
+```
+Expected: Should run `apm install` and `make sync-agents` and complete without failing on missing superpower includes or agents setups.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add _mk/main.mk
+git commit -m "refactor: transition make setup to trigger apm install"
+```
+
+- [ ] **Step 2: Clean up obsolete Makefile includes**
+
+Remove the `include _mk/superpowers.mk` line since the file was deleted.
+
+```bash
+sed -i '/-include _mk\/superpowers.mk/d' _mk/main.mk
+```
+
+- [ ] **Step 3: Test Make Setup**
+
+```bash
+make setup
+```
+Expected: Should run `apm install` and complete without failing on missing superpower includes or agents setups. *(Note: If APM is not installed locally, it will exit 1 with the message. This is expected behavior).*
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add _mk/main.mk
+git commit -m "refactor: transition make setup to trigger apm install"
+```

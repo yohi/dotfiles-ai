@@ -20,12 +20,44 @@ CODEX_CONFIG     := $(REPO_ROOT)/codex/config.toml
         install-external-skills clean-legacy
 
 # ============================================================
+# install-external-skills: 外部スキルのセットアップ
+# ============================================================
+install-external-skills: ## apm install を実行（ない場合は git clone でフォールバック）
+	@echo "📦 外部スキルのインストールを確認中..."
+	@if command -v apm >/dev/null 2>&1; then \
+		echo "  -> Using apm install"; \
+		apm install; \
+	else \
+		echo "  ⚠️  apm コマンドが見つかりません。git fetch で特定コミットへフォールバックします..."; \
+		mkdir -p "$(AGENT_SKILLS_DIR)/anthropics"; \
+		mkdir -p "$(AGENT_SKILLS_DIR)/superpowers"; \
+		if [ ! -d "$(AGENT_SKILLS_DIR)/anthropics/ai-api" ]; then \
+			tmpdir=$$(mktemp -d); \
+			git init "$$tmpdir" >/dev/null; \
+			git -C "$$tmpdir" remote add origin https://github.com/anthropics/skills; \
+			git -C "$$tmpdir" fetch --depth 1 origin 5128e1865d670f5d6c9cef000e6dfc4e951fb5b9 >/dev/null 2>&1 || true; \
+			git -C "$$tmpdir" checkout FETCH_HEAD >/dev/null 2>&1 || true; \
+			if [ -d "$$tmpdir/skills" ]; then cp -r "$$tmpdir/skills/"* "$(AGENT_SKILLS_DIR)/anthropics/" || true; fi; \
+			rm -rf "$$tmpdir"; \
+		fi; \
+		if [ ! -d "$(AGENT_SKILLS_DIR)/superpowers/brainstorming" ]; then \
+			tmpdir=$$(mktemp -d); \
+			git init "$$tmpdir" >/dev/null; \
+			git -C "$$tmpdir" remote add origin https://github.com/obra/superpowers; \
+			git -C "$$tmpdir" fetch --depth 1 origin 6efe32c9e2dd002d0c394e861e0529675d1ab32e >/dev/null 2>&1 || true; \
+			git -C "$$tmpdir" checkout FETCH_HEAD >/dev/null 2>&1 || true; \
+			if [ -d "$$tmpdir/skills" ]; then cp -r "$$tmpdir/skills/"* "$(AGENT_SKILLS_DIR)/superpowers/" || true; fi; \
+			rm -rf "$$tmpdir"; \
+		fi; \
+	fi
+	@echo "✅ 外部スキルの準備が完了しました"
+
+# ============================================================
 # sync-agents: メインの同期ターゲット (SPEC Feature #1, #2, #3)
 # ============================================================
 sync-agents: ## SSOTのスキル群を各エージェントの設定ファイルへ同期する
 	@echo "🔄 sync-agents: SSOT → 各エージェントへの同期を開始..."
 	@$(MAKE) clean-sync-artifacts
-	@$(MAKE) install-external-skills
 	@$(MAKE) sync-skillport-doc
 	@$(MAKE) link-user-agents
 	@$(MAKE) link-agent-commands
@@ -47,19 +79,6 @@ clean-sync-artifacts: ## 同期マーカーおよび生成されたリンク・�
 	find "$(REPO_ROOT)/.cursor/rules" -maxdepth 1 -type l -name "*.md" -delete 2>/dev/null || true
 	rm -rf "$(REPO_ROOT)/gemini/commands"
 	@echo "✅ clean-sync-artifacts: 同期状態がリセットされました"
-# ============================================================
-# install-external-skills: 外部スキルの自動インストール
-# EXTERNAL_SKILLS.md に記載された全 namespace のスキルを取得
-# ============================================================
-install-external-skills: ## EXTERNAL_SKILLS.md に基づいて外部スキルをインストール
-	@echo "📦 install-external-skills: 外部スキルのインストールを確認中..."
-	@if [ -x "$(REPO_ROOT)/_scripts/install-external-skills.sh" ]; then \
-		bash "$(REPO_ROOT)/_scripts/install-external-skills.sh" || \
-			(echo "❌ 外部スキルのインストールに失敗しました"; exit 1); \
-	else \
-		echo "❌ _scripts/install-external-skills.sh が見つからないか、実行権限がありません"; \
-		exit 1; \
-	fi
 
 # ============================================================
 # sync-skillport-doc: skillport doc の実行と各 AGENTS への直接反映

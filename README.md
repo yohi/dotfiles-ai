@@ -8,7 +8,6 @@ AIエージェント（Claude Code, Gemini CLI, OpenCode, Codex）の設定・�
 
 > [!IMPORTANT]
 > 本リポジトリは [dotfiles-core](https://github.com/yohi/dotfiles-core) によって管理されるコンポーネントの一つです。
-
 > [!WARNING]
 > **使用時の注意点**
 > 本リポジトリは `dotfiles-core` の共通 Makefile ルール（`common-mk`）に依存しており、実行時には `common-mk` へのシンボリックリンクが必要です。そのため、**本リポジトリ単体での使用（クローンしての利用）はサポートされていません。**
@@ -57,14 +56,9 @@ AIエージェント（Claude Code, Gemini CLI, OpenCode, Codex）の設定・�
 [SkillPort](https://github.com/gotalab/skillport) は、複数の AI エージェント間で再利用可能な「スキル」を一元管理するためのツールです。
 
 - **スキルの実体**: `agent-skills/` ディレクトリ配下に、各スキルの `SKILL.md`（インストラクション）が格納されています。
-- **外部スキルの管理 (Lock-file)**: `superpowers` などの高品質な外部スキルは、`agent-skills/EXTERNAL_SKILLS.md` でバージョン（コミットハッシュ）が固定（Lock）されています。
-  - 実体ファイルは `.gitignore` によりリポジトリには含まれません。
-  - **外部スキル一括インストール**: `make install-external-skills` で `agent-skills/EXTERNAL_SKILLS.md` に記載された
-    全外部スキル（anthropics, superpowers）をロックファイルのバージョンでインストールします（推奨）。
-    - このターゲットは `make sync-agents` 実行時にも自動で呼ばれるため、通常は意識する必要はありません。
-    - 手動で再インストールする場合: `make install-external-skills`
-    - 強制再インストール: `bash _scripts/install-external-skills.sh --force`
-  - `make setup-superpowers` は互換性のために残されていますが、推奨手順は `make install-external-skills` です。
+- **外部スキルの管理 (APM)**: `superpowers` などの高品質な外部スキルは、`apm.yml` の `dependencies` で管理され、`apm.lock.yaml` でバージョン（コミットハッシュ）が固定されます。
+  - **スキルインストール**: `apm install` で `apm.yml` に記載された全外部スキルをインストールします。
+  - この操作は `make setup` 実行時にも自動で行われます。
 - **構成**: `.skillportrc` で設定され、`~/.skillport/skills` からリポジトリの `agent-skills/` へシンボリックリンクが張られます。
 - **コマンド**:
   - `make skillport`: SkillPort と `skillport-mcp` をインストールし、本環境の**初期セットアップ**を行います。
@@ -99,22 +93,24 @@ AIエージェント（Claude Code, Gemini CLI, OpenCode, Codex）の設定・�
 1. **仕組み**: `skillport-mcp` が起動時にスキルディレクトリをスキャンし、各スキルを MCP ツールとして公開します。
 2. **利用方法**: `mcp/config.yaml` で `skillport` を有効にしている限り、全エージェントは Docker MCP Gateway (`:10888/sse`) 経由で自動的に全スキルを利用できます。
 
-## エージェント設定の自動同期
+## エージェント設定の自動同期 (APM)
 
-`_scripts/sync-mcp-configs.sh` により、各エージェントの設定ファイルは以下の状態に自動的に保たれます。
+`apm install` により、APM が各エージェントの設定ファイル（`mcp.json` や `settings.json` 等）を自動検出し、Docker MCP Gateway の SSE エンドポイントを注入します。
+
+**Automated Flow**: `make setup` → `apm install` (triggers `post_install` hooks) → `make sync-mcp` (renders backend config & restarts service).
+
+| エージェント | 接続方式 | 管理主体 |
+|:-----------|:--------|:--------|
+| **Claude Code** | Native SSE | APM (`apm install`) |
+| **Gemini CLI** | Native SSE | APM (`apm install`) |
+| **Antigravity** | Native SSE | APM (`apm install`) |
+| **Cursor** | Native SSE | APM (`apm install`) |
+| **OpenCode** | Remote MCP | APM (`apm install`) |
+| **VSCode** | Native SSE | APM (`apm install`) |
 
 注記:
-- `*.template` は初回セットアップ時の scaffold として使われます。
-- 生成先ファイルが既に存在する場合、`make sync-mcp` はテンプレートから全面再生成せず、MCP 関連の設定部分だけを更新します。
-
-| エージェント | 接続方式 | 備考 |
-|:-----------|:--------|:-----|
-| **Claude Code** | Native SSE (`type` + `url`) | 初回のみ template から生成し、以後は `mcpServers` を同期 |
-| **Gemini CLI** | Native SSE (`url`) | 初回のみ template から生成し、以後は `mcpServers` を同期 |
-| **Antigravity** | Native SSE (`serverUrl`) | `antigravity/mcp_config.json` を生成 |
-| **Cursor** | Native SSE (`url`) | `ide/cursor/mcp.json` を生成 |
-| **OpenCode** | Remote MCP (`type: remote`) | 初回のみ template から生成し、以後は `mcp` ブロックを同期 |
-| **VSCode** | Native SSE (`url`) | 初回のみ template から生成し、以後は `mcpServers` を同期 |
+- SSE エンドポイントとして `http://127.0.0.1:10888/sse` と `http://localhost:10888/sse` が混在している場合がありますが、これらは実質的に同一であり、環境に合わせて自動的に設定されます。
+- Gateway 自体のバックエンド構成（`mcp/config.yaml` の生成）は、`apm install` の `post_install` フックによって `make sync-mcp` が実行され、自動的に行われます。
 
 ## デプロイ構造 (シンボリックリンク)
 

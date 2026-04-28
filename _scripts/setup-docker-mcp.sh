@@ -124,9 +124,9 @@ fi
 
 echo -e "${GREEN}✅ Shared .env file is ready.${NC}"
 
-# 設定ファイルの配置は sync-mcp-configs.sh に集約
+# 設定ファイルの配置は render-mcp-configs.py に集約
 echo -e "${BLUE}🔗 Synchronizing Docker MCP configuration files...${NC}"
-bash "$REPO_ROOT/_scripts/sync-mcp-configs.sh"
+python3 "$REPO_ROOT/_scripts/render-mcp-configs.py"
 echo -e "${GREEN}✅ Configuration files synchronized.${NC}"
 
 # systemd ユーザーサービスの作成
@@ -157,7 +157,7 @@ if [[ ! -f "$CATALOG_FILE" ]]; then
 fi
 
 echo -e "${BLUE}⚙️  Setting up systemd service...${NC}"
-# Service file is already written by sync-mcp-configs.sh (called above).
+# Service file is rendered and deployed by render-mcp-configs.py (called above).
 # Only reload and enable/restart here.
 systemctl --user daemon-reload
 systemctl --user enable docker-mcp-gateway.service

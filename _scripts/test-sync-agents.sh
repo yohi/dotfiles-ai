@@ -41,12 +41,20 @@ if ! grep -qF "<name>anthropics/pdf</name>" "$REPO_ROOT/$f"; then
 fi
 echo "PASS: $f verified."
 
-# AGENTS.md should NOT contain the skill list to avoid bloating
+# AGENTS.md should also contain the skill list
 f="AGENTS.md"
-if grep -qF "<name>anthropics/pdf</name>" "$REPO_ROOT/$f"; then
-    echo "FAIL: Redundant skill list found in $f"
+if ! grep -qF "<available_skills>" "$REPO_ROOT/$f"; then
+    echo "FAIL: <available_skills> not found in $f"
     exit 1
 fi
-echo "PASS: $f (redundancy check) verified."
+if ! grep -qF "External skills (anthropics/*, superpowers/*)" "$REPO_ROOT/$f"; then
+    echo "FAIL: External skills note not found in $f"
+    exit 1
+fi
+if ! grep -qF "<name>anthropics/pdf</name>" "$REPO_ROOT/$f"; then
+    echo "FAIL: anthropics/pdf skill entry not found in $f"
+    exit 1
+fi
+echo "PASS: $f verified."
 
 echo "🎉 All sync agents tests passed successfully!"
