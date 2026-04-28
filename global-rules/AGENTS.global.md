@@ -62,6 +62,10 @@ The following rules apply to **ALL** projects unless overridden by a local proje
 
 
 
+
+
+
+
 <!-- SKILLPORT_START -->
 ## SkillPort Skills
 
@@ -97,11 +101,6 @@ Each skill contains step-by-step instructions, templates, and scripts.
   <location>agent-skills/agent-skill-architect/SKILL.md</location>
 </skill>
 <skill>
-  <name>anthropics/ai-api</name>
-  <description>Build apps with Claude API/Anthropic SDK. Trigger on: imports (anthropic, @anthropic-ai/sdk, claude_agent_sdk) or direct requests for Anthropic/Agent SDKs. Not for: openai, other AI SDKs, general programming, or ML tasks.</description>
-  <location>agent-skills/anthropics/ai-api/SKILL.md</location>
-</skill>
-<skill>
   <name>anthropics/algorithmic-art</name>
   <description>Creating algorithmic art using p5.js with seeded randomness and interactive parameter exploration. Use this when users request creating art using code, generative art, algorithmic art, flow fields, or particle systems. Create original algorithmic art rather than copying existing artists' work to avoid copyright violations.</description>
   <location>agent-skills/anthropics/algorithmic-art/SKILL.md</location>
@@ -115,6 +114,11 @@ Each skill contains step-by-step instructions, templates, and scripts.
   <name>anthropics/canvas-design</name>
   <description>Create beautiful visual art in .png and .pdf documents using design philosophy. You should use this skill when the user asks to create a poster, piece of art, design, or other static piece. Create original visual designs, never copying existing artists' work to avoid copyright violations.</description>
   <location>agent-skills/anthropics/canvas-design/SKILL.md</location>
+</skill>
+<skill>
+  <name>anthropics/claude-api</name>
+  <description>Build apps with Claude API/Anthropic SDK. Trigger on: imports (anthropic, @anthropic-ai/sdk) or direct requests. Not for: openai, ML tasks.</description>
+  <location>agent-skills/anthropics/claude-api/SKILL.md</location>
 </skill>
 <skill>
   <name>anthropics/doc-coauthoring</name>
@@ -278,6 +282,8 @@ Each skill contains step-by-step instructions, templates, and scripts.
 </skill>
 </available_skills>
 <!-- SKILLPORT_END -->
+
+
 
 
 

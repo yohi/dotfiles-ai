@@ -28,14 +28,26 @@ install-external-skills: ## apm install を実行（ない場合は git clone �
 		echo "  -> Using apm install"; \
 		apm install; \
 	else \
-		echo "  ⚠️  apm コマンドが見つかりません。git clone でフォールバックします..."; \
+		echo "  ⚠️  apm コマンドが見つかりません。git fetch で特定コミットへフォールバックします..."; \
 		mkdir -p "$(AGENT_SKILLS_DIR)/anthropics"; \
 		mkdir -p "$(AGENT_SKILLS_DIR)/superpowers"; \
-		if [ ! -d "$(AGENT_SKILLS_DIR)/anthropics/.git" ]; then \
-			git clone --depth 1 https://github.com/anthropics/skills "$(AGENT_SKILLS_DIR)/anthropics" || true; \
+		if [ ! -d "$(AGENT_SKILLS_DIR)/anthropics/ai-api" ]; then \
+			tmpdir=$$(mktemp -d); \
+			git init "$$tmpdir" >/dev/null; \
+			git -C "$$tmpdir" remote add origin https://github.com/anthropics/skills; \
+			git -C "$$tmpdir" fetch --depth 1 origin 5128e1865d670f5d6c9cef000e6dfc4e951fb5b9 >/dev/null 2>&1 || true; \
+			git -C "$$tmpdir" checkout FETCH_HEAD >/dev/null 2>&1 || true; \
+			if [ -d "$$tmpdir/skills" ]; then cp -r "$$tmpdir/skills/"* "$(AGENT_SKILLS_DIR)/anthropics/" || true; fi; \
+			rm -rf "$$tmpdir"; \
 		fi; \
-		if [ ! -d "$(AGENT_SKILLS_DIR)/superpowers/.git" ]; then \
-			git clone --depth 1 https://github.com/obra/superpowers "$(AGENT_SKILLS_DIR)/superpowers" || true; \
+		if [ ! -d "$(AGENT_SKILLS_DIR)/superpowers/brainstorming" ]; then \
+			tmpdir=$$(mktemp -d); \
+			git init "$$tmpdir" >/dev/null; \
+			git -C "$$tmpdir" remote add origin https://github.com/obra/superpowers; \
+			git -C "$$tmpdir" fetch --depth 1 origin 6efe32c9e2dd002d0c394e861e0529675d1ab32e >/dev/null 2>&1 || true; \
+			git -C "$$tmpdir" checkout FETCH_HEAD >/dev/null 2>&1 || true; \
+			if [ -d "$$tmpdir/skills" ]; then cp -r "$$tmpdir/skills/"* "$(AGENT_SKILLS_DIR)/superpowers/" || true; fi; \
+			rm -rf "$$tmpdir"; \
 		fi; \
 	fi
 	@echo "✅ 外部スキルの準備が完了しました"

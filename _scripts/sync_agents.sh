@@ -54,6 +54,8 @@ normalize_locations() {
     perl -0pi -e "s|(<location>)\Q${repo_root}/\E|\$1|g" "$file_path"
     # Fix vague tips from skillport doc
     sed -i 's/If search returns too many results, use more specific terms/If search returns 10+ results, refine your query/' "$file_path"
+    # Fix overly complex sentence for anthropics/claude-api
+    sed -i 's|<description>Build, debug, and optimize Claude API \/ Anthropic SDK apps.*</description>|<description>Build apps with Claude API/Anthropic SDK. Trigger on: imports (anthropic, @anthropic-ai/sdk) or direct requests. Not for: openai, ML tasks.</description>|g' "$file_path"
 }
 
 restore_external_skills_note() {
