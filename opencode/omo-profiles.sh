@@ -144,8 +144,10 @@ def merge_jsonc(base_path, overlay_path):
     if 'agents' in overlay:
         if 'agent' not in base:
             base['agent'] = {}
-        # 既存の 'build' などのキーを保持しつつ、エージェント定義をマージ
-        base['agent'].update(overlay['agents'])
+        # 既存のキーを保持しつつ、新規エージェントのみを追加する条件付きマージ
+        for k, v in overlay['agents'].items():
+            if k not in base['agent']:
+                base['agent'][k] = v
         
         with open(base_path, 'w', encoding='utf-8') as f:
             json.dump(base, f, indent=2, ensure_ascii=False)
@@ -155,7 +157,7 @@ def merge_jsonc(base_path, overlay_path):
 
 if not merge_jsonc('$base_output_path', '$output_path'):
     sys.exit(1)
-" 2>/dev/null; then
+"; then
           echo "✅ Merge successful"
         else
           echo "⚠️  Warning: Structured merge failed. Check if 'agents' key exists in $output_path." >&2

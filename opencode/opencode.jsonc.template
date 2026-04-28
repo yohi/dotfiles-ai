@@ -158,7 +158,9 @@
     },
     "markdownlint": {
       "command": [
-        "markdownlint-cli2"
+        "npx",
+        "markdownlint-lsp",
+        "--stdio"
       ],
       "extensions": [
         ".md"
@@ -166,13 +168,10 @@
     },
     "mypy": {
       "command": [
-        "dmypy",
-        "run",
-        "--",
+        "mypy",
         "--ignore-missing-imports",
         "--follow-imports=silent",
-        "--strict", // より厳格な型チェック
-        "."
+        "--strict" // より厳格な型チェック
       ],
       "extensions": [
         ".py"

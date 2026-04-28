@@ -9,8 +9,8 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # トークンの取得
 TOKEN=""
 if [ -f "$REPO_ROOT/.env" ]; then
-    # インデントされた行も考慮
-    TOKEN=$(grep "^[[:space:]]*MCP_GATEWAY_TOKEN=" "$REPO_ROOT/.env" | cut -d'=' -f2- | tr -d '"' | tr -d "'")
+    # render-mcp-configs.py と同様の正規表現ロジックで抽出
+    TOKEN=$(sed -n 's/^[[:space:]]*MCP_GATEWAY_TOKEN=\(.*\)$/\1/p' "$REPO_ROOT/.env" | sed -e 's/^["'\'']//' -e 's/["'\'']$//')
 fi
 
 if [ -z "$TOKEN" ]; then
@@ -30,8 +30,9 @@ while true; do
 
     if [ "$HTTP_CODE" != "200" ] && [ "$HTTP_CODE" != "405" ]; then
         echo "⚠️  Docker MCP Gateway is not responding (HTTP $HTTP_CODE). Attempting to restart..."
-        if ! systemctl --user restart docker-mcp-gateway.service; then
-            EXIT_CODE=$?
+        systemctl --user restart docker-mcp-gateway.service
+        EXIT_CODE=$?
+        if [ $EXIT_CODE -ne 0 ]; then
             echo "❌ Error: Failed to restart docker-mcp-gateway.service (Exit code: $EXIT_CODE)" >&2
             echo "💡 Tip: Check if systemd user mode is available and service is correctly installed." >&2
         fi
