@@ -14,6 +14,9 @@ QUIET ?= 0
 # OS detection
 OS_NAME := $(shell uname -s)
 
+# APM Installation
+APM_INSTALL_URL := https://aka.ms/apm-unix
+
 # Helper for conditional echo
 ifeq ($(QUIET),1)
   Q_ECHO = @:
