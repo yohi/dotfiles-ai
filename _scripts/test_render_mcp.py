@@ -116,18 +116,26 @@ def test_chronos_graph_rendering():
                 except Exception as e:
                     raise AssertionError(f"Failed to parse rendered TOML for {agent_name} at {path}: {e}") from e
 
-                # Walk the dict to find chronos-graph
+                # Walk the dict to find servers
                 root_key = agent_config["root_key"]
-                servers = data.get(root_key, {})
-                if not any(k in servers for k in ["chronos-graph", "chronos_graph", "docker-mcp", "docker-mcp-local"]):
-                    raise AssertionError(f"chronos-graph (or chronos_graph/gateway) missing in parsed TOML for {agent_name}")
-                print(f"PASS: {agent_name} verified presence of chronos-graph via parsed TOML.")
+                # New hierarchy: [root_key.mcp.name]
+                servers = data.get(root_key, {}).get("mcp", {})
+                
+                # Verify that all servers requested for this agent are present
+                expected_servers = set(agent_config.get("servers", {}).keys())
+                actual_servers = set(servers.keys())
+                if not expected_servers.issubset(actual_servers):
+                    missing = expected_servers - actual_servers
+                    raise AssertionError(f"Missing servers {missing} in parsed TOML (under {root_key}.mcp) for {agent_name}")
+                print(f"PASS: {agent_name} verified presence of expected servers via parsed TOML.")
                 continue
             else:
                 # Fallback to simple check if toml lib is missing
-                if not any(k in content for k in ["chronos-graph", "chronos_graph", "docker-mcp", "docker-mcp-local"]):
-                    raise AssertionError(f"chronos-graph (or chronos_graph/gateway) should be present in {agent_name} ({path})")
-                print(f"PASS: {agent_name} verified presence of chronos-graph via text (toml lib missing).")
+                expected_servers = set(agent_config.get("servers", {}).keys())
+                for srv in expected_servers:
+                    if srv not in content:
+                        raise AssertionError(f"Server '{srv}' should be present in {agent_name} ({path})")
+                print(f"PASS: {agent_name} verified presence of expected servers via text (toml lib missing).")
                 continue
         else:
             raise ValueError(f"Unknown format '{agent_config['format']}' for {agent_name}")
@@ -145,9 +153,14 @@ def test_chronos_graph_rendering():
             if root_key not in data:
                 raise AssertionError(f"root_key '{root_key}' missing in {agent_name} ({path})")
             servers = data[root_key]
-        if not any(k in servers for k in ["chronos-graph", "chronos_graph", "docker-mcp", "docker-mcp-local"]):
-            raise AssertionError(f"chronos-graph (or chronos_graph/gateway) should be present in {agent_name} ({path})")
-        print(f"PASS: {agent_name} verified presence of chronos-graph via structured data.")
+        
+        # Verify that all servers requested for this agent are present
+        expected_servers = set(agent_config.get("servers", {}).keys())
+        actual_servers = set(servers.keys())
+        if not expected_servers.issubset(actual_servers):
+            missing = expected_servers - actual_servers
+            raise AssertionError(f"Missing servers {missing} in {agent_name} ({path})")
+        print(f"PASS: {agent_name} verified presence of expected servers via structured data.")
 
 if __name__ == "__main__":
     try:

@@ -26,9 +26,7 @@ def get_gateway_token() -> str:
             match = re.search(r"^MCP_GATEWAY_TOKEN=(.+)$", content, re.MULTILINE)
             if match:
                 token = match.group(1).strip().strip('"').strip("'")
-    if not token:
-        raise ValueError("Required environment variable 'MCP_GATEWAY_TOKEN' is not set in environment or .env file.")
-    return token
+    return token or ""
 
 
 def load_client_config() -> dict[str, Any]:
@@ -123,9 +121,16 @@ def write_json_config(
         data: dict[str, Any] = {root_key: servers}
     else:
         try:
-            data = cast(Dict[str, Any], json5.loads(path.read_text(encoding="utf-8")))
-        except Exception as e:
-            print(f"Error reading {path}: {e}")
+            content = path.read_text(encoding="utf-8")
+        except (FileNotFoundError, PermissionError, OSError, UnicodeDecodeError) as e:
+            print(f"❌ File error reading {path}: {e}", file=sys.stderr)
+            return False
+            
+        try:
+            data = cast(Dict[str, Any], json5.loads(content))
+        except (ValueError, json.JSONDecodeError) as e:
+            # json5.loads typically raises ValueError on parse error
+            print(f"❌ JSON parse error in {path}: {e}", file=sys.stderr)
             return False
 
     if project_key:
@@ -166,15 +171,24 @@ def write_toml_config(path: Path, root_key: str, servers: dict[str, Any]) -> boo
             if "args" in srv:
                 args_str = ", ".join(f'"{a}"' for a in srv["args"])
                 lines.append(f"  args = [{args_str}]")
-        if "env" in srv and srv["env"]:
+        
+        env = srv.get("env")
+        if env:
             lines.append(f"  [{root_key}.mcp.{name}.env]")
-            for k, v in srv["env"].items():
+            for k, v in env.items():
                 lines.append(f"    {k} = \"{v}\"")
-        if "headers" in srv and srv["headers"]:
+        
+        headers = srv.get("headers")
+        if headers:
             lines.append(f"  [{root_key}.mcp.{name}.headers]")
-            for k, v in srv["headers"].items():
+            for k, v in headers.items():
                 lines.append(f"    {k} = \"{v}\"")
+    
     new_text = "\n".join(lines) + "\n"
+    if path.exists():
+        if path.read_text(encoding="utf-8") == new_text:
+            return False
+
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(new_text, encoding="utf-8")
     return True
@@ -281,6 +295,8 @@ def main() -> int:
                 final_srv[url_key] = srv_def.get("url")
                 if token:
                     final_srv["headers"] = {"Authorization": f"Bearer {token}"}
+                else:
+                    print(f"⚠️  Warning: No token available for SSE server '{srv_name}' (agent: {agent_name})", file=sys.stderr)
             else:
                 cmd_raw = srv_def.get("command")
                 if isinstance(cmd_raw, list):
