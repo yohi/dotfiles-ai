@@ -55,7 +55,8 @@ def replace_placeholders(data: Any, gateway_url: str, expand_paths: bool = False
 
 def deploy_systemd_service(src_path: Path, dest_dir: Path, repo_root: str, enabled_servers: str) -> None:
     if not src_path.exists():
-        return
+        print(f"Error: systemd unit template not found at {src_path}", file=sys.stderr)
+        sys.exit(1)
     
     content = src_path.read_text(encoding="utf-8")
     content = content.replace("__REPO_ROOT__", repo_root)
