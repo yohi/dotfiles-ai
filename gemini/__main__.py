@@ -28,9 +28,6 @@ def main():
     """
     メイン関数
     """
-    # 環境セットアップ
-    # cli_shared.setup_environment() # 必要な場合に有効化
-
     # コマンドライン引数のパース
     parser = create_parser()
     args = parser.parse_args()

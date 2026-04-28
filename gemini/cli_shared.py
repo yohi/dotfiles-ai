@@ -15,11 +15,14 @@ def setup_environment():
     
     if not os.path.exists(GEMINI_MD):
         try:
-            with open(GEMINI_MD, 'w', encoding='utf-8') as f:
+            with open(GEMINI_MD, 'x', encoding='utf-8') as f:
                 f.write("# Gemini CLI\n\n")
                 f.write("Gemini CLI のための設定ファイルです。\n")
-        except Exception:
+        except FileExistsError:
+            pass  # 既に存在する場合は何もしない
+        except OSError:
             logger.exception("GEMINI.md ファイルの作成エラー")
+            raise
 
 def show_version():
     """

@@ -16,7 +16,8 @@ ide/cursor/
 ├── keybindings.json        # Custom keybindings
 ├── mcp.json                # Generated MCP config (from mcp/servers.yaml)
 └── commands/               # Custom slash commands
-    └── coderabbit/         # CodeRabbit CLI commands
+    ├── coderabbit/         # CodeRabbit CLI commands
+    └── agent/              # Agent development commands
 ```
 
 ### MCP Server Integration

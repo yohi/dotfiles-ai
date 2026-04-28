@@ -119,7 +119,10 @@ def write_json_config(
 ) -> bool:
     """Update standard JSON configuration."""
     if not path.exists():
-        data: dict[str, Any] = {root_key: servers}
+        if project_key:
+            data: dict[str, Any] = {"projects": {project_key: {root_key: servers}}}
+        else:
+            data: dict[str, Any] = {root_key: servers}
     else:
         try:
             content = path.read_text(encoding="utf-8")
@@ -273,8 +276,8 @@ def main() -> int:
         fmt = cast(str, agent_cfg.get("format", "json"))
         root_key = cast(str, agent_cfg.get("root_key", "mcpServers"))
         project_key = cast(Any, agent_cfg.get("project_key"))
-        if project_key == "__REPO_ROOT__":
-            project_key = str(repo_root)
+        if isinstance(project_key, str):
+            project_key = replace_placeholders(project_key, gateway_url)
 
         agent_servers: dict[str, Any] = {}
         srv_map = cast(Dict[str, Any], agent_cfg.get("servers", {}))

@@ -64,6 +64,42 @@ link-gemini-global-md: ## GEMINI.md をグローバルルールにリンク
 help-gemini: ## Gemini の使い方を表示
 	$(call show-guide,$(REPO_ROOT)/_docs/guides/gemini.md)
 
+.PHONY: check-gemini
+check-gemini: ## Gemini CLI の診断を実行
+	@echo "🩺 Gemini CLI の診断を開始..."
+	@if command -v gemini >/dev/null 2>&1; then \
+		echo "✅ Gemini CLI: $$(gemini --version 2>/dev/null)"; \
+	else \
+		echo "❌ Gemini CLI が見つかりません。'make install-packages-gemini-cli' を実行してください。"; \
+	fi
+	@if [ -L "$(HOME_DIR)/.gemini/GEMINI.md" ]; then \
+		echo "✅ GEMINI.md: リンク済み ($$(readlink "$(HOME_DIR)/.gemini/GEMINI.md"))"; \
+	else \
+		echo "❌ GEMINI.md がリンクされていません。'make setup-supergemini' を実行してください。"; \
+	fi
+	@if [ -f "$(HOME_DIR)/.gemini/settings.json" ]; then \
+		echo "✅ settings.json: 存在します"; \
+	else \
+		echo "❌ settings.json が見つかりません。'make setup-supergemini' を実行してください。"; \
+	fi
+
+.PHONY: setup-supergemini
+setup-supergemini: install-gemini-ecosystem ## Gemini CLI の設定を適用 (互換性用)
+	@echo "📝 Gemini CLI の追加設定を適用中..."
+	@mkdir -p "$(HOME_DIR)/.gemini"
+	@if [ ! -f "$(HOME_DIR)/.gemini/settings.json" ]; then \
+		if [ -f "$(REPO_ROOT)/gemini/settings.json.template" ]; then \
+			cp "$(REPO_ROOT)/gemini/settings.json.template" "$(HOME_DIR)/.gemini/settings.json"; \
+			echo "✅ settings.json をテンプレートから作成しました"; \
+		else \
+			echo "{}" > "$(HOME_DIR)/.gemini/settings.json"; \
+			echo "✅ 空の settings.json を作成しました"; \
+		fi \
+	else \
+		echo "ℹ️  settings.json は既に存在します"; \
+	fi
+	@echo "✅ Gemini CLI の設定が完了しました"
+
 # Gemini エコシステム一括インストール
 install-gemini-ecosystem: install-packages-gemini-cli link-gemini-global-md
 	@echo "✅ Gemini エコシステムのセットアップが完了しました"

@@ -125,12 +125,12 @@ function omo-set-profile() {
         echo "🔗 Merging agents from $output_path into 'agent' section of $base_output_path..."
         
         # Python を使用した構造的マージ (json5 を使用)
-        if python3 -c "
+        if python3 - "$base_output_path" "$output_path" <<'PY'
 import sys, json, os
 try:
     import json5
 except ImportError:
-    print('❌ Error: Python module \"json5\" is required for structured merge.')
+    print('❌ Error: Python module "json5" is required for structured merge.')
     print('💡 Try: pip install json5')
     sys.exit(1)
 
@@ -160,12 +160,17 @@ def merge_jsonc(base_path, overlay_path):
         return True
     return False
 
-if not merge_jsonc('$base_output_path', '$output_path'):
-    sys.exit(1)
-"; then
+if __name__ == "__main__":
+    if len(sys.argv) < 3:
+        sys.exit(1)
+    if not merge_jsonc(sys.argv[1], sys.argv[2]):
+        sys.exit(1)
+PY
+then
           echo "✅ Merge successful"
         else
-          echo "⚠️  Warning: Structured merge failed. Check if 'agents' key exists in $output_path." >&2
+          echo "❌ Error: Structured merge failed. Check if 'agents' key exists in $output_path." >&2
+          return 1
         fi
       fi
     else

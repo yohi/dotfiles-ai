@@ -63,14 +63,14 @@
       "make *": "allow",
       "uv": "allow",
       "uv *": "allow",
-      "uvx": "allow",
-      "uvx *": "allow",
-      "python": "allow",
-      "python *": "allow",
-      "node": "allow",
-      "node *": "allow",
-      "bun": "allow",
-      "bun *": "allow",
+      "uvx": "ask",
+      "uvx *": "ask",
+      "python": "ask",
+      "python *": "ask",
+      "node": "ask",
+      "node *": "ask",
+      "bun": "ask",
+      "bun *": "ask",
       "git status": "allow",
       "git status *": "allow",
       "git log": "allow",
@@ -96,7 +96,7 @@
       "curl* | sh": "deny",
       "curl *|sh": "deny",
       "curl * | sh": "deny", // 外部スクリプトの直接実行は高リスク
-      "bash _scripts/*": "allow", // プロジェクト固有スクリプトの実行
+      "bash _scripts/*": "ask", // プロジェクト固有スクリプトの実行も確認を挟む
       "bun run lint*": "allow", // 静的解析による品質確認
       "bun run typecheck*": "allow", // 型チェックによる検証
       "bun run test*": "allow", // テスト実行による動作検証

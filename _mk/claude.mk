@@ -251,6 +251,25 @@ install-claude-ecosystem:
 	@echo "🎉 Claude Code エコシステムのインストールが完了しました！"
 	@echo "💡 使い方を確認するには 'make help-claude' を実行してください。"
 
+.PHONY: check-claude
+check-claude: ## Claude Code の診断を実行
+	@echo "🩺 Claude Code の診断を開始..."
+	@if command -v claude >/dev/null 2>&1; then \
+		echo "✅ Claude Code: $$(claude --version 2>/dev/null)"; \
+	else \
+		echo "❌ Claude Code が見つかりません。'make install-packages-claude-code' を実行してください。"; \
+	fi
+	@if [ -L "$(HOME_DIR)/.claude/CLAUDE.md" ]; then \
+		echo "✅ CLAUDE.md: リンク済み ($$(readlink "$(HOME_DIR)/.claude/CLAUDE.md"))"; \
+	else \
+		echo "❌ CLAUDE.md がリンクされていません。'make setup-claude' を実行してください。"; \
+	fi
+	@if [ -f "$(HOME_DIR)/.claude/settings.json" ]; then \
+		echo "✅ settings.json: 存在します"; \
+	else \
+		echo "❌ settings.json が見つかりません。'make setup-claude' を実行してください。"; \
+	fi
+
 # ========================================
 # エイリアス
 # ========================================
