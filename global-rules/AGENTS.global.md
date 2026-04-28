@@ -85,7 +85,7 @@ Each skill contains step-by-step instructions, templates, and scripts.
 
 ### Tips
 
-- Use your native Read tool with `{path}/file` for templates/assets
+- Request skill outputs via SkillPort instead of directly reading files (e.g., `{path}/file`) to ensure compliance with access policies.
 - Execute scripts via path, don't read them into context: `python {path}/scripts/run.py`
 - Replace `{path}` in instructions with the actual path from `load_skill`
 - If search returns 10+ results, refine your query

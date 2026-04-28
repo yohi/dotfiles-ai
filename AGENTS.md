@@ -48,7 +48,7 @@ Never mix IDE styling configurations here, and never put AI instructions or MCP 
 - **MCP Gateway**: Use the **Unified SSE Gateway (`http://localhost:10888/sse`)** as the standard connection method for all tools.
   - **SSOT Principle**: **`apm.yml`** is the master manifest for the project. **APM** stands for **Microsoft APM (Agent Package Manager)**. **`mcp/servers.yaml`** is the Source of Truth for Gateway-side MCP configurations. `mcp/config.yaml` is auto-generated from it via APM's `post_install` hook.
   - **Benefits of SSE Integration**:
-    - **Zero-second Startup**: Since the Gateway is not launched individually for each agent session, initialization delays (typically 7-10s) and timeouts/hangs are completely eliminated.
+    - **Zero-second Startup**: Since the Gateway is not launched individually for each agent session, initialization delays (typically 7-10s) and timeouts/hangs are eliminated.
     - **Resource Stability**: Prevents "too many open files" errors and Docker container conflicts common with the stdio transport method.
     - **APM Integration**: `apm install` automatically injects the Gateway SSE endpoint into all detected AI clients.
   - **Maintenance**: The gateway runs as a background service (`docker-mcp-gateway.service`), and the `mcp-watchdog.service` ensures automatic recovery in case of hangs.
