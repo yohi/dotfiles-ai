@@ -5,17 +5,16 @@ all: install init-env setup sync-mcp ## [完全セットアップ] インスト�
 
 install: install-requirements install-agents install-ides ## Install all AI agents and IDE binaries
 
-setup: install-requirements
+setup: install-requirements install-apm
 	$(Q_ECHO) "🚀 APMによるエージェント設定の自動セットアップを実行中..."
 	@if command -v apm >/dev/null 2>&1; then \
 		apm install; \
 	else \
-		echo "❌ APMがインストールされていません。 https://github.com/microsoft/apm に従いインストールしてください。"; \
+		echo "❌ APMのインストールまたは実行に失敗しました。"; \
 		exit 1; \
 	fi
 	@$(MAKE) sync-agents
 	$(Q_ECHO) "✅ dotfiles-ai のコア設定が適用されました"
-
 sync: ## [更新] リポジトリを最新にし、エージェントを同期する
 	$(Q_ECHO) "🔄 リポジトリを最新に同期中..."
 	@git pull --rebase || (echo "❌ git pull --rebase に失敗しました"; exit 1)
