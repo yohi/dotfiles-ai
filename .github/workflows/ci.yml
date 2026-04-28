@@ -40,7 +40,7 @@ jobs:
     - name: Render MCP Configs
       run: |
         # Generate config files using the new consolidated renderer
-        python3 _scripts/render-mcp-configs.py
+        uv run python3 _scripts/render-mcp-configs.py
 
     - name: Run Integrity Tests
       run: |
