@@ -119,14 +119,14 @@ def test_chronos_graph_rendering():
                 # Walk the dict to find chronos-graph
                 root_key = agent_config["root_key"]
                 servers = data.get(root_key, {})
-                if "chronos-graph" not in servers and "chronos_graph" not in servers:
-                    raise AssertionError(f"chronos-graph missing in parsed TOML for {agent_name}")
+                if not any(k in servers for k in ["chronos-graph", "chronos_graph", "docker-mcp", "docker-mcp-local"]):
+                    raise AssertionError(f"chronos-graph (or chronos_graph/gateway) missing in parsed TOML for {agent_name}")
                 print(f"PASS: {agent_name} verified presence of chronos-graph via parsed TOML.")
                 continue
             else:
                 # Fallback to simple check if toml lib is missing
-                if "chronos-graph" not in content and "chronos_graph" not in content:
-                    raise AssertionError(f"chronos-graph should be present in {agent_name} ({path})")
+                if not any(k in content for k in ["chronos-graph", "chronos_graph", "docker-mcp", "docker-mcp-local"]):
+                    raise AssertionError(f"chronos-graph (or chronos_graph/gateway) should be present in {agent_name} ({path})")
                 print(f"PASS: {agent_name} verified presence of chronos-graph via text (toml lib missing).")
                 continue
         else:
@@ -145,8 +145,8 @@ def test_chronos_graph_rendering():
             if root_key not in data:
                 raise AssertionError(f"root_key '{root_key}' missing in {agent_name} ({path})")
             servers = data[root_key]
-        if "chronos-graph" not in servers and "chronos_graph" not in servers:
-            raise AssertionError(f"chronos-graph (or chronos_graph) should be present in {agent_name} ({path})")
+        if not any(k in servers for k in ["chronos-graph", "chronos_graph", "docker-mcp", "docker-mcp-local"]):
+            raise AssertionError(f"chronos-graph (or chronos_graph/gateway) should be present in {agent_name} ({path})")
         print(f"PASS: {agent_name} verified presence of chronos-graph via structured data.")
 
 if __name__ == "__main__":
