@@ -2,7 +2,7 @@
 #
 # _scripts/sync_agents.sh
 # description: skillport doc を実行して、agent-skills/ をソースに
-#              global-rules/AGENTS.global.md の skill 一覧を
+#              global-rules/AGENTS.global.md および AGENTS.md の skill 一覧を
 #              直接更新する。
 #
 
@@ -13,6 +13,7 @@ cd "$(dirname "$0")/.." || exit 1
 
 readonly OUTPUT_FILES=(
     "global-rules/AGENTS.global.md"
+    "AGENTS.md"
 )
 
 run_skillport_doc() {
@@ -63,7 +64,8 @@ restore_external_skills_note() {
      IMPORTANT: Custom skills are tracked in Git, but external namespaces must be ignored
      in the project root .gitignore (blacklist strategy) to avoid polluting the repo. -->'
 
-    if grep -Eq '^[[:space:]]*<available_skills([[:space:]]|>)' "$file_path" && ! grep -qF "External skills (anthropics/*, superpowers/*)" "$file_path"; then
+    # check if the note already exists anywhere in the file (not just after run_skillport_doc)
+    if grep -Eq '^[[:space:]]*<available_skills([[:space:]]|>)' "$file_path" && ! grep -q "External skills (anthropics/\*, superpowers/\*)" "$file_path"; then
         tmp_file=$(mktemp)
         trap 'rm -f "$tmp_file"' EXIT INT TERM
         awk -v note="$note" '
@@ -100,4 +102,4 @@ for output_file in "${OUTPUT_FILES[@]}"; do
     restore_external_skills_note "$output_file"
 done
 
-echo "✅ Successfully synchronized skill listings to global-rules/AGENTS.global.md."
+echo "✅ Successfully synchronized skill listings."
