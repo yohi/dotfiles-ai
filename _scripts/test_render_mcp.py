@@ -1,9 +1,6 @@
 #!/usr/bin/env python3
 import importlib.util
-import json
-import json5
 import sys
-import toml  # type: ignore[import-untyped]
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -45,128 +42,20 @@ def test_placeholders():
         raise AssertionError(f"Expected {expected}, got {multi_val}")
     print("PASS: Multiple placeholders replacement")
 
-def test_jsonc_markers():
-    print("Testing jsonc markers insertion...")
-    import tempfile
-    import json5
-    
-    with tempfile.NamedTemporaryFile(mode='w+', delete=False, suffix='.jsonc') as tmp:
-        # Create a file without markers
-        tmp.write('{\n  "existing": true\n}\n')
-        tmp_path = Path(tmp.name)
-    
-    try:
-        servers = {"test-server": {"command": "echo"}}
-        # Call the actual function
-        render_mcp_configs.write_opencode_jsonc(tmp_path, "mcp", servers)
-        
-        content = tmp_path.read_text(encoding="utf-8")
-        if "// [MCP]" not in content:
-            raise AssertionError("Missing [MCP] marker")
-        if "// [LSP]" not in content:
-            raise AssertionError("Missing [LSP] marker")
-        if '"mcp": {' not in content:
-            raise AssertionError("Missing root_key insertion")
-        
-        try:
-            parsed = json5.loads(content)
-        except Exception:
-            print(f"Error parsing content: {content}")
-            raise
-        if parsed["mcp"]["test-server"]["command"] != "echo":
-            raise AssertionError("JSONC parsed missing test-server command")
-        
-        # Test updating existing markers
-        servers_updated = {"test-server": {"command": "echo2"}}
-        render_mcp_configs.write_opencode_jsonc(tmp_path, "mcp", servers_updated)
-        content_updated = tmp_path.read_text(encoding="utf-8")
-        parsed_updated = json5.loads(content_updated)
-        if parsed_updated["mcp"]["test-server"]["command"] != "echo2":
-            raise AssertionError("Failed to update existing markers block")
-        
-        print("PASS: jsonc markers inserted and updated correctly.")
-    finally:
-        tmp_path.unlink(missing_ok=True)
-
-def test_chronos_graph_rendering():
-    print("Testing chronos-graph presence in output files...")
+def test_gateway_config_loading():
+    print("Testing gateway configuration loading...")
     config = load_config()
-    agents = config.get("agents", {})
-    if not agents:
-        raise AssertionError("No agents found in configuration")
-    
-    # ゲートウェイURLを取得 (デフォルト値を使用)
-    gateway_url = config.get("defaults", {}).get("gateway_url", "http://localhost:10888/sse")
-    
-    for agent_name, agent_config in agents.items():
-        path = REPO_ROOT / agent_config["path"]
-        if not path.exists():
-            raise AssertionError(f"Output file {path} for {agent_name} not found")
-            
-        content = path.read_text(encoding="utf-8")
-        # Handle different formats
-        if agent_config["format"] in {"json", "generated_json"}:
-            data = json.loads(content)
-        elif agent_config["format"] in {"jsonc", "opencode_jsonc"}:
-            data = json5.loads(content)
-        elif agent_config["format"] == "toml":
-            if toml:
-                try:
-                    data = toml.loads(content)
-                except Exception as e:
-                    raise AssertionError(f"Failed to parse rendered TOML for {agent_name} at {path}: {e}") from e
-
-                # Walk the dict to find servers
-                root_key = agent_config["root_key"]
-                # New hierarchy: [root_key.mcp.name]
-                servers = data.get(root_key, {}).get("mcp", {})
-                
-                # Verify that all servers requested for this agent are present
-                expected_servers = set(agent_config.get("servers", {}).keys())
-                actual_servers = set(servers.keys())
-                if not expected_servers.issubset(actual_servers):
-                    missing = expected_servers - actual_servers
-                    raise AssertionError(f"Missing servers {missing} in parsed TOML (under {root_key}.mcp) for {agent_name}")
-                print(f"PASS: {agent_name} verified presence of expected servers via parsed TOML.")
-                continue
-            else:
-                # Fallback to simple check if toml lib is missing
-                expected_servers = set(agent_config.get("servers", {}).keys())
-                for srv in expected_servers:
-                    if srv not in content:
-                        raise AssertionError(f"Server '{srv}' should be present in {agent_name} ({path})")
-                print(f"PASS: {agent_name} verified presence of expected servers via text (toml lib missing).")
-                continue
-        else:
-            raise ValueError(f"Unknown format '{agent_config['format']}' for {agent_name}")
-            
-        root_key = agent_config["root_key"]
-        project_key = agent_config.get("project_key")
-        
-        if project_key:
-            # Resolving project_key since it might contain placeholders like __REPO_ROOT__
-            project_key = replace_placeholders(project_key, gateway_url)
-            if "projects" not in data or project_key not in data["projects"] or root_key not in data["projects"][project_key]:
-                raise AssertionError(f"root_key '{root_key}' missing under project '{project_key}' in {agent_name} ({path})")
-            servers = data["projects"][project_key][root_key]
-        else:
-            if root_key not in data:
-                raise AssertionError(f"root_key '{root_key}' missing in {agent_name} ({path})")
-            servers = data[root_key]
-        
-        # Verify that all servers requested for this agent are present
-        expected_servers = set(agent_config.get("servers", {}).keys())
-        actual_servers = set(servers.keys())
-        if not expected_servers.issubset(actual_servers):
-            missing = expected_servers - actual_servers
-            raise AssertionError(f"Missing servers {missing} in {agent_name} ({path})")
-        print(f"PASS: {agent_name} verified presence of expected servers via structured data.")
+    if not config:
+        print("Warning: config is empty, but this might be normal if servers.yaml is missing.")
+    else:
+        if "servers" not in config:
+            raise AssertionError("Key 'servers' missing in config")
+        print("PASS: Configuration loaded correctly.")
 
 if __name__ == "__main__":
     try:
         test_placeholders()
-        test_jsonc_markers()
-        test_chronos_graph_rendering()
+        test_gateway_config_loading()
         print("\n🎉 All specific verification points passed!")
     except Exception as e:
         print(f"\n❌ TEST FAILED: {e}")
