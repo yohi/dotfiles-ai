@@ -45,10 +45,34 @@ install-apm: ## Microsoft APM をインストール
 	@if command -v apm >/dev/null 2>&1; then \
 		echo "✅ APM は既にインストールされています ($$(apm --version 2>/dev/null || echo 'installed'))"; \
 	else \
-		echo "📦 APM をインストール中..."; \
-		curl -sSL $(APM_INSTALL_URL) | sh; \
-		if ! command -v apm >/dev/null 2>&1; then \
-			echo "⚠️  APM インストール後に PATH が通っていない可能性があります。手動で設定を確認してください。"; \
+		INSTALL_SUCCESS=false; \
+		if command -v brew >/dev/null 2>&1; then \
+			echo "📦 Homebrew を使用して APM をインストール中..."; \
+			if brew install apm >/dev/null 2>&1; then \
+				INSTALL_SUCCESS=true; \
+			else \
+				echo "⚠️  Homebrew でのインストールに失敗しました。スクリプトによるインストールを試みます。"; \
+			fi; \
+		fi; \
+		\
+		if [ "$$INSTALL_SUCCESS" = "false" ]; then \
+			echo "📦 APM インストールスクリプトを実行中..."; \
+			INSTALL_SCRIPT=$$(mktemp /tmp/apm-install.XXXXXX.sh); \
+			if curl -sSL "$(APM_INSTALL_URL)" -o "$$INSTALL_SCRIPT"; then \
+				sh "$$INSTALL_SCRIPT"; \
+				rm -f "$$INSTALL_SCRIPT"; \
+			else \
+				echo "❌ インストールスクリプトのダウンロードに失敗しました"; \
+				rm -f "$$INSTALL_SCRIPT"; \
+				exit 1; \
+			fi; \
+		fi; \
+		\
+		if command -v apm >/dev/null 2>&1; then \
+			echo "✅ APM のインストールが完了しました"; \
+		else \
+			echo "❌ APM のインストールに失敗したか、PATH が通っていません。"; \
+			exit 1; \
 		fi; \
 	fi
 
