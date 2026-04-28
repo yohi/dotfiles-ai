@@ -54,6 +54,12 @@ The following rules apply to **ALL** projects unless overridden by a local proje
 
 
 
+
+
+
+
+
+
 <!-- SKILLPORT_START -->
 ## SkillPort Skills
 
@@ -80,8 +86,8 @@ Each skill contains step-by-step instructions, templates, and scripts.
 
 <!-- NOTE: External skills (anthropics/*, superpowers/*) are managed via apm.yml.
      They are automatically synchronized and locked using 'apm install'.
-     IMPORTANT: Custom skills are tracked in Git, but external namespaces must be ignored
-     in the project root .gitignore (blacklist strategy) to avoid polluting the repo. -->
+     IMPORTANT: Custom skills are tracked in Git. External namespaces should generally be ignored
+     in the project root .gitignore (blacklist strategy) unless explicitly required for the repository's configuration. -->
 <available_skills>
 <skill>
   <name>agent-skill-architect</name>
@@ -90,7 +96,7 @@ Each skill contains step-by-step instructions, templates, and scripts.
 </skill>
 <skill>
   <name>anthropics/ai-api</name>
-  <description>Build apps with the Claude API or Anthropic SDK. TRIGGER when code imports 'anthropic', '@anthropic-ai/sdk', or 'claude_agent_sdk', or user asks to use Claude API, Anthropic SDKs, or Agent SDK. DO NOT TRIGGER when code imports 'openai' or other AI SDKs, general programming, or ML/data-science tasks.</description>
+  <description>Build apps with Claude API/Anthropic SDK. Trigger on: imports (anthropic, @anthropic-ai/sdk, claude_agent_sdk) or direct requests for Anthropic/Agent SDKs. Not for: openai, other AI SDKs, general programming, or ML tasks.</description>
   <location>agent-skills/anthropics/ai-api/SKILL.md</location>
 </skill>
 <skill>
@@ -270,6 +276,9 @@ Each skill contains step-by-step instructions, templates, and scripts.
 </skill>
 </available_skills>
 <!-- SKILLPORT_END -->
+
+
+
 
 
 

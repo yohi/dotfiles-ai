@@ -60,9 +60,9 @@ restore_external_skills_note() {
     local tmp_file
 
     note='<!-- NOTE: External skills (anthropics/*, superpowers/*) are managed via apm.yml.
-     They are automatically synchronized and locked using '"'apm install'"'.
-     IMPORTANT: Custom skills are tracked in Git, but external namespaces must be ignored
-     in the project root .gitignore (blacklist strategy) to avoid polluting the repo. -->'
+     They are automatically synchronized and locked using '\''apm install'\''.
+     IMPORTANT: Custom skills are tracked in Git. External namespaces should generally be ignored
+     in the project root .gitignore (blacklist strategy) unless explicitly required for the repository'\''s configuration. -->'
 
     # check if the note already exists anywhere in the file (not just after run_skillport_doc)
     if grep -Eq '^[[:space:]]*<available_skills([[:space:]]|>)' "$file_path" && ! grep -q "External skills (anthropics/\*, superpowers/\*)" "$file_path"; then

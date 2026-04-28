@@ -93,6 +93,12 @@ docker container prune -f --filter "label=docker-mcp=true"
 
 
 
+
+
+
+
+
+
 <!-- SKILLPORT_START -->
 ## SkillPort Skills
 
@@ -115,7 +121,7 @@ Each skill contains step-by-step instructions, templates, and scripts.
 - Use your native Read tool with `{path}/file` for templates/assets
 - Execute scripts via path, don't read them into context: `python {path}/scripts/run.py`
 - Replace `{path}` in instructions with the actual path from `load_skill`
-- If search_skills(query) returns 10 or more results, refine your query to be more specific
+- If search returns too many results, use more specific terms
 
 <!-- NOTE: External skills (anthropics/*, superpowers/*) are managed via apm.yml.
      They are automatically synchronized and locked using 'apm install'.
@@ -129,7 +135,7 @@ Each skill contains step-by-step instructions, templates, and scripts.
 </skill>
 <skill>
   <name>anthropics/ai-api</name>
-  <description>Build apps with Claude API/Anthropic SDK. Trigger on: imports ('anthropic', '@anthropic-ai/sdk', 'claude_agent_sdk') or direct requests for Anthropic/Agent SDKs. Not for: 'openai', other AI SDKs, general programming, or ML tasks.</description>
+  <description>Build apps with Claude API/Anthropic SDK. Trigger on: imports (anthropic, @anthropic-ai/sdk, claude_agent_sdk) or direct requests for Anthropic/Agent SDKs. Not for: openai, other AI SDKs, general programming, or ML tasks.</description>
   <location>agent-skills/anthropics/ai-api/SKILL.md</location>
 </skill>
 <skill>
@@ -309,6 +315,9 @@ Each skill contains step-by-step instructions, templates, and scripts.
 </skill>
 </available_skills>
 <!-- SKILLPORT_END -->
+
+
+
 
 
 ## Superpowers Workflow
