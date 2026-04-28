@@ -20,6 +20,27 @@ CODEX_CONFIG     := $(REPO_ROOT)/codex/config.toml
         install-external-skills clean-legacy
 
 # ============================================================
+# install-external-skills: 外部スキルのセットアップ
+# ============================================================
+install-external-skills: ## apm install を実行（ない場合は git clone でフォールバック）
+	@echo "📦 外部スキルのインストールを確認中..."
+	@if command -v apm >/dev/null 2>&1; then \
+		echo "  -> Using apm install"; \
+		apm install; \
+	else \
+		echo "  ⚠️  apm コマンドが見つかりません。git clone でフォールバックします..."; \
+		mkdir -p "$(AGENT_SKILLS_DIR)/anthropics"; \
+		mkdir -p "$(AGENT_SKILLS_DIR)/superpowers"; \
+		if [ ! -d "$(AGENT_SKILLS_DIR)/anthropics/.git" ]; then \
+			git clone --depth 1 https://github.com/anthropics/skills "$(AGENT_SKILLS_DIR)/anthropics" || true; \
+		fi; \
+		if [ ! -d "$(AGENT_SKILLS_DIR)/superpowers/.git" ]; then \
+			git clone --depth 1 https://github.com/obra/superpowers "$(AGENT_SKILLS_DIR)/superpowers" || true; \
+		fi; \
+	fi
+	@echo "✅ 外部スキルの準備が完了しました"
+
+# ============================================================
 # sync-agents: メインの同期ターゲット (SPEC Feature #1, #2, #3)
 # ============================================================
 sync-agents: ## SSOTのスキル群を各エージェントの設定ファイルへ同期する

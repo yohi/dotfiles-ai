@@ -34,13 +34,13 @@ jobs:
 
     - name: Install external skills
       run: |
+        # Use our new make target that handles apm install or git clone fallback
         make install-external-skills
 
     - name: Render MCP Configs
       run: |
-        # Generate initial config files from templates and render placeholders
-        # We skip the full 'make sync-mcp' because it tries to restart systemd services
-        bash _scripts/sync-mcp-configs.sh || true # Ignore systemd restart failures in CI
+        # Generate config files using the new consolidated renderer
+        python3 _scripts/render-mcp-configs.py
 
     - name: Run Integrity Tests
       run: |
