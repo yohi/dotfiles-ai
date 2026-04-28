@@ -156,11 +156,14 @@ def main() -> int:
     
     # Bootstrap symlink if it exists in repo
     bootstrap_src = repo_root / "mcp" / "catalogs" / "bootstrap.yaml"
+    bootstrap_dest = dot_docker_catalogs / "bootstrap.yaml"
     if bootstrap_src.exists():
-        bootstrap_dest = dot_docker_catalogs / "bootstrap.yaml"
         if bootstrap_dest.is_symlink() or bootstrap_dest.exists():
             bootstrap_dest.unlink()
         bootstrap_dest.symlink_to(bootstrap_src)
+    else:
+        if bootstrap_dest.is_symlink() or bootstrap_dest.exists():
+            bootstrap_dest.unlink()
 
     print(f"✅ Configs deployed to {dot_docker_mcp}")
 

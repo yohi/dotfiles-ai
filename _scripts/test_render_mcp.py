@@ -2,7 +2,9 @@
 import importlib.util
 import sys
 import unittest
+import tempfile
 from pathlib import Path
+from unittest.mock import patch
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.append(str(REPO_ROOT / "_scripts"))
@@ -21,36 +23,43 @@ class TestMCPRenderer(unittest.TestCase):
     def setUp(self):
         self.gateway_url = "http://localhost:10888/sse"
         self.config = render_mcp_configs.load_client_config()
+        # Create a temporary directory to isolate home
+        self.tmp_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp_dir.cleanup)
+        self.tmp_home = Path(self.tmp_dir.name)
 
     def test_placeholders(self):
         replace_placeholders = render_mcp_configs.replace_placeholders
         
-        # 1. Verify __HOME__
-        home_val = replace_placeholders("__HOME__", self.gateway_url)
-        self.assertEqual(home_val, str(Path.home()))
+        with patch.object(render_mcp_configs.Path, "home", return_value=self.tmp_home):
+            # 1. Verify __HOME__
+            home_val = replace_placeholders("__HOME__", self.gateway_url)
+            self.assertEqual(home_val, str(self.tmp_home))
 
-        # 2. Verify __REPO_ROOT__
-        repo_val = replace_placeholders("__REPO_ROOT__", self.gateway_url)
-        self.assertEqual(repo_val, str(REPO_ROOT))
+            # 2. Verify __REPO_ROOT__
+            repo_val = replace_placeholders("__REPO_ROOT__", self.gateway_url)
+            self.assertEqual(repo_val, str(REPO_ROOT))
 
-        # 3. Verify multiple placeholders
-        multi_val = replace_placeholders("__REPO_ROOT__/__HOME__/__GATEWAY_URL__", self.gateway_url)
-        expected = f"{REPO_ROOT}/{Path.home()}/{self.gateway_url}"
-        self.assertEqual(multi_val, expected)
+            # 3. Verify multiple placeholders
+            multi_val = replace_placeholders("__REPO_ROOT__/__HOME__/__GATEWAY_URL__", self.gateway_url)
+            expected = f"{REPO_ROOT}/{self.tmp_home}/{self.gateway_url}"
+            self.assertEqual(multi_val, expected)
 
     def test_gateway_config_loading_and_rendering(self):
         self.assertTrue(self.config, "Configuration is empty. servers.yaml must exist for testing.")
         self.assertIn("servers", self.config, "Key 'servers' missing in config")
 
-        # Execution of the main renderer
-        exit_code = render_mcp_configs.main()
+        # Execution of the main renderer with mocked Path.home
+        with patch.object(render_mcp_configs.Path, "home", return_value=self.tmp_home):
+            exit_code = render_mcp_configs.main()
+        
         self.assertEqual(exit_code, 0, "render_mcp_configs.main() returned non-zero exit code")
         
-        # Verification of artifacts
-        dot_docker_mcp = Path.home() / ".docker" / "mcp"
+        # Verification of artifacts under temporary home
+        dot_docker_mcp = self.tmp_home / ".docker" / "mcp"
         config_yaml = dot_docker_mcp / "config.yaml"
         custom_catalog = dot_docker_mcp / "catalogs" / "custom.yaml"
-        systemd_dir = Path.home() / ".config" / "systemd" / "user"
+        systemd_dir = self.tmp_home / ".config" / "systemd" / "user"
         service_file = systemd_dir / "docker-mcp-gateway.service"
 
         self.assertTrue(config_yaml.exists(), f"Generated config.yaml missing at {config_yaml}")
@@ -62,6 +71,32 @@ class TestMCPRenderer(unittest.TestCase):
         placeholders = ["__REPO_ROOT__", "__ENABLED_SERVERS__"]
         for ph in placeholders:
             self.assertNotIn(ph, service_content, f"Placeholder {ph} found in deployed service file")
+
+    def test_bootstrap_yaml_deployment(self):
+        dot_docker_catalogs = self.tmp_home / ".docker" / "mcp" / "catalogs"
+        bootstrap_dest = dot_docker_catalogs / "bootstrap.yaml"
+        bootstrap_src = REPO_ROOT / "mcp" / "catalogs" / "bootstrap.yaml"
+
+        # Case 1: bootstrap.yaml exists in repo
+        with patch.object(render_mcp_configs.Path, "home", return_value=self.tmp_home):
+            render_mcp_configs.main()
+        
+        if bootstrap_src.exists():
+            self.assertTrue(bootstrap_dest.exists(), "bootstrap.yaml should be deployed when it exists in repo")
+        
+        # Case 2: bootstrap.yaml does NOT exist in repo (simulated)
+        # We patch the instance method Path.exists via the class with autospec=True
+        original_exists = render_mcp_configs.Path.exists
+        def mock_exists(path_obj):
+            if str(path_obj).endswith("bootstrap.yaml"):
+                return False
+            return original_exists(path_obj)
+
+        with patch.object(render_mcp_configs.Path, "exists", autospec=True, side_effect=mock_exists):
+            with patch.object(render_mcp_configs.Path, "home", return_value=self.tmp_home):
+                render_mcp_configs.main()
+        
+        self.assertFalse(bootstrap_dest.exists(), "bootstrap.yaml should be removed from dest if it doesn't exist in repo")
 
 if __name__ == "__main__":
     unittest.main()
