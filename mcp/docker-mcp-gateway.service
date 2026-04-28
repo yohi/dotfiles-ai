@@ -7,7 +7,7 @@ Environment="PATH=/home/linuxbrew/.linuxbrew/bin:/usr/local/bin:/usr/bin:/bin"
 Type=simple
 WorkingDirectory=__REPO_ROOT__
 EnvironmentFile=__REPO_ROOT__/.env
-ExecStartPre=/usr/bin/env bash _scripts/sync-mcp-configs.sh
+ExecStartPre=/usr/bin/env python3 _scripts/render-mcp-configs.py
 ExecStart=/usr/bin/env bash _scripts/mcp-stdio-wrapper.sh \
   gateway run \
   --transport sse \

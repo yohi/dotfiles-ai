@@ -25,7 +25,6 @@ CODEX_CONFIG     := $(REPO_ROOT)/codex/config.toml
 sync-agents: ## SSOTのスキル群を各エージェントの設定ファイルへ同期する
 	@echo "🔄 sync-agents: SSOT → 各エージェントへの同期を開始..."
 	@$(MAKE) clean-sync-artifacts
-	@$(MAKE) install-external-skills
 	@$(MAKE) sync-skillport-doc
 	@$(MAKE) link-user-agents
 	@$(MAKE) link-agent-commands
@@ -47,19 +46,6 @@ clean-sync-artifacts: ## 同期マーカーおよび生成されたリンク・�
 	find "$(REPO_ROOT)/.cursor/rules" -maxdepth 1 -type l -name "*.md" -delete 2>/dev/null || true
 	rm -rf "$(REPO_ROOT)/gemini/commands"
 	@echo "✅ clean-sync-artifacts: 同期状態がリセットされました"
-# ============================================================
-# install-external-skills: 外部スキルの自動インストール
-# EXTERNAL_SKILLS.md に記載された全 namespace のスキルを取得
-# ============================================================
-install-external-skills: ## EXTERNAL_SKILLS.md に基づいて外部スキルをインストール
-	@echo "📦 install-external-skills: 外部スキルのインストールを確認中..."
-	@if [ -x "$(REPO_ROOT)/_scripts/install-external-skills.sh" ]; then \
-		bash "$(REPO_ROOT)/_scripts/install-external-skills.sh" || \
-			(echo "❌ 外部スキルのインストールに失敗しました"; exit 1); \
-	else \
-		echo "❌ _scripts/install-external-skills.sh が見つからないか、実行権限がありません"; \
-		exit 1; \
-	fi
 
 # ============================================================
 # sync-skillport-doc: skillport doc の実行と各 AGENTS への直接反映

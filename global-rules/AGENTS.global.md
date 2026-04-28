@@ -72,10 +72,8 @@ Each skill contains step-by-step instructions, templates, and scripts.
 - Replace `{path}` in instructions with the actual path from `load_skill`
 - If search returns too many results, use more specific terms
 
-<!-- NOTE: External skills (anthropics/*, superpowers/*) must be installed via:
-     skillport add <pkg> agent-skills/<ns> --namespace <ns>
-     (e.g., skillport add anthropics/algorithmic-art agent-skills/anthropics --namespace anthropics)
-     See agent-skills/EXTERNAL_SKILLS.md for the authoritative external-skill lock file.
+<!-- NOTE: External skills (anthropics/*, superpowers/*) are managed via apm.yml.
+     They are automatically synchronized and locked using 'apm install'.
      IMPORTANT: Custom skills are tracked in Git, but external namespaces must be ignored
      in the project root .gitignore (blacklist strategy) to avoid polluting the repo. -->
 <available_skills>

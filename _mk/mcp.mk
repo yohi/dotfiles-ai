@@ -19,7 +19,7 @@ help-mcp: ## MCP の使い方を表示
 	$(call show-guide,$(REPO_ROOT)/_docs/guides/mcp.md)
 
 sync-mcp: ## Render and synchronize centralized MCP configs
-	@bash _scripts/sync-mcp-configs.sh
+	@python3 _scripts/render-mcp-configs.py
 	@$(MAKE) restart-mcp
 	@echo "✅ MCP synchronization complete."
 

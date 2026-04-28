@@ -46,19 +46,19 @@ Never mix IDE styling configurations here, and never put AI instructions or MCP 
 ## 4. Development Workflow
 - **SSOT Enforcement**: Never edit symlinked files in home directories (e.g., `~/.gemini/GEMINI.md`). Always edit the Source of Truth within this repository.
 - **MCP Gateway**: Use the **Unified SSE Gateway (`http://localhost:10888/sse`)** as the standard connection method for all tools.
-  - **SSOT Principle**: **`mcp/servers.yaml`** is the Single Source of Truth for all MCP configurations. `mcp/config.yaml` and agent-specific configuration files (e.g., `.claude.json`, `gemini/settings.json`) are auto-generated from it.
+  - **SSOT Principle**: **`apm.yml`** is the master manifest for the project. **`mcp/servers.yaml`** is the Source of Truth for Gateway-side MCP configurations. `mcp/config.yaml` is auto-generated from it via APM's `post_install` hook.
   - **Benefits of SSE Integration**:
     - **Zero-second Startup**: Since the Gateway is not launched individually for each agent session, initialization delays (typically 7-10s) and timeouts/hangs are completely eliminated.
     - **Resource Stability**: Prevents "too many open files" errors and Docker container conflicts common with the stdio transport method.
-    - **Automatic Authentication**: `render-mcp-configs.py` automatically injects the latest authorization tokens into each configuration file, eliminating the need for manual setup.
+    - **APM Integration**: `apm install` automatically injects the Gateway SSE endpoint into all detected AI clients.
   - **Maintenance**: The gateway runs as a background service (`docker-mcp-gateway.service`), and the `mcp-watchdog.service` ensures automatic recovery in case of hangs.
 - **Skill Management**: New AI capabilities MUST be implemented as SkillPort skills in `agent-skills/` and managed via MCP.
-- **External Skills (Lock-file)**: High-quality external skills (like `superpowers/`) are managed via `agent-skills/EXTERNAL_SKILLS.md`. These files are ignored by Git and synchronized across environments using `make setup-superpowers` or `make sync-agents`. This prevents duplicating external code while maintaining version consistency.
+- **External Skills (APM)**: High-quality external skills (like `superpowers/`) are managed via `apm.yml`. They are automatically synchronized using `apm install` or `make setup`. This prevents duplicating external code while maintaining version consistency.
 
 ## 5. Tooling & Automation
-- `make setup`: Bootstrap the environment and create initial symlinks.
+- `make setup`: Bootstrap the environment and run `apm install`.
 - `make setup-docker-mcp`: Bootstrap Docker MCP Gateway service files and runtime environment.
-- `make sync-agents`: Refresh skill listings from `agent-skills/`, then propagate shared agent assets to each agent context.
+- `make sync-mcp`: Re-render Gateway backend configuration and restart the service.
 
 ## 6. MCP Gateway Advanced Configuration
 
