@@ -6,7 +6,7 @@ import re
 import sys
 import shutil
 from pathlib import Path
-from typing import Any, cast, Match, Dict, List
+from typing import Any, cast, Match, Dict
 import yaml
 
 def load_client_config() -> dict[str, Any]:
