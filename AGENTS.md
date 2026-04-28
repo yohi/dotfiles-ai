@@ -129,7 +129,7 @@ Each skill contains step-by-step instructions, templates, and scripts.
 </skill>
 <skill>
   <name>anthropics/ai-api</name>
-  <description>Build apps with the Claude API or Anthropic SDK. Trigger when code imports 'anthropic', '@anthropic-ai/sdk', or 'claude_agent_sdk'. Also trigger if the user asks to use Claude API, Anthropic SDKs, or the Agent SDK. Avoid triggering for 'openai', other AI SDKs, general programming, or ML/data-science tasks.</description>
+  <description>Build apps with Claude API/Anthropic SDK. Trigger on: imports ('anthropic', '@anthropic-ai/sdk', 'claude_agent_sdk') or direct requests for Anthropic/Agent SDKs. Not for: 'openai', other AI SDKs, general programming, or ML tasks.</description>
   <location>agent-skills/anthropics/ai-api/SKILL.md</location>
 </skill>
 <skill>
