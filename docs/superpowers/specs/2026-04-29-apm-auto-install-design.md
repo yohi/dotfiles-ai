@@ -15,7 +15,7 @@ Add `APM_INSTALL_URL` to point to the official Microsoft APM installation script
 Add `install-apm` target:
 - Check if `apm` is in `PATH`.
 - **First attempt**: If `brew` is available, run `brew install apm`.
-- **Fallback**: If Homebrew is missing or fails, download the official script to a temporary file via `curl -sSL` and execute it.
+- **Fallback**: If Homebrew is missing or fails, download the official script to a temporary file via `curl -sSL`, **verify its SHA256 hash**, and execute it.
 - **Verification**: Ensure `apm` is available after installation, or exit with status 1.
 
 ### 3. Main Workflow (`_mk/main.mk`)
