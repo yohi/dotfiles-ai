@@ -8,7 +8,8 @@ The goal is to eliminate custom Bash/Python sync scripts by leveraging APM's nat
 **"APM Native Transition with Gateway Preservation" (Approach A)**
 
 *   **APM as SSOT**: `apm.yml` at the repository root becomes the Single Source of Truth for all external skill dependencies and client-side MCP configurations.
-*   **Gateway Retention**: The Docker MCP Gateway (`http://127.0.0.1:10888/sse`) is maintained to manage backend server execution (container lifecycle, etc.).
+*   **Gateway Retention**:
+    The Docker MCP Gateway (`http://127.0.0.1:10888/sse`) is maintained to manage backend server execution (container lifecycle, etc.).
 *   **Division of Labor**:
     *   **APM**: Downloads skills, hashes them for security (`apm.lock.yaml`), and injects the Gateway SSE endpoint into each AI client's native config file.
     *   **Makefile/Hooks**: A scaled-down script handles only the Gateway's backend configuration (e.g., generating `mcp/config.yaml` from `mcp/servers.yaml` and restarting the systemd service) triggered via APM's `post_install` hook.
@@ -42,22 +43,16 @@ description: "AI Agent settings, skills, and unified MCP configuration for dotfi
 
 dependencies:
   apm:
-    - "obra/superpowers#main"
-    - "anthropics/skills#main"
+    - "obra/superpowers#6efe32c9e2dd002d0c394e861e0529675d1ab32e"
+    - "anthropics/skills#5128e1865d670f5d6c9cef000e6dfc4e951fb5b9"
 
   mcp:
     - name: docker-mcp-gateway
       transport: sse
       url: "http://127.0.0.1:10888/sse"
 
-exports:
-  skills:
-    - "agent-skills/**"
-
-hooks:
-  post_install:
-    - command: "make sync-mcp"
-      description: "Re-rendering Docker MCP Gateway backend configs and restarting service."
+scripts:
+  sync-mcp: "make sync-mcp"
 ```
 
 ## 5. Deployment Flow

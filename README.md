@@ -8,7 +8,6 @@ AIエージェント（Claude Code, Gemini CLI, OpenCode, Codex）の設定・�
 
 > [!IMPORTANT]
 > 本リポジトリは [dotfiles-core](https://github.com/yohi/dotfiles-core) によって管理されるコンポーネントの一つです。
-
 > [!WARNING]
 > **使用時の注意点**
 > 本リポジトリは `dotfiles-core` の共通 Makefile ルール（`common-mk`）に依存しており、実行時には `common-mk` へのシンボリックリンクが必要です。そのため、**本リポジトリ単体での使用（クローンしての利用）はサポートされていません。**
@@ -98,6 +97,8 @@ AIエージェント（Claude Code, Gemini CLI, OpenCode, Codex）の設定・�
 
 `apm install` により、APM が各エージェントの設定ファイル（`mcp.json` や `settings.json` 等）を自動検出し、Docker MCP Gateway の SSE エンドポイントを注入します。
 
+**Automated Flow**: `make setup` → `apm install` (triggers `post_install` hooks) → `make sync-mcp` (renders backend config & restarts service).
+
 | エージェント | 接続方式 | 管理主体 |
 |:-----------|:--------|:--------|
 | **Claude Code** | Native SSE | APM (`apm install`) |
@@ -108,6 +109,7 @@ AIエージェント（Claude Code, Gemini CLI, OpenCode, Codex）の設定・�
 | **VSCode** | Native SSE | APM (`apm install`) |
 
 注記:
+- SSE エンドポイントとして `http://127.0.0.1:10888/sse` と `http://localhost:10888/sse` が混在している場合がありますが、これらは実質的に同一であり、環境に合わせて自動的に設定されます。
 - Gateway 自体のバックエンド構成（`mcp/config.yaml` の生成）は、`apm install` の `post_install` フックによって `make sync-mcp` が実行され、自動的に行われます。
 
 ## デプロイ構造 (シンボリックリンク)

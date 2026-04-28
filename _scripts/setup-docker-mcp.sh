@@ -157,7 +157,7 @@ if [[ ! -f "$CATALOG_FILE" ]]; then
 fi
 
 echo -e "${BLUE}⚙️  Setting up systemd service...${NC}"
-# Service file is already written by sync-mcp-configs.sh (called above).
+# Service file is rendered and deployed by render-mcp-configs.py (called above).
 # Only reload and enable/restart here.
 systemctl --user daemon-reload
 systemctl --user enable docker-mcp-gateway.service

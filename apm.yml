@@ -5,8 +5,8 @@ description: "AI Agent settings, skills, and unified MCP configuration for dotfi
 
 dependencies:
   apm:
-    - "obra/superpowers#main"
-    - "anthropics/skills#main"
+    - "obra/superpowers#6efe32c9e2dd002d0c394e861e0529675d1ab32e"
+    - "anthropics/skills#5128e1865d670f5d6c9cef000e6dfc4e951fb5b9"
 
   mcp:
     - name: docker-mcp-gateway

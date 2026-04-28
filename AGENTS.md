@@ -46,7 +46,7 @@ Never mix IDE styling configurations here, and never put AI instructions or MCP 
 ## 4. Development Workflow
 - **SSOT Enforcement**: Never edit symlinked files in home directories (e.g., `~/.gemini/GEMINI.md`). Always edit the Source of Truth within this repository.
 - **MCP Gateway**: Use the **Unified SSE Gateway (`http://localhost:10888/sse`)** as the standard connection method for all tools.
-  - **SSOT Principle**: **`apm.yml`** is the master manifest for the project. **`mcp/servers.yaml`** is the Source of Truth for Gateway-side MCP configurations. `mcp/config.yaml` is auto-generated from it via APM's `post_install` hook.
+  - **SSOT Principle**: **`apm.yml`** is the master manifest for the project. **APM** stands for **Microsoft APM (Agent Package Manager)**. **`mcp/servers.yaml`** is the Source of Truth for Gateway-side MCP configurations. `mcp/config.yaml` is auto-generated from it via APM's `post_install` hook.
   - **Benefits of SSE Integration**:
     - **Zero-second Startup**: Since the Gateway is not launched individually for each agent session, initialization delays (typically 7-10s) and timeouts/hangs are completely eliminated.
     - **Resource Stability**: Prevents "too many open files" errors and Docker container conflicts common with the stdio transport method.
@@ -56,9 +56,9 @@ Never mix IDE styling configurations here, and never put AI instructions or MCP 
 - **External Skills (APM)**: High-quality external skills (like `superpowers/`) are managed via `apm.yml`. They are automatically synchronized using `apm install` or `make setup`. This prevents duplicating external code while maintaining version consistency.
 
 ## 5. Tooling & Automation
-- `make setup`: Bootstrap the environment and run `apm install`.
+- `make setup`: Bootstrap the environment and run `apm install`. (This triggers `sync-agents` and executes APM's `post_install` hooks).
 - `make setup-docker-mcp`: Bootstrap Docker MCP Gateway service files and runtime environment.
-- `make sync-mcp`: Re-render Gateway backend configuration and restart the service.
+- `make sync-mcp`: Re-render Gateway backend configuration and restart the service. (Executed automatically by `apm install`, but can be run manually after updating `mcp/servers.yaml`).
 
 ## 6. MCP Gateway Advanced Configuration
 

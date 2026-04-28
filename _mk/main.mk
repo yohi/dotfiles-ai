@@ -13,6 +13,7 @@ setup: install-requirements
 		echo "❌ APMがインストールされていません。 https://github.com/microsoft/apm に従いインストールしてください。"; \
 		exit 1; \
 	fi
+	@$(MAKE) sync-agents
 	$(Q_ECHO) "✅ dotfiles-ai のコア設定が適用されました"
 
 sync: ## [更新] リポジトリを最新にし、エージェントを同期する
