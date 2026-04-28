@@ -181,44 +181,12 @@ check-cursor-version:
 		echo "⚠️ 警告: jqコマンドがないため確認をスキップします"; \
 	fi
 
-# SuperCursor (Cursor Framework) のインストール
-install-packages-supercursor:
-	@echo "🚀 SuperCursor (Cursor Framework) のインストールを開始..."
-	@echo "📁 必要なディレクトリを作成中..."; \
-	mkdir -p "${HOME_DIR}/.cursor"; \
-	\
-	echo "🔗 シンボリックリンクを作成中..."; \
-	BACKUP_DIR="${HOME_DIR}/.cursor/backups/$$(date +%Y%m%d_%H%M%S)"; \
-	safe_link() { \
-		src="$$1"; dst="$$2"; \
-		if [ -L "$$dst" ]; then \
-			rm -f "$$dst"; \
-		elif [ -e "$$dst" ]; then \
-			mkdir -p "$$BACKUP_DIR"; \
-			mv "$$dst" "$$BACKUP_DIR/"; \
-			echo "📦 既存のファイルをバックアップしました: $$dst -> $$BACKUP_DIR/"; \
-		fi; \
-		ln -sfn "$$src" "$$dst"; \
-	}; \
-	safe_link "${REPO_ROOT}/ide/cursor/supercursor" "${HOME_DIR}/.cursor/supercursor"; \
-	safe_link "${REPO_ROOT}/ide/cursor/supercursor/Commands" "${HOME_DIR}/.cursor/commands"; \
-	safe_link "${REPO_ROOT}/ide/cursor/supercursor/Core" "${HOME_DIR}/.cursor/core"; \
-	safe_link "${REPO_ROOT}/ide/cursor/supercursor/Hooks" "${HOME_DIR}/.cursor/hooks"; \
-	safe_link "${REPO_ROOT}/ide/cursor/supercursor/README.md" "${HOME_DIR}/.cursor/CURSOR.md"; \
-	if [ -f "${REPO_ROOT}/global-rules/AGENTS.global.md" ]; then \
-		safe_link "${REPO_ROOT}/global-rules/AGENTS.global.md" "${HOME_DIR}/.cursor/AGENTS.md"; \
-	fi; \
-	echo "✅ SuperCursor フレームワークのセットアップが完了しました"
-
 # ========================================
 # エイリアス
 # ========================================
 
 .PHONY: install-cursor
 install-cursor: install-packages-cursor  ## Cursor IDEをインストール(エイリアス)
-
-.PHONY: install-supercursor
-install-supercursor: install-packages-supercursor  ## SuperCursorをインストール(エイリアス)
 
 .PHONY: uninstall-cursor
 uninstall-cursor:

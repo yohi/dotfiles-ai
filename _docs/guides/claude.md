@@ -8,15 +8,7 @@
 
 ## 📋 初回セットアップコマンド
 - `summarize this project`
-- `/init`
-
-## 🚀 SuperClaude (フレームワーク)
-Claude Code内で以下のコマンドが利用可能:
-- `/sc:implement <feature>`     - 機能実装
-- `/sc:design <ui>`             - UI/UXデザイン
-- `/sc:analyze <code>`          - コード分析
-- `/sc:test <suite>`            - テストスイート
-- `/sc:improve <code>`          - コード改善
+- `/help`
 
 ## 🖥️ Claudia (GUI)
 - **起動方法**: アプリケーションメニューから 'Claudia' を選択、または `/opt/claudia/claudia`
@@ -25,10 +17,9 @@ Claude Code内で以下のコマンドが利用可能:
 ## 🩺 トラブルシューティング
 設定に不備があると感じた場合は、ターミナルで以下を実行してください。
 ```bash
-make doctor
+make check-claude
 ```
 
 ## 📚 ドキュメント
 - [Claude Code](https://docs.anthropic.com/claude-code)
-- [SuperClaude](https://superclaude-org.github.io/)
 - [Claudia](https://github.com/getAsterisk/claudia)

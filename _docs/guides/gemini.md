@@ -1,38 +1,25 @@
-# SuperGemini (Gemini CLI Framework) 使用ガイド
+# Gemini CLI 使用ガイド
 
-🎉 SuperGemini のセットアップが完了しました！
+Gemini CLI は、Google の Gemini モデルをコマンドラインから利用するためのツールです。
 
 ## 🚀 使用方法:
 1. Gemini CLI を起動: `gemini`
-2. SuperGemini コマンドを使用
+2. 対話を開始するか、カスタムコマンドを使用します。
 
-## 📋 利用可能なコマンド例:
-- `/user-implement <feature>`    - 機能の実装
-- `/user-build`                  - ビルド・パッケージング
-- `/user-design <ui>`            - UI/UXデザイン
-- `/user-analyze <code>`         - コード分析
-- `/user-troubleshoot <issue>`   - 問題のデバッグ
-- `/user-test <suite>`           - テストスイート
-- `/user-improve <code>`         - コード改善
-- `/user-cleanup`                - コードクリーンアップ
-- `/user-document <code>`        - ドキュメント生成
-- `/user-git <operation>`        - Git操作
-- `/user-estimate <task>`        - 時間見積もり
-- `/user-task <management>`      - タスク管理
+## 📋 カスタムコマンド (User Tools):
+本リポジトリでは、Gemini CLI を強化するカスタムコマンドを提供しています。
+Gemini CLI 内で以下のコマンドを入力することで利用可能です。
 
-## 🎭 スマートペルソナ:
-- 🏗️ **architect**   - システム設計・アーキテクチャ
-- 🎨 **frontend**    - UI/UX・アクセシビリティ
-- ⚙️ **backend**     - API・インフラストラクチャ
-- 🔍 **analyzer**    - デバッグ・問題解決
-- 🛡️ **security**    - セキュリティ・脆弱性評価
-- ✍️ **scribe**      - ドキュメント・技術文書
+- `/build-skill` - 新しいスキルの雛形を作成
+- `/git-pr-flow` - Git のプルリクエスト作成フローを実行
+- `/setup-gh-actions-test-ci` - GitHub Actions のテスト CI をセットアップ
+
+## 🎭 ペルソナの使用:
+Gemini CLI では、特定の役割（ペルソナ）を演じさせることができます。
+例: `@codebase_investigator プロジェクトの構造を教えて`
 
 ## 🩺 トラブルシューティング
 設定に不備があると感じた場合は、ターミナルで以下を実行してください。
 ```bash
-make doctor
+make check-gemini
 ```
-
-## 📝 注意
-カスタムツールを再読み込みするには `/reload-user-tools` コマンドを使用します。

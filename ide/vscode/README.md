@@ -6,21 +6,9 @@
 
 ```text
 ide/vscode/
-├── settings/                  # SuperCopilot Framework
-│   ├── supercopilot.js        # 基本設定・データ定義
-│   ├── persona-selector.js    # ペルソナ選択ロジック
-│   ├── commands-handler.js    # コマンド処理ロジック
-│   ├── supercopilot-main.js   # メインシステム・統合
-│   └── README.md              # SuperCopilot Framework のREADME
-├── copilot-instructions/      # GitHub Copilot指示ファイル
-│   ├── commands.md            # コマンド定義
-│   ├── personas.md            # ペルソナ定義
-│   ├── rules.md               # 基本ルール
-│   └── integration.md         # 統合方法の説明
 ├── keybindings.json           # キーボードショートカット設定
 ├── settings.json              # VSCode設定
 ├── extensions.list            # インストール済み拡張機能リスト
-├── setup-supercopilot.sh      # SuperCopilot Framework セットアップスクリプト
 └── README.md                  # このファイル
 ```
 
@@ -46,14 +34,6 @@ ln -sf $(pwd)/ide/vscode/settings.json ~/.config/Code/User/settings.json
 ln -sf $(pwd)/ide/vscode/keybindings.json ~/.config/Code/User/keybindings.json
 ```
 
-または、ポータブルな設定として `~/.vscode` を使用している特別な理由がある場合（例えばエディタの起動スクリプトで独自の `--user-data-dir` を指定している場合）は、以下のようにします：
-
-```bash
-mkdir -p ~/.vscode
-ln -sf $(pwd)/ide/vscode/settings.json ~/.vscode/settings.json
-ln -sf $(pwd)/ide/vscode/keybindings.json ~/.vscode/keybindings.json
-```
-
 ### 拡張機能のインストール
 
 `extensions.list`に記載されている拡張機能をインストールするには：
@@ -62,45 +42,11 @@ ln -sf $(pwd)/ide/vscode/keybindings.json ~/.vscode/keybindings.json
 cat ~/dotfiles/ide/vscode/extensions.list | xargs -L 1 code --install-extension
 ```
 
-### SuperCopilot Frameworkのセットアップ
-
-SuperCopilot Frameworkを設定するには、セットアップスクリプトを実行します：
-
-```bash
-~/dotfiles/ide/vscode/setup-supercopilot.sh
-```
-
-これにより、以下が行われます：
-
-1. `~/.vscode/supercopilot`ディレクトリへのシンボリックリンク作成
-2. VSCode設定の確認と必要な設定の案内
-3. 使用方法の表示
-
 ## MCP 設定
 
 - VSCode の `mcpServers` は `mcp/servers.yaml` を SSOT として管理します。
 - 変更を反映するにはリポジトリルートで `make sync-mcp` を実行してください。
 - このコマンドで `ide/vscode/settings.json` の MCP セクションが再生成されます。
-
-## 特徴
-
-### キーバインディング
-
-`keybindings.json`には、効率的な作業のためのキーボードショートカットが定義されています。
-
-### SuperCopilot Framework
-
-GitHub Copilotを拡張し、以下の機能を提供します：
-
-1. **ペルソナ自動選択**
-   - ファイルタイプと質問内容から最適なペルソナを自動選択
-   - 明示的なペルソナ指定も可能（例: `@architect`）
-
-2. **コマンドシステム**
-   - 質問中にコマンドを含めるだけで専門的な回答を得られる
-   - 例: `implement 新しいログイン機能を追加したい`
-
-詳細は `settings/README.md` を参照してください。
 
 ## 注意事項
 

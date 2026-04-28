@@ -2,11 +2,10 @@
 
 ## OVERVIEW
 Configuration and rules for AI agents operating within the Cursor IDE environment.
-This includes MCP server management, custom slash commands, and the SuperCursor framework.
+This includes MCP server management and custom slash commands.
 
 ## DIRECTORY STRUCTURE
 - `commands/`: Custom slash commands (e.g., CodeRabbit, Agent workflows).
-- `supercursor/`: (Gitignored) The SuperCursor framework for enhanced agent capabilities.
 - `settings.json.template`: Template for Cursor editor settings.
 - `mcp.json`: (Generated) Model Context Protocol server configurations.
 
@@ -20,7 +19,7 @@ This includes MCP server management, custom slash commands, and the SuperCursor 
 
 ## AGENT BEHAVIOR
 - **Personas**: Use specific personas like `@architect`, `@developer`, or `@tester` when appropriate.
-- **Verification**: After implementation, use `/quick-cr-review` or `/sc:test` to verify changes.
+- **Verification**: After implementation, use automated tests to verify changes.
 - **Context**: Be aware of the `CLAUDE.md` in this directory for detailed technical guidance.
 
 ## ANTI-PATTERNS
