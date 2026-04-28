@@ -56,9 +56,13 @@ install-apm: ## Microsoft APM をインストール
 		fi; \
 		\
 		if [ "$$INSTALL_SUCCESS" = "false" ]; then \
+			if ! command -v sha256sum >/dev/null 2>&1 && ! command -v shasum >/dev/null 2>&1; then \
+				echo "❌ ハッシュ検証ユーティリティ (sha256sum または shasum) が見つかりません。"; \
+				exit 1; \
+			fi; \
 			echo "📦 APM インストールスクリプトを実行中..."; \
 			INSTALL_SCRIPT=$$(mktemp /tmp/apm-install.XXXXXX.sh); \
-			if curl -sSL "$(APM_INSTALL_URL)" -o "$$INSTALL_SCRIPT"; then \
+			if curl -f --max-time 30 -sSL "$(APM_INSTALL_URL)" -o "$$INSTALL_SCRIPT"; then \
 				ACTUAL_HASH=$$( (command -v sha256sum >/dev/null 2>&1 && sha256sum "$$INSTALL_SCRIPT" | cut -d" " -f1) || shasum -a 256 "$$INSTALL_SCRIPT" | cut -d" " -f1 ); \
 				if [ "$$ACTUAL_HASH" != "$(APM_INSTALLER_HASH)" ]; then \
 					echo "❌ APM インストーラーのハッシュ検証に失敗しました"; \
