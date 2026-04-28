@@ -115,7 +115,7 @@ Each skill contains step-by-step instructions, templates, and scripts.
 - Use your native Read tool with `{path}/file` for templates/assets
 - Execute scripts via path, don't read them into context: `python {path}/scripts/run.py`
 - Replace `{path}` in instructions with the actual path from `load_skill`
-- If search returns too many results, use more specific terms
+- If search_skills(query) returns 10 or more results, refine your query to be more specific
 
 <!-- NOTE: External skills (anthropics/*, superpowers/*) are managed via apm.yml.
      They are automatically synchronized and locked using 'apm install'.
