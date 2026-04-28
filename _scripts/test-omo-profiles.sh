@@ -26,8 +26,8 @@ mkdir -p "$TMP_DIR"
 cp "$REPO_ROOT/opencode/omo-profiles.sh" "$TMP_DIR/"
 
 # Create minimal test templates
-echo '{"token": "${MCP_GATEWAY_TOKEN}", "package": "${FLIXA_NPM_PACKAGE}"}' > "$TMP_DIR/opencode.jsonc.template"
-echo '{"token": "${MCP_GATEWAY_TOKEN}", "package": "${FLIXA_NPM_PACKAGE}"}' > "$TMP_DIR/oh-my-opencode.jsonc.template"
+echo '{"agent": {}, "token": "${MCP_GATEWAY_TOKEN}", "package": "${FLIXA_NPM_PACKAGE}"}' > "$TMP_DIR/opencode.jsonc.template"
+echo '{"agents": {"test_agent": {}}, "token": "${MCP_GATEWAY_TOKEN}", "package": "${FLIXA_NPM_PACKAGE}"}' > "$TMP_DIR/oh-my-opencode.jsonc.template"
 
 # Export dummy token and package
 export MCP_GATEWAY_TOKEN="test_token_123"
@@ -36,7 +36,18 @@ export FLIXA_NPM_PACKAGE="test_package_123"
 # Run profile setter
 cd "$TMP_DIR"
 source "omo-profiles.sh"
-omo-set-profile speed >/dev/null
+if ! omo-set-profile speed; then
+    echo "FAIL: omo-set-profile failed"
+    if [ -f "oh-my-opencode.jsonc.template" ]; then
+        echo "DEBUG: oh-my-opencode.jsonc.template content:"
+        cat "oh-my-opencode.jsonc.template"
+    fi
+    if [ -f "oh-my-opencode.jsonc" ]; then
+        echo "DEBUG: oh-my-opencode.jsonc content:"
+        cat "oh-my-opencode.jsonc"
+    fi
+    exit 1
+fi
 
 # Verify substitution
 if [ ! -f "opencode.jsonc" ]; then

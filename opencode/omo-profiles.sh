@@ -124,24 +124,27 @@ function omo-set-profile() {
       if [ -f "$output_path" ]; then
         echo "🔗 Merging agents from $output_path into 'agent' section of $base_output_path..."
         
-        # Python を使用した構造的マージ (json5 を使用)
+        # Python を使用した構造的マージ (json5 を優先し、なければ json を試行)
         if python3 - "$base_output_path" "$output_path" <<'PY'
 import sys, json, os
+
+# json5 のロードを試行し、なければ標準の json を使用
 try:
     import json5
+    loader = json5
 except ImportError:
-    print('❌ Error: Python module "json5" is required for structured merge.')
-    print('💡 Try: pip install json5')
-    sys.exit(1)
+    loader = json
 
 def merge_jsonc(base_path, overlay_path):
     try:
         with open(base_path, 'r', encoding='utf-8') as f:
-            base = json5.loads(f.read())
+            base = loader.loads(f.read())
         with open(overlay_path, 'r', encoding='utf-8') as f:
-            overlay = json5.loads(f.read())
+            overlay = loader.loads(f.read())
     except Exception as e:
-        print(f'❌ Error parsing JSONC files: {e}')
+        print(f'❌ Error parsing files using {loader.__name__}: {e}', file=sys.stderr)
+        if loader.__name__ == 'json':
+            print('💡 Hint: If your JSONC contains comments, you must install "json5": pip install json5', file=sys.stderr)
         return False
     
     # oh-my-opencode.jsonc の 'agents' セクションを 
@@ -154,9 +157,17 @@ def merge_jsonc(base_path, overlay_path):
             if k not in base['agent']:
                 base['agent'][k] = v
         
-        with open(base_path, 'w', encoding='utf-8') as f:
-            json.dump(base, f, indent=2, ensure_ascii=False)
-            f.write('\n')
+        try:
+            with open(base_path, 'w', encoding='utf-8') as f:
+                json.dump(base, f, indent=2, ensure_ascii=False)
+                f.write('\n')
+        except Exception as e:
+            print(f'❌ Error writing merged file: {e}', file=sys.stderr)
+            return False
+        return True
+    else:
+        # 'agents' キーがない場合は単に何もしない（正常系として扱うか検討が必要だが、
+        # 現状の仕様ではマージ不要とみなす）
         return True
     return False
 
