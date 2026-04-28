@@ -71,8 +71,16 @@ install-apm: ## Microsoft APM をインストール
 					rm -f "$$INSTALL_SCRIPT"; \
 					exit 1; \
 				fi; \
-				sh "$$INSTALL_SCRIPT"; \
-				rm -f "$$INSTALL_SCRIPT"; \
+				if sh "$$INSTALL_SCRIPT"; then \
+					rm -f "$$INSTALL_SCRIPT"; \
+				else \
+					EXIT_CODE=$$?; \
+					echo "❌ APM インストールスクリプトの実行に失敗しました (終了コード: $$EXIT_CODE)"; \
+					echo "URL: $(APM_INSTALL_URL)"; \
+					echo "ハッシュ: $(APM_INSTALLER_HASH)"; \
+					rm -f "$$INSTALL_SCRIPT"; \
+					exit $$EXIT_CODE; \
+				fi; \
 			else \
 				echo "❌ インストールスクリプトのダウンロードに失敗しました"; \
 				rm -f "$$INSTALL_SCRIPT"; \
