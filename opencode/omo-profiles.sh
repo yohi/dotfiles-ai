@@ -123,19 +123,46 @@ function omo-set-profile() {
       # opencode.jsonc の "agent": { セクション内にマージする
       if [ -f "$output_path" ]; then
         echo "🔗 Merging agents from $output_path into 'agent' section of $base_output_path..."
-        # 既存の "agent": { の次の行に、抽出したエージェント定義を挿入
-        # 一時ファイルを使ってエージェント内容を抽出
-        sed -n '/"agents": {/,/^  }/p' "$output_path" | sed '1d' | sed '$d' > agents_to_merge.tmp
-        # 最後の要素にカンマが必要な場合があるので調整
-        sed -i 's/    }/    },/' agents_to_merge.tmp
-        # 挿入実行
-        sed -i '/"agent": {/r agents_to_merge.tmp' "$base_output_path"
-        rm agents_to_merge.tmp
-        # カンマ重複（,,）を修正
-        sed -i 's/},,/},/g' "$base_output_path"
+        
+        # Python を使用した構造的マージ (json5 を使用)
+        if python3 -c "
+import sys, json, os
+try:
+    import json5
+except ImportError:
+    # json5 がない場合は標準 json で試行 (コメントがあると失敗する可能性がある)
+    json5 = json
+
+def merge_jsonc(base_path, overlay_path):
+    with open(base_path, 'r', encoding='utf-8') as f:
+        base = json5.loads(f.read())
+    with open(overlay_path, 'r', encoding='utf-8') as f:
+        overlay = json5.loads(f.read())
+    
+    # oh-my-opencode.jsonc の 'agents' セクションを 
+    # opencode.jsonc の 'agent' セクション内にマージ
+    if 'agents' in overlay:
+        if 'agent' not in base:
+            base['agent'] = {}
+        # 既存の 'build' などのキーを保持しつつ、エージェント定義をマージ
+        base['agent'].update(overlay['agents'])
+        
+        with open(base_path, 'w', encoding='utf-8') as f:
+            json.dump(base, f, indent=2, ensure_ascii=False)
+            f.write('\n')
+        return True
+    return False
+
+if not merge_jsonc('$base_output_path', '$output_path'):
+    sys.exit(1)
+" 2>/dev/null; then
+          echo "✅ Merge successful"
+        else
+          echo "⚠️  Warning: Structured merge failed. Check if 'agents' key exists in $output_path." >&2
+        fi
       fi
     else
-      echo "❌ Error: Failed to generate $base_output_path"
+      echo "❌ Error: Failed to generate $base_output_path" >&2
       return 1
     fi
   fi

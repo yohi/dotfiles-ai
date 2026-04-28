@@ -26,7 +26,9 @@ def get_gateway_token() -> str:
             match = re.search(r"^MCP_GATEWAY_TOKEN=(.+)$", content, re.MULTILINE)
             if match:
                 token = match.group(1).strip().strip('"').strip("'")
-    return token or ""
+    if not token:
+        raise ValueError("Required environment variable 'MCP_GATEWAY_TOKEN' is not set in environment or .env file.")
+    return token
 
 
 def load_client_config() -> dict[str, Any]:
@@ -129,15 +131,18 @@ def write_json_config(
     if project_key:
         if "projects" not in data:
             data["projects"] = {}
+
         if project_key not in data["projects"]:
             data["projects"][project_key] = {}
+
         data["projects"][project_key][root_key] = servers
     else:
         data[root_key] = servers
 
     new_text = json.dumps(data, indent=2, ensure_ascii=False) + "\n"
-    if path.exists() and path.read_text(encoding="utf-8") == new_text:
-        return False
+    if path.exists():
+        if path.read_text(encoding="utf-8") == new_text:
+            return False
 
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(new_text, encoding="utf-8")
@@ -149,7 +154,8 @@ def write_toml_config(path: Path, root_key: str, servers: dict[str, Any]) -> boo
     lines = []
     lines.append(f"[{root_key}]")
     for name, srv in servers.items():
-        lines.append(f"  [{root_key}.{name}]")
+        # Sub-sections should also use root_key and follow the expected hierarchy
+        lines.append(f"  [{root_key}.mcp.{name}]")
         if "url" in srv:
             lines.append(f"  url = \"{srv['url']}\"")
         else:
@@ -161,11 +167,11 @@ def write_toml_config(path: Path, root_key: str, servers: dict[str, Any]) -> boo
                 args_str = ", ".join(f'"{a}"' for a in srv["args"])
                 lines.append(f"  args = [{args_str}]")
         if "env" in srv and srv["env"]:
-            lines.append(f"  [{root_key}.{name}.env]")
+            lines.append(f"  [{root_key}.mcp.{name}.env]")
             for k, v in srv["env"].items():
                 lines.append(f"    {k} = \"{v}\"")
         if "headers" in srv and srv["headers"]:
-            lines.append(f"  [{root_key}.{name}.headers]")
+            lines.append(f"  [{root_key}.mcp.{name}.headers]")
             for k, v in srv["headers"].items():
                 lines.append(f"    {k} = \"{v}\"")
     new_text = "\n".join(lines) + "\n"
@@ -242,7 +248,12 @@ def main() -> int:
             continue
         agent_cfg: dict[str, Any] = agent_cfg_raw
 
-        agent_path_raw = cast(str, agent_cfg.get("path", ""))
+        # パスの存在確認とバリデーション
+        agent_path_raw = agent_cfg.get("path")
+        if not agent_path_raw or not isinstance(agent_path_raw, str):
+            print(f"⚠️  Skipping agent '{agent_name}': 'path' is missing or not a string")
+            continue
+
         path = repo_root / cast(str, replace_placeholders(agent_path_raw, gateway_url))
         fmt = cast(str, agent_cfg.get("format", "json"))
         root_key = cast(str, agent_cfg.get("root_key", "mcpServers"))

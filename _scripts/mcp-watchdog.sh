@@ -1,27 +1,40 @@
 #!/usr/bin/env bash
 # _scripts/mcp-watchdog.sh
+set -euo pipefail
 
 GATEWAY_URL="http://127.0.0.1:10888/sse"
 CHECK_INTERVAL=300
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 # トークンの取得
+TOKEN=""
 if [ -f "$REPO_ROOT/.env" ]; then
-    TOKEN=$(grep "^MCP_GATEWAY_TOKEN=" "$REPO_ROOT/.env" | cut -d'=' -f2- | tr -d '"' | tr -d "'")
+    # インデントされた行も考慮
+    TOKEN=$(grep "^[[:space:]]*MCP_GATEWAY_TOKEN=" "$REPO_ROOT/.env" | cut -d'=' -f2- | tr -d '"' | tr -d "'")
+fi
+
+if [ -z "$TOKEN" ]; then
+    echo "⚠️  Warning: MCP_GATEWAY_TOKEN is not set or empty. Proceeding without Authorization header." >&2
 fi
 
 echo "🛡️ MCP Watchdog started (Target: $GATEWAY_URL)"
 
 while true; do
-    # 認証ヘッダーを付けて死活監視
-    HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 \
-        -H "Authorization: Bearer $TOKEN" \
-        "$GATEWAY_URL")
+    # トークンがある場合のみヘッダーを追加
+    CURL_ARGS=("-s" "-o" "/dev/null" "-w" "%{http_code}" "--max-time" "10")
+    if [ -n "$TOKEN" ]; then
+        CURL_ARGS+=("-H" "Authorization: Bearer $TOKEN")
+    fi
+
+    HTTP_CODE=$(curl "${CURL_ARGS[@]}" "$GATEWAY_URL")
 
     if [ "$HTTP_CODE" != "200" ] && [ "$HTTP_CODE" != "405" ]; then
-        # 405 Method Not Allowed は SSE エンドポイントに対する GET 時に返ることがあるが疎通はしている
         echo "⚠️  Docker MCP Gateway is not responding (HTTP $HTTP_CODE). Attempting to restart..."
-        systemctl --user restart docker-mcp-gateway.service
+        if ! systemctl --user restart docker-mcp-gateway.service; then
+            EXIT_CODE=$?
+            echo "❌ Error: Failed to restart docker-mcp-gateway.service (Exit code: $EXIT_CODE)" >&2
+            echo "💡 Tip: Check if systemd user mode is available and service is correctly installed." >&2
+        fi
     fi
 
     sleep "$CHECK_INTERVAL"
