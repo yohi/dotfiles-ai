@@ -8,8 +8,8 @@ OPENCODE_BIN ?= $(OPENCODE_HOME)/bin/opencode
 OPENCODE_CONFIG_DIR ?= $(CONFIG_DIR)/opencode
 OPENCODE_CONFIG_PATH ?= $(OPENCODE_CONFIG_DIR)/opencode.jsonc
 OPENCODE_DOTFILES_CONFIG ?= $(REPO_ROOT)/opencode/opencode.jsonc
-OH_MY_OPENCODE_CONFIG_PATH ?= $(OPENCODE_CONFIG_DIR)/oh-my-opencode.jsonc
-OH_MY_OPENCODE_DOTFILES_CONFIG ?= $(REPO_ROOT)/opencode/oh-my-opencode.jsonc
+OH_MY_OPENAGENT_CONFIG_PATH ?= $(OPENCODE_CONFIG_DIR)/oh-my-openagent.jsonc
+OH_MY_OPENAGENT_DOTFILES_CONFIG ?= $(REPO_ROOT)/opencode/oh-my-openagent.jsonc
 OPENCODE_ANTIGRAVITY_PATH ?= $(OPENCODE_CONFIG_DIR)/antigravity.json
 OPENCODE_DOTFILES_ANTIGRAVITY ?= $(REPO_ROOT)/opencode/antigravity.json
 OPENCODE_AGENTS_PATH ?= $(OPENCODE_CONFIG_DIR)/AGENTS.md
@@ -74,9 +74,9 @@ opencode: ## OpenCode(opencode)のインストールとセットアップ
 		}; \
 		if check_link "$(OPENCODE_CONFIG_PATH)" "$(OPENCODE_DOTFILES_CONFIG)"; then \
 			skip=1; \
-			if [ -f "$(OH_MY_OPENCODE_DOTFILES_CONFIG)" ]; then \
-				if [ -L "$(OH_MY_OPENCODE_CONFIG_PATH)" ]; then \
-					if ! check_link "$(OH_MY_OPENCODE_CONFIG_PATH)" "$(OH_MY_OPENCODE_DOTFILES_CONFIG)"; then skip=0; fi; \
+			if [ -f "$(OH_MY_OPENAGENT_DOTFILES_CONFIG)" ]; then \
+				if [ -L "$(OH_MY_OPENAGENT_CONFIG_PATH)" ]; then \
+					if ! check_link "$(OH_MY_OPENAGENT_CONFIG_PATH)" "$(OH_MY_OPENAGENT_DOTFILES_CONFIG)"; then skip=0; fi; \
 				else skip=0; fi; \
 			fi; \
 			if [ -f "$(OPENCODE_DOTFILES_ANTIGRAVITY)" ]; then \
@@ -181,8 +181,9 @@ setup-opencode: ## OpenCode（opencode）の設定ファイルを適用
 	@mkdir -p "$(OPENCODE_HOME)"
 	@# opencode.jsonc の設定
 	@$(call link_config,$(OPENCODE_DOTFILES_CONFIG),$(OPENCODE_CONFIG_PATH),opencode)
-	@# oh-my-opencode.jsonc の設定
-	@$(call link_config,$(OH_MY_OPENCODE_DOTFILES_CONFIG),$(OH_MY_OPENCODE_CONFIG_PATH),oh-my-opencode)
+	@# oh-my-openagent.jsonc の設定
+	@$(call link_config,$(OH_MY_OPENAGENT_DOTFILES_CONFIG),$(OH_MY_OPENAGENT_CONFIG_PATH),oh-my-openagent)
+	@ln -sfn oh-my-openagent.jsonc "$(OPENCODE_CONFIG_DIR)/oh-my-opencode.jsonc"
 	@# antigravity.json の設定
 	@$(call link_config,$(OPENCODE_DOTFILES_ANTIGRAVITY),$(OPENCODE_ANTIGRAVITY_PATH),antigravity)
 	@# AGENTS.md の設定
@@ -226,19 +227,19 @@ check-opencode: ## OpenCode（opencode）の状態を確認
 	else \
 		echo "⚠️  config: $(OPENCODE_CONFIG_PATH) is not configured"; \
 	fi
-	@if [ -f "$(OH_MY_OPENCODE_DOTFILES_CONFIG)" ]; then \
-		if [ -L "$(OH_MY_OPENCODE_CONFIG_PATH)" ]; then \
-			actual=$$(readlink -f "$(OH_MY_OPENCODE_CONFIG_PATH)" 2>/dev/null || readlink "$(OH_MY_OPENCODE_CONFIG_PATH)" 2>/dev/null || true); \
-			expected=$$(readlink -f "$(OH_MY_OPENCODE_DOTFILES_CONFIG)" 2>/dev/null || readlink "$(OH_MY_OPENCODE_DOTFILES_CONFIG)" 2>/dev/null || true); \
+	@if [ -f "$(OH_MY_OPENAGENT_DOTFILES_CONFIG)" ]; then \
+		if [ -L "$(OH_MY_OPENAGENT_CONFIG_PATH)" ]; then \
+			actual=$$(readlink -f "$(OH_MY_OPENAGENT_CONFIG_PATH)" 2>/dev/null || readlink "$(OH_MY_OPENAGENT_CONFIG_PATH)" 2>/dev/null || true); \
+			expected=$$(readlink -f "$(OH_MY_OPENAGENT_DOTFILES_CONFIG)" 2>/dev/null || readlink "$(OH_MY_OPENAGENT_DOTFILES_CONFIG)" 2>/dev/null || true); \
 			if [ -n "$$actual" ] && [ "$$actual" = "$$expected" ]; then \
-				echo "✅ oh-my-config: $(OH_MY_OPENCODE_CONFIG_PATH) -> $(OH_MY_OPENCODE_DOTFILES_CONFIG)"; \
+				echo "✅ oh-my-config: $(OH_MY_OPENAGENT_CONFIG_PATH) -> $(OH_MY_OPENAGENT_DOTFILES_CONFIG)"; \
 			else \
-				echo "⚠️  oh-my-config: $(OH_MY_OPENCODE_CONFIG_PATH) points to $$actual (expected $$expected)"; \
+				echo "⚠️  oh-my-config: $(OH_MY_OPENAGENT_CONFIG_PATH) points to $$actual (expected $$expected)"; \
 			fi; \
-		elif [ -e "$(OH_MY_OPENCODE_CONFIG_PATH)" ]; then \
-			echo "⚠️  oh-my-config: $(OH_MY_OPENCODE_CONFIG_PATH) exists but is not a symlink"; \
+		elif [ -e "$(OH_MY_OPENAGENT_CONFIG_PATH)" ]; then \
+			echo "⚠️  oh-my-config: $(OH_MY_OPENAGENT_CONFIG_PATH) exists but is not a symlink"; \
 		else \
-			echo "⚠️  oh-my-config: $(OH_MY_OPENCODE_CONFIG_PATH) is not configured"; \
+			echo "⚠️  oh-my-config: $(OH_MY_OPENAGENT_CONFIG_PATH) is not configured"; \
 		fi; \
 	fi
 	@if [ -f "$(OPENCODE_DOTFILES_ANTIGRAVITY)" ]; then \

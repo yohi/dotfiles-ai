@@ -102,8 +102,8 @@ function omo-set-profile() {
   
   if [ -f "$template_path" ] || [ -f "$base_template_path" ]; then
     if [ -z "${FLIXA_NPM_PACKAGE:-}" ]; then
-      echo "❌ Error: FLIXA_NPM_PACKAGE is not set. Please set it to a valid npm package name for the flixa provider." >&2
-      return 1
+      echo "⚠️  Warning: FLIXA_NPM_PACKAGE is not set. Using 'dummy' for substitution." >&2
+      export FLIXA_NPM_PACKAGE="dummy"
     fi
   fi
 
@@ -119,6 +119,71 @@ function omo-set-profile() {
   if [ -f "$base_template_path" ]; then
     if envsubst "$vars_to_subst" < "$base_template_path" > "$base_output_path"; then
       echo "📄 Base Config generated: $base_output_path"
+      # マージ処理: oh-my-opencode.jsonc から agents セクションを抽出し、
+      # opencode.jsonc の "agent": { セクション内にマージする
+      if [ -f "$output_path" ]; then
+        echo "🔗 Merging agents from $output_path into 'agent' section of $base_output_path..."
+        
+        # Python を使用した構造的マージ (json5 を優先し、なければ json を試行)
+        if python3 - "$base_output_path" "$output_path" <<'PY'
+import sys, json, os
+
+# json5 のロードを試行し、なければ標準の json を使用
+try:
+    import json5
+    loader = json5
+except ImportError:
+    loader = json
+
+def merge_jsonc(base_path, overlay_path):
+    try:
+        with open(base_path, 'r', encoding='utf-8') as f:
+            base = loader.loads(f.read())
+        with open(overlay_path, 'r', encoding='utf-8') as f:
+            overlay = loader.loads(f.read())
+    except Exception as e:
+        print(f'❌ Error parsing files using {loader.__name__}: {e}', file=sys.stderr)
+        if loader.__name__ == 'json':
+            print('💡 Hint: If your JSONC contains comments, you must install "json5": pip install json5', file=sys.stderr)
+        return False
+    
+    # oh-my-opencode.jsonc の 'agents' セクションを 
+    # opencode.jsonc の 'agent' セクション内にマージ
+    if 'agents' in overlay:
+        if 'agent' not in base:
+            base['agent'] = {}
+        # 既存のキーを保持しつつ、新規エージェントのみを追加する条件付きマージ
+        for k, v in overlay['agents'].items():
+            if k not in base['agent']:
+                base['agent'][k] = v
+        
+        try:
+            with open(base_path, 'w', encoding='utf-8') as f:
+                json.dump(base, f, indent=2, ensure_ascii=False)
+                f.write('\n')
+        except Exception as e:
+            print(f'❌ Error writing merged file: {e}', file=sys.stderr)
+            return False
+        return True
+    else:
+        # 'agents' キーがない場合は単に何もしない（正常系として扱うか検討が必要だが、
+        # 現状の仕様ではマージ不要とみなす）
+        return True
+    return False
+
+if __name__ == "__main__":
+    if len(sys.argv) < 3:
+        sys.exit(1)
+    if not merge_jsonc(sys.argv[1], sys.argv[2]):
+        sys.exit(1)
+PY
+then
+          echo "✅ Merge successful"
+        else
+          echo "❌ Error: Structured merge failed. Check if 'agents' key exists in $output_path." >&2
+          return 1
+        fi
+      fi
     else
       echo "❌ Error: Failed to generate $base_output_path" >&2
       return 1

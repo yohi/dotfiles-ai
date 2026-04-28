@@ -4,7 +4,7 @@
 
 各ツールでの設定方法は以下の通りです。
 
-## 1. Gemini CLI (SuperGemini)
+## 1. Gemini CLI
 Gemini CLI は `gemini/settings.json` を通じて MCP サーバーを管理します。
 
 - **設定ファイルの場所**: `~/.gemini/settings.json` (プロジェクト内の `gemini/settings.json` から生成されます)

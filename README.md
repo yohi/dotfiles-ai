@@ -26,10 +26,10 @@ AIエージェント（Claude Code, Gemini CLI, OpenCode, Codex）の設定・�
 ├── agent-commands/         # [SSOT] Slash commands
 ├── global-rules/           # [SSOT] Global AI rules
 ├── claude/                 # Claude Code specific settings
-├── gemini/                 # Gemini CLI / SuperGemini settings
+├── gemini/                 # Gemini CLI specific settings
 ├── opencode/               # OpenCode specific settings
 ├── codex/                  # Codex specific settings
-├── ide/                    # IDE AI settings (MCP, SuperCursor)
+├── ide/                    # IDE AI settings (MCP)
 └── mcp/                    # Docker MCP Gateway settings
 ```
 

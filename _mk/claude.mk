@@ -132,7 +132,7 @@ install-packages-claudia:
 	fi
 
 	# Claudia のクローンとビルド
-	@echo "📥 Claudia をクローン中 (Commit: $(CLAUDIA_COMMIT))..."
+	@echo "📥 Claudia をクローン中 (Commit: $(CLAUDIA_COMMIT)). GEAR 🚀"
 	@CLAUDIA_DIR="/tmp/claudia-build" && \
 	rm -rf "$$CLAUDIA_DIR" 2>/dev/null || true && \
 	if git clone --depth 1 https://github.com/getAsterisk/claudia.git "$$CLAUDIA_DIR" && \
@@ -222,33 +222,19 @@ install-packages-claudia:
 .PHONY: install-claude-ecosystem
 install-claude-ecosystem:
 	@echo "🌟 Claude Code エコシステム一括インストールを開始..."
-	@echo "ℹ️  以下の3つのツールを順次インストールします:"
+	@echo "ℹ️  以下の2つのツールを順次インストールします:"
 	@echo "   1. Claude Code (AI コードエディタ・CLI)"
-	@echo "   2. SuperClaude (Claude Code フレームワーク)"
-	@echo "   3. Claudia (Claude Code GUI アプリ)"
+	@echo "   2. Claudia (Claude Code GUI アプリ)"
 	@echo ""
 
 	# Step 1: Claude Code のインストール
-	@echo "📋 Step 1/3: Claude Code をインストール中..."
+	@echo "📋 Step 1/2: Claude Code をインストール中..."
 	@$(MAKE) install-packages-claude-code
 	@echo "✅ Claude Code のインストールが完了しました"
 	@echo ""
 
-	# Step 2: SuperClaude のインストール
-	@echo "📋 Step 2/3: SuperClaude をインストール中..."
-	@if [ "$${SKIP_SUPERCLAUDE:-0}" = "1" ]; then \
-		echo "⚠️  SuperClaude のインストールはスキップされています (SKIP_SUPERCLAUDE=1)"; \
-		echo "   手動インストール例: make install-superclaude"; \
-		echo "   有効化方法: SKIP_SUPERCLAUDE=0 make install-claude-ecosystem"; \
-	else \
-		echo "📦 SuperClaude をインストール中..."; \
-		$(MAKE) install-packages-superclaude || (echo "❌ SuperClaude インストールに失敗しました"; exit 1); \
-		echo "✅ SuperClaude のインストールが完了しました"; \
-	fi
-	@echo ""
-
-	# Step 3: Claudia のインストール
-	@echo "📋 Step 3/3: Claudia をインストール中..."
+	# Step 2: Claudia のインストール
+	@echo "📋 Step 2/2: Claudia をインストール中..."
 	@$(MAKE) install-packages-claudia
 	@echo "✅ Claudia のインストールが完了しました"
 	@echo ""
@@ -259,16 +245,30 @@ install-claude-ecosystem:
 		echo "Claude Code: ✅ $$(claude --version 2>/dev/null)"; \
 	else \
 		echo "Claude Code: ❌ 未確認"; \
-	fi; \
-	if command -v SuperClaude >/dev/null 2>&1; then \
-		echo "SuperClaude: ✅ $$(SuperClaude --version 2>/dev/null)"; \
-	else \
-		echo "SuperClaude: ❌ 未確認"; \
 	fi
 
 	@echo ""
 	@echo "🎉 Claude Code エコシステムのインストールが完了しました！"
 	@echo "💡 使い方を確認するには 'make help-claude' を実行してください。"
+
+.PHONY: check-claude
+check-claude: ## Claude Code の診断を実行
+	@echo "🩺 Claude Code の診断を開始..."
+	@if command -v claude >/dev/null 2>&1; then \
+		echo "✅ Claude Code: $$(claude --version 2>/dev/null)"; \
+	else \
+		echo "❌ Claude Code が見つかりません。'make install-packages-claude-code' を実行してください。"; \
+	fi
+	@if [ -L "$(HOME_DIR)/.claude/CLAUDE.md" ]; then \
+		echo "✅ CLAUDE.md: リンク済み ($$(readlink "$(HOME_DIR)/.claude/CLAUDE.md"))"; \
+	else \
+		echo "❌ CLAUDE.md がリンクされていません。'make setup-claude' を実行してください。"; \
+	fi
+	@if [ -f "$(HOME_DIR)/.claude/settings.json" ]; then \
+		echo "✅ settings.json: 存在します"; \
+	else \
+		echo "❌ settings.json が見つかりません。'make setup-claude' を実行してください。"; \
+	fi
 
 # ========================================
 # エイリアス
@@ -284,8 +284,6 @@ setup-claude: ## Claude Codeの設定を適用
 	@echo "📝 Claude Codeの設定を適用中..."
 	@mkdir -p "$(HOME_DIR)/.claude"
 	@ln -sf "$(REPO_ROOT)/global-rules/AGENTS.global.md" "$(HOME_DIR)/.claude/CLAUDE.md"
-	@# Claude Codeが設定を上書きする場合、本リポジトリのファイルが変更されます(SSOT)。
-	@# ツールによってはシンボリックリンクを削除して通常ファイルで上書きする可能性があります。
 	@ln -sf "$(REPO_ROOT)/claude/settings.json" "$(HOME_DIR)/.claude/settings.json"
 	@chmod +x "$(REPO_ROOT)/claude/statusline.sh"
 	@ln -sf "$(REPO_ROOT)/claude/statusline.sh" "$(HOME_DIR)/.claude/statusline.sh"

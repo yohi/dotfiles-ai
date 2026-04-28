@@ -132,6 +132,12 @@ deploy_config "$REPO_ROOT/.claude.json" "$HOME/.claude.json" "Claude Code"
 echo "==> Deploying Codex CLI settings..."
 deploy_config "$REPO_ROOT/codex/config.toml" "$HOME/.codex/config.toml" "Codex CLI"
 
+echo "==> Deploying OpenCode settings..."
+deploy_config "$REPO_ROOT/opencode/opencode.jsonc" "$HOME/.opencode/opencode.jsonc" "OpenCode"
+if [ -f "$REPO_ROOT/opencode/oh-my-opencode.jsonc" ]; then
+    deploy_config "$REPO_ROOT/opencode/oh-my-opencode.jsonc" "$HOME/.opencode/oh-my-opencode.jsonc" "Oh-My-OpenCode"
+fi
+
 echo "✅ MCP configurations synchronized from mcp/servers.yaml and mcp/config.yaml"
 
 echo "==> Validating Skillport skills..."

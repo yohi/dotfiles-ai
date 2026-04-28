@@ -2,7 +2,7 @@ export SHELL := /bin/bash
 
 # ============================================================
 # VSCode IDE セットアップ用Makefile
-# VSCodeの設定、拡張機能、SuperCopilotの管理を担当
+# VSCodeのAI設定（MCP等）の管理を担当
 # ============================================================
 
 # OS検出とディレクトリ設定
@@ -34,6 +34,4 @@ setup-vscode:
 .PHONY: uninstall-vscode
 uninstall-vscode:
 	@echo "🧹 VSCodeのAI設定リンクを解除しています..."
-	@if [ -L "$(HOME)/.vscode/supercopilot" ]; then rm -f "$(HOME)/.vscode/supercopilot"; fi
 	@echo "✅ VSCodeのAI設定解除が完了しました"
-

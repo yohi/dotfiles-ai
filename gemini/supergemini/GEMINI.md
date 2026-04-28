@@ -1,1 +1,0 @@
-../../global-rules/AGENTS.global.md
