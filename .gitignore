@@ -64,3 +64,16 @@ __pycache__/
 .claude.json
 mcp/config.yaml
 codex/config.toml
+
+
+# APM dependencies
+apm_modules/
+apm.lock.yaml
+.github/agents/
+.github/hooks/
+.github/prompts/
+.github/skills/
+.cursor/skills/
+.gemini/skills/
+.gemini/hooks/
+.gemini/commands/
