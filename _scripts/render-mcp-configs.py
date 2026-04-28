@@ -120,9 +120,9 @@ def write_json_config(
     """Update standard JSON configuration."""
     if not path.exists():
         if project_key:
-            data: dict[str, Any] = {"projects": {project_key: {root_key: servers}}}
+            data = {"projects": {project_key: {root_key: servers}}}
         else:
-            data: dict[str, Any] = {root_key: servers}
+            data = {root_key: servers}
     else:
         try:
             content = path.read_text(encoding="utf-8")
