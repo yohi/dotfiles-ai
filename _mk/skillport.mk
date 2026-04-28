@@ -59,6 +59,14 @@ install-apm: ## Microsoft APM をインストール
 			echo "📦 APM インストールスクリプトを実行中..."; \
 			INSTALL_SCRIPT=$$(mktemp /tmp/apm-install.XXXXXX.sh); \
 			if curl -sSL "$(APM_INSTALL_URL)" -o "$$INSTALL_SCRIPT"; then \
+				ACTUAL_HASH=$$( (command -v sha256sum >/dev/null 2>&1 && sha256sum "$$INSTALL_SCRIPT" | cut -d" " -f1) || shasum -a 256 "$$INSTALL_SCRIPT" | cut -d" " -f1 ); \
+				if [ "$$ACTUAL_HASH" != "$(APM_INSTALLER_HASH)" ]; then \
+					echo "❌ APM インストーラーのハッシュ検証に失敗しました"; \
+					echo "期待値: $(APM_INSTALLER_HASH)"; \
+					echo "実際の値: $$ACTUAL_HASH"; \
+					rm -f "$$INSTALL_SCRIPT"; \
+					exit 1; \
+				fi; \
 				sh "$$INSTALL_SCRIPT"; \
 				rm -f "$$INSTALL_SCRIPT"; \
 			else \
