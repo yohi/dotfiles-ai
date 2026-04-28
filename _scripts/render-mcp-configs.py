@@ -23,7 +23,8 @@ def get_gateway_token() -> str:
         env_path = repo_root / ".env"
         if env_path.exists():
             content = env_path.read_text(encoding="utf-8")
-            match = re.search(r"^MCP_GATEWAY_TOKEN=(.+)$", content, re.MULTILINE)
+            # 行頭の空白や = 前後のスペースを許容する
+            match = re.search(r"^\s*MCP_GATEWAY_TOKEN\s*=\s*(.+)$", content, re.MULTILINE)
             if match:
                 token = match.group(1).strip().strip('"').strip("'")
     return token or ""

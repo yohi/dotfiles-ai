@@ -26,13 +26,13 @@ while true; do
         CURL_ARGS+=("-H" "Authorization: Bearer $TOKEN")
     fi
 
-    HTTP_CODE=$(curl "${CURL_ARGS[@]}" "$GATEWAY_URL")
+    # set -e による中断を防ぐため、失敗を許容し終了コードを確認
+    HTTP_CODE=$(curl "${CURL_ARGS[@]}" "$GATEWAY_URL" || echo "000")
 
     if [ "$HTTP_CODE" != "200" ] && [ "$HTTP_CODE" != "405" ]; then
         echo "⚠️  Docker MCP Gateway is not responding (HTTP $HTTP_CODE). Attempting to restart..."
-        systemctl --user restart docker-mcp-gateway.service
-        EXIT_CODE=$?
-        if [ $EXIT_CODE -ne 0 ]; then
+        if ! systemctl --user restart docker-mcp-gateway.service; then
+            EXIT_CODE=$?
             echo "❌ Error: Failed to restart docker-mcp-gateway.service (Exit code: $EXIT_CODE)" >&2
             echo "💡 Tip: Check if systemd user mode is available and service is correctly installed." >&2
         fi

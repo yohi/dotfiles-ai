@@ -130,14 +130,19 @@ import sys, json, os
 try:
     import json5
 except ImportError:
-    # json5 がない場合は標準 json で試行 (コメントがあると失敗する可能性がある)
-    json5 = json
+    print('❌ Error: Python module \"json5\" is required for structured merge.')
+    print('💡 Try: pip install json5')
+    sys.exit(1)
 
 def merge_jsonc(base_path, overlay_path):
-    with open(base_path, 'r', encoding='utf-8') as f:
-        base = json5.loads(f.read())
-    with open(overlay_path, 'r', encoding='utf-8') as f:
-        overlay = json5.loads(f.read())
+    try:
+        with open(base_path, 'r', encoding='utf-8') as f:
+            base = json5.loads(f.read())
+        with open(overlay_path, 'r', encoding='utf-8') as f:
+            overlay = json5.loads(f.read())
+    except Exception as e:
+        print(f'❌ Error parsing JSONC files: {e}')
+        return False
     
     # oh-my-opencode.jsonc の 'agents' セクションを 
     # opencode.jsonc の 'agent' セクション内にマージ
