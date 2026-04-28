@@ -5,7 +5,7 @@
 SKILLPORT_SKILLS_DIR ?= $(HOME)/.skillport/skills
 AGENT_SKILLS_REPO_ROOT ?= $(REPO_ROOT)/agent-skills
 
-.PHONY: skillport install-skillport setup-skillport check-skillport check-skillport-version
+.PHONY: skillport install-skillport setup-skillport check-skillport check-skillport-version install-apm
 
 # SkillPort のインストールとセットアップ
 skillport: ## SkillPortのインストールとセットアップ
@@ -39,6 +39,19 @@ install-skillport: ## SkillPort と SkillPort MCP をインストール
 		exit 1; \
 	fi; \
 	echo "✅ SkillPort のインストールが完了しました"
+
+# APM (Agent Package Manager) のインストール
+install-apm: ## Microsoft APM をインストール
+	@if command -v apm >/dev/null 2>&1; then \
+		echo "✅ APM は既にインストールされています ($$(apm --version 2>/dev/null || echo 'installed'))"; \
+	else \
+		echo "📦 APM をインストール中..."; \
+		curl -sSL $(APM_INSTALL_URL) | sh; \
+		if ! command -v apm >/dev/null 2>&1; then \
+			echo "⚠️  APM インストール後に PATH が通っていない可能性があります。手動で設定を確認してください。"; \
+		fi; \
+	fi
+
 # SkillPort の設定（ディレクトリ作成とリンク）
 setup-skillport: ## SkillPort のディレクトリ構成をセットアップ
 	@if $(call check_marker,setup-skillport); then \
