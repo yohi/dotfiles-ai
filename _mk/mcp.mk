@@ -1,4 +1,4 @@
-.PHONY: setup-docker-mcp sync-mcp mcp uninstall-mcp status-mcp start-mcp stop-mcp restart-mcp logs-mcp status-watchdog logs-watchdog
+.PHONY: setup-docker-mcp sync-mcp mcp uninstall-mcp status-mcp start-mcp stop-mcp restart-mcp logs-mcp status-watchdog logs-watchdog fix-ubuntu-rootless
 
 mcp: setup-docker-mcp
 
@@ -7,6 +7,12 @@ setup-docker-mcp:
 	@bash _scripts/setup-docker-mcp.sh
 	$(Q_ECHO) "✅ Docker MCPの設定が完了しました。"
 	$(Q_ECHO) "💡 使い方を確認するには 'make help-mcp' を実行してください。"
+
+fix-ubuntu-rootless: ## Ubuntu 24.04+ の Rootless Docker 制限を解除 (要 sudo)
+	@echo "🔧 Ubuntu 24.04+ の Rootless Docker 制限を解除しています..."
+	sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+	echo "kernel.apparmor_restrict_unprivileged_userns = 0" | sudo tee /etc/sysctl.d/99-rootless-docker.conf
+	@echo "✅ 設定が完了しました。'systemctl --user restart docker.service' を実行して Docker を再起動してください。"
 
 .PHONY: help-mcp
 help-mcp: ## MCP の使い方を表示

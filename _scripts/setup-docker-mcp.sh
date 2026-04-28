@@ -41,6 +41,17 @@ if [ "$SKIP_DOCKER_CHECK" = "false" ]; then
 
     if ! docker info > /dev/null 2>&1; then
         echo -e "${RED}❌ Docker daemon is not running. Please start Docker first.${NC}"
+        
+        # Ubuntu 24.04+ の Rootless 制限チェック
+        if [[ -f /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]]; then
+            RESTRICT_VAL=$(cat /proc/sys/kernel/apparmor_restrict_unprivileged_userns)
+            if [[ "$RESTRICT_VAL" == "1" ]]; then
+                echo -e "${YELLOW}⚠️  Ubuntu 24.04+ restriction detected.${NC}"
+                echo -e "It seems unprivileged user namespaces are restricted by AppArmor."
+                echo -e "Please run the following command to fix it:"
+                echo -e "${BLUE}  make fix-ubuntu-rootless${NC}"
+            fi
+        fi
         exit 1
     fi
     echo -e "${GREEN}✅ Docker is installed and running.${NC}"
