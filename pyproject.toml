@@ -44,7 +44,7 @@ disallow_untyped_defs = false
 check_untyped_defs = true
 ignore_missing_imports = true
 explicit_package_bases = true
-exclude = "agent-skills/"
+exclude = ["agent-skills/", "apm_modules/"]
 
 [[tool.mypy.overrides]]
 module = "gemini.*"
