@@ -24,8 +24,8 @@ def transform_from_pdf_coords(bbox, pdf_height):
     left = bbox[0]
     right = bbox[2]
 
-    pypdf_top = pdf_height - bbox[1]      
-    pypdf_bottom = pdf_height - bbox[3]   
+    pypdf_top = pdf_height - bbox[1]
+    pypdf_bottom = pdf_height - bbox[3]
 
     return left, pypdf_bottom, right, pypdf_top
 

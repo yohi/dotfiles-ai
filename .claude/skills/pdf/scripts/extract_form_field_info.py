@@ -22,7 +22,7 @@ def make_field_dict(field, field_id):
     if ft == "/Tx":
         field_dict["type"] = "text"
     elif ft == "/Btn":
-        field_dict["type"] = "checkbox"  
+        field_dict["type"] = "checkbox"
         states = field.get("/_States_", [])
         if len(states) == 2:
             if "/Off" in states:
