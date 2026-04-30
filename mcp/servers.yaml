@@ -10,16 +10,16 @@ servers:
       - "/mcp/sqlite.db"
     volumes:
       - "__HOME__/.mcp/sqlite:/mcp"
-  filesystem:
-    title: "Filesystem"
-    description: "Local filesystem access with restricted paths."
-    type: server
-    image: docker.io/mcp/filesystem:latest
-    command:
-      - "__HOME__"
-      - "__REPO_ROOT__"
-    volumes:
-      - "__HOME__:__HOME__"
+  # filesystem:
+  #   title: "Filesystem"
+  #   description: "Local filesystem access with restricted paths."
+  #   type: server
+  #   image: docker.io/mcp/filesystem:latest
+  #   args:
+  #     - "__HOME__"
+  #     - "__REPO_ROOT__"
+  #   volumes:
+  #     - "__HOME__:__HOME__"
   github-official:
     description: "Official GitHub MCP server for repository management."
     type: server
