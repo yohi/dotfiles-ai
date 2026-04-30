@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any, cast, Match, Dict
 import yaml
 
+json5: Any
 try:
     import json5
 except ImportError:
