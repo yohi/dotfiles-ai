@@ -35,7 +35,7 @@ servers:
   chronos-graph:
     title: "ChronosGraph"
     description: "Long-term memory and knowledge graph system."
-    type: local
+    type: stdio
     command:
       - uv
       - run
@@ -64,7 +64,7 @@ servers:
   nexus:
     title: "Nexus"
     description: "Local knowledge base and indexer."
-    type: local
+    type: stdio
     command:
       - "node"
       - "__PROGRAM__/nexus/dist/bin/nexus.js"
@@ -92,7 +92,7 @@ servers:
   skillport:
     title: "Skillport"
     description: "Professional development and AI skill management toolkit."
-    type: local
+    type: stdio
     command:
       - "uvx"
     args:
@@ -106,6 +106,8 @@ servers:
     description: "SSE gateway for containerized MCP servers."
     type: sse
     url: "__GATEWAY_URL__"
+    headers:
+      Authorization: "Bearer ${MCP_GATEWAY_TOKEN}"
     _generated_by: "gateway"
 
 agents:
@@ -115,6 +117,9 @@ agents:
     root_key: "mcpServers"
     servers:
       docker-mcp: { inherit: "docker-mcp" }
+      chronos-graph: { inherit: "chronos-graph" }
+      nexus: { inherit: "nexus" }
+      skillport: { inherit: "skillport" }
 
   claude:
     path: ".claude.json"
@@ -123,6 +128,9 @@ agents:
     servers:
       docker-mcp: { inherit: "docker-mcp" }
       atlassian: { inherit: "atlassian" }
+      chronos-graph: { inherit: "chronos-graph" }
+      nexus: { inherit: "nexus" }
+      skillport: { inherit: "skillport" }
 
   opencode:
     path: "opencode/opencode.jsonc"

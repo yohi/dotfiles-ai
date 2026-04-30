@@ -2,12 +2,18 @@
 
 from __future__ import annotations
 import os
+import json
 import re
 import sys
 import shutil
 from pathlib import Path
 from typing import Any, cast, Match, Dict
 import yaml
+
+try:
+    import json5
+except ImportError:
+    json5 = None
 
 def load_client_config() -> dict[str, Any]:
     repo_root = Path(__file__).parent.parent.resolve()
@@ -81,12 +87,12 @@ def main() -> int:
 
     all_servers_raw = cast(Dict[str, Any], config.get("servers", {}))
     
-    # Filter candidates first to avoid unnecessary placeholder expansion failures
+    # Filter candidates for Gateway (containerized only)
     gateway_candidates = {
         name: cfg for name, cfg in all_servers_raw.items()
-        if isinstance(cfg, dict) and cfg.get("type") in ["server", "local"]
+        if isinstance(cfg, dict) and cfg.get("type") == "server"
     }
-    gateway_servers_expanded = cast(Dict[str, Any], replace_placeholders(gateway_candidates, gateway_url))
+    gateway_servers_expanded = cast(Dict[str, Any], replace_placeholders(gateway_candidates, gateway_url, expand_paths=True))
     
     gateway_servers: dict[str, Any] = {}
     for name, cfg in gateway_servers_expanded.items():
@@ -183,6 +189,113 @@ def main() -> int:
         str(repo_root),
         enabled_servers_str
     )
+
+    # Update AI Agent configs
+    agents_config = cast(Dict[str, Any], config.get("agents", {}))
+    for agent_name, agent_cfg in agents_config.items():
+        path_str = agent_cfg.get("path")
+        if not path_str:
+            continue
+        
+        # Path might contain placeholders
+        path_str = replace_placeholders(path_str, gateway_url, expand_paths=True)
+        config_path = repo_root / path_str
+        if not config_path.exists():
+            # Try absolute path or relative to home
+            config_path = Path(path_str).expanduser()
+            if not config_path.exists():
+                print(f"  [SKIP] Agent config not found: {path_str}")
+                continue
+
+        format_type = agent_cfg.get("format", "json")
+        root_key = agent_cfg.get("root_key", "mcpServers")
+        mapped_servers = agent_cfg.get("servers", {})
+        
+        # Prepare server definitions for this agent
+        agent_mcp_servers: dict[str, Any] = {}
+        for srv_name, mapping in mapped_servers.items():
+            inherit_name = mapping.get("inherit", srv_name)
+            if inherit_name in all_servers_raw:
+                srv_def = all_servers_raw[inherit_name].copy()
+                # Expand placeholders and paths
+                srv_def = replace_placeholders(srv_def, gateway_url, expand_paths=True)
+                # Clean up metadata
+                srv_def.pop("title", None)
+                srv_def.pop("description", None)
+                srv_def.pop("_generated_by", None)
+                
+                # Special handling for type: local -> stdio
+                if srv_def.get("type") == "local":
+                    srv_def["type"] = "stdio"
+                
+                # Standardize command/args for stdio
+                if srv_def.get("type") == "stdio" and isinstance(srv_def.get("command"), list):
+                    cmd_list = srv_def["command"]
+                    if cmd_list:
+                        srv_def["command"] = cmd_list[0]
+                        new_args = cmd_list[1:] + srv_def.get("args", [])
+                        if new_args:
+                            srv_def["args"] = new_args
+                        else:
+                            srv_def.pop("args", None)
+
+                # Handle args/env format differences if necessary
+                if "env" in srv_def and isinstance(srv_def["env"], list):
+                    env_dict = {}
+                    for e in srv_def["env"]:
+                        if isinstance(e, dict) and "name" in e and "value" in e:
+                            env_dict[e["name"]] = e["value"]
+                    srv_def["env"] = env_dict
+
+                agent_mcp_servers[srv_name] = srv_def
+
+        # Adjust format for specific agents
+        if agent_name == "gemini":
+            # Gemini CLI expects command to be a string
+            for srv in agent_mcp_servers.values():
+                if srv.get("type") == "stdio" and isinstance(srv.get("command"), list):
+                    full_cmd = srv["command"] + srv.get("args", [])
+                    srv["command"] = " ".join(full_cmd)
+                    srv.pop("args", None)
+
+        if agent_name in ["opencode", "oh-my-opencode"]:
+            # OpenCode expects type: remote instead of sse, and needs enabled: true
+            for srv in agent_mcp_servers.values():
+                if srv.get("type") == "sse":
+                    srv["type"] = "remote"
+                srv["enabled"] = True
+
+        # Load, update, and save
+        try:
+            content = config_path.read_text(encoding="utf-8")
+            if format_type in ["json", "opencode_jsonc"]:
+                if json5 and (format_type == "opencode_jsonc" or "//" in content):
+                    data = json5.loads(content)
+                else:
+                    data = json.loads(content)
+                
+                # Update mcpServers
+                if root_key not in data:
+                    data[root_key] = {}
+                
+                # Replace exactly what's in servers.yaml for this agent
+                data[root_key] = agent_mcp_servers
+                
+                # Save
+                with config_path.open("w", encoding="utf-8") as f:
+                    json.dump(data, f, indent=2, ensure_ascii=False)
+                print(f"  ✅ Updated agent config: {config_path}")
+            
+            elif format_type == "toml":
+                import toml
+                data = toml.loads(content)
+                data[root_key] = agent_mcp_servers
+                with config_path.open("w", encoding="utf-8") as f:
+                    toml.dump(data, f)
+                print(f"  ✅ Updated agent config (TOML): {config_path}")
+
+        except Exception as e:
+            print(f"  ❌ Failed to update agent config {config_path}: {e}")
 
     return 0
 

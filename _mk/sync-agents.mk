@@ -17,7 +17,7 @@ CODEX_CONFIG     := $(REPO_ROOT)/codex/config.toml
 .PHONY: sync-agents clean-sync-artifacts ai-setup \
         inject-meta-prompt-opencode inject-meta-prompt-codex \
         sync-skillport-doc link-user-agents link-agent-commands \
-        install-external-skills clean-legacy
+        install-external-skills uninstall-superpowers clean-legacy
 
 # ============================================================
 # install-external-skills: 外部スキルのセットアップ
@@ -49,11 +49,17 @@ install-external-skills: ## apm install を実行（ない場合は git clone �
 			if [ -d "$$tmpdir/skills" ]; then cp -r "$$tmpdir/skills/"* "$(AGENT_SKILLS_DIR)/superpowers/" || true; fi; \
 			rm -rf "$$tmpdir"; \
 		fi; \
-	fi
+		fi
 	@echo "✅ 外部スキルの準備が完了しました"
 
+uninstall-superpowers: ## 外部スキル (superpowers) を削除する
+	@echo "🗑️  外部スキル (superpowers) を削除中..."
+	rm -rf "$(AGENT_SKILLS_DIR)/superpowers"
+	@echo "✅ 削除が完了しました"
+
 # ============================================================
-# sync-agents: メインの同期ターゲット (SPEC Feature #1, #2, #3)
+		# sync-agents: メインの同期ターゲット (SPEC Feature #1, #2, #3)
+
 # ============================================================
 sync-agents: ## SSOTのスキル群を各エージェントの設定ファイルへ同期する
 	@echo "🔄 sync-agents: SSOT → 各エージェントへの同期を開始..."

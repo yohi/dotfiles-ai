@@ -72,19 +72,20 @@ check-gemini: ## Gemini CLI の診断を実行
 	else \
 		echo "❌ Gemini CLI が見つかりません。'make install-packages-gemini-cli' を実行してください。"; \
 	fi
-	@if [ -L "$(HOME_DIR)/.gemini/GEMINI.md" ]; then \
+	if [ -L "$(HOME_DIR)/.gemini/GEMINI.md" ]; then \
 		echo "✅ GEMINI.md: リンク済み ($$(readlink "$(HOME_DIR)/.gemini/GEMINI.md"))"; \
 	else \
-		echo "❌ GEMINI.md がリンクされていません。'make setup-supergemini' を実行してください。"; \
-	fi
-	@if [ -f "$(HOME_DIR)/.gemini/settings.json" ]; then \
+		echo "❌ GEMINI.md がリンクされていません。'make setup-gemini' を実行してください。"; \
+	fi \
+	&& \
+	if [ -f "$(HOME_DIR)/.gemini/settings.json" ]; then \
 		echo "✅ settings.json: 存在します"; \
 	else \
-		echo "❌ settings.json が見つかりません。'make setup-supergemini' を実行してください。"; \
+		echo "❌ settings.json が見つかりません。'make setup-gemini' を実行してください。"; \
 	fi
 
-.PHONY: setup-supergemini
-setup-supergemini: install-gemini-ecosystem ## Gemini CLI の設定を適用 (互換性用)
+.PHONY: setup-gemini
+setup-gemini: install-gemini-ecosystem ## Gemini CLI の設定を適用
 	@echo "📝 Gemini CLI の追加設定を適用中..."
 	@mkdir -p "$(HOME_DIR)/.gemini"
 	@if [ ! -f "$(HOME_DIR)/.gemini/settings.json" ]; then \

@@ -26,7 +26,7 @@ install-agents:
 	$(MAKE) install-packages-gemini-cli
 	$(MAKE) install-packages-codex
 	$(MAKE) install-packages-opencode
-	$(MAKE) install-packages-superclaude
+	$(MAKE) install-packages-opcode
 
 install-ides:
 	$(Q_ECHO) "📦 dotfiles-ai IDE ツールをインストール中..."
@@ -42,7 +42,7 @@ setup-agents:
 		fi \
 	fi
 	$(MAKE) setup-claude
-	$(MAKE) setup-supergemini
+	$(MAKE) setup-gemini
 	$(MAKE) setup-codex
 	$(MAKE) setup-opencode
 	$(MAKE) setup-antigravity
@@ -61,7 +61,6 @@ link: setup
 
 clean-internal:
 	@echo "🧹 dotfiles-ai をクリーンアップ中..."
-	-$(MAKE) uninstall-superclaude
 	-$(MAKE) uninstall-claude
 	-$(MAKE) uninstall-gemini
 	-$(MAKE) uninstall-codex
@@ -104,7 +103,8 @@ status: ## [確認] 全コンポーネントの状態を一括表示
 	@echo "--- Agent Status ---"
 	@$(MAKE) -s check-skillport
 	@$(MAKE) -s check-opencode
-	@$(MAKE) -s check-superclaude
+	@$(MAKE) -s check-claude
+	@$(MAKE) -s check-gemini
 	@$(MAKE) -s check-codex
 	@$(MAKE) -s check-antigravity
 	@$(MAKE) -s check-cursor-version
@@ -131,11 +131,11 @@ doctor: ## [診断] 設定の不備や同期が必要な箇所を特定し、解
 		echo "⚠️  [ACTION REQUIRED] 同期が一度も実行されていません。'make sync-agents' を実行してください。"; \
 	fi
 	@# 3. Component specific checks
-	@if [ ! -L "$(HOME)/.claude/CLAUDE.md" ]; then \
+	@if [ ! -L "$(HOME_DIR)/.claude/CLAUDE.md" ]; then \
 		echo "⚠️  [ACTION REQUIRED] Claude の設定が未完了です。'make setup-claude' を実行してください。"; \
 	fi
-	@if [ ! -L "$(HOME)/.gemini/settings.json" ]; then \
-		echo "⚠️  [ACTION REQUIRED] Gemini の設定が未完了です。'make setup-supergemini' を実行してください。"; \
+	@if [ ! -L "$(HOME_DIR)/.gemini/settings.json" ]; then \
+		echo "⚠️  [ACTION REQUIRED] Gemini の設定が未完了です。'make setup-gemini' を実行してください。"; \
 	fi
 	@if ! command -v skillport >/dev/null 2>&1; then \
 		echo "⚠️  [ACTION REQUIRED] SkillPort がインストールされていません。'make install-skillport' を実行してください。"; \

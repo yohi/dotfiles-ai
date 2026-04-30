@@ -1,0 +1,10 @@
+{
+  "servers": {
+    "docker-mcp": {
+      "type": "sse",
+      "url": "http://127.0.0.1:10888/sse",
+      "headers": {}
+    }
+  },
+  "inputs": []
+}
