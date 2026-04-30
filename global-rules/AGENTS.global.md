@@ -419,9 +419,3 @@ After calling `memory_save` or `session_flush`, perform a self-verification usin
 
 If any item fails, cancel the save or correct the content before finalizing.
 </quick_rubric>
-e:**
-   - [ ] Have you already called `memory_save` for substantially the same content within the same session?
-   - [ ] Did you choose to skip saving if the information was insufficient or ambiguous?
-
-If any item fails, cancel the save or correct the content before finalizing.
-</quick_rubric>

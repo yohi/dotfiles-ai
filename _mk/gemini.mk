@@ -76,8 +76,7 @@ check-gemini: ## Gemini CLI の診断を実行
 		echo "✅ GEMINI.md: リンク済み ($$(readlink "$(HOME_DIR)/.gemini/GEMINI.md"))"; \
 	else \
 		echo "❌ GEMINI.md がリンクされていません。'make setup-gemini' を実行してください。"; \
-	fi \
-	&& \
+	fi
 	@if [ -f "$(HOME_DIR)/.gemini/settings.json" ]; then \
 		echo "✅ settings.json: 存在します"; \
 	else \

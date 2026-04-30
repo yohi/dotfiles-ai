@@ -133,8 +133,8 @@ install-packages-opcode: ## Opcode (Claude Code GUI) をインストール
 
 	# Opcode のクローンとビルド
 	@echo "📥 Opcode をクローン中 (Commit: $(OPCODE_COMMIT)). GEAR 🚀"
-	@OPCODE_DIR="/tmp/opcode-build" && \
-	rm -rf "$$OPCODE_DIR" 2>/dev/null || true && \
+	@OPCODE_DIR=$$(mktemp -d) && \
+	trap 'rm -rf "$$OPCODE_DIR"' EXIT && \
 	if git clone --depth 1 https://github.com/winfunc/opcode.git "$$OPCODE_DIR" && \
 	   git -C "$$OPCODE_DIR" fetch --depth=1 origin $(OPCODE_COMMIT) && \
 	   git -C "$$OPCODE_DIR" checkout $(OPCODE_COMMIT); then \

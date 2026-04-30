@@ -254,9 +254,16 @@ def main() -> int:
         if agent_name == "gemini":
             # Gemini CLI expects command to be a string
             for srv in agent_mcp_servers.values():
-                if srv.get("type") == "stdio" and isinstance(srv.get("command"), list):
-                    full_cmd = srv["command"] + srv.get("args", [])
-                    srv["command"] = " ".join(full_cmd)
+                if srv.get("type") == "stdio" and srv.get("command"):
+                    # Command is likely already a string from normalization above
+                    parts = []
+                    if isinstance(srv["command"], list):
+                        parts.extend(srv["command"])
+                    else:
+                        parts.append(srv["command"])
+                    
+                    parts.extend(srv.get("args", []))
+                    srv["command"] = " ".join(parts)
                     srv.pop("args", None)
 
         if agent_name in ["opencode", "oh-my-opencode"]:
@@ -318,8 +325,10 @@ def main() -> int:
                     print(f"  ❌ Failed to handle TOML config {config_path}: {e}")
 
         except Exception as e:
+            if isinstance(e, (KeyboardInterrupt, SystemExit)):
+                raise
             # Catch-all for truly unexpected bugs, but now inner blocks catch specific IO/Parse errors
-            print(f"  ❌ Unexpected error updating {config_path}: {e}")
+            print(f"  ❌ Unexpected error ({type(e).__name__}) updating {config_path}: {e}")
             import traceback
             traceback.print_exc()
 
