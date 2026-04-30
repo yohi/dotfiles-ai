@@ -72,13 +72,13 @@ check-gemini: ## Gemini CLI の診断を実行
 	else \
 		echo "❌ Gemini CLI が見つかりません。'make install-packages-gemini-cli' を実行してください。"; \
 	fi
-	if [ -L "$(HOME_DIR)/.gemini/GEMINI.md" ]; then \
+	@if [ -L "$(HOME_DIR)/.gemini/GEMINI.md" ]; then \
 		echo "✅ GEMINI.md: リンク済み ($$(readlink "$(HOME_DIR)/.gemini/GEMINI.md"))"; \
 	else \
 		echo "❌ GEMINI.md がリンクされていません。'make setup-gemini' を実行してください。"; \
 	fi \
 	&& \
-	if [ -f "$(HOME_DIR)/.gemini/settings.json" ]; then \
+	@if [ -f "$(HOME_DIR)/.gemini/settings.json" ]; then \
 		echo "✅ settings.json: 存在します"; \
 	else \
 		echo "❌ settings.json が見つかりません。'make setup-gemini' を実行してください。"; \

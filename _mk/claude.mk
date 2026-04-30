@@ -8,9 +8,9 @@ REPO_ROOT ?= $(CURDIR)
 
 define create_desktop_entry
 	echo "📝 デスクトップエントリーを作成中..."; \
-	printf "[Desktop Entry]\nName=Opcode\nComment=A powerful GUI app and Toolkit for Claude Code\nExec=/opt/opcode/opcode\nTryExec=/opt/opcode/opcode\nIcon=applications-development\nTerminal=false\nType=Application\nCategories=Development;IDE;Utility;\nStartupWMClass=opcode\n" | sudo tee /usr/share/applications/opcode.desktop > /dev/null; \
-	sudo chmod +x /usr/share/applications/opcode.desktop; \
-	sudo update-desktop-database 2>/dev/null || true
+	printf "[Desktop Entry]\nName=Opcode\nComment=A powerful GUI app and Toolkit for Claude Code\nExec=/opt/opcode/opcode\nTryExec=/opt/opcode/opcode\nIcon=applications-development\nTerminal=false\nType=Application\nCategories=Development;IDE;Utility;\nStartupWMClass=opcode\n" | sudo tee /usr/share/applications/opcode.desktop > /dev/null && \
+	sudo chmod +x /usr/share/applications/opcode.desktop && \
+	(sudo update-desktop-database 2>/dev/null || true)
 endef
 
 # Opcode (Claude Code GUI) のバージョン固定

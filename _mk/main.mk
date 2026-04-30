@@ -134,7 +134,7 @@ doctor: ## [診断] 設定の不備や同期が必要な箇所を特定し、解
 	@if [ ! -L "$(HOME_DIR)/.claude/CLAUDE.md" ]; then \
 		echo "⚠️  [ACTION REQUIRED] Claude の設定が未完了です。'make setup-claude' を実行してください。"; \
 	fi
-	@if [ ! -L "$(HOME_DIR)/.gemini/settings.json" ]; then \
+	@if [ ! -e "$(HOME_DIR)/.gemini/settings.json" ]; then \
 		echo "⚠️  [ACTION REQUIRED] Gemini の設定が未完了です。'make setup-gemini' を実行してください。"; \
 	fi
 	@if ! command -v skillport >/dev/null 2>&1; then \

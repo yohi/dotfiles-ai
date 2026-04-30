@@ -107,7 +107,7 @@ servers:
     type: sse
     url: "__GATEWAY_URL__"
     headers:
-      Authorization: "Bearer ${MCP_GATEWAY_TOKEN}"
+      Authorization: "Bearer ${MCP_GATEWAY_TOKEN:-}"
     _generated_by: "gateway"
 
 agents:

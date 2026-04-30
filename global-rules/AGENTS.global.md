@@ -87,7 +87,7 @@ Each skill contains step-by-step instructions, templates, and scripts.
 
 ### Tips
 
-- Use your native Read tool with `{path}/file` for templates/assets
+- Use your native Read tool with `{path}/file` for templates/assets (e.g., `read_file(file_path="{path}/template.md")`)
 - Execute scripts via path, don't read them into context: `python {path}/scripts/run.py`
 - Replace `{path}` in instructions with the actual path from `load_skill`
 - If search returns 10+ results, refine your query
@@ -414,6 +414,12 @@ After calling `memory_save` or `session_flush`, perform a self-verification usin
    - [ ] Does it avoid pronouns or relative terms like "the previous," "above," or "this"?
 
 3. **Avoidance of Duplication and Noise:**
+   - [ ] Have you already called `memory_save` for substantially the same content within the same session?
+   - [ ] Did you choose to skip saving if the information was insufficient or ambiguous?
+
+If any item fails, cancel the save or correct the content before finalizing.
+</quick_rubric>
+e:**
    - [ ] Have you already called `memory_save` for substantially the same content within the same session?
    - [ ] Did you choose to skip saving if the information was insufficient or ambiguous?
 

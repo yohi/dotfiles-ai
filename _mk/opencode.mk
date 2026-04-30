@@ -114,7 +114,7 @@ opencode: ## OpenCode(opencode)のインストールとセットアップ
 
 # OpenCode をインストール（公式インストーラ）
 install-packages-opencode: ## OpenCode（opencode）をインストール
-	@bash -c 'set -e; \
+	@bash -c 'set -euo pipefail; \
 		echo "📦 OpenCode のバージョンを確認中..."; \
 		LATEST_VERSION=$$(curl -sL --connect-timeout 10 --max-time 30 "$(OPENCODE_API_URL)" 2>/dev/null | grep -E "^[0-9]+\.[0-9]+\.[0-9]+$$" || echo "unknown"); \
 		CURRENT_VERSION=$$( "$(OPENCODE_BIN)" --version 2>/dev/null || echo "none" ); \

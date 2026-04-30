@@ -268,12 +268,26 @@ def main() -> int:
 
         # Load, update, and save
         try:
-            content = config_path.read_text(encoding="utf-8")
+            try:
+                content = config_path.read_text(encoding="utf-8")
+            except OSError as e:
+                print(f"  ❌ Failed to read config {config_path}: {e}")
+                continue
+
             if format_type in ["json", "opencode_jsonc"]:
-                if json5 and (format_type == "opencode_jsonc" or "//" in content):
-                    data = json5.loads(content)
-                else:
-                    data = json.loads(content)
+                try:
+                    if format_type == "opencode_jsonc":
+                        if json5:
+                            data = json5.loads(content)
+                        else:
+                            raise ValueError(f"json5 library is required for {format_type}")
+                    elif json5 and "//" in content:
+                        data = json5.loads(content)
+                    else:
+                        data = json.loads(content)
+                except (json.JSONDecodeError, ValueError) as e:
+                    print(f"  ❌ Failed to parse JSON config {config_path}: {e}")
+                    continue
                 
                 # Update mcpServers
                 if root_key not in data:
@@ -283,20 +297,31 @@ def main() -> int:
                 data[root_key] = agent_mcp_servers
                 
                 # Save
-                with config_path.open("w", encoding="utf-8") as f:
-                    json.dump(data, f, indent=2, ensure_ascii=False)
-                print(f"  ✅ Updated agent config: {config_path}")
+                try:
+                    with config_path.open("w", encoding="utf-8") as f:
+                        json.dump(data, f, indent=2, ensure_ascii=False)
+                    print(f"  ✅ Updated agent config: {config_path}")
+                except OSError as e:
+                    print(f"  ❌ Failed to write config {config_path}: {e}")
             
             elif format_type == "toml":
-                import toml
-                data = toml.loads(content)
-                data[root_key] = agent_mcp_servers
-                with config_path.open("w", encoding="utf-8") as f:
-                    toml.dump(data, f)
-                print(f"  ✅ Updated agent config (TOML): {config_path}")
+                try:
+                    import toml
+                    data = toml.loads(content)
+                    data[root_key] = agent_mcp_servers
+                    with config_path.open("w", encoding="utf-8") as f:
+                        toml.dump(data, f)
+                    print(f"  ✅ Updated agent config (TOML): {config_path}")
+                except ImportError:
+                    print(f"  ❌ toml library is required for {config_path}")
+                except (toml.TomlDecodeError, OSError) as e:
+                    print(f"  ❌ Failed to handle TOML config {config_path}: {e}")
 
         except Exception as e:
-            print(f"  ❌ Failed to update agent config {config_path}: {e}")
+            # Catch-all for truly unexpected bugs, but now inner blocks catch specific IO/Parse errors
+            print(f"  ❌ Unexpected error updating {config_path}: {e}")
+            import traceback
+            traceback.print_exc()
 
     return 0
 

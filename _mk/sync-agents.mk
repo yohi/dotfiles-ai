@@ -58,9 +58,7 @@ uninstall-superpowers: ## 外部スキル (superpowers) を削除する
 	@echo "✅ 削除が完了しました"
 
 # ============================================================
-		# sync-agents: メインの同期ターゲット (SPEC Feature #1, #2, #3)
-
-# ============================================================
+# sync-agents: メインの同期ターゲット (SPEC Feature #1, #2, #3)
 sync-agents: ## SSOTのスキル群を各エージェントの設定ファイルへ同期する
 	@echo "🔄 sync-agents: SSOT → 各エージェントへの同期を開始..."
 	@$(MAKE) clean-sync-artifacts
