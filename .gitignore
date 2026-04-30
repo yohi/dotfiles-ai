@@ -25,7 +25,7 @@ codex/.tmp/
 codex/skills/.system/
 
 # OpenCode
-opencode/oh-my-opencode.json*
+opencode/oh-my-*.json*
 .mcp.json
 .serena/
 .env
@@ -37,16 +37,21 @@ ide/cursor/mcp.json
 .opencode/
 .cursor/
 .gemini/
+.claude/
 
 # Worktrees
 .worktrees/
 .worktrees
 claude/settings.json
 claude/claude-settings.json
+.claude/settings.json
+.claude/settings.local.json
 gemini/settings.json
+.gemini/settings.json
 ide/vscode/settings.json
 opencode/opencode.jsonc
-*.bk
+*.bk*
+*.test
 # test.mk (Removed to allow git tracking)
 # Python environment
 __pycache__/
