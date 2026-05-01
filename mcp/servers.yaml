@@ -37,13 +37,15 @@ servers:
     description: "Long-term memory and knowledge graph system."
     type: stdio
     command:
-      - uv
-      - run
-      - --project
-      - "${CHRONOS_GRAPH_PATH:-__PROGRAM__/chronos-graph}"
-      - -m
-      - context_store
+      - "uvx"
+      - "--from"
+      - "git+https://github.com/yohi/chronos-graph.git"
+      - "context-store"
     env:
+      - name: OPENAI_API_KEY
+        value: "${OPENAI_API_KEY:-YOUR_API_KEY_HERE}"
+      - name: LOG_LEVEL
+        value: "error"
       - name: STORAGE_BACKEND
         value: "sqlite"
       - name: SQLITE_DB_PATH
@@ -61,27 +63,27 @@ servers:
       - name: LOCAL_MODEL_NAME
         value: "cl-nagoya/ruri-v3-310m"
 
-  nexus:
-    title: "Nexus"
-    description: "Local knowledge base and indexer."
-    type: stdio
-    command:
-      - "node"
-      - "__PROGRAM__/nexus/dist/bin/nexus.js"
-    args:
-      - "--project-root"
-      - "__PROGRAM__/nexus"
-    env:
-      - name: NEXUS_STORAGE_ROOT_DIR
-        value: "__PROGRAM__/nexus/.nexus"
-      - name: NEXUS_WATCHER_IGNORE_PATHS
-        value: "node_modules,.git,.nexus,dist,gemini,.worktrees,.venv,target,.mypy_cache,.ruff_cache,build,.serena,.cache,__pycache__,*.db,*.sqlite,*.log,out,bundle,vendor,package-lock.json,yarn.lock,pnpm-lock.yaml"
-      - name: CHOKIDAR_USEPOLLING
-        value: "false"
-      - name: CHOKIDAR_INTERVAL
-        value: "2000"
-      - name: NO_PROXY
-        value: "127.0.0.1,localhost"
+  # nexus:
+  #   title: "Nexus"
+  #   description: "Local knowledge base and indexer."
+  #   type: stdio
+  #   command:
+  #     - "node"
+  #     - "__PROGRAM__/nexus/dist/bin/nexus.js"
+  #   args:
+  #     - "--project-root"
+  #     - "__PROGRAM__/nexus"
+  #   env:
+  #     - name: NEXUS_STORAGE_ROOT_DIR
+  #       value: "__PROGRAM__/nexus/.nexus"
+  #     - name: NEXUS_WATCHER_IGNORE_PATHS
+  #       value: "node_modules,.git,.nexus,dist,gemini,.worktrees,.venv,target,.mypy_cache,.ruff_cache,build,.serena,.cache,__pycache__,*.db,*.sqlite,*.log,out,bundle,vendor,package-lock.json,yarn.lock,pnpm-lock.yaml"
+  #     - name: CHOKIDAR_USEPOLLING
+  #       value: "false"
+  #     - name: CHOKIDAR_INTERVAL
+  #       value: "2000"
+  #     - name: NO_PROXY
+  #       value: "127.0.0.1,localhost"
 
   atlassian:
     title: "Atlassian"
@@ -89,17 +91,17 @@ servers:
     type: sse
     url: "https://mcp.atlassian.com/v1/mcp"
 
-  skillport:
-    title: "Skillport"
-    description: "Professional development and AI skill management toolkit."
-    type: stdio
-    command:
-      - "uvx"
-    args:
-      - "skillport-mcp"
-    env:
-      - name: SKILLPORT_SKILLS_DIR
-        value: "__REPO_ROOT__/agent-skills"
+  # skillport:
+  #   title: "Skillport"
+  #   description: "Professional development and AI skill management toolkit."
+  #   type: stdio
+  #   command:
+  #     - "uvx"
+  #   args:
+  #     - "skillport-mcp"
+  #   env:
+  #     - name: SKILLPORT_SKILLS_DIR
+  #       value: "__REPO_ROOT__/agent-skills"
 
   docker-mcp:
     title: "Docker MCP Gateway"
@@ -112,14 +114,14 @@ servers:
 
 agents:
   gemini:
-    path: "gemini/settings.json"
+    path: ".gemini/settings.json"
     format: "json"
     root_key: "mcpServers"
     servers:
       docker-mcp: { inherit: "docker-mcp" }
       chronos-graph: { inherit: "chronos-graph" }
-      nexus: { inherit: "nexus" }
-      skillport: { inherit: "skillport" }
+      # nexus: { inherit: "nexus" }
+      # skillport: { inherit: "skillport" }
 
   claude:
     path: ".claude.json"
@@ -129,8 +131,8 @@ agents:
       docker-mcp: { inherit: "docker-mcp" }
       atlassian: { inherit: "atlassian" }
       chronos-graph: { inherit: "chronos-graph" }
-      nexus: { inherit: "nexus" }
-      skillport: { inherit: "skillport" }
+      # nexus: { inherit: "nexus" }
+      # skillport: { inherit: "skillport" }
 
   opencode:
     path: "opencode/opencode.jsonc"

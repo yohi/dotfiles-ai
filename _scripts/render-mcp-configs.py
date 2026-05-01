@@ -31,7 +31,18 @@ def load_client_config() -> dict[str, Any]:
 def replace_placeholders(data: Any, gateway_url: str, expand_paths: bool = False) -> Any:
     home = str(Path.home())
     repo_root = str(Path(__file__).parent.parent.resolve())
-    program_dir = os.environ.get("PROGRAM_DIR", str(Path.home() / "program" / "private"))
+    
+    # Try to derive program_dir from environment or use default
+    program_dir = os.environ.get("PROGRAM_DIR")
+    if not program_dir:
+        # Fallback to parent of CHRONOS_GRAPH_PATH if it exists in env
+        cg_path = os.environ.get("CHRONOS_GRAPH_PATH")
+        if cg_path:
+            # Expand ~ if present (though .env should have absolute paths)
+            cg_path_abs = Path(cg_path).expanduser()
+            program_dir = str(cg_path_abs.parent)
+        else:
+            program_dir = str(Path.home() / "program" / "private")
 
     if isinstance(data, dict):
         return {k: replace_placeholders(v, gateway_url, expand_paths) for k, v in data.items()}
@@ -53,7 +64,7 @@ def replace_placeholders(data: Any, gateway_url: str, expand_paths: bool = False
                 return cast(str, default_val)
             raise ValueError(f"Required environment variable '${var_name}' is not set and has no default value.")
 
-        s = re.sub(r"\${(\w+)(?::-([^}]+))?}", _get_env, s)
+        s = re.sub(r"\${(\w+)(?::-([^}]*))?}", _get_env, s)
 
         if expand_paths:
             if s.startswith("/") or s.startswith("~"):
@@ -207,6 +218,10 @@ def main() -> int:
         if not path_str:
             continue
         
+        if not isinstance(path_str, str):
+            print(f"  [WARN] 'path' for agent {agent_name} must be a string, got {type(path_str).__name__}")
+            continue
+        
         # Path might contain placeholders
         path_str = replace_placeholders(path_str, gateway_url, expand_paths=True)
         config_path = repo_root / path_str
@@ -262,6 +277,13 @@ def main() -> int:
                         else:
                             srv_def.pop("args", None)
 
+                # Expand 'uv' or 'uvx' to absolute path if it's the command
+                if srv_def.get("type") == "stdio" and srv_def.get("command") in ["uv", "uvx"]:
+                    cmd_name = cast(str, srv_def["command"])
+                    abs_path = shutil.which(cmd_name)
+                    if abs_path:
+                        srv_def["command"] = abs_path
+
                 # Handle args/env format differences if necessary
                 if "env" in srv_def and isinstance(srv_def["env"], list):
                     env_dict = {}
@@ -274,19 +296,9 @@ def main() -> int:
 
         # Adjust format for specific agents
         if agent_name == "gemini":
-            # Gemini CLI expects command to be a string
-            for srv in agent_mcp_servers.values():
-                if srv.get("type") == "stdio" and srv.get("command"):
-                    # Command is likely already a string from normalization above
-                    parts = []
-                    if isinstance(srv["command"], list):
-                        parts.extend(srv["command"])
-                    else:
-                        parts.append(srv["command"])
-                    
-                    parts.extend(srv.get("args", []))
-                    srv["command"] = shlex.join(parts)
-                    srv.pop("args", None)
+            # Gemini CLI supports both command string and args array.
+            # No need to merge them into a single string.
+            pass
 
         if agent_name in ["opencode", "oh-my-opencode"]:
             # OpenCode expects type: remote instead of sse, and needs enabled: true
