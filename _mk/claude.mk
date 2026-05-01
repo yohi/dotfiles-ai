@@ -165,11 +165,11 @@ install-packages-opcode: ## Opcode (Claude Code GUI) をインストール
 			done; \
 			if [ -n "$$BIN_PATH" ] && [ -f "$$BIN_PATH" ] && [ -x "$$BIN_PATH" ]; then \
 				echo "✅ 選択された実行ファイル: $$BIN_PATH"; \
-				sudo mkdir -p /opt/opcode; \
-				sudo cp "$$BIN_PATH" /opt/opcode/opcode; \
-				sudo chmod +x /opt/opcode/opcode; \
+				sudo mkdir -p /opt/opcode && \
+				sudo cp "$$BIN_PATH" /opt/opcode/opcode && \
+				sudo chmod +x /opt/opcode/opcode && \
 				\
-				$(create_desktop_entry); \
+				$(create_desktop_entry) && \
 				\
 				echo "✅ Opcode が /opt/opcode にインストールされました"; \
 			else \
@@ -181,7 +181,7 @@ install-packages-opcode: ## Opcode (Claude Code GUI) をインストール
 			echo "🔧 トラブルシューティング:"; \
 			echo "1. 依存関係の確認: すべてのシステム依存関係がインストールされているか"; \
 			echo "2. メモリ不足: ビルドには十分なRAMが必要"; \
-			echo "3. 手動ビルド: cd /tmp/opcode-build && bun run tauri build --debug"; \
+			echo "3. 手動ビルド: cd $$OPCODE_DIR && bun run tauri build --debug"; \
 			exit 1; \
 		fi; \
 	else \
@@ -189,10 +189,6 @@ install-packages-opcode: ## Opcode (Claude Code GUI) をインストール
 		echo "ℹ️  インターネット接続を確認してください"; \
 		exit 1; \
 	fi
-
-	# クリーンアップ
-	@echo "🧹 一時ファイルをクリーンアップ中..."
-	@rm -rf /tmp/opcode-build 2>/dev/null || true
 
 	@echo "✅ Opcode のインストールが完了しました"
 	@echo "💡 使い方を確認するには 'make help-claude' を実行してください。"

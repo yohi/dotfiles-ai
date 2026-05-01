@@ -215,9 +215,15 @@ def main() -> int:
         # Prepare server definitions for this agent
         agent_mcp_servers: dict[str, Any] = {}
         for srv_name, mapping in mapped_servers.items():
+            if not isinstance(mapping, dict):
+                print(f"  [WARN] Invalid mapping for {srv_name} in {agent_name} (expected dict)")
+                continue
+                
             inherit_name = mapping.get("inherit", srv_name)
-            if inherit_name in all_servers_raw:
-                srv_def = all_servers_raw[inherit_name].copy()
+            inherit_val = all_servers_raw.get(inherit_name)
+            
+            if isinstance(inherit_val, dict):
+                srv_def = inherit_val.copy()
                 # Expand placeholders and paths
                 srv_def = replace_placeholders(srv_def, gateway_url, expand_paths=True)
                 # Clean up metadata
@@ -323,6 +329,8 @@ def main() -> int:
                     print(f"  ❌ toml library is required for {config_path}")
                 except (toml.TomlDecodeError, OSError) as e:
                     print(f"  ❌ Failed to handle TOML config {config_path}: {e}")
+            else:
+                print(f"  [SKIP] Unsupported format type '{format_type}' for {config_path}")
 
         except Exception as e:
             if isinstance(e, (KeyboardInterrupt, SystemExit)):
