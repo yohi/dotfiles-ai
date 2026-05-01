@@ -54,7 +54,7 @@ class TestMCPRenderer(unittest.TestCase):
         # Testing path expansion
         data = "~/test/path"
         with patch.object(render_mcp_configs, "Path") as mock_path:
-            fake_home = "/tmp/fakehome"
+            fake_home = str(self.tmp_home)
             fake_path = f"{fake_home}/test/path"
             mock_path.return_value.expanduser.return_value.resolve.return_value = fake_path
             expanded = render_mcp_configs.replace_placeholders(data, self.gateway_url, expand_paths=True)
