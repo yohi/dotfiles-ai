@@ -231,7 +231,7 @@ def main() -> int:
                 print(f"  [WARN] Invalid mapping for {srv_name} in {agent_name} (expected dict)")
                 continue
                 
-            inherit_name = mapping.get("inherit", srv_name)
+            inherit_name = cast(str, mapping.get("inherit", srv_name))
             inherit_val = all_servers_raw.get(inherit_name)
             
             if isinstance(inherit_val, dict):
