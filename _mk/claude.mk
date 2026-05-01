@@ -1,6 +1,6 @@
 # ============================================================
-# Claude Code / Claudia セットアップ用Makefile
-# Claude Code (CLI)、Claudia (GUI) のインストール・管理を担当
+# Claude Code / Opcode セットアップ用Makefile
+# Claude Code (CLI)、Opcode (GUI) のインストール・管理を担当
 # ============================================================
 
 HOME_DIR ?= $(HOME)
@@ -8,13 +8,13 @@ REPO_ROOT ?= $(CURDIR)
 
 define create_desktop_entry
 	echo "📝 デスクトップエントリーを作成中..."; \
-	printf "[Desktop Entry]\nName=Claudia\nComment=A powerful GUI app and Toolkit for Claude Code\nExec=/opt/claudia/claudia\nTryExec=/opt/claudia/claudia\nIcon=applications-development\nTerminal=false\nType=Application\nCategories=Development;IDE;Utility;\nStartupWMClass=claudia\n" | sudo tee /usr/share/applications/claudia.desktop > /dev/null; \
-	sudo chmod +x /usr/share/applications/claudia.desktop; \
-	sudo update-desktop-database 2>/dev/null || true
+	printf "[Desktop Entry]\nName=Opcode\nComment=A powerful GUI app and Toolkit for Claude Code\nExec=/opt/opcode/opcode\nTryExec=/opt/opcode/opcode\nIcon=applications-development\nTerminal=false\nType=Application\nCategories=Development;IDE;Utility;\nStartupWMClass=opcode\n" | sudo tee /usr/share/applications/opcode.desktop > /dev/null && \
+	sudo chmod +x /usr/share/applications/opcode.desktop && \
+	(sudo update-desktop-database 2>/dev/null || true)
 endef
 
-# Claudia (Claude Code GUI) のバージョン固定
-CLAUDIA_COMMIT := 70c16d8a4910db48cd9684aeacdd431caefd7d71
+# Opcode (Claude Code GUI) のバージョン固定
+OPCODE_COMMIT := 70c16d8a4910db48cd9684aeacdd431caefd7d71
 
 # Claude Code のインストール
 .PHONY: install-packages-claude-code
@@ -55,11 +55,11 @@ install-packages-claude-code:
 help-claude: ## Claude Code の使い方を表示
 	$(call show-guide,$(REPO_ROOT)/_docs/guides/claude.md)
 
-# Claudia (Claude Code GUI) のインストール
-.PHONY: install-packages-claudia
-install-packages-claudia:
-	@echo "🖥️  Claudia (Claude Code GUI) のインストールを開始..."
-	@echo "ℹ️  注意: ClaudiaはまだRelease版が公開されていないため、ソースからビルドします"
+# Opcode (Claude Code GUI) のインストール
+.PHONY: install-packages-opcode
+install-packages-opcode: ## Opcode (Claude Code GUI) をインストール
+	@echo "🖥️  Opcode (Claude Code GUI) のインストールを開始..."
+	@echo "ℹ️  注意: OpcodeはまだRelease版が公開されていないため、ソースからビルドします"
 	@echo "⏱️  ビルドには10-15分かかる場合があります（システム環境により変動）"
 	@echo ""
 
@@ -131,15 +131,15 @@ install-packages-claudia:
 		echo "✅ Bun が見つかりました: $$(bun --version)"; \
 	fi
 
-	# Claudia のクローンとビルド
-	@echo "📥 Claudia をクローン中 (Commit: $(CLAUDIA_COMMIT)). GEAR 🚀"
-	@CLAUDIA_DIR="/tmp/claudia-build" && \
-	rm -rf "$$CLAUDIA_DIR" 2>/dev/null || true && \
-	if git clone --depth 1 https://github.com/getAsterisk/claudia.git "$$CLAUDIA_DIR" && \
-	   git -C "$$CLAUDIA_DIR" fetch --depth=1 origin $(CLAUDIA_COMMIT) && \
-	   git -C "$$CLAUDIA_DIR" checkout $(CLAUDIA_COMMIT); then \
-		echo "✅ Claudia のクローンが完了しました"; \
-		cd "$$CLAUDIA_DIR" && \
+	# Opcode のクローンとビルド
+	@echo "📥 Opcode をクローン中 (Commit: $(OPCODE_COMMIT)). GEAR 🚀"
+	@OPCODE_DIR=$$(mktemp -d) && \
+	trap 'rm -rf "$$OPCODE_DIR"' EXIT && \
+	if git clone --depth 1 https://github.com/winfunc/opcode.git "$$OPCODE_DIR" && \
+	   git -C "$$OPCODE_DIR" fetch --depth=1 origin $(OPCODE_COMMIT) && \
+	   git -C "$$OPCODE_DIR" checkout $(OPCODE_COMMIT); then \
+		echo "✅ Opcode のクローンが完了しました"; \
+		cd "$$OPCODE_DIR" && \
 		\
 		echo "📦 フロントエンド依存関係をインストール中..."; \
 		if command -v bun >/dev/null 2>&1; then \
@@ -149,73 +149,48 @@ install-packages-claudia:
 			exit 1; \
 		fi; \
 		\
-		echo "🔨 Claudia をビルド中..."; \
+		echo "🔨 Opcode をビルド中..."; \
 		echo "ℹ️  この処理には数分かかる場合があります..."; \
 		export PKG_CONFIG_PATH="/usr/lib/x86_64-linux-gnu/pkgconfig:$$PKG_CONFIG_PATH"; \
 		if bun run tauri build; then \
-			echo "✅ Claudia のビルドが完了しました"; \
+			echo "✅ Opcode のビルドが完了しました"; \
 			\
 			echo "📁 実行ファイルをインストール中..."; \
 			BIN_PATH=""; \
-			for candidate in src-tauri/target/release/claudia* src-tauri/target/release/opcode*; do \
+			for candidate in src-tauri/target/release/opcode*; do \
 				if [ -f "$$candidate" ] && [ -x "$$candidate" ]; then \
-					case "$$(basename "$$candidate")" in \
-						claudia*|opcode*) \
-							BIN_PATH="$$candidate"; \
-							break ;; \
-					esac; \
+					BIN_PATH="$$candidate"; \
+					break; \
 				fi; \
 			done; \
 			if [ -n "$$BIN_PATH" ] && [ -f "$$BIN_PATH" ] && [ -x "$$BIN_PATH" ]; then \
 				echo "✅ 選択された実行ファイル: $$BIN_PATH"; \
-				sudo mkdir -p /opt/claudia; \
-				sudo cp "$$BIN_PATH" /opt/claudia/claudia; \
-				sudo chmod +x /opt/claudia/claudia; \
+				sudo mkdir -p /opt/opcode && \
+				sudo cp "$$BIN_PATH" /opt/opcode/opcode && \
+				sudo chmod +x /opt/opcode/opcode && \
 				\
-				$(create_desktop_entry); \
+				$(create_desktop_entry) && \
 				\
-				echo "✅ Claudia が /opt/claudia にインストールされました"; \
+				echo "✅ Opcode が /opt/opcode にインストールされました"; \
 			else \
-				echo "⚠️  主要バイナリが見つかりません。代替候補を検索中..."; \
-				ALT_BIN=""; \
-				for alt_candidate in $$(find src-tauri/target/release -maxdepth 1 -type f -executable -name "claudia*" -o -name "opcode*" 2>/dev/null | sort -V); do \
-					case "$$(basename "$$alt_candidate")" in \
-						claudia*|opcode*) \
-							ALT_BIN="$$alt_candidate"; \
-							break ;; \
-					esac; \
-				done; \
-				if [ -n "$$ALT_BIN" ] && [ -f "$$ALT_BIN" ] && [ -x "$$ALT_BIN" ]; then \
-					echo "✅ 代替実行ファイルを発見: $$ALT_BIN"; \
-					sudo mkdir -p /opt/claudia; \
-					sudo cp "$$ALT_BIN" /opt/claudia/claudia; \
-					sudo chmod +x /opt/claudia/claudia; \
-					$(create_desktop_entry); \
-					echo "✅ Claudia が /opt/claudia にインストールされました（代替実行ファイル使用）"; \
-				else \
-					echo "❌ ビルドされた実行ファイルが見つかりません"; \
-					exit 1; \
-				fi; \
+				echo "❌ ビルドされた実行ファイルが見つかりません"; \
+				exit 1; \
 			fi; \
 		else \
-			echo "❌ Claudia のビルドに失敗しました"; \
+			echo "❌ Opcode のビルドに失敗しました"; \
 			echo "🔧 トラブルシューティング:"; \
 			echo "1. 依存関係の確認: すべてのシステム依存関係がインストールされているか"; \
 			echo "2. メモリ不足: ビルドには十分なRAMが必要"; \
-			echo "3. 手動ビルド: cd /tmp/claudia-build && bun run tauri build --debug"; \
+			echo "3. 手動ビルド: cd $$OPCODE_DIR && bun run tauri build --debug"; \
 			exit 1; \
 		fi; \
 	else \
-		echo "❌ Claudia のクローンに失敗しました"; \
+		echo "❌ Opcode のクローンに失敗しました"; \
 		echo "ℹ️  インターネット接続を確認してください"; \
 		exit 1; \
 	fi
 
-	# クリーンアップ
-	@echo "🧹 一時ファイルをクリーンアップ中..."
-	@rm -rf /tmp/claudia-build 2>/dev/null || true
-
-	@echo "✅ Claudia のインストールが完了しました"
+	@echo "✅ Opcode のインストールが完了しました"
 	@echo "💡 使い方を確認するには 'make help-claude' を実行してください。"
 
 # Claude Code エコシステム一括インストール
@@ -224,7 +199,7 @@ install-claude-ecosystem:
 	@echo "🌟 Claude Code エコシステム一括インストールを開始..."
 	@echo "ℹ️  以下の2つのツールを順次インストールします:"
 	@echo "   1. Claude Code (AI コードエディタ・CLI)"
-	@echo "   2. Claudia (Claude Code GUI アプリ)"
+	@echo "   2. Opcode (Claude Code GUI アプリ)"
 	@echo ""
 
 	# Step 1: Claude Code のインストール
@@ -233,10 +208,9 @@ install-claude-ecosystem:
 	@echo "✅ Claude Code のインストールが完了しました"
 	@echo ""
 
-	# Step 2: Claudia のインストール
-	@echo "📋 Step 2/2: Claudia をインストール中..."
-	@$(MAKE) install-packages-claudia
-	@echo "✅ Claudia のインストールが完了しました"
+	# Step 2: Opcode のインストール
+	@echo "📋 Step 2/2: Opcode をインストール中..."
+	@$(MAKE) install-packages-opcode
 	@echo ""
 
 	# 最終確認
@@ -274,11 +248,11 @@ check-claude: ## Claude Code の診断を実行
 # エイリアス
 # ========================================
 
-.PHONY: install-claude-code install-claudia setup-claude uninstall-claude
+.PHONY: install-claude-code install-opcode setup-claude uninstall-claude
 
 install-claude-code: install-packages-claude-code  ## Claude Codeをインストール(エイリアス)
 
-install-claudia: install-packages-claudia  ## Claudiaをインストール(エイリアス)
+install-opcode: install-packages-opcode  ## Opcodeをインストール(エイリアス)
 
 setup-claude: ## Claude Codeの設定を適用
 	@echo "📝 Claude Codeの設定を適用中..."

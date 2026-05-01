@@ -1,4 +1,4 @@
-# Claude Code / Claudia 使用ガイド
+# Claude Code / Opcode 使用ガイド
 
 🤖 Claude Code のセットアップが完了しました！
 
@@ -10,8 +10,8 @@
 - `summarize this project`
 - `/help`
 
-## 🖥️ Claudia (GUI)
-- **起動方法**: アプリケーションメニューから 'Claudia' を選択、または `/opt/claudia/claudia`
+## 🖥️ Opcode (GUI)
+- **起動方法**: アプリケーションメニューから 'Opcode' を選択、または `/opt/opcode/opcode`
 - **機能**: プロジェクト管理、使用状況分析、MCPサーバー管理等
 
 ## 🩺 トラブルシューティング
@@ -22,4 +22,4 @@ make check-claude
 
 ## 📚 ドキュメント
 - [Claude Code](https://docs.anthropic.com/claude-code)
-- [Claudia](https://github.com/getAsterisk/claudia)
+- [Opcode](https://github.com/winfunc/opcode)

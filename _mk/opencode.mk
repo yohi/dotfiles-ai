@@ -114,24 +114,31 @@ opencode: ## OpenCode(opencode)のインストールとセットアップ
 
 # OpenCode をインストール（公式インストーラ）
 install-packages-opencode: ## OpenCode（opencode）をインストール
-	@echo "📦 OpenCode のバージョンを確認中..."
-	@LATEST_VERSION=$$(curl -sL --connect-timeout 10 --max-time 30 "$(OPENCODE_API_URL)" 2>/dev/null || echo "unknown"); \
-	CURRENT_VERSION=$$( $(OPENCODE_BIN) --version 2>/dev/null || echo "none" ); \
-	if [ "$$LATEST_VERSION" != "unknown" ] && [ "$$CURRENT_VERSION" = "$$LATEST_VERSION" ]; then \
-		echo "✅ OpenCode は既に最新バージョンです (バージョン: $$CURRENT_VERSION)"; \
-		exit 0; \
-	fi; \
-	if [ "$$CURRENT_VERSION" = "none" ]; then \
-		echo "📦 OpenCode を新規インストールします..."; \
-	else \
-		echo "🔄 OpenCode をアップデートします ($$CURRENT_VERSION -> $$LATEST_VERSION)..."; \
-	fi
-
-	@if ! command -v curl >/dev/null 2>&1; then \
-		echo "❌ curl が見つかりません。先に curl をインストールしてください"; \
-		exit 1; \
-	fi
 	@bash -c 'set -euo pipefail; \
+		if ! command -v curl >/dev/null 2>&1; then \
+			echo "❌ curl が見つかりません。先に curl をインストールしてください"; \
+			exit 1; \
+		fi; \
+		echo "📦 OpenCode のバージョンを確認中..."; \
+		LATEST_VERSION=$$(curl -sL --connect-timeout 10 --max-time 30 "$(OPENCODE_API_URL)" 2>/dev/null | grep -E "^[0-9]+\.[0-9]+\.[0-9]+$$" || echo "unknown"); \
+		CURRENT_VERSION=$$( "$(OPENCODE_BIN)" --version 2>/dev/null || echo "none" ); \
+		if [ "$$LATEST_VERSION" != "unknown" ]; then \
+			if [ "$$CURRENT_VERSION" = "$$LATEST_VERSION" ]; then \
+				echo "✅ OpenCode は既に最新バージョンです (バージョン: $$CURRENT_VERSION)"; \
+				exit 0; \
+			fi; \
+			if [ "$$CURRENT_VERSION" = "none" ]; then \
+				echo "📦 OpenCode を新規インストールします..."; \
+			else \
+				echo "🔄 OpenCode をアップデートします ($$CURRENT_VERSION -> $$LATEST_VERSION)..."; \
+			fi; \
+		else \
+			if [ "$$CURRENT_VERSION" != "none" ]; then \
+				echo "⚠️  最新バージョンの取得に失敗しました（404 またはレート制限）。現在のバージョン ($$CURRENT_VERSION) を維持します。"; \
+				exit 0; \
+			fi; \
+			echo "📦 最新バージョンの取得に失敗しましたが、新規インストールを試みます..."; \
+		fi; \
 		tmp="$$(mktemp)"; \
 		trap "rm -f \"$$tmp\"" EXIT; \
 		curl -fsSL "$(OPENCODE_INSTALL_URL)" -o "$$tmp"; \
@@ -141,12 +148,12 @@ install-packages-opencode: ## OpenCode（opencode）をインストール
 			echo "❌ Installer checksum mismatch"; \
 			exit 1; \
 		fi; \
-		yes | bash "$$tmp" || [ $${PIPESTATUS[1]} -eq 0 ]'
-	@if [ ! -x "$(OPENCODE_BIN)" ]; then \
-		echo "❌ opencode のインストールに失敗しました: $(OPENCODE_BIN) が見つかりません"; \
-		exit 1; \
-	fi
-	@echo "✅ OpenCode（opencode）のインストールが完了しました"
+		yes | bash "$$tmp" || [ $${PIPESTATUS[1]} -eq 0 ]; \
+		if [ ! -x "$(OPENCODE_BIN)" ]; then \
+			echo "❌ opencode のインストールに失敗しました: $(OPENCODE_BIN) が見つかりません"; \
+			exit 1; \
+		fi; \
+		echo "✅ OpenCode（opencode）のインストールが完了しました"'
 	@$(call create_marker,install-packages-opencode,$$($(OPENCODE_BIN) --version 2>/dev/null || echo unknown))
 
 # OpenCode を更新（公式インストーラ再実行）

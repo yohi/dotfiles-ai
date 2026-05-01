@@ -13,7 +13,7 @@ DOTFILES_SHELL_ROOT ?= $(REPO_ROOT)/..
 # Cursor IDEのインストール
 .PHONY: install-packages-cursor _cursor_download \
         update-cursor stop-cursor check-cursor-version \
-        install-packages-supercursor setup-cursor
+        setup-cursor
 
 CURSOR_API_URL := https://cursor.com/api/download?platform=linux-x64&format=deb&releaseTrack=stable
 CURSOR_USER_AGENT := Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36
@@ -186,6 +186,7 @@ check-cursor-version:
 # ========================================
 
 .PHONY: install-cursor
+
 install-cursor: install-packages-cursor  ## Cursor IDEをインストール(エイリアス)
 
 .PHONY: uninstall-cursor

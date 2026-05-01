@@ -10,16 +10,16 @@ servers:
       - "/mcp/sqlite.db"
     volumes:
       - "__HOME__/.mcp/sqlite:/mcp"
-  filesystem:
-    title: "Filesystem"
-    description: "Local filesystem access with restricted paths."
-    type: server
-    image: docker.io/mcp/filesystem:latest
-    command:
-      - "__HOME__"
-      - "__REPO_ROOT__"
-    volumes:
-      - "__HOME__:__HOME__"
+  # filesystem:
+  #   title: "Filesystem"
+  #   description: "Local filesystem access with restricted paths."
+  #   type: server
+  #   image: docker.io/mcp/filesystem:latest
+  #   args:
+  #     - "__HOME__"
+  #     - "__REPO_ROOT__"
+  #   volumes:
+  #     - "__HOME__:__HOME__"
   github-official:
     description: "Official GitHub MCP server for repository management."
     type: server
@@ -35,15 +35,17 @@ servers:
   chronos-graph:
     title: "ChronosGraph"
     description: "Long-term memory and knowledge graph system."
-    type: local
+    type: stdio
     command:
-      - uv
-      - run
-      - --project
-      - "${CHRONOS_GRAPH_PATH:-__PROGRAM__/chronos-graph}"
-      - -m
-      - context_store
+      - "uvx"
+      - "--from"
+      - "git+https://github.com/yohi/chronos-graph.git"
+      - "context-store"
     env:
+      - name: OPENAI_API_KEY
+        value: "${OPENAI_API_KEY:-YOUR_API_KEY_HERE}"
+      - name: LOG_LEVEL
+        value: "error"
       - name: STORAGE_BACKEND
         value: "sqlite"
       - name: SQLITE_DB_PATH
@@ -64,16 +66,18 @@ servers:
   nexus:
     title: "Nexus"
     description: "Local knowledge base and indexer."
-    type: local
+    type: stdio
     command:
-      - "node"
-      - "__PROGRAM__/nexus/dist/bin/nexus.js"
-    args:
-      - "--project-root"
-      - "__PROGRAM__/nexus"
+      - "npx"
+      - "-y"
+      - "-p"
+      - "@yohi/nexus@latest"
+      - "-p"
+      - "typescript"
+      - "nexus"
     env:
       - name: NEXUS_STORAGE_ROOT_DIR
-        value: "__PROGRAM__/nexus/.nexus"
+        value: "__HOME__/.nexus"
       - name: NEXUS_WATCHER_IGNORE_PATHS
         value: "node_modules,.git,.nexus,dist,gemini,.worktrees,.venv,target,.mypy_cache,.ruff_cache,build,.serena,.cache,__pycache__,*.db,*.sqlite,*.log,out,bundle,vendor,package-lock.json,yarn.lock,pnpm-lock.yaml"
       - name: CHOKIDAR_USEPOLLING
@@ -92,7 +96,7 @@ servers:
   skillport:
     title: "Skillport"
     description: "Professional development and AI skill management toolkit."
-    type: local
+    type: stdio
     command:
       - "uvx"
     args:
@@ -106,15 +110,20 @@ servers:
     description: "SSE gateway for containerized MCP servers."
     type: sse
     url: "__GATEWAY_URL__"
+    headers:
+      Authorization: "Bearer ${MCP_GATEWAY_TOKEN:-}"
     _generated_by: "gateway"
 
 agents:
   gemini:
-    path: "gemini/settings.json"
+    path: ".gemini/settings.json"
     format: "json"
     root_key: "mcpServers"
     servers:
       docker-mcp: { inherit: "docker-mcp" }
+      chronos-graph: { inherit: "chronos-graph" }
+      nexus: { inherit: "nexus" }
+      skillport: { inherit: "skillport" }
 
   claude:
     path: ".claude.json"
@@ -123,6 +132,9 @@ agents:
     servers:
       docker-mcp: { inherit: "docker-mcp" }
       atlassian: { inherit: "atlassian" }
+      chronos-graph: { inherit: "chronos-graph" }
+      nexus: { inherit: "nexus" }
+      skillport: { inherit: "skillport" }
 
   opencode:
     path: "opencode/opencode.jsonc"
@@ -130,13 +142,9 @@ agents:
     root_key: "mcp"
     servers:
       docker-mcp: { inherit: "docker-mcp" }
-
-  oh-my-opencode:
-    path: "opencode/oh-my-opencode.jsonc"
-    format: "opencode_jsonc"
-    root_key: "mcp"
-    servers:
-      docker-mcp: { inherit: "docker-mcp" }
+      chronos-graph: { inherit: "chronos-graph" }
+      nexus: { inherit: "nexus" }
+      skillport: { inherit: "skillport" }
 
   vscode:
     path: "ide/vscode/settings.json"

@@ -66,6 +66,8 @@ The following rules apply to **ALL** projects unless overridden by a local proje
 
 
 
+
+
 <!-- SKILLPORT_START -->
 ## SkillPort Skills
 
@@ -85,7 +87,7 @@ Each skill contains step-by-step instructions, templates, and scripts.
 
 ### Tips
 
-- Request skill outputs via SkillPort instead of directly reading files (e.g., `{path}/file`) to ensure compliance with access policies.
+- Use your native Read tool with `{path}/file` for templates/assets (e.g., `read_file(file_path="{path}/template.md")`)
 - Execute scripts via path, don't read them into context: `python {path}/scripts/run.py`
 - Replace `{path}` in instructions with the actual path from `load_skill`
 - If search returns 10+ results, refine your query
@@ -114,11 +116,6 @@ Each skill contains step-by-step instructions, templates, and scripts.
   <name>anthropics/canvas-design</name>
   <description>Create beautiful visual art in .png and .pdf documents using design philosophy. You should use this skill when the user asks to create a poster, piece of art, design, or other static piece. Create original visual designs, never copying existing artists' work to avoid copyright violations.</description>
   <location>agent-skills/anthropics/canvas-design/SKILL.md</location>
-</skill>
-<skill>
-  <name>anthropics/claude-api</name>
-  <description>Build apps with Claude API/Anthropic SDK. Trigger on: imports (anthropic, @anthropic-ai/sdk) or direct requests. Not for: openai, ML tasks.</description>
-  <location>agent-skills/anthropics/claude-api/SKILL.md</location>
 </skill>
 <skill>
   <name>anthropics/doc-coauthoring</name>
@@ -295,6 +292,7 @@ Each skill contains step-by-step instructions, templates, and scripts.
 
 
 
+
 ## 6. Agent-Specific Contexts (Unified)
 
 - **CI/CD**: Default to **Bitbucket Pipelines** (`bitbucket-pipelines.yml`).
@@ -341,7 +339,7 @@ This project employs the [obra/superpowers](https://github.com/obra/superpowers)
 
 ## Skill Integration (SkillPort)
 - **Mandatory MCP Priority:** Agents MUST always use the `load_skill` tool whenever a SkillPort MCP connection is available and MUST immediately terminate the task and report an error without any automatic fallback if `load_skill` fails or the SkillPort MCP server is unavailable; the use of `skillport show` via CLI is permitted only for manual operations by human operators in explicitly identified non-MCP environments. **EXCEPTION**: This requirement does NOT apply to Level 0 (Zero Intensity) tasks, which must skip formal skills and proceed directly to response.
-- **Prohibited Access:** Direct file path reads or direct access to skill files are strictly forbidden during runtime and for Pull Requests.
+- **Prohibited Access:** Direct file path reads or direct access to skill files are strictly forbidden during runtime and for Pull Requests, **except** for template/asset files (e.g., `{path}/template.md`) that have been explicitly resolved and returned via the `load_skill` call from the SkillPort MCP, which may be read with the native Read tool. All other skill files or runtime skill artifacts (any files produced by or belonging to skills, skill definitions, or SkillPort MCP endpoints) remain strictly prohibited. Reference `load_skill`, `SkillPort MCP`, `{path}/template.md`, and `Read tool` to ensure consistency with Section 5.
 ## END Superpowers Workflow
 
 ## 7. ChronosGraph Memory System (Autonomous)
