@@ -277,8 +277,8 @@ def main() -> int:
                         else:
                             srv_def.pop("args", None)
 
-                # Expand 'uv' or 'uvx' to absolute path if it's the command
-                if srv_def.get("type") == "stdio" and srv_def.get("command") in ["uv", "uvx"]:
+                # Expand 'uv', 'uvx', or 'npx' to absolute path if it's the command
+                if srv_def.get("type") == "stdio" and srv_def.get("command") in ["uv", "uvx", "npx"]:
                     cmd_name = cast(str, srv_def["command"])
                     abs_path = shutil.which(cmd_name)
                     if abs_path:
