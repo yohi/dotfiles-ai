@@ -98,5 +98,70 @@ class TestMCPRenderer(unittest.TestCase):
         
         self.assertFalse(bootstrap_dest.exists(), "bootstrap.yaml should be removed from dest if it doesn't exist in repo")
 
+    def test_guards(self):
+        # 1. Test when 'agents' is not a dict
+        mock_config = {"defaults": {}, "servers": {}, "agents": ["not a dict"]}
+        with patch.object(render_mcp_configs, "load_client_config", return_value=mock_config):
+            with patch.object(render_mcp_configs.Path, "home", return_value=self.tmp_home):
+                # Redirect stdout to capture the error message
+                from io import StringIO
+                with patch("sys.stdout", new=StringIO()) as fake_out:
+                    exit_code = render_mcp_configs.main()
+                    self.assertEqual(exit_code, 1)
+                    self.assertIn("must be a mapping", fake_out.getvalue())
+
+        # 2. Test when agent_cfg is not a dict
+        mock_config = {"defaults": {}, "servers": {}, "agents": {"gemini": "not a dict"}}
+        with patch.object(render_mcp_configs, "load_client_config", return_value=mock_config):
+            with patch.object(render_mcp_configs.Path, "home", return_value=self.tmp_home):
+                with patch("sys.stdout", new=StringIO()) as fake_out:
+                    exit_code = render_mcp_configs.main()
+                    self.assertEqual(exit_code, 0)
+                    self.assertIn("[SKIP] Invalid config for agent gemini", fake_out.getvalue())
+
+    def test_gemini_command_quoting(self):
+        import json
+        import shlex
+        
+        mock_config = {
+            "defaults": {"gateway_url": "http://localhost:10888/sse"},
+            "servers": {
+                "server with space": {
+                    "type": "local",
+                    "command": "/path/with space/bin/mcp",
+                    "args": ["arg with space", "--verbose"]
+                }
+            },
+            "agents": {
+                "gemini": {
+                    "path": "gemini/test_settings.json",
+                    "servers": {"my_server": {"inherit": "server with space"}}
+                }
+            }
+        }
+        
+        # Create a temporary config file for gemini
+        test_gemini_json = REPO_ROOT / "gemini" / "test_settings.json"
+        test_gemini_json.parent.mkdir(parents=True, exist_ok=True)
+        test_gemini_json.write_text('{"mcpServers": {}}', encoding="utf-8")
+        
+        try:
+            with patch.object(render_mcp_configs, "load_client_config", return_value=mock_config):
+                with patch.object(render_mcp_configs.Path, "home", return_value=self.tmp_home):
+                    exit_code = render_mcp_configs.main()
+                    self.assertEqual(exit_code, 0)
+            
+            # Verify result
+            data = json.loads(test_gemini_json.read_text(encoding="utf-8"))
+            cmd = data["mcpServers"]["my_server"]["command"]
+            
+            expected = shlex.join(["/path/with space/bin/mcp", "arg with space", "--verbose"])
+            self.assertEqual(cmd, expected)
+            self.assertNotIn("args", data["mcpServers"]["my_server"])
+            
+        finally:
+            if test_gemini_json.exists():
+                test_gemini_json.unlink()
+
 if __name__ == "__main__":
     unittest.main()

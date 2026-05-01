@@ -6,6 +6,7 @@ import json
 import re
 import sys
 import shutil
+import shlex
 from pathlib import Path
 from typing import Any, cast, Match, Dict
 import yaml
@@ -192,8 +193,16 @@ def main() -> int:
     )
 
     # Update AI Agent configs
-    agents_config = cast(Dict[str, Any], config.get("agents", {}))
+    agents_config = config.get("agents", {})
+    if not isinstance(agents_config, dict):
+        print(f"Error: 'agents' section in config must be a mapping, got {type(agents_config).__name__}")
+        return 1
+
     for agent_name, agent_cfg in agents_config.items():
+        if not isinstance(agent_cfg, dict):
+            print(f"  [SKIP] Invalid config for agent {agent_name} (expected dict)")
+            continue
+
         path_str = agent_cfg.get("path")
         if not path_str:
             continue
@@ -211,6 +220,9 @@ def main() -> int:
         format_type = agent_cfg.get("format", "json")
         root_key = agent_cfg.get("root_key", "mcpServers")
         mapped_servers = agent_cfg.get("servers", {})
+        if not isinstance(mapped_servers, dict):
+            print(f"  [SKIP] 'servers' for agent {agent_name} must be a mapping")
+            continue
         
         # Prepare server definitions for this agent
         agent_mcp_servers: dict[str, Any] = {}
@@ -269,7 +281,7 @@ def main() -> int:
                         parts.append(srv["command"])
                     
                     parts.extend(srv.get("args", []))
-                    srv["command"] = " ".join(parts)
+                    srv["command"] = shlex.join(parts)
                     srv.pop("args", None)
 
         if agent_name in ["opencode", "oh-my-opencode"]:
