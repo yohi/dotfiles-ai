@@ -54,9 +54,11 @@ class TestMCPRenderer(unittest.TestCase):
         # Testing path expansion
         data = "~/test/path"
         with patch.object(render_mcp_configs, "Path") as mock_path:
-            mock_path.return_value.expanduser.return_value.resolve.return_value = "/home/user/test/path"
+            fake_home = "/tmp/fakehome"
+            fake_path = f"{fake_home}/test/path"
+            mock_path.return_value.expanduser.return_value.resolve.return_value = fake_path
             expanded = render_mcp_configs.replace_placeholders(data, self.gateway_url, expand_paths=True)
-            self.assertEqual(str(expanded), "/home/user/test/path")
+            self.assertEqual(str(expanded), fake_path)
 
     def test_deploy_systemd_service(self):
         src_file = self.tmp_home / "test.service"
