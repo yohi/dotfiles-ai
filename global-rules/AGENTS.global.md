@@ -339,7 +339,7 @@ This project employs the [obra/superpowers](https://github.com/obra/superpowers)
 
 ## Skill Integration (SkillPort)
 - **Mandatory MCP Priority:** Agents MUST always use the `load_skill` tool whenever a SkillPort MCP connection is available and MUST immediately terminate the task and report an error without any automatic fallback if `load_skill` fails or the SkillPort MCP server is unavailable; the use of `skillport show` via CLI is permitted only for manual operations by human operators in explicitly identified non-MCP environments. **EXCEPTION**: This requirement does NOT apply to Level 0 (Zero Intensity) tasks, which must skip formal skills and proceed directly to response.
-- **Prohibited Access:** Direct file path reads or direct access to skill files are strictly forbidden during runtime and for Pull Requests.
+- **Prohibited Access:** Direct file path reads or direct access to skill files are strictly forbidden during runtime and for Pull Requests, **except** for template/asset files (e.g., `{path}/template.md`) resolved via `load_skill`, which may be read with the native Read tool.
 ## END Superpowers Workflow
 
 ## 7. ChronosGraph Memory System (Autonomous)

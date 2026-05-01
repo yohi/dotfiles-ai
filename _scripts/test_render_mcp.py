@@ -122,8 +122,9 @@ class TestMCPRenderer(unittest.TestCase):
     def test_gemini_command_quoting(self):
         import json
         import shlex
+        from typing import Any
         
-        mock_config = {
+        mock_config: dict[str, Any] = {
             "defaults": {"gateway_url": "http://localhost:10888/sse"},
             "servers": {
                 "server with space": {
@@ -140,10 +141,13 @@ class TestMCPRenderer(unittest.TestCase):
             }
         }
         
-        # Create a temporary config file for gemini
-        test_gemini_json = REPO_ROOT / "gemini" / "test_settings.json"
+        # Create a temporary config file for gemini in the isolated home
+        test_gemini_json = self.tmp_home / "gemini" / "test_settings.json"
         test_gemini_json.parent.mkdir(parents=True, exist_ok=True)
         test_gemini_json.write_text('{"mcpServers": {}}', encoding="utf-8")
+        
+        # Update path to be absolute for the test
+        mock_config["agents"]["gemini"]["path"] = str(test_gemini_json)
         
         try:
             with patch.object(render_mcp_configs, "load_client_config", return_value=mock_config):

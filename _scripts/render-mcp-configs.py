@@ -231,7 +231,11 @@ def main() -> int:
                 print(f"  [WARN] Invalid mapping for {srv_name} in {agent_name} (expected dict)")
                 continue
                 
-            inherit_name = cast(str, mapping.get("inherit", srv_name))
+            inherit_name_val = mapping.get("inherit", srv_name)
+            if not isinstance(inherit_name_val, (str, type(None))):
+                print(f"  [WARN] 'inherit' for {srv_name} in {agent_name} must be a string")
+                continue
+            inherit_name = cast(str, inherit_name_val if inherit_name_val is not None else srv_name)
             inherit_val = all_servers_raw.get(inherit_name)
             
             if isinstance(inherit_val, dict):
