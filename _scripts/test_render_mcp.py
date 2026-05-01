@@ -4,7 +4,7 @@ import sys
 import unittest
 import tempfile
 from pathlib import Path
-from unittest.mock import patch, PropertyMock
+from unittest.mock import patch
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.append(str(REPO_ROOT / "_scripts"))

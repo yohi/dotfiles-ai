@@ -6,7 +6,6 @@ import json
 import re
 import sys
 import shutil
-import shlex
 from pathlib import Path
 from typing import Any, cast, Match, Dict
 import yaml
