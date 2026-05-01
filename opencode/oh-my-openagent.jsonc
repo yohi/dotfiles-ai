@@ -22,14 +22,14 @@
   "agents": {
     // 【司令塔: Sisyphus】 全体の品質管理と最終意思決定
     "sisyphus": {
-      "model": "nvidia/moonshotai/kimi-k2.5",
+      "model": "opencode/kimi-k2.5-free",
       "fallback_models": [
         "nvidia/z-ai/glm-5.1"
       ],
       "ultrawork": {
         // Ultrawork: 長時間自律駆動。リファクタリングやログ解析など、
         // 巨大なコンテキストを読み込む重労働。Kimiの圧倒的な文脈窓を活用します。
-        "model": "nvidia/moonshotai/kimi-k2.5",
+        "model": "opencode/kimi-k2.5-free",
         "fallback_models": [
           "nvidia/z-ai/glm-5.1"
         ],
@@ -44,7 +44,7 @@
 
     // 【戦略家: Prometheus】 並列タスク（Agent Swarm）の分解と割り当て
     "prometheus": {
-      "model": "nvidia/moonshotai/kimi-k2.5",
+      "model": "opencode/kimi-k2.5-free",
       "fallback_models": [
         "nvidia/z-ai/glm-5.1"
       ],
@@ -229,8 +229,5 @@
         }
       }
     }
-  },
-  // [MCP]
-  "mcp": {},
-  // [LSP]
+  }
 }

@@ -1,0 +1,320 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "default_agent": "sisyphus",
+  "plugin": [
+    "oh-my-opencode@dev"
+  ],
+  "agent": {
+    "build": {
+      "model": "opencode/minimax-m2.5-free"
+    },
+    "sisyphus": {
+      "model": "nvidia/moonshotai/kimi-k2.5",
+      "fallback_models": [
+        "nvidia/z-ai/glm-5.1"
+      ],
+      "ultrawork": {
+        "model": "nvidia/moonshotai/kimi-k2.5",
+        "fallback_models": [
+          "nvidia/z-ai/glm-5.1"
+        ],
+        "variant": "max",
+        "effort": "high"
+      }
+    },
+    "momus": {
+      "model": "nvidia/minimaxai/minimax-m2.7"
+    },
+    "prometheus": {
+      "model": "nvidia/moonshotai/kimi-k2.5",
+      "fallback_models": [
+        "nvidia/z-ai/glm-5.1"
+      ],
+      "prompt_append": "Strategy: Maximize parallel backend file edits. Partition tasks to avoid merge conflicts."
+    },
+    "atlas": {
+      "model": "openai/gpt-5.4",
+      "variant": "medium",
+      "description": "Orchestrates Tmux, Playwright, and server states. Ensures environment consistency."
+    },
+    "hephaestus": {
+      "model": "openai/gpt-5.3-codex",
+      "prompt_append": "Code: High-performance logic. Prioritize error handling, type safety, and modularity.",
+      "permission": {
+        "edit": "allow",
+        "bash": {
+          "git": "allow",
+          "test": "allow",
+          "npm": "allow"
+        }
+      }
+    },
+    "multimodal-looker": {
+      "model": "openai/gpt-5.4",
+      "fallback_models": [
+        "openai/gpt-5.4-mini"
+      ],
+      "variant": "medium",
+      "description": "Visual Intelligence. Analyzes UI designs for API generation and debugs browser test failures."
+    },
+    "explore": {
+      "model": "opencode/big-pickle",
+      "fallback_models": [
+        "openai/gpt-5.4-mini"
+      ],
+      "description": "Rapid scaffolding using autonomous web search for latest technical specs."
+    },
+    "librarian": {
+      "model": "opencode/nemotron-3-super-free",
+      "fallback_models": [
+        "openai/gpt-5.4-mini"
+      ],
+      "temperature": 0.1,
+      "description": "Ultra-fast background research with minimal token cost."
+    },
+    "oracle": {
+      "model": "opencode/big-pickle",
+      "fallback_models": [
+        "opencode/minimax-m2.5-free"
+      ],
+      "prompt_append": "Audit: Trace dependencies across the entire repository. Provide high-density, professional summaries."
+    }
+  },
+  "permission": {
+    "*": "ask",
+    "read": "allow",
+    "list": "allow",
+    "glob": "allow",
+    "grep": "allow",
+    "edit": "allow",
+    "lsp": "allow",
+    "skill": "allow",
+    "websearch": "allow",
+    "bash": {
+      "*": "ask",
+      "ls": "allow",
+      "ls *": "allow",
+      "cat": "allow",
+      "cat *": "allow",
+      "head": "allow",
+      "head *": "allow",
+      "tail": "allow",
+      "tail *": "allow",
+      "mkdir": "allow",
+      "mkdir *": "allow",
+      "touch": "allow",
+      "touch *": "allow",
+      "cp": "allow",
+      "cp *": "allow",
+      "mv": "allow",
+      "mv *": "allow",
+      "make": "allow",
+      "make *": "allow",
+      "uv": "allow",
+      "uv *": "allow",
+      "uvx": "ask",
+      "uvx *": "ask",
+      "python": "ask",
+      "python *": "ask",
+      "node": "ask",
+      "node *": "ask",
+      "bun": "ask",
+      "bun *": "ask",
+      "git status": "allow",
+      "git status *": "allow",
+      "git log": "allow",
+      "git log *": "allow",
+      "git diff": "allow",
+      "git diff *": "allow",
+      "git branch": "allow",
+      "git branch *": "allow",
+      "git checkout": "allow",
+      "git checkout *": "allow",
+      "git add": "allow",
+      "git add *": "allow",
+      "git commit": "allow",
+      "git commit *": "allow",
+      "git add .": "deny",
+      "rm -rf *": "deny",
+      "npm publish*": "deny",
+      "sudo *": "deny",
+      "su *": "deny",
+      "curl*|sh": "deny",
+      "curl* | sh": "deny",
+      "curl *|sh": "deny",
+      "curl * | sh": "deny",
+      "bash _scripts/*": "ask",
+      "bun run lint*": "allow",
+      "bun run typecheck*": "allow",
+      "bun run test*": "allow",
+      "bun run build*": "allow",
+      "dmypy*": "allow",
+      "shellcheck*": "allow",
+      "eslint*": "allow",
+      "git push*": "ask",
+      "git reset*": "ask",
+      "git clean*": "ask",
+      "git pull*": "ask",
+      "gh pr create*": "ask"
+    }
+  },
+  "compaction": {
+    "auto": true,
+    "reserved": 12000,
+    "tail_turns": 3,
+    "prune": true
+  },
+  "lsp": {
+    "typescript-language-server": {
+      "command": [
+        "typescript-language-server",
+        "--stdio"
+      ],
+      "extensions": [
+        ".ts",
+        ".tsx",
+        ".js",
+        ".jsx"
+      ],
+      "initialization": {
+        "preferences": {
+          "includeInlayParameterNameHints": "all",
+          "includeInlayVariableTypeHints": true,
+          "includeInlayFunctionParameterTypeHints": true,
+          "disableSuggestions": false
+        },
+        "diagnostics": {
+          "ignoredCodes": [
+            6133
+          ]
+        }
+      }
+    },
+    "bash-language-server": {
+      "command": [
+        "bash-language-server",
+        "start"
+      ],
+      "extensions": [
+        ".sh"
+      ]
+    },
+    "pyright": {
+      "command": [
+        "pyright-langserver",
+        "--stdio"
+      ],
+      "extensions": [
+        ".py"
+      ],
+      "initialization": {
+        "python": {
+          "analysis": {
+            "typeCheckingMode": "strict",
+            "autoSearchPaths": true,
+            "useLibraryCodeForTypes": true
+          }
+        }
+      }
+    },
+    "markdownlint": {
+      "command": [
+        "npx",
+        "markdownlint-lsp",
+        "--stdio"
+      ],
+      "extensions": [
+        ".md"
+      ]
+    },
+    "mypy": {
+      "command": [
+        "mypy",
+        "--ignore-missing-imports",
+        "--follow-imports=silent",
+        "--strict"
+      ],
+      "extensions": [
+        ".py"
+      ]
+    },
+    "shellcheck": {
+      "command": [
+        "shellcheck",
+        "-f",
+        "gcc",
+        "--severity=style"
+      ],
+      "extensions": [
+        ".sh"
+      ]
+    },
+    "eslint": {
+      "command": [
+        "eslint",
+        "--format",
+        "compact",
+        "--max-warnings",
+        "0"
+      ],
+      "extensions": [
+        ".ts",
+        ".tsx",
+        ".js",
+        ".jsx"
+      ]
+    }
+  },
+  "experimental": {
+    "batch_tool": true,
+    "continue_loop_on_deny": false,
+    "mcp_timeout": 10000
+  },
+  "instructions": [
+    "docs/global-rules/AGENTS.global.md",
+    "agent-skills/superpowers/using-superpowers/SKILL.md"
+  ],
+  "watcher": {
+    "ignore": [
+      "**/node_modules/**",
+      "**/dist/**",
+      "**/coverage/**",
+      "**/*.lock",
+      "**/.git/**"
+    ]
+  },
+  "provider": {
+    "opencode": {
+      "whitelist": [
+        "big-pickle",
+        "minimax-m2.5-free",
+        "ling-2.6-flash-free",
+        "hy3-preview-free",
+        "nemotron-3-super-free",
+        "gpt-5-nano"
+      ]
+    },
+    "openai": {
+      "whitelist": [
+        "gpt-5.5",
+        "gpt-5.4",
+        "gpt-5.4-mini",
+        "gpt-5.3-codex"
+      ]
+    },
+    "nvidia": {
+      "whitelist": [
+        "z-ai/glm-5.1",
+        "z-ai/glm5",
+        "moonshotai/kimi-k2.5",
+        "minimaxai/minimax-m2.5",
+        "minimaxai/minimax-m2.7",
+        "nvidia/nemotron-3-nano-30b-a3b",
+        "nvidia/nvidia-nemotron-nano-9b-v2",
+        "nvidia/nemotron-4-340b-instruct",
+        "qwen/qwen3.5-397b-a17b"
+      ]
+    }
+  },
+  "mcp": {}
+}
