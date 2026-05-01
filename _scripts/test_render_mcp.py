@@ -101,7 +101,6 @@ class TestMCPRenderer(unittest.TestCase):
 
     def test_gemini_command_quoting(self):
         import json
-        import shlex
         from typing import Any
         
         mock_config: dict[str, Any] = {
@@ -150,8 +149,9 @@ class TestMCPRenderer(unittest.TestCase):
             
             data = json.loads(test_gemini_json.read_text(encoding="utf-8"))
             cmd = data["mcpServers"]["my_server"]["command"]
-            expected = shlex.join(["/path/with space/bin/mcp", "arg with space", "--verbose"])
+            expected = "/path/with space/bin/mcp"
             self.assertEqual(cmd, expected)
+            self.assertEqual(data["mcpServers"]["my_server"]["args"], ["arg with space", "--verbose"])
             
         finally:
             if test_gemini_json.exists():
