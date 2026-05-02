@@ -306,6 +306,16 @@ def main() -> int:
                     srv["type"] = "remote"
                 srv["enabled"] = True
 
+        if agent_name == "codex":
+            # Codex does not support SSE natively. Bridge docker-mcp to stdio.
+            if "docker-mcp" in agent_mcp_servers:
+                srv = agent_mcp_servers["docker-mcp"]
+                if srv.get("type") == "sse":
+                    srv["type"] = "stdio"
+                    srv["command"] = str(repo_root / "_scripts" / "mcp-stdio-wrapper.sh")
+                    srv.pop("url", None)
+                    srv.pop("headers", None)
+
         # Load, update, and save
         try:
             try:

@@ -174,3 +174,6 @@ agents:
     root_key: "mcp_servers"
     servers:
       docker-mcp: { inherit: "docker-mcp" }
+      chronos-graph: { inherit: "chronos-graph" }
+      nexus: { inherit: "nexus" }
+      skillport: { inherit: "skillport" }
