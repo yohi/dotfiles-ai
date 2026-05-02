@@ -13,8 +13,7 @@ define create_desktop_entry
 	(sudo update-desktop-database 2>/dev/null || true)
 endef
 
-# Opcode (Claude Code GUI) のバージョン固定
-OPCODE_COMMIT := 70c16d8a4910db48cd9684aeacdd431caefd7d71
+# Opcode (Claude Code GUI) のバージョンは _mk/variables.mk で定義されています
 
 # Claude Code のインストール
 .PHONY: install-packages-claude-code
@@ -59,135 +58,27 @@ help-claude: ## Claude Code の使い方を表示
 .PHONY: install-packages-opcode
 install-packages-opcode: ## Opcode (Claude Code GUI) をインストール
 	@echo "🖥️  Opcode (Claude Code GUI) のインストールを開始..."
-	@echo "ℹ️  注意: OpcodeはまだRelease版が公開されていないため、ソースからビルドします"
-	@echo "⏱️  ビルドには10-15分かかる場合があります（システム環境により変動）"
-	@echo ""
+	@if [ -z "$(OPCODE_VERSION)" ]; then echo "❌ 最新バージョンの取得に失敗しました"; exit 1; fi
+	@echo "📦 最新バージョン: v$(OPCODE_VERSION)"
 
-	# Claude Code の確認
-	@echo "🔍 Claude Code の確認中..."
-	@if ! command -v claude >/dev/null 2>&1; then \
-		echo "❌ Claude Code がインストールされていません"; \
-		echo "ℹ️  先に 'make install-packages-claude-code' を実行してください"; \
-		exit 1; \
+	# 既存バージョンの確認
+	@CURRENT_VERSION=$$(/opt/opcode/opcode --version 2>/dev/null || echo "none"); \
+	if [ "$$CURRENT_VERSION" = "$(OPCODE_VERSION)" ]; then \
+		echo "✅ すでに最新バージョン (v$(OPCODE_VERSION)) がインストールされています"; \
 	else \
-		echo "✅ Claude Code が見つかりました: $$(claude --version 2>/dev/null)"; \
-	fi
-
-	# Rust の確認 (Homebrew版を使用)
-	@echo "🔍 Rust の確認中..."
-	@if ! command -v rustc >/dev/null 2>&1; then \
-		echo "❌ Rust がインストールされていません"; \
-		echo "📥 Homebrewでインストールしてください: brew install rust"; \
-		echo "💡 または公式のrustupでインストール: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh"; \
-		exit 1; \
-	else \
-		RUST_VERSION=$$(rustc --version | grep -o '[0-9]\+\.[0-9]\+' | head -1); \
-		echo "✅ Rust が見つかりました: $$(rustc --version)"; \
-		MAJOR=$$(echo "$$RUST_VERSION" | cut -d'.' -f1); \
-		MINOR=$$(echo "$$RUST_VERSION" | cut -d'.' -f2); \
-		if [ "$$MAJOR" -lt 1 ] || { [ "$$MAJOR" -eq 1 ] && [ "$$MINOR" -lt 70 ]; }; then \
-			echo "⚠️  Rust 1.70.0+ が推奨されています (現在: $$RUST_VERSION)"; \
-			echo "💡 アップデート: rustup update または brew upgrade rust"; \
-		fi; \
-	fi
-
-	# システム依存関係のインストール (Linux)
-	@echo "📦 システム依存関係をインストール中..."
-	@if command -v apt-get >/dev/null 2>&1; then \
-		echo "🔧 Linux向けの依存関係をインストール中..."; \
-		sudo apt update -q 2>/dev/null || echo "⚠️  パッケージリストの更新で問題が発生しましたが、処理を続行します"; \
-		sudo DEBIAN_FRONTEND=noninteractive apt install -y \
-			libwebkit2gtk-4.1-dev \
-			libgtk-3-dev \
-			libayatana-appindicator3-dev \
-			librsvg2-dev \
-			patchelf \
-			build-essential \
-			curl \
-			wget \
-			file \
-			libssl-dev \
-			libxdo-dev \
-			libsoup-3.0-dev \
-			libjavascriptcoregtk-4.1-dev || \
-		echo "⚠️  一部の依存関係のインストールに失敗しましたが、処理を続行します"; \
-	else \
-		echo "ℹ️  Linuxではないため、システム依存関係のインストールをスキップします"; \
-	fi
-
-	# Bun のインストール
-	@echo "🔍 Bun の確認中..."
-	@if ! command -v bun >/dev/null 2>&1; then \
-		echo "📦 Bun をインストール中..."; \
-		curl -fsSL https://bun.sh/install | bash; \
-		echo "🔄 Bunのパスを更新中..."; \
-		if ! command -v bun >/dev/null 2>&1; then \
-			echo "⚠️  Bunのインストールが完了しましたが、現在のセッションで認識されていません"; \
-			echo "   新しいターミナルセッションで再実行するか、以下を実行してください:"; \
-			echo "   source $$HOME/.bashrc"; \
-			echo "   source $$HOME/.zshrc (zshの場合)"; \
-		fi; \
-	else \
-		echo "✅ Bun が見つかりました: $$(bun --version)"; \
-	fi
-
-	# Opcode のクローンとビルド
-	@echo "📥 Opcode をクローン中 (Commit: $(OPCODE_COMMIT)). GEAR 🚀"
-	@OPCODE_DIR=$$(mktemp -d) && \
-	trap 'rm -rf "$$OPCODE_DIR"' EXIT && \
-	if git clone --depth 1 https://github.com/winfunc/opcode.git "$$OPCODE_DIR" && \
-	   git -C "$$OPCODE_DIR" fetch --depth=1 origin $(OPCODE_COMMIT) && \
-	   git -C "$$OPCODE_DIR" checkout $(OPCODE_COMMIT); then \
-		echo "✅ Opcode のクローンが完了しました"; \
-		cd "$$OPCODE_DIR" && \
-		\
-		echo "📦 フロントエンド依存関係をインストール中..."; \
-		if command -v bun >/dev/null 2>&1; then \
-			bun install; \
+		echo "📥 .deb パッケージをダウンロード中..."; \
+		TEMP_DIR=$$(mktemp -d); \
+		trap 'rm -rf "$$TEMP_DIR"' EXIT; \
+		DEB_URL="https://github.com/winfunc/opcode/releases/download/v$(OPCODE_VERSION)/opcode_$(OPCODE_VERSION)_amd64.deb"; \
+		if curl -L -o "$$TEMP_DIR/opcode.deb" "$$DEB_URL"; then \
+			echo "🔧 インストール中 (sudo権限が必要です)..."; \
+			sudo apt-get update -q && sudo apt-get install -y "$$TEMP_DIR/opcode.deb"; \
+			echo "✅ インストール完了"; \
+			$(create_desktop_entry); \
 		else \
-			echo "❌ Bun が見つかりません。新しいターミナルセッションで再実行してください"; \
+			echo "❌ ダウンロードに失敗しました: $$DEB_URL"; \
 			exit 1; \
-		fi; \
-		\
-		echo "🔨 Opcode をビルド中..."; \
-		echo "ℹ️  この処理には数分かかる場合があります..."; \
-		export PKG_CONFIG_PATH="/usr/lib/x86_64-linux-gnu/pkgconfig:$$PKG_CONFIG_PATH"; \
-		if bun run tauri build; then \
-			echo "✅ Opcode のビルドが完了しました"; \
-			\
-			echo "📁 実行ファイルをインストール中..."; \
-			BIN_PATH=""; \
-			for candidate in src-tauri/target/release/opcode*; do \
-				if [ -f "$$candidate" ] && [ -x "$$candidate" ]; then \
-					BIN_PATH="$$candidate"; \
-					break; \
-				fi; \
-			done; \
-			if [ -n "$$BIN_PATH" ] && [ -f "$$BIN_PATH" ] && [ -x "$$BIN_PATH" ]; then \
-				echo "✅ 選択された実行ファイル: $$BIN_PATH"; \
-				sudo mkdir -p /opt/opcode && \
-				sudo cp "$$BIN_PATH" /opt/opcode/opcode && \
-				sudo chmod +x /opt/opcode/opcode && \
-				\
-				$(create_desktop_entry) && \
-				\
-				echo "✅ Opcode が /opt/opcode にインストールされました"; \
-			else \
-				echo "❌ ビルドされた実行ファイルが見つかりません"; \
-				exit 1; \
-			fi; \
-		else \
-			echo "❌ Opcode のビルドに失敗しました"; \
-			echo "🔧 トラブルシューティング:"; \
-			echo "1. 依存関係の確認: すべてのシステム依存関係がインストールされているか"; \
-			echo "2. メモリ不足: ビルドには十分なRAMが必要"; \
-			echo "3. 手動ビルド: cd $$OPCODE_DIR && bun run tauri build --debug"; \
-			exit 1; \
-		fi; \
-	else \
-		echo "❌ Opcode のクローンに失敗しました"; \
-		echo "ℹ️  インターネット接続を確認してください"; \
-		exit 1; \
+		fi \
 	fi
 
 	@echo "✅ Opcode のインストールが完了しました"
