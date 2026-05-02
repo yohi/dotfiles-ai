@@ -149,6 +149,7 @@ setup-claude: ## Claude Codeの設定を適用
 	@echo "📝 Claude Codeの設定を適用中..."
 	@mkdir -p "$(HOME_DIR)/.claude"
 	@ln -sf "$(REPO_ROOT)/global-rules/AGENTS.global.md" "$(HOME_DIR)/.claude/CLAUDE.md"
+	@ln -sf "$(REPO_ROOT)/claude/settings.json" "$(HOME_DIR)/.claude.json"
 	@ln -sf "$(REPO_ROOT)/claude/settings.json" "$(HOME_DIR)/.claude/settings.json"
 	@chmod +x "$(REPO_ROOT)/claude/statusline.sh"
 	@ln -sf "$(REPO_ROOT)/claude/statusline.sh" "$(HOME_DIR)/.claude/statusline.sh"
@@ -156,7 +157,8 @@ setup-claude: ## Claude Codeの設定を適用
 
 uninstall-claude: ## Claude Codeの設定を削除
 	@echo "🗑️  Claude Codeの設定を削除中..."
-	@if [ -L "$(HOME_DIR)/.claude/CLAUDE.md" ]; then rm -f "$(HOME_DIR)/.claude/CLAUDE.md"; fi
-	@if [ -L "$(HOME_DIR)/.claude/settings.json" ]; then rm -f "$(HOME_DIR)/.claude/settings.json"; fi
-	@if [ -L "$(HOME_DIR)/.claude/statusline.sh" ]; then rm -f "$(HOME_DIR)/.claude/statusline.sh"; fi
+	@rm -f "$(HOME_DIR)/.claude.json"
+	@rm -f "$(HOME_DIR)/.claude/CLAUDE.md"
+	@rm -f "$(HOME_DIR)/.claude/settings.json"
+	@rm -f "$(HOME_DIR)/.claude/statusline.sh"
 	@echo "✅ Claude Codeの設定を削除しました"

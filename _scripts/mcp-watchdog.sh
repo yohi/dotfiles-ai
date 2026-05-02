@@ -2,7 +2,7 @@
 # _scripts/mcp-watchdog.sh
 set -euo pipefail
 
-GATEWAY_URL="http://127.0.0.1:10888/sse"
+GATEWAY_URL="http://127.0.0.1:10888/health"
 CHECK_INTERVAL=300
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
