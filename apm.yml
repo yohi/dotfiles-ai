@@ -1,19 +1,165 @@
 name: dotfiles-ai
 version: 1.0.0
 description: AI Agent settings, skills, and unified MCP configuration for dotfiles
+
+# Dependency Management (Skills & Direct MCP)
 dependencies:
   apm:
   - obra/superpowers#6efe32c9e2dd002d0c394e861e0529675d1ab32e
   - anthropics/skills#5128e1865d670f5d6c9cef000e6dfc4e951fb5b9
+
   mcp:
+  - name: superpowers
+    title: "Superpowers"
+    description: "High-performance instruction sets for engineering workflows."
+    registry: false
+    transport: stdio
+    command: "uvx"
+    args: ["skillport-mcp", "--skills-dir", "__REPO_ROOT__/agent-skills/superpowers"]
+
   - name: docker-mcp
     registry: false
     transport: sse
     url: http://127.0.0.1:10888/sse
+    headers:
+      Authorization: "Bearer $${MCP_GATEWAY_TOKEN}"
+
+  - name: chronos-graph
+    title: "ChronosGraph"
+    description: "Long-term memory and knowledge graph system."
+    registry: false
+    transport: stdio
+    command: "uvx"
+    args: ["--from", "git+https://github.com/yohi/chronos-graph.git", "context-store"]
+    env:
+      OPENAI_API_KEY: "${OPENAI_API_KEY:-YOUR_API_KEY_HERE}"
+      LOG_LEVEL: "error"
+      STORAGE_BACKEND: "sqlite"
+      SQLITE_DB_PATH: "__HOME__/.context-store/memories.db"
+      GRAPH_ENABLED: "true"
+      DECAY_HALF_LIFE_DAYS: "30"
+      SIMILARITY_THRESHOLD: "0.70"
+      DEDUP_THRESHOLD: "0.90"
+      EMBEDDING_PROVIDER: "local-model"
+      LOCAL_MODEL_NAME: "cl-nagoya/ruri-v3-310m"
+
+  - name: nexus
+    title: "Nexus"
+    description: "Local knowledge base and indexer."
+    registry: false
+    transport: stdio
+    command: "npx"
+    args: ["-y", "-p", "@yohi/nexus@latest", "-p", "typescript", "nexus"]
+    env:
+      NEXUS_STORAGE_ROOT_DIR: "__HOME__/.nexus"
+      NEXUS_WATCHER_IGNORE_PATHS: "node_modules,.git,.nexus,dist,gemini,.worktrees,.venv,target,.mypy_cache,.ruff_cache,build,.serena,.cache,__pycache__,*.db,*.sqlite,*.log,out,bundle,vendor,package-lock.json,yarn.lock,pnpm-lock.yaml"
+      CHOKIDAR_USEPOLLING: "false"
+      CHOKIDAR_INTERVAL: "2000"
+      NO_PROXY: "127.0.0.1,localhost"
+
+  - name: skillport
+    title: "Skillport"
+    description: "Professional development and AI skill management toolkit."
+    registry: false
+    transport: stdio
+    command: "uvx"
+    args: ["skillport-mcp"]
+    env:
+      SKILLPORT_SKILLS_DIR: "__REPO_ROOT__/agent-skills"
+
+  - name: atlassian
+    title: "Atlassian"
+    description: "Atlassian (Jira/Confluence) official MCP server."
+    registry: false
+    transport: sse
+    url: "https://mcp.atlassian.com/v1/mcp"
+
+# Agent Configurations & Deployment Settings
+config:
+  defaults:
+    gateway_url: "http://127.0.0.1:10888/sse"
+
+  # Docker MCP Gateway Backend Servers (Not directly used by agents)
+  mcp_gateway:
+  - name: SQLite
+    title: "SQLite"
+    description: "SQLite database access and management."
+    type: server
+    image: mcp/sqlite:latest
+    args: ["/mcp/sqlite.db"]
+    volumes: ["__HOME__/.mcp/sqlite:/mcp"]
+
+  - name: github-official
+    description: "Official GitHub MCP server for repository management."
+    type: server
+    image: mcp/github:latest
+    env:
+      GITHUB_PERSONAL_ACCESS_TOKEN: "${GITHUB_TOKEN:-placeholder_set_GITHUB_TOKEN_in_env}"
+
+  - name: sequentialthinking
+    title: "Sequential Thinking"
+    description: "A tool for sequential problem solving and logical reasoning."
+    type: server
+    image: mcp/sequentialthinking:latest
+  
+  agents:
+    gemini:
+      path: "gemini/settings.json"
+      format: "json"
+      root_key: "mcpServers"
+      servers: [docker-mcp]
+
+    claude:
+      path: "claude/settings.json"
+      format: "json"
+      root_key: "mcpServers"
+      servers: [docker-mcp, atlassian]
+
+    opencode:
+      path: "opencode/opencode.jsonc"
+      format: "opencode_jsonc"
+      root_key: "mcp"
+      servers: [docker-mcp]
+
+    vscode:
+      path: "ide/vscode/settings.json"
+      format: "json"
+      root_key: "mcpServers"
+      servers: [docker-mcp]
+
+    cursor:
+      path: "ide/cursor/mcp.json"
+      format: "json"
+      root_key: "mcpServers"
+      servers: [docker-mcp]
+
+    antigravity:
+      path: "antigravity/mcp_config.json"
+      format: "json"
+      root_key: "mcpServers"
+      url_key: "serverUrl"
+      servers: [docker-mcp]
+
+    codex:
+      path: "codex/config.toml"
+      format: "toml"
+      root_key: "mcp_servers"
+      servers: [docker-mcp]
+
+# Exported Artifacts (SkillPort & Documentation)
 exports:
   skills:
   - agent-skills/**
+  agents:
+  - path: global-rules/AGENTS.global.md
+    target: all
+
+# Automation Hooks
 hooks:
   post_install:
+  - command: make setup-agents
+    description: Initialize AI agent configurations and symbolic links.
   - command: make sync-mcp
     description: Re-rendering Docker MCP Gateway backend configs and restarting service.
+  - command: make sync-agents
+    description: Synchronize skill listings to AGENTS.md files.

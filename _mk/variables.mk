@@ -18,6 +18,11 @@ OS_NAME := $(shell uname -s)
 APM_INSTALL_URL := https://aka.ms/apm-unix
 APM_INSTALLER_HASH := f7b122a76c40170a6fd338b596a344d6452ebc0b2c55e39e25318dc0983d49af
 
+# Opcode (Claude Code GUI) Version Detection
+# Uses GitHub API to get the latest tag name (vX.Y.Z) and strips the 'v'
+OPCODE_LATEST_TAG = $(shell curl -fS --max-time 10 --retry 3 https://api.github.com/repos/winfunc/opcode/releases/latest 2>/dev/null | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/' || echo "FAILED")
+OPCODE_VERSION = $(shell echo $(OPCODE_LATEST_TAG) | sed 's/^v//')
+
 # Helper for conditional echo
 ifeq ($(QUIET),1)
   Q_ECHO = @:
