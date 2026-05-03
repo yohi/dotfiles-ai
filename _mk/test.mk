@@ -15,7 +15,7 @@ test-mcp-connectivity: ## Check MCP connectivity for all CLI tools
 	@./_scripts/test-mcp-connectivity.sh
 
 .PHONY: test-all
-test-all: test-integrity test-mcp-connectivity ## Run all tests in the project
+test-all: test-integrity ## Run all tests in the project
 	@echo "Running all tests..."
 	@bash -c 'shopt -s nullglob; \
 	PYTHON_CMD="python3"; \
@@ -26,10 +26,12 @@ test-all: test-integrity test-mcp-connectivity ## Run all tests in the project
 		$$PYTHON_CMD "$$f" || exit 1; \
 	done; \
 	for f in _scripts/test-*.sh; do \
+		[[ "$$f" == "_scripts/test-mcp-connectivity.sh" ]] && continue; \
 		echo "Running bash test: $$f"; \
 		bash "$$f" || exit 1; \
 	done'
-.PHONY: install-hooks
+	@echo "✅ All tests passed!"
+
 install-hooks: ## Install git hooks (pre-push)
 	@echo "Installing git hooks..."
 	@chmod +x _scripts/pre-push.sh

@@ -78,12 +78,17 @@ if ! has_cmd "gemini"; then
     echo -e "${YELLOW}Skipped (not installed)${NC}"
 else
     # Use 'script' to simulate a TTY because gemini mcp list may produce no output otherwise
-    if [[ "$OSTYPE" == "darwin"* ]]; then
-        # macOS script syntax: script -q <file> <command>
-        script -q "$TMP_DIR/gemini_raw.txt" gemini mcp list > /dev/null 2>&1 || true
+    if command -v script > /dev/null 2>&1; then
+        if [[ "$OSTYPE" == "darwin"* ]]; then
+            # macOS script syntax: script -q <file> <command>
+            script -q "$TMP_DIR/gemini_raw.txt" gemini mcp list > /dev/null 2>&1 || true
+        else
+            # Linux script syntax: script -q -c <command> <file>
+            script -q -c "gemini mcp list" "$TMP_DIR/gemini_raw.txt" > /dev/null 2>&1 || true
+        fi
     else
-        # Linux script syntax: script -q -c <command> <file>
-        script -q -c "gemini mcp list" "$TMP_DIR/gemini_raw.txt" > /dev/null 2>&1 || true
+        # Fallback for environments without 'script' command
+        gemini mcp list > "$TMP_DIR/gemini_raw.txt" 2>&1 || true
     fi
 
     if [ -f "$TMP_DIR/gemini_raw.txt" ]; then

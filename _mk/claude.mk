@@ -86,8 +86,10 @@ install-packages-opcode: ## Opcode (Claude Code GUI) をインストール
 	                fi; \
 	                if [ -n "$$CI" ] || [ -n "$$AGENT_MODE" ] || ! [ -t 0 ]; then \
 	                        echo "⚠️  非対話環境またはエージェント実行を検出したため、sudo を伴うインストールをスキップします。"; \
+	                        cp "$$TEMP_DIR/opcode.deb" /tmp/opcode.deb; \
 	                        echo "💡 手動で以下のコマンドを実行してください:"; \
-	                        echo "   sudo apt-get update && sudo apt-get install -y $$TEMP_DIR/opcode.deb"; \
+	                        echo "   sudo apt-get update && sudo apt-get install -y /tmp/opcode.deb"; \
+	                        exit 1; \
 	                else \
 	                        echo "🔧 sudo 権限を使用してインストール中..."; \
 	                        if sudo apt-get update -q && sudo apt-get install -y "$$TEMP_DIR/opcode.deb"; then \
