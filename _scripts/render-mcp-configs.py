@@ -56,6 +56,9 @@ def replace_placeholders(
         )
 
         def _get_env(m: Match[str]) -> str:
+            full_match = m.group(0)
+            if full_match.startswith("$$"):
+                return full_match[1:]  # Return ${VAR} instead of expanding
             v, d = m.group(1), m.group(2)
             val = os.environ.get(v)
             if val is not None:
@@ -66,7 +69,7 @@ def replace_placeholders(
                 f"Required environment variable '${{{v}}}' is not set and has no default."
             )
 
-        s = re.sub(r"\${(\w+)(?::-([^}]*))?}", _get_env, s)
+        s = re.sub(r"\$?\${(\w+)(?::-([^}]*))?}", _get_env, s)
         if expand_paths and (s.startswith("/") or s.startswith("~")):
             s = str(Path(s).expanduser().resolve())
         return cast(str, s)

@@ -22,7 +22,7 @@ dependencies:
     transport: sse
     url: http://127.0.0.1:10888/sse
     headers:
-      Authorization: "Bearer ${MCP_GATEWAY_TOKEN:-}"
+      Authorization: "Bearer $${OPCODE_GATEWAY_TOKEN}"
 
   - name: chronos-graph
     title: "ChronosGraph"
