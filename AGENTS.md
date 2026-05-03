@@ -22,7 +22,7 @@ Never mix IDE styling configurations here, and never put AI instructions or MCP 
 - `mcp/`: Management of the Docker MCP Gateway and associated catalogs.
 
 ## 4. Development Workflow
-- **SSOT Enforcement**: Never edit symlinked files in home directories (e.g., `~/.gemini/GEMINI.md`). Always edit the Source of Truth within this repository.
+- **SSOT Enforcement**: Never edit symlinked files in home directories (e.g., `~/.gemini/GEMINI.md`). Always edit the Source of Truth within this repository, unless a specific user directive instructs a local-only override for temporary testing.
 - **Unified Manifest**: **`apm.yml`** is the master manifest and Single Source of Truth (SSOT) for the entire project, managing AI skills, MCP server definitions, and agent environment configurations using **APM (Agent Package Manager)**.
 - **MCP Gateway**: Use the **Unified SSE Gateway (`http://localhost:10888/sse`)** as the standard connection method for all tools.
   - **Benefits of SSE Integration**:
@@ -43,7 +43,7 @@ As the central authority for AI configurations, **Level 1 (High Intensity)** is 
 - **Level 0 (Zero Intensity)**: Greetings, chitchat, or direct inquiries.
 
 ## 7. Component Layout Convention (Polyrepo)
-This repository relies on symbolic links to `common-mk` from [dotfiles-core](https://github.com/yohi/dotfiles-core). **NEVER** replace these links with physical files.
+This repository relies on symbolic links to `common-mk` from [dotfiles-core](https://github.com/yohi/dotfiles-core). **NEVER** replace these links with physical files unless explicitly instructed by the user for environment-specific troubleshooting.
 - `DOTFILES_COMMON_RULES.md` -> `../../common-mk/DOTFILES_COMMON_RULES.md`
 - `_mk/core.mk` -> `../../../common-mk/core.mk`
 - `_mk/help.mk` -> `../../../common-mk/help.mk`

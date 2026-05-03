@@ -1,0 +1,10 @@
+---
+# Codacy configuration file
+# https://docs.codacy.com/repositories-configure/codacy-configuration-file/
+
+exclude_paths:
+  # AGENTS.md contains AI-specific instructions with RFC 2119 keywords (MUST, NEVER, etc.)
+  # which trigger false positives for "Undefined acronym" and "Absolute rule without escape hatch".
+  # Per AGENTMS-MD_BESTPRACTICE.md Section 10, we exclude it to prioritize instruction clarity.
+  - "AGENTS.md"
+  - "AGENTMS-MD_BESTPRACTICE.md"
