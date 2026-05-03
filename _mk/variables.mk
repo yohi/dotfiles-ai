@@ -20,8 +20,8 @@ APM_INSTALLER_HASH := f7b122a76c40170a6fd338b596a344d6452ebc0b2c55e39e25318dc098
 
 # Opcode (Claude Code GUI) Version Detection
 # Uses GitHub API to get the latest tag name (vX.Y.Z) and strips the 'v'
-OPCODE_LATEST_TAG := $(shell curl -s https://api.github.com/repos/winfunc/opcode/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
-OPCODE_VERSION := $(shell echo $(OPCODE_LATEST_TAG) | sed 's/^v//')
+OPCODE_LATEST_TAG = $(shell curl -s https://api.github.com/repos/winfunc/opcode/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+OPCODE_VERSION = $(shell echo $(OPCODE_LATEST_TAG) | sed 's/^v//')
 
 # Helper for conditional echo
 ifeq ($(QUIET),1)

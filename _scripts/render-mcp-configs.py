@@ -5,6 +5,7 @@ import os
 import json
 import re
 import shutil
+import sys
 from pathlib import Path
 from typing import Any, cast, Match, Dict
 import yaml
@@ -61,7 +62,9 @@ def replace_placeholders(
                 return cast(str, val)
             if d is not None:
                 return cast(str, d)
-            return ""
+            raise ValueError(
+                f"Required environment variable '${{{v}}}' is not set and has no default."
+            )
 
         s = re.sub(r"\${(\w+)(?::-([^}]*))?}", _get_env, s)
         if expand_paths and (s.startswith("/") or s.startswith("~")):
@@ -74,7 +77,8 @@ def deploy_systemd_service(
     src_path: Path, dest_dir: Path, repo_root: str, enabled_servers: str
 ) -> None:
     if not src_path.exists():
-        return
+        print(f"❌ Error: systemd service template not found: {src_path}")
+        sys.exit(1)
     content = (
         src_path.read_text(encoding="utf-8")
         .replace("__REPO_ROOT__", repo_root)
@@ -278,4 +282,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

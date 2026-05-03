@@ -281,6 +281,15 @@
         "gpt-5.3-codex"
       ]
     },
+    "google": {
+      "whitelist": [
+        "gemini-3-flash-preview",
+        "gemini-3.1-flash-image-preview",
+        "gemini-3.1-flash-lite-preview",
+        "gemini-3.1-pro-preview",
+        "gemini-3.1-pro-preview-customtools",
+      ]
+    },
     "nvidia": {
       "whitelist": [
         "z-ai/glm-5.1",

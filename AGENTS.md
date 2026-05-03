@@ -47,3 +47,6 @@ This repository relies on symbolic links to `common-mk` from [dotfiles-core](htt
 - `DOTFILES_COMMON_RULES.md` -> `../../common-mk/DOTFILES_COMMON_RULES.md`
 - `_mk/core.mk` -> `../../../common-mk/core.mk`
 - `_mk/help.mk` -> `../../../common-mk/help.mk`
+
+<!-- SKILLPORT_START -->
+<!-- SKILLPORT_END -->
