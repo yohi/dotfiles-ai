@@ -37,7 +37,9 @@ check_gateway() {
 # Ensure environment variables are loaded
 if [ -f ".env" ]; then
     # shellcheck disable=SC1091
+    set -a
     source .env
+    set +a
 else
     echo -e "${YELLOW}⚠ .env file not found. Connection tests might fail due to missing tokens.${NC}"
 fi
