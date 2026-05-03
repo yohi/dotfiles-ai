@@ -26,9 +26,9 @@ has_cmd() {
 
 # Helper to check if gateway is running
 check_gateway() {
-    if curl -s -o /dev/null "http://127.0.0.1:10888/sse"; then
+    if curl -s --connect-timeout 2 --max-time 5 -o /dev/null "http://127.0.0.1:10888/sse"; then
         return 0
-    elif curl -s -k -o /dev/null "https://127.0.0.1:10888/sse"; then
+    elif curl -s -k --connect-timeout 2 --max-time 5 -o /dev/null "https://127.0.0.1:10888/sse"; then
         return 0
     fi
     return 1
