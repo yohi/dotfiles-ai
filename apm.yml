@@ -8,7 +8,7 @@ dependencies:
   - obra/superpowers#6efe32c9e2dd002d0c394e861e0529675d1ab32e
   - anthropics/skills#5128e1865d670f5d6c9cef000e6dfc4e951fb5b9
 
-  mcp:
+  mcp_servers:
   - name: superpowers
     title: "Superpowers"
     description: "High-performance instruction sets for engineering workflows."
@@ -22,7 +22,7 @@ dependencies:
     transport: sse
     url: http://127.0.0.1:10888/sse
     headers:
-      Authorization: "Bearer $${MCP_GATEWAY_TOKEN}"
+      Authorization: "Bearer __AUTH_TOKEN__"
 
   - name: chronos-graph
     title: "ChronosGraph"
@@ -110,7 +110,7 @@ config:
       servers: [docker-mcp]
 
     claude:
-      path: "claude/settings.json"
+      path: ".mcp.json"
       format: "json"
       root_key: "mcpServers"
       servers: [docker-mcp, atlassian]

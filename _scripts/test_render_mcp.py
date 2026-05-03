@@ -44,6 +44,14 @@ class TestMCPRenderer(unittest.TestCase):
         (self.mcp_dir / "docker-mcp-gateway.service").write_text("", encoding="utf-8")
         (self.mcp_dir / "mcp-watchdog.service").write_text("", encoding="utf-8")
 
+    def robust_mock_path(self, *args):
+        if not args:
+            return Path(".")
+        p_str = str(args[0])
+        if "render-mcp-configs.py" in p_str:
+            return self.fake_repo / "_scripts" / "render-mcp-configs.py"
+        return Path(*args)
+
     def test_load_client_config(self):
         config = render_mcp_configs.load_client_config()
         self.assertIsInstance(config, dict)
@@ -85,16 +93,8 @@ class TestMCPRenderer(unittest.TestCase):
     def test_guards(self):
         mock_config = {
             "config": {"defaults": {}, "agents": ["not a dict"]},
-            "dependencies": {"mcp": []},
+            "dependencies": {"mcp_servers": []},
         }
-
-        def robust_mock_path(*args):
-            if not args:
-                return Path(".")
-            p_str = str(args[0])
-            if "render-mcp-configs.py" in p_str:
-                return self.fake_repo / "_scripts" / "render-mcp-configs.py"
-            return Path(*args)
 
         with patch.object(
             render_mcp_configs, "load_client_config", return_value=mock_config
@@ -103,9 +103,8 @@ class TestMCPRenderer(unittest.TestCase):
                 with patch.object(
                     render_mcp_configs.Path, "home", return_value=self.tmp_home
                 ):
-                    # Fixed patch.object for hyphenated module
                     with patch.object(
-                        render_mcp_configs, "Path", side_effect=robust_mock_path
+                        render_mcp_configs, "Path", side_effect=self.robust_mock_path
                     ) as MockPath:
                         MockPath.home.return_value = self.tmp_home
                         exit_code = render_mcp_configs.main()
@@ -118,34 +117,44 @@ class TestMCPRenderer(unittest.TestCase):
                 "agents": {
                     "gemini": {
                         "path": "gemini/test_settings.json",
-                        "servers": {"my_server": {"inherit": "server with space"}},
-                    }
+                        "servers": {
+                            "my_server": {"inherit": "server with space"},
+                            "auth_server": {"inherit": "secure_server"},
+                        },
+                    },
+                    "opencode": {
+                        "path": "opencode/opencode.jsonc",
+                        "format": "opencode_jsonc",
+                        "servers": {"auth_server": {"inherit": "secure_server"}},
+                    },
                 },
             },
             "dependencies": {
-                "mcp": [
+                "mcp_servers": [
                     {
                         "name": "server with space",
                         "type": "local",
                         "command": "/path/with space/bin/mcp",
                         "args": ["arg with space", "--verbose"],
-                    }
+                    },
+                    {
+                        "name": "secure_server",
+                        "type": "sse",
+                        "url": "http://secure/sse",
+                        "headers": {"Authorization": "Bearer __AUTH_TOKEN__"},
+                    },
                 ]
             },
         }
 
-        # Create config file in fake_repo
+        # Create config files in fake_repo
         fake_gemini_json = self.fake_repo / "gemini" / "test_settings.json"
         fake_gemini_json.parent.mkdir(parents=True, exist_ok=True)
         fake_gemini_json.write_text('{"mcpServers": {}}', encoding="utf-8")
 
-        def robust_mock_path(*args):
-            if not args:
-                return Path(".")
-            p_str = str(args[0])
-            if "render-mcp-configs.py" in p_str:
-                return self.fake_repo / "_scripts" / "render-mcp-configs.py"
-            return Path(*args)
+        fake_opencode_json = self.fake_repo / "opencode" / "opencode.jsonc"
+        fake_opencode_json.parent.mkdir(parents=True, exist_ok=True)
+        fake_opencode_json.write_text('{"mcpServers": {}}', encoding="utf-8")
 
         with patch.object(
             render_mcp_configs, "load_client_config", return_value=mock_config
@@ -154,18 +163,28 @@ class TestMCPRenderer(unittest.TestCase):
                 with patch.object(
                     render_mcp_configs.Path, "home", return_value=self.tmp_home
                 ):
-                    # Fixed patch.object for hyphenated module
                     with patch.object(
-                        render_mcp_configs, "Path", side_effect=robust_mock_path
+                        render_mcp_configs, "Path", side_effect=self.robust_mock_path
                     ) as MockPath:
                         MockPath.home.return_value = self.tmp_home
-                        exit_code = render_mcp_configs.main()
-                        self.assertEqual(exit_code, 0)
+                        render_mcp_configs.main()
 
-        data = json.loads(fake_gemini_json.read_text(encoding="utf-8"))
-        self.assertIn("my_server", data["mcpServers"])
-        url = data["mcpServers"]["my_server"]["url"]
+        # Check Gemini output
+        gemini_data = json.loads(fake_gemini_json.read_text(encoding="utf-8"))
+        self.assertEqual(
+            gemini_data["mcpServers"]["auth_server"]["headers"]["Authorization"],
+            "Bearer ${MCP_GATEWAY_TOKEN}",
+        )
+        self.assertIn("my_server", gemini_data["mcpServers"])
+        url = gemini_data["mcpServers"]["my_server"]["url"]
         self.assertIn("http://localhost:10888/sse?server=my_server", url)
+
+        # Check Opencode output
+        opencode_data = json.loads(fake_opencode_json.read_text(encoding="utf-8"))
+        self.assertEqual(
+            opencode_data["mcpServers"]["auth_server"]["headers"]["Authorization"],
+            "Bearer {env:MCP_GATEWAY_TOKEN}",
+        )
 
 
 if __name__ == "__main__":

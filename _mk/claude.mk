@@ -69,7 +69,7 @@ install-packages-opcode: ## Opcode (Claude Code GUI) をインストール
 	@echo "📦 最新バージョン: v$(OPCODE_VERSION)"
 
 	# 既存バージョンの確認
-	@CURRENT_VERSION=$$(/opt/opcode/opcode --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "none"); \
+	@CURRENT_VERSION=$$(dpkg-query -W -f='$${Version}' opcode 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "none"); \
 	if [ "$$CURRENT_VERSION" = "$(OPCODE_VERSION)" ]; then \
 	        echo "✅ すでに最新バージョン (v$(OPCODE_VERSION)) がインストールされています"; \
 	else \
@@ -84,10 +84,22 @@ install-packages-opcode: ## Opcode (Claude Code GUI) をインストール
 	                        echo "❌ チェックサム検証に失敗しました"; \
 	                        exit 1; \
 	                fi; \
-	                echo "🔧 インストール中 (sudo権限が必要です)..."; \
-	                sudo apt-get update -q && sudo apt-get install -y "$$TEMP_DIR/opcode.deb"; \
-	                echo "✅ インストール完了"; \
-	                $(create_desktop_entry); \
+	                if [ -n "$$CI" ] || [ -n "$$AGENT_MODE" ] || ! [ -t 0 ]; then \
+	                        echo "⚠️  非対話環境またはエージェント実行を検出したため、sudo を伴うインストールをスキップします。"; \
+	                        cp "$$TEMP_DIR/opcode.deb" /tmp/opcode.deb; \
+	                        echo "💡 手動で以下のコマンドを実行してください:"; \
+	                        echo "   sudo apt-get update && sudo apt-get install -y /tmp/opcode.deb"; \
+	                        exit 1; \
+	                else \
+	                        echo "🔧 sudo 権限を使用してインストール中..."; \
+	                        if sudo apt-get update -q && sudo apt-get install -y "$$TEMP_DIR/opcode.deb"; then \
+	                                echo "✅ インストール完了"; \
+	                                $(create_desktop_entry); \
+	                        else \
+	                                echo "❌ インストールに失敗しました。権限やパッケージ依存関係を確認してください。"; \
+	                                exit 1; \
+	                        fi; \
+	                fi; \
 	        else \
 	                echo "❌ ダウンロードに失敗しました: $$DEB_URL"; \
 	                exit 1; \
