@@ -1,27 +1,5 @@
 # Agent Instructions for dotfiles-ai
 
-
-## COMPONENT LAYOUT CONVENTION
-
-This repository is part of the **dotfiles polyrepo** managed by [dotfiles-core](https://github.com/yohi/dotfiles-core).
-
-### ⚠️ CRITICAL: SYMBOLIC LINK & STANDALONE USAGE
-- **Standalone usage is NOT supported.** 公式にはサポートされていませんが、自己責任での単体使用は可能であり、使用する場合は symbolic links と ARCHITECTURE.md に従い、共通ライブラリ（dotfiles-core）を上書きしないことを前提としてください.
-- **Symbolic Links:** This repository relies on symbolic links to `common-mk`. **NEVER** suggest or perform a replacement of these symbolic links with physical files/directories. 
-- **SSOT:** Always respect the "Single Source of Truth" principle. Shared logic resides in `dotfiles-core`, and components must remain thin wrappers or specific configurations.
-- **Architectural Compliance:** All modifications must adhere to the layout defined in the central [ARCHITECTURE.md](https://github.com/yohi/dotfiles-core/blob/master/docs/ARCHITECTURE.md).
-
-> [!IMPORTANT]
-> Please refer to [DOTFILES_COMMON_RULES.md](./DOTFILES_COMMON_RULES.md) for common base rules.
-> 
-> **Note on Symbolic Links:**
-> Several files are symbolic links to an external `common-mk` directory:
-> - `DOTFILES_COMMON_RULES.md` -> `../../common-mk/DOTFILES_COMMON_RULES.md`
-> - `_mk/core.mk` -> `../../../common-mk/core.mk`
-> - `_mk/help.mk` -> `../../../common-mk/help.mk`
->
-> If these links appear broken, ensure the `common-mk` repository is placed at the correct relative path as specified in [README.md](./README.md#-単体使用時の注意点).
-
 ## 1. Hierarchy & Authority
 - **Global Rules (`global-rules/AGENTS.global.md`)**: The **Global Foundation**. It contains universal instructions shared across *all* projects, such as Identity, Language Policy (Japanese output), Security protocols, and cross-project SkillPort workflows.
 - **Project Rules (`AGENTS.md`)**: The **Local Constitution** (This file). It contains project-specific mandates, architectural decisions, and directory structures unique to this repository. Local project rules take precedence over global rules if a conflict occurs.
@@ -44,64 +22,31 @@ Never mix IDE styling configurations here, and never put AI instructions or MCP 
 - `mcp/`: Management of the Docker MCP Gateway and associated catalogs.
 
 ## 4. Development Workflow
-- **SSOT Enforcement**: Never edit symlinked files in home directories (e.g., `~/.gemini/GEMINI.md`). Always edit the Source of Truth within this repository.
+- **SSOT Enforcement**: Never edit symlinked files in home directories (e.g., `~/.gemini/GEMINI.md`). Always edit the Source of Truth within this repository, unless a specific user directive instructs a local-only override for temporary testing.
+- **Unified Manifest**: **`apm.yml`** is the master manifest and Single Source of Truth (SSOT) for the entire project, managing AI skills, MCP server definitions, and agent environment configurations using **APM (Agent Package Manager)**.
 - **MCP Gateway**: Use the **Unified SSE Gateway (`http://localhost:10888/sse`)** as the standard connection method for all tools.
-  - **SSOT Principle**: **`apm.yml`** is the master manifest for the project. **APM** stands for **Microsoft APM (Agent Package Manager)**. **`mcp/servers.yaml`** is the Source of Truth for Gateway-side MCP configurations. `mcp/config.yaml` is auto-generated from it via APM's `post_install` hook.
   - **Benefits of SSE Integration**:
-    - **Zero-second Startup**: Since the Gateway is not launched individually for each agent session, initialization delays (typically 7-10s) and timeouts/hangs are eliminated.
-    - **Resource Stability**: Prevents "too many open files" errors and Docker container conflicts common with the stdio transport method.
-    - **APM Integration**: `apm install` automatically injects the Gateway SSE endpoint into all detected AI clients.
-  - **Maintenance**: The gateway runs as a background service (`docker-mcp-gateway.service`), and the `mcp-watchdog.service` ensures automatic recovery in case of hangs.
-- **Skill Management**: New AI capabilities MUST be implemented as SkillPort skills in `agent-skills/` and managed via MCP.
-- **External Skills (APM)**: High-quality external skills (like `superpowers/`) are managed via `apm.yml`. They are automatically synchronized using `apm install` or `make setup`. This prevents duplicating external code while maintaining version consistency.
+    - **Zero-second Startup**: Eliminates initialization delays (typically 7-10s) and timeouts common with stdio.
+    - **Resource Stability**: Prevents "too many open files" errors and DB lock conflicts.
+    - **APM Integration**: `apm install` automatically injects the Gateway SSE endpoint and re-renders the backend `mcp/config.yaml`.
+- **Skill Management**: New AI capabilities MUST be implemented as SkillPort skills in `agent-skills/` and managed via MCP. External skills are managed via `apm.yml`.
 
 ## 5. Tooling & Automation
-- `make setup`: Bootstrap the environment and run `apm install`. (This triggers `sync-agents` and executes APM's `post_install` hooks).
+- `make setup`: Bootstrap the environment and run `apm install`. (Triggers `sync-agents` and executes APM's `post_install` hooks).
 - `make setup-docker-mcp`: Bootstrap Docker MCP Gateway service files and runtime environment.
-- `make sync-mcp`: Re-render Gateway backend configuration and restart the service. (Executed automatically by `apm install`, but can be run manually after updating `mcp/servers.yaml`).
+- `make sync-mcp`: Re-render Gateway backend configuration from `apm.yml` and restart the service. (Executed automatically by `apm install`).
 
-## 6. MCP Gateway Advanced Configuration
+## 6. Superpowers Workflow: Project Level
+As the central authority for AI configurations, **Level 1 (High Intensity)** is the default for most tasks in this repository.
+- **Level 2 (Medium Intensity)**: Refactoring, improvements, or moderate logic changes.
+- **Level 3 (Low Intensity)**: Minor documentation or trivial configuration changes.
+- **Level 0 (Zero Intensity)**: Greetings, chitchat, or direct inquiries.
 
-When managing custom command-based MCP servers (e.g., `uv tool run`) using `docker-mcp-gateway`, please note the following technical requirements and workarounds.
-
-### ⚠️ Constraints and Workarounds for Custom Servers
-1.  **Mandatory `image` Field (No Host Execution)**: 
-    The Docker MCP Gateway **always** executes servers within isolated Docker containers; it cannot execute commands directly on the host machine. When defining a command-based server (e.g., `uvx` or `npx`) in the catalog, you MUST specify a valid Docker image that contains the required execution environment (e.g., `ghcr.io/astral-sh/uv:python3.12-bookworm` for Python/uv, or `node:lts-slim` for Node/npx). Do NOT use a dummy placeholder image, as the command will fail if the dependencies (like `uv` or `git`) are missing inside the container.
-2.  **Manual Registration in `registry.yaml`**:
-    If a custom server in the catalog is not automatically detected, force its recognition by manually adding an entry to `~/.docker/mcp/registry.yaml`:
-    ```yaml
-    registry:
-      your-server-name:
-        ref: ""
-    ```
-3.  **Environment Variables & Volume Mounts**:
-    Host-side tools often require specific environment variables and filesystem access. Explicitly map these using the `env` and `volumes` sections in `mcp/catalogs/custom.yaml.template`.
-
-### 🛠️ Troubleshooting: "too many open files"
-A `too many open files` error in the gateway logs usually indicates resource exhaustion from orphaned MCP containers. Cleanup all managed containers using:
-```bash
-docker ps -q --filter "label=docker-mcp=true" | xargs -r docker stop
-docker container prune -f --filter "label=docker-mcp=true"
-```
-
-### 📚 References
-- [MCP Client 設定ガイド (Unified SSE Gateway)](./_docs/mcp-settings.md)
-- [Docker MCP Gateway: Getting Started](https://docs.docker.com/ai/mcp-catalog-and-toolkit/mcp-gateway/)
-- [Docker MCP Gateway: FAQs & Troubleshooting](https://docs.docker.com/ai/mcp-catalog-and-toolkit/faqs/)
-- [GitHub: docker/mcp-gateway (Lifecycle Management)](https://github.com/docker/mcp-gateway#overview)
-- [Community Guide: Advanced Docker MCP Gateway Usage](https://qiita.com/moritalous/items/8789a37b7db451cc1dba)
-
-
-
-
-
-
-
-
-
-
-
-
+## 7. Component Layout Convention (Polyrepo)
+This repository relies on symbolic links to `common-mk` from [dotfiles-core](https://github.com/yohi/dotfiles-core). **NEVER** replace these links with physical files unless explicitly instructed by the user for environment-specific troubleshooting.
+- `DOTFILES_COMMON_RULES.md` -> `../../common-mk/DOTFILES_COMMON_RULES.md`
+- `_mk/core.mk` -> `../../../common-mk/core.mk`
+- `_mk/help.mk` -> `../../../common-mk/help.mk`
 
 
 
@@ -155,6 +100,11 @@ Each skill contains step-by-step instructions, templates, and scripts.
   <name>anthropics/canvas-design</name>
   <description>Create beautiful visual art in .png and .pdf documents using design philosophy. You should use this skill when the user asks to create a poster, piece of art, design, or other static piece. Create original visual designs, never copying existing artists' work to avoid copyright violations.</description>
   <location>agent-skills/anthropics/canvas-design/SKILL.md</location>
+</skill>
+<skill>
+  <name>anthropics/claude-api</name>
+  <description>Build apps with Claude API/Anthropic SDK. Trigger on: imports (anthropic, @anthropic-ai/sdk) or direct requests. Not for: openai, ML tasks.</description>
+  <location>agent-skills/anthropics/claude-api/SKILL.md</location>
 </skill>
 <skill>
   <name>anthropics/doc-coauthoring</name>
@@ -320,22 +270,3 @@ Each skill contains step-by-step instructions, templates, and scripts.
 <!-- SKILLPORT_END -->
 
 
-
-
-
-
-
-
-
-## Superpowers Workflow
-This project adheres to the **Superpowers Workflow** as defined in [`global-rules/AGENTS.global.md`](global-rules/AGENTS.global.md). All Skill Integration rules, mandatory MCP tool usage, and workflow principles defined in the global reference apply here to balance rigor and efficiency based on task complexity.
-
-### Project Application Level
-As the central authority for AI agent configurations, **Level 1 (High Intensity)** is the default for most tasks.
-- **Level 2 (Medium Intensity)** may be applied for refactoring, improvements, or moderate logic changes.
-- **Level 3 (Low Intensity)** is reserved for minor documentation edits or trivial configuration changes to ensure a rapid response without sacrificing essential validation.
-- **Level 0 (Zero Intensity)** is for greetings, chitchat, or direct inquiries. Skip all formal skills (including `load_skill`) and proceed directly to response.
-
-## 単体使用時の注意点
-
-公式にはサポートされていませんが、自己責任での単体使用は可能であり、使用する場合は symbolic links と ARCHITECTURE.md に従い、共通ライブラリ（dotfiles-core）を上書きしないことを前提としてください.

@@ -28,7 +28,7 @@
       ],
       "ultrawork": {
         // Ultrawork: 長時間自律駆動。リファクタリングやログ解析など、
-        // 巨大なコンテキストを読み込む重労働。Kimiの圧倒的な文脈窓を活用します。
+        // 巨大なコンテキストを読み込む重労働。Kimiের圧倒的な文脈窓を活用します。
         "model": "opencode/kimi-k2.5-free",
         "fallback_models": [
           "nvidia/z-ai/glm-5.1"

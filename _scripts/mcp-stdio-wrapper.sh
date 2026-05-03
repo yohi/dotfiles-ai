@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # _scripts/mcp-stdio-wrapper.sh
 
-LOG_FILE="$HOME/.mcp/gateway-stdio.log"
+LOG_FILE="${MCP_LOG_FILE:-$HOME/.mcp/gateway-stdio.log}"
 mkdir -p "$(dirname "$LOG_FILE")"
 
 # Docker MCP Gateway が多数のコンテナを制御するため、

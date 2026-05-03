@@ -126,7 +126,11 @@ echo -e "${GREEN}✅ Shared .env file is ready.${NC}"
 
 # 設定ファイルの配置は render-mcp-configs.py に集約
 echo -e "${BLUE}🔗 Synchronizing Docker MCP configuration files...${NC}"
-python3 "$REPO_ROOT/_scripts/render-mcp-configs.py"
+if command -v uv >/dev/null 2>&1; then
+    uv run python3 "$REPO_ROOT/_scripts/render-mcp-configs.py"
+else
+    python3 "$REPO_ROOT/_scripts/render-mcp-configs.py"
+fi
 echo -e "${GREEN}✅ Configuration files synchronized.${NC}"
 
 # systemd ユーザーサービスの作成
