@@ -11,12 +11,12 @@
       "model": "opencode/minimax-m2.5-free"
     },
     "sisyphus": {
-      "model": "nvidia/moonshotai/kimi-k2.5",
+      "model": "opencode/kimi-k2.5",
       "fallback_models": [
         "nvidia/z-ai/glm-5.1"
       ],
       "ultrawork": {
-        "model": "nvidia/moonshotai/kimi-k2.5",
+        "model": "opencode/kimi-k2.5",
         "fallback_models": [
           "nvidia/z-ai/glm-5.1"
         ],
@@ -28,7 +28,7 @@
       "model": "nvidia/minimaxai/minimax-m2.7"
     },
     "prometheus": {
-      "model": "nvidia/moonshotai/kimi-k2.5",
+      "model": "opencode/kimi-k2.5",
       "fallback_models": [
         "nvidia/z-ai/glm-5.1"
       ],
@@ -290,6 +290,8 @@
       "whitelist": [
         "big-pickle",
         "minimax-m2.5-free",
+        "kimi-k2.5-free",
+        "kimi-k2.5",
         "ling-2.6-flash-free",
         "hy3-preview-free",
         "nemotron-3-super-free",
