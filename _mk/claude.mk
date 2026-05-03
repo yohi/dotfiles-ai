@@ -75,13 +75,13 @@ install-packages-opcode: ## Opcode (Claude Code GUI) をインストール
 	else \
 	        echo "📥 .deb パッケージをダウンロード中..."; \
 	        TEMP_DIR=$$(mktemp -d); \
+	        trap 'rm -rf "$$TEMP_DIR"' EXIT; \
 	        DEB_URL="https://github.com/winfunc/opcode/releases/download/v$(OPCODE_VERSION)/opcode_v$(OPCODE_VERSION)_linux_x86_64.deb"; \
 	        if curl -fL --retry 3 --connect-timeout 10 --max-time 180 -o "$$TEMP_DIR/opcode.deb" "$$DEB_URL"; then \
 	                EXPECTED_SHA=$$(curl -fsSL "$$DEB_URL.sha256" | awk '{print $$1}'); \
 	                ACTUAL_SHA=$$(sha256sum "$$TEMP_DIR/opcode.deb" | awk '{print $$1}'); \
 	                if [ "$$EXPECTED_SHA" != "$$ACTUAL_SHA" ]; then \
 	                        echo "❌ チェックサム検証に失敗しました"; \
-	                        rm -rf "$$TEMP_DIR"; \
 	                        exit 1; \
 	                fi; \
 	                if [ -n "$$CI" ] || [ -n "$$AGENT_MODE" ] || ! [ -t 0 ]; then \
@@ -95,16 +95,13 @@ install-packages-opcode: ## Opcode (Claude Code GUI) をインストール
 	                                $(create_desktop_entry); \
 	                        else \
 	                                echo "❌ インストールに失敗しました。権限やパッケージ依存関係を確認してください。"; \
-	                                rm -rf "$$TEMP_DIR"; \
 	                                exit 1; \
 	                        fi; \
 	                fi; \
 	        else \
 	                echo "❌ ダウンロードに失敗しました: $$DEB_URL"; \
-	                rm -rf "$$TEMP_DIR"; \
 	                exit 1; \
 	        fi; \
-	        rm -rf "$$TEMP_DIR"; \
 	fi
 	@echo "✅ Opcode のインストールが完了しました"
 	@echo "💡 使い方を確認するには 'make help-claude' を実行してください。"
