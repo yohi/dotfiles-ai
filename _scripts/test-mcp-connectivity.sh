@@ -97,7 +97,11 @@ else
         GEMINI_OUT=$(strip_ansi < "$TMP_DIR/gemini_raw.txt")
         if echo "$GEMINI_OUT" | grep -q "docker-mcp:.*Connected"; then
             echo -e "${GREEN}✓ Connected${NC}"
-        elif echo "$GEMINI_OUT" | grep -Eq "docker-mcp:.*(Disconnected|sse)"; then
+        elif echo "$GEMINI_OUT" | grep -q "docker-mcp:.*Disconnected"; then
+            echo -e "${RED}✗ Connection Failed (Disconnected)${NC}"
+            echo "$GEMINI_OUT" | grep "docker-mcp" || true
+            FAILED=1
+        elif echo "$GEMINI_OUT" | grep -q "docker-mcp:.*sse"; then
             echo -e "${YELLOW}⚠ Found (in config)${NC}"
         else
             echo -e "${RED}✗ Not found in config${NC}"
