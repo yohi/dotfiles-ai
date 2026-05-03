@@ -280,8 +280,13 @@ def main() -> int:
                 d = toml.loads(txt)
                 d[rk] = aservs
                 cp.write_text(toml.dumps(d), encoding="utf-8")
-        except Exception as e:
+        except (OSError, ValueError) as e:
             print(f"  ❌ Error {cp}: {e}")
+        except Exception as e:
+            if type(e).__name__ == "TomlDecodeError":
+                print(f"  ❌ Error {cp}: {e}")
+            else:
+                raise
     return 0
 
 

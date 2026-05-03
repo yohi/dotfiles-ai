@@ -271,7 +271,7 @@
     "docker-mcp": {
       "url": "http://127.0.0.1:10888/sse",
       "headers": {
-        "Authorization": "Bearer ${OPCODE_GATEWAY_TOKEN}"
+        "Authorization": "Bearer ${MCP_GATEWAY_TOKEN}"
       },
       "type": "remote",
       "enabled": true
