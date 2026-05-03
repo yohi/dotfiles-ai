@@ -117,7 +117,10 @@ class TestMCPRenderer(unittest.TestCase):
                 "agents": {
                     "gemini": {
                         "path": "gemini/test_settings.json",
-                        "servers": {"my_server": {"inherit": "server with space"}},
+                        "servers": {
+                            "my_server": {"inherit": "server with space"},
+                            "auth_server": {"inherit": "secure_server"},
+                        },
                     },
                     "opencode": {
                         "path": "opencode/opencode.jsonc",
@@ -142,9 +145,6 @@ class TestMCPRenderer(unittest.TestCase):
                     },
                 ]
             },
-        }
-        mock_config["config"]["agents"]["gemini"]["servers"]["auth_server"] = {
-            "inherit": "secure_server"
         }
 
         # Create config files in fake_repo
