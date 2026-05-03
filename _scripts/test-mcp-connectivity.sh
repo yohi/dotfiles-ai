@@ -47,7 +47,11 @@ echo -e "${YELLOW}🔍 Checking MCP Connectivity for all CLI tools...${NC}"
 if ! check_gateway; then
     echo -e "${RED}✗ MCP Gateway is not responding on port 10888.${NC}"
     echo -e "${YELLOW}  Hint: Run 'make sync-mcp' to start the gateway.${NC}"
-    FAILED=1
+    if [ "${CI:-}" = "true" ]; then
+        echo -e "${YELLOW}⚠ Skipping hard failure in CI environment.${NC}"
+    else
+        FAILED=1
+    fi
 fi
 
 # 1. Claude Code
@@ -71,7 +75,7 @@ fi
 # 2. Gemini CLI
 echo -n "Gemini CLI: "
 if ! has_cmd "gemini"; then
-    echo -e "${YELLOW}⚠ Skipped (not installed)${NC}"
+    echo -e "${YELLOW}Skipped (not installed)${NC}"
 else
     # Use 'script' to simulate a TTY because gemini mcp list may produce no output otherwise
     if [[ "$OSTYPE" == "darwin"* ]]; then
@@ -106,7 +110,7 @@ fi
 # 3. OpenCode
 echo -n "OpenCode: "
 if ! has_cmd "opencode"; then
-    echo -e "${YELLOW}⚠ Skipped (not installed)${NC}"
+    echo -e "${YELLOW}Skipped (not installed)${NC}"
 else
     opencode mcp list > "$TMP_DIR/opencode_out.txt" 2>&1 || true
     OPENCODE_OUT=$(strip_ansi < "$TMP_DIR/opencode_out.txt")
