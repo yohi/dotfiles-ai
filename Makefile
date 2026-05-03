@@ -28,4 +28,4 @@ include _mk/main.mk
 # -include _mk/test-ide-cursor.mk
 
 .PHONY: test
-test: test-all ## Run all tests
+test: lint test-all ## Run all tests

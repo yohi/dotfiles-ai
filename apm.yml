@@ -49,7 +49,7 @@ dependencies:
     registry: false
     transport: stdio
     command: "npx"
-    args: ["-y", "-p", "@yohi/nexus@latest", "-p", "typescript", "nexus"]
+    args: ["-y", "-p", "@yohi/nexus@1.6.2", "-p", "typescript", "nexus"]
     env:
       NEXUS_STORAGE_ROOT_DIR: "__HOME__/.nexus"
       NEXUS_WATCHER_IGNORE_PATHS: "node_modules,.git,.nexus,dist,gemini,.worktrees,.venv,target,.mypy_cache,.ruff_cache,build,.serena,.cache,__pycache__,*.db,*.sqlite,*.log,out,bundle,vendor,package-lock.json,yarn.lock,pnpm-lock.yaml"
@@ -85,14 +85,14 @@ config:
     title: "SQLite"
     description: "SQLite database access and management."
     type: server
-    image: mcp/sqlite:latest
+    image: mcp/sqlite@sha256:efbc05ccace18df122f26b674bd1730c76ece716551df2b3961d519909c34696
     args: ["/mcp/sqlite.db"]
     volumes: ["__HOME__/.mcp/sqlite:/mcp"]
 
   - name: github-official
     description: "Official GitHub MCP server for repository management."
     type: server
-    image: mcp/github:latest
+    image: mcp/github@sha256:89fd71b6f2dd098de0d7517c1899b7fe90590d3193e253991d61a800b041bfd4
     env:
       GITHUB_PERSONAL_ACCESS_TOKEN: "${GITHUB_TOKEN:-placeholder_set_GITHUB_TOKEN_in_env}"
 
@@ -100,7 +100,7 @@ config:
     title: "Sequential Thinking"
     description: "A tool for sequential problem solving and logical reasoning."
     type: server
-    image: mcp/sequentialthinking:latest
+    image: mcp/sequentialthinking@sha256:cd3174b2ecf37738654cf7671fb1b719a225c40a78274817da00c4241f465e5f
   
   agents:
     gemini:

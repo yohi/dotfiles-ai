@@ -22,14 +22,14 @@
   "agents": {
     // 【司令塔: Sisyphus】 全体の品質管理と最終意思決定
     "sisyphus": {
-      "model": "cloudflare-workers-ai/@cf/moonshotai/kimi-k2.6",
+      "model": "opencode/kimi-k2.5",
       "fallback_models": [
         "nvidia/z-ai/glm-5.1"
       ],
       "ultrawork": {
         // Ultrawork: 長時間自律駆動。リファクタリングやログ解析など、
-        // 巨大なコンテキストを読み込む重労働。Kimiの圧倒的な文脈窓を活用します。
-        "model": "cloudflare-workers-ai/@cf/moonshotai/kimi-k2.6",
+        // 巨大なコンテキストを読み込む重労働。Kimiের圧倒的な文脈窓を活用します。
+        "model": "opencode/kimi-k2.5",
         "fallback_models": [
           "nvidia/z-ai/glm-5.1"
         ],
@@ -44,7 +44,7 @@
 
     // 【戦略家: Prometheus】 並列タスク（Agent Swarm）の分解と割り当て
     "prometheus": {
-      "model": "cloudflare-workers-ai/@cf/moonshotai/kimi-k2.6",
+      "model": "opencode/kimi-k2.5",
       "fallback_models": [
         "nvidia/z-ai/glm-5.1"
       ],
@@ -105,7 +105,7 @@
     "oracle": {
       "model": "opencode/big-pickle",
       "fallback_models": [
-        "opencode/minimax-m2.6-free"
+        "opencode/minimax-m2.5-free"
       ],
       "prompt_append": "Audit: Trace dependencies across the entire repository. Provide high-density, professional summaries."
     }
@@ -129,7 +129,7 @@
       "model": "nvidia/z-ai/glm-5.1"
     },
     "unspecified-low": {
-      "model": "opencode/minimax-m2.6-free"
+      "model": "opencode/minimax-m2.5-free"
     },
     "visual-engineering": {
       "model": "openai/gpt-5.4-mini"
@@ -165,8 +165,7 @@
       "nvidia": 10,
       "minimax": 5,
       "google": 20,
-      "anthropic": 5,
-      "cloudflare-workers-ai": 10,
+      "anthropic": 5
     }
   },
 

@@ -163,15 +163,6 @@ clean: ## 生成されたアーティファクトとキャッシュを削除
 	@rm -rf build/ dist/ *.pyc __pycache__ .ruff_cache .mypy_cache
 	@echo "✅ クリーンアップが完了しました"
 
-test: ## プロジェクトのテスト/静的解析を実行
-	@$(MAKE) lint
-	@echo "🧪 Running Python unit tests..."
-	@PYTHONPATH=_scripts $(PYTHON) -m unittest discover -p "test_*.py" _scripts
-	@echo "🧪 Running profile substitution tests..."
-	@bash _scripts/test-omo-profiles.sh
-	@echo "🧪 Running MCP Make target tests..."
-	@bash _scripts/test-mcp-make-targets.sh
-
 # --- Local Git Ignore Configuration ---
 configure-git-ignore: ## [.git] .gitignore_template をグローバル設定に同期する
 	@echo "🔄 グローバル gitignore を同期中..."
