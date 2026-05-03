@@ -244,7 +244,7 @@
   //    エージェントが準拠すべきコーディング標準や共通ルールを定義します。
   // --------------------------------------------------------------------------
   "instructions": [
-    "docs/global-rules/AGENTS.global.md", // 全プロジェクト共通の行動指針
+    "global-rules/AGENTS.global.md", // 全プロジェクト共通の行動指針
     "agent-skills/superpowers/using-superpowers/SKILL.md" // Superpowersワークフローの導入
   ],
   "watcher": {
@@ -321,7 +321,7 @@
     "docker-mcp": {
       "url": "http://127.0.0.1:10888/sse",
       "headers": {
-        "Authorization": "Bearer e718284d85d0f6ac62a995477d081010"
+        "Authorization": "Bearer ${OPCODE_GATEWAY_TOKEN}"
       },
       "type": "remote",
       "enabled": true
