@@ -135,6 +135,7 @@ def main() -> int:
     )
     mcp_dir = repo_root / "mcp"
     mcp_dir.mkdir(parents=True, exist_ok=True)
+    (mcp_dir / "catalogs").mkdir(parents=True, exist_ok=True)
     (mcp_dir / "config.yaml").write_text(
         yaml.safe_dump(
             {
@@ -177,7 +178,7 @@ def main() -> int:
     shutil.copy2(mcp_dir / "config.yaml", dot_docker / "config.yaml")
     (dot_docker / "catalogs").mkdir(parents=True, exist_ok=True)
     target = dot_docker / "catalogs" / "custom.yaml"
-    if target.exists():
+    if target.exists() or target.is_symlink():
         target.unlink()
     target.symlink_to(mcp_dir / "catalogs" / "custom.yaml")
 

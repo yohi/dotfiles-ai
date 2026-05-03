@@ -87,7 +87,14 @@ check-gemini: ## Gemini CLI の診断を実行
 setup-gemini: install-gemini-ecosystem ## Gemini CLI の設定を適用
 	@echo "📝 Gemini CLI の追加設定を適用中..."
 	@mkdir -p "$(HOME_DIR)/.gemini"
-	@ln -sf "$(REPO_ROOT)/gemini/settings.json" "$(HOME_DIR)/.gemini/settings.json"
+	@if [ -e "$(REPO_ROOT)/gemini/settings.json" ]; then \
+		ln -sf "$(REPO_ROOT)/gemini/settings.json" "$(HOME_DIR)/.gemini/settings.json"; \
+	else \
+		mkdir -p "$(HOME_DIR)/.gemini"; \
+		echo '{"mcpServers": {}}' > "$(HOME_DIR)/.gemini/settings.json"; \
+		echo "⚠️  Warning: gemini/settings.json not found. Created a default one."; \
+	fi
+
 	@echo "✅ Gemini CLI の設定が完了しました"
 
 # Gemini エコシステム一括インストール
