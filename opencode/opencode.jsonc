@@ -2,7 +2,9 @@
   "$schema": "https://opencode.ai/config.json",
   "default_agent": "sisyphus",
   "plugin": [
-    "oh-my-opencode@dev"
+    "@yohi/justice@2.2.0",
+    "oh-my-openagent@3.17.12"
+    // "opencode-geminicli-a2a-provider",
   ],
   "agent": {
     "build": {
@@ -271,8 +273,8 @@
     "mcp_timeout": 10000
   },
   "instructions": [
-    "docs/global-rules/AGENTS.global.md",
-    "agent-skills/superpowers/using-superpowers/SKILL.md"
+    "global-rules/AGENTS.global.md", // 全プロジェクト共通の行動指針
+    "agent-skills/superpowers/using-superpowers/SKILL.md" // Superpowersワークフローの導入
   ],
   "watcher": {
     "ignore": [
