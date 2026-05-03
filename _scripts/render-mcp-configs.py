@@ -99,7 +99,7 @@ def main() -> int:
         return 1
 
     app_config = cast(Dict[str, Any], config.get("config", {}))
-    combined_mcp_list = config.get("dependencies", {}).get("mcp", []) + app_config.get(
+    combined_mcp_list = config.get("dependencies", {}).get("mcp_servers", []) + app_config.get(
         "mcp_gateway", []
     )
     all_servers_raw = {
@@ -222,6 +222,17 @@ def main() -> int:
             inv = all_servers_raw.get(inherit_name)
             if isinstance(inv, dict):
                 s = replace_placeholders(inv.copy(), gateway_url, expand_paths=True)
+                
+                # Use native environment variable expansion per agent
+                if "headers" in s and isinstance(s["headers"], dict):
+                    for k, v in s["headers"].items():
+                        if "__AUTH_TOKEN__" in v:
+                            env_syntax = "{env:MCP_GATEWAY_TOKEN}" if an == "opencode" else "${MCP_GATEWAY_TOKEN}"
+                            s["headers"][k] = v.replace("__AUTH_TOKEN__", env_syntax)
+
+                if s.get("transport") and not s.get("type"):
+                    s["type"] = s.get("transport")
+                
                 if sn == "docker-mcp":
                     s["type"] = "sse"
                 else:
