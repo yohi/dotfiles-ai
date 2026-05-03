@@ -70,7 +70,13 @@ install-packages-opcode: ## Opcode (Claude Code GUI) をインストール
 	        TEMP_DIR=$$(mktemp -d); \
 	        trap 'rm -rf "$$TEMP_DIR"' EXIT; \
 	        DEB_URL="https://github.com/winfunc/opcode/releases/download/v$(OPCODE_VERSION)/opcode_v$(OPCODE_VERSION)_linux_x86_64.deb"; \
-	        if curl -L -o "$$TEMP_DIR/opcode.deb" "$$DEB_URL"; then \
+	        if curl -fL --retry 3 --connect-timeout 10 --max-time 180 -o "$$TEMP_DIR/opcode.deb" "$$DEB_URL"; then \
+	                EXPECTED_SHA=$$(curl -fsSL "$$DEB_URL.sha256" | awk '{print $$1}'); \
+	                ACTUAL_SHA=$$(sha256sum "$$TEMP_DIR/opcode.deb" | awk '{print $$1}'); \
+	                if [ "$$EXPECTED_SHA" != "$$ACTUAL_SHA" ]; then \
+	                        echo "❌ チェックサム検証に失敗しました"; \
+	                        exit 1; \
+	                fi; \
 	                echo "🔧 インストール中 (sudo権限が必要です)..."; \
 	                sudo apt-get update -q && sudo apt-get install -y "$$TEMP_DIR/opcode.deb"; \
 	                echo "✅ インストール完了"; \
