@@ -23,7 +23,7 @@ Never mix IDE styling configurations here, and never put AI instructions or MCP 
 
 ## 4. Development Workflow
 - **SSOT Enforcement**: Never edit symlinked files in home directories (e.g., `~/.gemini/GEMINI.md`). Always edit the Source of Truth within this repository.
-- **Unified Manifest**: **`apm.yml`** is the master manifest and Single Source of Truth (SSOT) for the entire project, managing AI skills, MCP server definitions, and agent environment configurations.
+- **Unified Manifest**: **`apm.yml`** is the master manifest and Single Source of Truth (SSOT) for the entire project, managing AI skills, MCP server definitions, and agent environment configurations using **APM (Agent Package Manager)**.
 - **MCP Gateway**: Use the **Unified SSE Gateway (`http://localhost:10888/sse`)** as the standard connection method for all tools.
   - **Benefits of SSE Integration**:
     - **Zero-second Startup**: Eliminates initialization delays (typically 7-10s) and timeouts common with stdio.

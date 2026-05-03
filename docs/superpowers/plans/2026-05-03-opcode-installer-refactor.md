@@ -10,7 +10,7 @@
 
 ---
 
-### Task 1: Update variables.mk with version detection logic
+## Task 1: Update variables.mk with version detection logic
 
 **Files:**
 - Modify: `_mk/variables.mk`
@@ -38,7 +38,7 @@ git commit -m "refactor: add dynamic version detection for Opcode"
 
 ---
 
-### Task 2: Refactor install-packages-opcode in claude.mk
+## Task 2: Refactor install-packages-opcode in claude.mk
 
 **Files:**
 - Modify: `_mk/claude.mk`
@@ -49,29 +49,29 @@ Remove old build logic (clone, bun install, tauri build) and replace with `.deb`
 
 ```makefile
 install-packages-opcode: ## Opcode (Claude Code GUI) をインストール
-	@echo "🖥️  Opcode (Claude Code GUI) のインストールを開始..."
-	@if [ -z "$(OPCODE_VERSION)" ]; then echo "❌ 最新バージョンの取得に失敗しました"; exit 1; fi
-	@echo "📦 最新バージョン: v$(OPCODE_VERSION)"
+        @echo "🖥️  Opcode (Claude Code GUI) のインストールを開始..."
+        @if [ -z "$(OPCODE_VERSION)" ]; then echo "❌ 最新バージョンの取得に失敗しました"; exit 1; fi
+        @echo "📦 最新バージョン: v$(OPCODE_VERSION)"
 
-	# 既存バージョンの確認
-	@CURRENT_VERSION=$$(/opt/opcode/opcode --version 2>/dev/null || echo "none"); \
-	if [ "$$CURRENT_VERSION" = "$(OPCODE_VERSION)" ]; then \
-		echo "✅ すでに最新バージョン (v$(OPCODE_VERSION)) がインストールされています"; \
-	else \
-		echo "📥 .deb パッケージをダウンロード中..."; \
-		TEMP_DIR=$$(mktemp -d); \
-		trap 'rm -rf "$$TEMP_DIR"' EXIT; \
-		DEB_URL="https://github.com/winfunc/opcode/releases/download/v$(OPCODE_VERSION)/opcode_$(OPCODE_VERSION)_amd64.deb"; \
-		if curl -L -o "$$TEMP_DIR/opcode.deb" "$$DEB_URL"; then \
-			echo "🔧 インストール中 (sudo権限が必要です)..."; \
-			sudo apt-get update -q && sudo apt-get install -y "$$TEMP_DIR/opcode.deb"; \
-			echo "✅ インストール完了"; \
-			$(create_desktop_entry); \
-		else \
-			echo "❌ ダウンロードに失敗しました: $$DEB_URL"; \
-			exit 1; \
-		fi \
-	fi
+        # 既存バージョンの確認
+        @CURRENT_VERSION=$$(/opt/opcode/opcode --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "none"); \
+        if [ "$$CURRENT_VERSION" = "$(OPCODE_VERSION)" ]; then \
+                echo "✅ すでに最新バージョン (v$(OPCODE_VERSION)) がインストールされています"; \
+        else \
+                echo "📥 .deb パッケージをダウンロード中..."; \
+                TEMP_DIR=$$(mktemp -d); \
+                trap 'rm -rf "$$TEMP_DIR"' EXIT; \
+                DEB_URL="https://github.com/winfunc/opcode/releases/download/v$(OPCODE_VERSION)/opcode_v$(OPCODE_VERSION)_linux_x86_64.deb"; \
+                if curl -L -o "$$TEMP_DIR/opcode.deb" "$$DEB_URL"; then \
+                        echo "🔧 インストール中 (sudo権限が必要です)..."; \
+                        sudo apt-get update -q && sudo apt-get install -y "$$TEMP_DIR/opcode.deb"; \
+                        echo "✅ インストール完了"; \
+                        $(create_desktop_entry); \
+                else \
+                        echo "❌ ダウンロードに失敗しました: $$DEB_URL"; \
+                        exit 1; \
+                fi \
+        fi
 ```
 
 - [ ] **Step 2: Verify the target structure (Dry Run)**
@@ -87,7 +87,7 @@ git commit -m "refactor: replace Opcode source build with .deb installer"
 
 ---
 
-### Task 3: Final Verification
+## Task 3: Final Verification
 
 - [ ] **Step 1: Run the new installer**
 
