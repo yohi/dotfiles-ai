@@ -58,7 +58,14 @@ help-claude: ## Claude Code の使い方を表示
 .PHONY: install-packages-opcode
 install-packages-opcode: ## Opcode (Claude Code GUI) をインストール
 	@echo "🖥️  Opcode (Claude Code GUI) のインストールを開始..."
-	@if [ -z "$(OPCODE_VERSION)" ]; then echo "❌ 最新バージョンの取得に失敗しました"; exit 1; fi
+	@if [ -z "$(OPCODE_VERSION)" ] || [ "$(OPCODE_VERSION)" = "FAILED" ]; then \
+		echo "❌ 最新バージョンの取得に失敗しました。ネットワーク接続や GitHub API の制限を確認してください。"; \
+		exit 1; \
+	fi
+	@if [[ ! "$(OPCODE_VERSION)" =~ ^[0-9]+(\.[0-9]+)*$$ ]]; then \
+		echo "❌ 無効なバージョン形式です: $(OPCODE_VERSION)"; \
+		exit 1; \
+	fi
 	@echo "📦 最新バージョン: v$(OPCODE_VERSION)"
 
 	# 既存バージョンの確認
@@ -153,17 +160,40 @@ install-opcode: install-packages-opcode  ## Opcodeをインストール(エイ�
 setup-claude: ## Claude Codeの設定を適用
 	@echo "📝 Claude Codeの設定を適用中..."
 	@mkdir -p "$(HOME_DIR)/.claude"
-	@ln -sf "$(REPO_ROOT)/global-rules/AGENTS.global.md" "$(HOME_DIR)/.claude/CLAUDE.md"
-	@ln -sf "$(REPO_ROOT)/claude/settings.json" "$(HOME_DIR)/.claude.json"
-	@ln -sf "$(REPO_ROOT)/claude/settings.json" "$(HOME_DIR)/.claude/settings.json"
+	@# CLAUDE.md
+	@if [ -e "$(HOME_DIR)/.claude/CLAUDE.md" ] && [ ! -L "$(HOME_DIR)/.claude/CLAUDE.md" ]; then \
+		echo "⚠️  $(HOME_DIR)/.claude/CLAUDE.md が実体ファイルとして既に存在するため、スキップします。"; \
+	else \
+		ln -sf "$(REPO_ROOT)/global-rules/AGENTS.global.md" "$(HOME_DIR)/.claude/CLAUDE.md"; \
+	fi
+	@# .claude.json
+	@if [ -e "$(HOME_DIR)/.claude.json" ] && [ ! -L "$(HOME_DIR)/.claude.json" ]; then \
+		echo "⚠️  $(HOME_DIR)/.claude.json が実体ファイルとして既に存在するため、スキップします。"; \
+	else \
+		ln -sf "$(REPO_ROOT)/claude/settings.json" "$(HOME_DIR)/.claude.json"; \
+	fi
+	@# settings.json
+	@if [ -e "$(HOME_DIR)/.claude/settings.json" ] && [ ! -L "$(HOME_DIR)/.claude/settings.json" ]; then \
+		echo "⚠️  $(HOME_DIR)/.claude/settings.json が実体ファイルとして既に存在するため、スキップします。"; \
+	else \
+		ln -sf "$(REPO_ROOT)/claude/settings.json" "$(HOME_DIR)/.claude/settings.json"; \
+	fi
+	@# statusline.sh
 	@chmod +x "$(REPO_ROOT)/claude/statusline.sh"
-	@ln -sf "$(REPO_ROOT)/claude/statusline.sh" "$(HOME_DIR)/.claude/statusline.sh"
+	@if [ -e "$(HOME_DIR)/.claude/statusline.sh" ] && [ ! -L "$(HOME_DIR)/.claude/statusline.sh" ]; then \
+		echo "⚠️  $(HOME_DIR)/.claude/statusline.sh が実体ファイルとして既に存在するため、スキップします。"; \
+	else \
+		ln -sf "$(REPO_ROOT)/claude/statusline.sh" "$(HOME_DIR)/.claude/statusline.sh"; \
+	fi
 	@echo "✅ Claude Codeの設定が完了しました"
 
 uninstall-claude: ## Claude Codeの設定を削除
 	@echo "🗑️  Claude Codeの設定を削除中..."
-	@rm -f "$(HOME_DIR)/.claude.json"
-	@rm -f "$(HOME_DIR)/.claude/CLAUDE.md"
-	@rm -f "$(HOME_DIR)/.claude/settings.json"
-	@rm -f "$(HOME_DIR)/.claude/statusline.sh"
+	@for target in "$(HOME_DIR)/.claude.json" "$(HOME_DIR)/.claude/CLAUDE.md" "$(HOME_DIR)/.claude/settings.json" "$(HOME_DIR)/.claude/statusline.sh"; do \
+		if [ -L "$$target" ]; then \
+			rm "$$target"; \
+		elif [ -e "$$target" ]; then \
+			echo "⚠️  $$target は実体ファイルのため削除をスキップしました。"; \
+		fi; \
+	done
 	@echo "✅ Claude Codeの設定を削除しました"
