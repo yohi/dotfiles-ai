@@ -4,7 +4,6 @@
   "plugin": [
     "@yohi/justice@2.2.0",
     "oh-my-openagent@3.17.12"
-    // "opencode-geminicli-a2a-provider",
   ],
   "agent": {
     "build": {
@@ -273,8 +272,8 @@
     "mcp_timeout": 10000
   },
   "instructions": [
-    "global-rules/AGENTS.global.md", // 全プロジェクト共通の行動指針
-    "agent-skills/superpowers/using-superpowers/SKILL.md" // Superpowersワークフローの導入
+    "global-rules/AGENTS.global.md",
+    "agent-skills/superpowers/using-superpowers/SKILL.md"
   ],
   "watcher": {
     "ignore": [
@@ -320,5 +319,14 @@
       ]
     }
   },
-  "mcp": {}
+  "mcp": {
+    "docker-mcp": {
+      "url": "http://127.0.0.1:10888/sse",
+      "headers": {
+        "Authorization": "Bearer {env:MCP_GATEWAY_TOKEN}"
+      },
+      "type": "remote",
+      "enabled": true
+    }
+  }
 }

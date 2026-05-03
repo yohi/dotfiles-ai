@@ -85,7 +85,7 @@ class TestMCPRenderer(unittest.TestCase):
     def test_guards(self):
         mock_config = {
             "config": {"defaults": {}, "agents": ["not a dict"]},
-            "dependencies": {"mcp": []},
+            "dependencies": {"mcp_servers": []},
         }
 
         def robust_mock_path(*args):
@@ -123,7 +123,7 @@ class TestMCPRenderer(unittest.TestCase):
                 },
             },
             "dependencies": {
-                "mcp": [
+                "mcp_servers": [
                     {
                         "name": "server with space",
                         "type": "local",

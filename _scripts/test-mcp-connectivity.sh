@@ -14,12 +14,6 @@ FAILED=0
 TMP_DIR=$(mktemp -d)
 trap 'rm -rf "$TMP_DIR"' EXIT
 
-# Ensure environment variables are loaded
-if [ -f ".env" ]; then
-    # shellcheck disable=SC1091
-    source .env
-fi
-
 # ANSI color codes removal helper
 strip_ansi() {
     sed 's/\x1b\[[0-9;]*m//g'
@@ -30,21 +24,47 @@ has_cmd() {
     command -v "$1" >/dev/null 2>&1
 }
 
+# Helper to check if gateway is running
+check_gateway() {
+    if curl -s -o /dev/null "http://127.0.0.1:10888/sse"; then
+        return 0
+    elif curl -s -k -o /dev/null "https://127.0.0.1:10888/sse"; then
+        return 0
+    fi
+    return 1
+}
+
+# Ensure environment variables are loaded
+if [ -f ".env" ]; then
+    # shellcheck disable=SC1091
+    source .env
+else
+    echo -e "${YELLOW}⚠ .env file not found. Connection tests might fail due to missing tokens.${NC}"
+fi
+
 echo -e "${YELLOW}🔍 Checking MCP Connectivity for all CLI tools...${NC}"
+
+if ! check_gateway; then
+    echo -e "${RED}✗ MCP Gateway is not responding on port 10888.${NC}"
+    echo -e "${YELLOW}  Hint: Run 'make sync-mcp' to start the gateway.${NC}"
+    FAILED=1
+fi
 
 # 1. Claude Code
 echo -n "Claude Code: "
 if ! has_cmd "claude"; then
-    echo -e "${YELLOW}⚠ Skipped (not installed)${NC}"
+    echo -e "${YELLOW}Skipped (not installed)${NC}"
 else
-    claude mcp list > "$TMP_DIR/claude_out.txt" 2>&1 || true
-    CLAUDE_OUT=$(strip_ansi < "$TMP_DIR/claude_out.txt")
+    # claude mcp list might fail if it can't connect, but we want to capture the status
+    CLAUDE_OUT=$(claude mcp list 2>&1 | strip_ansi || true)
     if echo "$CLAUDE_OUT" | grep -q "docker-mcp:.*Connected"; then
         echo -e "${GREEN}✓ Connected${NC}"
-    else
-        echo -e "${RED}✗ Failed${NC}"
+    elif echo "$CLAUDE_OUT" | grep -q "docker-mcp"; then
+        echo -e "${RED}✗ Connection Failed${NC}"
         echo "$CLAUDE_OUT" | grep "docker-mcp" || true
         FAILED=1
+    else
+        echo -e "${YELLOW}⚠ docker-mcp not configured in Claude${NC}"
     fi
 fi
 
