@@ -1,7 +1,7 @@
 // vim: ft=jsonc
 {
   // Config Modernized: 2026-05-04
-  // Based on oh-my-opencode v3.18.0 (Documentation updated based on latest feature specs)
+  // Based on oh-my-openagent @dev (Documentation updated based on latest feature specs)
 
   // スキーマ定義：エディタでの補完とバリデーションを有効化
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/master/assets/oh-my-opencode.schema.json",
@@ -64,7 +64,7 @@
     // 【大規模解析・監査: Oracle】 読み取り専用のコンサルタント
     // アーキテクチャ決定、深い論理的推論、コードレビュー、難解なバグのデバッグを担当。
     "oracle": {
-      "model": "openai/gpt-5.4",
+      "model": "openai/gpt-5.5",
       "fallback_models": [
         "google/gemini-3.1-pro-preview"
       ]
@@ -129,7 +129,7 @@
     // 【計画レビュアー: Momus】 計画の検証と品質保証
     // 明確さ、検証可能性、完全性の基準に照らして、Prometheusが作成した計画を厳格にレビュー。
     "momus": {
-      "model": "openai/gpt-5.4"
+      "model": "openai/gpt-5.5"
     },
 
     // --- Orchestration Agents ---
@@ -137,7 +137,7 @@
     // 【現場監督: Atlas】 Todo駆動型実行エンジン
     // Tmux, Playwrightなどの環境管理、Todo項目の体系的な管理・調整・維持を担当。
     "atlas": {
-      "model": "openai/gpt-5.4",
+      "model": "openai/gpt-5.5",
       "variant": "medium",
       "description": "Orchestrates Tmux, Playwright, and server states. Ensures environment consistency."
     }
@@ -148,7 +148,7 @@
   // --------------------------------------------------------------------------
   "categories": {
     "ultrabrain": {
-      "model": "openai/gpt-5.4", // 最強の論理推論 (xhigh)
+      "model": "openai/gpt-5.5", // 最強の論理推論 (xhigh)
       "variant": "xhigh"
     },
     "deep": {

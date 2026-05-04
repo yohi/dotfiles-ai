@@ -1,8 +1,8 @@
 // vim: ft=jsonc
 {
-  // Config Modernized: 2026-04-24
-  // Target OpenCode Version: v1.14.22
-  // Based on oh-my-opencode v3.17.4
+  // Config Modernized: 2026-05-04
+  // Target OpenCode Version: v1.14.33
+  // Based on oh-my-openagent @dev
   "$schema": "https://opencode.ai/config.json",
 
   "default_agent": "sisyphus",
@@ -15,7 +15,7 @@
   // [Plugin]
   "plugin": [
     "@yohi/justice@2.2.0",
-    "oh-my-openagent@3.17.12"
+    "oh-my-openagent@dev"
   ],
 
   // --------------------------------------------------------------------------
