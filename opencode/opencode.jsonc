@@ -2,7 +2,7 @@
 {
   // Config Modernized: 2026-05-04
   // Target OpenCode Version: v1.14.33
-  // Based on oh-my-openagent @dev
+  // Based on oh-my-openagent Version: v3.17.12
   "$schema": "https://opencode.ai/config.json",
 
   "default_agent": "sisyphus",
@@ -16,7 +16,7 @@
   "plugin": [
     "@yohi/opencode-codex-quota@1.0.0",
     "@yohi/justice@2.2.0",
-    "oh-my-openagent@dev"
+    "oh-my-openagent@v3.17.12"
   ],
 
   // --------------------------------------------------------------------------
