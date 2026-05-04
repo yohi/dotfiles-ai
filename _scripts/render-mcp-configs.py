@@ -102,17 +102,61 @@ def surgical_json_update(text: str, key: str, new_value: dict[str, Any]) -> str 
     indent = match.group(1)
     start_pos = match.end() - 1  # '{'
 
-    # Find matching closing brace
+    # Find matching closing brace using a state machine to ignore strings and comments
+    in_string = False
+    escape = False
+    in_line_comment = False
+    in_block_comment = False
     count = 0
     end_pos = -1
-    for i in range(start_pos, len(text)):
-        if text[i] == "{":
-            count += 1
-        elif text[i] == "}":
-            count -= 1
-            if count == 0:
-                end_pos = i + 1
-                break
+    
+    i = start_pos
+    while i < len(text):
+        char = text[i]
+        
+        if in_line_comment:
+            if char == '\n':
+                in_line_comment = False
+            i += 1
+            continue
+            
+        if in_block_comment:
+            if char == '*' and i + 1 < len(text) and text[i+1] == '/':
+                in_block_comment = False
+                i += 1
+            i += 1
+            continue
+            
+        if not in_string:
+            if char == '/' and i + 1 < len(text):
+                next_char = text[i+1]
+                if next_char == '/':
+                    in_line_comment = True
+                    i += 2
+                    continue
+                elif next_char == '*':
+                    in_block_comment = True
+                    i += 2
+                    continue
+                    
+            if char == '"':
+                in_string = True
+            elif char == "{":
+                count += 1
+            elif char == "}":
+                count -= 1
+                if count == 0:
+                    end_pos = i + 1
+                    break
+        else:
+            if escape:
+                escape = False
+            elif char == '\\':
+                escape = True
+            elif char == '"':
+                in_string = False
+                
+        i += 1
     if end_pos == -1:
         return None
 

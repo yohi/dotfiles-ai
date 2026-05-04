@@ -15,7 +15,7 @@
   // [Plugin]
   "plugin": [
     "@yohi/justice@2.2.0",
-    "oh-my-openagent@dev"
+    "oh-my-openagent@3.17.12"
   ],
 
   // --------------------------------------------------------------------------
@@ -73,7 +73,7 @@
       "git checkout": "allow",
       "git checkout *": "allow",
       "git add": "allow",
-      "git add *": "allow",
+      "git add *": "deny",
       "git commit": "allow",
       "git commit *": "allow",
 
@@ -239,6 +239,7 @@
   // --------------------------------------------------------------------------
   "instructions": [
     "global-rules/AGENTS.global.md", // 全プロジェクト共通の行動指針
+    "agent-skills/superpowers/using-superpowers/SKILL.md"
   ],
   "watcher": {
     "ignore": [
@@ -279,6 +280,7 @@
     },
     "google": {
       "whitelist": [
+        "gemini-3-flash-preview",
         "gemini-3.1-flash-image-preview",
         "gemini-3.1-pro-preview"
       ]

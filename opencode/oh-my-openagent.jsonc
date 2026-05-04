@@ -29,7 +29,7 @@
     "sisyphus": {
       "model": "cloudflare-workers-ai/@cf/moonshotai/kimi-k2.6",
       "fallback_models": [
-        "nvidia/moonshotai/kimi-k2.6",
+        // "nvidia/moonshotai/kimi-k2.6",
         "nvidia/z-ai/glm-5.1",
         "cloudflare-workers-ai/@cf/zai-org/glm-4.7-flash"
       ],
@@ -38,7 +38,7 @@
         // 圧倒的な文脈窓(Kimi/GLM)を活かした重労働を担当します。
         "model": "cloudflare-workers-ai/@cf/moonshotai/kimi-k2.6",
         "fallback_models": [
-          "nvidia/moonshotai/kimi-k2.6",
+          // "nvidia/moonshotai/kimi-k2.6",
           "nvidia/z-ai/glm-5.1",
           "cloudflare-workers-ai/@cf/zai-org/glm-4.7-flash"
         ],
@@ -109,9 +109,9 @@
     "prometheus": {
       "model": "cloudflare-workers-ai/@cf/moonshotai/kimi-k2.6",
       "fallback_models": [
-          "nvidia/moonshotai/kimi-k2.6",
-          "nvidia/z-ai/glm-5.1",
-          "cloudflare-workers-ai/@cf/zai-org/glm-4.7-flash"
+        // "nvidia/moonshotai/kimi-k2.6",
+        "nvidia/z-ai/glm-5.1",
+        "cloudflare-workers-ai/@cf/zai-org/glm-4.7-flash"
       ]
     },
 
@@ -120,9 +120,9 @@
     "metis": {
       "model": "cloudflare-workers-ai/@cf/moonshotai/kimi-k2.6",
       "fallback_models": [
-          "nvidia/moonshotai/kimi-k2.6",
-          "nvidia/z-ai/glm-5.1",
-          "cloudflare-workers-ai/@cf/zai-org/glm-4.7-flash"
+        // "nvidia/moonshotai/kimi-k2.6",
+        "nvidia/z-ai/glm-5.1",
+        "cloudflare-workers-ai/@cf/zai-org/glm-4.7-flash"
       ]
     },
 
