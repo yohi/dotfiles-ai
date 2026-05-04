@@ -1,7 +1,7 @@
 // vim: ft=jsonc
 {
-  // Config Modernized: 2026-04-22
-  // Based on oh-my-opencode v3.17.4
+  // Config Modernized: 2026-05-04
+  // Based on oh-my-openagent @dev (Documentation updated based on latest feature specs)
 
   // スキーマ定義：エディタでの補完とバリデーションを有効化
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/master/assets/oh-my-opencode.schema.json",
@@ -10,58 +10,47 @@
   // 1. Sisyphus Agent: オーケストレーションの中核
   // --------------------------------------------------------------------------
   "sisyphus_agent": {
+    // デフォルトのオーケストレーター。複雑なタスクの計画、委譲、実行を担当。
+    // サブエージェントを活用した積極的な並列実行と、Todo駆動型ワークフロー(Atlas統合)が特徴。
     "disabled": false,
-    "planner_enabled": true,
-    "replace_plan": true,
-    "default_builder_enabled": true
+    "planner_enabled": true, // Prometheus/Metis/Momus を使用した高度な計画立案を有効化
+    "replace_plan": true,    // 実行中に計画を動的に修正・更新することを許可
+    "default_builder_enabled": true // デフォルトのビルド/デプロイフローの有効化
   },
 
   // --------------------------------------------------------------------------
   // 2. Agents: 4大コア + 専門家エージェントの定義
   // --------------------------------------------------------------------------
   "agents": {
+    // --- Core Agents ---
+
     // 【司令塔: Sisyphus】 全体の品質管理と最終意思決定
+    // 32kの思考バジェットを持ち、プロジェクト全体の文脈を把握して最適解を導き出します。
     "sisyphus": {
-      "model": "opencode/kimi-k2.5",
+      "model": "cloudflare-workers-ai/@cf/moonshotai/kimi-k2.6",
       "fallback_models": [
-        "nvidia/z-ai/glm-5.1"
+        // "nvidia/moonshotai/kimi-k2.6",
+        "nvidia/z-ai/glm-5.1",
+        "cloudflare-workers-ai/@cf/zai-org/glm-4.7-flash"
       ],
       "ultrawork": {
-        // Ultrawork: 長時間自律駆動。リファクタリングやログ解析など、
-        // 巨大なコンテキストを読み込む重労働。Kimiের圧倒的な文脈窓を活用します。
-        "model": "opencode/kimi-k2.5",
+        // Ultrawork: 長時間自律駆動モード。リファクタリングや巨大なログ解析など、
+        // 圧倒的な文脈窓(Kimi/GLM)を活かした重労働を担当します。
+        "model": "cloudflare-workers-ai/@cf/moonshotai/kimi-k2.6",
         "fallback_models": [
-          "nvidia/z-ai/glm-5.1"
+          // "nvidia/moonshotai/kimi-k2.6",
+          "nvidia/z-ai/glm-5.1",
+          "cloudflare-workers-ai/@cf/zai-org/glm-4.7-flash"
         ],
         "variant": "max",
         "effort": "high"
       }
     },
 
-    "momus": {
-      "model": "nvidia/minimaxai/minimax-m2.7"
-    },
-
-    // 【戦略家: Prometheus】 並列タスク（Agent Swarm）の分解と割り当て
-    "prometheus": {
-      "model": "opencode/kimi-k2.5",
-      "fallback_models": [
-        "nvidia/z-ai/glm-5.1"
-      ],
-      "prompt_append": "Strategy: Maximize parallel backend file edits. Partition tasks to avoid merge conflicts."
-    },
-
-    // 【現場監督: Atlas】 環境管理・ツール操作・コンテキスト維持
-    "atlas": {
-      "model": "openai/gpt-5.4",
-      "variant": "medium",
-      "description": "Orchestrates Tmux, Playwright, and server states. Ensures environment consistency."
-    },
-
-    // 【製造担当: Hephaestus】 ロジックの実装、リファクタリング
+    // 【製造担当: Hephaestus】 「正当な職人」。ロジックの実装、リファクタリング
+    // AmpCodeのディープモードにインスパイアされ、徹底的な調査の後に一気に書き上げます。
     "hephaestus": {
       "model": "openai/gpt-5.3-codex",
-      "prompt_append": "Code: High-performance logic. Prioritize error handling, type safety, and modularity.",
       "permission": {
         "edit": "allow",
         "bash": {
@@ -72,67 +61,110 @@
       }
     },
 
-    // 【視覚アナリスト: Multimodal-Looker】 デザイン分析とUIデバッグ
-    "multimodal-looker": {
-      "model": "openai/gpt-5.4",
+    // 【大規模解析・監査: Oracle】 読み取り専用のコンサルタント
+    // アーキテクチャ決定、深い論理的推論、コードレビュー、難解なバグのデバッグを担当。
+    "oracle": {
+      "model": "openai/gpt-5.5",
       "fallback_models": [
-        "openai/gpt-5.4-mini"
-      ],
-      "variant": "medium",
-      "description": "Visual Intelligence. Analyzes UI designs for API generation and debugs browser test failures."
+        "google/gemini-3.1-pro-preview"
+      ]
     },
 
-    // 【高速プロトタイプ: Explore】 Big Pickle
-    "explore": {
-      "model": "opencode/big-pickle",
-      "fallback_models": [
-        "openai/gpt-5.4-mini"
-      ],
-      "description": "Rapid scaffolding using autonomous web search for latest technical specs."
-    },
-
-    // 【超高速補助: Librarian】 Nemotron 3 Super
+    // 【超高速補助: Librarian】 証拠に基づいた調査の専門家
+    // マルチリポジトリ分析、ドキュメント検索、OSS実装例の調査を低コスト・高精度で行います。
     "librarian": {
-      "model": "opencode/nemotron-3-super-free",
+      "model": "opencode/minimax-m2.5-free",
       "fallback_models": [
-        "openai/gpt-5.4-mini"
+        "nvidia/qwen/qwen3.5-397b-a17b"
       ],
       "temperature": 0.1,
       "description": "Ultra-fast background research with minimal token cost."
     },
 
-    // 【大規模解析・監査: Oracle】
-    "oracle": {
-      "model": "opencode/big-pickle",
+    // 【高速探索: Explore】 高速なコードベース探索とプロトタイピング
+    // 自律的なweb searchを組み合わせ、最新の技術仕様に基づいたスキャフォールディングを行います。
+    "explore": {
+      "model": "opencode/minimax-m2.5-free",
       "fallback_models": [
-        "opencode/minimax-m2.5-free"
+        "nvidia/qwen/qwen3.5-397b-a17b"
       ],
-      "prompt_append": "Audit: Trace dependencies across the entire repository. Provide high-density, professional summaries."
+      "description": "Rapid scaffolding using autonomous web search for latest technical specs."
+    },
+
+    // 【視覚アナリスト: Multimodal-Looker】 視覚コンテンツ・UI分析
+    // PDF、画像、図解、UIデザインを分析。ブラウザテストの失敗時のUIデバッグにも威力を発揮。
+    "multimodal-looker": {
+      "model": "google/gemini-3.1-flash-image-preview",
+      "fallback_models": [
+        "google/gemini-3.1-pro-preview"
+      ],
+      "variant": "medium",
+      "description": "Visual Intelligence. Analyzes UI designs for API generation and debugs browser test failures."
+    },
+
+    // --- Planning Agents ---
+
+    // 【戦略家: Prometheus】 インタビューモードを備えたプランナー
+    // 対話を通じてタスクを分解し、並列実行可能な「Agent Swarm」用の作業計画を作成します。
+    "prometheus": {
+      "model": "cloudflare-workers-ai/@cf/moonshotai/kimi-k2.6",
+      "fallback_models": [
+        // "nvidia/moonshotai/kimi-k2.6",
+        "nvidia/z-ai/glm-5.1",
+        "cloudflare-workers-ai/@cf/zai-org/glm-4.7-flash"
+      ]
+    },
+
+    // 【計画コンサル: Metis】 計画前の分析とリスク特定
+    // 隠れた意図や曖昧さ、AIが失敗しやすいポイントを事前に特定し、計画の精度を高めます。
+    "metis": {
+      "model": "cloudflare-workers-ai/@cf/moonshotai/kimi-k2.6",
+      "fallback_models": [
+        // "nvidia/moonshotai/kimi-k2.6",
+        "nvidia/z-ai/glm-5.1",
+        "cloudflare-workers-ai/@cf/zai-org/glm-4.7-flash"
+      ]
+    },
+
+    // 【計画レビュアー: Momus】 計画の検証と品質保証
+    // 明確さ、検証可能性、完全性の基準に照らして、Prometheusが作成した計画を厳格にレビュー。
+    "momus": {
+      "model": "openai/gpt-5.5"
+    },
+
+    // --- Orchestration Agents ---
+
+    // 【現場監督: Atlas】 Todo駆動型実行エンジン
+    // Tmux, Playwrightなどの環境管理、Todo項目の体系的な管理・調整・維持を担当。
+    "atlas": {
+      "model": "openai/gpt-5.5",
+      "variant": "medium",
+      "description": "Orchestrates Tmux, Playwright, and server states. Ensures environment consistency."
     }
   },
 
   // --------------------------------------------------------------------------
-  // 3. Categories: タスクの種類に応じたモデルの自動ルーティング
+  // 3. Categories: タスクの性質に応じたモデルの自動ルーティング
   // --------------------------------------------------------------------------
   "categories": {
     "ultrabrain": {
-      "model": "openai/gpt-5.4",
+      "model": "openai/gpt-5.5", // 最強の論理推論 (xhigh)
       "variant": "xhigh"
     },
     "deep": {
-      "model": "nvidia/minimaxai/minimax-m2.7"
+      "model": "openai/gpt-5.3-codex" // 自律的解決・難解なタスク
     },
     "quick": {
-      "model": "opencode/ling-2.6-flash-free"
+      "model": "cloudflare-workers-ai/@cf/meta/llama-4-scout-17b-16e-instruct" // 些細な修正・高速レスポンス
     },
     "writing": {
-      "model": "nvidia/z-ai/glm-5.1"
+      "model": "cloudflare-workers-ai/@cf/zai-org/glm-4.7-flash" // テクニカルライティング・散文
     },
     "unspecified-low": {
       "model": "opencode/minimax-m2.5-free"
     },
     "visual-engineering": {
-      "model": "openai/gpt-5.4-mini"
+      "model": "google/gemini-3.1-flash-image-preview" // UI/UX, デザイン, アニメーション
     }
   },
 
@@ -140,24 +172,27 @@
   // 4. Experimental: 最新・実験的機能の最適化
   // --------------------------------------------------------------------------
   "experimental": {
-    "task_system": true,
-    "hashline_edit": true,
+    "task_system": true, // Todo駆動タスク管理(blockedBy対応)。 .sisyphus/tasks/ に永続化
+    "hashline_edit": true, // LINE#ID形式のハッシュアンカー編集。行ずれエラーをゼロに
     "hashline_diff_enhancer": true,
     "aggressive_truncation": true,
-    "auto_resume": true,
-    "preemptive_compaction_threshold": 0.85
+    "auto_resume": true, // セッション中断・失敗からの自動復旧
+    "preemptive_compaction_threshold": 0.85 // トークン限界前のプロアクティブな圧縮
   },
 
+  // TMUX統合: バックグラウンドエージェントを別ペインでリアルタイム監視
   "tmux": {
     "enabled": true,
     "layout": "main-vertical",
     "main_pane_size": 65
   },
 
+  // ブラウザ自動化エンジン: スクリーンショット、フォーム入力、ネットワーク監視をサポート
   "browser_automation_engine": {
-    "provider": "playwright-cli"
+    "provider": "playwright-cli" // デフォルト: playwright
   },
 
+  // バックグラウンドタスクの並列実行制御
   "background_task": {
     "defaultConcurrency": 10,
     "providerConcurrency": {
@@ -169,31 +204,37 @@
     }
   },
 
+  // Ralph Loop: タスク完了まで自律的に試行を繰り返す自己参照型開発ループ
   "ralph_loop": {
     "enabled": true,
     "default_max_iterations": 20
   },
 
+  // Boulder State: セッションを跨いでエージェントの状態を維持する永続化機構
   "boulder_state": {
     "enabled": true,
     "storage_path": ".sisyphus/boulder_state.json"
   },
 
+  // セッションリカバリ: エラーやコンテキスト上限からの透明な復旧
   "session_recovery": {
     "enabled": true,
     "max_age_minutes": 1440
   },
 
+  // Interactive Bash: tmuxベースの永続ターミナル(vim/htopなどのTUI対応)
   "interactive_bash": {
     "enabled": true,
     "timeout_ms": 300000
   },
 
+  // Git Master: コミット分割、スタイル自動検出を行うGit専門機能
   "git_master": {
     "commit_footer": false,
     "include_co_authored_by": false
   },
 
+  // 過剰なコメントを削減・整理する提案機能
   "comment_checker": {
     "enabled": true
   },
@@ -202,10 +243,12 @@
     "auto-update-checker"
   ],
 
+  // Rules Injector: .claude/rules/ 内のルールをglob条件で自動注入
   "rules_injector": {
     "enabled": true
   },
 
+  // Auto Slash Command: プロンプトからのスラッシュコマンド自動実行
   "auto_slash_command": {
     "enabled": true
   },

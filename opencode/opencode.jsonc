@@ -1,98 +1,40 @@
+// vim: ft=jsonc
 {
+  // Config Modernized: 2026-05-04
+  // Target OpenCode Version: v1.14.33
+  // Based on oh-my-openagent @dev
   "$schema": "https://opencode.ai/config.json",
+
   "default_agent": "sisyphus",
+
+  // --------------------------------------------------------------------------
+  // 1. コアモデル設定: 最新のフラグシップモデルを配置
+  //    タスクの難易度に応じて適切なモデルを使い分けるための基本設定です。
+  // --------------------------------------------------------------------------
+
+  // [Plugin]
   "plugin": [
+    "@yohi/opencode-codex-quota@1.0.0",
     "@yohi/justice@2.2.0",
-    "oh-my-openagent@3.17.12"
+    "oh-my-openagent@dev"
   ],
-  "agent": {
-    "build": {
-      "model": "opencode/minimax-m2.5-free"
-    },
-    "sisyphus": {
-      "model": "opencode/kimi-k2.5",
-      "fallback_models": [
-        "nvidia/z-ai/glm-5.1"
-      ],
-      "ultrawork": {
-        "model": "opencode/kimi-k2.5",
-        "fallback_models": [
-          "nvidia/z-ai/glm-5.1"
-        ],
-        "variant": "max",
-        "effort": "high"
-      }
-    },
-    "momus": {
-      "model": "nvidia/minimaxai/minimax-m2.7"
-    },
-    "prometheus": {
-      "model": "opencode/kimi-k2.5",
-      "fallback_models": [
-        "nvidia/z-ai/glm-5.1"
-      ],
-      "prompt_append": "Strategy: Maximize parallel backend file edits. Partition tasks to avoid merge conflicts."
-    },
-    "atlas": {
-      "model": "openai/gpt-5.4",
-      "variant": "medium",
-      "description": "Orchestrates Tmux, Playwright, and server states. Ensures environment consistency."
-    },
-    "hephaestus": {
-      "model": "openai/gpt-5.3-codex",
-      "prompt_append": "Code: High-performance logic. Prioritize error handling, type safety, and modularity.",
-      "permission": {
-        "edit": "allow",
-        "bash": {
-          "git": "allow",
-          "test": "allow",
-          "npm": "allow"
-        }
-      }
-    },
-    "multimodal-looker": {
-      "model": "openai/gpt-5.4",
-      "fallback_models": [
-        "openai/gpt-5.4-mini"
-      ],
-      "variant": "medium",
-      "description": "Visual Intelligence. Analyzes UI designs for API generation and debugs browser test failures."
-    },
-    "explore": {
-      "model": "opencode/big-pickle",
-      "fallback_models": [
-        "openai/gpt-5.4-mini"
-      ],
-      "description": "Rapid scaffolding using autonomous web search for latest technical specs."
-    },
-    "librarian": {
-      "model": "opencode/nemotron-3-super-free",
-      "fallback_models": [
-        "openai/gpt-5.4-mini"
-      ],
-      "temperature": 0.1,
-      "description": "Ultra-fast background research with minimal token cost."
-    },
-    "oracle": {
-      "model": "opencode/big-pickle",
-      "fallback_models": [
-        "opencode/minimax-m2.5-free"
-      ],
-      "prompt_append": "Audit: Trace dependencies across the entire repository. Provide high-density, professional summaries."
-    }
-  },
+
+  // --------------------------------------------------------------------------
+  // 2. 権限とセキュリティ: 「自律」と「安全」の黄金律
+  //    エージェントがスムーズに作業できる「自律性」と、破壊的操作を防ぐ「安全性」のバランスを定義します。
+  // --------------------------------------------------------------------------
   "permission": {
-    "*": "ask",
-    "read": "allow",
-    "list": "allow",
-    "glob": "allow",
-    "grep": "allow",
-    "edit": "allow",
-    "lsp": "allow",
-    "skill": "allow",
-    "websearch": "allow",
+    "*": "ask", // 明示的に許可されていない操作は、安全のため常に人間に確認する
+    "read": "allow", // ファイルの読み取りは自由（解析に必須）
+    "list": "allow", // ディレクトリ一覧の取得（構造理解に必須）
+    "glob": "allow", // パターンマッチによるファイル探索
+    "grep": "allow", // コード内キーワード検索
+    "edit": "allow", // ファイル編集（エージェントの主目的）
+    "lsp": "allow", // 言語サーバーによるコード診断情報の取得
+    "skill": "allow", // 登録されたスキルの実行
+    "websearch": "allow", // 最新情報の収集（ブラウザ検索）
     "bash": {
-      "*": "ask",
+      "*": "ask", // 任意のコマンド実行は原則として確認が必要
       "ls": "allow",
       "ls *": "allow",
       "cat": "allow",
@@ -121,9 +63,9 @@
       "node *": "ask",
       "bun": "ask",
       "bun *": "ask",
-      "git status": "allow",
+      "git status": "allow", // リポジトリの状態確認
       "git status *": "allow",
-      "git log": "allow",
+      "git log": "allow", // コミット履歴の確認
       "git log *": "allow",
       "git diff": "allow",
       "git diff *": "allow",
@@ -135,36 +77,51 @@
       "git add *": "allow",
       "git commit": "allow",
       "git commit *": "allow",
-      "git add .": "deny",
-      "rm -rf *": "deny",
-      "npm publish*": "deny",
-      "sudo *": "deny",
-      "su *": "deny",
-      "curl*|sh": "deny",
+
+      // --- 禁止設定 (Deny): 最優先で評価されるガードレール ---
+      "git add .": "deny", // 意図しない全ファイル追加を防止。個別にファイル指定（git add file）を推奨。
+      "rm -rf *": "deny", // 破壊的な削除は絶対に許可しない
+      "npm publish*": "deny", // 公開操作は必ず人間が行う
+      "sudo *": "deny", // 特権操作はエージェントには許可しない
+      "su *": "deny", // ユーザー切り替え禁止
+      "curl*|sh": "deny", // 外部スクリプトの直接実行は高リスク
       "curl* | sh": "deny",
       "curl *|sh": "deny",
       "curl * | sh": "deny",
+
       "bash _scripts/*": "ask",
-      "bun run lint*": "allow",
-      "bun run typecheck*": "allow",
-      "bun run test*": "allow",
-      "bun run build*": "allow",
-      "dmypy*": "allow",
-      "shellcheck*": "allow",
-      "eslint*": "allow",
-      "git push*": "ask",
-      "git reset*": "ask",
-      "git clean*": "ask",
-      "git pull*": "ask",
-      "gh pr create*": "ask"
+      "bun run lint*": "allow", // 静的解析による品質確認
+      "bun run typecheck*": "allow", // 型チェックによる検証
+      "bun run test*": "allow", // テスト実行による動作検証
+      "bun run build*": "allow", // ビルド確認（構文エラーの最終確認）
+      "dmypy*": "allow", // mypyデーモンによる高速な型チェック
+      "shellcheck*": "allow", // シェルスクリプトの文法確認
+      "eslint*": "allow", // JS/TSのスタイル・バグ確認
+
+      // --- 確認設定 (Ask): 外部影響やコンテキストの大きな変化を伴う操作 ---
+      "git push*": "ask", // リモートへの反映は最終的な人間の承認が必要
+      "git reset*": "ask", // 作業内容の巻き戻しは意図を確認する
+      "git clean*": "ask", // 未追跡ファイルの削除
+      "git pull*": "ask", // コンフリクトのリスクがあるため確認
+      "gh pr create*": "ask" // プルリクエスト作成は外部向けの意思表示
     }
   },
+
+  // --------------------------------------------------------------------------
+  // 3. コンテキスト・ライフサイクル管理
+  //    エージェントの「記憶」の質と量を最適化し、長時間の対話でも精度を維持します。
+  // --------------------------------------------------------------------------
   "compaction": {
-    "auto": true,
-    "reserved": 12000,
-    "tail_turns": 3,
-    "prune": true
+    "auto": true, // 会話が長くなった際に自動で重要事項を要約する
+    "reserved": 12000, // 要約バッファを広めに確保（複雑なタスクでもコンテキスト落ちしにくくする）
+    "tail_turns": 3, // 直近の数ターンは原文をそのまま保持し、現在の文脈を正確に把握させる
+    "prune": true // 不要なツールの実行結果などを積極的に削除してトークンを節約する
   },
+
+  // --------------------------------------------------------------------------
+  // 4. 言語サーバー (LSP) / 静的解析ツール: コード理解の精度向上
+  //    AIがコードを書くだけでなく、その正しさをリアルタイムに自己診断するための設定です。
+  // --------------------------------------------------------------------------
   "lsp": {
     "typescript-language-server": {
       "command": [
@@ -243,7 +200,7 @@
       "command": [
         "shellcheck",
         "-f",
-        "gcc",
+        "gcc", // OpenCodeがエラー箇所を正確に把握しやすいgcc形式を指定
         "--severity=style"
       ],
       "extensions": [
@@ -254,7 +211,7 @@
       "command": [
         "eslint",
         "--format",
-        "compact",
+        "compact", // 出力を簡潔にし、コンテキストの圧迫を防ぎつつ正確な情報を伝達
         "--max-warnings",
         "0"
       ],
@@ -266,13 +223,23 @@
       ]
     }
   },
+
+  // --------------------------------------------------------------------------
+  // 5. 実験的・最新機能の有効化
+  //    OpenCodeのポテンシャルを最大限に引き出すための最適化設定です。
+  // --------------------------------------------------------------------------
   "experimental": {
-    "batch_tool": true,
-    "continue_loop_on_deny": false,
-    "mcp_timeout": 10000
+    "batch_tool": true, // 複数ツール実行をバッチ化して通信回数を減らし、高速化する
+    "continue_loop_on_deny": false, // コマンド実行が拒否された場合は思考を停止させ、安全を確保する
+    "mcp_timeout": 10000 // MCP (Model Context Protocol) リクエストのタイムアウトを延長
   },
+
+  // --------------------------------------------------------------------------
+  // 6. 外部リソース・ルール
+  //    エージェントが準拠すべきコーディング標準や共通ルールを定義します。
+  // --------------------------------------------------------------------------
   "instructions": [
-    "global-rules/AGENTS.global.md",
+    "global-rules/AGENTS.global.md", // 全プロジェクト共通の行動指針
     "agent-skills/superpowers/using-superpowers/SKILL.md"
   ],
   "watcher": {
@@ -284,41 +251,56 @@
       "**/.git/**"
     ]
   },
+
+  // --------------------------------------------------------------------------
+  // 7. プロバイダー構成 (主要なA2AおよびAPI接続)
+  //    利用可能なモデルのホワイトリストを管理し、適切な推論コストと精度を選択します。
+  //    モデル識別子は最新のスキーマ (models.dev) に基づき "provider/name" 形式で記述します。
+  // --------------------------------------------------------------------------
+  "enabled_providers": [
+    "cloudflare-workers-ai",
+    "openai",
+    "google",
+    "nvidia",
+    "opencode"
+  ],
   "provider": {
-    "opencode": {
+    "cloudflare-workers-ai": {
       "whitelist": [
-        "big-pickle",
-        "minimax-m2.5-free",
-        "kimi-k2.5-free",
-        "kimi-k2.5",
-        "ling-2.6-flash-free",
-        "hy3-preview-free",
-        "nemotron-3-super-free",
-        "gpt-5-nano"
+        "@cf/moonshotai/kimi-k2.6",
+        "@cf/zai-org/glm-4.7-flash",
+        "@cf/meta/llama-4-scout-17b-16e-instruct"
       ]
     },
     "openai": {
       "whitelist": [
         "gpt-5.5",
         "gpt-5.4",
-        "gpt-5.4-mini",
         "gpt-5.3-codex"
+      ]
+    },
+    "google": {
+      "whitelist": [
+        "gemini-3-flash-preview",
+        "gemini-3.1-flash-image-preview",
+        "gemini-3.1-pro-preview"
       ]
     },
     "nvidia": {
       "whitelist": [
+        "moonshotai/kimi-k2.6",
         "z-ai/glm-5.1",
-        "z-ai/glm5",
-        "moonshotai/kimi-k2.5",
-        "minimaxai/minimax-m2.5",
-        "minimaxai/minimax-m2.7",
-        "nvidia/nemotron-3-nano-30b-a3b",
-        "nvidia/nvidia-nemotron-nano-9b-v2",
-        "nvidia/nemotron-4-340b-instruct",
         "qwen/qwen3.5-397b-a17b"
+      ]
+    },
+    "opencode": {
+      "whitelist": [
+        "minimax-m2.5-free",
+        "big-pickle"
       ]
     }
   },
+  // [MCP]
   "mcp": {
     "docker-mcp": {
       "url": "http://127.0.0.1:10888/sse",
