@@ -256,63 +256,44 @@
   //    モデル識別子は最新のスキーマ (models.dev) に基づき "provider/name" 形式で記述します。
   // --------------------------------------------------------------------------
   "enabled_providers": [
-    "opencode",
-    "openai",
-    "nvidia",
     "cloudflare-workers-ai",
-    "google"
+    "openai",
+    "google",
+    "nvidia",
+    "opencode"
   ],
   "provider": {
-    "opencode": {
+    "cloudflare-workers-ai": {
       "whitelist": [
-        "big-pickle",
-        "minimax-m2.5-free",
-        "ling-2.6-flash-free",
-        "hy3-preview-free",
-        "nemotron-3-super-free",
-        "gpt-5-nano"
+        "@cf/moonshotai/kimi-k2.6",
+        "@cf/zai-org/glm-4.7-flash",
+        "@cf/meta/llama-4-scout-17b-16e-instruct"
       ]
     },
     "openai": {
       "whitelist": [
         "gpt-5.5",
         "gpt-5.4",
-        "gpt-5.4-mini",
         "gpt-5.3-codex"
-      ]
-    },
-    "nvidia": {
-      "whitelist": [
-        "z-ai/glm-5.1",
-        "z-ai/glm5",
-        "moonshotai/kimi-k2.6",
-        "minimaxai/minimax-m2.5",
-        "minimaxai/minimax-m2.7",
-        "nvidia/nemotron-3-nano-30b-a3b",
-        "nvidia/nvidia-nemotron-nano-9b-v2",
-        "nvidia/nemotron-4-340b-instruct",
-        "qwen/qwen3.5-397b-a17b"
-      ]
-    },
-    "cloudflare-workers-ai": {
-      "whitelist": [
-        "@cf/google/gemma-4-26b-a4b-it",
-        "@cf/meta/llama-4-scout-17b-16e-instruct",
-        "@cf/moonshotai/kimi-k2.5",
-        "@cf/moonshotai/kimi-k2.6",
-        "@cf/nvidia/nemotron-3-120b-a12b",
-        "@cf/openai/gpt-oss-120b",
-        "@cf/openai/gpt-oss-20b",
-        "@cf/zai-org/glm-4.7-flash"
       ]
     },
     "google": {
       "whitelist": [
-        "gemini-3-flash-preview",
         "gemini-3.1-flash-image-preview",
-        "gemini-3.1-flash-lite-preview",
-        "gemini-3.1-pro-preview",
-        "gemini-3.1-pro-preview-customtools",
+        "gemini-3.1-pro-preview"
+      ]
+    },
+    "nvidia": {
+      "whitelist": [
+        "moonshotai/kimi-k2.6",
+        "z-ai/glm-5.1",
+        "qwen/qwen3.5-397b-a17b"
+      ]
+    },
+    "opencode": {
+      "whitelist": [
+        "minimax-m2.5-free",
+        "big-pickle"
       ]
     }
   },

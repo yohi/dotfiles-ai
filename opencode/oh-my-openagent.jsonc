@@ -30,7 +30,8 @@
       "model": "cloudflare-workers-ai/@cf/moonshotai/kimi-k2.6",
       "fallback_models": [
         "nvidia/moonshotai/kimi-k2.6",
-        "nvidia/z-ai/glm-5.1"
+        "nvidia/z-ai/glm-5.1",
+        "cloudflare-workers-ai/@cf/zai-org/glm-4.7-flash"
       ],
       "ultrawork": {
         // Ultrawork: 長時間自律駆動モード。リファクタリングや巨大なログ解析など、
@@ -38,7 +39,8 @@
         "model": "cloudflare-workers-ai/@cf/moonshotai/kimi-k2.6",
         "fallback_models": [
           "nvidia/moonshotai/kimi-k2.6",
-          "nvidia/z-ai/glm-5.1"
+          "nvidia/z-ai/glm-5.1",
+          "cloudflare-workers-ai/@cf/zai-org/glm-4.7-flash"
         ],
         "variant": "max",
         "effort": "high"
@@ -71,9 +73,9 @@
     // 【超高速補助: Librarian】 証拠に基づいた調査の専門家
     // マルチリポジトリ分析、ドキュメント検索、OSS実装例の調査を低コスト・高精度で行います。
     "librarian": {
-      "model": "opencode/nemotron-3-super-free",
+      "model": "opencode/minimax-m2.5-free",
       "fallback_models": [
-        "openai/gpt-5.4-mini"
+        "nvidia/qwen/qwen3.5-397b-a17b"
       ],
       "temperature": 0.1,
       "description": "Ultra-fast background research with minimal token cost."
@@ -82,9 +84,9 @@
     // 【高速探索: Explore】 高速なコードベース探索とプロトタイピング
     // 自律的なweb searchを組み合わせ、最新の技術仕様に基づいたスキャフォールディングを行います。
     "explore": {
-      "model": "opencode/nemotron-3-super-free",
+      "model": "opencode/minimax-m2.5-free",
       "fallback_models": [
-        "openai/gpt-5.4-mini"
+        "nvidia/qwen/qwen3.5-397b-a17b"
       ],
       "description": "Rapid scaffolding using autonomous web search for latest technical specs."
     },
@@ -92,11 +94,9 @@
     // 【視覚アナリスト: Multimodal-Looker】 視覚コンテンツ・UI分析
     // PDF、画像、図解、UIデザインを分析。ブラウザテストの失敗時のUIデバッグにも威力を発揮。
     "multimodal-looker": {
-      "model": "openai/gpt-5.4",
+      "model": "google/gemini-3.1-flash-image-preview",
       "fallback_models": [
-        "cloudflare-workers-ai/@cf/moonshotai/kimi-k2.6",
-        "nvidia/moonshotai/kimi-k2.6",
-        "nvidia/z-ai/glm-5.1"
+        "google/gemini-3.1-pro-preview"
       ],
       "variant": "medium",
       "description": "Visual Intelligence. Analyzes UI designs for API generation and debugs browser test failures."
@@ -110,7 +110,8 @@
       "model": "cloudflare-workers-ai/@cf/moonshotai/kimi-k2.6",
       "fallback_models": [
           "nvidia/moonshotai/kimi-k2.6",
-          "nvidia/z-ai/glm-5.1"
+          "nvidia/z-ai/glm-5.1",
+          "cloudflare-workers-ai/@cf/zai-org/glm-4.7-flash"
       ]
     },
 
@@ -120,7 +121,8 @@
       "model": "cloudflare-workers-ai/@cf/moonshotai/kimi-k2.6",
       "fallback_models": [
           "nvidia/moonshotai/kimi-k2.6",
-          "nvidia/z-ai/glm-5.1"
+          "nvidia/z-ai/glm-5.1",
+          "cloudflare-workers-ai/@cf/zai-org/glm-4.7-flash"
       ]
     },
 
@@ -150,19 +152,19 @@
       "variant": "xhigh"
     },
     "deep": {
-      "model": "nvidia/minimaxai/minimax-m2.7" // 自律的解決・難解なタスク
+      "model": "openai/gpt-5.3-codex" // 自律的解決・難解なタスク
     },
     "quick": {
-      "model": "opencode/ling-2.6-flash-free" // 些細な修正・高速レスポンス
+      "model": "cloudflare-workers-ai/@cf/meta/llama-4-scout-17b-16e-instruct" // 些細な修正・高速レスポンス
     },
     "writing": {
-      "model": "nvidia/z-ai/glm-5.1" // テクニカルライティング・散文
+      "model": "cloudflare-workers-ai/@cf/zai-org/glm-4.7-flash" // テクニカルライティング・散文
     },
     "unspecified-low": {
       "model": "opencode/minimax-m2.5-free"
     },
     "visual-engineering": {
-      "model": "openai/gpt-5.4-mini" // UI/UX, デザイン, アニメーション
+      "model": "google/gemini-3.1-flash-image-preview" // UI/UX, デザイン, アニメーション
     }
   },
 
