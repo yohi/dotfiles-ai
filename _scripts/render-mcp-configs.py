@@ -92,6 +92,40 @@ def deploy_systemd_service(
     dest_path.write_text(content, encoding="utf-8")
 
 
+def surgical_json_update(text: str, key: str, new_value: dict[str, Any]) -> str | None:
+    # Match key at top level with potential indentation
+    pattern = rf'^([ \t]*)"{key}"\s*:\s*\{{'
+    match = re.search(pattern, text, re.MULTILINE)
+    if not match:
+        return None
+
+    indent = match.group(1)
+    start_pos = match.end() - 1  # '{'
+
+    # Find matching closing brace
+    count = 0
+    end_pos = -1
+    for i in range(start_pos, len(text)):
+        if text[i] == "{":
+            count += 1
+        elif text[i] == "}":
+            count -= 1
+            if count == 0:
+                end_pos = i + 1
+                break
+    if end_pos == -1:
+        return None
+
+    new_json_str = json.dumps(new_value, indent=2, ensure_ascii=False)
+    # Re-indent new_json_str
+    lines = new_json_str.splitlines()
+    new_block = [f'"{key}": {lines[0]}']
+    for line in lines[1:]:
+        new_block.append(indent + line)
+
+    return text[: match.start()] + indent + "\n".join(new_block) + text[end_pos:]
+
+
 def main() -> int:
     repo_root = Path(__file__).parent.parent.resolve()
     config = load_client_config()
@@ -222,17 +256,21 @@ def main() -> int:
             inv = all_servers_raw.get(inherit_name)
             if isinstance(inv, dict):
                 s = replace_placeholders(inv.copy(), gateway_url, expand_paths=True)
-                
+
                 # Use native environment variable expansion per agent
                 if "headers" in s and isinstance(s["headers"], dict):
                     for k, v in s["headers"].items():
                         if "__AUTH_TOKEN__" in v:
-                            env_syntax = "{env:MCP_GATEWAY_TOKEN}" if an == "opencode" else "${MCP_GATEWAY_TOKEN}"
+                            env_syntax = (
+                                "{env:MCP_GATEWAY_TOKEN}"
+                                if an == "opencode"
+                                else "${MCP_GATEWAY_TOKEN}"
+                            )
                             s["headers"][k] = v.replace("__AUTH_TOKEN__", env_syntax)
 
                 if s.get("transport") and not s.get("type"):
                     s["type"] = s.get("transport")
-                
+
                 if sn == "docker-mcp":
                     s["type"] = "sse"
                 else:
@@ -276,15 +314,25 @@ def main() -> int:
         try:
             txt = cp.read_text(encoding="utf-8")
             if ac.get("format", "json") in ["json", "opencode_jsonc"]:
-                if json5 and (ac.get("format") == "opencode_jsonc" or "//" in txt):
-                    d = json5.loads(txt)
+                updated_txt = None
+                # Surgical update to preserve comments if it's a JSONC-like file
+                if ac.get("format") == "opencode_jsonc" or "//" in txt:
+                    updated_txt = surgical_json_update(txt, rk, aservs)
+
+                if updated_txt:
+                    cp.write_text(updated_txt, encoding="utf-8")
+                    print(f"  ✅ Updated (surgical): {cp}")
                 else:
-                    d = json.loads(txt)
-                d[rk] = aservs
-                cp.write_text(
-                    json.dumps(d, indent=2, ensure_ascii=False), encoding="utf-8"
-                )
-                print(f"  ✅ Updated: {cp}")
+                    if json5 and (ac.get("format") == "opencode_jsonc" or "//" in txt):
+                        d = json5.loads(txt)
+                    else:
+                        d = json.loads(txt)
+                    d[rk] = aservs
+                    cp.write_text(
+                        json.dumps(d, indent=2, ensure_ascii=False), encoding="utf-8"
+                    )
+                    print(f"  ✅ Updated (overwrite): {cp}")
+
             elif ac.get("format") == "toml":
                 import toml
 
