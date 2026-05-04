@@ -14,8 +14,9 @@
 
   // [Plugin]
   "plugin": [
+    "@yohi/opencode-codex-quota@1.0.0",
     "@yohi/justice@2.2.0",
-    "oh-my-openagent@3.17.12"
+    "oh-my-openagent@dev"
   ],
 
   // --------------------------------------------------------------------------
