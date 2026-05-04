@@ -74,7 +74,7 @@
       "git checkout": "allow",
       "git checkout *": "allow",
       "git add": "allow",
-      "git add *": "deny",
+      "git add *": "allow",
       "git commit": "allow",
       "git commit *": "allow",
 
