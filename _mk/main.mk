@@ -1,7 +1,7 @@
 .PHONY: all install install-agents install-ides setup setup-agents setup-ides mcp-render link clean-internal install-requirements lint init sync secrets status clean test clean-legacy configure-git-ignore doctor
 
 # --- Standard Entry Points ---
-all: install init-env setup sync-mcp ## [完全セットアップ] インストール、環境構築、設定、MCP同期をすべて行う
+all: install init-env setup setup-agents setup-ides sync-mcp ## [完全セットアップ] インストール、環境構築、設定、MCP同期をすべて行う
 
 install: install-requirements install-agents install-ides ## Install all AI agents and IDE binaries
 

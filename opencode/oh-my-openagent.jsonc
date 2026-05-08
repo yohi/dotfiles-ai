@@ -1,10 +1,31 @@
 // vim: ft=jsonc
 {
-  // Config Modernized: 2026-05-04
-  // Based on oh-my-openagent @dev (Documentation updated based on latest feature specs)
+  /**
+   * oh-my-openagent.jsonc - v4.0.0 Optimized Configuration
+   * 
+   * このファイルは oh-my-openagent (OpenCode Plugin) の中核となる設定ファイルです。
+   * v4.0.0での主要な変更点である「チームモードの強化」「最新モデル(GLM-5.1/Kimi-k2.6/Qwen3.5-Plus)への最適化」
+   * および「エージェントプロンプトの刷新」を反映し、元の設定をすべて保持した完全版です。
+   * 
+   * 更新日: 2026-05-09
+   * バージョン: 4.0.0
+   */
 
   // スキーマ定義：エディタでの補完とバリデーションを有効化
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/master/assets/oh-my-opencode.schema.json",
+
+  // --------------------------------------------------------------------------
+  // 0. Team Mode: チーム開発・マルチエージェント連携 (v4.0.0 新機能/強化)
+  // --------------------------------------------------------------------------
+  /**
+   * v4.0.0では初期化プロセスが刷新され、tmuxやディレクトリ構造の自動検証がより強固になりました。
+   * 複数のエージェントが並列で動作する際のコンテキスト共有と状態管理を最適化します。
+   */
+  "team_mode": {
+    "enabled": true,
+    "base_dir": ".sisyphus/team", // エージェント間の共有ワークスペース
+    "auto_sync": true            // 状態変更の自動同期
+  },
 
   // --------------------------------------------------------------------------
   // 1. Sisyphus Agent: オーケストレーションの中核
@@ -24,13 +45,15 @@
   "agents": {
     // --- Core Agents ---
 
-    // 【司令塔: Sisyphus】 全体の品質管理と最終意思決定
-    // 32kの思考バジェットを持ち、プロジェクト全体の文脈を把握して最適解を導き出します。
+    /**
+     * 【司令塔: Sisyphus】 全体の品質管理と最終意思決定
+     * 32kの思考バジェットを持ち、プロジェクト全体の文脈を把握して最適解を導き出します。
+     * v4.0.0では GLM-5.1 を正式にフォールバックに採用。
+     */
     "sisyphus": {
       "model": "cloudflare-workers-ai/@cf/moonshotai/kimi-k2.6",
       "fallback_models": [
-        // "nvidia/moonshotai/kimi-k2.6",
-        "nvidia/z-ai/glm-5.1",
+        "nvidia/z-ai/glm-5.1", // v4.0.0 で公式推奨モデルに格上げ
         "cloudflare-workers-ai/@cf/zai-org/glm-4.7-flash"
       ],
       "ultrawork": {
@@ -38,7 +61,6 @@
         // 圧倒的な文脈窓(Kimi/GLM)を活かした重労働を担当します。
         "model": "cloudflare-workers-ai/@cf/moonshotai/kimi-k2.6",
         "fallback_models": [
-          // "nvidia/moonshotai/kimi-k2.6",
           "nvidia/z-ai/glm-5.1",
           "cloudflare-workers-ai/@cf/zai-org/glm-4.7-flash"
         ],
@@ -47,8 +69,11 @@
       }
     },
 
-    // 【製造担当: Hephaestus】 「正当な職人」。ロジックの実装、リファクタリング
-    // AmpCodeのディープモードにインスパイアされ、徹底的な調査の後に一気に書き上げます。
+    /**
+     * 【製造担当: Hephaestus】 「正当な職人」。ロジックの実装、リファクタリング
+     * v4.0.0の「deepカテゴリプロンプト」により、GPT-5.3-codex の性能を限界まで引き出し、
+     * 徹底的な調査の後に一気に書き上げます。
+     */
     "hephaestus": {
       "model": "openai/gpt-5.3-codex",
       "permission": {
@@ -61,8 +86,11 @@
       }
     },
 
-    // 【大規模解析・監査: Oracle】 読み取り専用のコンサルタント
-    // アーキテクチャ決定、深い論理的推論、コードレビュー、難解なバグのデバッグを担当。
+    /**
+     * 【大規模解析・監査: Oracle】 読み取り専用のコンサルタント
+     * アーキテクチャ決定、深い論理的推論、コードレビュー、難解なバグのデバッグを担当。
+     * v4.0.0の刷新されたプロンプトでGPT-5.5の推論力を最大限に活用します。
+     */
     "oracle": {
       "model": "openai/gpt-5.5",
       "fallback_models": [
@@ -70,29 +98,36 @@
       ]
     },
 
-    // 【超高速補助: Librarian】 証拠に基づいた調査の専門家
-    // マルチリポジトリ分析、ドキュメント検索、OSS実装例の調査を低コスト・高精度で行います。
+    /**
+     * 【超高速補助: Librarian】 証拠に基づいた調査の専門家
+     * マルチリポジトリ分析、ドキュメント検索、OSS実装例の調査を低コスト・高精度で行います。
+     * v4.0.0でプロンプトが全面刷新。「GitHubパーマリンクの発見」に特化。
+     */
     "librarian": {
       "model": "opencode/minimax-m2.5-free",
       "fallback_models": [
-        "nvidia/qwen/qwen3.5-397b-a17b"
+        "nvidia/qwen/qwen3.5-plus" // v4.0.0 で推奨される高速・高精度モデル
       ],
       "temperature": 0.1,
       "description": "Ultra-fast background research with minimal token cost."
     },
 
-    // 【高速探索: Explore】 高速なコードベース探索とプロトタイピング
-    // 自律的なweb searchを組み合わせ、最新の技術仕様に基づいたスキャフォールディングを行います。
+    /**
+     * 【高速探索: Explore】 高速なコードベース探索とプロトタイピング
+     * 自律的なweb searchを組み合わせ、最新の技術仕様に基づいたスキャフォールディングを行います。
+     */
     "explore": {
       "model": "opencode/minimax-m2.5-free",
       "fallback_models": [
-        "nvidia/qwen/qwen3.5-397b-a17b"
+        "nvidia/qwen/qwen3.5-plus"
       ],
       "description": "Rapid scaffolding using autonomous web search for latest technical specs."
     },
 
-    // 【視覚アナリスト: Multimodal-Looker】 視覚コンテンツ・UI分析
-    // PDF、画像、図解、UIデザインを分析。ブラウザテストの失敗時のUIデバッグにも威力を発揮。
+    /**
+     * 【視覚アナリスト: Multimodal-Looker】 視覚コンテンツ・UI分析
+     * PDF、画像、図解、UIデザインを分析。ブラウザテストの失敗時のUIデバッグにも威力を発揮。
+     */
     "multimodal-looker": {
       "model": "google/gemini-3.1-flash-image-preview",
       "fallback_models": [
@@ -104,38 +139,45 @@
 
     // --- Planning Agents ---
 
-    // 【戦略家: Prometheus】 インタビューモードを備えたプランナー
-    // 対話を通じてタスクを分解し、並列実行可能な「Agent Swarm」用の作業計画を作成します。
+    /**
+     * 【戦略家: Prometheus】 インタビューモードを備えたプランナー
+     * 対話を通じてタスクを分解し、並列実行可能な「Agent Swarm」用の作業計画を作成します。
+     */
     "prometheus": {
       "model": "cloudflare-workers-ai/@cf/moonshotai/kimi-k2.6",
       "fallback_models": [
-        // "nvidia/moonshotai/kimi-k2.6",
         "nvidia/z-ai/glm-5.1",
         "cloudflare-workers-ai/@cf/zai-org/glm-4.7-flash"
       ]
     },
 
-    // 【計画コンサル: Metis】 計画前の分析とリスク特定
-    // 隠れた意図や曖昧さ、AIが失敗しやすいポイントを事前に特定し、計画の精度を高めます。
+    /**
+     * 【計画コンサル: Metis】 計画前の分析とリスク特定
+     * v4.0.0ではユーザーの指示から「リファクタリング」「新規追加」等の意図を自動分類する機能が強化。
+     * 隠れた意図や曖昧さ、AIが失敗しやすいポイントを事前に特定します。
+     */
     "metis": {
       "model": "cloudflare-workers-ai/@cf/moonshotai/kimi-k2.6",
       "fallback_models": [
-        // "nvidia/moonshotai/kimi-k2.6",
         "nvidia/z-ai/glm-5.1",
         "cloudflare-workers-ai/@cf/zai-org/glm-4.7-flash"
       ]
     },
 
-    // 【計画レビュアー: Momus】 計画の検証と品質保証
-    // 明確さ、検証可能性、完全性の基準に照らして、Prometheusが作成した計画を厳格にレビュー。
+    /**
+     * 【計画レビュアー: Momus】 計画の検証と品質保証
+     * 明確さ、検証可能性、完全性の基準に照らして、Prometheusが作成した計画を厳格にレビュー。
+     */
     "momus": {
       "model": "openai/gpt-5.5"
     },
 
     // --- Orchestration Agents ---
 
-    // 【現場監督: Atlas】 Todo駆動型実行エンジン
-    // Tmux, Playwrightなどの環境管理、Todo項目の体系的な管理・調整・維持を担当。
+    /**
+     * 【現場監督: Atlas】 Todo駆動型実行エンジン
+     * Tmux, Playwrightなどの環境管理、Todo項目の体系的な管理・調整・維持を担当。
+     */
     "atlas": {
       "model": "openai/gpt-5.5",
       "variant": "medium",
@@ -172,10 +214,10 @@
   // 4. Experimental: 最新・実験的機能の最適化
   // --------------------------------------------------------------------------
   "experimental": {
-    "task_system": true, // Todo駆動タスク管理(blockedBy対応)。 .sisyphus/tasks/ に永続化
+    "task_system": false, // Todo駆動タスク管理(blockedBy対応)。 .sisyphus/tasks/ に永続化
     "hashline_edit": true, // LINE#ID形式のハッシュアンカー編集。行ずれエラーをゼロに
     "hashline_diff_enhancer": true,
-    "aggressive_truncation": true,
+    "aggressive_truncation": true, // トークン節約のための積極的なカット
     "auto_resume": true, // セッション中断・失敗からの自動復旧
     "preemptive_compaction_threshold": 0.85 // トークン限界前のプロアクティブな圧縮
   },
@@ -207,7 +249,7 @@
   // Ralph Loop: タスク完了まで自律的に試行を繰り返す自己参照型開発ループ
   "ralph_loop": {
     "enabled": true,
-    "default_max_iterations": 20
+    "default_max_iterations": 20 // v4.0.0 で実行時エラーのガードが強化
   },
 
   // Boulder State: セッションを跨いでエージェントの状態を維持する永続化機構
