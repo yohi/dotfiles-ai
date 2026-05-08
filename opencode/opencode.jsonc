@@ -224,67 +224,66 @@
   // Providers & Models (2026-05 Latest)
   // --------------------------------------------------------------------------
   "enabled_providers": [
-    "anthropic",
     "google",
     "openai",
-    "amazon-bedrock",
     "cloudflare-workers-ai",
     "nvidia",
-    "opencode"
+    "opencode",
+    "cursor"
   ],
   "provider": {
-    "anthropic": {
-      "options": {
-        "timeout": 600000,
-        "setCacheKey": true
-      },
-      "whitelist": [
-        "claude-4-7-opus-latest",
-        "claude-4-6-sonnet-latest",
-        "claude-4-5-haiku-latest"
-      ]
-    },
     "google": {
       "whitelist": [
-        "gemini-3-1-pro-latest",
-        "gemini-3-1-flash-latest",
-        "gemini-3-1-flash-lite",
-        "gemini-3-deep-think"
+        "gemini-3-flash-preview",
+        "gemini-3.1-flash-image-preview",
+        "gemini-3.1-flash-lite",
+        "gemini-3.1-flash-lite-preview",
+        "gemini-3.1-pro-preview",
+        "gemini-3.1-pro-preview-customtools",
       ]
     },
     "openai": {
       "whitelist": [
-        "gpt-5-5-thinking-latest",
-        "gpt-5-5-instant-latest",
-        "o3-pro-latest",
-        "o4-mini-latest"
-      ]
-    },
-    "amazon-bedrock": {
-      "options": {
-        "region": "us-east-1"
-      },
-      "whitelist": [
-        "anthropic.claude-opus-4-7",
-        "anthropic.claude-sonnet-4-6",
-        "anthropic.claude-haiku-4-5-20251001-v1:0"
+        "gpt-5.3-codex",
+        "gpt-5.3-codex-spark",
+        "gpt-5.4",
+        "gpt-5.4-mini",
+        "gpt-5.5",
       ]
     },
     "nvidia": {
       "whitelist": [
-        "meta/llama-4-maverick-400b-moe",
-        "alibaba/qwen-3-5-397b-a17b",
-        "mistral/mistral-large-3",
-        "nvidia/nemotron-3-super-120b"
+        "minimaxai/minimax-m2.5",
+        "minimaxai/minimax-m2.7",
+        "z-ai/glm4.7",
       ]
     },
     "opencode": {
       "whitelist": [
-        "deepseek-v4-pro-moe",
-        "minimax-m2-5-free",
-        "big-pickle-turbo"
+        "minimax-m2.5-free",
+        "ling-2.6-flash-free",
+        "hy3-preview-free",
+        "nemotron-3-super-free",
+        "big-pickle",
+      ]
+    },
+    "cursor":{
+      "whitelist": [
+        "claude-haiku-4-5",
+        "claude-opus-4-7",
+        "claude-sonnet-4-6",
+        "composer-2",
+        "gemini-3-flash",
+        "gemini-3.1-pro",
+        "gpt-5.3-codex",
+        "gpt-5.3-codex-spark",
+        "gpt-5.4",
+        "gpt-5.4-mini",
+        "gpt-5.4-nano",
+        "gpt-5.5",
       ]
     }
+    
   },
 
   "experimental": {
