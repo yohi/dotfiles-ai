@@ -77,6 +77,13 @@ opencode: ## OpenCode(opencode)のインストールとセットアップ
 			if [ -f "$(OH_MY_OPENAGENT_DOTFILES_CONFIG)" ]; then \
 				if [ -L "$(OH_MY_OPENAGENT_CONFIG_PATH)" ]; then \
 					if ! check_link "$(OH_MY_OPENAGENT_CONFIG_PATH)" "$(OH_MY_OPENAGENT_DOTFILES_CONFIG)"; then skip=0; fi; \
+	@if [ -L "$(OPENCODE_CONFIG_DIR)/oh-my-opencode.jsonc" ]; then \
+		actual=$$(readlink -f "$(OPENCODE_CONFIG_DIR)/oh-my-opencode.jsonc" 2>/dev/null || readlink "$(OPENCODE_CONFIG_DIR)/oh-my-opencode.jsonc" 2>/dev/null || true); \
+		expected=$$(readlink -f "$(OH_MY_OPENAGENT_DOTFILES_CONFIG)" 2>/dev/null || readlink "$(OH_MY_OPENAGENT_DOTFILES_CONFIG)" 2>/dev/null || true); \
+		if [ -n "$$actual" ] && [ "$$act" = "$$exp" ]; then \
+			echo "✅ oh-my-config: $(OPENCODE_CONFIG_DIR)/oh-my-opencode.jsonc -> $(OH_MY_OPENAGENT_DOTFILES_CONFIG)"; \
+		fi; \
+	fi
 				else skip=0; fi; \
 			fi; \
 			if [ -f "$(OPENCODE_DOTFILES_ANTIGRAVITY)" ]; then \
@@ -190,7 +197,7 @@ setup-opencode: ## OpenCode（opencode）の設定ファイルを適用
 	@$(call link_config,$(OPENCODE_DOTFILES_CONFIG),$(OPENCODE_CONFIG_PATH),opencode)
 	@# oh-my-openagent.jsonc の設定
 	@$(call link_config,$(OH_MY_OPENAGENT_DOTFILES_CONFIG),$(OH_MY_OPENAGENT_CONFIG_PATH),oh-my-openagent)
-	@ln -sfn oh-my-openagent.jsonc "$(OPENCODE_CONFIG_DIR)/oh-my-opencode.jsonc"
+	@$(call link_config,$(OH_MY_OPENAGENT_DOTFILES_CONFIG),$(OPENCODE_CONFIG_DIR)/oh-my-opencode.jsonc,oh-my-opencode)
 	@# antigravity.json の設定
 	@$(call link_config,$(OPENCODE_DOTFILES_ANTIGRAVITY),$(OPENCODE_ANTIGRAVITY_PATH),antigravity)
 	@# AGENTS.md の設定
@@ -240,6 +247,13 @@ check-opencode: ## OpenCode（opencode）の状態を確認
 			expected=$$(readlink -f "$(OH_MY_OPENAGENT_DOTFILES_CONFIG)" 2>/dev/null || readlink "$(OH_MY_OPENAGENT_DOTFILES_CONFIG)" 2>/dev/null || true); \
 			if [ -n "$$actual" ] && [ "$$actual" = "$$expected" ]; then \
 				echo "✅ oh-my-config: $(OH_MY_OPENAGENT_CONFIG_PATH) -> $(OH_MY_OPENAGENT_DOTFILES_CONFIG)"; \
+	@if [ -L "$(OPENCODE_CONFIG_DIR)/oh-my-opencode.jsonc" ]; then \
+		actual=$$(readlink -f "$(OPENCODE_CONFIG_DIR)/oh-my-opencode.jsonc" 2>/dev/null || readlink "$(OPENCODE_CONFIG_DIR)/oh-my-opencode.jsonc" 2>/dev/null || true); \
+		expected=$$(readlink -f "$(OH_MY_OPENAGENT_DOTFILES_CONFIG)" 2>/dev/null || readlink "$(OH_MY_OPENAGENT_DOTFILES_CONFIG)" 2>/dev/null || true); \
+		if [ -n "$$actual" ] && [ "$$act" = "$$exp" ]; then \
+			echo "✅ oh-my-config: $(OPENCODE_CONFIG_DIR)/oh-my-opencode.jsonc -> $(OH_MY_OPENAGENT_DOTFILES_CONFIG)"; \
+		fi; \
+	fi
 			else \
 				echo "⚠️  oh-my-config: $(OH_MY_OPENAGENT_CONFIG_PATH) points to $$actual (expected $$expected)"; \
 			fi; \
