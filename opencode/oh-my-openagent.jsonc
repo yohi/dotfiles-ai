@@ -1,69 +1,80 @@
 // vim: ft=jsonc
+/**
+ * oh-my-openagent.jsonc - The Ultimate Augmented Configuration (v4.0.0 Optimized)
+ * 
+ * [概要]
+ * このファイルは、AIエージェントハーネス "oh-my-openagent" の挙動を定義する最上位の設定ファイルです。
+ * v4.0.0 のメジャーアップデートに伴う内部プロンプトの刷新、およびチーム開発機能の強化を反映しつつ、
+ * yohi-env の `opencode.jsonc` ホワイトリストに準拠した最新モデル構成を採用しています。
+ * 
+ * [設計思想: 職人集団としてのエージェント]
+ * 私たちは AI を単なる「ツール」ではなく、それぞれに専門性と誇りを持つ「職人集団」として定義します。
+ * この設定ファイルは、各エージェントがそのポテンシャルを最大限に発揮し、
+ * 人間と AI が最高のシンクロ率で開発を進めるための「行動指針」としての役割も兼ねています。
+ * 
+ * 更新日: 2026-05-09
+ * バージョン: 4.0.0 (Ultimate Documented Edition)
+ */
 {
-  /**
-   * oh-my-openagent.jsonc - v4.0.0 Optimized Configuration
-   * 
-   * このファイルは oh-my-openagent (OpenCode Plugin) の中核となる設定ファイルです。
-   * v4.0.0での主要な変更点である「チームモードの強化」「最新モデル(GLM-5.1/Kimi-k2.6/Qwen3.5-Plus)への最適化」
-   * および「エージェントプロンプトの刷新」を反映し、元の設定をすべて保持した完全版です。
-   * 
-   * 更新日: 2026-05-09
-   * バージョン: 4.0.0
-   */
-
-  // スキーマ定義：エディタでの補完とバリデーションを有効化
+  // スキーマ定義：エディタ（VSCode/JetBrains等）での補完、バリデーション、ホバーヒントを有効化
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/master/assets/oh-my-opencode.schema.json",
 
   // --------------------------------------------------------------------------
-  // 0. Team Mode: チーム開発・マルチエージェント連携 (v4.0.0 新機能/強化)
+  // 0. Team Mode: 並列実行・環境同期 (v4.0.0 強化)
   // --------------------------------------------------------------------------
   /**
-   * v4.0.0では初期化プロセスが刷新され、tmuxやディレクトリ構造の自動検証がより強固になりました。
-   * 複数のエージェントが並列で動作する際のコンテキスト共有と状態管理を最適化します。
+   * 【チーム開発の心臓部】
+   * v4.0.0 では、複数のバックグラウンドエージェントが同一プロジェクトで動作する際の
+   * 「状態の不一致」を極限まで減らすための同期メカニズムが強化されました。
+   * エージェントたちが一つの Todo 計画を共有し、互いの作業を妨げずに並列走行するための設定です。
    */
   "team_mode": {
     "enabled": true,
-    "base_dir": ".sisyphus/team", // エージェント間の共有ワークスペース
-    "auto_sync": true            // 状態変更の自動同期
+    "base_dir": ".sisyphus/team", // エージェント間の共有データ、Todoリスト、作業進捗の永続化先
+    "auto_sync": true            // 実行計画やタスク状態のリアルタイム同期。tmux ペイン間での情報共有を加速。
   },
 
   // --------------------------------------------------------------------------
-  // 1. Sisyphus Agent: オーケストレーションの中核
+  // 1. Sisyphus Agent: 自律型オーケストレーションの中核
   // --------------------------------------------------------------------------
+  /**
+   * Sisyphus Agent システムの全体制御。
+   * Prometheus (Planner), Metis (Consultant), Momus (Reviewer) を統括し、
+   * 複雑なタスクを自動的に分解、委譲、実行、検証する「自律開発サイクル」のスイッチです。
+   */
   "sisyphus_agent": {
-    // デフォルトのオーケストレーター。複雑なタスクの計画、委譲、実行を担当。
-    // サブエージェントを活用した積極的な並列実行と、Todo駆動型ワークフロー(Atlas統合)が特徴。
     "disabled": false,
-    "planner_enabled": true, // Prometheus/Metis/Momus を使用した高度な計画立案を有効化
-    "replace_plan": true,    // 実行中に計画を動的に修正・更新することを許可
-    "default_builder_enabled": true // デフォルトのビルド/デプロイフローの有効化
+    "planner_enabled": true, // 高度な段階的思考 (Prometheus) を有効化。一撃で解こうとせず、まず「計画」を立てる。
+    "replace_plan": true,    // 実行中の予期せぬエラーや新発見に基づき、計画をリアルタイムに修正・最適化。
+    "default_builder_enabled": true // プロジェクト標準のビルド/デプロイフローを自動検出し、エージェントが利用可能に。
   },
 
   // --------------------------------------------------------------------------
-  // 2. Agents: 4大コア + 専門家エージェントの定義
+  // 2. Agents: 4大コア + 専門家職人集団の定義 (モデルホワイトリスト準拠)
   // --------------------------------------------------------------------------
   "agents": {
-    // --- Core Agents ---
+    // --- Core Agents: 開発の主要工程を担う精鋭 ---
 
     /**
      * 【司令塔: Sisyphus】 全体の品質管理と最終意思決定
-     * 32kの思考バジェットを持ち、プロジェクト全体の文脈を把握して最適解を導き出します。
-     * v4.0.0では GLM-5.1 を正式にフォールバックに採用。
+     * 32kの巨大な思考バジェットを持ち、プロジェクト全体の文脈を俯瞰して最適解を導き出します。
+     * モデル: ホワイトリスト最強の `cursor/gemini-3.1-pro` を採用。
+     * その圧倒的なコンテキスト窓により、大規模なコードベースを一度に把握した意思決定が可能です。
      */
     "sisyphus": {
-      "model": "cloudflare-workers-ai/@cf/moonshotai/kimi-k2.6",
+      "model": "cursor/gemini-3.1-pro", 
       "fallback_models": [
-        "nvidia/z-ai/glm-5.1", // v4.0.0 で公式推奨モデルに格上げ
-        "cloudflare-workers-ai/@cf/zai-org/glm-4.7-flash"
+        "cloudflare-workers-ai/@cf/moonshotai/kimi-k2.6", // 巨大コンテキスト枠
+        "google/gemini-3.1-pro-preview"
       ],
       "ultrawork": {
-        // Ultrawork: 長時間自律駆動モード。リファクタリングや巨大なログ解析など、
-        // 圧倒的な文脈窓(Kimi/GLM)を活かした重労働を担当します。
-        "model": "cloudflare-workers-ai/@cf/moonshotai/kimi-k2.6",
-        "fallback_models": [
-          "nvidia/z-ai/glm-5.1",
-          "cloudflare-workers-ai/@cf/zai-org/glm-4.7-flash"
-        ],
+        /**
+         * Ultrawork: 長時間自律駆動モード。
+         * 数時間規模のリファクタリングや、数千行に及ぶ巨大なログ解析など、
+         * 精神的・技術的負荷の高い重労働を、人間を介さず完遂します。
+         */
+        "model": "cursor/gemini-3.1-pro",
+        "fallback_models": ["cloudflare-workers-ai/@cf/moonshotai/kimi-k2.6"],
         "variant": "max",
         "effort": "high"
       }
@@ -71,11 +82,13 @@
 
     /**
      * 【製造担当: Hephaestus】 「正当な職人」。ロジックの実装、リファクタリング
-     * v4.0.0の「deepカテゴリプロンプト」により、GPT-5.3-codex の性能を限界まで引き出し、
-     * 徹底的な調査の後に一気に書き上げます。
+     * ギリシャ神話の鍛冶神の名を冠する。AmpCodeのディープモードにインスパイアされ、
+     * 徹底的な現状調査の後に、一気に無駄のないコードを書き上げます。
+     * モデル: コーディング特化の `cursor/gpt-5.3-codex`。
+     * v4.0.0 の専用 deep カテゴリプロンプトにより、複雑な差分生成の正確性が劇的に向上。
      */
     "hephaestus": {
-      "model": "openai/gpt-5.3-codex",
+      "model": "cursor/gpt-5.3-codex",
       "permission": {
         "edit": "allow",
         "bash": {
@@ -88,25 +101,26 @@
 
     /**
      * 【大規模解析・監査: Oracle】 読み取り専用のコンサルタント
-     * アーキテクチャ決定、深い論理的推論、コードレビュー、難解なバグのデバッグを担当。
-     * v4.0.0の刷新されたプロンプトでGPT-5.5の推論力を最大限に活用します。
+     * アーキテクチャの決定、深い論理的推論、コードレビュー、難解なバグのデバッグを担当。
+     * モデル: 論理推論の頂点 `cursor/gpt-5.5`。
+     * 実装はせず、常に「何が正しいか」「なぜそうすべきか」を追求する賢者です。
      */
     "oracle": {
-      "model": "openai/gpt-5.5",
-      "fallback_models": [
-        "google/gemini-3.1-pro-preview"
-      ]
+      "model": "cursor/gpt-5.5",
+      "fallback_models": ["cursor/claude-opus-4-7"]
     },
 
     /**
      * 【超高速補助: Librarian】 証拠に基づいた調査の専門家
      * マルチリポジトリ分析、ドキュメント検索、OSS実装例の調査を低コスト・高精度で行います。
-     * v4.0.0でプロンプトが全面刷新。「GitHubパーマリンクの発見」に特化。
+     * v4.0.0 でプロンプトが全面刷新され、GitHubのパーマリンクを発見する能力が極限まで高められました。
+     * モデル: 高速・高効率な `cursor/claude-haiku-4-5`。
      */
     "librarian": {
-      "model": "opencode/minimax-m2.5-free",
+      "model": "cursor/claude-haiku-4-5",
       "fallback_models": [
-        "nvidia/qwen/qwen3.5-plus" // v4.0.0 で推奨される高速・高精度モデル
+        "opencode/minimax-m2.5-free",
+        "nvidia/minimaxai/minimax-m2.7"
       ],
       "temperature": 0.1,
       "description": "Ultra-fast background research with minimal token cost."
@@ -114,19 +128,19 @@
 
     /**
      * 【高速探索: Explore】 高速なコードベース探索とプロトタイピング
-     * 自律的なweb searchを組み合わせ、最新の技術仕様に基づいたスキャフォールディングを行います。
+     * 自律的な web search を組み合わせ、最新の技術仕様に基づいたスキャフォールディングを行います。
+     * モデル: `cursor/claude-haiku-4-5`。
      */
     "explore": {
-      "model": "opencode/minimax-m2.5-free",
-      "fallback_models": [
-        "nvidia/qwen/qwen3.5-plus"
-      ],
+      "model": "cursor/claude-haiku-4-5",
+      "fallback_models": ["opencode/ling-2.6-flash-free"],
       "description": "Rapid scaffolding using autonomous web search for latest technical specs."
     },
 
     /**
      * 【視覚アナリスト: Multimodal-Looker】 視覚コンテンツ・UI分析
-     * PDF、画像、図解、UIデザインを分析。ブラウザテストの失敗時のUIデバッグにも威力を発揮。
+     * PDF、画像、図解、UIデザインを分析。ブラウザテスト失敗時のUIデバッグにも威力を発揮。
+     * モデル: 画像解析に強い `google/gemini-3.1-flash-image-preview`。
      */
     "multimodal-looker": {
       "model": "google/gemini-3.1-flash-image-preview",
@@ -134,52 +148,51 @@
         "google/gemini-3.1-pro-preview"
       ],
       "variant": "medium",
-      "description": "Visual Intelligence. Analyzes UI designs for API generation and debugs browser test failures."
+      "description": "Visual Intelligence. Analyzes UI designs and debugs browser test failures."
     },
 
-    // --- Planning Agents ---
+    // --- Planning Agents: タスクを「解ける形」に整理する軍師たち ---
 
     /**
      * 【戦略家: Prometheus】 インタビューモードを備えたプランナー
-     * 対話を通じてタスクを分解し、並列実行可能な「Agent Swarm」用の作業計画を作成します。
+     * 人間との対話を通じて抽象的なリクエストを分解し、並列実行可能な作業計画を作成します。
+     * モデル: 推論と表現力のバランスが良い `cursor/claude-sonnet-4-6`。
      */
     "prometheus": {
-      "model": "cloudflare-workers-ai/@cf/moonshotai/kimi-k2.6",
-      "fallback_models": [
-        "nvidia/z-ai/glm-5.1",
-        "cloudflare-workers-ai/@cf/zai-org/glm-4.7-flash"
-      ]
+      "model": "cursor/claude-sonnet-4-6",
+      "fallback_models": ["openai/gpt-5.4"]
     },
 
     /**
      * 【計画コンサル: Metis】 計画前の分析とリスク特定
-     * v4.0.0ではユーザーの指示から「リファクタリング」「新規追加」等の意図を自動分類する機能が強化。
-     * 隠れた意図や曖昧さ、AIが失敗しやすいポイントを事前に特定します。
+     * v4.0.0 では、ユーザーの指示から「リファクタリング」「新規機能」などの
+     * インテント（意図）を自動分類し、AIが失敗しやすいポイントを事前に特定する機能が強化。
+     * モデル: 分類・分析に長けた `cursor/claude-sonnet-4-6`。
      */
     "metis": {
-      "model": "cloudflare-workers-ai/@cf/moonshotai/kimi-k2.6",
-      "fallback_models": [
-        "nvidia/z-ai/glm-5.1",
-        "cloudflare-workers-ai/@cf/zai-org/glm-4.7-flash"
-      ]
+      "model": "cursor/claude-sonnet-4-6",
+      "fallback_models": ["nvidia/z-ai/glm4.7"]
     },
 
     /**
      * 【計画レビュアー: Momus】 計画の検証と品質保証
-     * 明確さ、検証可能性、完全性の基準に照らして、Prometheusが作成した計画を厳格にレビュー。
+     * Prometheus が作成した計画に対し、「漏れはないか」「検証可能か」を厳格にチェック。
+     * モデル: 厳しい審美眼を持つ `cursor/gpt-5.5`。
      */
     "momus": {
-      "model": "openai/gpt-5.5"
+      "model": "cursor/gpt-5.5"
     },
 
-    // --- Orchestration Agents ---
+    // --- Orchestration Agents: 現場の物理環境を管理する指揮官 ---
 
     /**
      * 【現場監督: Atlas】 Todo駆動型実行エンジン
-     * Tmux, Playwrightなどの環境管理、Todo項目の体系的な管理・調整・維持を担当。
+     * Tmux、Playwright などの環境管理、Todo項目の体系的な管理・調整・維持を担当。
+     * セッションを跨いでエージェントの「現在の立ち位置」を保持します。
+     * モデル: 安定感のある `cursor/gpt-5.5`。
      */
     "atlas": {
-      "model": "openai/gpt-5.5",
+      "model": "cursor/gpt-5.5",
       "variant": "medium",
       "description": "Orchestrates Tmux, Playwright, and server states. Ensures environment consistency."
     }
@@ -188,22 +201,26 @@
   // --------------------------------------------------------------------------
   // 3. Categories: タスクの性質に応じたモデルの自動ルーティング
   // --------------------------------------------------------------------------
+  /**
+   * エージェントを個別に指定しない場合でも、タスクの種類 (Category) に応じて
+   * 最適なモデルが自動的に選出されるためのマッピングです。
+   */
   "categories": {
     "ultrabrain": {
-      "model": "openai/gpt-5.5", // 最強の論理推論 (xhigh)
+      "model": "cursor/gpt-5.5", // 最強の論理推論 (xhigh)
       "variant": "xhigh"
     },
     "deep": {
-      "model": "openai/gpt-5.3-codex" // 自律的解決・難解なタスク
+      "model": "cursor/gpt-5.3-codex" // 自律的解決・重厚な実装
     },
     "quick": {
-      "model": "cloudflare-workers-ai/@cf/meta/llama-4-scout-17b-16e-instruct" // 些細な修正・高速レスポンス
+      "model": "cursor/claude-haiku-4-5" // 些細な修正・高速レスポンス
     },
     "writing": {
-      "model": "cloudflare-workers-ai/@cf/zai-org/glm-4.7-flash" // テクニカルライティング・散文
+      "model": "opencode/ling-2.6-flash-free" // テクニカルライティング・散文
     },
     "unspecified-low": {
-      "model": "opencode/minimax-m2.5-free"
+      "model": "opencode/minimax-m2.5-free" // デフォルトの低コスト枠
     },
     "visual-engineering": {
       "model": "google/gemini-3.1-flash-image-preview" // UI/UX, デザイン, アニメーション
@@ -211,72 +228,75 @@
   },
 
   // --------------------------------------------------------------------------
-  // 4. Experimental: 最新・実験的機能の最適化
+  // 4. Experimental: 実験的・次世代機能の最適化
   // --------------------------------------------------------------------------
   "experimental": {
-    "task_system": false, // Todo駆動タスク管理(blockedBy対応)。 .sisyphus/tasks/ に永続化
-    "hashline_edit": true, // LINE#ID形式のハッシュアンカー編集。行ずれエラーをゼロに
+    "task_system": false,  // Todo駆動タスク管理。 .sisyphus/tasks/ に永続化
+    "hashline_edit": true, // LINE#ID形式のハッシュアンカー編集。行ずれによる事故を物理的にゼロに。
     "hashline_diff_enhancer": true,
-    "aggressive_truncation": true, // トークン節約のための積極的なカット
-    "auto_resume": true, // セッション中断・失敗からの自動復旧
-    "preemptive_compaction_threshold": 0.85 // トークン限界前のプロアクティブな圧縮
+    "aggressive_truncation": true, // コンテキストが溢れる前に、古い履歴を戦略的に圧縮
+    "auto_resume": true,           // セッション中断や API 失敗からのシームレスな自動復旧
+    "preemptive_compaction_threshold": 0.85 // トークン限界の 85% に達した時点で事前圧縮を開始
   },
 
-  // TMUX統合: バックグラウンドエージェントを別ペインでリアルタイム監視
+  // --------------------------------------------------------------------------
+  // 5. Tooling & Environment: 物理環境との接続設定
+  // --------------------------------------------------------------------------
+
+  // TMUX統合: バックグラウンドエージェントの思考過程を別ペインでリアルタイム監視
   "tmux": {
     "enabled": true,
     "layout": "main-vertical",
     "main_pane_size": 65
   },
 
-  // ブラウザ自動化エンジン: スクリーンショット、フォーム入力、ネットワーク監視をサポート
+  // ブラウザ自動化エンジン: スクリーンショット、フォーム入力、E2Eテストをサポート
   "browser_automation_engine": {
-    "provider": "playwright-cli" // デフォルト: playwright
+    "provider": "playwright-cli"
   },
 
-  // バックグラウンドタスクの並列実行制御
+  // バックグラウンドタスクの並列実行制御 (APIプロバイダーごとのレート制限に配慮)
   "background_task": {
     "defaultConcurrency": 10,
     "providerConcurrency": {
       "openai": 5,
-      "nvidia": 10,
-      "minimax": 5,
       "google": 20,
-      "anthropic": 5
+      "cursor": 10,
+      "opencode": 5
     }
   },
 
-  // Ralph Loop: タスク完了まで自律的に試行を繰り返す自己参照型開発ループ
+  // Ralph Loop: タスクが「完全に」終わるまで自律的に思考と修正を繰り返す自己参照型開発ループ
   "ralph_loop": {
     "enabled": true,
-    "default_max_iterations": 20 // v4.0.0 で実行時エラーのガードが強化
+    "default_max_iterations": 20 // v4.0.0 でランタイムエラー時のガードとリトライ戦略が強化
   },
 
-  // Boulder State: セッションを跨いでエージェントの状態を維持する永続化機構
+  // Boulder State: セッションを跨いでエージェントの状態（変数値や試行結果）を維持
   "boulder_state": {
     "enabled": true,
     "storage_path": ".sisyphus/boulder_state.json"
   },
 
-  // セッションリカバリ: エラーやコンテキスト上限からの透明な復旧
+  // セッションリカバリ: ネットワーク断や予期せぬ終了からの復旧
   "session_recovery": {
     "enabled": true,
-    "max_age_minutes": 1440
+    "max_age_minutes": 1440 // 24時間以内のセッションなら継続可能
   },
 
-  // Interactive Bash: tmuxベースの永続ターミナル(vim/htopなどのTUI対応)
+  // Interactive Bash: tmuxベースの永続ターミナル (vim や htop 等のインタラクティブツール対応)
   "interactive_bash": {
     "enabled": true,
     "timeout_ms": 300000
   },
 
-  // Git Master: コミット分割、スタイル自動検出を行うGit専門機能
+  // Git Master: コミット分割、Conventional Commits スタイルの自動適用
   "git_master": {
     "commit_footer": false,
     "include_co_authored_by": false
   },
 
-  // 過剰なコメントを削減・整理する提案機能
+  // 不要な AI コメントや過剰なドキュメント化を自動検知して整理
   "comment_checker": {
     "enabled": true
   },
@@ -285,33 +305,32 @@
     "auto-update-checker"
   ],
 
-  // Rules Injector: .claude/rules/ 内のルールをglob条件で自動注入
+  // Rules Injector: .claude/rules/ 内のルールを glob 条件に合わせて自動的にプロンプトへ注入
   "rules_injector": {
     "enabled": true
   },
 
-  // Auto Slash Command: プロンプトからのスラッシュコマンド自動実行
+  // Auto Slash Command: プロンプト内のスラッシュコマンドを検知して自動実行
   "auto_slash_command": {
     "enabled": true
   },
 
+  // --------------------------------------------------------------------------
+  // 6. Custom Commands: ワークフローの短縮エイリアス
+  // --------------------------------------------------------------------------
   "commands": {
     "git-pr-flow": {
       "description": "Git PR Flow with full-skill access",
       "prompt": "./commands/git-pr-flow.md",
       "skills": {
-        "git-master": {
-          "enabled": true
-        }
+        "git-master": { "enabled": true }
       }
     },
     "build-skill": {
       "description": "Agent Skill Builder",
       "prompt": "./commands/build-skill.md",
       "skills": {
-        "agent-skill-architect": {
-          "enabled": true
-        }
+        "agent-skill-architect": { "enabled": true }
       }
     }
   }
