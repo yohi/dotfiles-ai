@@ -18,14 +18,15 @@ fix-ubuntu-rootless: ## Ubuntu 24.04+ の Rootless Docker 制限を解除 (要 s
 help-mcp: ## MCP の使い方を表示
 	$(call show-guide,$(REPO_ROOT)/_docs/guides/mcp.md)
 
-sync-mcp: ## Render and synchronize centralized MCP configs
+sync-mcp: render-mcp restart-mcp ## Render and synchronize centralized MCP configs
+	@echo "✅ MCP synchronization complete."
+
+render-mcp: ## Render centralized MCP configs
 	@if command -v uv >/dev/null 2>&1; then \
 		uv run python3 _scripts/render-mcp-configs.py; \
 	else \
 		python3 _scripts/render-mcp-configs.py; \
 	fi
-	@$(MAKE) restart-mcp
-	@echo "✅ MCP synchronization complete."
 
 status-mcp: ## Docker MCP Gatewayのステータスを確認
 	@echo "📊 Docker MCP Gateway status:"
