@@ -1,9 +1,10 @@
+// vim: ft=jsonc
 // Config Modernized: 2026-05-09
 // Target OpenCode Version: v1.14.41
-// vim: ft=jsonc
+
 /**
- * OpenCode Core Configuration - v1.14.41 Optimized
- * 
+ * OpenCode Core Configuration
+ *
  * [概要]
  * このファイルは OpenCode の推論エンジン、権限、およびバックエンド動作を定義します。
  * [Plugin] や [MCP] などのマーカーは自動化ツールのアンカーとして機能するため、
@@ -226,8 +227,8 @@
   "enabled_providers": [
     "google",
     "openai",
-    "cloudflare-workers-ai",
     "nvidia",
+    "cloudflare-workers-ai",
     "opencode",
     "cursor"
   ],
@@ -256,6 +257,18 @@
         "minimaxai/minimax-m2.5",
         "minimaxai/minimax-m2.7",
         "z-ai/glm4.7",
+      ]
+    },
+    "cloudflare-workers-ai": {
+      "whitelist": [
+        "@cf/google/gemma-4-26b-a4b-it",
+        "@cf/meta/llama-4-scout-17b-16e-instruct",
+        "@cf/moonshotai/kimi-k2.5",
+        "@cf/moonshotai/kimi-k2.6",
+        "@cf/nvidia/nemotron-3-120b-a12b",
+        "@cf/openai/gpt-oss-120b",
+        "@cf/openai/gpt-oss-20b",
+        "@cf/zai-org/glm-4.7-flash",
       ]
     },
     "opencode": {
