@@ -305,12 +305,16 @@ def main() -> int:
                 if "headers" in s and isinstance(s["headers"], dict):
                     for k, v in s["headers"].items():
                         if "__AUTH_TOKEN__" in v:
-                            env_syntax = (
-                                "{env:MCP_GATEWAY_TOKEN}"
-                                if an == "opencode"
-                                else "${MCP_GATEWAY_TOKEN}"
-                            )
-                            s["headers"][k] = v.replace("__AUTH_TOKEN__", env_syntax)
+                            token = os.environ.get("MCP_GATEWAY_TOKEN")
+                            if token:
+                                s["headers"][k] = v.replace("__AUTH_TOKEN__", token)
+                            else:
+                                env_syntax = (
+                                    "{env:MCP_GATEWAY_TOKEN}"
+                                    if an == "opencode"
+                                    else "${MCP_GATEWAY_TOKEN}"
+                                )
+                                s["headers"][k] = v.replace("__AUTH_TOKEN__", env_syntax)
 
                 if s.get("transport") and not s.get("type"):
                     s["type"] = s.get("transport")
