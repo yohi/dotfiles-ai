@@ -9,6 +9,7 @@ fix_all.sh
 agent-skills/anthropics/
 agent-skills/superpowers/
 .agents/
+.sisyphus/
 
 # Codex runtime files
 codex/*.jsonl
