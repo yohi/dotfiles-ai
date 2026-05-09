@@ -1,4 +1,4 @@
-.PHONY: setup-docker-mcp sync-mcp mcp uninstall-mcp status-mcp start-mcp stop-mcp restart-mcp logs-mcp status-watchdog logs-watchdog fix-ubuntu-rootless
+.PHONY: setup-docker-mcp sync-mcp mcp uninstall-mcp status-mcp start-mcp stop-mcp restart-mcp logs-mcp status-watchdog logs-watchdog fix-ubuntu-rootless render-mcp
 
 mcp: setup-docker-mcp
 
@@ -18,7 +18,8 @@ fix-ubuntu-rootless: ## Ubuntu 24.04+ の Rootless Docker 制限を解除 (要 s
 help-mcp: ## MCP の使い方を表示
 	$(call show-guide,$(REPO_ROOT)/_docs/guides/mcp.md)
 
-sync-mcp: render-mcp restart-mcp ## Render and synchronize centralized MCP configs
+sync-mcp: render-mcp ## Render and synchronize centralized MCP configs
+	@$(MAKE) restart-mcp
 	@echo "✅ MCP synchronization complete."
 
 render-mcp: ## Render centralized MCP configs
