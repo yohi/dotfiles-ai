@@ -89,37 +89,55 @@ fi
 # トークンの存在確認と取得
 GATEWAY_TOKEN=$(safe_dotenv_get "MCP_GATEWAY_TOKEN" "$DOTENV_FILE")
 
+# プレースホルダ値をチェックし、該当する場合は空として扱う
+if [[ "$GATEWAY_TOKEN" == *"your-mcp-"* ]]; then
+    echo -e "${YELLOW}⚠️  Placeholder token detected for MCP_GATEWAY_TOKEN.${NC}"
+    GATEWAY_TOKEN=""
+fi
+
 if [ -z "$GATEWAY_TOKEN" ]; then
     # 既存の古いトークン名があるか確認
     EXISTING_TOKEN=$(safe_dotenv_get "MCP_AUTH_TOKEN" "$DOTENV_FILE")
+    if [[ "$EXISTING_TOKEN" == *"your-mcp-"* ]]; then
+        EXISTING_TOKEN=""
+    fi
     
     if [ -n "$EXISTING_TOKEN" ]; then
         echo "MCP_GATEWAY_TOKEN=$EXISTING_TOKEN" >> "$DOTENV_FILE"
         echo -e "${GREEN}✅ Migrated existing MCP_AUTH_TOKEN to MCP_GATEWAY_TOKEN in .env${NC}"
+        GATEWAY_TOKEN="$EXISTING_TOKEN"
     else
         # 新しいトークンを生成 (32 bytes)
         NEW_TOKEN=$(openssl rand -hex 32)
-        echo "MCP_GATEWAY_TOKEN=$NEW_TOKEN" >> "$DOTENV_FILE"
-        echo "MCP_GATEWAY_AUTH_TOKEN=$NEW_TOKEN" >> "$DOTENV_FILE"
-        echo "MCP_AUTH_TOKEN=$NEW_TOKEN" >> "$DOTENV_FILE"
-        echo -e "${GREEN}✅ Generated new MCP_GATEWAY_TOKEN and added to .env${NC}"
+        # 重複を防ぐため、既存のプレースホルダやエントリを削除
+        sed -i.tmp '/^MCP_GATEWAY_TOKEN=/d; /^MCP_GATEWAY_AUTH_TOKEN=/d; /^MCP_AUTH_TOKEN=/d' "$DOTENV_FILE"
+        rm -f "$DOTENV_FILE.tmp"
+        {
+            echo "MCP_GATEWAY_TOKEN=$NEW_TOKEN"
+            echo "MCP_GATEWAY_AUTH_TOKEN=$NEW_TOKEN"
+            echo "MCP_AUTH_TOKEN=$NEW_TOKEN"
+        } >> "$DOTENV_FILE"
+        echo -e "${GREEN}✅ Generated new random tokens and added to .env${NC}"
+        GATEWAY_TOKEN="$NEW_TOKEN"
     fi
 fi
 
-# 個別の変数が欠けている場合の補完 (最新の MCP_GATEWAY_TOKEN を基準にする)
-CURRENT_TOKEN=$(safe_dotenv_get "MCP_GATEWAY_TOKEN" "$DOTENV_FILE")
-if [ -n "$CURRENT_TOKEN" ]; then
-    GATEWAY_AUTH_TOKEN=$(safe_dotenv_get "MCP_GATEWAY_AUTH_TOKEN" "$DOTENV_FILE")
-    if [ -z "$GATEWAY_AUTH_TOKEN" ]; then
-        echo "MCP_GATEWAY_AUTH_TOKEN=$CURRENT_TOKEN" >> "$DOTENV_FILE"
-        echo -e "${GREEN}✅ Added missing MCP_GATEWAY_AUTH_TOKEN using current token${NC}"
-    fi
+# 個別の変数が欠けているか、不整合がある場合の補完 (最新の GATEWAY_TOKEN を基準にする)
+GATEWAY_AUTH_TOKEN=$(safe_dotenv_get "MCP_GATEWAY_AUTH_TOKEN" "$DOTENV_FILE")
+if [ -z "$GATEWAY_AUTH_TOKEN" ] || [[ "$GATEWAY_AUTH_TOKEN" == *"your-mcp-"* ]] || [ "$GATEWAY_AUTH_TOKEN" != "$GATEWAY_TOKEN" ]; then
+    # 重複を避けるため、既存の定義を削除してから追加
+    sed -i.tmp '/^MCP_GATEWAY_AUTH_TOKEN=/d' "$DOTENV_FILE"
+    rm -f "$DOTENV_FILE.tmp"
+    echo "MCP_GATEWAY_AUTH_TOKEN=$GATEWAY_TOKEN" >> "$DOTENV_FILE"
+    echo -e "${GREEN}✅ Synchronized MCP_GATEWAY_AUTH_TOKEN with MCP_GATEWAY_TOKEN${NC}"
+fi
 
-    AUTH_TOKEN=$(safe_dotenv_get "MCP_AUTH_TOKEN" "$DOTENV_FILE")
-    if [ -z "$AUTH_TOKEN" ]; then
-        echo "MCP_AUTH_TOKEN=$CURRENT_TOKEN" >> "$DOTENV_FILE"
-        echo -e "${GREEN}✅ Added missing MCP_AUTH_TOKEN (backward compatibility) using current token${NC}"
-    fi
+AUTH_TOKEN=$(safe_dotenv_get "MCP_AUTH_TOKEN" "$DOTENV_FILE")
+if [ -z "$AUTH_TOKEN" ] || [[ "$AUTH_TOKEN" == *"your-mcp-"* ]] || [ "$AUTH_TOKEN" != "$GATEWAY_TOKEN" ]; then
+    sed -i.tmp '/^MCP_AUTH_TOKEN=/d' "$DOTENV_FILE"
+    rm -f "$DOTENV_FILE.tmp"
+    echo "MCP_AUTH_TOKEN=$GATEWAY_TOKEN" >> "$DOTENV_FILE"
+    echo -e "${GREEN}✅ Synchronized MCP_AUTH_TOKEN (backward compatibility) with MCP_GATEWAY_TOKEN${NC}"
 fi
 
 echo -e "${GREEN}✅ Shared .env file is ready.${NC}"
