@@ -1,6 +1,6 @@
 // vim: ft=jsonc
 // Config Modernized: 2026-05-09
-// Target oh-my-openagent Version: v4.0.0
+// Target oh-my-openagent Version: v3.17.15
 
 /**
  * OhMyOpenagent Core Configuration
@@ -76,7 +76,7 @@
 
     // 【大規模解析・監査: Oracle】 読み取り専用のコンサルタント
     // アーキテクチャ決定、深い論理的推論、コードレビュー、難解なバグのデバッグを担当。
-    // 論理推論の頂点である gpt-5.5 を採用。
+    // 論理推論の頂点である gpt-5.4 を採用。
     "oracle": {
       "model": "openai/gpt-5.4",
       "variant": "high",

@@ -109,9 +109,14 @@ if [ -z "$GATEWAY_TOKEN" ]; then
     else
         # 新しいトークンを生成 (32 bytes)
         NEW_TOKEN=$(openssl rand -hex 32)
-        echo "MCP_GATEWAY_TOKEN=$NEW_TOKEN" >> "$DOTENV_FILE"
-        echo "MCP_GATEWAY_AUTH_TOKEN=$NEW_TOKEN" >> "$DOTENV_FILE"
-        echo "MCP_AUTH_TOKEN=$NEW_TOKEN" >> "$DOTENV_FILE"
+        # 重複を防ぐため、既存のプレースホルダやエントリを削除
+        sed -i.tmp '/^MCP_GATEWAY_TOKEN=/d; /^MCP_GATEWAY_AUTH_TOKEN=/d; /^MCP_AUTH_TOKEN=/d' "$DOTENV_FILE"
+        rm -f "$DOTENV_FILE.tmp"
+        {
+            echo "MCP_GATEWAY_TOKEN=$NEW_TOKEN"
+            echo "MCP_GATEWAY_AUTH_TOKEN=$NEW_TOKEN"
+            echo "MCP_AUTH_TOKEN=$NEW_TOKEN"
+        } >> "$DOTENV_FILE"
         echo -e "${GREEN}✅ Generated new random tokens and added to .env${NC}"
         GATEWAY_TOKEN="$NEW_TOKEN"
     fi
@@ -121,14 +126,16 @@ fi
 GATEWAY_AUTH_TOKEN=$(safe_dotenv_get "MCP_GATEWAY_AUTH_TOKEN" "$DOTENV_FILE")
 if [ -z "$GATEWAY_AUTH_TOKEN" ] || [[ "$GATEWAY_AUTH_TOKEN" == *"your-mcp-"* ]] || [ "$GATEWAY_AUTH_TOKEN" != "$GATEWAY_TOKEN" ]; then
     # 重複を避けるため、既存の定義を削除してから追加
-    sed -i '/^MCP_GATEWAY_AUTH_TOKEN=/d' "$DOTENV_FILE"
+    sed -i.tmp '/^MCP_GATEWAY_AUTH_TOKEN=/d' "$DOTENV_FILE"
+    rm -f "$DOTENV_FILE.tmp"
     echo "MCP_GATEWAY_AUTH_TOKEN=$GATEWAY_TOKEN" >> "$DOTENV_FILE"
     echo -e "${GREEN}✅ Synchronized MCP_GATEWAY_AUTH_TOKEN with MCP_GATEWAY_TOKEN${NC}"
 fi
 
 AUTH_TOKEN=$(safe_dotenv_get "MCP_AUTH_TOKEN" "$DOTENV_FILE")
 if [ -z "$AUTH_TOKEN" ] || [[ "$AUTH_TOKEN" == *"your-mcp-"* ]] || [ "$AUTH_TOKEN" != "$GATEWAY_TOKEN" ]; then
-    sed -i '/^MCP_AUTH_TOKEN=/d' "$DOTENV_FILE"
+    sed -i.tmp '/^MCP_AUTH_TOKEN=/d' "$DOTENV_FILE"
+    rm -f "$DOTENV_FILE.tmp"
     echo "MCP_AUTH_TOKEN=$GATEWAY_TOKEN" >> "$DOTENV_FILE"
     echo -e "${GREEN}✅ Synchronized MCP_AUTH_TOKEN (backward compatibility) with MCP_GATEWAY_TOKEN${NC}"
 fi
