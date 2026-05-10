@@ -31,20 +31,20 @@ Atlassian 製品（Jira, Confluence）用の公式 MCP サーバーです。
 
 ## 2. 設定管理の仕組み (SSOT)
 
-本プロジェクトでは、MCP 設定を **`mcp/servers.yaml`** を唯一の正解（Single Source of Truth）として管理しています。
+本プロジェクトでは、MCP 設定をリポジトリルートの **`apm.yml`** を唯一の正解（Single Source of Truth）として管理しています。
 
 > [!WARNING]
 > **`mcp/config.yaml` や各エージェントの設定ファイルを直接編集しないでください。**
-> これらのファイルは `make sync-mcp` 実行時に `mcp/servers.yaml` から自動生成されるため、手動の変更は上書きされます。設定を変更する場合は必ず `mcp/servers.yaml` を修正し、`make sync-mcp` を実行してください。
+> これらのファイルは `make sync-mcp` 実行時に `apm.yml` から自動生成されるため、手動の変更は上書きされます。設定を変更する場合は必ず `apm.yml` を修正し、`make sync-mcp` を実行してください。
 
-- **`mcp/servers.yaml`**: 
+- **`apm.yml`**: 
   - 全 AI エージェント（Gemini, Claude, Cursor, VSCode, Antigravity, OpenCode, Codex 等）のマスター設定。
   - 各サーバーの定義（Docker イメージ、環境変数、ボリュームマウント等）と、各エージェントがどのサーバーを利用するかを定義します。
 - **自動生成されるファイル**:
   - `make sync-mcp` を実行すると、`_scripts/render-mcp-configs.py` によって以下のファイルが自動生成・更新されます。
     - **`mcp/config.yaml`**: Docker MCP Gateway で有効化するサーバー一覧。
     - **`mcp/catalogs/custom.yaml`**: Docker MCP Gateway のカスタムカタログ定義。
-    - **各エージェントの設定ファイル**: `gemini/settings.json`, `claude/settings.json`, `opencode/opencode.jsonc`, `.cursor/mcp.json`, `codex/config.toml` 等。
+    - **各エージェントの設定ファイル**: `gemini/settings.json`, `.mcp.json`, `opencode/opencode.jsonc`, `ide/cursor/mcp.json`, `codex/config.toml` 等。
 - **プレースホルダー置換**: `__GATEWAY_URL__`, `__HOME__`, `__REPO_ROOT__` は生成時に動的に置換されます。また、`${VAR}` 形式の環境変数も `_scripts/render-mcp-configs.py` によって展開されます。
 
 ---

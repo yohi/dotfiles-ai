@@ -24,8 +24,8 @@
   "plugin": [
     "@yohi/opencode-codex-quota@1.0.0",
     "@yohi/justice@2.2.0",
-    "@yohi/opencode-cursor-plugin@1.3.4",
-    "oh-my-openagent@v4.0.0"
+    "@yohi/opencode-cursor-plugin@1.3.8",
+    "oh-my-openagent@3.17.15"
   ],
 
   // --------------------------------------------------------------------------

@@ -328,12 +328,12 @@ def main() -> int:
                 if "headers" in s and isinstance(s["headers"], dict):
                     for k, v in s["headers"].items():
                         if isinstance(v, str) and "__AUTH_TOKEN__" in v:
-                            env_syntax = (
-                                "{env:MCP_GATEWAY_TOKEN}"
-                                if an == "opencode"
-                                else "${MCP_GATEWAY_TOKEN}"
-                            )
-                            s["headers"][k] = v.replace("__AUTH_TOKEN__", env_syntax)
+                            if an == "opencode":
+                                # OpenCode supports {env:VAR} syntax
+                                s["headers"][k] = v.replace("__AUTH_TOKEN__", "{env:MCP_GATEWAY_TOKEN}")
+                            else:
+                                # Others (Gemini, Claude) support ${VAR} expansion
+                                s["headers"][k] = v.replace("__AUTH_TOKEN__", "${MCP_GATEWAY_TOKEN}")
 
                 if s.get("transport") and not s.get("type"):
                     s["type"] = s.get("transport")
