@@ -1,7 +1,7 @@
 .PHONY: all install install-agents install-ides setup setup-agents setup-ides mcp-render link clean-internal install-requirements lint init sync secrets status clean test clean-legacy configure-git-ignore doctor
 
 # --- Standard Entry Points ---
-all: install init-env setup sync-mcp ## [完全セットアップ] インストール、環境構築、設定、MCP同期をすべて行う
+all: install init-env setup setup-agents setup-ides sync-mcp ## [完全セットアップ] インストール、環境構築、設定、MCP同期をすべて行う
 
 install: install-requirements install-agents install-ides ## Install all AI agents and IDE binaries
 
@@ -120,7 +120,8 @@ doctor: ## [診断] 設定の不備や同期が必要な箇所を特定し、解
 	fi
 	@# 2. Sync check (skills vs agents)
 	@LATEST_SKILL=$$(find agent-skills -type f -name "*.md" -printf '%%T@ %%p\n' 2>/dev/null | sort -n | tail -1 | cut -d' ' -f2-); \
-	LATEST_CMD=$$(find agent-commands -type f -name "*.md" -printf '%%T@ %%p\n' 2>/dev/null | sort -n | tail -1 | cut -d' ' -f2-); \	LAST_SYNC_FILE="$(REPO_ROOT)/.last_sync"; \
+	LATEST_CMD=$$(find agent-commands -type f -name "*.md" -printf '%%T@ %%p\n' 2>/dev/null | sort -n | tail -1 | cut -d' ' -f2-); \
+	LAST_SYNC_FILE="$(REPO_ROOT)/.last_sync"; \
 	if [ -f "$$LAST_SYNC_FILE" ]; then \
 		if [ -n "$$LATEST_SKILL" ] && [ "$$LATEST_SKILL" -nt "$$LAST_SYNC_FILE" ]; then \
 			echo "⚠️  [ACTION REQUIRED] スキルが変更されています。'make sync-agents' を実行してください。"; \

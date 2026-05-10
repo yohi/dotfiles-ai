@@ -8,6 +8,8 @@ fix_all.sh
 # Agent Skills (Exclude external/fetched skills managed by EXTERNAL_SKILLS.md)
 agent-skills/anthropics/
 agent-skills/superpowers/
+.agents/
+.sisyphus/
 
 # Codex runtime files
 codex/*.jsonl

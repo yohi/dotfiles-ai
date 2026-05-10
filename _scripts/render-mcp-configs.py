@@ -170,8 +170,31 @@ def surgical_json_update(text: str, key: str, new_value: dict[str, Any]) -> str 
     return text[: match.start()] + indent + "\n".join(new_block) + text[end_pos:]
 
 
+def get_token_from_env_file(repo_root: Path) -> str | None:
+    env_path = repo_root / ".env"
+    if not env_path.exists():
+        return None
+    try:
+        content = env_path.read_text(encoding="utf-8")
+        # Match lines like MCP_GATEWAY_TOKEN=value or MCP_GATEWAY_TOKEN="value"
+        match = re.search(r"^MCP_GATEWAY_TOKEN=(?:\"([^\"]*)\"|'([^']*)'|([^#\n\s]*))", content, re.MULTILINE)
+        if match:
+            # Return the first non-None group
+            return match.group(1) or match.group(2) or match.group(3)
+    except OSError:
+        pass
+    return None
+
+
 def main() -> int:
     repo_root = Path(__file__).parent.parent.resolve()
+
+    # Load token from .env if not present in environment
+    if "MCP_GATEWAY_TOKEN" not in os.environ:
+        token = get_token_from_env_file(repo_root)
+        if token:
+            os.environ["MCP_GATEWAY_TOKEN"] = token
+
     config = load_client_config()
     if not config:
         return 1
@@ -304,7 +327,7 @@ def main() -> int:
                 # Use native environment variable expansion per agent
                 if "headers" in s and isinstance(s["headers"], dict):
                     for k, v in s["headers"].items():
-                        if "__AUTH_TOKEN__" in v:
+                        if isinstance(v, str) and "__AUTH_TOKEN__" in v:
                             env_syntax = (
                                 "{env:MCP_GATEWAY_TOKEN}"
                                 if an == "opencode"
