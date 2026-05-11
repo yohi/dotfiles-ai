@@ -49,33 +49,26 @@ config:
   - name: chronos-graph
     title: "ChronosGraph"
     description: "Long-term memory and knowledge graph system."
-    transport: stdio
-    command: "uvx"
-    args: ["--from", "git+https://github.com/yohi/chronos-graph.git", "context-store"]
+    type: server
+    image: mcp/chronos-graph:latest
     env:
       OPENAI_API_KEY: "${OPENAI_API_KEY:-YOUR_API_KEY_HERE}"
       LOG_LEVEL: "error"
       STORAGE_BACKEND: "sqlite"
-      SQLITE_DB_PATH: "__HOME__/.context-store/memories.db"
+      SQLITE_DB_PATH: "/home/chronos/memories.db"
       GRAPH_ENABLED: "true"
-      DECAY_HALF_LIFE_DAYS: "30"
-      SIMILARITY_THRESHOLD: "0.70"
-      DEDUP_THRESHOLD: "0.90"
-      EMBEDDING_PROVIDER: "local-model"
-      LOCAL_MODEL_NAME: "cl-nagoya/ruri-v3-310m"
+      EMBEDDING_PROVIDER: "openai"
+    volumes: ["__HOME__/.context-store:/home/chronos"]
 
   - name: nexus
     title: "Nexus"
     description: "Local knowledge base and indexer."
-    transport: stdio
-    command: "npx"
-    args: ["-y", "-p", "@yohi/nexus@1.6.2", "-p", "typescript", "nexus"]
+    type: server
+    image: mcp/nexus:latest
     env:
-      NEXUS_STORAGE_ROOT_DIR: "__HOME__/.nexus"
-      NEXUS_WATCHER_IGNORE_PATHS: "node_modules,.git,.nexus,dist,gemini,.worktrees,.venv,target,.mypy_cache,.ruff_cache,build,.serena,.cache,__pycache__,*.db,*.sqlite,*.log,out,bundle,vendor,package-lock.json,yarn.lock,pnpm-lock.yaml"
-      CHOKIDAR_USEPOLLING: "false"
-      CHOKIDAR_INTERVAL: "2000"
+      NEXUS_STORAGE_ROOT_DIR: "/home/nexus/.nexus"
       NO_PROXY: "127.0.0.1,localhost"
+    volumes: ["__HOME__/.nexus:/home/nexus/.nexus"]
 
   - name: SQLite
     title: "SQLite"

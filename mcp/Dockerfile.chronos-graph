@@ -1,6 +1,6 @@
 FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
 RUN apt-get update && apt-get install -y --no-install-recommends gosu git && rm -rf /var/lib/apt/lists/*
 RUN groupadd -r -g 1000 chronos && useradd -r -u 1000 -g 1000 -m chronos
-RUN uv pip install --system git+https://github.com/yohi/chronos-graph.git@v0.1.0
+RUN uv pip install --system git+https://github.com/yohi/chronos-graph.git@master
 USER chronos
 ENTRYPOINT ["context-store"]

@@ -16,16 +16,19 @@
   - **Skillport**: エージェントスキルの検索・ロード。
   - **GitHub Official**: GitHub 連携。
 
-### Chronos Graph (Local / uv)
-各クライアント（エージェント）側で `uv` を介して直接実行される MCP サーバーです。
-- **ステータス**: 有効（`mcp/servers.yaml` で全エージェントに共通設定）
-- **機能**: ローカル SQLite (`~/.context-store/memories.db`) をバックエンドとした、コンテキストの長期記憶とナレッジグラフ管理。
-- **実装**: `git+https://github.com/yohi/chronos-graph.git` を `uv tool run` で実行（最新の動作検証済みコミットハッシュによるピン留め情報は `mcp/servers.yaml` で管理）。
+### Chronos Graph & Nexus (Docker Integration)
+Docker MCP Gateway 経由で統合管理される、ローカル知識ベース・長期記憶システムです。
+- **ステータス**: 有効（Docker イメージとして実行され、SSE 経由で全エージェントから利用可能）
+- **機能**:
+  - **ChronosGraph**: ローカル SQLite (`~/.context-store/memories.db`) をバックエンドとした、コンテキストの長期記憶とナレッジグラフ管理。
+  - **Nexus**: プロジェクトコードの高速なセマンティック検索・インデックス管理。
+- **実装**: `mcp/Dockerfile.*` でビルドされたイメージを使用。設定は `apm.yml` で一括管理されます。
 
 ### Atlassian MCP (Direct / Streamable HTTP)
 Atlassian 製品（Jira, Confluence）用の公式 MCP サーバーです。
-- **ステータス**: 有効（Gemini CLI から直接接続。OAuth 認証をネイティブに処理）
+- **ステータス**: 有効（Gemini CLI / Claude Code から直接接続。OAuth 認証をネイティブに処理）
 - **エンドポイント**: `https://mcp.atlassian.com/v1/mcp`
+
 
 ---
 
@@ -75,8 +78,8 @@ command = "npx"
 args = ["-y", "mcp-remote", "http://127.0.0.1:10888/sse?server=SQLite", "-H", "Authorization: Bearer ..."]
 ```
 
-#### ■ ChronosGraph (Local)
-`chronos-graph` はゲートウェイを経由せず、各エージェントから直接 `uv tool run` で実行されます。この設定も `servers.yaml` から各エージェントの設定ファイルに直接埋め込まれます。
+#### ■ ChronosGraph & Nexus
+Docker MCP Gateway を介して統合的に提供されます。ボリュームマウントにより、ホスト上の `~/.context-store` および `~/.nexus` にデータを永続化します。
 
 ---
 
