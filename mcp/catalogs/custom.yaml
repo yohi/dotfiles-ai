@@ -24,31 +24,49 @@ registry:
   chronos-graph:
     name: chronos-graph
     title: ChronosGraph
-    description: Long-term memory and knowledge graph system.
+    description: Long-term memory and knowledge graph system (Cloud Mode).
     registry: false
     command:
     - uvx
     args:
     - --from
-    - git+https://github.com/yohi/chronos-graph.git
+    - git+https://github.com/yohi/chronos-graph.git@0afd7bd97a25b074d4d419be0c4f795ddf026579
     - context-store
     env:
     - name: OPENAI_API_KEY
-      value: YOUR_API_KEY_HERE
+      value: \${OPENAI_API_KEY}
     - name: LOG_LEVEL
       value: error
     - name: STORAGE_BACKEND
-      value: sqlite
-    - name: SQLITE_DB_PATH
-      value: /home/y_ohi/.context-store/memories.db
+      value: postgres
+    - name: POSTGRES_HOST
+      value: \${POSTGRES_HOST}
+    - name: POSTGRES_PORT
+      value: \${POSTGRES_PORT:-5432}
+    - name: POSTGRES_DB
+      value: \${POSTGRES_DB:-postgres}
+    - name: POSTGRES_USER
+      value: \${POSTGRES_USER}
+    - name: POSTGRES_PASSWORD
+      value: \${POSTGRES_PASSWORD}
+    - name: POSTGRES_SSL
+      value: 'true'
+    - name: POSTGRES_SSL_NO_VERIFY
+      value: 'false'
     - name: GRAPH_ENABLED
       value: 'true'
-    - name: DECAY_HALF_LIFE_DAYS
-      value: '30'
-    - name: SIMILARITY_THRESHOLD
-      value: '0.70'
-    - name: DEDUP_THRESHOLD
-      value: '0.90'
+    - name: NEO4J_URI
+      value: \${NEO4J_URI}
+    - name: NEO4J_USER
+      value: \${NEO4J_USER}
+    - name: NEO4J_PASSWORD
+      value: \${NEO4J_PASSWORD}
+    - name: CACHE_BACKEND
+      value: redis
+    - name: REDIS_URL
+      value: \${REDIS_URL}
+    - name: REDIS_SSL
+      value: 'true'
     - name: EMBEDDING_PROVIDER
       value: local-model
     - name: LOCAL_MODEL_NAME
