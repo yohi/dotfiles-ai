@@ -53,6 +53,8 @@ registry:
       value: 'true'
     - name: POSTGRES_SSL_NO_VERIFY
       value: 'false'
+    - name: POSTGRES_SSLMODE
+      value: \${POSTGRES_SSLMODE:-require}
     - name: GRAPH_ENABLED
       value: 'true'
     - name: NEO4J_URI
