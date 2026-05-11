@@ -9,14 +9,6 @@ dependencies:
   - anthropics/skills#5128e1865d670f5d6c9cef000e6dfc4e951fb5b9
 
   mcp_servers:
-  - name: superpowers
-    title: "Superpowers"
-    description: "High-performance instruction sets for engineering workflows."
-    registry: false
-    transport: stdio
-    command: "uvx"
-    args: ["skillport-mcp", "--skills-dir", "__REPO_ROOT__/agent-skills/superpowers"]
-
   - name: docker-mcp
     registry: false
     transport: sse
@@ -24,10 +16,39 @@ dependencies:
     headers:
       Authorization: "Bearer __AUTH_TOKEN__"
 
+  - name: atlassian
+    title: "Atlassian"
+    description: "Atlassian (Jira/Confluence) official MCP server."
+    registry: false
+    transport: sse
+    url: "https://mcp.atlassian.com/v1/mcp"
+
+# Agent Configurations & Deployment Settings
+config:
+  defaults:
+    gateway_url: "http://127.0.0.1:10888/sse"
+
+  # Docker MCP Gateway Backend Servers (Consolidated)
+  mcp_gateway:
+  - name: skillport
+    title: "Skillport"
+    description: "Professional development and AI skill management toolkit."
+    transport: stdio
+    command: "uvx"
+    args: ["skillport-mcp"]
+    env:
+      SKILLPORT_SKILLS_DIR: "__REPO_ROOT__/agent-skills"
+
+  - name: superpowers
+    title: "Superpowers"
+    description: "High-performance instruction sets for engineering workflows."
+    transport: stdio
+    command: "uvx"
+    args: ["skillport-mcp", "--skills-dir", "__REPO_ROOT__/agent-skills/superpowers"]
+
   - name: chronos-graph
     title: "ChronosGraph"
     description: "Long-term memory and knowledge graph system."
-    registry: false
     transport: stdio
     command: "uvx"
     args: ["--from", "git+https://github.com/yohi/chronos-graph.git", "context-store"]
@@ -46,7 +67,6 @@ dependencies:
   - name: nexus
     title: "Nexus"
     description: "Local knowledge base and indexer."
-    registry: false
     transport: stdio
     command: "npx"
     args: ["-y", "-p", "@yohi/nexus@1.6.2", "-p", "typescript", "nexus"]
@@ -57,30 +77,6 @@ dependencies:
       CHOKIDAR_INTERVAL: "2000"
       NO_PROXY: "127.0.0.1,localhost"
 
-  - name: skillport
-    title: "Skillport"
-    description: "Professional development and AI skill management toolkit."
-    registry: false
-    transport: stdio
-    command: "uvx"
-    args: ["skillport-mcp"]
-    env:
-      SKILLPORT_SKILLS_DIR: "__REPO_ROOT__/agent-skills"
-
-  - name: atlassian
-    title: "Atlassian"
-    description: "Atlassian (Jira/Confluence) official MCP server."
-    registry: false
-    transport: sse
-    url: "https://mcp.atlassian.com/v1/mcp"
-
-# Agent Configurations & Deployment Settings
-config:
-  defaults:
-    gateway_url: "http://127.0.0.1:10888/sse"
-
-  # Docker MCP Gateway Backend Servers (Not directly used by agents)
-  mcp_gateway:
   - name: SQLite
     title: "SQLite"
     description: "SQLite database access and management."
@@ -110,7 +106,7 @@ config:
       servers: [docker-mcp]
 
     claude:
-      path: ".mcp.json"
+      path: "claude/settings.json"
       format: "json"
       root_key: "mcpServers"
       servers: [docker-mcp, atlassian]

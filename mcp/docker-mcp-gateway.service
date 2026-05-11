@@ -3,7 +3,7 @@ Description=Docker MCP Gateway (chronos-graph runs locally via uv on each client
 After=network.target docker.service
 
 [Service]
-Environment="PATH=/home/linuxbrew/.linuxbrew/bin:/usr/local/bin:/usr/bin:/bin"
+Environment="PATH=/home/y_ohi/.cargo/bin:/home/y_ohi/.npm-global/bin:/home/linuxbrew/.linuxbrew/bin:/usr/local/bin:/usr/bin:/bin"
 Type=simple
 WorkingDirectory=__REPO_ROOT__
 EnvironmentFile=__REPO_ROOT__/.env

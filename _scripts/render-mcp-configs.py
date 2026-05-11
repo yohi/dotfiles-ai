@@ -48,6 +48,16 @@ def replace_placeholders(
     if isinstance(data, list):
         return [replace_placeholders(v, gateway_url, expand_paths) for v in data]
     if isinstance(data, str):
+        # Auto-expand well-known binaries to absolute paths
+        if data == "uvx":
+            uvx_path = shutil.which("uvx")
+            if uvx_path:
+                data = uvx_path
+        elif data == "npx":
+            npx_path = shutil.which("npx")
+            if npx_path:
+                data = npx_path
+
         s = (
             data.replace("__GATEWAY_URL__", gateway_url)
             .replace("__HOME__", home)
