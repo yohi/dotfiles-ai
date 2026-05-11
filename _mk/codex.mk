@@ -89,6 +89,15 @@ sync-codex: ## リポジトリ内の設定ファイルを ~/.codex へ個別に�
 		echo "  ✅ rules/ -> $(CODEX_REPO_DIR)/rules"; \
 	fi
 
+	@# skills/ (ディレクトリごとリンク)
+	@if [ -d "$(CODEX_REPO_DIR)/skills" ]; then \
+		if [ -d "$(CODEX_DOT_DIR)/skills" ] && [ ! -L "$(CODEX_DOT_DIR)/skills" ]; then \
+			rm -rf "$(CODEX_DOT_DIR)/skills"; \
+		fi; \
+		ln -sfn "$(CODEX_REPO_DIR)/skills" "$(CODEX_DOT_DIR)/skills"; \
+		echo "  ✅ skills/ -> $(CODEX_REPO_DIR)/skills"; \
+	fi
+
 	@# .personality_migration
 	@if [ -f "$(CODEX_REPO_DIR)/.personality_migration" ]; then \
 		ln -sf "$(CODEX_REPO_DIR)/.personality_migration" "$(CODEX_DOT_DIR)/.personality_migration"; \

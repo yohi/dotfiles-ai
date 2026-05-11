@@ -195,6 +195,22 @@ link-agent-commands: ## agent-commands/ のコマンドを各エージェント�
 			echo "  ✅ gemini/commands/$$base.toml (generated from .md)"; \
 		fi; \
 	done
+	@# --- Codex CLI: .md → SKILL.md 変換 ---
+	@mkdir -p "$(REPO_ROOT)/codex/skills"
+	@for cmd in "$(AGENT_CMDS_DIR)"/*.md; do \
+		[ -f "$$cmd" ] || continue; \
+		base=$$(basename "$$cmd" .md); \
+		target="$(REPO_ROOT)/codex/skills/$$base.md"; \
+		if [ -f "$$target" ] && [ "$$target" -nt "$$cmd" ]; then \
+			echo "  [SKIP] codex/skills/$$base.md (up-to-date)"; \
+		else \
+			name=$$(echo "$$base" | sed 's/-/ /g; s/\b\(.\)/\u\1/g'); \
+			desc=$$(awk '/^---$$/{n++; next} n==1 && /^description:/{sub(/^description: */, ""); print; exit}' "$$cmd"); \
+			body=$$(awk 'BEGIN{n=0} /^---$$/{n++; next} n>=2{print}' "$$cmd"); \
+			printf -- "---\nname: %s\ndescription: %s\n---\n\n# %s\n\n%s\n" "$$base" "$$desc" "$$name" "$$body" > "$$target"; \
+			echo "  ✅ codex/skills/$$base.md (generated from .md)"; \
+		fi; \
+	done
 
 # ============================================================
 # inject-meta-prompt-opencode: OpenCode docs への参照リンク作成
