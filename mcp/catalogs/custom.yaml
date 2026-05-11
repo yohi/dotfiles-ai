@@ -1,0 +1,144 @@
+version: 3
+name: custom
+displayName: Custom Servers
+registry:
+  superpowers:
+    name: superpowers
+    title: Superpowers
+    description: High-performance instruction sets for engineering workflows.
+    registry: false
+    command:
+    - uvx
+    args:
+    - skillport-mcp
+    - --skills-dir
+    - /home/y_ohi/dotfiles/components/dotfiles-ai/agent-skills/superpowers
+    type: stdio
+  docker-mcp:
+    name: docker-mcp
+    registry: false
+    url: http://127.0.0.1:10888/sse
+    headers:
+      Authorization: Bearer __AUTH_TOKEN__
+    type: sse
+  chronos-graph:
+    name: chronos-graph
+    title: ChronosGraph
+    description: Long-term memory and knowledge graph system (Cloud Mode).
+    registry: false
+    command:
+    - uvx
+    args:
+    - --from
+    - git+https://github.com/yohi/chronos-graph.git
+    - context-store
+    env:
+    - name: LOG_LEVEL
+      value: error
+    - name: STORAGE_BACKEND
+      value: postgres
+    - name: POSTGRES_HOST
+      value: aws-1-ap-southeast-1.pooler.supabase.com
+    - name: POSTGRES_PORT
+      value: '5432'
+    - name: POSTGRES_DB
+      value: postgres
+    - name: POSTGRES_USER
+      value: postgres.cojzbcmvvqlivowmjeza
+    - name: POSTGRES_PASSWORD
+      value: \${POSTGRES_PASSWORD}
+    - name: POSTGRES_SSL
+      value: 'true'
+    - name: POSTGRES_SSL_NO_VERIFY
+      value: 'true'
+    - name: GRAPH_ENABLED
+      value: 'true'
+    - name: NEO4J_URI
+      value: neo4j+s://3af8423f.databases.neo4j.io
+    - name: NEO4J_USER
+      value: 3af8423f
+    - name: NEO4J_PASSWORD
+      value: \${NEO4J_PASSWORD}
+    - name: CACHE_BACKEND
+      value: redis
+    - name: REDIS_URL
+      value: \${REDIS_URL}
+    - name: REDIS_SSL
+      value: 'true'
+    - name: EMBEDDING_PROVIDER
+      value: local-model
+    - name: LOCAL_MODEL_NAME
+      value: cl-nagoya/ruri-v3-310m
+    - name: EMBEDDING_DIMENSION
+      value: '768'
+    type: stdio
+  nexus:
+    name: nexus
+    title: Nexus
+    description: Local knowledge base and indexer.
+    registry: false
+    command:
+    - npx
+    args:
+    - -y
+    - -p
+    - '@yohi/nexus@1.6.2'
+    - -p
+    - typescript
+    - nexus
+    env:
+    - name: NEXUS_STORAGE_ROOT_DIR
+      value: /home/y_ohi/.nexus
+    - name: NEXUS_WATCHER_IGNORE_PATHS
+      value: node_modules,.git,.nexus,dist,gemini,.worktrees,.venv,target,.mypy_cache,.ruff_cache,build,.serena,.cache,__pycache__,*.db,*.sqlite,*.log,out,bundle,vendor,package-lock.json,yarn.lock,pnpm-lock.yaml
+    - name: CHOKIDAR_USEPOLLING
+      value: 'false'
+    - name: CHOKIDAR_INTERVAL
+      value: '2000'
+    - name: NO_PROXY
+      value: 127.0.0.1,localhost
+    type: stdio
+  skillport:
+    name: skillport
+    title: Skillport
+    description: Professional development and AI skill management toolkit.
+    registry: false
+    command:
+    - uvx
+    args:
+    - skillport-mcp
+    env:
+    - name: SKILLPORT_SKILLS_DIR
+      value: /home/y_ohi/dotfiles/components/dotfiles-ai/agent-skills
+    type: stdio
+  atlassian:
+    name: atlassian
+    title: Atlassian
+    description: Atlassian (Jira/Confluence) official MCP server.
+    registry: false
+    url: https://mcp.atlassian.com/v1/mcp
+    type: sse
+  SQLite:
+    name: SQLite
+    title: SQLite
+    description: SQLite database access and management.
+    type: server
+    image: mcp/sqlite@sha256:efbc05ccace18df122f26b674bd1730c76ece716551df2b3961d519909c34696
+    args:
+    - /mcp/sqlite.db
+    volumes:
+    - /home/y_ohi/.mcp/sqlite:/mcp
+  github-official:
+    name: github-official
+    description: Official GitHub MCP server for repository management.
+    type: server
+    image: mcp/github@sha256:89fd71b6f2dd098de0d7517c1899b7fe90590d3193e253991d61a800b041bfd4
+    env:
+    - name: GITHUB_PERSONAL_ACCESS_TOKEN
+      value: ''
+  sequentialthinking:
+    name: sequentialthinking
+    title: Sequential Thinking
+    description: A tool for sequential problem solving and logical reasoning.
+    type: server
+    image: mcp/sequentialthinking@sha256:cd3174b2ecf37738654cf7671fb1b719a225c40a78274817da00c4241f465e5f
