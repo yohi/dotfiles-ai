@@ -213,48 +213,42 @@
   // 4. Experimental: 最新・実験的機能の最適化
   // --------------------------------------------------------------------------
   "experimental": {
-    "task_system": true, // Todo駆動タスク管理(blockedBy対応)。 .sisyphus/tasks/ に永続化
-    "hashline_edit": true, // LINE#ID形式のハッシュアンカー編集。行ずれエラーをゼロに
-    "hashline_diff_enhancer": true,
+    "task_system": false, 
+    "hashline_edit": false,
+    "hashline_diff_enhancer": false,
     "aggressive_truncation": true,
-    "auto_resume": true, // セッション中断・失敗からの自動復旧
-    "preemptive_compaction_threshold": 0.85 // トークン限界前のプロアクティブな圧縮
+    "auto_resume": false, 
+    "preemptive_compaction_threshold": 0.85
   },
 
   // TMUX統合: バックグラウンドエージェントを別ペインでリアルタイム監視
   "tmux": {
-    "enabled": true,
+    "enabled": false,
     "layout": "main-vertical",
     "main_pane_size": 65
   },
 
   // ブラウザ自動化エンジン: スクリーンショット、フォーム入力、ネットワーク監視をサポート
   "browser_automation_engine": {
-    "provider": "playwright-cli" // デフォルト: playwright
+    "provider": "none" 
   },
 
   // バックグラウンドタスクの並列実行制御
   "background_task": {
-    "defaultConcurrency": 10,
+    "defaultConcurrency": 1,
     "providerConcurrency": {
-      "openai": 5,
-      "nvidia": 10,
-      "minimax": 5,
-      "google": 20,
-      "opencode": 5
+      "openai": 1
     }
   },
 
   // Ralph Loop: タスク完了まで自律的に試行を繰り返す自己参照型開発ループ
   "ralph_loop": {
-    "enabled": true,
-    "default_max_iterations": 20 // v4.0.0 で実行時エラーのガードとリトライ戦略が強化
+    "enabled": false
   },
 
   // Boulder State: セッションを跨いでエージェントの状態を維持する永続化機構
   "boulder_state": {
-    "enabled": true,
-    "storage_path": ".sisyphus/boulder_state.json"
+    "enabled": false
   },
 
   // セッションリカバリ: エラーやコンテキスト上限からの透明な復旧

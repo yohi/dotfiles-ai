@@ -82,6 +82,7 @@ clean-sync-artifacts: ## 同期マーカーおよび生成されたリンク・�
 	rm -rf "$(REPO_ROOT)/ide/cursor/commands/agent"
 	find "$(REPO_ROOT)/.cursor/rules" -maxdepth 1 -type l -name "*.md" -delete 2>/dev/null || true
 	rm -rf "$(REPO_ROOT)/gemini/commands"
+	rm -rf "$(REPO_ROOT)/codex/skills"
 	@echo "✅ clean-sync-artifacts: 同期状態がリセットされました"
 
 # ============================================================

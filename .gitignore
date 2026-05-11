@@ -79,7 +79,16 @@ __pycache__/
 .claude.json
 mcp/config.yaml
 codex/config.toml
+resolved_config.json
 
+
+# Generated agent commands & skills (derived from agent-commands/)
+codex/skills/
+gemini/commands/
+opencode/commands/
+claude/commands/
+ide/cursor/commands/agent/
+.cursor/rules/
 
 # APM dependencies
 apm_modules/
