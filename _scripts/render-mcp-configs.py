@@ -180,30 +180,31 @@ def surgical_json_update(text: str, key: str, new_value: dict[str, Any]) -> str 
     return text[: match.start()] + indent + "\n".join(new_block) + text[end_pos:]
 
 
-def get_token_from_env_file(repo_root: Path) -> str | None:
+def load_env_file(repo_root: Path) -> None:
     env_path = repo_root / ".env"
     if not env_path.exists():
-        return None
+        return
     try:
         content = env_path.read_text(encoding="utf-8")
-        # Match lines like MCP_GATEWAY_TOKEN=value or MCP_GATEWAY_TOKEN="value"
-        match = re.search(r"^MCP_GATEWAY_TOKEN=(?:\"([^\"]*)\"|'([^']*)'|([^#\n\s]*))", content, re.MULTILINE)
-        if match:
-            # Return the first non-None group
-            return match.group(1) or match.group(2) or match.group(3)
+        for line in content.splitlines():
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            if "=" in line:
+                key, val = line.split("=", 1)
+                key = key.strip()
+                val = val.strip().strip("\"").strip("'")
+                if key and key not in os.environ:
+                    os.environ[key] = val
     except OSError:
         pass
-    return None
 
 
 def main() -> int:
     repo_root = Path(__file__).parent.parent.resolve()
 
-    # Load token from .env if not present in environment
-    if "MCP_GATEWAY_TOKEN" not in os.environ:
-        token = get_token_from_env_file(repo_root)
-        if token:
-            os.environ["MCP_GATEWAY_TOKEN"] = token
+    # Load environment variables from .env
+    load_env_file(repo_root)
 
     config = load_client_config()
     if not config:
@@ -223,7 +224,8 @@ def main() -> int:
     gateway_candidates = {
         n: s
         for n, s in all_servers_raw.items()
-        if s.get("type") in ["server", "stdio"] or s.get("transport") == "stdio"
+        if (s.get("type") in ["server", "stdio"] or s.get("transport") == "stdio")
+        and not s.get("standalone", False)
     }
 
     def std_for_gateway(srv_dict):
@@ -235,7 +237,7 @@ def main() -> int:
             s = {
                 k: v
                 for k, v in s.items()
-                if k not in ["title", "description", "name", "registry", "port"]
+                if k not in ["title", "description", "name", "registry", "port", "standalone"]
             }
             if "env" in s and isinstance(s["env"], dict):
                 s["env"] = [{"name": k, "value": v} for k, v in s["env"].items()]
@@ -351,10 +353,11 @@ def main() -> int:
                 if sn == "docker-mcp":
                     s["type"] = "sse"
                 else:
-                    # Bridge to unified gateway if it's a local/container server
+                    # Bridge to unified gateway if it's a local/container server and not standalone
                     if (
-                        s.get("type") in ["stdio", "server", "local"]
-                        or s.get("transport") == "stdio"
+                        (s.get("type") in ["stdio", "server", "local"]
+                        or s.get("transport") == "stdio")
+                        and not s.get("standalone", False)
                     ):
                         s["type"] = "remote" if an == "opencode" else "sse"
                         s["url"] = f"{gateway_url}?server={sn}"
@@ -376,6 +379,7 @@ def main() -> int:
                     "name",
                     "registry",
                     "transport",
+                    "standalone",
                 ]:
                     s.pop(k, None)
                 if an == "opencode":

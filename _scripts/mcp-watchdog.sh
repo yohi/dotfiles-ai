@@ -27,7 +27,15 @@ while true; do
     fi
 
     # set -e による中断を防ぐため、失敗を許容し終了コードを確認
-    HTTP_CODE=$(curl "${CURL_ARGS[@]}" "$GATEWAY_URL" || echo "000")
+    # SSE エンドポイントの場合、接続は確立してもタイムアウト (exit 28) するが、
+    # 200 が返ってきていればゲートウェイは生きていると判断する。
+    # pipefail の影響を受けないよう、一時的に無効化するか、より単純な取得方法をとる。
+    set +o pipefail
+    RAW_OUT=$(curl "${CURL_ARGS[@]}" "$GATEWAY_URL" 2>/dev/null || true)
+    set -o pipefail
+    
+    HTTP_CODE=$(echo "$RAW_OUT" | grep -oE '[0-9]{3}' | head -n 1)
+    if [ -z "$HTTP_CODE" ]; then HTTP_CODE="000"; fi
 
     if [ "$HTTP_CODE" != "200" ] && [ "$HTTP_CODE" != "405" ]; then
         echo "⚠️  Docker MCP Gateway is not responding (HTTP $HTTP_CODE). Attempting to restart..."
