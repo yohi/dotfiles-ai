@@ -63,7 +63,7 @@ config:
     description: "Local knowledge base and indexer."
     transport: stdio
     command: "npx"
-    args: ["-y", "@yohi/nexus"]
+    args: ["-y", "@yohi/nexus@1.7.0"]
     env:
       NEXUS_STORAGE_ROOT_DIR: "__HOME__/.nexus"
       NO_PROXY: "127.0.0.1,localhost"
