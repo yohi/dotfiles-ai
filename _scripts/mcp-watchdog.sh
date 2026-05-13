@@ -34,7 +34,10 @@ while true; do
     RAW_OUT=$(curl "${CURL_ARGS[@]}" "$GATEWAY_URL" 2>/dev/null || true)
     set -o pipefail
     
-    HTTP_CODE=$(echo "$RAW_OUT" | grep -oE '[0-9]{3}' | head -n 1)
+    # curl -w "%{http_code}" は末尾に改行を含まないため、
+    # 直後の grep で確実に拾えるよう、エコー時に改行を意識するか、
+    # 変数展開の工夫を行う。
+    HTTP_CODE=$(echo "$RAW_OUT" | grep -oE '[0-9]{3}' | tail -n 1)
     if [ -z "$HTTP_CODE" ]; then HTTP_CODE="000"; fi
 
     if [ "$HTTP_CODE" != "200" ] && [ "$HTTP_CODE" != "405" ]; then
