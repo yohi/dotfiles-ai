@@ -328,6 +328,30 @@
       },
       "type": "remote",
       "enabled": true
+    },
+    "skillport": {
+      "command": "/home/<user>/.linuxbrew/Cellar/uv/0.11.12/bin/uvx",
+      "args": [
+        "skillport-mcp"
+      ],
+      "env": {
+        "SKILLPORT_SKILLS_DIR": "${HOME}/dotfiles/components/dotfiles-ai/agent-skills"
+      },
+      "type": "stdio",
+      "enabled": true
+    },
+    "nexus": {
+      "command": "/home/<user>/.linuxbrew/lib/node_modules/npm/bin/npx-cli.js",
+      "args": [
+        "-y",
+        "@yohi/nexus@1.7.0"
+      ],
+      "env": {
+        "NEXUS_STORAGE_ROOT_DIR": "${HOME}/.nexus",
+        "NO_PROXY": "127.0.0.1,localhost"
+      },
+      "type": "stdio",
+      "enabled": true
     }
   }
 }
