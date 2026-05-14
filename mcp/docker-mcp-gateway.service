@@ -8,7 +8,6 @@ Type=simple
 WorkingDirectory=__REPO_ROOT__
 EnvironmentFile=__REPO_ROOT__/.env
 LimitNOFILE=65536
-ExecStartPre=/usr/bin/env uv run python3 _scripts/render-mcp-configs.py
 ExecStart=/usr/bin/env bash _scripts/mcp-stdio-wrapper.sh \
   --verbose \
   --transport sse \
