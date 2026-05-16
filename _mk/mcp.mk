@@ -37,7 +37,8 @@ sync-mcp-gateway: ## Docker MCP Gateway 設定を同期
 		cp mcp/config.yaml $(HOME_DIR)/.docker/mcp/config.yaml; \
 		echo "✅ Gateway config synced."; \
 	else \
-		echo "⚠️  mcp/config.yaml not found — Gateway config may be stale."; \
+		echo "❌ mcp/config.yaml not found — run 'make sync-mcp' first." >&2; \
+		exit 1; \
 	fi
 
 status-mcp: ## Docker MCP Gatewayのステータスを確認

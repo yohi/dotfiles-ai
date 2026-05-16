@@ -84,8 +84,10 @@ sync-skills-to-agents: ## agent-skills/ から .agents/skills/ へのシンボ�
 	done
 	@for subdir in "$(AGENT_SKILLS_DIR)"/*/*/; do \
 		[ -d "$$subdir" ] || continue; \
+		ns=$$(basename "$$(dirname "$$subdir")"); \
 		name=$$(basename "$$subdir"); \
-		target="$(REPO_ROOT)/.agents/skills/$$name"; \
+		mkdir -p "$(REPO_ROOT)/.agents/skills/$$ns"; \
+		target="$(REPO_ROOT)/.agents/skills/$$ns/$$name"; \
 		if [ -f "$${subdir}SKILL.md" ]; then \
 			if [ -L "$$target" ] || [ ! -e "$$target" ]; then \
 				rm -f "$$target"; \
