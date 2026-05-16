@@ -1,32 +1,332 @@
+// vim: ft=jsonc
+// Config Modernized: 2026-05-09
+// Target OpenCode Version: v1.14.41
+
+/**
+ * OpenCode Core Configuration
+ *
+ * [概要]
+ * このファイルは OpenCode の推論エンジン、権限、およびバックエンド動作を定義します。
+ * [Plugin] や [MCP] などのマーカーは自動化ツールのアンカーとして機能するため、
+ * 位置を変更せずに保持してください。
+ */
 {
   "$schema": "https://opencode.ai/config.json",
-  "mcp": {
-    "skillport": {
-      "type": "local",
-      "enabled": true,
+
+  "default_agent": "sisyphus",
+  "shell": "bash",
+  "snapshot": true,
+
+  // --------------------------------------------------------------------------
+  // [Plugin] - エコシステム設定
+  // --------------------------------------------------------------------------
+  // [Plugin]
+  "plugin": [
+    "@yohi/opencode-codex-quota@1.0.0",
+    "@yohi/justice@2.2.0",
+    "@yohi/opencode-cursor-plugin@1.3.8",
+    "oh-my-openagent@3.17.15"
+  ],
+
+  // --------------------------------------------------------------------------
+  // Permission - 権限とガードレール
+  // --------------------------------------------------------------------------
+  "permission": {
+    "*": "ask",
+    "read": "allow",
+    "list": "allow",
+    "glob": "allow",
+    "grep": "allow",
+    "edit": "allow",
+    "lsp": "allow",
+    "skill": "allow",
+    "websearch": "allow",
+    "bash": {
+      "*": "ask",
+      "ls": "allow",
+      "ls *": "allow",
+      "cat": "allow",
+      "cat *": "allow",
+      "head": "allow",
+      "head *": "allow",
+      "tail": "allow",
+      "tail *": "allow",
+      "mkdir": "allow",
+      "mkdir *": "allow",
+      "touch": "allow",
+      "touch *": "allow",
+      "cp": "allow",
+      "cp *": "allow",
+      "mv": "allow",
+      "mv *": "allow",
+      "make": "allow",
+      "make *": "allow",
+      "uv": "allow",
+      "uv *": "allow",
+      "python": "ask",
+      "node": "ask",
+      "bun": "ask",
+      "git status": "allow",
+      "git status *": "allow",
+      "git log": "allow",
+      "git log *": "allow",
+      "git diff": "allow",
+      "git diff *": "allow",
+      "git branch": "allow",
+      "git add": "allow",
+      "git commit": "allow",
+      "git commit *": "allow",
+      "git add .": "deny",
+      "git add *": "deny",
+      "git add -A": "deny",
+      "git add --all": "deny",
+      "git add -u": "deny",
+      "git add :/": "deny",
+      "rm -rf *": "deny",
+      "npm publish*": "deny",
+      "sudo *": "deny",
+      "su *": "deny",
+      "curl* | sh": "deny",
+      "curl *|sh": "deny",
+      "curl * | sh": "deny",
+      "bash _scripts/*": "deny",
+      "curl*|sh": "deny",
+      "bun run lint*": "allow",
+      "bun run typecheck*": "allow",
+      "bun run test*": "allow",
+      "eslint*": "allow"
+    }
+  },
+
+  // --------------------------------------------------------------------------
+  // Compaction & Lifecycle
+  // --------------------------------------------------------------------------
+  "compaction": {
+    "auto": true,
+    "reserved": 15000,
+    "tail_turns": 3,
+    "prune": true
+  },
+
+  "share": "manual",
+
+  // --------------------------------------------------------------------------
+  // LSP - 言語サーバー設定
+  // --------------------------------------------------------------------------
+  "lsp": {
+    "typescript-language-server": {
       "command": [
-        "uvx",
-        "skillport-mcp"
+        "typescript-language-server",
+        "--stdio"
+      ],
+      "extensions": [
+        ".ts",
+        ".tsx",
+        ".js",
+        ".jsx"
+      ],
+      "initialization": {
+        "preferences": {
+          "includeInlayParameterNameHints": "all",
+          "includeInlayVariableTypeHints": true,
+          "includeInlayFunctionParameterTypeHints": true,
+          "disableSuggestions": false
+        },
+        "diagnostics": {
+          "ignoredCodes": [
+            6133
+          ]
+        }
+      }
+    },
+    "bash-language-server": {
+      "command": [
+        "bash-language-server",
+        "start"
+      ],
+      "extensions": [
+        ".sh"
       ]
     },
-    "nexus": {
-      "type": "local",
-      "enabled": true,
+    "pyright": {
+      "command": [
+        "pyright-langserver",
+        "--stdio"
+      ],
+      "extensions": [
+        ".py"
+      ],
+      "initialization": {
+        "python": {
+          "analysis": {
+            "typeCheckingMode": "strict",
+            "autoSearchPaths": true,
+            "useLibraryCodeForTypes": true
+          }
+        }
+      }
+    },
+    "markdownlint": {
       "command": [
         "npx",
-        "-y",
-        "@yohi/nexus@1.7.0"
+        "markdownlint-lsp",
+        "--stdio"
+      ],
+      "extensions": [
+        ".md"
       ]
     },
-    "chronos-graph": {
-      "type": "local",
-      "enabled": true,
+    "mypy": {
       "command": [
-        "uvx",
-        "--from",
-        "git+https://github.com/yohi/chronos-graph.git",
-        "context-store"
+        "mypy",
+        "--ignore-missing-imports",
+        "--follow-imports=silent",
+        "--strict"
+      ],
+      "extensions": [
+        ".py"
       ]
+    },
+    "shellcheck": {
+      "command": [
+        "shellcheck",
+        "-f",
+        "gcc",
+        "--severity=style"
+      ],
+      "extensions": [
+        ".sh"
+      ]
+    },
+    "eslint": {
+      "command": [
+        "eslint",
+        "--format",
+        "stylish",
+        "--max-warnings",
+        "0"
+      ],
+      "extensions": [
+        ".ts",
+        ".tsx",
+        ".js",
+        ".jsx"
+      ]
+    }
+  },
+
+  "instructions": [
+    "global-rules/AGENTS.global.md",
+    "agent-skills/superpowers/using-superpowers/SKILL.md"
+  ],
+
+  "watcher": {
+    "ignore": [
+      "**/node_modules/**",
+      "**/dist/**",
+      "**/coverage/**",
+      "**/*.lock",
+      "**/.git/**"
+    ]
+  },
+
+  // --------------------------------------------------------------------------
+  // Providers & Models (2026-05 Latest)
+  // --------------------------------------------------------------------------
+  "enabled_providers": [
+    "google",
+    "openai",
+    "nvidia",
+    "cloudflare-workers-ai",
+    "opencode",
+    "cursor"
+  ],
+  "provider": {
+    "google": {
+      "whitelist": [
+        "gemini-3-flash-preview",
+        "gemini-3.1-flash-image-preview",
+        "gemini-3.1-flash-lite",
+        "gemini-3.1-flash-lite-preview",
+        "gemini-3.1-pro-preview",
+        "gemini-3.1-pro-preview-customtools",
+      ]
+    },
+    "openai": {
+      "whitelist": [
+        "gpt-5.3-codex",
+        "gpt-5.3-codex-spark",
+        "gpt-5.4",
+        "gpt-5.4-mini",
+        "gpt-5.5",
+      ]
+    },
+    "nvidia": {
+      "whitelist": [
+        "minimaxai/minimax-m2.5",
+        "minimaxai/minimax-m2.7",
+        "z-ai/glm4.7",
+      ]
+    },
+    "cloudflare-workers-ai": {
+      "whitelist": [
+        "@cf/google/gemma-4-26b-a4b-it",
+        "@cf/meta/llama-4-scout-17b-16e-instruct",
+        "@cf/moonshotai/kimi-k2.5",
+        "@cf/moonshotai/kimi-k2.6",
+        "@cf/nvidia/nemotron-3-120b-a12b",
+        "@cf/openai/gpt-oss-120b",
+        "@cf/openai/gpt-oss-20b",
+        "@cf/zai-org/glm-4.7-flash",
+      ]
+    },
+    "opencode": {
+      "whitelist": [
+        "minimax-m2.5-free",
+        "ling-2.6-flash-free",
+        "hy3-preview-free",
+        "nemotron-3-super-free",
+        "big-pickle",
+      ]
+    },
+    "cursor":{
+      "whitelist": [
+        "claude-haiku-4-5",
+        "claude-opus-4-7",
+        "claude-sonnet-4-6",
+        "composer-2",
+        "gemini-3-flash",
+        "gemini-3.1-pro",
+        "gpt-5.3-codex",
+        "gpt-5.3-codex-spark",
+        "gpt-5.4",
+        "gpt-5.4-mini",
+        "gpt-5.4-nano",
+        "gpt-5.5",
+      ]
+    }
+    
+  },
+
+  "experimental": {
+    "batch_tool": true,
+    "openTelemetry": true,
+    "continue_loop_on_deny": false,
+    "mcp_timeout": 15000
+  },
+
+  // --------------------------------------------------------------------------
+  // [MCP] - サーバー設定
+  // --------------------------------------------------------------------------
+  // [MCP]
+  "mcp": {
+    "docker-mcp": {
+      "url": "http://127.0.0.1:10888/sse",
+      "headers": {
+        "Authorization": "Bearer {env:MCP_GATEWAY_TOKEN}"
+      },
+      "type": "remote",
+      "enabled": true
     }
   }
 }
