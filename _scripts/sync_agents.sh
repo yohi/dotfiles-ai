@@ -12,6 +12,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.." || exit 1
 
 readonly OUTPUT_FILES=(
+    "AGENTS.md"
     "global-rules/AGENTS.global.md"
 )
 
