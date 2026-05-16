@@ -128,10 +128,10 @@ AIエージェント（Claude Code, Gemini CLI, OpenCode, Codex）の設定・�
 |:-----------|:--------|:--------|
 | **Claude Code** | Native SSE | APM (`apm install`) |
 | **Gemini CLI** | Native SSE | APM (`apm install`) |
-| **Antigravity** | Native SSE | APM (`apm install`) |
+| **Antigravity** | Native SSE | Make (`make sync-mcp`) |
 | **Cursor** | Native SSE | APM (`apm install`) |
 | **OpenCode** | Remote MCP | APM (`apm install`) |
-| **VSCode** | Native SSE | APM (`apm install`) |
+| **VSCode** | Native SSE | Make (`make sync-mcp`) |
 
 注記:
 - SSE エンドポイントとして `http://127.0.0.1:10888/sse` と `http://localhost:10888/sse` が混在している場合がありますが、これらは実質的に同一であり、環境に合わせて自動的に設定されます。

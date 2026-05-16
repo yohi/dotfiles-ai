@@ -80,8 +80,6 @@ targets:
   - gemini
   - claude
   - cursor
-  - vscode
-  - antigravity
   - codex
 
 # Exported Artifacts

@@ -183,7 +183,7 @@ dependencies:
       standalone: true
 
 targets:
-  default: [opencode, gemini, claude, cursor, vscode, antigravity, codex]
+  default: [opencode, gemini, claude, cursor, codex]
 
 exports:
   skills:
