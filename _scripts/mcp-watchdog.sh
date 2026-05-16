@@ -20,25 +20,13 @@ fi
 echo "🛡️ MCP Watchdog started (Target: $GATEWAY_URL)"
 
 while true; do
-    # トークンがある場合のみヘッダーを追加
     CURL_ARGS=("-s" "-o" "/dev/null" "-w" "%{http_code}" "--max-time" "10")
     if [ -n "$TOKEN" ]; then
         CURL_ARGS+=("-H" "Authorization: Bearer $TOKEN")
     fi
 
-    # set -e による中断を防ぐため、失敗を許容し終了コードを確認
-    # SSE エンドポイントの場合、接続は確立してもタイムアウト (exit 28) するが、
-    # 200 が返ってきていればゲートウェイは生きていると判断する。
-    # pipefail の影響を受けないよう、一時的に無効化するか、より単純な取得方法をとる。
-    set +o pipefail
     RAW_OUT=$(curl "${CURL_ARGS[@]}" "$GATEWAY_URL" 2>/dev/null || true)
-    set -o pipefail
-    
-    # curl -w "%{http_code}" は末尾に改行を含まないため、
-    # 直後の grep で確実に拾えるよう、エコー時に改行を意識するか、
-    # 変数展開の工夫を行う。
-    HTTP_CODE=$(echo "$RAW_OUT" | grep -oE '[0-9]{3}' | tail -n 1)
-    if [ -z "$HTTP_CODE" ]; then HTTP_CODE="000"; fi
+    HTTP_CODE="${RAW_OUT:-000}"
 
     if [ "$HTTP_CODE" != "200" ] && [ "$HTTP_CODE" != "405" ]; then
         echo "⚠️  Docker MCP Gateway is not responding (HTTP $HTTP_CODE). Attempting to restart..."

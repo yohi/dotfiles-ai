@@ -19,10 +19,10 @@ init-env: ## Interactive setup for .env file (essential secrets only)
 	echo "📝 Setting up essential environment variables..."; \
 	\
 	# 1. AI Agent API Keys \
-	read -p "Anthropic API Key: " anthropic_key; \
-	read -p "OpenAI API Key: " openai_key; \
-	read -p "Gemini API Key: " gemini_key; \
-	read -p "Cursor API Key: " cursor_key; \
+	read -s -p "Anthropic API Key: " anthropic_key; echo; \
+	read -s -p "OpenAI API Key: " openai_key; echo; \
+	read -s -p "Gemini API Key: " gemini_key; echo; \
+	read -s -p "Cursor API Key: " cursor_key; echo; \
 	\
 	# 2. Atlassian Secrets (Personal) \
 	read -p "Atlassian Domain [https://diamondhead.atlassian.net]: " atlassian_domain; \

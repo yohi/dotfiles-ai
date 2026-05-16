@@ -119,7 +119,9 @@ uninstall-codex: ## 設定ファイルのリンクを解除する（実体ファ
 .PHONY: run-codex
 run-codex: ## Codex CLI を起動
 	@if [ -f .env ]; then \
-		export $$(grep -v '^#' .env | xargs); \
+		set -a; \
+		. ./.env; \
+		set +a; \
 	fi; \
 	echo "🚀 Starting Codex CLI..."; \
 	codex

@@ -341,7 +341,9 @@ check-opencode: ## OpenCode（opencode）の状態を確認
 .PHONY: run-opencode
 run-opencode: ## OpenCode を起動
 	@if [ -f .env ]; then \
-		export $$(grep -v '^#' .env | xargs); \
+		set -a; \
+		. ./.env; \
+		set +a; \
 	fi; \
 	echo "🚀 Starting OpenCode..."; \
 	$(OPENCODE_BIN)

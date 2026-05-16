@@ -163,7 +163,9 @@ check-claude: ## Claude Code の診断を実行
 .PHONY: run-claude
 run-claude: ## プロジェクト固有の設定で Claude Code を起動
 	@if [ -f .env ]; then \
-		export $$(grep -v '^#' .env | xargs); \
+		set -a; \
+		. ./.env; \
+		set +a; \
 	fi; \
 	export CLAUDE_CONFIG_DIR=$${CLAUDE_CONFIG_DIR:-$(REPO_ROOT)/.claude}; \
 	mkdir -p "$$CLAUDE_CONFIG_DIR"; \

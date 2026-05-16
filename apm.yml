@@ -47,7 +47,7 @@ dependencies:
       command: "uvx"
       args:
         - "--from"
-        - "git+https://github.com/yohi/chronos-graph.git"
+        - "git+https://github.com/yohi/chronos-graph.git[all]"
         - "context-store"
       env:
         STORAGE_BACKEND: "postgres"

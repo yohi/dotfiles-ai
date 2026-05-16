@@ -184,7 +184,9 @@ check-cursor-version:
 .PHONY: run-cursor
 run-cursor: ## Cursor IDE を起動
 	@if [ -f .env ]; then \
-		export $$(grep -v '^#' .env | xargs); \
+		set -a; \
+		. ./.env; \
+		set +a; \
 	fi; \
 	echo "🚀 Starting Cursor..."; \
 	cursor &

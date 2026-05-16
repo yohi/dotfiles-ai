@@ -45,7 +45,9 @@ check-antigravity: ## Antigravityの状態を確認
 .PHONY: run-antigravity
 run-antigravity: ## Antigravity を起動
 	@if [ -f .env ]; then \
-		export $$(grep -v '^#' .env | xargs); \
+		set -a; \
+		. ./.env; \
+		set +a; \
 	fi; \
 	echo "🚀 Starting Antigravity..."; \
 	antigravity &

@@ -71,7 +71,7 @@ dependencies:
 
 ### 4.1 システム構成図
 
-```
+```text
 dotfiles-ai (SSOT)
 ├── apm.yml .................. SSOT（外部スキル依存関係 + カスタムMCP）
 ├── agent-skills/
@@ -212,10 +212,10 @@ exports:
 
 # --- Tier 2: Environment-specific Settings ---
 # マシンや環境に依存する設定（非秘匿）
-# CHRONOS_POSTGRES_HOST=db.cojzbcmvvqlivowmjeza.supabase.co
-# CHRONOS_NEO4J_URI=neo4j+s://3af8423f.databases.neo4j.io
-# CHRONOS_NEO4J_PASSWORD=your_password
-# CHRONOS_REDIS_URL=rediss://default:your_password@organic-crow-100989.upstash.io:6379
+# CHRONOS_POSTGRES_HOST=<your_postgres_host>
+# CHRONOS_NEO4J_URI=neo4j+s://<your_neo4j_host>
+# CHRONOS_NEO4J_PASSWORD=<your_password>
+# CHRONOS_REDIS_URL=rediss://default:<your_password>@<your_redis_host>:6379
 
 # --- Tier 3: Defaults (通常は変更不要) ---
 # これらは apm.yml にデフォルト値が記述されています。
@@ -238,9 +238,9 @@ exports:
 
 | 変数名 | 用途 | 例 |
 | :--- | :--- | :--- |
-| `CHRONOS_POSTGRES_HOST` | DBホスト | `db.cojzbcmvvqlivowmjeza.supabase.co` |
-| `CHRONOS_NEO4J_URI` | Neo4j接続先 | `neo4j+s://...` |
-| `CHRONOS_REDIS_URL` | Redis接続先 | `rediss://...` |
+| `CHRONOS_POSTGRES_HOST` | DBホスト | `<your_postgres_host>` |
+| `CHRONOS_NEO4J_URI` | Neo4j接続先 | `neo4j+s://<your_neo4j_host>` |
+| `CHRONOS_REDIS_URL` | Redis接続先 | `rediss://default:<your_password>@<your_redis_host>:6379` |
 
 #### Tier 3: `apm.yml` 内直接定義（デフォルト値）
 
@@ -255,7 +255,7 @@ exports:
 
 #### ディレクトリ構造
 
-```
+```text
 agent-skills/
 ├── .skillport/ ........... Skillport 設定・メタデータ
 ├── custom/ ............... プロジェクト固有スキル
@@ -298,7 +298,7 @@ agent-skills/
 
 #### 集合成品（`.agents/skills/`）
 
-```
+```text
 .agents/skills/ ........... APM 標準クロスプラットフォーム配置先
 ├── agent-skill-architect -> ../agent-skills/custom/agent-skill-architect
 ├── config-modernizer -> ../agent-skills/custom/config-modernizer
@@ -350,7 +350,7 @@ Docker Catalog 標準の MCP は Docker Desktop / Docker CLI で有効化し、G
 
 ### 6.2 セットアップフロー
 
-```
+```text
 make setup
 │
 ├─ apm install --target agent-skills ............ 外部スキル配備
@@ -364,7 +364,7 @@ make setup
 
 ### 6.3 スキル追加フロー
 
-```
+```text
 # 外部スキルを追加する場合
 1. apm.yml dependencies.apm に追加
 2. make apm-install

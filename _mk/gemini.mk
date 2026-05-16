@@ -112,7 +112,9 @@ uninstall-gemini: ## Gemini CLI の設定を削除
 .PHONY: run-gemini
 run-gemini: ## Gemini CLI を起動
 	@if [ -f .env ]; then \
-		export $$(grep -v '^#' .env | xargs); \
+		set -a; \
+		. ./.env; \
+		set +a; \
 	fi; \
 	export GEMINI_SANDBOX=$${GEMINI_SANDBOX:-true}; \
 	echo "🚀 Starting Gemini CLI (Sandbox: $$GEMINI_SANDBOX)"; \
