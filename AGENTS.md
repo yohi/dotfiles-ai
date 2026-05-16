@@ -16,9 +16,10 @@ Never mix IDE styling configurations here, and never put AI instructions or MCP 
 
 ## 3. Directory Mandates
 - `claude/`, `gemini/`, `opencode/`, `codex/`: High-level configuration for specific AI CLI tools.
-- `ide/`: AI-specific configurations (MCP) for Cursor and VSCode. (UI settings are moved to `dotfiles-ide`).
+- `ide/`: AI-specific configurations (MCP) for Cursor and VSCode.
 - `global-rules/`: Source of Truth for cross-project AI instructions.
 - `agent-skills/`: The master repository for SkillPort skills.
+- `.agents/skills/`: Cross-platform standard skills directory (symlinked from agent-skills/).
 - `mcp/`: Management of the Docker MCP Gateway and associated catalogs.
 
 ## 4. Development Workflow
@@ -33,8 +34,10 @@ Never mix IDE styling configurations here, and never put AI instructions or MCP 
 
 ## 5. Tooling & Automation
 - `make setup`: Bootstrap the environment and run `apm install`. (Triggers `sync-agents` and executes APM's `post_install` hooks).
-- `make setup-docker-mcp`: Bootstrap Docker MCP Gateway service files and runtime environment.
-- `make sync-mcp`: Re-render Gateway backend configuration from `apm.yml` and restart the service. (Executed automatically by `apm install`).
+- `make setup-apm-env`: Create .env from .env.example (first time only).
+- `make apm-install`: Run `apm install` and execute post-install hooks.
+- `make sync-agents` / `make sync-skills-to-agents`: Sync skills to `.agents/skills/` for cross-platform compatibility.
+- `make sync-mcp`: Re-render Gateway backend configuration from `apm.yml` and restart the service.
 
 ## 6. Superpowers Workflow: Project Level
 As the central authority for AI configurations, **Level 1 (High Intensity)** is the default for most tasks in this repository.
@@ -66,7 +69,8 @@ This repository relies on symbolic links to `common-mk` from [dotfiles-core](htt
 
 <!-- SKILLPORT_START -->
 <!-- Skills are centrally managed in global-rules/AGENTS.global.md. 
-     Refer to the Global Foundation for the full list of available SkillPort skills. -->
+     Refer to the Global Foundation for the full list of available SkillPort skills.
+     Unified skills directory: .agents/skills/ -->
 <!-- SKILLPORT_END -->
 
 
