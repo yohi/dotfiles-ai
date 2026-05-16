@@ -9,7 +9,7 @@ REPO_ROOT ?= $(CURDIR)
 .PHONY: install-packages-gemini-cli install-gemini-ecosystem
 
 # Gemini CLI のインストール
-install-packages-gemini-cli:
+install-packages-gemini-cli: ## Gemini CLI のインストール / アップデート
 	@echo "♊ Gemini CLI のバージョンを確認中..."
 	@LATEST_VERSION=$$(npm show @google/gemini-cli version 2>/dev/null || echo "error"); \
 	CURRENT_VERSION=$$(gemini --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "none"); \

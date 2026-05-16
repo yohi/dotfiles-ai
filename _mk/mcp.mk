@@ -2,8 +2,13 @@
 
 mcp: setup-docker-mcp
 
-setup-docker-mcp:
+setup-docker-mcp: sync-mcp ## Docker MCP Gateway のセットアップ（APM同期→設定反映→サービス起動）
 	$(Q_ECHO) "🐳 Docker MCPの設定をセットアップ中..."
+	@mkdir -p $(HOME_DIR)/.docker/mcp
+	@if [ -f "mcp/config.yaml" ]; then \
+		cp mcp/config.yaml $(HOME_DIR)/.docker/mcp/config.yaml; \
+		echo "✅ Gateway config synced."; \
+	fi
 	@bash _scripts/setup-docker-mcp.sh
 	$(Q_ECHO) "✅ Docker MCPの設定が完了しました。"
 	$(Q_ECHO) "💡 使い方を確認するには 'make help-mcp' を実行してください。"

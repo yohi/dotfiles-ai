@@ -142,12 +142,6 @@ fi
 
 echo -e "${GREEN}✅ Shared .env file is ready.${NC}"
 
-# 設定ファイルの配置は APM (Standard Dependencies) に集約
-echo -e "${BLUE}🔗 Synchronizing Docker MCP configuration files via APM...${NC}"
-apm install --force
-make sync-mcp-gateway
-echo -e "${GREEN}✅ Configuration files synchronized.${NC}"
-
 # systemd ユーザーサービスの作成
 if [ "$SKIP_DOCKER_CHECK" = "true" ]; then
     echo -e "${YELLOW}⚠️  Skipping systemd service setup as --skip-docker-check is enabled.${NC}"

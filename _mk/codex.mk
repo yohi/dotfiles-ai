@@ -11,7 +11,7 @@ CODEX_REPO_DIR := $(REPO_ROOT)/codex
 .PHONY: setup-codex sync-codex uninstall-codex check-codex install-packages-codex
 
 # Codex CLI のインストール
-install-packages-codex:
+install-packages-codex: ## Codex CLI のインストール / アップデート
 	@echo "🧠 Codex CLI のバージョンを確認中..."
 	@if ! command -v npm >/dev/null 2>&1; then \
 		echo "❌ npm が見つかりません。先に Node.js/npm をインストールしてください"; \

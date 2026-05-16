@@ -17,7 +17,7 @@ endef
 
 # Claude Code のインストール
 .PHONY: install-packages-claude-code
-install-packages-claude-code:
+install-packages-claude-code: ## Claude Code CLI のインストール / アップデート
 	@echo "🤖 Claude Code のバージョンを確認中..."
 	@if ! command -v npm >/dev/null 2>&1; then \
 		echo "❌ npm が見つかりません。先に Node.js/npm をインストールしてください"; \
