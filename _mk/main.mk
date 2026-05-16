@@ -98,9 +98,9 @@ install-requirements:
 lint: ## Run Ruff and Mypy on .
 	@echo "🔍 . に対して Ruff と Mypy を実行中..."
 	@if command -v uv >/dev/null 2>&1; then \
-		$(PYTHON) ruff check . && $(PYTHON) mypy .; \
+		$(PYTHON) ruff check . --exclude oss && $(PYTHON) mypy --exclude '(^|/)oss/' .; \
 	else \
-		ruff check . && mypy .; \
+		ruff check . --exclude oss && mypy --exclude '(^|/)oss/' .; \
 	fi
 
 # --- Workflow Guide Targets (Help Integration & Parent Compatibility) ---
