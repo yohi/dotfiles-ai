@@ -50,7 +50,15 @@ run-antigravity: ## Antigravity を起動
 		set +a; \
 	fi; \
 	echo "🚀 Starting Antigravity..."; \
-	antigravity &
+	antigravity & \
+	ANTI_PID=$$!; \
+	sleep 2; \
+	if kill -0 $$ANTI_PID 2>/dev/null; then \
+		echo "✅ Antigravity started (PID: $$ANTI_PID)"; \
+	else \
+		echo "❌ Antigravity failed to start"; \
+		exit 1; \
+	fi
 
 # Antigravityの設定を削除
 uninstall-antigravity: ## Antigravityの設定を削除

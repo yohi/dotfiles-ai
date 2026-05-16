@@ -27,6 +27,7 @@ sync-mcp: ## APMを使用してMCP設定を同期
 	@echo "🔄 Synchronizing MCP settings via APM..."
 	@apm install --force
 	@echo "✅ MCP synchronization complete."
+	@$(MAKE) sync-mcp-gateway
 	@$(MAKE) restart-mcp
 
 sync-mcp-gateway: ## Docker MCP Gateway 設定を同期

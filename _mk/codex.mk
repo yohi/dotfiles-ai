@@ -83,7 +83,8 @@ sync-codex: ## リポジトリ内の設定ファイルを ~/.codex へ個別に�
 	@# rules/ (ディレクトリごとリンク)
 	@if [ -d "$(CODEX_REPO_DIR)/rules" ]; then \
 		if [ -d "$(CODEX_DOT_DIR)/rules" ] && [ ! -L "$(CODEX_DOT_DIR)/rules" ]; then \
-			rm -rf "$(CODEX_DOT_DIR)/rules"; \
+			mv "$(CODEX_DOT_DIR)/rules" "$(CODEX_DOT_DIR)/rules.bak.$$(date +%Y%m%d%H%M%S)"; \
+			echo "  ⚠️  Existing rules/ backed up"; \
 		fi; \
 		ln -sfn "$(CODEX_REPO_DIR)/rules" "$(CODEX_DOT_DIR)/rules"; \
 		echo "  ✅ rules/ -> $(CODEX_REPO_DIR)/rules"; \
@@ -92,7 +93,8 @@ sync-codex: ## リポジトリ内の設定ファイルを ~/.codex へ個別に�
 	@# skills/ (ディレクトリごとリンク)
 	@if [ -d "$(CODEX_REPO_DIR)/skills" ]; then \
 		if [ -d "$(CODEX_DOT_DIR)/skills" ] && [ ! -L "$(CODEX_DOT_DIR)/skills" ]; then \
-			rm -rf "$(CODEX_DOT_DIR)/skills"; \
+			mv "$(CODEX_DOT_DIR)/skills" "$(CODEX_DOT_DIR)/skills.bak.$$(date +%Y%m%d%H%M%S)"; \
+			echo "  ⚠️  Existing skills/ backed up"; \
 		fi; \
 		ln -sfn "$(CODEX_REPO_DIR)/skills" "$(CODEX_DOT_DIR)/skills"; \
 		echo "  ✅ skills/ -> $(CODEX_REPO_DIR)/skills"; \
@@ -112,6 +114,7 @@ uninstall-codex: ## 設定ファイルのリンクを解除する（実体ファ
 	@if [ -L "$(CODEX_DOT_DIR)/config.toml" ]; then rm -f "$(CODEX_DOT_DIR)/config.toml"; fi
 	@if [ -L "$(CODEX_DOT_DIR)/AGENTS.md" ]; then rm -f "$(CODEX_DOT_DIR)/AGENTS.md"; fi
 	@if [ -L "$(CODEX_DOT_DIR)/rules" ]; then rm -rf "$(CODEX_DOT_DIR)/rules"; fi
+	@if [ -L "$(CODEX_DOT_DIR)/skills" ]; then rm -rf "$(CODEX_DOT_DIR)/skills"; fi
 	@if [ -L "$(CODEX_DOT_DIR)/.personality_migration" ]; then rm -f "$(CODEX_DOT_DIR)/.personality_migration"; fi
 	@echo "✅ リンクを解除しました。実体データは保持されています"
 

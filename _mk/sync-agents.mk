@@ -17,31 +17,35 @@ CODEX_CONFIG     := $(REPO_ROOT)/codex/config.toml
 .PHONY: sync-agents clean-sync-artifacts ai-setup \
         inject-meta-prompt-opencode inject-meta-prompt-codex \
         sync-skillport-doc link-user-agents link-agent-commands \
-        install-external-skills uninstall-superpowers clean-legacy
+        install-external-skills uninstall-superpowers clean-legacy \
+        sync-skills-to-agents
 
 # ============================================================
 # install-external-skills: 外部スキルのセットアップ
 # ============================================================
 install-external-skills: ## apm 未対応環境向けに git clone で外部スキルを取得する
-	@echo "📦 git clone で外部スキルを取得中..."; \
+	@set -e; \
+	echo "📦 git clone で外部スキルを取得中..."; \
 	mkdir -p "$(AGENT_SKILLS_DIR)/anthropics"; \
 	mkdir -p "$(AGENT_SKILLS_DIR)/superpowers"; \
 	if [ ! -d "$(AGENT_SKILLS_DIR)/anthropics/ai-api" ]; then \
 		tmpdir=$$(mktemp -d); \
+		trap 'rm -rf "$$tmpdir"' EXIT; \
 		git init "$$tmpdir" >/dev/null; \
 		git -C "$$tmpdir" remote add origin https://github.com/anthropics/skills; \
-		git -C "$$tmpdir" fetch --depth 1 origin 5128e1865d670f5d6c9cef000e6dfc4e951fb5b9 >/dev/null 2>&1 || true; \
-		git -C "$$tmpdir" checkout FETCH_HEAD >/dev/null 2>&1 || true; \
-		if [ -d "$$tmpdir/skills" ]; then cp -r "$$tmpdir/skills/"* "$(AGENT_SKILLS_DIR)/anthropics/" || true; fi; \
+		git -C "$$tmpdir" fetch --depth 1 origin 5128e1865d670f5d6c9cef000e6dfc4e951fb5b9 >/dev/null 2>&1; \
+		git -C "$$tmpdir" checkout FETCH_HEAD >/dev/null 2>&1; \
+		if [ -d "$$tmpdir/skills" ]; then cp -r "$$tmpdir/skills/"* "$(AGENT_SKILLS_DIR)/anthropics/"; fi; \
 		rm -rf "$$tmpdir"; \
 	fi; \
 	if [ ! -d "$(AGENT_SKILLS_DIR)/superpowers/brainstorming" ]; then \
 		tmpdir=$$(mktemp -d); \
+		trap 'rm -rf "$$tmpdir"' EXIT; \
 		git init "$$tmpdir" >/dev/null; \
 		git -C "$$tmpdir" remote add origin https://github.com/obra/superpowers; \
-		git -C "$$tmpdir" fetch --depth 1 origin 6efe32c9e2dd002d0c394e861e0529675d1ab32e >/dev/null 2>&1 || true; \
-		git -C "$$tmpdir" checkout FETCH_HEAD >/dev/null 2>&1 || true; \
-		if [ -d "$$tmpdir/skills" ]; then cp -r "$$tmpdir/skills/"* "$(AGENT_SKILLS_DIR)/superpowers/" || true; fi; \
+		git -C "$$tmpdir" fetch --depth 1 origin 6efe32c9e2dd002d0c394e861e0529675d1ab32e >/dev/null 2>&1; \
+		git -C "$$tmpdir" checkout FETCH_HEAD >/dev/null 2>&1; \
+		if [ -d "$$tmpdir/skills" ]; then cp -r "$$tmpdir/skills/"* "$(AGENT_SKILLS_DIR)/superpowers/"; fi; \
 		rm -rf "$$tmpdir"; \
 	fi
 	@echo "✅ 外部スキルの準備が完了しました"
@@ -236,9 +240,9 @@ link-agent-commands: ## agent-commands/ のコマンドを各エージェント�
 			echo "  [SKIP] codex/skills/$$base.md (up-to-date)"; \
 		else \
 			name=$$(echo "$$base" | sed 's/-/ /g; s/\b\(.\)/\u\1/g'); \
-			desc=$$(awk '/^---$$/{n++; next} n==1 && /^description:/{sub(/^description: */, ""); print; exit}' "$$cmd"); \
+			desc=$$(awk '/^---$$/{n++; next} n==1 && /^description:/{sub(/^description: */, ""); print; exit}' "$$cmd" | sed "s/\\\\/\\\\\\\\/g; s/\"/\\\\\"/g"); \
 			body=$$(awk 'BEGIN{n=0} /^---$$/{n++; next} n>=2{print}' "$$cmd"); \
-			printf -- "---\nname: %s\ndescription: %s\n---\n\n# %s\n\n%s\n" "$$base" "$$desc" "$$name" "$$body" > "$$target"; \
+			printf -- "---\nname: %s\ndescription: \"%s\"\n---\n\n# %s\n\n%s\n" "$$base" "$$desc" "$$name" "$$body" > "$$target"; \
 			echo "  ✅ codex/skills/$$base.md (generated from .md)"; \
 		fi; \
 	done
