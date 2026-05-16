@@ -27,7 +27,6 @@ sync-mcp: ## APMを使用してMCP設定を同期
 	@echo "🔄 Synchronizing MCP settings via APM..."
 	@apm install --force
 	@echo "✅ MCP synchronization complete."
-	@$(MAKE) sync-mcp-gateway
 	@$(MAKE) restart-mcp
 
 sync-mcp-gateway: ## Docker MCP Gateway 設定を同期
@@ -38,8 +37,7 @@ sync-mcp-gateway: ## Docker MCP Gateway 設定を同期
 		cp mcp/config.yaml $(HOME_DIR)/.docker/mcp/config.yaml; \
 		echo "✅ Gateway config synced."; \
 	else \
-		echo "❌ mcp/config.yaml not found — run 'make sync-mcp' first." >&2; \
-		exit 1; \
+		echo "⚠️  mcp/config.yaml not found — run 'make sync-mcp' first."; \
 	fi
 
 status-mcp: ## Docker MCP Gatewayのステータスを確認
