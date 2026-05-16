@@ -9,7 +9,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # トークンの取得
 TOKEN=""
 if [ -f "$REPO_ROOT/.env" ]; then
-    # render-mcp-configs.py と同様の正規表現ロジックで抽出
+    # .env からトークンを抽出 (クォート除去を含む)
     TOKEN=$(sed -n 's/^[[:space:]]*MCP_GATEWAY_TOKEN=\(.*\)$/\1/p' "$REPO_ROOT/.env" | sed -e 's/^["'\'']//' -e 's/["'\'']$//')
 fi
 

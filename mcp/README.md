@@ -44,11 +44,11 @@ Atlassian 製品（Jira, Confluence）用の公式 MCP サーバーです。
   - 全 AI エージェント（Gemini, Claude, Cursor, VSCode, Antigravity, OpenCode, Codex 等）のマスター設定。
   - 各サーバーの定義（Docker イメージ、環境変数、ボリュームマウント等）と、各エージェントがどのサーバーを利用するかを定義します。
 - **自動生成されるファイル**:
-  - `make sync-mcp` を実行すると、`_scripts/render-mcp-configs.py` によって以下のファイルが自動生成・更新されます。
+  - `make sync-mcp` を実行すると、**APM (Agent Package Manager)** の標準機能によって以下のファイルが自動生成・更新されます。
     - **`mcp/config.yaml`**: Docker MCP Gateway で有効化するサーバー一覧。
     - **`mcp/catalogs/custom.yaml`**: Docker MCP Gateway のカスタムカタログ定義。
     - **各エージェントの設定ファイル**: `gemini/settings.json`, `.mcp.json`, `opencode/opencode.jsonc`, `ide/cursor/mcp.json`, `codex/config.toml` 等。
-- **プレースホルダー置換**: `__GATEWAY_URL__`, `__HOME__`, `__REPO_ROOT__` は生成時に動的に置換されます。また、`${VAR}` 形式の環境変数も `_scripts/render-mcp-configs.py` によって展開されます。
+- **プレースホルダー置換**: `__GATEWAY_URL__`, `__HOME__`, `__REPO_ROOT__` は生成時に動的に置換されます。また、`${VAR}` 形式の環境変数も APM によって展開されます。
 
 ---
 
@@ -86,6 +86,6 @@ Docker MCP Gateway を介して統合的に提供されます。ボリューム�
 
 ## 4. メンテナンスコマンド
 
-- **`make sync-mcp`**: `servers.yaml` と `config.yaml` から各エージェント固有の設定ファイルと Gateway 実行設定を同期。
+- **`make sync-mcp`**: `apm install` を実行し、`apm.yml` の定義に基づいて各エージェントの設定ファイルと Gateway 実行設定を同期。
 - **`make setup-docker-mcp`**: Docker MCP Gateway の systemd サービスと環境をセットアップ。
 - **`_scripts/check-skillport-version.sh`**: Skillport イメージが PyPI の最新版と一致するか確認。

@@ -67,8 +67,42 @@ sync-agents: ## SSOTのスキル群を各エージェントの設定ファイル
 	@$(MAKE) link-agent-commands
 	@$(MAKE) inject-meta-prompt-opencode
 	@$(MAKE) inject-meta-prompt-codex
+	@$(MAKE) sync-skills-to-agents
 	@touch "$(REPO_ROOT)/.last_sync"
 	@echo "✅ sync-agents: 全エージェントへの同期が完了しました"
+
+sync-skills-to-agents: ## agent-skills/ から .agents/skills/ へのシンボリックリンクを作成
+	@echo "→ Syncing skills to .agents/skills/..."
+	@mkdir -p "$(REPO_ROOT)/.agents/skills"
+	@for dir in "$(AGENT_SKILLS_DIR)"/*/; do \
+		[ -d "$$dir" ] || continue; \
+		name=$$(basename "$$dir"); \
+		target="$(REPO_ROOT)/.agents/skills/$$name"; \
+		if [ -f "$${dir}SKILL.md" ]; then \
+			if [ -L "$$target" ] || [ ! -e "$$target" ]; then \
+				rm -f "$$target"; \
+				ln -s "../$${dir%/}" "$$target" && \
+				echo "  Linked: $$name"; \
+			else \
+				echo "  [SKIP] $$name (exists as directory)"; \
+			fi; \
+		fi; \
+	done
+	@for subdir in "$(AGENT_SKILLS_DIR)"/*/*/; do \
+		[ -d "$$subdir" ] || continue; \
+		name=$$(basename "$$subdir"); \
+		target="$(REPO_ROOT)/.agents/skills/$$name"; \
+		if [ -f "$${subdir}SKILL.md" ]; then \
+			if [ -L "$$target" ] || [ ! -e "$$target" ]; then \
+				rm -f "$$target"; \
+				ln -s "../../$${subdir%/}" "$$target" && \
+				echo "  Linked: $$name"; \
+			else \
+				echo "  [SKIP] $$name (exists as directory)"; \
+			fi; \
+		fi; \
+	done
+	@echo "✓ Skills synced to .agents/skills/"
 
 # ============================================================
 # clean-sync-artifacts: 同期状態のリセット

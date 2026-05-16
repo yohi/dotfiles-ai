@@ -11,7 +11,7 @@ ANTIGRAVITY_DOTFILES_MCP ?= $(REPO_ROOT)/antigravity/mcp_config.json
 # Antigravityの設定を適用
 setup-antigravity: ## Antigravityの設定ファイルを適用
 	@echo "🔧 Antigravityの設定を適用中..."
-	@if [ ! -f "$(ANTIGRAVITY_DOTFILES_MCP)" ] || [ "$(REPO_ROOT)/apm.yml" -nt "$(ANTIGRAVITY_DOTFILES_MCP)" ] || [ "$(REPO_ROOT)/_scripts/render-mcp-configs.py" -nt "$(ANTIGRAVITY_DOTFILES_MCP)" ]; then \
+	@if [ ! -f "$(ANTIGRAVITY_DOTFILES_MCP)" ] || [ "$(REPO_ROOT)/apm.yml" -nt "$(ANTIGRAVITY_DOTFILES_MCP)" ]; then \
 		echo "📝 中央管理ファイルから Antigravity MCP 設定を再生成します..."; \
 		$(MAKE) sync-mcp; \
 	fi
@@ -45,6 +45,15 @@ check-antigravity: ## Antigravityの状態を確認
 	else \
 		echo "⚠️  config: $(ANTIGRAVITY_MCP_PATH) is not configured"; \
 	fi
+
+# Antigravity の起動
+.PHONY: run-antigravity
+run-antigravity: ## Antigravity を起動
+	@if [ -f .env ]; then \
+		export $$(grep -v '^#' .env | xargs); \
+	fi; \
+	echo "🚀 Starting Antigravity..."; \
+	antigravity &
 
 # Antigravityの設定を削除
 uninstall-antigravity: ## Antigravityの設定を削除

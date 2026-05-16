@@ -1,5 +1,5 @@
 name: dotfiles-ai
-version: 1.0.0
+version: 2.0.0
 description: AI Agent settings, skills, and unified MCP configuration for dotfiles
 
 # APM Standard Dependencies
@@ -16,9 +16,10 @@ dependencies:
       registry: false
       transport: stdio
       command: "uvx"
-      args: ["skillport-mcp"]
+      args:
+        - "skillport-mcp"
       env:
-        SKILLPORT_SKILLS_DIR: "${HOME}/dotfiles/components/dotfiles-ai/agent-skills"
+        SKILLPORT_SKILLS_DIR: "${env:PWD}/.agents/skills"
       standalone: true
 
     - name: nexus
@@ -26,34 +27,62 @@ dependencies:
       registry: false
       transport: stdio
       command: "npx"
-      args: ["-y", "@yohi/nexus@1.7.0"]
+      args:
+        - "-y"
+        - "@yohi/nexus@1.7.0"
       env:
-        NEXUS_STORAGE_ROOT_DIR: "${HOME}/.nexus"
+        NEXUS_STORAGE_ROOT_DIR: "${env:HOME}/.nexus"
+        LOG_LEVEL: "ERROR"
+        NEXUS_WATCHER_IGNORE_PATHS: "node_modules,opencode/node_modules,.opencode/node_modules,oss/apm/node_modules,oss/apm/docs/node_modules,.git,.nexus,dist,gemini,agent-skills,apm_modules,.agents,.opencode,.gemini,.claude,.codex,.vscode,.devcontainer,oss,codex/.tmp,.worktrees,.venv,target,.mypy_cache,.ruff_cache,build,.serena,.cache,__pycache__,*.db,*.sqlite,*.log"
+        CHOKIDAR_USEPOLLING: "false"
+        CHOKIDAR_INTERVAL: "2000"
         NO_PROXY: "127.0.0.1,localhost"
+      timeout: 30000
       standalone: true
 
-    - name: SQLite
+    - name: chronos-graph
+      title: "Chronos Graph"
       registry: false
-      transport: sse
-      url: "http://127.0.0.1:10888/sse?server=SQLite"
+      transport: stdio
+      command: "uvx"
+      args:
+        - "--from"
+        - "git+https://github.com/yohi/chronos-graph.git"
+        - "context-store"
       env:
-        SQLITE_DB_PATH: "${HOME}/.mcp/sqlite/sqlite.db"
-
-    - name: github-official
-      registry: false
-      transport: sse
-      url: "http://127.0.0.1:10888/sse?server=github-official"
-      env:
-        GITHUB_PERSONAL_ACCESS_TOKEN: "${GITHUB_TOKEN}"
-
-    - name: sequentialthinking
-      registry: false
-      transport: sse
-      url: "http://127.0.0.1:10888/sse?server=sequentialthinking"
+        STORAGE_BACKEND: "postgres"
+        # Tier 2: Required env vars (set in .env file)
+        POSTGRES_HOST: "${env:CHRONOS_POSTGRES_HOST}"
+        POSTGRES_PASSWORD: "${env:CHRONOS_POSTGRES_PASSWORD}"
+        NEO4J_URI: "${env:CHRONOS_NEO4J_URI}"
+        NEO4J_PASSWORD: "${env:CHRONOS_NEO4J_PASSWORD}"
+        REDIS_URL: "${env:CHRONOS_REDIS_URL}"
+        # Tier 3: Default values (can be overridden in .env)
+        POSTGRES_PORT: "${env:CHRONOS_POSTGRES_PORT:-5432}"
+        POSTGRES_DB: "${env:CHRONOS_POSTGRES_DB:-postgres}"
+        POSTGRES_USER: "${env:CHRONOS_POSTGRES_USER:-postgres}"
+        POSTGRES_SSL: "${env:CHRONOS_POSTGRES_SSL:-true}"
+        GRAPH_ENABLED: "${env:CHRONOS_GRAPH_ENABLED:-true}"
+        NEO4J_USER: "${env:CHRONOS_NEO4J_USER:-3af8423f}"
+        CACHE_BACKEND: "${env:CHRONOS_CACHE_BACKEND:-redis}"
+        REDIS_SSL: "${env:CHRONOS_REDIS_SSL:-true}"
+        DECAY_HALF_LIFE_DAYS: "${env:CHRONOS_DECAY_HALF_LIFE_DAYS:-30}"
+        SIMILARITY_THRESHOLD: "${env:CHRONOS_SIMILARITY_THRESHOLD:-0.70}"
+        DEDUP_THRESHOLD: "${env:CHRONOS_DEDUP_THRESHOLD:-0.90}"
+        EMBEDDING_PROVIDER: "${env:CHRONOS_EMBEDDING_PROVIDER:-local-model}"
+        LOCAL_MODEL_NAME: "${env:CHRONOS_LOCAL_MODEL_NAME:-cl-nagoya/ruri-v3-310m}"
+        EMBEDDING_DIMENSION: "${env:CHRONOS_EMBEDDING_DIMENSION:-768}"
+      standalone: true
 
 # APM Standard Targets
 targets:
-  default: [opencode, gemini, claude, cursor, vscode, antigravity, codex]
+  - opencode
+  - gemini
+  - claude
+  - cursor
+  - vscode
+  - antigravity
+  - codex
 
 # Exported Artifacts
 exports:

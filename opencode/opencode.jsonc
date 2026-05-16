@@ -1,4 +1,5 @@
 {
+  "$schema": "https://opencode.ai/config.json",
   "mcp": {
     "skillport": {
       "type": "local",
@@ -6,10 +7,7 @@
       "command": [
         "uvx",
         "skillport-mcp"
-      ],
-      "environment": {
-        "SKILLPORT_SKILLS_DIR": "${HOME}/dotfiles/components/dotfiles-ai/agent-skills"
-      }
+      ]
     },
     "nexus": {
       "type": "local",
@@ -18,26 +16,17 @@
         "npx",
         "-y",
         "@yohi/nexus@1.7.0"
-      ],
-      "environment": {
-        "NEXUS_STORAGE_ROOT_DIR": "${HOME}/.nexus",
-        "NO_PROXY": "127.0.0.1,localhost"
-      }
+      ]
     },
-    "SQLite": {
-      "type": "remote",
+    "chronos-graph": {
+      "type": "local",
       "enabled": true,
-      "url": "http://127.0.0.1:10888/sse?server=SQLite"
-    },
-    "github-official": {
-      "type": "remote",
-      "enabled": true,
-      "url": "http://127.0.0.1:10888/sse?server=github-official"
-    },
-    "sequentialthinking": {
-      "type": "remote",
-      "enabled": true,
-      "url": "http://127.0.0.1:10888/sse?server=sequentialthinking"
+      "command": [
+        "uvx",
+        "--from",
+        "git+https://github.com/yohi/chronos-graph.git",
+        "context-store"
+      ]
     }
   }
 }

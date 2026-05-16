@@ -1,82 +1,126 @@
 # Agent Instructions for dotfiles-ai
 
-## 1. Hierarchy & Authority
-- **Global Rules (`global-rules/AGENTS.global.md`)**: The **Global Foundation**. It contains universal instructions shared across *all* projects, such as Identity, Language Policy (Japanese output), Security protocols, and cross-project SkillPort workflows.
-- **Project Rules (`AGENTS.md`)**: The **Local Constitution** (This file). It contains project-specific mandates, architectural decisions, and directory structures unique to this repository. Local project rules take precedence over global rules if a conflict occurs.
-- **Sub-directory Rules**: Highly specific overrides for individual agents or components (e.g., `opencode/AGENTS.md`).
+This repository is the central authority for AI agent instructions, skills,
+MCP configuration, and reproducible agent runtime setup across Claude Code,
+Gemini CLI, OpenCode, Codex, Cursor, VSCode, and Antigravity.
 
-## 2. Project Purpose
-This repository is the Central Authority for AI Agent configurations, specialized skills, and AI-enabled development environments. It ensures a consistent "AI persona" across all tools and machines.
+## Authority
 
-### 💡 Core Design Philosophy: Separation of Concerns
-We strictly separate **"AI Rules & Behavior"** (`dotfiles-ai`) from **"IDE Infrastructure & UI"** (`dotfiles-ide`).
-- **`dotfiles-ide`** manages the physical editor settings (`settings.json`, `keybindings.json`, visual themes) for both Cursor and VSCode.
-- **`dotfiles-ai`** (this repository) manages the mind and tools of the AI (`mcp.json`, Agent instructions, SkillPort).
-Never mix IDE styling configurations here, and never put AI instructions or MCP configs in `dotfiles-ide`.
+- `AGENTS.md` defines repository-wide rules for `dotfiles-ai`.
+- Subdirectory `AGENTS.md` files add narrower rules and take precedence in
+  their directory scope.
+- `global-rules/AGENTS.global.md` contains cross-project user rules and is
+  independent from this file.
+- Keep this file concise and universally applicable. Put detailed guidance in
+  focused docs and link to it instead of copying it here.
 
-## 3. Directory Mandates
-- `claude/`, `gemini/`, `opencode/`, `codex/`: High-level configuration for specific AI CLI tools.
-- `ide/`: AI-specific configurations (MCP) for Cursor and VSCode.
-- `global-rules/`: Source of Truth for cross-project AI instructions.
-- `agent-skills/`: The master repository for SkillPort skills.
-- `.agents/skills/`: Cross-platform standard skills directory (symlinked from agent-skills/).
-- `mcp/`: Management of the Docker MCP Gateway and associated catalogs.
+## Core Boundaries
 
-## 4. Development Workflow
-- **SSOT Enforcement**: Never edit symlinked files in home directories (e.g., `~/.gemini/GEMINI.md`). Always edit the Source of Truth within this repository, unless a specific user directive instructs a local-only override for temporary testing.
-- **Unified Manifest**: **`apm.yml`** is the master manifest and Single Source of Truth (SSOT) for the entire project, managing AI skills, MCP server definitions, and agent environment configurations using **APM (Agent Package Manager)**.
-- **MCP Gateway**: Use the **Unified SSE Gateway (`http://localhost:10888/sse`)** as the standard connection method for all tools.
-  - **Benefits of SSE Integration**:
-    - **Zero-second Startup**: Eliminates initialization delays (typically 7-10s) and timeouts common with stdio.
-    - **Resource Stability**: Prevents "too many open files" errors and DB lock conflicts.
-    - **APM Integration**: `apm install` automatically injects the Gateway SSE endpoint and re-renders the backend `mcp/config.yaml`.
-- **Skill Management**: New AI capabilities MUST be implemented as SkillPort skills in `agent-skills/` and managed via MCP. External skills are managed via `apm.yml`.
+- `dotfiles-ai` owns AI behavior: instructions, skills, MCP configuration,
+  APM manifests, and agent-facing automation.
+- `dotfiles-ide` owns editor infrastructure and UI: editor settings,
+  keybindings, themes, and non-AI IDE customization.
+- Do not mix IDE styling settings into this repository.
+- Do not place AI rules, MCP definitions, or skills in `dotfiles-ide`.
 
-## 5. Tooling & Automation
-- `make setup`: Bootstrap the environment and run `apm install`. (Triggers `sync-agents` and executes APM's `post_install` hooks).
-- `make setup-apm-env`: Create .env from .env.example (first time only).
-- `make apm-install`: Run `apm install` and execute post-install hooks.
-- `make sync-agents` / `make sync-skills-to-agents`: Sync skills to `.agents/skills/` for cross-platform compatibility.
-- `make sync-mcp`: Re-render Gateway backend configuration from `apm.yml` and restart the service.
+## Source Of Truth
 
-## 6. Superpowers Workflow: Project Level
-As the central authority for AI configurations, **Level 1 (High Intensity)** is the default for most tasks in this repository.
-- **Level 2 (Medium Intensity)**: Refactoring, improvements, or moderate logic changes.
-- **Level 3 (Low Intensity)**: Minor documentation or trivial configuration changes.
-- **Level 0 (Zero Intensity)**: Greetings, chitchat, or direct inquiries.
+- Manage AI agent configuration through APM. `apm.yml` is the SSOT for
+  external skills, custom MCP servers, agent targets, and defaults.
+- Commit `apm.lock.yaml` when dependency resolution changes so agent context
+  is reproducible.
+- Do not hand-edit generated agent MCP files when an APM or Make target owns them.
+- Do not edit symlinked files in home directories such as
+  `~/.gemini/GEMINI.md`; edit the source file in this repository.
+- Never commit machine-specific absolute paths, credentials, API keys,
+  personal tokens, or populated `.env` files.
 
-## 7. Component Layout Convention (Polyrepo)
-This repository relies on symbolic links to `common-mk` from [dotfiles-core](https://github.com/yohi/dotfiles-core). **NEVER** replace these links with physical files unless explicitly instructed by the user for environment-specific troubleshooting.
-- `DOTFILES_COMMON_RULES.md` -> `../../common-mk/DOTFILES_COMMON_RULES.md`
-- `_mk/core.mk` -> `../../../common-mk/core.mk`
-- `_mk/help.mk` -> `../../../common-mk/help.mk`
+## MCP Architecture
 
+- Use Docker MCP Gateway as the unified MCP entry point, normally via
+  `http://127.0.0.1:10888/sse` or `http://localhost:10888/sse`.
+- Use Docker MCP Catalog entries when a server exists in the catalog, such as
+  GitHub, SQLite, or sequentialthinking.
+- Define only non-catalog custom MCP servers in APM, such as Skillport, Nexus,
+  or Chronos Graph.
+- Use direct MCP configuration only when the server is not in Docker MCP
+  Catalog and cannot be represented through the APM-managed flow.
+- Keep Gateway backend rendering deterministic through repository Make targets
+  rather than ad hoc local edits.
 
+## Environment Variables
 
+- Follow the 3-tier model from `apm-environment.md`.
+- Tier 1: OS, shell, keychain, or CI secrets for API keys and personal access tokens.
+- Tier 2: project `.env` for environment-specific values; `.env` must stay Git-ignored.
+- Tier 3: safe defaults in `apm.yml` for non-secret values.
+- Use `${env:VAR}` placeholders in managed configuration instead of embedding
+  resolved secret values.
+- Keep `.env.example` safe and complete enough to document required variables
+  without exposing real values.
 
+## Skills
 
+- Use the APM and Skillport hybrid model from `agent-skills.md`.
+- APM is the static management layer for installing, versioning, locking, and
+  syncing skills.
+- Skillport is the dynamic runtime layer for discovering and loading skills
+  during agent work.
+- `agent-skills/` is the source location for custom and managed skill definitions.
+- `.agents/skills/` is the cross-platform runtime layout consumed by agents
+  and Skillport.
+- Add external skills through `apm.yml`; add local custom skills under
+  `agent-skills/` and sync them into `.agents/skills/`.
 
+## Key Directories
 
+- `apm.yml`: master APM manifest for AI agent dependencies and targets.
+- `global-rules/`: cross-project AI instructions.
+- `agent-skills/`: source skill definitions.
+- `.agents/skills/`: cross-platform skill runtime layout.
+- `claude/`, `gemini/`, `opencode/`, `codex/`: agent-specific configuration.
+- `ide/`: AI-specific IDE integration, especially MCP configuration for Cursor
+  and VSCode.
+- `mcp/`: Docker MCP Gateway configuration, catalogs, and render outputs.
+- `docs/superpowers/`: design and planning documents for larger repository changes.
 
+## Standard Commands
 
+- `make setup`: bootstrap the full environment and run APM installation hooks.
+- `make apm-install`: run `apm install` and post-install synchronization.
+- `make setup-apm-env`: create local `.env` from `.env.example` when needed.
+- `make sync-agents` or `make sync-skills-to-agents`: sync skills into `.agents/skills/`.
+- `make sync-mcp`: render Gateway configuration and refresh the MCP service.
+- `make setup-docker-mcp`: set up Docker MCP Gateway.
 
+## Working Guidance
 
+- Read `README.md` and the relevant focused docs before non-trivial changes.
+- For APM and environment changes, consult `apm-environment.md` and `docs/superpowers/specs/2026-05-16-dotfiles-ai-reconstruction-design.md`.
+- For skill changes, consult `agent-skills.md`.
+- For broad implementation plans, consult `docs/superpowers/` and keep root
+  instructions lightweight.
+- Prefer deterministic verification commands over asking an LLM to manually
+  enforce formatting or style.
 
+## Superpowers Intensity
 
+- Level 1: new architecture, major APM/MCP changes, or broad repository reconstruction.
+- Level 2: moderate refactoring, workflow changes, or configuration improvements.
+- Level 3: small documentation updates, typos, or trivial config corrections.
+- Level 0: greetings, chitchat, or direct factual inquiries.
 
+## Polyrepo Layout
 
-
+- This repository relies on symlinks to `common-mk` from `dotfiles-core`.
+- Do not replace these symlinks with physical files unless the user explicitly
+  requests environment-specific troubleshooting.
+- `DOTFILES_COMMON_RULES.md` points to `../../common-mk/DOTFILES_COMMON_RULES.md`.
+- `_mk/core.mk` points to `../../../common-mk/core.mk`.
+- `_mk/help.mk` points to `../../../common-mk/help.mk`.
 
 <!-- SKILLPORT_START -->
-<!-- Skills are centrally managed in global-rules/AGENTS.global.md. 
-     Refer to the Global Foundation for the full list of available SkillPort skills.
-     Unified skills directory: .agents/skills/ -->
+<!-- Skills are centrally managed through APM and exposed through Skillport.
+     Refer to global-rules/AGENTS.global.md for the full shared skill list.
+     Unified runtime skills directory: .agents/skills/ -->
 <!-- SKILLPORT_END -->
-
-
-
-
-
-
-
-

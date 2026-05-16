@@ -337,6 +337,15 @@ check-opencode: ## OpenCode（opencode）の状態を確認
 		fi; \
 	fi
 
+# OpenCode の起動
+.PHONY: run-opencode
+run-opencode: ## OpenCode を起動
+	@if [ -f .env ]; then \
+		export $$(grep -v '^#' .env | xargs); \
+	fi; \
+	echo "🚀 Starting OpenCode..."; \
+	$(OPENCODE_BIN)
+
 uninstall-opencode: ## OpenCode（opencode）のアンインストール
 	@echo "🗑️  OpenCode（opencode）をアンインストール中..."
 	@# 防護策: 変数が空、または危険なパス（/ や HOME）を指している場合は中断する

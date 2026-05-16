@@ -159,6 +159,17 @@ check-claude: ## Claude Code の診断を実行
 		echo "❌ settings.json が見つかりません。'make setup-claude' を実行してください。"; \
 	fi
 
+# Claude Code の起動（プロジェクト固有設定）
+.PHONY: run-claude
+run-claude: ## プロジェクト固有の設定で Claude Code を起動
+	@if [ -f .env ]; then \
+		export $$(grep -v '^#' .env | xargs); \
+	fi; \
+	export CLAUDE_CONFIG_DIR=$${CLAUDE_CONFIG_DIR:-$(REPO_ROOT)/.claude}; \
+	mkdir -p "$$CLAUDE_CONFIG_DIR"; \
+	echo "🚀 Starting Claude Code with config at $$CLAUDE_CONFIG_DIR"; \
+	claude
+
 # ========================================
 # エイリアス
 # ========================================
@@ -171,32 +182,41 @@ install-opcode: install-packages-opcode  ## Opcodeをインストール(エイ�
 
 setup-claude: ## Claude Codeの設定を適用
 	@echo "📝 Claude Codeの設定を適用中..."
+	@# グローバル設定ディレクトリ (~/.claude) を作成
 	@mkdir -p "$(HOME_DIR)/.claude"
+	@# プロジェクト内の設定ディレクトリ (.claude) も必要に応じて作成
+	@mkdir -p "$(REPO_ROOT)/.claude"
 	@# CLAUDE.md
-	@if [ -e "$(HOME_DIR)/.claude/CLAUDE.md" ] && [ ! -L "$(HOME_DIR)/.claude/CLAUDE.md" ]; then \
-		echo "⚠️  $(HOME_DIR)/.claude/CLAUDE.md が実体ファイルとして既に存在するため、スキップします。"; \
-	else \
-		ln -sf "$(REPO_ROOT)/global-rules/AGENTS.global.md" "$(HOME_DIR)/.claude/CLAUDE.md"; \
-	fi
-	@# .claude.json
+	@for dir in "$(HOME_DIR)/.claude" "$(REPO_ROOT)/.claude"; do \
+		if [ -e "$$dir/CLAUDE.md" ] && [ ! -L "$$dir/CLAUDE.md" ]; then \
+			echo "⚠️  $$dir/CLAUDE.md が実体ファイルとして既に存在するため、スキップします。"; \
+		else \
+			ln -sf "$(REPO_ROOT)/global-rules/AGENTS.global.md" "$$dir/CLAUDE.md"; \
+		fi; \
+	done
+	@# .claude.json (Home root)
 	@if [ -e "$(HOME_DIR)/.claude.json" ] && [ ! -L "$(HOME_DIR)/.claude.json" ]; then \
 		echo "⚠️  $(HOME_DIR)/.claude.json が実体ファイルとして既に存在するため、スキップします。"; \
 	else \
 		ln -sf "$(REPO_ROOT)/claude/settings.json" "$(HOME_DIR)/.claude.json"; \
 	fi
 	@# settings.json
-	@if [ -e "$(HOME_DIR)/.claude/settings.json" ] && [ ! -L "$(HOME_DIR)/.claude/settings.json" ]; then \
-		echo "⚠️  $(HOME_DIR)/.claude/settings.json が実体ファイルとして既に存在するため、スキップします。"; \
-	else \
-		ln -sf "$(REPO_ROOT)/claude/settings.json" "$(HOME_DIR)/.claude/settings.json"; \
-	fi
+	@for dir in "$(HOME_DIR)/.claude" "$(REPO_ROOT)/.claude"; do \
+		if [ -e "$$dir/settings.json" ] && [ ! -L "$$dir/settings.json" ]; then \
+			echo "⚠️  $$dir/settings.json が実体ファイルとして既に存在するため、スキップします。"; \
+		else \
+			ln -sf "$(REPO_ROOT)/claude/settings.json" "$$dir/settings.json"; \
+		fi; \
+	done
 	@# statusline.sh
 	@chmod +x "$(REPO_ROOT)/claude/statusline.sh"
-	@if [ -e "$(HOME_DIR)/.claude/statusline.sh" ] && [ ! -L "$(HOME_DIR)/.claude/statusline.sh" ]; then \
-		echo "⚠️  $(HOME_DIR)/.claude/statusline.sh が実体ファイルとして既に存在するため、スキップします。"; \
-	else \
-		ln -sf "$(REPO_ROOT)/claude/statusline.sh" "$(HOME_DIR)/.claude/statusline.sh"; \
-	fi
+	@for dir in "$(HOME_DIR)/.claude" "$(REPO_ROOT)/.claude"; do \
+		if [ -e "$$dir/statusline.sh" ] && [ ! -L "$$dir/statusline.sh" ]; then \
+			echo "⚠️  $$dir/statusline.sh が実体ファイルとして既に存在するため、スキップします。"; \
+		else \
+			ln -sf "$(REPO_ROOT)/claude/statusline.sh" "$$dir/statusline.sh"; \
+		fi; \
+	done
 	@echo "✅ Claude Codeの設定が完了しました"
 
 uninstall-claude: ## Claude Codeの設定を削除

@@ -21,6 +21,9 @@ AIエージェント（Claude Code, Gemini CLI, OpenCode, Codex）の設定・�
 ├── Makefile
 ├── README.md
 ├── AGENTS.md
+├── apm.yml                 # [SSOT] APM 設定・外部スキル依存関係
+├── .env.example            # 環境変数テンプレート
+├── .agents/skills/         # [APM 標準] 全エージェント向けスキル配置
 ├── agent-skills/           # [SSOT] Skill definitions (skillport)
 ├── agent-commands/         # [SSOT] Slash commands
 ├── global-rules/           # [SSOT] Global AI rules
@@ -60,13 +63,33 @@ AIエージェント（Claude Code, Gemini CLI, OpenCode, Codex）の設定・�
   - **スキルインストール**: `apm install` で `apm.yml` に記載された全外部スキルをインストールします。
   - この操作は `make setup` 実行時にも自動で行われます。
 - **構成**: `.skillportrc` で設定され、`~/.skillport/skills` からリポジトリの `agent-skills/` へシンボリックリンクが張られます。
+- **スキル配置**: `.agents/skills/` に集約（全エージェントが参照）
 - **コマンド**:
   - `make skillport`: SkillPort と `skillport-mcp` をインストールし、本環境の**初期セットアップ**を行います。
   - `make check-skillport`: インストール状態とシンボリックリンクの整合性を確認します。
-  - `make sync-agents`: `agent-skills/` をソースとして、`AGENTS.md` と `global-rules/AGENTS.global.md` の SkillPort ブロックを直接更新します。
+  - `make sync-agents` / `make sync-skills-to-agents`: `agent-skills/` をソースとして、`.agents/skills/` にスキルを同期します。
+  - `make sync-agents-rules`: `agent-skills/` をソースとして、`AGENTS.md` と `global-rules/AGENTS.global.md` の SkillPort ブロックを直接更新します。
   - `skillport <command>`: スキルの追加・削除・更新などの**管理操作**は、`skillport` CLI を直接実行してください（`make` 経由ではありません）。
     - 例: `skillport add anthropics/skills skills/ --namespace anthropics`
   - `skillport check`: スキル定義ファイル（.md）の構文や整合性をチェックします。
+
+## APM による一元管理
+
+`apm.yml` は AI エージェント設定の Single Source of Truth (SSOT) です。
+
+- **管理対象**: 外部スキル依存関係（`obra/superpowers`, `anthropics/skills`）+ カスタムMCP（Docker Catalog にないもの）
+- **Docker Catalog 標準 MCP**: GitHub, SQLite, sequentialthinking は Docker Desktop 側で管理
+- **スキル配置**: `.agents/skills/` に集約（全エージェントが参照）
+
+### 環境変数の3層モデル
+
+| Tier | ソース | コンテンツ |
+| :--- | :--- | :--- |
+| Tier 1 | OS / シェル環境 | API Keys, PATs |
+| Tier 2 | `.env` (Git除外) | 環境固有設定 |
+| Tier 3 | `apm.yml` | デフォルト値 |
+
+`.env.example` を `.env` にコピーして使用してください。
 
 ## Docker MCP Gateway (Unified SSE)
 
@@ -77,21 +100,23 @@ AIエージェント（Claude Code, Gemini CLI, OpenCode, Codex）の設定・�
   - `make start-mcp`: ゲートウェイを起動。
   - `make stop-mcp`: ゲートウェイを停止。
   - `make setup-docker-mcp`: Docker MCP Gateway 自体のセットアップを行います。
-  - `make sync-mcp`: `mcp/servers.yaml` から各エージェント/IDE 向け設定と Gateway 実行設定を再生成し、Gateway を再読み込みします。
-- **Source of Truth**: 
-  - **`mcp/servers.yaml`**: 全ての MCP 設定（サーバー定義およびクライアント接続設定）の **SSOT** です。
-- **自動生成されるファイル**: `make sync-mcp` を実行すると、以下のファイルが `mcp/servers.yaml` から自動生成されます。
+  - `make sync-mcp`: `apm.yml` のカスタム MCP 定義から各エージェント/IDE 向け設定と Gateway 実行設定を再生成し、Gateway を再読み込みします。
+- **Source of Truth**:
+  - **`apm.yml`**: 外部スキル依存関係と Docker Catalog にないカスタム MCP 定義の **SSOT** です。
+- **自動生成されるファイル**: `make sync-mcp` を実行すると、以下のファイルが `apm.yml` から自動生成されます。
   - `mcp/config.yaml`: Docker MCP Gateway で有効化するサーバー一覧。
   - `mcp/catalogs/custom.yaml`: Docker MCP Gateway のカスタムカタログ定義。
 - **初期セットアップ**: `make setup-docker-mcp` を実行すると、service 設定を含む Gateway の初期配置が完了します。
-- **自動同期**: `mcp/servers.yaml` を編集したら `make sync-mcp` を実行してください。
+- **自動同期**: `apm.yml` の MCP 定義を編集したら `make sync-mcp` を実行してください。
 
 ## SkillPort & MCP の統合
 
-`skillport-mcp` を MCP サーバーとして Docker MCP Gateway に登録することで、エージェントは `agent-skills/` 内の全スキルを MCP Tool として動的に利用できます。
+`skillport-mcp` を MCP サーバーとして Docker MCP Gateway に登録することで、エージェントは `.agents/skills/` 内の全スキルを MCP Tool として動的に利用できます。
 
 1. **仕組み**: `skillport-mcp` が起動時にスキルディレクトリをスキャンし、各スキルを MCP ツールとして公開します。
 2. **利用方法**: `mcp/config.yaml` で `skillport` を有効にしている限り、全エージェントは Docker MCP Gateway (`:10888/sse`) 経由で自動的に全スキルを利用できます。
+3. **スキル配置先**: `.agents/skills/` (APM 標準クロスプラットフォーム)
+4. **実体**: `agent-skills/` (SSOT)
 
 ## エージェント設定の自動同期 (APM)
 
@@ -129,11 +154,26 @@ AIエージェント（Claude Code, Gemini CLI, OpenCode, Codex）の設定・�
 - **ルールの編集**: 
   - ユーザー共通設定は `global-rules/AGENTS.global.md` を編集。
   - 個別のスキルは `agent-skills/*/SKILL.md` を編集。
-  - **MCP サーバーの追加・変更・有効化**、および**エージェント/IDE の接続設定変更**は、全て **`mcp/servers.yaml`** を編集してください。
+  - **カスタム MCP サーバーの追加・変更・有効化**、および**エージェント/IDE の接続設定変更**は、全て **`apm.yml`** を編集してください。
 - **同期コマンド**:
   - `make setup-docker-mcp`: Docker MCP Gateway のセットアップ。
   - `make sync-mcp`: MCP 設定の再生成と同期。
   - `make sync-agents`: `agent-skills/` から各 AGENTS instruction file のスキル一覧を同期。
+
+## 主要な make ターゲット
+
+| ターゲット | 説明 |
+| :--- | :--- |
+| `make setup` | 全体のセットアップ |
+| `make apm-install` | APM インストール + 同期 |
+| `make setup-apm-env` | .env ファイルの雛形作成 |
+| `make setup-docker-mcp` | Docker MCP Gateway のセットアップ |
+| `make sync-agents` / `make sync-skills-to-agents` | スキルを .agents/skills/ に集約 |
+| `make sync-mcp` | MCP 設定の再生成 |
+| `make start-mcp` | MCP Gateway を起動 |
+| `make stop-mcp` | MCP Gateway を停止 |
+| `make skillport` | SkillPort の初期セットアップ |
+| `make check-skillport` | インストール状態の確認 |
 
 ## 技術スタック
 

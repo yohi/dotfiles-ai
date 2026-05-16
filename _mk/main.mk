@@ -1,4 +1,16 @@
-.PHONY: all install install-agents install-ides setup setup-agents setup-ides mcp-render link clean-internal install-requirements lint init sync secrets status clean test clean-legacy configure-git-ignore doctor
+.PHONY: all install install-agents install-ides setup setup-agents setup-ides mcp-render link clean-internal install-requirements lint init sync secrets status clean test clean-legacy configure-git-ignore doctor apm-install
+
+# --- APM Entry Point ---
+apm-install: ## APM install と全設定の同期を実行
+	$(Q_ECHO) "📦 APM install を実行中..."
+	@apm install --target agent-skills
+	$(Q_ECHO) "🔄 エージェントを同期中..."
+	@$(MAKE) sync-agents
+	$(Q_ECHO) "🔗 MCP設定を同期中..."
+	@$(MAKE) sync-mcp
+	$(Q_ECHO) "📝 .env 雛形を確認中..."
+	@$(MAKE) setup-apm-env
+	$(Q_ECHO) "✅ APM install と全設定の同期が完了しました"
 
 # --- Standard Entry Points ---
 all: install init-env setup setup-agents setup-ides sync-mcp ## [完全セットアップ] インストール、環境構築、設定、MCP同期をすべて行う
@@ -14,6 +26,9 @@ setup: install-requirements install-apm
 		exit 1; \
 	fi
 	@$(MAKE) sync-agents
+	@$(MAKE) sync-mcp
+	@$(MAKE) setup-apm-env
+	@$(MAKE) setup-docker-mcp
 	$(Q_ECHO) "✅ dotfiles-ai のコア設定が適用されました"
 sync: ## [更新] リポジトリを最新にし、エージェントを同期する
 	$(Q_ECHO) "🔄 リポジトリを最新に同期中..."

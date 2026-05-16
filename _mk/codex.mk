@@ -115,6 +115,15 @@ uninstall-codex: ## 設定ファイルのリンクを解除する（実体ファ
 	@if [ -L "$(CODEX_DOT_DIR)/.personality_migration" ]; then rm -f "$(CODEX_DOT_DIR)/.personality_migration"; fi
 	@echo "✅ リンクを解除しました。実体データは保持されています"
 
+# Codex CLI の起動
+.PHONY: run-codex
+run-codex: ## Codex CLI を起動
+	@if [ -f .env ]; then \
+		export $$(grep -v '^#' .env | xargs); \
+	fi; \
+	echo "🚀 Starting Codex CLI..."; \
+	codex
+
 # 状態確認
 check-codex: ## Codex の設定状態を確認
 	@echo "🔍 Codex 設定状態の確認..."

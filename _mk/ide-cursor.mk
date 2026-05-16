@@ -50,7 +50,7 @@ _cursor_link_settings:
 		fi; \
 	done
 	@mkdir -p $(HOME_DIR)/.config/Cursor/User/globalStorage/rooveterinaryinc.cursor-mcp
-	@if [ ! -f "$(REPO_ROOT)/ide/cursor/mcp.json" ] || [ "$(REPO_ROOT)/apm.yml" -nt "$(REPO_ROOT)/ide/cursor/mcp.json" ] || [ "$(REPO_ROOT)/_scripts/render-mcp-configs.py" -nt "$(REPO_ROOT)/ide/cursor/mcp.json" ]; then \
+	@if [ ! -f "$(REPO_ROOT)/ide/cursor/mcp.json" ] || [ "$(REPO_ROOT)/apm.yml" -nt "$(REPO_ROOT)/ide/cursor/mcp.json" ]; then \
 		echo "📝 中央管理ファイルから Cursor MCP 設定を再生成します..."; \
 		$(MAKE) sync-mcp; \
 	fi
@@ -180,6 +180,15 @@ check-cursor-version:
 	else \
 		echo "⚠️ 警告: jqコマンドがないため確認をスキップします"; \
 	fi
+
+# Cursor の起動
+.PHONY: run-cursor
+run-cursor: ## Cursor IDE を起動
+	@if [ -f .env ]; then \
+		export $$(grep -v '^#' .env | xargs); \
+	fi; \
+	echo "🚀 Starting Cursor..."; \
+	cursor &
 
 # ========================================
 # エイリアス
