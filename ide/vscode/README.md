@@ -44,7 +44,7 @@ cat ~/dotfiles/ide/vscode/extensions.list | xargs -L 1 code --install-extension
 
 ## MCP 設定
 
-- VSCode の `mcpServers` は `mcp/servers.yaml` を SSOT として管理します。
+- VSCode の `mcpServers` は `apm.yml` を SSOT として管理します。
 - 変更を反映するにはリポジトリルートで `make sync-mcp` を実行してください。
 - このコマンドで `ide/vscode/settings.json` の MCP セクションが再生成されます。
 

@@ -5,13 +5,21 @@
 *.swp
 *.log
 fix_all.sh
-# Agent Skills (Exclude external/fetched skills managed by EXTERNAL_SKILLS.md)
-agent-skills/anthropics/
-agent-skills/superpowers/
+# Agent Skills (Exclude external/fetched skills managed by apm)
+agent-skills/*/
+!agent-skills/agent-skill-architect/
+!agent-skills/config-modernizer/
+!agent-skills/doc-sync-verifier/
+!agent-skills/dotfiles-guidelines/
+!agent-skills/git-master/
+!agent-skills/makefile-organization/
+!agent-skills/.skillport/
 .agents/
 .sisyphus/
+oss/
 
 # Codex runtime files
+.codex/
 codex/*.jsonl
 codex/*.sqlite
 codex/*.sqlite-shm
@@ -27,7 +35,8 @@ codex/.tmp/
 codex/skills/.system/
 
 # OpenCode
-# opencode/oh-my-*.json*
+opencode/oh-my-*.json*
+!opencode/oh-my-openagent.jsonc
 .mcp.json
 .serena/
 .env
@@ -36,6 +45,7 @@ mcp/*.rendered
 mcp/catalogs/custom.yaml
 node_modules/
 ide/cursor/mcp.json
+.vscode/mcp.json
 .opencode/
 .cursor/
 .gemini/
@@ -71,7 +81,16 @@ __pycache__/
 .claude.json
 mcp/config.yaml
 codex/config.toml
+resolved_config.json
 
+
+# Generated agent commands & skills (derived from agent-commands/)
+codex/skills/
+gemini/commands/
+opencode/commands/
+claude/commands/
+ide/cursor/commands/agent/
+.cursor/rules/
 
 # APM dependencies
 apm_modules/

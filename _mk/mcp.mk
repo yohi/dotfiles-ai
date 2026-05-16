@@ -1,9 +1,14 @@
-.PHONY: setup-docker-mcp sync-mcp mcp uninstall-mcp status-mcp start-mcp stop-mcp restart-mcp logs-mcp status-watchdog logs-watchdog fix-ubuntu-rootless render-mcp
+.PHONY: setup-docker-mcp sync-mcp mcp uninstall-mcp status-mcp start-mcp stop-mcp restart-mcp logs-mcp status-watchdog logs-watchdog fix-ubuntu-rootless sync-mcp-gateway
 
 mcp: setup-docker-mcp
 
-setup-docker-mcp:
+setup-docker-mcp: sync-mcp ## Docker MCP Gateway のセットアップ（APM同期→設定反映→サービス起動）
 	$(Q_ECHO) "🐳 Docker MCPの設定をセットアップ中..."
+	@mkdir -p $(HOME_DIR)/.docker/mcp
+	@if [ -f "mcp/config.yaml" ]; then \
+		cp mcp/config.yaml $(HOME_DIR)/.docker/mcp/config.yaml; \
+		echo "✅ Gateway config synced."; \
+	fi
 	@bash _scripts/setup-docker-mcp.sh
 	$(Q_ECHO) "✅ Docker MCPの設定が完了しました。"
 	$(Q_ECHO) "💡 使い方を確認するには 'make help-mcp' を実行してください。"
@@ -18,15 +23,21 @@ fix-ubuntu-rootless: ## Ubuntu 24.04+ の Rootless Docker 制限を解除 (要 s
 help-mcp: ## MCP の使い方を表示
 	$(call show-guide,$(REPO_ROOT)/_docs/guides/mcp.md)
 
-sync-mcp: render-mcp ## Render and synchronize centralized MCP configs
-	@$(MAKE) restart-mcp
+sync-mcp: ## APMを使用してMCP設定を同期
+	@echo "🔄 Synchronizing MCP settings via APM..."
+	@apm install --force
 	@echo "✅ MCP synchronization complete."
+	@$(MAKE) restart-mcp
 
-render-mcp: ## Render centralized MCP configs
-	@if command -v uv >/dev/null 2>&1; then \
-		uv run python3 _scripts/render-mcp-configs.py; \
+sync-mcp-gateway: ## Docker MCP Gateway 設定を同期
+	@echo "📦 Syncing Docker MCP Gateway config..."
+	@mkdir -p $(HOME_DIR)/.docker/mcp
+	@# APMによって生成された設定ファイルをGatewayの場所へ配置
+	@if [ -f "mcp/config.yaml" ]; then \
+		cp mcp/config.yaml $(HOME_DIR)/.docker/mcp/config.yaml; \
+		echo "✅ Gateway config synced."; \
 	else \
-		python3 _scripts/render-mcp-configs.py; \
+		echo "⚠️  mcp/config.yaml not found — run 'make sync-mcp' first."; \
 	fi
 
 status-mcp: ## Docker MCP Gatewayのステータスを確認

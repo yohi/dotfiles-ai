@@ -1,12 +1,9 @@
-export SHELL := /bin/bash
-
 # ============================================================
 # VSCode IDE セットアップ用Makefile
 # VSCodeのAI設定（MCP等）の管理を担当
 # ============================================================
 
-# OS検出とディレクトリ設定
-OS_NAME := $(shell uname -s)
+# OS検出とディレクトリ設定（OS_NAME は variables.mk から継承）
 ifeq ($(OS_NAME),Darwin)
     # macOS
     VSCODE_USER_DIR := $(HOME)/Library/Application Support/Code/User

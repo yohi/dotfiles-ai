@@ -11,7 +11,7 @@ CODEX_REPO_DIR := $(REPO_ROOT)/codex
 .PHONY: setup-codex sync-codex uninstall-codex check-codex install-packages-codex
 
 # Codex CLI のインストール
-install-packages-codex:
+install-packages-codex: ## Codex CLI のインストール / アップデート
 	@echo "🧠 Codex CLI のバージョンを確認中..."
 	@if ! command -v npm >/dev/null 2>&1; then \
 		echo "❌ npm が見つかりません。先に Node.js/npm をインストールしてください"; \
@@ -83,10 +83,21 @@ sync-codex: ## リポジトリ内の設定ファイルを ~/.codex へ個別に�
 	@# rules/ (ディレクトリごとリンク)
 	@if [ -d "$(CODEX_REPO_DIR)/rules" ]; then \
 		if [ -d "$(CODEX_DOT_DIR)/rules" ] && [ ! -L "$(CODEX_DOT_DIR)/rules" ]; then \
-			rm -rf "$(CODEX_DOT_DIR)/rules"; \
+			mv "$(CODEX_DOT_DIR)/rules" "$(CODEX_DOT_DIR)/rules.bak.$$(date +%Y%m%d%H%M%S)"; \
+			echo "  ⚠️  Existing rules/ backed up"; \
 		fi; \
 		ln -sfn "$(CODEX_REPO_DIR)/rules" "$(CODEX_DOT_DIR)/rules"; \
 		echo "  ✅ rules/ -> $(CODEX_REPO_DIR)/rules"; \
+	fi
+
+	@# skills/ (ディレクトリごとリンク)
+	@if [ -d "$(CODEX_REPO_DIR)/skills" ]; then \
+		if [ -d "$(CODEX_DOT_DIR)/skills" ] && [ ! -L "$(CODEX_DOT_DIR)/skills" ]; then \
+			mv "$(CODEX_DOT_DIR)/skills" "$(CODEX_DOT_DIR)/skills.bak.$$(date +%Y%m%d%H%M%S)"; \
+			echo "  ⚠️  Existing skills/ backed up"; \
+		fi; \
+		ln -sfn "$(CODEX_REPO_DIR)/skills" "$(CODEX_DOT_DIR)/skills"; \
+		echo "  ✅ skills/ -> $(CODEX_REPO_DIR)/skills"; \
 	fi
 
 	@# .personality_migration
@@ -103,8 +114,20 @@ uninstall-codex: ## 設定ファイルのリンクを解除する（実体ファ
 	@if [ -L "$(CODEX_DOT_DIR)/config.toml" ]; then rm -f "$(CODEX_DOT_DIR)/config.toml"; fi
 	@if [ -L "$(CODEX_DOT_DIR)/AGENTS.md" ]; then rm -f "$(CODEX_DOT_DIR)/AGENTS.md"; fi
 	@if [ -L "$(CODEX_DOT_DIR)/rules" ]; then rm -rf "$(CODEX_DOT_DIR)/rules"; fi
+	@if [ -L "$(CODEX_DOT_DIR)/skills" ]; then rm -rf "$(CODEX_DOT_DIR)/skills"; fi
 	@if [ -L "$(CODEX_DOT_DIR)/.personality_migration" ]; then rm -f "$(CODEX_DOT_DIR)/.personality_migration"; fi
 	@echo "✅ リンクを解除しました。実体データは保持されています"
+
+# Codex CLI の起動
+.PHONY: run-codex
+run-codex: ## Codex CLI を起動
+	@if [ -f .env ]; then \
+		set -a; \
+		. ./.env; \
+		set +a; \
+	fi; \
+	echo "🚀 Starting Codex CLI..."; \
+	codex
 
 # 状態確認
 check-codex: ## Codex の設定状態を確認

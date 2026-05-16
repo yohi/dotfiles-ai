@@ -1,20 +1,30 @@
-.PHONY: all install install-agents install-ides setup setup-agents setup-ides mcp-render link clean-internal install-requirements lint init sync secrets status clean test clean-legacy configure-git-ignore doctor
+.PHONY: all install install-agents install-ides setup setup-agents setup-ides mcp-render link clean-internal install-requirements lint init sync secrets status clean test clean-legacy configure-git-ignore doctor apm-install install-apm
+
+# --- APM Entry Point ---
+apm-install: ## APM install と全設定の同期を実行
+	$(Q_ECHO) "📦 APM install を実行中..."
+	@apm install --target agent-skills
+	$(Q_ECHO) "🔄 エージェントを同期中..."
+	@$(MAKE) sync-agents
+	$(Q_ECHO) "🔗 MCP設定を同期中..."
+	@$(MAKE) sync-mcp
+	$(Q_ECHO) "📝 .env 雛形を確認中..."
+	@$(MAKE) setup-apm-env
+	$(Q_ECHO) "✅ APM install と全設定の同期が完了しました"
 
 # --- Standard Entry Points ---
-all: install init-env setup setup-agents setup-ides sync-mcp ## [完全セットアップ] インストール、環境構築、設定、MCP同期をすべて行う
+all: install init-env setup ## [完全セットアップ] インストール、環境構築、エージェント/IDE/MCPの設定をすべて行う
 
 install: install-requirements install-agents install-ides ## Install all AI agents and IDE binaries
 
-setup: install-requirements install-apm
+setup: install-requirements install-apm ## APMインストール、エージェント/IDE/MCP設定を一括適用
 	$(Q_ECHO) "🚀 APMによるエージェント設定の自動セットアップを実行中..."
-	@if command -v apm >/dev/null 2>&1; then \
-		apm install; \
-	else \
-		echo "❌ APMのインストールまたは実行に失敗しました。"; \
-		exit 1; \
-	fi
 	@$(MAKE) sync-agents
-	$(Q_ECHO) "✅ dotfiles-ai のコア設定が適用されました"
+	@$(MAKE) setup-apm-env
+	@$(MAKE) setup-docker-mcp
+	@$(MAKE) setup-agents
+	@$(MAKE) setup-ides
+	$(Q_ECHO) "✅ dotfiles-ai の全設定が適用されました"
 sync: ## [更新] リポジトリを最新にし、エージェントを同期する
 	$(Q_ECHO) "🔄 リポジトリを最新に同期中..."
 	@git pull --rebase || (echo "❌ git pull --rebase に失敗しました"; exit 1)
@@ -46,7 +56,6 @@ setup-agents:
 	$(MAKE) setup-codex
 	$(MAKE) setup-opencode
 	$(MAKE) setup-antigravity
-	$(MAKE) setup-docker-mcp
 
 setup-ides:
 	$(Q_ECHO) "🚀 dotfiles-ai IDE 設定をセットアップ中..."
@@ -83,9 +92,9 @@ install-requirements:
 lint: ## Run Ruff and Mypy on .
 	@echo "🔍 . に対して Ruff と Mypy を実行中..."
 	@if command -v uv >/dev/null 2>&1; then \
-		$(PYTHON) ruff check . && $(PYTHON) mypy .; \
+		$(PYTHON) ruff check . --exclude oss && $(PYTHON) mypy --exclude '(^|/)oss/' .; \
 	else \
-		ruff check . && mypy .; \
+		ruff check . --exclude oss && mypy --exclude '(^|/)oss/' .; \
 	fi
 
 # --- Workflow Guide Targets (Help Integration & Parent Compatibility) ---

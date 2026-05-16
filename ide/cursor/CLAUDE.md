@@ -14,7 +14,7 @@ This repository contains Cursor IDE configuration files and custom slash command
 ide/cursor/
 ├── settings.json           # Cursor IDE settings
 ├── keybindings.json        # Custom keybindings
-├── mcp.json                # Generated MCP config (from mcp/servers.yaml)
+├── mcp.json                # Generated MCP config (from apm.yml)
 └── commands/               # Custom slash commands
     ├── coderabbit/         # CodeRabbit CLI commands
     └── agent/              # Agent development commands
@@ -26,7 +26,7 @@ This repository manages multiple MCP server configurations:
 
 **Generated Configuration** (`mcp.json`):
 
-- Rendered from the repository-wide SSOT: `mcp/servers.yaml`
+- Rendered from the repository-wide SSOT: `apm.yml`
 - Points Cursor directly at the local Docker MCP Gateway SSE endpoint
 - Refreshed by `make sync-mcp`
 
@@ -91,7 +91,7 @@ CodeRabbit CLI is integrated with Claude Code for autonomous development:
 ### Setting Up New MCP Server
 
 ```bash
-# 1. Update mcp/servers.yaml
+# 1. Update apm.yml
 # 2. Run make sync-mcp
 # 3. Restart Cursor IDE to load new configuration
 ```
@@ -108,6 +108,6 @@ CodeRabbit CLI is integrated with Claude Code for autonomous development:
 
 ## Notes
 
-- MCP server configuration is centralized in `mcp/servers.yaml` and rendered via `make sync-mcp`
+- MCP server configuration is centralized in `apm.yml` and rendered via `make sync-mcp`
 - CodeRabbit requires authentication and Git repository context
 - Settings are optimized for Japanese development (fonts, language support)

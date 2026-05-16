@@ -16,11 +16,11 @@
   // v4.0.0 では、複数のバックグラウンドエージェントが同一プロジェクトで動作する際の
   // 「状態の不一致」を極限まで減らすための同期メカニズムが強化されました。
   // エージェントたちが一つの Todo 計画を共有し、互いの作業を妨げずに並列走行するための設定です。
-  // "team_mode": {
-  //   "enabled": true,
-  //   "base_dir": ".sisyphus/team", // エージェント間の共有データ、Todoリスト、作業進捗の永続化先
-  //   "auto_sync": true            // 実行計画やタスク状態のリアルタイム同期。tmux ペイン間での情報共有を加速。
-  // },
+  "team_mode": {
+    "enabled": false,
+    "base_dir": ".sisyphus/team", // エージェント間の共有データ、Todoリスト、作業進捗の永続化先
+    "auto_sync": true            // 実行計画やタスク状態のリアルタイム同期。tmux ペイン間での情報共有を加速。
+  },
 
   // --------------------------------------------------------------------------
   // 1. Sisyphus Agent: オーケストレーションの中核
@@ -42,16 +42,14 @@
 
     // 【司令塔: Sisyphus】 全体の品質管理と最終意思決定
     "sisyphus": {
-      "model": "cloudflare-workers-ai/@cf/moonshotai/kimi-k2.6",
+      "model": "opencode/big-pickle",
       "fallback_models": [
-        "opencode/big-pickle",
         "openai/gpt-5.4"
       ],
       "ultrawork": {
         // Ultrawork: 長時間自律駆動モード。リファクタリングや巨大なログ解析など、
-        "model": "cloudflare-workers-ai/@cf/moonshotai/kimi-k2.6",
+        "model": "opencode/big-pickle",
         "fallback_models": [
-          "opencode/big-pickle",
           "openai/gpt-5.4"
         ],
         "variant": "max",
@@ -62,7 +60,7 @@
     // 【製造担当: Hephaestus】 「正当な職人」。ロジックの実装、リファクタリング
     // AmpCodeのディープモードにインスパイアされ、徹底的な調査の後に一気に書き上げます。
     "hephaestus": {
-      "model": "openai/gpt-5.4",
+      "model": "openai/gpt-5.3-codex",
       "variant": "low",
       "permission": {
         "edit": "allow",
@@ -112,7 +110,6 @@
     "multimodal-looker": {
       "model": "openai/gpt-5.4",
       "fallback_models": [
-        "cloudflare-workers-ai/@cf/moonshotai/kimi-k2.6",
         "nvidia/z-ai/glm4.7"
       ],
       "description": "Visual Intelligence. Analyzes UI designs for API generation and debugs browser test failures."
@@ -156,7 +153,7 @@
     // 【現場監督: Atlas】 Todo駆動型実行エンジン
     // Tmux, Playwrightなどの環境管理、Todo項目の体系的な管理・調整・維持を担当。
     "atlas": {
-      "model": "cloudflare-workers-ai/@cf/moonshotai/kimi-k2.6",
+      "model": "opencode/big-pickle",
       "fallback_models": [
         "nvidia/minimaxai/minimax-m2.7",
       ],
@@ -197,7 +194,7 @@
       "model": "openai/gpt-5.4", // 自律的解決・難解なタスク
       "variant": "high",
       "fallback_models": [
-        "cloudflare-workers-ai/@cf/moonshotai/kimi-k2.6",
+        "opencode/big-pickle",
       ]
     },
     "visual-engineering": {

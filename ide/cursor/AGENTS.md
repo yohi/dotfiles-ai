@@ -10,7 +10,7 @@ This includes MCP server management and custom slash commands.
 - `mcp.json`: (Generated) Model Context Protocol server configurations.
 
 ## KEY WORKFLOWS
-1. **MCP Synchronization**: Always use `make sync-mcp` to update `mcp.json` from the central `mcp/servers.yaml`. Do not edit `mcp.json` directly.
+1. **MCP Synchronization**: Always use `make sync-mcp` to update `mcp.json` from the central `apm.yml`. Do not edit `mcp.json` directly.
 2. **Slash Commands**:
    - `/coderabbit-review`: Comprehensive code review using CodeRabbit CLI.
    - `/build-skill`: Interactive skill generation.
@@ -23,5 +23,5 @@ This includes MCP server management and custom slash commands.
 - **Context**: Be aware of the `CLAUDE.md` in this directory for detailed technical guidance.
 
 ## ANTI-PATTERNS
-- **Manual MCP Editing**: Leads to sync conflicts with the master `servers.yaml`.
+- **Manual MCP Editing**: Leads to sync conflicts with the master `apm.yml`.
 - **Bypassing Approval Gates**: Do not proceed to the Implementation phase without an approved Design and Tasks list.

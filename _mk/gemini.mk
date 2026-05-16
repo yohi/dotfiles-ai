@@ -9,7 +9,7 @@ REPO_ROOT ?= $(CURDIR)
 .PHONY: install-packages-gemini-cli install-gemini-ecosystem
 
 # Gemini CLI のインストール
-install-packages-gemini-cli:
+install-packages-gemini-cli: ## Gemini CLI のインストール / アップデート
 	@echo "♊ Gemini CLI のバージョンを確認中..."
 	@LATEST_VERSION=$$(npm show @google/gemini-cli version 2>/dev/null || echo "error"); \
 	CURRENT_VERSION=$$(gemini --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "none"); \
@@ -87,12 +87,12 @@ check-gemini: ## Gemini CLI の診断を実行
 setup-gemini: install-gemini-ecosystem ## Gemini CLI の設定を適用
 	@echo "📝 Gemini CLI の追加設定を適用中..."
 	@mkdir -p "$(HOME_DIR)/.gemini"
-	@if [ -e "$(REPO_ROOT)/gemini/settings.json" ]; then \
-		ln -sf "$(REPO_ROOT)/gemini/settings.json" "$(HOME_DIR)/.gemini/settings.json"; \
+	@if [ -e "$(REPO_ROOT)/.gemini/settings.json" ]; then \
+		ln -sf "$(REPO_ROOT)/.gemini/settings.json" "$(HOME_DIR)/.gemini/settings.json"; \
 	else \
 		mkdir -p "$(HOME_DIR)/.gemini"; \
 		echo '{"mcpServers": {}}' > "$(HOME_DIR)/.gemini/settings.json"; \
-		echo "⚠️  Warning: gemini/settings.json not found. Created a default one."; \
+		echo "⚠️  Warning: .gemini/settings.json not found. Created a default one."; \
 	fi
 
 	@echo "✅ Gemini CLI の設定が完了しました"
@@ -107,6 +107,18 @@ uninstall-gemini: ## Gemini CLI の設定を削除
 	@rm -f $(HOME_DIR)/.gemini/GEMINI.md
 	@rm -f $(HOME_DIR)/.gemini/settings.json
 	@echo "✅ Gemini CLI の設定を削除しました"
+
+# Gemini CLI の起動
+.PHONY: run-gemini
+run-gemini: ## Gemini CLI を起動
+	@if [ -f .env ]; then \
+		set -a; \
+		. ./.env; \
+		set +a; \
+	fi; \
+	export GEMINI_SANDBOX=$${GEMINI_SANDBOX:-true}; \
+	echo "🚀 Starting Gemini CLI (Sandbox: $$GEMINI_SANDBOX)"; \
+	gemini
 
 # ========================================
 # エイリアス

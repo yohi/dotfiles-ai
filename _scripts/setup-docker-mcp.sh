@@ -142,15 +142,6 @@ fi
 
 echo -e "${GREEN}✅ Shared .env file is ready.${NC}"
 
-# 設定ファイルの配置は render-mcp-configs.py に集約
-echo -e "${BLUE}🔗 Synchronizing Docker MCP configuration files...${NC}"
-if command -v uv >/dev/null 2>&1; then
-    uv run python3 "$REPO_ROOT/_scripts/render-mcp-configs.py"
-else
-    python3 "$REPO_ROOT/_scripts/render-mcp-configs.py"
-fi
-echo -e "${GREEN}✅ Configuration files synchronized.${NC}"
-
 # systemd ユーザーサービスの作成
 if [ "$SKIP_DOCKER_CHECK" = "true" ]; then
     echo -e "${YELLOW}⚠️  Skipping systemd service setup as --skip-docker-check is enabled.${NC}"
@@ -179,7 +170,7 @@ if [[ ! -f "$CATALOG_FILE" ]]; then
 fi
 
 echo -e "${BLUE}⚙️  Setting up systemd service...${NC}"
-# Service file is rendered and deployed by render-mcp-configs.py (called above).
+# Service file is deployed by the sync-mcp-gateway target (called above).
 # Only reload and enable/restart here.
 systemctl --user daemon-reload
 systemctl --user enable docker-mcp-gateway.service

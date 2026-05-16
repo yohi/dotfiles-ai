@@ -12,8 +12,8 @@ set -euo pipefail
 cd "$(dirname "$0")/.." || exit 1
 
 readonly OUTPUT_FILES=(
-    "global-rules/AGENTS.global.md"
     "AGENTS.md"
+    "global-rules/AGENTS.global.md"
 )
 
 run_skillport_doc() {

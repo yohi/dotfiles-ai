@@ -1,5 +1,3 @@
-export SHELL := /bin/bash
-
 # ============================================================
 # Cursor IDE セットアップ用Makefile (Debian/Ubuntu .deb 版)
 # Cursor IDEのインストール、アップデート、管理を担当
@@ -20,7 +18,7 @@ CURSOR_USER_AGENT := Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, 
 
 setup-cursor: _cursor_link_settings ## Cursorの設定をセットアップ（設定ファイルのみ）
 
-install-packages-cursor:
+install-packages-cursor: ## Cursor IDE のインストール / アップデート (.deb版)
 	@echo "📝 Cursor IDE (.deb) のバージョンを確認中..."
 	@LATEST_VERSION=$$(curl -sL -A "$(CURSOR_USER_AGENT)" --connect-timeout 10 --max-time 30 "$(CURSOR_API_URL)" | jq -r '.version' 2>/dev/null || echo "error"); \
 	CURRENT_VERSION=$$( (dpkg-query -W -f='$${Version}' cursor 2>/dev/null || echo "none") | cut -d'-' -f1 ); \
@@ -49,18 +47,19 @@ _cursor_link_settings:
 			rm "$$dst"; \
 		fi; \
 	done
-	@mkdir -p $(HOME_DIR)/.config/Cursor/User/globalStorage/rooveterinaryinc.cursor-mcp
-	@if [ ! -f "$(REPO_ROOT)/ide/cursor/mcp.json" ] || [ "$(REPO_ROOT)/apm.yml" -nt "$(REPO_ROOT)/ide/cursor/mcp.json" ] || [ "$(REPO_ROOT)/_scripts/render-mcp-configs.py" -nt "$(REPO_ROOT)/ide/cursor/mcp.json" ]; then \
-		echo "📝 中央管理ファイルから Cursor MCP 設定を再生成します..."; \
-		$(MAKE) sync-mcp; \
-	fi
-	@mcp_json_dst="$(HOME_DIR)/.config/Cursor/User/globalStorage/rooveterinaryinc.cursor-mcp/mcp.json"; \
+	@mcp_json_src="$(REPO_ROOT)/ide/cursor/mcp.json"; \
+	if [ ! -f "$$mcp_json_src" ]; then \
+		echo "⚠️  Cursor MCP 設定ファイルが見つかりません（スキップ）: $$mcp_json_src"; \
+		exit 0; \
+	fi; \
+	mkdir -p $(HOME_DIR)/.config/Cursor/User/globalStorage/rooveterinaryinc.cursor-mcp; \
+	mcp_json_dst="$(HOME_DIR)/.config/Cursor/User/globalStorage/rooveterinaryinc.cursor-mcp/mcp.json"; \
 	if [ -f "$$mcp_json_dst" ] && [ ! -L "$$mcp_json_dst" ]; then \
 		backup="$$mcp_json_dst.bak.$$(date +%Y%m%d_%H%M%S)"; \
 		echo "⚠️  既存の mcp.json をバックアップします: $$backup"; \
 		mv "$$mcp_json_dst" "$$backup"; \
 	fi; \
-	ln -sf $(REPO_ROOT)/ide/cursor/mcp.json "$$mcp_json_dst"
+	ln -sf $$mcp_json_src "$$mcp_json_dst"
 	@echo "✅ CursorのMCP設定リンクが完了しました"
 
 _cursor_download:
@@ -180,6 +179,17 @@ check-cursor-version:
 	else \
 		echo "⚠️ 警告: jqコマンドがないため確認をスキップします"; \
 	fi
+
+# Cursor の起動
+.PHONY: run-cursor
+run-cursor: ## Cursor IDE を起動
+	@if [ -f .env ]; then \
+		set -a; \
+		. ./.env; \
+		set +a; \
+	fi; \
+	echo "🚀 Starting Cursor..."; \
+	cursor &
 
 # ========================================
 # エイリアス

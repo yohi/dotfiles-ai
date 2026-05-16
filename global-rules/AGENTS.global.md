@@ -88,6 +88,30 @@ The following rules apply to **ALL** projects unless overridden by a local proje
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 <!-- SKILLPORT_START -->
 ## SkillPort Skills
 
@@ -328,6 +352,18 @@ Each skill contains step-by-step instructions, templates, and scripts.
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 ## 6. Agent-Specific Contexts (Unified)
 
 - **CI/CD**: Default to **Bitbucket Pipelines** (`bitbucket-pipelines.yml`).
@@ -411,16 +447,16 @@ When performing tasks, actively invoke the `memory_save` tool according to the f
 <memory_rules>
 - **Format for Semantic (Concepts/Knowledge):**
   When saving Semantic information via `memory_save`, follow this structure:
-  - Prefix the text with `[Semantic]`.
+  - Prefix the text with `[🧠 Semantic]`.
   - Always include a pair of "Subject (What it is about)" and "Fact/Rule/Value (What it is)".
-  - Example: `[Semantic] ChronosGraph default storage — Uses SQLite with SIMILARITY_THRESHOLD set to 0.70`
+  - Example: `[🧠 Semantic] ChronosGraph default storage — Uses SQLite with SIMILARITY_THRESHOLD set to 0.70`
 
 - **Format for Procedural (Steps/Solutions):**
   When saving Procedural information via `memory_save`, follow this structure:
-  - Prefix the text with `[Procedural]`.
+  - Prefix the text with `[🕒 Procedural]`.
   - Always include a pair of "Trigger Condition (When to apply)" and "Steps (Specific actions)".
   - Use numbered steps (1. 2. 3. ...) for the procedure.
-  - Example: `[Procedural] When pytest fails with ModuleNotFoundError: 1. Verify execution inside devcontainer 2. Reinstall dependencies via 'uv sync' 3. Ensure 'src' is in PYTHONPATH`
+  - Example: `[🕒 Procedural] When pytest fails with ModuleNotFoundError: 1. Verify execution inside devcontainer 2. Reinstall dependencies via 'uv sync' 3. Ensure 'src' is in PYTHONPATH`
 
 - **No Fear of Duplication:**
   If a previously saved rule or knowledge is updated, simply save the latest state using `memory_save`. The backend Deduplicator (with similarity >= 0.90) will automatically create a `SUPERSEDES` edge to integrate and modernize the memory.
@@ -439,8 +475,8 @@ After calling `memory_save` or `session_flush`, perform a self-verification usin
          - memory_save: Post-instruction completion or failure-to-success transition.
          - session_flush: Reaching 8,000 characters.
    - [ ] For memory_save: Does it follow the format requirements?
-         - Semantic: `[Semantic]` prefix + "Subject" & "Fact/Rule/Value" pair.
-         - Procedural: `[Procedural]` prefix + "Trigger" & "Numbered Steps" pair.
+         - Semantic: `[🧠 Semantic]` prefix + "Subject" & "Fact/Rule/Value" pair.
+         - Procedural: `[🕒 Procedural]` prefix + "Trigger" & "Numbered Steps" pair.
    - [ ] For session_flush: Is the full log passed to `conversation_log`?
 
 2. **Summary Self-Containment:**
