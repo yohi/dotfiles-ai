@@ -42,15 +42,13 @@
 
     // 【司令塔: Sisyphus】 全体の品質管理と最終意思決定
     "sisyphus": {
-      "model": "opencode/big-pickle",
+      "model": "sakura/preview/Kimi-K2.6",
       "fallback_models": [
-        "openai/gpt-5.5"
       ],
       "ultrawork": {
         // Ultrawork: 長時間自律駆動モード。リファクタリングや巨大なログ解析など、
-        "model": "opencode/big-pickle",
+        "model": "sakura/preview/Kimi-K2.6",
         "fallback_models": [
-          "openai/gpt-5.5"
         ],
         "variant": "max",
         "effort": "high"
@@ -61,7 +59,7 @@
     // AmpCodeのディープモードにインスパイアされ、徹底的な調査の後に一気に書き上げます。
     "hephaestus": {
       "model": "openai/gpt-5.5",
-      "variant": "low",
+      "variant": "medium",
       "permission": {
         "edit": "allow",
         "bash": {
@@ -79,8 +77,7 @@
       "model": "openai/gpt-5.5",
       "variant": "high",
       "fallback_models": [
-        // "google/gemini-3.1-pro-preview"
-        "nvidia/z-ai/glm4.7"
+        "opencode/deepseek-v4-flash-free",
       ]
     },
 
@@ -88,9 +85,8 @@
     // マルチリポジトリ分析、ドキュメント検索、OSS実装例の調査を低コスト・高精度で行います。
     // v4.0.0 でプロンプトが刷新され、GitHubパーマリンクの発見能力が向上。
     "librarian": {
-      "model": "nvidia/minimaxai/minimax-m2.7",
+      "model": "openai/gpt-5.4-mini",
       "fallback_models": [
-        "opencode/minimax-m2.5-free",
       ],
       "description": "Ultra-fast background research with minimal token cost."
     },
@@ -98,9 +94,8 @@
     // 【高速探索: Explore】 高速なコードベース探索とプロトタイピング
     // 自律的なweb searchを組み合わせ、最新の技術仕様に基づいたスキャフォールディングを行います。
     "explore": {
-      "model": "nvidia/minimaxai/minimax-m2.7",
+      "model": "openai/gpt-5.4-mini",
       "fallback_models": [
-        "opencode/minimax-m2.5-free",
       ],
       "description": "Rapid scaffolding using autonomous web search for latest technical specs."
     },
@@ -110,7 +105,6 @@
     "multimodal-looker": {
       "model": "openai/gpt-5.5",
       "fallback_models": [
-        "nvidia/z-ai/glm4.7"
       ],
       "description": "Visual Intelligence. Analyzes UI designs for API generation and debugs browser test failures."
     },
@@ -120,10 +114,9 @@
     // 【戦略家: Prometheus】 インタビューモードを備えたプランナー
     // 対話を通じてタスクを分解し、並列実行可能な「Agent Swarm」用の作業計画を作成します。
     "prometheus": {
-      "model": "openai/gpt-5.5",
+      "model": "sakura/preview/Kimi-K2.6",
       "variant": "high",
       "fallback_models": [
-        "nvidia/z-ai/glm4.7",
       ]
     },
 
@@ -134,7 +127,6 @@
       "model": "openai/gpt-5.5",
       "variant": "high",
       "fallback_models": [
-        "nvidia/z-ai/glm4.7"
       ]
     },
 
@@ -142,9 +134,8 @@
     // 明確さ、検証可能性、完全性の基準に照らして、Prometheusが作成した計画を厳格にレビュー。
     "momus": {
       "model": "openai/gpt-5.5",
-      "variant": "high",
+      "variant": "xhigh",
       "fallback_models": [
-        "nvidia/z-ai/glm4.7"
       ]
     },
 
@@ -153,9 +144,8 @@
     // 【現場監督: Atlas】 Todo駆動型実行エンジン
     // Tmux, Playwrightなどの環境管理、Todo項目の体系的な管理・調整・維持を担当。
     "atlas": {
-      "model": "opencode/big-pickle",
+      "model": "sakura/preview/Kimi-K2.6",
       "fallback_models": [
-        "nvidia/minimaxai/minimax-m2.7",
       ],
       "description": "Orchestrates Tmux, Playwright, and server states. Ensures environment consistency."
     }
@@ -169,41 +159,44 @@
       "model": "openai/gpt-5.5", // 最強の論理推論 (xhigh)
       "variant": "xhigh",
       "fallback_models": [
-        "nvidia/z-ai/glm4.7"
       ]
     },
     "deep": {
-      "model": "openai/gpt-5.5" // 自律的解決・難解なタスク
+      "model": "openai/gpt-5.5", // 自律的解決・難解なタスク
+      "variant": "medium",
+      "fallback_models": [
+      ]
     },
     "quick": {
-      "model": "openai/gpt-5.5-mini", // 些細な修正・高速レスポンス
+      "model": "openai/gpt-5.4-mini", // 些細な修正・高速レスポンス
       "fallback_models": [
-        "nvidia/minimaxai/minimax-m2.7"
       ]
     },
     "writing": {
-      "model": "opencode/minimax-m2.5-free" // テクニカルライティング・散文
+      "model": "sakura/preview/Kimi-K2.6", // テクニカルライティング・散文
+      "fallback_models": [
+      ]
     },
     "unspecified-low": {
-      "model": "cloudflare-workers-ai/@cf/moonshotai/kimi-k2.6",
+      "model": "sakura/preview/Kimi-K2.6", // ← MiniMaxからKimi K2.6に変更
       "fallback_models": [
-        "opencode/minimax-m2.5-free"
       ]
     },
     "unspecified-high": {
-      "model": "openai/gpt-5.5", // 自律的解決・難解なタスク
-      "variant": "high",
+      "model": "sakura/preview/Kimi-K2.6", // 自律的解決・難解なタスク
       "fallback_models": [
-        "opencode/big-pickle",
       ]
     },
     "visual-engineering": {
-      "model": "nvidia/z-ai/glm4.7" // UI/UX, デザイン, アニメーション
+      "model": "nvidia/qwen/qwen3-coder-480b-a35b-instruct", // UI/UX, デザイン, アニメーション
+      "fallback_models": [
+      ]
     },
     "artistry": {
       "model": "openai/gpt-5.5",
+      "fallback_models": [
+      ]
     }
-    
   },
 
   // --------------------------------------------------------------------------
