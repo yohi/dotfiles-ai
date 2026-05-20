@@ -207,6 +207,19 @@ setup-opencode: ## OpenCode（opencode）の設定ファイルを適用
 	@$(call create_marker,setup-opencode,1)
 	$(Q_ECHO) "✅ OpenCode（opencode）の設定を適用しました"
 	$(Q_ECHO) "💡 使い方を確認するには 'make help-opencode' を実行してください。"
+	@# Load .env from .zshrc for MCP_GATEWAY_TOKEN etc.
+	@if [ -f "$(REPO_ROOT)/.env" ]; then \
+		RC="$$HOME/.zshrc"; \
+		MARKER="# dotfiles-ai .env"; \
+		BLOCK='if [ -f "$(REPO_ROOT)/.env" ]; then set -a; . "$(REPO_ROOT)/.env"; set +a; fi'; \
+		if [ -f "$$RC" ] && ! grep -q "$$MARKER" "$$RC" 2>/dev/null; then \
+			echo "" >> "$$RC"; \
+			echo "$$MARKER" >> "$$RC"; \
+			echo "$$BLOCK" >> "$$RC"; \
+			echo "Added .env to $$RC"; \
+			echo "💡 Run 'source $$RC' to apply changes to the current session."; \
+		fi; \
+	fi
 
 .PHONY: help-opencode
 help-opencode: ## OpenCode の使い方を表示
@@ -338,16 +351,6 @@ check-opencode: ## OpenCode（opencode）の状態を確認
 	fi
 
 # OpenCode の起動
-.PHONY: run-opencode
-run-opencode: ## OpenCode を起動
-	@if [ -f .env ]; then \
-		set -a; \
-		. ./.env; \
-		set +a; \
-	fi; \
-	echo "🚀 Starting OpenCode..."; \
-	$(OPENCODE_BIN)
-
 uninstall-opencode: ## OpenCode（opencode）のアンインストール
 	@echo "🗑️  OpenCode（opencode）をアンインストール中..."
 	@# 防護策: 変数が空、または危険なパス（/ や HOME）を指している場合は中断する

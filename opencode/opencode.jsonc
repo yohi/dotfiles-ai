@@ -24,8 +24,8 @@
   "plugin": [
     "@yohi/opencode-codex-quota@1.0.0",
     "@yohi/justice@2.2.0",
-    "@yohi/opencode-cursor-plugin@1.3.8",
-    "oh-my-openagent@3.17.15"
+    // "@yohi/opencode-cursor-plugin@1.3.8",
+    "oh-my-openagent@4.2.2"
   ],
 
   // --------------------------------------------------------------------------
@@ -234,24 +234,25 @@
   // Providers & Models (2026-05 Latest)
   // --------------------------------------------------------------------------
   "enabled_providers": [
-    "google",
+    // "google",
     "openai",
     "nvidia",
     "cloudflare-workers-ai",
     "opencode",
-    "cursor"
+    // "cursor",
+    "sakura"
   ],
   "provider": {
-    "google": {
-      "whitelist": [
-        "gemini-3-flash-preview",
-        "gemini-3.1-flash-image-preview",
-        "gemini-3.1-flash-lite",
-        "gemini-3.1-flash-lite-preview",
-        "gemini-3.1-pro-preview",
-        "gemini-3.1-pro-preview-customtools",
-      ]
-    },
+    // "google": {
+    //   "whitelist": [
+    //     "gemini-3-flash-preview",
+    //     "gemini-3.1-flash-image-preview",
+    //     "gemini-3.1-flash-lite",
+    //     "gemini-3.1-flash-lite-preview",
+    //     "gemini-3.1-pro-preview",
+    //     "gemini-3.1-pro-preview-customtools",
+    //   ]
+    // },
     "openai": {
       "whitelist": [
         "gpt-5.3-codex",
@@ -266,13 +267,14 @@
         "minimaxai/minimax-m2.5",
         "minimaxai/minimax-m2.7",
         "z-ai/glm4.7",
+       "qwen/qwen3-coder-480b-a35b-instruct",
       ]
     },
     "cloudflare-workers-ai": {
       "whitelist": [
         "@cf/google/gemma-4-26b-a4b-it",
         "@cf/meta/llama-4-scout-17b-16e-instruct",
-        "@cf/moonshotai/kimi-k2.5",
+        // "@cf/moonshotai/kimi-k2.5",
         "@cf/moonshotai/kimi-k2.6",
         "@cf/nvidia/nemotron-3-120b-a12b",
         "@cf/openai/gpt-oss-120b",
@@ -283,29 +285,39 @@
     "opencode": {
       "whitelist": [
         "minimax-m2.5-free",
-        "ling-2.6-flash-free",
-        "hy3-preview-free",
         "nemotron-3-super-free",
+        "deepseek-v4-flash-free",
         "big-pickle",
       ]
     },
-    "cursor":{
-      "whitelist": [
-        "claude-haiku-4-5",
-        "claude-opus-4-7",
-        "claude-sonnet-4-6",
-        "composer-2",
-        "gemini-3-flash",
-        "gemini-3.1-pro",
-        "gpt-5.3-codex",
-        "gpt-5.3-codex-spark",
-        "gpt-5.4",
-        "gpt-5.4-mini",
-        "gpt-5.4-nano",
-        "gpt-5.5",
-      ]
+    // "cursor":{
+    //   "whitelist": [
+    //     "claude-haiku-4-5",
+    //     "claude-opus-4-7",
+    //     "claude-sonnet-4-6",
+    //     "composer-2",
+    //     "gemini-3-flash",
+    //     "gemini-3.1-pro",
+    //     "gpt-5.3-codex",
+    //     "gpt-5.3-codex-spark",
+    //     "gpt-5.4",
+    //     "gpt-5.4-mini",
+    //     "gpt-5.4-nano",
+    //     "gpt-5.5",
+    //   ]
+    // },
+    "sakura": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "sakura aipf",
+      "options": {
+        "baseURL": "https://api.ai.sakura.ad.jp/v1"
+      },
+      "models": {
+        "preview/Kimi-K2.6": {
+          "name": "Kimi-K2.6"
+        }
+      }
     }
-    
   },
 
   "experimental": {

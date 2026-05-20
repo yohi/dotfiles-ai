@@ -75,11 +75,13 @@ AIエージェント（Claude Code, Gemini CLI, OpenCode, Codex）の設定・�
 
 ## APM による一元管理
 
-`apm.yml` は AI エージェント設定の Single Source of Truth (SSOT) です。
+[Agent Package Manager (APM)](https://github.com/microsoft/apm) ([Docs](https://microsoft.github.io/apm/)) は AI エージェント設定の Single Source of Truth (SSOT) です。
 
 - **管理対象**: 外部スキル依存関係（`obra/superpowers`, `anthropics/skills`）+ カスタムMCP（Docker Catalog にないもの）
 - **Docker Catalog 標準 MCP**: GitHub, SQLite, sequentialthinking は Docker Desktop 側で管理
 - **スキル配置**: `.agents/skills/` に集約（全エージェントが参照）
+- **自動生成ファイルと Git**:
+  `opencode.json` などのルート直下の設定ファイルは、`apm install` 時に APM が「プロジェクトの目印」として自動生成します。これらは `.gitignore` で除外されており、Git 管理（コミット）の対象外です。
 
 ### 環境変数の3層モデル
 
