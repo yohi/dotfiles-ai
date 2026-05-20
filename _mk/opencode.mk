@@ -193,7 +193,6 @@ setup-opencode: ## OpenCode（opencode）の設定ファイルを適用
 	@$(call link_config,$(OPENCODE_DOTFILES_CONFIG),$(OPENCODE_CONFIG_PATH),opencode)
 	@# oh-my-openagent.jsonc の設定
 	@$(call link_config,$(OH_MY_OPENAGENT_DOTFILES_CONFIG),$(OH_MY_OPENAGENT_CONFIG_PATH),oh-my-openagent)
-	@$(call link_config,$(OH_MY_OPENAGENT_DOTFILES_CONFIG),$(OPENCODE_CONFIG_DIR)/oh-my-opencode.jsonc,oh-my-opencode)
 	@# antigravity.json の設定
 	@$(call link_config,$(OPENCODE_DOTFILES_ANTIGRAVITY),$(OPENCODE_ANTIGRAVITY_PATH),antigravity)
 	@# AGENTS.md の設定

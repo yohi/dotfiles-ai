@@ -285,7 +285,7 @@
 
   // 過剰なコメントを削減・整理する提案機能
   "comment_checker": {
-    "enabled": true
+    "enabled": false
   },
 
   "disabled_hooks": [
