@@ -211,12 +211,13 @@ setup-opencode: ## OpenCode（opencode）の設定ファイルを適用
 	@if [ -f "$(REPO_ROOT)/.env" ]; then \
 		RC="$$HOME/.zshrc"; \
 		MARKER="# dotfiles-ai .env"; \
-		BLOCK='if [ -f "$$HOME/dotfiles/components/dotfiles-ai/.env" ]; then set -a; . "$$HOME/dotfiles/components/dotfiles-ai/.env"; set +a; fi'; \
+		BLOCK='if [ -f "$(REPO_ROOT)/.env" ]; then set -a; . "$(REPO_ROOT)/.env"; set +a; fi'; \
 		if [ -f "$$RC" ] && ! grep -q "$$MARKER" "$$RC" 2>/dev/null; then \
 			echo "" >> "$$RC"; \
 			echo "$$MARKER" >> "$$RC"; \
 			echo "$$BLOCK" >> "$$RC"; \
 			echo "Added .env to $$RC"; \
+			echo "💡 Run 'source $$RC' to apply changes to the current session."; \
 		fi; \
 	fi
 
