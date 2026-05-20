@@ -78,7 +78,7 @@ uvx skillport validate agent-skills/my-new-skill
 make sync-agents
 ```
 
-※ `make sync-agents` は内部で `skillport doc` を実行し、`agent-skills/` をソースとして `global-rules/AGENTS.global.md` の `<!-- SKILLPORT_START -->` マーカー内にスキルリストを直接反映します。ローカルの `AGENTS.md` はコンテキストの肥大化を避けるため同期対象外です。
+※ `make sync-agents` は内部で `skillport doc` を実行し、`agent-skills/` をソースとして `agent-skills/AVAILABLE_SKILLS.md` の `<!-- SKILLPORT_START -->` マーカー内にスキルリストを直接反映します。各 `AGENTS.md` はコンテキストの肥大化を避けるため、このファイルへのリンクのみを保持します。
 
 ## スキル設計の原則
 

@@ -25,16 +25,16 @@ install-antigravity: install-antigravity-ide install-antigravity-hub install-ant
 
 install-antigravity-ide: ## Antigravity IDE をインストール
 	@echo "🎨 Installing Antigravity IDE..."
-	@mkdir -p "$(ANTIGRAVITY_OPT_DIR)/ide" "$(ANTIGRAVITY_TMP_DIR)"
-	@curl -L "$(ANTIGRAVITY_IDE_URL)" -o "$(ANTIGRAVITY_TMP_DIR)/ide.tar.gz"
+	@mkdir -p "$(ANTIGRAVITY_OPT_DIR)/ide" "$(ANTIGRAVITY_TMP_DIR)" "$(ANTIGRAVITY_BIN_DIR)"
+	@curl -fSL --retry 3 --retry-delay 2 --max-time 60 "$(ANTIGRAVITY_IDE_URL)" -o "$(ANTIGRAVITY_TMP_DIR)/ide.tar.gz"
 	@tar -xzf "$(ANTIGRAVITY_TMP_DIR)/ide.tar.gz" -C "$(ANTIGRAVITY_OPT_DIR)/ide" --strip-components=1
 	@ln -sfn "$(ANTIGRAVITY_OPT_DIR)/ide/antigravity-ide" "$(ANTIGRAVITY_BIN_DIR)/antigravity-ide"
 	@echo "✅ Antigravity IDE installed to $(ANTIGRAVITY_OPT_DIR)/ide"
 
 install-antigravity-hub: ## Antigravity Hub をインストール
 	@echo "🔗 Installing Antigravity Hub..."
-	@mkdir -p "$(ANTIGRAVITY_OPT_DIR)/hub" "$(ANTIGRAVITY_TMP_DIR)"
-	@curl -L "$(ANTIGRAVITY_HUB_URL)" -o "$(ANTIGRAVITY_TMP_DIR)/hub.tar.gz"
+	@mkdir -p "$(ANTIGRAVITY_OPT_DIR)/hub" "$(ANTIGRAVITY_TMP_DIR)" "$(ANTIGRAVITY_BIN_DIR)"
+	@curl -fSL --retry 3 --retry-delay 2 --max-time 60 "$(ANTIGRAVITY_HUB_URL)" -o "$(ANTIGRAVITY_TMP_DIR)/hub.tar.gz"
 	@tar -xzf "$(ANTIGRAVITY_TMP_DIR)/hub.tar.gz" -C "$(ANTIGRAVITY_OPT_DIR)/hub" --strip-components=1
 	@ln -sfn "$(ANTIGRAVITY_OPT_DIR)/hub/antigravity-hub" "$(ANTIGRAVITY_BIN_DIR)/antigravity-hub"
 	@echo "✅ Antigravity Hub installed to $(ANTIGRAVITY_OPT_DIR)/hub"
