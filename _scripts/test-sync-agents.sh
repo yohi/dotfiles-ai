@@ -23,6 +23,14 @@ bash "$REPO_ROOT/_scripts/sync_agents.sh" >/dev/null
 
 # Verify files
 f="agent-skills/AVAILABLE_SKILLS.md"
+if ! grep -qF "<!-- SKILLPORT_START -->" "$REPO_ROOT/$f"; then
+    echo "FAIL: <!-- SKILLPORT_START --> marker not found in $f"
+    exit 1
+fi
+if ! grep -qF "<!-- SKILLPORT_END -->" "$REPO_ROOT/$f"; then
+    echo "FAIL: <!-- SKILLPORT_END --> marker not found in $f"
+    exit 1
+fi
 if ! grep -qF "<available_skills>" "$REPO_ROOT/$f"; then
     echo "FAIL: <available_skills> not found in $f"
     exit 1

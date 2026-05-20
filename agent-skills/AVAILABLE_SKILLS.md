@@ -2,6 +2,34 @@
 
 This document provides a comprehensive list of skills available through SkillPort in the `dotfiles-ai` repository.
 
+<!-- SKILLPORT_START -->
+## SkillPort Skills
+
+Skills are reusable expert knowledge that help you complete tasks effectively.
+Each skill contains step-by-step instructions, templates, and scripts.
+
+### Workflow
+
+1. **Search** - Call `search_skills(query)` to find skills matching your task
+2. **Load** - Call `load_skill(skill_id)` to get full instructions and `path`
+3. **Execute** - Follow the instructions using your available tools
+
+### Tools
+
+- `search_skills(query)` - Find skills by task description. Use `""` to list all.
+- `load_skill(id)` - Get full instructions and the skill's filesystem path.
+
+### Tips
+
+- Use your native Read tool with `{path}/file` for templates/assets
+- Execute scripts via path, don't read them into context: `python {path}/scripts/run.py`
+- Replace `{path}` in instructions with the actual path from `load_skill`
+- If search returns 10+ results, refine your query
+
+<!-- NOTE: External skills (anthropics/*, superpowers/*) are managed via apm.yml.
+     They are automatically synchronized and locked using 'apm install'.
+     IMPORTANT: Custom skills are tracked in Git. External namespaces should generally be ignored
+     in the project root .gitignore (blacklist strategy) unless explicitly required for the repository's configuration. -->
 <available_skills>
 <skill>
   <name>agent-skill-architect</name>
@@ -190,4 +218,4 @@ This document provides a comprehensive list of skills available through SkillPor
 </skill>
 </available_skills>
 <!-- SKILLPORT_END -->
->
+
