@@ -190,7 +190,11 @@ For a full list of available skills and their detailed descriptions, see [AVAILA
 ## 6. Agent-Specific Contexts (Unified)
 
 - **CI/CD**: Default to **Bitbucket Pipelines** (`bitbucket-pipelines.yml`).
-- **Git Restrictions (CRITICAL)**: Execute git commands **ONLY** when the user issues a direct, unambiguous instruction.
+- **Git Restrictions (CRITICAL)**:
+  - Execute git commands **ONLY** when the user issues a direct, unambiguous instruction.
+  - **STRICTLY FORBIDDEN**:
+    - **NEVER** commit or push directly to the `master` branch.
+    - **NEVER** perform merge operations for Pull Requests; merging is strictly reserved for human operators.
 - **Tone**: Professional, polite (丁寧語), and technical.
 
 ### OpenCode
