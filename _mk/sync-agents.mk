@@ -60,63 +60,56 @@ uninstall-superpowers: ## 外部スキル (superpowers) を削除する
 sync-agents: ## SSOTのスキル群を各エージェントの設定ファイルへ同期する
 	@echo "🔄 sync-agents: SSOT → 各エージェントへの同期を開始..."
 	@$(MAKE) clean-sync-artifacts
+	@$(MAKE) sync-skills-to-agents
 	@$(MAKE) sync-skillport-doc
 	@$(MAKE) link-user-agents
 	@$(MAKE) link-agent-commands
 	@$(MAKE) inject-meta-prompt-opencode
 	@$(MAKE) inject-meta-prompt-codex
-	@$(MAKE) sync-skills-to-agents
 	@touch "$(REPO_ROOT)/.last_sync"
 	@echo "✅ sync-agents: 全エージェントへの同期が完了しました"
 
-sync-skills-to-agents: ## agent-skills/ から .agents/skills/ へのシンボリックリンクを作成
-	@echo "→ Syncing skills to .agents/skills/..."
-	@mkdir -p "$(REPO_ROOT)/.agents/skills"
-	@for dir in "$(AGENT_SKILLS_DIR)"/*/; do \
-		[ -d "$$dir" ] || continue; \
-		name=$$(basename "$$dir"); \
-		target="$(REPO_ROOT)/.agents/skills/$$name"; \
-		if [ -f "$${dir}SKILL.md" ]; then \
-			if [ -L "$$target" ] || [ ! -e "$$target" ]; then \
-				rm -f "$$target"; \
-				ln -s "$${dir%/}" "$$target" && \
-				echo "  Linked: $$name"; \
-			else \
-				echo "  [SKIP] $$name (exists as directory)"; \
-			fi; \
-		fi; \
-	done
-	@for subdir in "$(AGENT_SKILLS_DIR)"/*/*/; do \
-		[ -d "$$subdir" ] || continue; \
-		ns=$$(basename "$$(dirname "$$subdir")"); \
-		name=$$(basename "$$subdir"); \
-		mkdir -p "$(REPO_ROOT)/.agents/skills/$$ns"; \
-		target="$(REPO_ROOT)/.agents/skills/$$ns/$$name"; \
-		if [ -f "$${subdir}SKILL.md" ]; then \
-			if [ -L "$$target" ] || [ ! -e "$$target" ]; then \
-				rm -f "$$target"; \
-				ln -s "$${subdir%/}" "$$target" && \
-				echo "  Linked: $$name"; \
-			else \
-				echo "  [SKIP] $$name (exists as directory)"; \
-			fi; \
-		fi; \
-	done
-	@echo "✓ Skills synced to .agents/skills/"
+sync-skills-to-agents: ## apm_modules/ 内の外部スキルを agent-skills/ にシンボリックリンクする
+	@echo "→ Syncing external skills from apm_modules to agent-skills/..."
+	@if [ -d "$(REPO_ROOT)/apm_modules" ]; then \
+		for scope_dir in "$(REPO_ROOT)/apm_modules"/*; do \
+			[ -d "$$scope_dir" ] || continue; \
+			scope=$$(basename "$$scope_dir"); \
+			for pkg_dir in "$$scope_dir"/*; do \
+				[ -d "$$pkg_dir" ] || continue; \
+				pkg=$$(basename "$$pkg_dir"); \
+				if [ "$$scope" = "anthropics" ]; then namespace="anthropics"; \
+				elif [ "$$pkg" = "superpowers" ]; then namespace="superpowers"; \
+				else namespace="$$scope/$$pkg"; fi; \
+				if [ -d "$$pkg_dir/skills" ]; then \
+					for skill_path in "$$pkg_dir/skills"/*; do \
+						[ -d "$$skill_path" ] || continue; \
+						name=$$(basename "$$skill_path"); \
+						target_dir="$(AGENT_SKILLS_DIR)/$$namespace/$$name"; \
+						rm -rf "$$target_dir"; \
+						mkdir -p "$$target_dir"; \
+						cp -as "$$skill_path/." "$$target_dir/"; \
+						echo "  Linked external skill: $$namespace/$$name"; \
+					done; \
+				fi; \
+			done; \
+		done; \
+	fi
+	@echo "✓ Skills synced to agent-skills/"
 
 # ============================================================
 # clean-sync-artifacts: 同期状態のリセット
 # ============================================================
 clean-sync-artifacts: ## 同期マーカーおよび生成されたリンク・コマンドファイルを削除する
 	@echo "🧹 clean-sync-artifacts: 同期状態をリセット中..."
-	rm -f "$(REPO_ROOT)/.last_sync"
+	@rm -f "$(REPO_ROOT)/.last_sync"
 	@# OpenCode/Claude/Cursor 等のシンボリックリンクをクリーンアップ
-	rm -rf "$(REPO_ROOT)/opencode/commands"
-	rm -rf "$(REPO_ROOT)/claude/commands"
-	rm -rf "$(REPO_ROOT)/ide/cursor/commands/agent"
-	find "$(REPO_ROOT)/.cursor/rules" -maxdepth 1 -type l -name "*.md" -delete 2>/dev/null || true
-	rm -rf "$(REPO_ROOT)/gemini/commands"
-	rm -rf "$(REPO_ROOT)/codex/skills"
+	@rm -rf "$(REPO_ROOT)/opencode/commands"
+	@rm -rf "$(REPO_ROOT)/claude/commands"
+	@rm -rf "$(REPO_ROOT)/ide/cursor/commands/agent"
+	@find "$(REPO_ROOT)/.cursor/rules" -maxdepth 1 -type l -name "*.md" -delete 2>/dev/null || true
+	@rm -rf "$(REPO_ROOT)/gemini/commands"
+	@rm -rf "$(REPO_ROOT)/codex/skills"
 	@echo "✅ clean-sync-artifacts: 同期状態がリセットされました"
 
 # ============================================================

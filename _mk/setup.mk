@@ -69,7 +69,7 @@ init-env: ## Interactive setup for .env file (essential secrets only)
 	printf "CURSOR_API_KEY=%s\n" "$$cursor_key" >> .env; \
 	echo "" >> .env; \
 	echo "# --- Agent Management & Isolation ---" >> .env; \
-	printf "CLAUDE_CONFIG_DIR=%s/.claude\n" "$$repo_root" >> .env; \
+	printf "CLAUDE_CONFIG_DIR=%s/.claude\n" "$$HOME" >> .env; \
 	echo "GEMINI_SANDBOX=true" >> .env; \
 	echo "" >> .env; \
 	echo "# --- Atlassian Secrets (Personal) ---" >> .env; \

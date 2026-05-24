@@ -134,11 +134,11 @@ For a full list of available skills and their detailed descriptions, see [AVAILA
 
 ### Key Skills Summary
 
-- **agent-skill-architect**: Designs and generates best-practice-compliant SKILL.md files.
+- **custom/agent-skill-architect**: Designs and generates best-practice-compliant SKILL.md files.
 - **anthropics/* **: Specialized skills for design, API usage, and document handling.
 - **superpowers/* **: Core engineering workflow skills (brainstorming, planning, TDD).
-- **config-modernizer**: Refactors configuration files based on best practices.
-- **git-master**: Performs Git operations safely and appropriately.
+- **custom/config-modernizer**: Refactors configuration files based on best practices.
+- **custom/git-master**: Performs Git operations safely and appropriately.
 
 ### Tips
 

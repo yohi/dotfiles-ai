@@ -153,10 +153,10 @@ MCP_CONFIG_DIR="$HOME/.docker/mcp"
 CATALOG_FILE="$MCP_CONFIG_DIR/catalogs/docker-mcp.yaml"
 if [[ ! -f "$CATALOG_FILE" ]]; then
     echo -e "${BLUE}📦 Initializing official MCP Catalog...${NC}"
-    # Try update, fallback to init + update
-    if ! docker mcp catalog update; then
-        echo -e "${YELLOW}⚠️  Update failed, trying init then update...${NC}"
-        docker mcp catalog init || true
+    mkdir -p "$MCP_CONFIG_DIR/catalogs"
+    # Try init first, then update
+    if ! docker mcp catalog init; then
+        echo -e "${YELLOW}⚠️  Init failed, trying update...${NC}"
         docker mcp catalog update || true
     fi
     

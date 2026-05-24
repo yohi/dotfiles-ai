@@ -2,6 +2,8 @@
 
 This document provides a comprehensive list of skills available through SkillPort in the `dotfiles-ai` repository.
 
+
+
 <!-- SKILLPORT_START -->
 ## SkillPort Skills
 
@@ -31,11 +33,6 @@ Each skill contains step-by-step instructions, templates, and scripts.
      IMPORTANT: Custom skills are tracked in Git. External namespaces should generally be ignored
      in the project root .gitignore (blacklist strategy) unless explicitly required for the repository's configuration. -->
 <available_skills>
-<skill>
-  <name>agent-skill-architect</name>
-  <description>Designs and generates best-practice-compliant SKILL.md files for OpenCode agent skills. Use when creating new agent skills, drafting skill definitions, or improving existing skill files. Guides through requirements discovery and outputs production-ready SKILL.md with proper YAML frontmatter, XML-structured instructions, and progressive disclosure patterns.</description>
-  <location>agent-skills/agent-skill-architect/SKILL.md</location>
-</skill>
 <skill>
   <name>anthropics/algorithmic-art</name>
   <description>Creating algorithmic art using p5.js with seeded randomness and interactive parameter exploration. Use this when users request creating art using code, generative art, algorithmic art, flow fields, or particle systems. Create original algorithmic art rather than copying existing artists' work to avoid copyright violations.</description>
@@ -122,29 +119,34 @@ Each skill contains step-by-step instructions, templates, and scripts.
   <location>agent-skills/anthropics/xlsx/SKILL.md</location>
 </skill>
 <skill>
-  <name>config-modernizer</name>
+  <name>custom/agent-skill-architect</name>
+  <description>Designs and generates best-practice-compliant SKILL.md files for OpenCode agent skills. Use when creating new agent skills, drafting skill definitions, or improving existing skill files. Guides through requirements discovery and outputs production-ready SKILL.md with proper YAML frontmatter, XML-structured instructions, and progressive disclosure patterns.</description>
+  <location>agent-skills/custom/agent-skill-architect/SKILL.md</location>
+</skill>
+<skill>
+  <name>custom/config-modernizer</name>
   <description>A specialized skill for analyzing OpenCode configuration files and performing refactoring based on the latest best practices and release information. Triggered when requested for "configuration modernization" or "upgrading", or when configuration files like .jsonc are present.</description>
-  <location>agent-skills/config-modernizer/SKILL.md</location>
+  <location>agent-skills/custom/config-modernizer/SKILL.md</location>
 </skill>
 <skill>
-  <name>doc-sync-verifier</name>
+  <name>custom/doc-sync-verifier</name>
   <description>A specialized skill for verifying document consistency in a multi-phase review pipeline. Use this skill when you need to validate Phase 1 review findings (e.g., from Gemini) against actual project documentation files, applying strict evidence-based judgment without touching source code. Trigger whenever the user provides a review_results block with issue IDs to verify, asks to "裏取り" (fact-check) review findings, or mentions "DocSync Verifier", "整合性検証", "ドキュメント照合", or "指摘事項の検証". Also trigger when the user wants to cross-reference YAML frontmatter, Mermaid diagrams, or Markdown tables between documents.</description>
-  <location>agent-skills/doc-sync-verifier/SKILL.md</location>
+  <location>agent-skills/custom/doc-sync-verifier/SKILL.md</location>
 </skill>
 <skill>
-  <name>dotfiles-guidelines</name>
+  <name>custom/dotfiles-guidelines</name>
   <description>Core principles, persona definitions, and command workflows for the dotfiles project. Use when seeking development guidance, selecting an appropriate expert persona (Architect, Developer, Tester, DevOps, Analyst), or following standard project commands (analyze, implement, design, etc.). Ensures consistency, quality, and adherence to project-wide best practices.</description>
-  <location>agent-skills/dotfiles-guidelines/SKILL.md</location>
+  <location>agent-skills/custom/dotfiles-guidelines/SKILL.md</location>
 </skill>
 <skill>
-  <name>git-master</name>
+  <name>custom/git-master</name>
   <description>A specialized skill for performing Git operations safely and appropriately. Particularly focuses on splitting changes correctly and creating Japanese commit messages following Conventional Commits.</description>
-  <location>agent-skills/git-master/SKILL.md</location>
+  <location>agent-skills/custom/git-master/SKILL.md</location>
 </skill>
 <skill>
-  <name>makefile-organization</name>
+  <name>custom/makefile-organization</name>
   <description>Guidelines for organizing and maintaining modular Makefiles. Use when refactoring, creating new .mk files, or ensuring consistency across the project's Makefile structure. Covers naming conventions, inclusion order, idempotency management, and error handling for a robust development environment.</description>
-  <location>agent-skills/makefile-organization/SKILL.md</location>
+  <location>agent-skills/custom/makefile-organization/SKILL.md</location>
 </skill>
 <skill>
   <name>superpowers/brainstorming</name>
@@ -193,7 +195,7 @@ Each skill contains step-by-step instructions, templates, and scripts.
 </skill>
 <skill>
   <name>superpowers/using-git-worktrees</name>
-  <description>Use when starting feature work that needs isolation from current workspace or before executing implementation plans - creates isolated git worktrees with smart directory selection and safety verification</description>
+  <description>Use when starting feature work that needs isolation from current workspace or before executing implementation plans - ensures an isolated workspace exists via native tools or git worktree fallback</description>
   <location>agent-skills/superpowers/using-git-worktrees/SKILL.md</location>
 </skill>
 <skill>
@@ -218,4 +220,5 @@ Each skill contains step-by-step instructions, templates, and scripts.
 </skill>
 </available_skills>
 <!-- SKILLPORT_END -->
+
 

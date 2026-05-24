@@ -1,53 +1,36 @@
-// vim: ft=jsonc
-// Config Modernized: 2026-05-09
-// Target oh-my-openagent Version: v3.17.15
-
-/**
- * OhMyOpenagent Core Configuration
- */
 {
-  // スキーマ定義：エディタでの補完とバリデーションを有効化
+  "_comment": "Config Modernized: 2026-05-09, Target oh-my-openagent Version: v3.17.15",
+  "_comment_schema": "スキーマ定義：エディタでの補完とバリデーションを有効化",
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/master/assets/oh-my-opencode.schema.json",
-
-  // --------------------------------------------------------------------------
-  // 0. Team Mode: チーム開発・マルチエージェント連携 (v4.0.0 強化)
-  // --------------------------------------------------------------------------
-  // 【チーム開発の心臓部】
-  // v4.0.0 では、複数のバックグラウンドエージェントが同一プロジェクトで動作する際の
-  // 「状態の不一致」を極限まで減らすための同期メカニズムが強化されました。
-  // エージェントたちが一つの Todo 計画を共有し、互いの作業を妨げずに並列走行するための設定です。
+  "_comment_team_mode": "Team Mode: チーム開発・マルチエージェント連携 (v4.0.0 強化)\n【チーム開発の心臓部】\nv4.0.0 では、複数のバックグラウンドエージェントが同一プロジェクトで動作する際の「状態の不一致」を極限まで減らすための同期メカニズムが強化されました。\nエージェントたちが一つの Todo 計画を共有し、互いの作業を妨げずに並列走行するための設定です。",
   "team_mode": {
     "enabled": false,
-    "base_dir": ".sisyphus/team", // エージェント間の共有データ、Todoリスト、作業進捗の永続化先
-    "auto_sync": true            // 実行計画やタスク状態のリアルタイム同期。tmux ペイン間での情報共有を加速。
+    "_comment_base_dir": "エージェント間の共有データ、Todoリスト、作業進捗の永続化先",
+    "base_dir": ".sisyphus/team",
+    "_comment_auto_sync": "実行計画やタスク状態のリアルタイム同期。tmux ペイン間での情報共有を加速。",
+    "auto_sync": true
   },
-
-  // --------------------------------------------------------------------------
-  // 1. Sisyphus Agent: オーケストレーションの中核
-  // --------------------------------------------------------------------------
+  "_comment_sisyphus_agent": "Sisyphus Agent: オーケストレーションの中核\nデフォルトのオーケストレーター。複雑なタスクの計画、委譲、実行を担当。\nサブエージェントを活用した積極的な並列実行と、Todo駆動型ワークフロー(Atlas統合)が特徴。",
   "sisyphus_agent": {
-    // デフォルトのオーケストレーター。複雑なタスクの計画、委譲、実行を担当。
-    // サブエージェントを活用した積極的な並列実行と、Todo駆動型ワークフロー(Atlas統合)が特徴。
     "disabled": false,
-    "planner_enabled": true, // Prometheus/Metis/Momus を使用した高度な計画立案を有効化
-    "replace_plan": true,    // 実行中に計画を動的に修正・更新することを許可
-    "default_builder_enabled": true // デフォルトのビルド/デプロイフローの有効化
+    "_comment_planner_enabled": "Prometheus/Metis/Momus を使用した高度な計画立案を有効化",
+    "planner_enabled": true,
+    "_comment_replace_plan": "実行中に計画を動的に修正・更新することを許可",
+    "replace_plan": true,
+    "_comment_default_builder": "デフォルトのビルド/デプロイフローの有効化",
+    "default_builder_enabled": true
   },
-
-  // --------------------------------------------------------------------------
-  // 2. Agents: 4大コア + 専門家エージェントの定義
-  // --------------------------------------------------------------------------
+  "_comment_agents": "Agents: 4大コア + 専門家エージェントの定義",
   "agents": {
-    // --- Core Agents ---
-
-    // 【司令塔: Sisyphus】 全体の品質管理と最終意思決定
+    "_comment_core_agents": "--- Core Agents ---",
+    "_comment_sisyphus": "【司令塔: Sisyphus】 全体の品質管理と最終意思決定",
     "sisyphus": {
       "model": "sakura/preview/Kimi-K2.6",
       "fallback_models": [
         "openai/gpt-5.4-mini"
       ],
+      "_comment_ultrawork": "Ultrawork: 長時間自律駆動モード。リファクタリングや巨大なログ解析など、負荷の高いタスクに使用。",
       "ultrawork": {
-        // Ultrawork: 長時間自律駆動モード。リファクタリングや巨大なログ解析など、
         "model": "sakura/preview/Kimi-K2.6",
         "fallback_models": [
           "openai/gpt-5.4-mini"
@@ -56,9 +39,7 @@
         "effort": "high"
       }
     },
-
-    // 【製造担当: Hephaestus】 「正当な職人」。ロジックの実装、リファクタリング
-    // AmpCodeのディープモードにインスパイアされ、徹底的な調査の後に一気に書き上げます。
+    "_comment_hephaestus": "【製造担当: Hephaestus】 「正当な職人」。ロジックの実装、リファクタリング。\nAmpCodeのディープモードにインスパイアされ、徹底的な調査の後に一気に書き上げます。",
     "hephaestus": {
       "model": "openai/gpt-5.5",
       "variant": "medium",
@@ -71,10 +52,7 @@
         }
       }
     },
-
-    // 【大規模解析・監査: Oracle】 読み取り専用のコンサルタント
-    // アーキテクチャ決定、深い論理的推論、コードレビュー、難解なバグのデバッグを担当。
-    // 論理推論の頂点である gpt-5.5 を採用。
+    "_comment_oracle": "【大規模解析・監査: Oracle】 読み取り専用のコンサルタント。\nアーキテクチャ決定、深い論理的推論、コードレビュー、難解なバグのデバッグを担当。",
     "oracle": {
       "model": "openai/gpt-5.5",
       "variant": "high",
@@ -82,10 +60,7 @@
         "opencode/deepseek-v4-flash-free"
       ]
     },
-
-    // 【超高速補助: Librarian】 証拠に基づいた調査の専門家
-    // マルチリポジトリ分析、ドキュメント検索、OSS実装例の調査を低コスト・高精度で行います。
-    // v4.0.0 でプロンプトが刷新され、GitHubパーマリンクの発見能力が向上。
+    "_comment_librarian": "【超高速補助: Librarian】 証拠に基づいた調査の専門家。\nマルチリポジトリ分析、ドキュメント検索、OSS実装例の調査を低コスト・高精度で行います。\nv4.0.0 でプロンプトが刷新され、GitHubパーマリンクの発見能力が向上。",
     "librarian": {
       "model": "openai/gpt-5.4-mini",
       "fallback_models": [
@@ -93,9 +68,7 @@
       ],
       "description": "Ultra-fast background research with minimal token cost."
     },
-
-    // 【高速探索: Explore】 高速なコードベース探索とプロトタイピング
-    // 自律的なweb searchを組み合わせ、最新の技術仕様に基づいたスキャフォールディングを行います。
+    "_comment_explore": "【高速探索: Explore】 高速なコードベース探索とプロトタイピング。\n自律的なweb searchを組み合わせ、最新の技術仕様に基づいたスキャフォールディングを行います。",
     "explore": {
       "model": "openai/gpt-5.4-mini",
       "fallback_models": [
@@ -103,9 +76,7 @@
       ],
       "description": "Rapid scaffolding using autonomous web search for latest technical specs."
     },
-
-    // 【視覚アナリスト: Multimodal-Looker】 視覚コンテンツ・UI分析
-    // PDF、画像、図解、UIデザインを分析。ブラウザテストの失敗時のUIデバッグにも威力を発揮。
+    "_comment_multimodal_looker": "【視覚アナリスト: Multimodal-Looker】 視覚コンテンツ・UI分析。\nPDF、画像、図解、UIデザインを分析。ブラウザテストの失敗時のUIデバッグにも威力を発揮。",
     "multimodal-looker": {
       "model": "openai/gpt-5.5",
       "fallback_models": [
@@ -113,11 +84,8 @@
       ],
       "description": "Visual Intelligence. Analyzes UI designs for API generation and debugs browser test failures."
     },
-
-    // --- Planning Agents ---
-
-    // 【戦略家: Prometheus】 インタビューモードを備えたプランナー
-    // 対話を通じてタスクを分解し、並列実行可能な「Agent Swarm」用の作業計画を作成します。
+    "_comment_planning_agents": "--- Planning Agents ---",
+    "_comment_prometheus": "【戦略家: Prometheus】 インタビューモードを備えたプランナー。\n対話を通じてタスクを分解し、並列実行可能な「Agent Swarm」用の作業計画を作成します。",
     "prometheus": {
       "model": "sakura/preview/Kimi-K2.6",
       "variant": "high",
@@ -125,10 +93,7 @@
         "openai/gpt-5.4-mini"
       ]
     },
-
-    // 【計画コンサル: Metis】 計画前の分析とリスク特定
-    // 隠れた意図や曖昧さ、AIが失敗しやすいポイントを事前に特定し、計画の精度を高めます。
-    // v4.0.0 では意図の自動分類機能が大幅に強化されています。
+    "_comment_metis": "【計画コンサル: Metis】 計画前の分析とリスク特定。\n隠れた意図や曖昧さ、AIが失敗しやすいポイントを事前に特定し、計画の精度を高めます。\nv4.0.0 では意図の自動分類機能が大幅に強化されています。",
     "metis": {
       "model": "openai/gpt-5.5",
       "variant": "high",
@@ -136,9 +101,7 @@
         "openai/gpt-5.4-mini"
       ]
     },
-
-    // 【計画レビュアー: Momus】 計画の検証と品質保証
-    // 明確さ、検証可能性、完全性の基準に照らして、Prometheusが作成した計画を厳格にレビュー。
+    "_comment_momus": "【計画レビュアー: Momus】 計画の検証と品質保証。\n明確さ、検証可能性、完全性の基準に照らして、Prometheusが作成した計画を厳格にレビュー。",
     "momus": {
       "model": "openai/gpt-5.5",
       "variant": "xhigh",
@@ -146,11 +109,8 @@
         "openai/gpt-5.4-mini"
       ]
     },
-
-    // --- Orchestration Agents ---
-
-    // 【現場監督: Atlas】 Todo駆動型実行エンジン
-    // Tmux, Playwrightなどの環境管理、Todo項目の体系的な管理・調整・維持を担当。
+    "_comment_orchestration_agents": "--- Orchestration Agents ---",
+    "_comment_atlas": "【現場監督: Atlas】 Todo駆動型実行エンジン。\nTmux, Playwrightなどの環境管理、Todo項目の体系的な管理・調整・維持を担当。",
     "atlas": {
       "model": "sakura/preview/Kimi-K2.6",
       "fallback_models": [
@@ -159,51 +119,53 @@
       "description": "Orchestrates Tmux, Playwright, and server states. Ensures environment consistency."
     }
   },
-
-  // --------------------------------------------------------------------------
-  // 3. Categories: タスクの性質に応じたモデルの自動ルーティング
-  // --------------------------------------------------------------------------
+  "_comment_categories": "Categories: タスクの性質に応じたモデルの自動ルーティング",
   "categories": {
+    "_comment_ultrabrain": "ultrabrain: 最強の論理推論 (xhigh variant)",
     "ultrabrain": {
-      "model": "openai/gpt-5.5", // 最強の論理推論 (xhigh)
+      "model": "openai/gpt-5.5",
       "variant": "xhigh",
       "fallback_models": [
         "openai/gpt-5.4-mini"
       ]
     },
+    "_comment_deep": "deep: 自律的解決・難解なタスク",
     "deep": {
-      "model": "openai/gpt-5.5", // 自律的解決・難解なタスク
+      "model": "openai/gpt-5.5",
       "variant": "medium",
       "fallback_models": [
         "openai/gpt-5.4-mini"
       ]
     },
+    "_comment_quick": "quick: 些細な修正・高速レスポンス",
     "quick": {
-      "model": "openai/gpt-5.4-mini", // 些細な修正・高速レスポンス
+      "model": "openai/gpt-5.4-mini",
       "fallback_models": [
         "sakura/preview/Kimi-K2.6"
       ]
     },
+    "_comment_writing": "writing: テクニカルライティング・散文",
     "writing": {
-      "model": "sakura/preview/Kimi-K2.6", // テクニカルライティング・散文
+      "model": "sakura/preview/Kimi-K2.6",
       "fallback_models": [
         "openai/gpt-5.4-mini"
       ]
     },
     "unspecified-low": {
-      "model": "sakura/preview/Kimi-K2.6", // ← MiniMaxからKimi K2.6に変更
+      "model": "sakura/preview/Kimi-K2.6",
       "fallback_models": [
         "openai/gpt-5.4-mini"
       ]
     },
     "unspecified-high": {
-      "model": "sakura/preview/Kimi-K2.6", // 自律的解決・難解なタスク
+      "model": "sakura/preview/Kimi-K2.6",
       "fallback_models": [
         "openai/gpt-5.4-mini"
       ]
     },
+    "_comment_visual_engineering": "visual-engineering: UI/UX、デザイン、アニメーション",
     "visual-engineering": {
-      "model": "nvidia/qwen/qwen3-coder-480b-a35b-instruct", // UI/UX, デザイン, アニメーション
+      "model": "nvidia/qwen/qwen3-coder-480b-a35b-instruct",
       "fallback_models": [
         "openai/gpt-5.4-mini"
       ]
@@ -215,32 +177,30 @@
       ]
     }
   },
-
-  // --------------------------------------------------------------------------
-  // 4. Experimental: 最新・実験的機能の最適化
-  // --------------------------------------------------------------------------
+  "_comment_experimental": "Experimental: 最新・実験的機能の最適化",
   "experimental": {
-    "task_system": true, // Todo駆動タスク管理(blockedBy対応)。 .sisyphus/tasks/ に永続化
-    "hashline_edit": true, // LINE#ID形式のハッシュアンカー編集。行ずれエラーをゼロに
+    "_comment_task_system": "Todo駆動タスク管理(blockedBy対応)。 .sisyphus/tasks/ に永続化",
+    "task_system": true,
+    "_comment_hashline_edit": "LINE#ID形式のハッシュアンカー編集。行ずれエラーをゼロに",
     "hashline_diff_enhancer": true,
     "aggressive_truncation": true,
-    "auto_resume": true, // セッション中断・失敗からの自動復旧
-    "preemptive_compaction_threshold": 0.85 // トークン限界前のプロアクティブな圧縮
+    "_comment_auto_resume": "セッション中断・失敗からの自動復旧",
+    "auto_resume": true,
+    "_comment_compaction": "トークン限界前のプロアクティブな圧縮 (85% で発動)",
+    "preemptive_compaction_threshold": 0.85
   },
-
-  // TMUX統合: バックグラウンドエージェントを別ペインでリアルタイム監視
+  "_comment_tmux": "TMUX統合: バックグラウンドエージェントを別ペインでリアルタイム監視",
   "tmux": {
     "enabled": true,
     "layout": "main-vertical",
     "main_pane_size": 65
   },
-
-  // ブラウザ自動化エンジン: スクリーンショット、フォーム入力、ネットワーク監視をサポート
+  "_comment_browser": "ブラウザ自動化エンジン: スクリーンショット、フォーム入力、ネットワーク監視をサポート",
   "browser_automation_engine": {
-    "provider": "playwright-cli" // デフォルト: playwright
+    "_comment_provider": "デフォルト: playwright-cli",
+    "provider": "playwright-cli"
   },
-
-  // バックグラウンドタスクの並列実行制御
+  "_comment_background_task": "バックグラウンドタスクの並列実行制御",
   "background_task": {
     "defaultConcurrency": 10,
     "providerConcurrency": {
@@ -252,56 +212,46 @@
       "sakura": 5
     }
   },
-
-  // Ralph Loop: タスク完了まで自律的に試行を繰り返す自己参照型開発ループ
+  "_comment_ralph_loop": "Ralph Loop: タスク完了まで自律的に試行を繰り返す自己参照型開発ループ。\nv4.0.0 で実行時エラーのガードとリトライ戦略が強化。",
   "ralph_loop": {
     "enabled": true,
-    "default_max_iterations": 20 // v4.0.0 で実行時エラーのガードとリトライ戦略が強化
+    "default_max_iterations": 20
   },
-
-  // Boulder State: セッションを跨いでエージェントの状態を維持する永続化機構
+  "_comment_boulder_state": "Boulder State: セッションを跨いでエージェントの状態を維持する永続化機構",
   "boulder_state": {
     "enabled": true,
     "storage_path": ".sisyphus/boulder_state.json"
   },
-
-  // セッションリカバリ: エラーやコンテキスト上限からの透明な復旧
+  "_comment_session_recovery": "セッションリカバリ: エラーやコンテキスト上限からの透明な復旧",
   "session_recovery": {
     "enabled": true,
     "max_age_minutes": 1440
   },
-
-  // Interactive Bash: tmuxベースの永続ターミナル(vim/htopなどのTUI対応)
+  "_comment_interactive_bash": "Interactive Bash: tmuxベースの永続ターミナル(vim/htopなどのTUI対応)",
   "interactive_bash": {
     "enabled": true,
     "timeout_ms": 300000
   },
-
-  // Git Master: コミット分割、スタイル自動検出を行うGit専門機能
+  "_comment_git_master": "Git Master: コミット分割、スタイル自動検出を行うGit専門機能",
   "git_master": {
     "commit_footer": false,
     "include_co_authored_by": false
   },
-
-  // 過剰なコメントを削減・整理する提案機能
+  "_comment_comment_checker": "過剰なコメントを削減・整理する提案機能",
   "comment_checker": {
     "enabled": true
   },
-
   "disabled_hooks": [
     "auto-update-checker"
   ],
-
-  // Rules Injector: .claude/rules/ 内のルールをglob条件で自動注入
+  "_comment_rules_injector": "Rules Injector: .claude/rules/ 内のルールをglob条件で自動注入",
   "rules_injector": {
     "enabled": true
   },
-
-  // Auto Slash Command: プロンプトからのスラッシュコマンド自動実行
+  "_comment_auto_slash": "Auto Slash Command: プロンプトからのスラッシュコマンド自動実行",
   "auto_slash_command": {
     "enabled": true
   },
-
   "commands": {
     "git-pr-flow": {
       "description": "Git PR Flow with full-skill access",
@@ -321,5 +271,30 @@
         }
       }
     }
-  }
+  },
+  "hashline_edit": true,
+
+  "env": [
+    "HOME",
+    "MCP_GATEWAY_TOKEN",
+    "CHRONOS_POSTGRES_HOST",
+    "CHRONOS_POSTGRES_PASSWORD",
+    "CHRONOS_NEO4J_URI",
+    "CHRONOS_NEO4J_PASSWORD",
+    "CHRONOS_REDIS_URL",
+    "CHRONOS_POSTGRES_PORT",
+    "CHRONOS_POSTGRES_DB",
+    "CHRONOS_POSTGRES_USER",
+    "CHRONOS_POSTGRES_SSL",
+    "CHRONOS_GRAPH_ENABLED",
+    "CHRONOS_NEO4J_USER",
+    "CHRONOS_CACHE_BACKEND",
+    "CHRONOS_REDIS_SSL",
+    "CHRONOS_DECAY_HALF_LIFE_DAYS",
+    "CHRONOS_SIMILARITY_THRESHOLD",
+    "CHRONOS_DEDUP_THRESHOLD",
+    "CHRONOS_EMBEDDING_PROVIDER",
+    "CHRONOS_LOCAL_MODEL_NAME",
+    "CHRONOS_EMBEDDING_DIMENSION"
+  ]
 }

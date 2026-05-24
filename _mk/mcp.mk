@@ -2,13 +2,8 @@
 
 mcp: setup-docker-mcp
 
-setup-docker-mcp: sync-mcp ## Docker MCP Gateway のセットアップ（APM同期→設定反映→サービス起動）
+setup-docker-mcp: sync-mcp sync-mcp-gateway ## Docker MCP Gateway のセットアップ（APM同期→設定反映→サービス起動）
 	$(Q_ECHO) "🐳 Docker MCPの設定をセットアップ中..."
-	@mkdir -p $(HOME_DIR)/.docker/mcp
-	@if [ -f "mcp/config.yaml" ]; then \
-		cp mcp/config.yaml $(HOME_DIR)/.docker/mcp/config.yaml; \
-		echo "✅ Gateway config synced."; \
-	fi
 	@bash _scripts/setup-docker-mcp.sh
 	$(Q_ECHO) "✅ Docker MCPの設定が完了しました。"
 	$(Q_ECHO) "💡 使い方を確認するには 'make help-mcp' を実行してください。"
@@ -32,12 +27,26 @@ sync-mcp: ## APMを使用してMCP設定を同期
 sync-mcp-gateway: ## Docker MCP Gateway 設定を同期
 	@echo "📦 Syncing Docker MCP Gateway config..."
 	@mkdir -p $(HOME_DIR)/.docker/mcp
+	@mkdir -p $(HOME_DIR)/.config/systemd/user
 	@# APMによって生成された設定ファイルをGatewayの場所へ配置
 	@if [ -f "mcp/config.yaml" ]; then \
 		cp mcp/config.yaml $(HOME_DIR)/.docker/mcp/config.yaml; \
 		echo "✅ Gateway config synced."; \
 	else \
 		echo "⚠️  mcp/config.yaml not found — run 'make sync-mcp' first."; \
+	fi
+	@if [ -f "mcp/docker-mcp-gateway.service" ]; then \
+		sed -e "s|__HOME__|$(HOME_DIR)|g" \
+		    -e "s|__REPO_ROOT__|$(REPO_ROOT)|g" \
+		    -e "s|__ENABLED_SERVERS__|skillport,nexus,chronos-graph|g" \
+		    mcp/docker-mcp-gateway.service > $(HOME_DIR)/.config/systemd/user/docker-mcp-gateway.service; \
+		echo "✅ Service file docker-mcp-gateway.service deployed and configured."; \
+	fi
+	@if [ -f "mcp/mcp-watchdog.service" ]; then \
+		sed -e "s|__HOME__|$(HOME_DIR)|g" \
+		    -e "s|__REPO_ROOT__|$(REPO_ROOT)|g" \
+		    mcp/mcp-watchdog.service > $(HOME_DIR)/.config/systemd/user/mcp-watchdog.service; \
+		echo "✅ Service file mcp-watchdog.service deployed and configured."; \
 	fi
 
 status-mcp: ## Docker MCP Gatewayのステータスを確認
@@ -61,13 +70,17 @@ stop-mcp: ## Docker MCP Gatewayを停止
 
 restart-mcp: ## Docker MCP Gatewayを再起動
 	@echo "🔄 Restarting Docker MCP Gateway..."
-	@systemctl --user --no-pager daemon-reload
-	@if systemctl --user --no-pager is-active docker-mcp-gateway.service > /dev/null 2>&1; then \
-		systemctl --user --no-pager restart docker-mcp-gateway.service; \
+	@systemctl --user --no-pager daemon-reload || true
+	@if systemctl --user list-unit-files docker-mcp-gateway.service >/dev/null 2>&1; then \
+		if systemctl --user --no-pager is-active docker-mcp-gateway.service > /dev/null 2>&1; then \
+			systemctl --user --no-pager restart docker-mcp-gateway.service || echo "⚠️  Failed to restart docker-mcp-gateway.service"; \
+		else \
+			systemctl --user --no-pager start docker-mcp-gateway.service || echo "⚠️  Failed to start docker-mcp-gateway.service"; \
+		fi; \
+		$(MAKE) status-mcp || true; \
 	else \
-		systemctl --user --no-pager start docker-mcp-gateway.service; \
+		echo "ℹ️  docker-mcp-gateway.service is not installed yet. Skipping restart."; \
 	fi
-	@$(MAKE) status-mcp
 
 logs-mcp: ## Docker MCP Gatewayのログを表示
 	@echo "📋 Docker MCP Gateway logs (last 50 lines):"

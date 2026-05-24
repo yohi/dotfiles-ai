@@ -156,6 +156,8 @@ install-packages-opencode: ## OpenCode（opencode）をインストール
 			echo "❌ opencode のインストールに失敗しました: $(OPENCODE_BIN) が見つかりません"; \
 			exit 1; \
 		fi; \
+		mkdir -p "$(HOME_DIR)/.local/bin"; \
+		ln -sfn "$(OPENCODE_BIN)" "$(HOME_DIR)/.local/bin/opencode"; \
 		echo "✅ OpenCode（opencode）のインストールが完了しました"'
 	@$(call create_marker,install-packages-opencode,$$($(OPENCODE_BIN) --version 2>/dev/null || echo unknown))
 
@@ -181,6 +183,8 @@ opencode-update: ## OpenCode（opencode）をアップデート
 		echo "❌ opencode のアップデートに失敗しました: $(OPENCODE_BIN) が見つかりません"; \
 		exit 1; \
 	fi
+	@mkdir -p "$(HOME_DIR)/.local/bin"
+	@ln -sfn "$(OPENCODE_BIN)" "$(HOME_DIR)/.local/bin/opencode"
 	@echo "✅ 更新後のバージョン: $$($(OPENCODE_BIN) --version 2>/dev/null || echo unknown)"
 	@$(call create_marker,opencode-update,$$($(OPENCODE_BIN) --version 2>/dev/null || echo unknown))
 
