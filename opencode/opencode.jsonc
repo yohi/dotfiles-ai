@@ -22,7 +22,7 @@
   // --------------------------------------------------------------------------
   // [Plugin]
   "plugin": [
-    "@yohi/opencode-codex-quota@1.0.0",
+    // "@yohi/opencode-codex-quota@1.0.0",
     "@yohi/justice@2.2.0",
     // "@yohi/opencode-cursor-plugin@1.3.8",
     "oh-my-openagent@4.2.2"
@@ -40,9 +40,20 @@
     "edit": "allow",
     "lsp": "allow",
     "skill": "allow",
+    "skill_mcp": "allow",
+    "task": "allow",
+    "task_": "allow",
+    "delegate-task": "allow",
+    "mcp-": "allow",
+    "mcp_": "allow",
+    "docker-mcp": "allow",
+    "skillport": "allow",
+    "nexus": "allow",
+    "chronos-graph": "allow",
     "websearch": "allow",
     "bash": {
       "*": "ask",
+      // --- File Read Operations (Safe) ---
       "ls": "allow",
       "ls *": "allow",
       "cat": "allow",
@@ -51,37 +62,86 @@
       "head *": "allow",
       "tail": "allow",
       "tail *": "allow",
-      "mkdir": "allow",
-      "mkdir *": "allow",
-      "touch": "allow",
-      "touch *": "allow",
-      "cp": "allow",
-      "cp *": "allow",
-      "mv": "allow",
-      "mv *": "allow",
+      "grep": "allow",
+      "grep *": "allow",
+      "devcontainer": "allow",
+      "devcontainer *": "allow",
+      "docker": "allow",
+      "docker *": "allow",
+
+      // --- Development Tools (Safe) ---
       "make": "allow",
       "make *": "allow",
       "uv": "allow",
       "uv *": "allow",
-      "python": "ask",
-      "node": "ask",
-      "bun": "ask",
+      "bun run lint*": "allow",
+      "bun run typecheck*": "allow",
+      "bun run test*": "allow",
+      "eslint*": "allow",
+      "npm": "allow",
+      "npm *": "allow",
+      "npx": "allow",
+      "npx *": "allow",
+      "pnpm": "allow",
+      "pnpm *": "allow",
+      "yarn": "allow",
+      "yarn *": "allow",
+      "bun": "allow",
+      "bun *": "allow",
+
+      // --- Git: Investigation (Safe/Allow) ---
       "git status": "allow",
       "git status *": "allow",
       "git log": "allow",
       "git log *": "allow",
       "git diff": "allow",
       "git diff *": "allow",
+      "git show": "allow",
+      "git show *": "allow",
+      "git blame": "allow",
+      "git blame *": "allow",
+      "git ls-files": "allow",
+      "git ls-files *": "allow",
+      "git rev-parse": "allow",
+      "git rev-parse *": "allow",
+      "git remote": "allow",
+      "git remote *": "allow",
+      "git tag": "allow",
+      "git tag *": "allow",
       "git branch": "allow",
+      "git branch *": "allow",
+      "git fetch": "allow",
+      "git fetch *": "allow",
+
+      // --- Git: Modification (Ask/Manual) ---
       "git add": "allow",
       "git commit": "allow",
       "git commit *": "allow",
+      "git checkout": "ask",
+      "git checkout *": "ask",
+      "git merge": "ask",
+      "git rebase": "ask",
+      "git pull": "ask",
+
+      // --- Git: Dangerous (Deny) ---
       "git add .": "deny",
-      "git add *": "deny",
+      // NOTE: "git add *" を deny にすると個別のファイル追加もできなくなるため ask に設定
+      "git add *": "ask",
       "git add -A": "deny",
       "git add --all": "deny",
       "git add -u": "deny",
       "git add :/": "deny",
+      "git push -f*": "deny",
+      "git reset --hard*": "deny",
+      "git clean -fd*": "deny",
+
+      // --- General Write Operations (Ask for safety) ---
+      "mkdir": "allow",
+      "touch": "allow",
+      "cp": "allow",
+      "mv": "allow",
+
+      // --- Security Guards (Deny) ---
       "rm -rf *": "deny",
       "npm publish*": "deny",
       "sudo *": "deny",
@@ -89,12 +149,13 @@
       "curl* | sh": "deny",
       "curl *|sh": "deny",
       "curl * | sh": "deny",
-      "bash _scripts/*": "deny",
       "curl*|sh": "deny",
-      "bun run lint*": "allow",
-      "bun run typecheck*": "allow",
-      "bun run test*": "allow",
-      "eslint*": "allow"
+      "bash _scripts/*": "deny",
+
+      // --- Interpreter Access (Ask) ---
+      "python": "ask",
+      "node": "ask",
+      "bun": "ask"
     }
   },
 
