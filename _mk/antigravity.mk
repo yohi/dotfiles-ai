@@ -12,7 +12,7 @@ ANTIGRAVITY_OPT_DIR := $(HOME)/.local/opt/antigravity
 ANTIGRAVITY_BIN_DIR := $(HOME)/.local/bin
 ANTIGRAVITY_TMP_DIR := $(REPO_ROOT)/.tmp/antigravity
 
-ANTIGRAVITY_CONFIG_DIR := $(HOME)/.gemini/antigravity-cli
+ANTIGRAVITY_CONFIG_DIR := $(HOME)/.gemini/antigravity
 ANTIGRAVITY_MCP_PATH := $(ANTIGRAVITY_CONFIG_DIR)/mcp_config.json
 # 生成されるプロジェクト固有のMCP設定
 PROJECT_MCP_CONFIG := $(REPO_ROOT)/.agents/mcp_config.json
@@ -49,9 +49,8 @@ sync-antigravity: ## apm.ymlからAntigravity用のMCP設定を生成して同�
 	@echo "🔄 Generating Antigravity MCP config from apm.yml..."
 	@mkdir -p "$(REPO_ROOT)/.agents"
 	@set -a; [ -f "$(REPO_ROOT)/.env" ] && . "$(REPO_ROOT)/.env"; set +a; \
-	python3 "$(REPO_ROOT)/_scripts/render-antigravity-config.py"
+	uv run python3 "$(REPO_ROOT)/_scripts/render-antigravity-config.py"
 	@$(MAKE) setup-antigravity
-
 # Antigravityの設定を同期
 setup-antigravity: ## 生成された設定をAntigravityのグローバル設定にリンク
 	@echo "🔧 Synchronizing Antigravity config..."
