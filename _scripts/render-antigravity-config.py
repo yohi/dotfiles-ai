@@ -61,7 +61,7 @@ def main():
 
     output = {"mcpServers": mcp_servers}
     
-    output_path = '.agents/mcp_config.json'
+    output_path = os.path.join(repo_root, '.agents/mcp_config.json')
     with open(output_path, 'w') as f:
         json.dump(output, f, indent=2)
     
