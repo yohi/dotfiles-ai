@@ -117,16 +117,19 @@ export $(cat opencode/personal.env | xargs)
 この関数は `dotfiles-zsh` の起動時に自動的にロードされます。
 
 ### 実装されている機能
-- **空きポートの自動検出**: 4090-4100 の範囲で未使用のポートを自動的に探し、`--port` 引数として付与します。
-- **プロファイルの自動ロード**: `PROFILE` 環境変数が指定されている場合、`opencode/{PROFILE}.env` を自動的に `export` します。
+- **空きポートの自動検出**: `ss` または `lsof` を使用し、4090-4100 の範囲で未使用のポートを自動的に探し、`--port` 引数として付与します。
+- **プロファイルの自動ロード**: `PROFILE` 環境変数が指定されている場合、`opencode/{PROFILE}.env` を自動的に `export` します（未指定時はデフォルトで `personal` プロファイルをロードします）。
 
 ### 使用例
 ```bash
-# 業務用構成で起動（自動的に 4090番台の空きポートを使用）
-PROFILE=work opencode
+# デフォルト（personal）構成で起動
+opencode
+# 出力例: ✅ Profile [personal] | Port [4090]
 
-# 特定のコマンドを実行
-PROFILE=personal opencode run "Hello"
+# 業務用構成で起動
+PROFILE=work opencode
+# 出力例: ✅ Profile [work] | Port [4091] (4090が使用中の場合)
 ```
+
 
 
