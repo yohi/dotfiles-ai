@@ -22,27 +22,21 @@
   },
   "_comment_agents": "Agents: 4大コア + 専門家エージェントの定義",
   "agents": {
-    "_comment_core_agents": "--- Core Agents ---",
-    "_comment_sisyphus": "【司令塔: Sisyphus】 全体の品質管理と最終意思決定",
     "sisyphus": {
-      "model": "sakura/preview/Kimi-K2.6",
-      "fallback_models": [
-        "openai/gpt-5.4-mini"
-      ],
-      "_comment_ultrawork": "Ultrawork: 長時間自律駆動モード。リファクタリングや巨大なログ解析など、負荷の高いタスクに使用。",
+      "_comment": "--- Core Agents ---\n【司令塔: Sisyphus】 全体の品質管理と最終意思決定\nUltrawork: 長時間自律駆動モード。リファクタリングや巨大なログ解析など、負荷の高いタスクに使用。",
+      "category": "ultrabrain",
       "ultrawork": {
-        "model": "sakura/preview/Kimi-K2.6",
+        "model": "{env:ULTRA_WORK_MODEL}",
         "fallback_models": [
-          "openai/gpt-5.4-mini"
+          "{env:ULTRA_WORK_FALLBACK_MODEL}"
         ],
         "variant": "max",
         "effort": "high"
       }
     },
-    "_comment_hephaestus": "【製造担当: Hephaestus】 「正当な職人」。ロジックの実装、リファクタリング。\nAmpCodeのディープモードにインスパイアされ、徹底的な調査の後に一気に書き上げます。",
     "hephaestus": {
-      "model": "openai/gpt-5.5",
-      "variant": "medium",
+      "_comment": "【製造担当: Hephaestus】 「正当な職人」。ロジックの実装、リファクタリング。\nAmpCode of the deep mode にインスパイアされ、徹底的な調査の後に一気に書き上げます。",
+      "category": "deep",
       "permission": {
         "edit": "allow",
         "bash": {
@@ -52,128 +46,99 @@
         }
       }
     },
-    "_comment_oracle": "【大規模解析・監査: Oracle】 読み取り専用のコンサルタント。\nアーキテクチャ決定、深い論理的推論、コードレビュー、難解なバグのデバッグを担当。",
     "oracle": {
-      "model": "openai/gpt-5.5",
-      "variant": "high",
-      "fallback_models": [
-        "opencode/deepseek-v4-flash-free"
-      ]
+      "_comment": "【大規模解析・監査: Oracle】 読み取り専用のコンサルタント。\nアーキテクチャ決定、深い論理的推論、コードレビュー、難解なバグのデバッグを担当。",
+      "category": "ultrabrain"
     },
-    "_comment_librarian": "【超高速補助: Librarian】 証拠に基づいた調査の専門家。\nマルチリポジトリ分析、ドキュメント検索、OSS実装例の調査を低コスト・高精度で行います。\nv4.0.0 でプロンプトが刷新され、GitHubパーマリンクの発見能力が向上。",
     "librarian": {
-      "model": "openai/gpt-5.4-mini",
-      "fallback_models": [
-        "sakura/preview/Kimi-K2.6"
-      ],
+      "_comment": "【超高速補助: Librarian】 証拠に基づいた調査の専門家。\nマルチリポジトリ分析、ドキュメント検索、OSS実装例の調査を低コスト・高精度で行います。\nv4.0.0 でプロンプトが刷新され、GitHubパーマリンクの発見能力が向上。",
+      "category": "quick",
       "description": "Ultra-fast background research with minimal token cost."
     },
-    "_comment_explore": "【高速探索: Explore】 高速なコードベース探索とプロトタイピング。\n自律的なweb searchを組み合わせ、最新の技術仕様に基づいたスキャフォールディングを行います。",
     "explore": {
-      "model": "openai/gpt-5.4-mini",
-      "fallback_models": [
-        "sakura/preview/Kimi-K2.6"
-      ],
+      "_comment": "【高速探索: Explore】 高速なコードベース探索とプロトタイピング。\n自律的なweb searchを組み合わせ、最新の技術仕様に基づいたスキャフォールディングを行います。",
+      "category": "quick",
       "description": "Rapid scaffolding using autonomous web search for latest technical specs."
     },
-    "_comment_multimodal_looker": "【視覚アナリスト: Multimodal-Looker】 視覚コンテンツ・UI分析。\nPDF、画像、図解、UIデザインを分析。ブラウザテストの失敗時のUIデバッグにも威力を発揮。",
     "multimodal-looker": {
-      "model": "openai/gpt-5.5",
-      "fallback_models": [
-        "openai/gpt-5.4-mini"
-      ],
+      "_comment": "【視覚アナリスト: Multimodal-Looker】 視覚コンテンツ・UI分析。\nPDF、画像、図解、UIデザインを分析。ブラウザテストの失敗時のUIデバッグにも威力を発揮。",
+      "category": "ultrabrain",
       "description": "Visual Intelligence. Analyzes UI designs for API generation and debugs browser test failures."
     },
-    "_comment_planning_agents": "--- Planning Agents ---",
-    "_comment_prometheus": "【戦略家: Prometheus】 インタビューモードを備えたプランナー。\n対話を通じてタスクを分解し、並列実行可能な「Agent Swarm」用の作業計画を作成します。",
     "prometheus": {
-      "model": "sakura/preview/Kimi-K2.6",
-      "variant": "high",
-      "fallback_models": [
-        "openai/gpt-5.4-mini"
-      ]
+      "_comment": "--- Planning Agents ---\n【戦略家: Prometheus】 インタビューモードを備えたプランナー。\n対話を通じてタスクを分解し、並列実行可能な「Agent Swarm」用の作業計画を作成します。",
+      "category": "ultrabrain"
     },
-    "_comment_metis": "【計画コンサル: Metis】 計画前の分析とリスク特定。\n隠れた意図や曖昧さ、AIが失敗しやすいポイントを事前に特定し、計画の精度を高めます。\nv4.0.0 では意図の自動分類機能が大幅に強化されています。",
     "metis": {
-      "model": "openai/gpt-5.5",
-      "variant": "high",
-      "fallback_models": [
-        "openai/gpt-5.4-mini"
-      ]
+      "_comment": "【計画コンサル: Metis】 計画前の分析とリスク特定。\n隠れた意図や曖昧さ、AIが失敗しやすいポイントを事前に特定し、計画の精度を高めます。\nv4.0.0 では意図の自動分類機能が大幅に強化されています。",
+      "category": "ultrabrain"
     },
-    "_comment_momus": "【計画レビュアー: Momus】 計画の検証と品質保証。\n明確さ、検証可能性、完全性の基準に照らして、Prometheusが作成した計画を厳格にレビュー。",
     "momus": {
-      "model": "openai/gpt-5.5",
-      "variant": "xhigh",
-      "fallback_models": [
-        "openai/gpt-5.4-mini"
-      ]
+      "_comment": "【計画レビュアー: Momus】 計画の検証と品質保証。\n明確さ、検証可能性、完全性の基準に照らして、Prometheusが作成した計画を厳格にレビュー。",
+      "category": "ultrabrain"
     },
-    "_comment_orchestration_agents": "--- Orchestration Agents ---",
-    "_comment_atlas": "【現場監督: Atlas】 Todo駆動型実行エンジン。\nTmux, Playwrightなどの環境管理、Todo項目の体系的な管理・調整・維持を担当。",
     "atlas": {
-      "model": "sakura/preview/Kimi-K2.6",
-      "fallback_models": [
-        "openai/gpt-5.4-mini"
-      ],
+      "_comment": "--- Orchestration Agents ---\n【現場監督: Atlas】 Todo駆動型実行エンジン。\nTmux, Playwrightなどの環境管理、Todo項目の体系的な管理・調整・維持を担当。",
+      "category": "ultrabrain",
       "description": "Orchestrates Tmux, Playwright, and server states. Ensures environment consistency."
     }
   },
   "_comment_categories": "Categories: タスクの性質に応じたモデルの自動ルーティング",
   "categories": {
-    "_comment_ultrabrain": "ultrabrain: 最強の論理推論 (xhigh variant)",
     "ultrabrain": {
-      "model": "openai/gpt-5.5",
+      "_comment": "ultrabrain: 最強の論理推論 (xhigh variant)",
+      "model": "{env:ULTRABRAIN_MODEL}",
       "variant": "xhigh",
       "fallback_models": [
-        "openai/gpt-5.4-mini"
+        "{env:ULTRABRAIN_FALLBACK_MODEL}"
       ]
     },
-    "_comment_deep": "deep: 自律的解決・難解なタスク",
     "deep": {
-      "model": "openai/gpt-5.5",
+      "_comment": "deep: 自律的解決・難解なタスク",
+      "model": "{env:DEEP_MODEL}",
       "variant": "medium",
       "fallback_models": [
-        "openai/gpt-5.4-mini"
+        "{env:DEEP_FALLBACK_MODEL}"
       ]
     },
-    "_comment_quick": "quick: 些細な修正・高速レスポンス",
     "quick": {
-      "model": "openai/gpt-5.4-mini",
+      "_comment": "quick: 些細な修正・高速レスポンス",
+      "model": "{env:QUICK_MODEL}",
       "fallback_models": [
-        "sakura/preview/Kimi-K2.6"
+        "{env:QUICK_FALLBACK_MODEL}"
       ]
     },
-    "_comment_writing": "writing: テクニカルライティング・散文",
     "writing": {
-      "model": "sakura/preview/Kimi-K2.6",
+      "_comment": "writing: テクニカルライティング・散文",
+      "model": "{env:WRITING_MODEL}",
       "fallback_models": [
-        "openai/gpt-5.4-mini"
+        "{env:WRITING_FALLBACK_MODEL}"
       ]
     },
     "unspecified-low": {
-      "model": "sakura/preview/Kimi-K2.6",
+      "model": "{env:UNSPECIFIED_LOW_MODEL}",
       "fallback_models": [
-        "openai/gpt-5.4-mini"
+        "{env:UNSPECIFIED_LOW_FALLBACK_MODEL}"
       ]
     },
     "unspecified-high": {
-      "model": "sakura/preview/Kimi-K2.6",
+      "model": "{env:UNSPECIFIED_HIGH_MODEL}",
       "fallback_models": [
-        "openai/gpt-5.4-mini"
+        "{env:UNSPECIFIED_HIGH_FALLBACK_MODEL}"
       ]
     },
-    "_comment_visual_engineering": "visual-engineering: UI/UX、デザイン、アニメーション",
     "visual-engineering": {
-      "model": "nvidia/qwen/qwen3-coder-480b-a35b-instruct",
+      "_comment": "visual-engineering: UI/UX、デザイン、アニメーション",
+      "model": "{env:VISUAL_ENGINEERING_MODEL}",
       "fallback_models": [
-        "openai/gpt-5.4-mini"
+        "{env:VISUAL_ENGINEERING_FALLBACK_MODEL}"
       ]
     },
     "artistry": {
-      "model": "openai/gpt-5.5",
+      "_comment": "artistry: アーティスト性・ジェネレーティブ",
+      "model": "{env:ARTISTRY_MODEL}",
       "fallback_models": [
-        "openai/gpt-5.4-mini"
+        "{env:ARTISTRY_FALLBACK_MODEL}"
       ]
     }
   },
@@ -273,7 +238,6 @@
     }
   },
   "hashline_edit": true,
-
   "env": [
     "HOME",
     "MCP_GATEWAY_TOKEN",
