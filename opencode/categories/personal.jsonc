@@ -1,0 +1,28 @@
+{
+  "categories": {
+    "ultrabrain": {
+      "model": "google/gemini-1.5-pro" 
+    },
+    "deep": {
+      "model": "google/gemini-1.5-pro" 
+    },
+    "quick": {
+      "model": "google/gemini-2.0-flash" 
+    },
+    "writing": {
+      "model": "google/gemini-1.5-pro" 
+    },
+    "unspecified-low": {
+      "model": "google/gemini-1.5-flash" 
+    },
+    "unspecified-high": {
+      "model": "google/gemini-1.5-pro" 
+    },
+    "visual-engineering": {
+      "model": "google/gemini-1.5-pro"
+    },
+    "artistry": {
+      "model": "google/gemini-1.5-pro" 
+    }
+  }
+}

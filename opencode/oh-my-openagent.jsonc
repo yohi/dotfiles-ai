@@ -23,20 +23,12 @@
   "_comment_agents": "Agents: 4大コア + 専門家エージェントの定義",
   "agents": {
     "sisyphus": {
-      "_comment": "--- Core Agents ---\n【司令塔: Sisyphus】 全体の品質管理と最終意思決定\nUltrawork: 長時間自律駆動モード。リファクタリングや巨大なログ解析など、負荷の高いタスクに使用。",
-      "category": "ultrabrain",
-      "ultrawork": {
-        "model": "{env:ULTRA_WORK_MODEL}",
-        "fallback_models": [
-          "{env:ULTRA_WORK_FALLBACK_MODEL}"
-        ],
-        "variant": "max",
-        "effort": "high"
-      }
+      "_comment": "--- Core Agents ---\n【司令塔: Sisyphus】 全体の品質管理と最終意思決定",
+      // "category": "ultrabrain"
     },
     "hephaestus": {
       "_comment": "【製造担当: Hephaestus】 「正当な職人」。ロジックの実装、リファクタリング。\nAmpCode of the deep mode にインスパイアされ、徹底的な調査の後に一気に書き上げます。",
-      "category": "deep",
+      // "category": "deep",
       "permission": {
         "edit": "allow",
         "bash": {
@@ -48,98 +40,39 @@
     },
     "oracle": {
       "_comment": "【大規模解析・監査: Oracle】 読み取り専用のコンサルタント。\nアーキテクチャ決定、深い論理的推論、コードレビュー、難解なバグのデバッグを担当。",
-      "category": "ultrabrain"
+      // "category": "ultrabrain"
     },
     "librarian": {
       "_comment": "【超高速補助: Librarian】 証拠に基づいた調査の専門家。\nマルチリポジトリ分析、ドキュメント検索、OSS実装例の調査を低コスト・高精度で行います。\nv4.0.0 でプロンプトが刷新され、GitHubパーマリンクの発見能力が向上。",
-      "category": "quick",
+      // "category": "quick",
       "description": "Ultra-fast background research with minimal token cost."
     },
     "explore": {
       "_comment": "【高速探索: Explore】 高速なコードベース探索とプロトタイピング。\n自律的なweb searchを組み合わせ、最新の技術仕様に基づいたスキャフォールディングを行います。",
-      "category": "quick",
+      // "category": "quick",
       "description": "Rapid scaffolding using autonomous web search for latest technical specs."
     },
     "multimodal-looker": {
       "_comment": "【視覚アナリスト: Multimodal-Looker】 視覚コンテンツ・UI分析。\nPDF、画像、図解、UIデザインを分析。ブラウザテストの失敗時のUIデバッグにも威力を発揮。",
-      "category": "ultrabrain",
+      // "category": "ultrabrain",
       "description": "Visual Intelligence. Analyzes UI designs for API generation and debugs browser test failures."
     },
     "prometheus": {
       "_comment": "--- Planning Agents ---\n【戦略家: Prometheus】 インタビューモードを備えたプランナー。\n対話を通じてタスクを分解し、並列実行可能な「Agent Swarm」用の作業計画を作成します。",
-      "category": "ultrabrain"
+      // "category": "ultrabrain"
     },
     "metis": {
       "_comment": "【計画コンサル: Metis】 計画前の分析とリスク特定。\n隠れた意図や曖昧さ、AIが失敗しやすいポイントを事前に特定し、計画の精度を高めます。\nv4.0.0 では意図の自動分類機能が大幅に強化されています。",
-      "category": "ultrabrain"
+      // "category": "ultrabrain"
     },
     "momus": {
       "_comment": "【計画レビュアー: Momus】 計画の検証と品質保証。\n明確さ、検証可能性、完全性の基準に照らして、Prometheusが作成した計画を厳格にレビュー。",
-      "category": "ultrabrain"
+      // "category": "ultrabrain"
     },
     "atlas": {
       "_comment": "--- Orchestration Agents ---\n【現場監督: Atlas】 Todo駆動型実行エンジン。\nTmux, Playwrightなどの環境管理、Todo項目の体系的な管理・調整・維持を担当。",
-      "category": "ultrabrain",
+      // "category": "ultrabrain",
       "description": "Orchestrates Tmux, Playwright, and server states. Ensures environment consistency."
-    }
-  },
-  "_comment_categories": "Categories: タスクの性質に応じたモデルの自動ルーティング",
-  "categories": {
-    "ultrabrain": {
-      "_comment": "ultrabrain: 最強の論理推論 (xhigh variant)",
-      "model": "{env:ULTRABRAIN_MODEL}",
-      "variant": "xhigh",
-      "fallback_models": [
-        "{env:ULTRABRAIN_FALLBACK_MODEL}"
-      ]
-    },
-    "deep": {
-      "_comment": "deep: 自律的解決・難解なタスク",
-      "model": "{env:DEEP_MODEL}",
-      "variant": "medium",
-      "fallback_models": [
-        "{env:DEEP_FALLBACK_MODEL}"
-      ]
-    },
-    "quick": {
-      "_comment": "quick: 些細な修正・高速レスポンス",
-      "model": "{env:QUICK_MODEL}",
-      "fallback_models": [
-        "{env:QUICK_FALLBACK_MODEL}"
-      ]
-    },
-    "writing": {
-      "_comment": "writing: テクニカルライティング・散文",
-      "model": "{env:WRITING_MODEL}",
-      "fallback_models": [
-        "{env:WRITING_FALLBACK_MODEL}"
-      ]
-    },
-    "unspecified-low": {
-      "model": "{env:UNSPECIFIED_LOW_MODEL}",
-      "fallback_models": [
-        "{env:UNSPECIFIED_LOW_FALLBACK_MODEL}"
-      ]
-    },
-    "unspecified-high": {
-      "model": "{env:UNSPECIFIED_HIGH_MODEL}",
-      "fallback_models": [
-        "{env:UNSPECIFIED_HIGH_FALLBACK_MODEL}"
-      ]
-    },
-    "visual-engineering": {
-      "_comment": "visual-engineering: UI/UX、デザイン、アニメーション",
-      "model": "{env:VISUAL_ENGINEERING_MODEL}",
-      "fallback_models": [
-        "{env:VISUAL_ENGINEERING_FALLBACK_MODEL}"
-      ]
-    },
-    "artistry": {
-      "_comment": "artistry: アーティスト性・ジェネレーティブ",
-      "model": "{env:ARTISTRY_MODEL}",
-      "fallback_models": [
-        "{env:ARTISTRY_FALLBACK_MODEL}"
-      ]
     }
   },
   "_comment_experimental": "Experimental: 最新・実験的機能の最適化",
@@ -237,28 +170,5 @@
       }
     }
   },
-  "hashline_edit": true,
-  "env": [
-    "HOME",
-    "MCP_GATEWAY_TOKEN",
-    "CHRONOS_POSTGRES_HOST",
-    "CHRONOS_POSTGRES_PASSWORD",
-    "CHRONOS_NEO4J_URI",
-    "CHRONOS_NEO4J_PASSWORD",
-    "CHRONOS_REDIS_URL",
-    "CHRONOS_POSTGRES_PORT",
-    "CHRONOS_POSTGRES_DB",
-    "CHRONOS_POSTGRES_USER",
-    "CHRONOS_POSTGRES_SSL",
-    "CHRONOS_GRAPH_ENABLED",
-    "CHRONOS_NEO4J_USER",
-    "CHRONOS_CACHE_BACKEND",
-    "CHRONOS_REDIS_SSL",
-    "CHRONOS_DECAY_HALF_LIFE_DAYS",
-    "CHRONOS_SIMILARITY_THRESHOLD",
-    "CHRONOS_DEDUP_THRESHOLD",
-    "CHRONOS_EMBEDDING_PROVIDER",
-    "CHRONOS_LOCAL_MODEL_NAME",
-    "CHRONOS_EMBEDDING_DIMENSION"
-  ]
+  "hashline_edit": true
 }

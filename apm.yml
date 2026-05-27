@@ -11,6 +11,15 @@ dependencies:
 
   # MCP Servers
   mcp:
+    - name: docker-mcp
+      title: "Docker MCP Gateway"
+      registry: false
+      transport: sse
+      url: "http://127.0.0.1:10888/sse"
+      headers:
+        Authorization: "Bearer ${env:MCP_GATEWAY_TOKEN}"
+      enabled: true
+
     - name: skillport
       title: "Skillport"
       registry: false
@@ -21,6 +30,7 @@ dependencies:
       env:
         SKILLPORT_SKILLS_DIR: "${env:HOME}/dotfiles/components/dotfiles-ai/agent-skills"
       standalone: true
+      enabled: true
 
     - name: nexus
       title: "Nexus"
@@ -29,7 +39,7 @@ dependencies:
       command: "npx"
       args:
         - "-y"
-        - "@yohi/nexus@1.7.0"
+        - "@yohi/nexus@1.7.4"
       env:
         NEXUS_STORAGE_ROOT_DIR: "${env:HOME}/.nexus"
         LOG_LEVEL: "ERROR"
@@ -39,6 +49,7 @@ dependencies:
         NO_PROXY: "127.0.0.1,localhost"
       timeout: 30000
       standalone: true
+      enabled: true
 
     - name: chronos-graph
       title: "Chronos Graph"
@@ -50,29 +61,247 @@ dependencies:
         - "git+https://github.com/yohi/chronos-graph.git[all]"
         - "context-store"
       env:
-        STORAGE_BACKEND: "postgres"
-        # Tier 2: Required env vars (set in .env file)
-        POSTGRES_HOST: "${env:CHRONOS_POSTGRES_HOST}"
-        POSTGRES_PASSWORD: "${env:CHRONOS_POSTGRES_PASSWORD}"
-        NEO4J_URI: "${env:CHRONOS_NEO4J_URI}"
-        NEO4J_PASSWORD: "${env:CHRONOS_NEO4J_PASSWORD}"
-        REDIS_URL: "${env:CHRONOS_REDIS_URL}"
-        # Tier 3: Default values (can be overridden in .env)
-        POSTGRES_PORT: "${env:CHRONOS_POSTGRES_PORT:-5432}"
-        POSTGRES_DB: "${env:CHRONOS_POSTGRES_DB:-postgres}"
-        POSTGRES_USER: "${env:CHRONOS_POSTGRES_USER:-postgres}"
-        POSTGRES_SSL: "${env:CHRONOS_POSTGRES_SSL:-true}"
-        GRAPH_ENABLED: "${env:CHRONOS_GRAPH_ENABLED:-true}"
-        NEO4J_USER: "${env:CHRONOS_NEO4J_USER:-3af8423f}"
-        CACHE_BACKEND: "${env:CHRONOS_CACHE_BACKEND:-redis}"
-        REDIS_SSL: "${env:CHRONOS_REDIS_SSL:-true}"
-        DECAY_HALF_LIFE_DAYS: "${env:CHRONOS_DECAY_HALF_LIFE_DAYS:-30}"
-        SIMILARITY_THRESHOLD: "${env:CHRONOS_SIMILARITY_THRESHOLD:-0.70}"
-        DEDUP_THRESHOLD: "${env:CHRONOS_DEDUP_THRESHOLD:-0.90}"
-        EMBEDDING_PROVIDER: "${env:CHRONOS_EMBEDDING_PROVIDER:-local-model}"
-        LOCAL_MODEL_NAME: "${env:CHRONOS_LOCAL_MODEL_NAME:-cl-nagoya/ruri-v3-310m}"
-        EMBEDDING_DIMENSION: "${env:CHRONOS_EMBEDDING_DIMENSION:-768}"
+        STORAGE_BACKEND: "${env:STORAGE_BACKEND}"
+        GRAPH_ENABLED: "${env:GRAPH_ENABLED}"
+        POSTGRES_HOST: "${env:POSTGRES_HOST}"
+        POSTGRES_PORT: "${env:POSTGRES_PORT}"
+        POSTGRES_DB: "${env:POSTGRES_DB}"
+        POSTGRES_USER: "${env:POSTGRES_USER}"
+        POSTGRES_PASSWORD: "${env:POSTGRES_PASSWORD}"
+        POSTGRES_SSL: "${env:POSTGRES_SSL}"
+        NEO4J_URI: "${env:NEO4J_URI}"
+        NEO4J_USER: "${env:NEO4J_USER}"
+        NEO4J_PASSWORD: "${env:NEO4J_PASSWORD}"
+        CACHE_BACKEND: "${env:CACHE_BACKEND}"
+        REDIS_URL: "${env:REDIS_URL}"
+        REDIS_SSL: "${env:REDIS_SSL}"
+        EMBEDDING_PROVIDER: "${env:EMBEDDING_PROVIDER}"
+        LOCAL_MODEL_NAME: "${env:LOCAL_MODEL_NAME}"
+        EMBEDDING_DIMENSION: "${env:EMBEDDING_DIMENSION}"
+        SIMILARITY_THRESHOLD: "${env:SIMILARITY_THRESHOLD}"
+        DEDUP_THRESHOLD: "${env:DEDUP_THRESHOLD}"
+        DEFAULT_TOP_K: "${env:DEFAULT_TOP_K}"
+        DECAY_HALF_LIFE_DAYS: "${env:DECAY_HALF_LIFE_DAYS}"
+        ARCHIVE_THRESHOLD: "${env:ARCHIVE_THRESHOLD}"
+        PURGE_RETENTION_DAYS: "${env:PURGE_RETENTION_DAYS}"
+        DASHBOARD_HOST: "${env:DASHBOARD_HOST}"
+        DASHBOARD_PORT: "${env:DASHBOARD_PORT}"
       standalone: true
+      enabled: true
+
+# --------------------------------------------------------------------------
+# Global Agent Settings (Inherited by all targets)
+# --------------------------------------------------------------------------
+default_agent: sisyphus
+shell: bash
+snapshot: true
+
+plugin:
+  - "@yohi/justice@2.3.0"
+  - "oh-my-openagent@4.5.1"
+
+disabled_providers:
+  - google
+  - cursor
+
+permission:
+  "*": ask
+  read: allow
+  edit: allow
+  glob: allow
+  grep: allow
+  task: allow
+  skill: allow
+  lsp: allow
+  webfetch: allow
+  websearch: allow
+  skillport_*: allow
+  mcp_skillport_*: allow
+  mcp__skillport__*: allow
+  skillport_load_skill: allow
+  nexus_*: allow
+  mcp_nexus_*: allow
+  chronos-graph_*: allow
+  mcp_chronos-graph_*: allow
+  external_directory: ask
+  doom_loop: ask
+  bash:
+    "*": ask
+    "ls*": allow
+    "cat*": allow
+    "head*": allow
+    "tail*": allow
+    "grep*": allow
+    "devcontainer*": allow
+    "docker*": allow
+    "make*": allow
+    "uv*": allow
+    "bun run lint*": allow
+    "bun run typecheck*": allow
+    "bun run test*": allow
+    "eslint*": allow
+    "npm*": allow
+    "npx*": allow
+    "pnpm*": allow
+    "yarn*": allow
+    "bun*": allow
+    "git status*": allow
+    "git log*": allow
+    "git diff*": allow
+    "git show*": allow
+    "git blame*": allow
+    "git ls-files*": allow
+    "git rev-parse*": allow
+    "git remote*": allow
+    "git tag*": allow
+    "git branch*": allow
+    "git fetch*": allow
+    "git add": allow
+    "git commit*": allow
+    "git checkout": ask
+    "git checkout *": ask
+    "git merge": ask
+    "git rebase": ask
+    "git pull": ask
+    "git add .": deny
+    "git add *": ask
+    "git add -A": deny
+    "git add --all": deny
+    "git add -u": deny
+    "git add :/": deny
+    "git push -f*": deny
+    "git reset --hard*": deny
+    "git clean -fd*": deny
+    "mkdir": allow
+    "touch": allow
+    "cp": allow
+    "mv": allow
+    "rm -rf *": deny
+    "npm publish*": deny
+    "sudo *": deny
+    "su *": deny
+    "curl* | sh": deny
+    "curl *|sh": deny
+    "curl * | sh": deny
+    "curl*|sh": deny
+    "bash _scripts/*": deny
+    "python": ask
+    "node": ask
+
+compaction:
+  auto: true
+  reserved: 15000
+  tail_turns: 3
+  prune: true
+
+share: manual
+
+lsp:
+  typescript-language-server:
+    command: ["typescript-language-server", "--stdio"]
+    extensions: [".ts", ".tsx", ".js", ".jsx"]
+    initialization:
+      preferences:
+        includeInlayParameterNameHints: "all"
+        includeInlayVariableTypeHints: true
+        includeInlayFunctionParameterTypeHints: true
+        disableSuggestions: false
+      diagnostics:
+        ignoredCodes: [6133]
+  bash-language-server:
+    command: ["bash-language-server", "start"]
+    extensions: [".sh"]
+  pyright:
+    command: ["pyright-langserver", "--stdio"]
+    extensions: [".py"]
+    initialization:
+      python:
+        analysis:
+          typeCheckingMode: "strict"
+          autoSearchPaths: true
+          useLibraryCodeForTypes: true
+  markdownlint:
+    command: ["npx", "markdownlint-lsp", "--stdio"]
+    extensions: [".md"]
+  mypy:
+    command: ["mypy", "--ignore-missing-imports", "--follow-imports=silent", "--strict"]
+    extensions: [".py"]
+  shellcheck:
+    command: ["shellcheck", "-f", "gcc", "--severity=style"]
+    extensions: [".sh"]
+  eslint:
+    command: ["eslint", "--format", "stylish", "--max-warnings", "0"]
+    extensions: [".ts", ".tsx", ".js", ".jsx"]
+
+instructions:
+  - global-rules/AGENTS.global.md
+  - agent-skills/superpowers/using-superpowers/SKILL.md
+
+watcher:
+  ignore:
+    - "**/node_modules/**"
+    - "**/dist/**"
+    - "**/coverage/**"
+    - "**/*.lock"
+    - "**/.git/**"
+
+enabled_providers:
+  - openai
+  - nvidia
+  - cloudflare-workers-ai
+  - opencode
+  - amazon-bedrock
+  - sakura
+
+provider:
+  openai:
+    whitelist:
+      - "gpt-5.3-codex"
+      - "gpt-5.3-codex-spark"
+      - "gpt-5.4"
+      - "gpt-5.4-mini"
+      - "gpt-5.5"
+  nvidia:
+    whitelist:
+      - "minimaxai/minimax-m2.5"
+      - "minimaxai/minimax-m2.7"
+      - "z-ai/glm4.7"
+      - "qwen/qwen3-coder-480b-a35b-instruct"
+  cloudflare-workers-ai:
+    whitelist:
+      - "@cf/google/gemma-4-26b-a4b-it"
+      - "@cf/meta/llama-4-scout-17b-16e-instruct"
+      - "@cf/moonshotai/kimi-k2.6"
+      - "@cf/nvidia/nemotron-3-120b-a12b"
+      - "@cf/openai/gpt-oss-120b"
+      - "@cf/openai/gpt-oss-20b"
+      - "@cf/zai-org/glm-4.7-flash"
+  opencode:
+    whitelist:
+      - "minimax-m2.5-free"
+      - "nemotron-3-super-free"
+      - "deepseek-v4-flash-free"
+      - "big-pickle"
+  amazon-bedrock:
+    whitelist:
+      - "global.anthropic.claude-haiku-4-5-20251001-v1:0"
+      - "global.anthropic.claude-opus-4-6-v1"
+      - "global.anthropic.claude-opus-4-7"
+      - "global.anthropic.claude-sonnet-4-6"
+  sakura:
+    npm: "@ai-sdk/openai-compatible"
+    name: "sakura aipf"
+    options:
+      baseURL: "https://api.ai.sakura.ad.jp/v1"
+    models:
+      "preview/Kimi-K2.6":
+        name: "Kimi-K2.6"
+
+experimental:
+  batch_tool: true
+  openTelemetry: true
+  continue_loop_on_deny: false
+  mcp_timeout: 120000
 
 # APM Standard Targets
 targets:

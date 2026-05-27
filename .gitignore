@@ -40,6 +40,7 @@ opencode/oh-my-*.json*
 .serena/
 .env
 antigravity/mcp_config.json
+antigravity/settings.json
 mcp/*.rendered
 mcp/catalogs/custom.yaml
 node_modules/
