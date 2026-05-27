@@ -107,3 +107,26 @@ export $(cat opencode/personal.env | xargs)
 
 この方法により、`oh-my-openagent.jsonc` を書き換えることなく、瞬時に推論エンジンのスタックを切り替えることが可能です。
 
+## 6. 高度な使い方：PROFILEによる自動切り替え
+
+本プロジェクトでは、`dotfiles-zsh` と連携し、`PROFILE=work opencode` と打つだけで「環境変数のロード」と「空きポートの自動割り当て」を同時に行うシェル関数が用意されています。
+
+### 統合場所
+- `~/dotfiles/components/dotfiles-zsh/functions/opencode.zsh`
+
+この関数は `dotfiles-zsh` の起動時に自動的にロードされます。
+
+### 実装されている機能
+- **空きポートの自動検出**: 4090-4100 の範囲で未使用のポートを自動的に探し、`--port` 引数として付与します。
+- **プロファイルの自動ロード**: `PROFILE` 環境変数が指定されている場合、`opencode/{PROFILE}.env` を自動的に `export` します。
+
+### 使用例
+```bash
+# 業務用構成で起動（自動的に 4090番台の空きポートを使用）
+PROFILE=work opencode
+
+# 特定のコマンドを実行
+PROFILE=personal opencode run "Hello"
+```
+
+
