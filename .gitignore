@@ -35,6 +35,8 @@ codex/skills/.system/
 
 # OpenCode
 opencode/oh-my-*.json*
+!opencode/oh-my-*.json*.template
+!opencode/*.env
 !opencode/oh-my-openagent.jsonc
 .mcp.json
 .serena/

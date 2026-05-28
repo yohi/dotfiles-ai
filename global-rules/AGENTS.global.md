@@ -40,7 +40,8 @@ The following rules apply to **ALL** projects unless overridden by a local proje
 
 1. **Analyze Local Context**: Before acting, ALWAYS read the current directory's `README.md` or local `AGENTS.md` to understand the specific project constraints.
 2. **Resolve Paths**: Paths in Section 3 are relative to the Central Config Repo. Check accessibility before trying to resolve them.
-3. **Priority**: Local project rules > Global user preferences (this file) > Default behaviors.
+3. **Execution Environment**: If a `devcontainer` environment (e.g., `.devcontainer/`) is available, **ALWAYS** prioritize executing static analysis, linting, and tests **inside the devcontainer** to ensure environment consistency.
+4. **Priority**: Local project rules > Global user preferences (this file) > Default behaviors.
 
 
 
@@ -189,9 +190,9 @@ For a full list of available skills and their detailed descriptions, see [AVAILA
 
 ## 6. Agent-Specific Contexts (Unified)
 
-- **CI/CD**: Default to **Bitbucket Pipelines** (`bitbucket-pipelines.yml`).
 - **Git Restrictions (CRITICAL)**:
   - Execute git commands **ONLY** when the user issues a direct, unambiguous instruction.
+  - **NEVER** execute git commands inside a `devcontainer` environment due to permission issues; always perform git operations on the host.
   - **STRICTLY FORBIDDEN**:
     - **NEVER** commit or push directly to the `master` branch.
     - **NEVER** perform merge operations for Pull Requests; merging is strictly reserved for human operators.
