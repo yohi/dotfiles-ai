@@ -33,9 +33,9 @@
       // Ultrawork: 長時間自律駆動モード。リファクタリングや巨大なログ解析など、負荷の高いタスクに使用。
       "category": "ultrabrain",
       "ultrawork": {
-        "model": "{env:ULTRA_WORK_MODEL}",
+        "model": "${ULTRA_WORK_MODEL}",
         "fallback_models": [
-          "{env:ULTRA_WORK_FALLBACK_MODEL}"
+          "${ULTRA_WORK_FALLBACK_MODEL}"
         ],
         "variant": "max",
         "effort": "high"
@@ -107,58 +107,58 @@
   "categories": {
     "ultrabrain": {
       // ultrabrain: 最強の論理推論 (xhigh variant)
-      "model": "{env:ULTRABRAIN_MODEL}",
+      "model": "${ULTRABRAIN_MODEL}",
       "variant": "xhigh",
       "fallback_models": [
-        "{env:ULTRABRAIN_FALLBACK_MODEL}"
+        "${ULTRABRAIN_FALLBACK_MODEL}"
       ]
     },
     "deep": {
       // deep: 自律的解決・難解なタスク
-      "model": "{env:DEEP_MODEL}",
+      "model": "${DEEP_MODEL}",
       "variant": "medium",
       "fallback_models": [
-        "{env:DEEP_FALLBACK_MODEL}"
+        "${DEEP_FALLBACK_MODEL}"
       ]
     },
     "quick": {
       // quick: 些細な修正・高速レスポンス
-      "model": "{env:QUICK_MODEL}",
+      "model": "${QUICK_MODEL}",
       "fallback_models": [
-        "{env:QUICK_FALLBACK_MODEL}"
+        "${QUICK_FALLBACK_MODEL}"
       ]
     },
     "writing": {
       // writing: テクニカルライティング・散文
-      "model": "{env:WRITING_MODEL}",
+      "model": "${WRITING_MODEL}",
       "fallback_models": [
-        "{env:WRITING_FALLBACK_MODEL}"
+        "${WRITING_FALLBACK_MODEL}"
       ]
     },
     "unspecified-low": {
-      "model": "{env:UNSPECIFIED_LOW_MODEL}",
+      "model": "${UNSPECIFIED_LOW_MODEL}",
       "fallback_models": [
-        "{env:UNSPECIFIED_LOW_FALLBACK_MODEL}"
+        "${UNSPECIFIED_LOW_FALLBACK_MODEL}"
       ]
     },
     "unspecified-high": {
-      "model": "{env:UNSPECIFIED_HIGH_MODEL}",
+      "model": "${UNSPECIFIED_HIGH_MODEL}",
       "fallback_models": [
-        "{env:UNSPECIFIED_HIGH_FALLBACK_MODEL}"
+        "${UNSPECIFIED_HIGH_FALLBACK_MODEL}"
       ]
     },
     "visual-engineering": {
       // visual-engineering: UI/UX、デザイン、アニメーション
-      "model": "{env:VISUAL_ENGINEERING_MODEL}",
+      "model": "${VISUAL_ENGINEERING_MODEL}",
       "fallback_models": [
-        "{env:VISUAL_ENGINEERING_FALLBACK_MODEL}"
+        "${VISUAL_ENGINEERING_FALLBACK_MODEL}"
       ]
     },
     "artistry": {
       // artistry: アーティスト性・ジェネレーティブ
-      "model": "{env:ARTISTRY_MODEL}",
+      "model": "${ARTISTRY_MODEL}",
       "fallback_models": [
-        "{env:ARTISTRY_FALLBACK_MODEL}"
+        "${ARTISTRY_FALLBACK_MODEL}"
       ]
     }
   },
