@@ -68,6 +68,7 @@
       "head*": "allow",
       "tail*": "allow",
       "grep*": "allow",
+      "rg*": "allow",
       "print*": "allow",
       "printf*": "allow",
       "command*": "allow",
