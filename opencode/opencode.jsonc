@@ -453,6 +453,11 @@
             // "zai.glm-5",
         ]
     },
+    "openrouter": {
+        "whitelist": [
+            "moonshotai/kimi-k2.6:free"
+        ]
+    },
     "sakura": {
       "npm": "@ai-sdk/openai-compatible",
       "name": "sakura aipf",
