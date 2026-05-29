@@ -30,8 +30,12 @@
     "sisyphus": {
       // --- Core Agents ---
       // 【司令塔: Sisyphus】 全体の品質管理と最終意思決定
-      // Ultrawork: 長時間自律駆動モード。リファクタリングや巨大なログ解析など、負荷の高いタスクに使用。
-      "category": "ultrabrain",
+      // Ultrawork: 長時間自律駆動モード。リファクタリングや巨大なログ解析など, 負荷の高いタスクに使用。
+      "model": "${SISYPHUS_MODEL}",
+      "variant": "${SISYPHUS_VARIANT}",
+      "fallback_models": [
+        "${SISYPHUS_FALLBACK_MODEL}"
+      ],
       "ultrawork": {
         "model": "${ULTRA_WORK_MODEL}",
         "fallback_models": [
@@ -44,7 +48,12 @@
     "hephaestus": {
       // 【製造担当: Hephaestus】 「正当な職人」。ロジックの実装、リファクタリング。
       // AmpCode of the deep mode にインスパイアされ、徹底的な調査の後に一気に書き上げます。
-      "category": "deep",
+      "disabled": ${HEPHAESTUS_DISABLED},
+      "model": "${HEPHAESTUS_MODEL}",
+      "variant": "${HEPHAESTUS_VARIANT}",
+      "fallback_models": [
+        "${HEPHAESTUS_FALLBACK_MODEL}"
+      ],
       "permission": {
         "edit": "allow",
         "bash": {
@@ -57,49 +66,81 @@
     "oracle": {
       // 【大規模解析・監査: Oracle】 読み取り専用のコンサルタント。
       // アーキテクチャ決定、深い論理的推論、コードレビュー、難解なバグのデバッグを担当。
-      "category": "ultrabrain"
+      "model": "${ORACLE_MODEL}",
+      "variant": "${ORACLE_VARIANT}",
+      "fallback_models": [
+        "${ORACLE_FALLBACK_MODEL}"
+      ]
     },
     "librarian": {
       // 【超高速補助: Librarian】 証拠に基づいた調査の専門家。
       // マルチリポジトリ分析、ドキュメント検索、OSS実装例の調査を低コスト・高精度で行います。
       // v4.0.0 でプロンプトが刷新され、GitHubパーマリンクの発見能力が向上。
-      "category": "quick",
+      "model": "${LIBRARIAN_MODEL}",
+      "variant": "${LIBRARIAN_VARIANT}",
+      "fallback_models": [
+        "${LIBRARIAN_FALLBACK_MODEL}"
+      ],
       "description": "Ultra-fast background research with minimal token cost."
     },
     "explore": {
       // 【高速探索: Explore】 高速なコードベース探索とプロトタイピング。
       // 自律的なweb searchを組み合わせ、最新の技術仕様に基づいたスキャフォールディングを行います。
-      "category": "quick",
+      "model": "${EXPLORE_MODEL}",
+      "variant": "${EXPLORE_VARIANT}",
+      "fallback_models": [
+        "${EXPLORE_FALLBACK_MODEL}"
+      ],
       "description": "Rapid scaffolding using autonomous web search for latest technical specs."
     },
     "multimodal-looker": {
       // 【視覚アナリスト: Multimodal-Looker】 視覚コンテンツ・UI分析。
       // PDF、画像、図解、UIデザインを分析。ブラウザテストの失敗時のUIデバッグにも威力を発揮。
-      "category": "ultrabrain",
+      "model": "${MULTIMODAL_LOOKER_MODEL}",
+      "variant": "${MULTIMODAL_LOOKER_VARIANT}",
+      "fallback_models": [
+        "${MULTIMODAL_LOOKER_FALLBACK_MODEL}"
+      ],
       "description": "Visual Intelligence. Analyzes UI designs for API generation and debugs browser test failures."
     },
     "prometheus": {
       // --- Planning Agents ---
       // 【戦略家: Prometheus】 インタビューモードを備えたプランナー。
       // 対話を通じてタスクを分解し、並列実行可能な「Agent Swarm」用の作業計画を作成します。
-      "category": "ultrabrain"
+      "model": "${PROMETHEUS_MODEL}",
+      "variant": "${PROMETHEUS_VARIANT}",
+      "fallback_models": [
+        "${PROMETHEUS_FALLBACK_MODEL}"
+      ]
     },
     "metis": {
       // 【計画コンサル: Metis】 計画前の分析とリスク特定。
       // 隠れた意図や曖昧さ、AIが失敗しやすいポイントを事前に特定し、計画の精度を高めます。
       // v4.0.0 では意図の自動分類機能が大幅に強化されています。
-      "category": "ultrabrain"
+      "model": "${METIS_MODEL}",
+      "variant": "${METIS_VARIANT}",
+      "fallback_models": [
+        "${METIS_FALLBACK_MODEL}"
+      ]
     },
     "momus": {
       // 【計画レビュアー: Momus】 計画の検証と品質保証。
       // 明確さ、検証可能性、完全性の基準に照らして、Prometheusが作成した計画を厳格にレビュー。
-      "category": "ultrabrain"
+      "model": "${MOMUS_MODEL}",
+      "variant": "${MOMUS_VARIANT}",
+      "fallback_models": [
+        "${MOMUS_FALLBACK_MODEL}"
+      ]
     },
     "atlas": {
       // --- Orchestration Agents ---
       // 【現場監督: Atlas】 Todo駆動型実行エンジン。
       // Tmux, Playwrightなどの環境管理、Todo項目の体系的な管理・調整・維持を担当。
-      "category": "ultrabrain",
+      "model": "${ATLAS_MODEL}",
+      "variant": "${ATLAS_VARIANT}",
+      "fallback_models": [
+        "${ATLAS_FALLBACK_MODEL}"
+      ],
       "description": "Orchestrates Tmux, Playwright, and server states. Ensures environment consistency."
     }
   },
@@ -108,7 +149,7 @@
     "ultrabrain": {
       // ultrabrain: 最強の論理推論 (xhigh variant)
       "model": "${ULTRABRAIN_MODEL}",
-      "variant": "xhigh",
+      "variant": "${ULTRABRAIN_VARIANT}",
       "fallback_models": [
         "${ULTRABRAIN_FALLBACK_MODEL}"
       ]
@@ -116,7 +157,7 @@
     "deep": {
       // deep: 自律的解決・難解なタスク
       "model": "${DEEP_MODEL}",
-      "variant": "medium",
+      "variant": "${DEEP_VARIANT}",
       "fallback_models": [
         "${DEEP_FALLBACK_MODEL}"
       ]
@@ -124,6 +165,7 @@
     "quick": {
       // quick: 些細な修正・高速レスポンス
       "model": "${QUICK_MODEL}",
+      "variant": "${QUICK_VARIANT}",
       "fallback_models": [
         "${QUICK_FALLBACK_MODEL}"
       ]
@@ -131,18 +173,21 @@
     "writing": {
       // writing: テクニカルライティング・散文
       "model": "${WRITING_MODEL}",
+      "variant": "${WRITING_VARIANT}",
       "fallback_models": [
         "${WRITING_FALLBACK_MODEL}"
       ]
     },
     "unspecified-low": {
       "model": "${UNSPECIFIED_LOW_MODEL}",
+      "variant": "${UNSPECIFIED_LOW_VARIANT}",
       "fallback_models": [
         "${UNSPECIFIED_LOW_FALLBACK_MODEL}"
       ]
     },
     "unspecified-high": {
       "model": "${UNSPECIFIED_HIGH_MODEL}",
+      "variant": "${UNSPECIFIED_HIGH_VARIANT}",
       "fallback_models": [
         "${UNSPECIFIED_HIGH_FALLBACK_MODEL}"
       ]
@@ -150,6 +195,7 @@
     "visual-engineering": {
       // visual-engineering: UI/UX、デザイン、アニメーション
       "model": "${VISUAL_ENGINEERING_MODEL}",
+      "variant": "${VISUAL_ENGINEERING_VARIANT}",
       "fallback_models": [
         "${VISUAL_ENGINEERING_FALLBACK_MODEL}"
       ]
@@ -157,6 +203,7 @@
     "artistry": {
       // artistry: アーティスト性・ジェネレーティブ
       "model": "${ARTISTRY_MODEL}",
+      "variant": "${ARTISTRY_VARIANT}",
       "fallback_models": [
         "${ARTISTRY_FALLBACK_MODEL}"
       ]
@@ -280,7 +327,32 @@
     "CHRONOS_DEDUP_THRESHOLD",
     "CHRONOS_EMBEDDING_PROVIDER",
     "CHRONOS_LOCAL_MODEL_NAME",
-    "CHRONOS_EMBEDDING_DIMENSION"
+    "CHRONOS_EMBEDDING_DIMENSION",
+
+    // --- Agent Status ---
+    "HEPHAESTUS_DISABLED",
+
+    // --- Agent Models & Variants ---
+    "SISYPHUS_MODEL", "SISYPHUS_VARIANT", "SISYPHUS_FALLBACK_MODEL",
+    "PROMETHEUS_MODEL", "PROMETHEUS_VARIANT", "PROMETHEUS_FALLBACK_MODEL",
+    "ATLAS_MODEL", "ATLAS_VARIANT", "ATLAS_FALLBACK_MODEL",
+    "HEPHAESTUS_MODEL", "HEPHAESTUS_VARIANT", "HEPHAESTUS_FALLBACK_MODEL",
+    "ORACLE_MODEL", "ORACLE_VARIANT", "ORACLE_FALLBACK_MODEL",
+    "LIBRARIAN_MODEL", "LIBRARIAN_VARIANT", "LIBRARIAN_FALLBACK_MODEL",
+    "EXPLORE_MODEL", "EXPLORE_VARIANT", "EXPLORE_FALLBACK_MODEL",
+    "MULTIMODAL_LOOKER_MODEL", "MULTIMODAL_LOOKER_VARIANT", "MULTIMODAL_LOOKER_FALLBACK_MODEL",
+    "METIS_MODEL", "METIS_VARIANT", "METIS_FALLBACK_MODEL",
+    "MOMUS_MODEL", "MOMUS_VARIANT", "MOMUS_FALLBACK_MODEL",
+    "ULTRA_WORK_MODEL", "ULTRA_WORK_FALLBACK_MODEL",
+
+    // --- Category Models & Variants ---
+    "ULTRABRAIN_MODEL", "ULTRABRAIN_VARIANT", "ULTRABRAIN_FALLBACK_MODEL",
+    "DEEP_MODEL", "DEEP_VARIANT", "DEEP_FALLBACK_MODEL",
+    "QUICK_MODEL", "QUICK_VARIANT", "QUICK_FALLBACK_MODEL",
+    "WRITING_MODEL", "WRITING_VARIANT", "WRITING_FALLBACK_MODEL",
+    "UNSPECIFIED_LOW_MODEL", "UNSPECIFIED_LOW_VARIANT", "UNSPECIFIED_LOW_FALLBACK_MODEL",
+    "UNSPECIFIED_HIGH_MODEL", "UNSPECIFIED_HIGH_VARIANT", "UNSPECIFIED_HIGH_FALLBACK_MODEL",
+    "VISUAL_ENGINEERING_MODEL", "VISUAL_ENGINEERING_VARIANT", "VISUAL_ENGINEERING_FALLBACK_MODEL",
+    "ARTISTRY_MODEL", "ARTISTRY_VARIANT", "ARTISTRY_FALLBACK_MODEL"
   ]
 }
-
