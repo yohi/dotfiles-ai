@@ -29,7 +29,7 @@
     "oh-my-openagent@4.6.0",
     //"file:///home/y_ohi/program/oss/oh-my-openagent/dist/index.js",
     // "file:///home/y_ohi/program/chronos-graph/.opencode/plugins/chronos-gate.js"
-    // "@yohi/opencode-plugin-chronos-gate@1.2.0"
+    "@yohi/opencode-plugin-chronos-gate@1.3.0"
   ],
 
   // 使用しないプロバイダーを解決チェーンから明示的にブロック (v4.3.0 新機能)
