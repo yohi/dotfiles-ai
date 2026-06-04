@@ -60,10 +60,8 @@ setup-antigravity: ## 生成された設定をAntigravityのグローバル設�
 	@echo "🔧 Synchronizing Antigravity config..."
 	@mkdir -p "$(ANTIGRAVITY_CONFIG_DIR)/skills"
 	@# グローバルスキルのリンク作成
-	@if [ ! -L "$(ANTIGRAVITY_CONFIG_DIR)/skills/agent-skills" ]; then \
-		ln -sfn "$(REPO_ROOT)/agent-skills" "$(ANTIGRAVITY_CONFIG_DIR)/skills/agent-skills"; \
-		echo "✅ Linked Global Skills: $(ANTIGRAVITY_CONFIG_DIR)/skills/agent-skills -> agent-skills"; \
-	fi
+	@ln -sfn "$(REPO_ROOT)/agent-skills" "$(ANTIGRAVITY_CONFIG_DIR)/skills/agent-skills"
+	@echo "✅ Linked Global Skills: $(ANTIGRAVITY_CONFIG_DIR)/skills/agent-skills -> agent-skills"
 	@# settings.jsonのリンク作成
 	@if [ -f "$(PROJECT_SETTINGS_CONFIG)" ]; then \
 		if [ -e "$(ANTIGRAVITY_SETTINGS_PATH)" ] && [ ! -L "$(ANTIGRAVITY_SETTINGS_PATH)" ]; then \
@@ -118,6 +116,10 @@ check-antigravity: ## Antigravityの状態確認
 		else \
 			echo "⚠️  Sync Settings: Misaligned ($$target)"; \
 		fi; \
+	elif [ -e "$(ANTIGRAVITY_SETTINGS_PATH)" ]; then \
+		echo "⚠️  Sync Settings: Not a symbolic link (manual config exists)"; \
+	else \
+		echo "❌ Sync Settings: Not configured"; \
 	fi
 
 # Antigravityのアンインストール
