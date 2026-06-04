@@ -247,28 +247,18 @@ check-opencode: ## OpenCode（opencode）の状態を確認
 		echo "⚠️  config: $(OPENCODE_CONFIG_PATH) is not configured"; \
 	fi
 	@if [ -f "$(OH_MY_OPENAGENT_DOTFILES_CONFIG)" ]; then \
-		if [ -L "$(OH_MY_OPENAGENT_CONFIG_PATH)" ]; then \
-			actual=$$(readlink -f "$(OH_MY_OPENAGENT_CONFIG_PATH)" 2>/dev/null || readlink "$(OH_MY_OPENAGENT_CONFIG_PATH)" 2>/dev/null || true); \
-			expected=$$(readlink -f "$(OH_MY_OPENAGENT_DOTFILES_CONFIG)" 2>/dev/null || readlink "$(OH_MY_OPENAGENT_DOTFILES_CONFIG)" 2>/dev/null || true); \
-			if [ -n "$$actual" ] && [ "$$actual" = "$$expected" ]; then \
-				echo "✅ oh-my-config: $(OH_MY_OPENAGENT_CONFIG_PATH) -> $(OH_MY_OPENAGENT_DOTFILES_CONFIG)"; \
-			else \
-				echo "⚠️  oh-my-config: $(OH_MY_OPENAGENT_CONFIG_PATH) points to $$actual (expected $$expected)"; \
-			fi; \
-		elif [ -e "$(OH_MY_OPENAGENT_CONFIG_PATH)" ]; then \
-			echo "⚠️  oh-my-config: $(OH_MY_OPENAGENT_CONFIG_PATH) exists but is not a symlink"; \
+		echo "✅ template: $(OH_MY_OPENAGENT_DOTFILES_CONFIG) exists"; \
+	else \
+		echo "⚠️  template: $(OH_MY_OPENAGENT_DOTFILES_CONFIG) not found"; \
+	fi
+	@if [ -f "$(REPO_ROOT)/_scripts/opencode-wrapper.sh" ]; then \
+		if [ -x "$(REPO_ROOT)/_scripts/opencode-wrapper.sh" ]; then \
+			echo "✅ wrapper: $(REPO_ROOT)/_scripts/opencode-wrapper.sh exists and is executable"; \
 		else \
-			echo "⚠️  oh-my-config: $(OH_MY_OPENAGENT_CONFIG_PATH) is not configured"; \
+			echo "⚠️  wrapper: $(REPO_ROOT)/_scripts/opencode-wrapper.sh exists but is NOT executable"; \
 		fi; \
-		if [ -L "$(OPENCODE_CONFIG_DIR)/oh-my-opencode.jsonc" ]; then \
-			actual=$$(readlink -f "$(OPENCODE_CONFIG_DIR)/oh-my-opencode.jsonc" 2>/dev/null || readlink "$(OPENCODE_CONFIG_DIR)/oh-my-opencode.jsonc" 2>/dev/null || true); \
-			expected=$$(readlink -f "$(OH_MY_OPENAGENT_DOTFILES_CONFIG)" 2>/dev/null || readlink "$(OH_MY_OPENAGENT_DOTFILES_CONFIG)" 2>/dev/null || true); \
-			if [ -n "$$actual" ] && [ "$$actual" = "$$expected" ]; then \
-				echo "✅ oh-my-config: $(OPENCODE_CONFIG_DIR)/oh-my-opencode.jsonc -> $(OH_MY_OPENAGENT_DOTFILES_CONFIG)"; \
-			else \
-				echo "⚠️  oh-my-config: $(OPENCODE_CONFIG_DIR)/oh-my-opencode.jsonc points to $$actual (expected $$expected)"; \
-			fi; \
-		fi; \
+	else \
+		echo "⚠️  wrapper: $(REPO_ROOT)/_scripts/opencode-wrapper.sh not found"; \
 	fi
 	@if [ -f "$(OPENCODE_DOTFILES_ANTIGRAVITY)" ]; then \
 		if [ -L "$(OPENCODE_ANTIGRAVITY_PATH)" ]; then \
@@ -364,3 +354,9 @@ uninstall-opencode: ## OpenCode（opencode）のアンインストール
 	@rm -f "$(MARKER_DIR)/opencode-update"*
 	@rm -f "$(MARKER_DIR)/setup-opencode"*
 	@echo "✅ OpenCode（opencode）のアンインストールが完了しました"
+
+opencode-personal: ## OpenCode の personal プロファイルを適用して起動
+	@bash _scripts/opencode-wrapper.sh personal
+
+opencode-work: ## OpenCode の work プロファイルを適用して起動
+	@bash _scripts/opencode-wrapper.sh work
