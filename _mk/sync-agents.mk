@@ -88,7 +88,11 @@ sync-skills-to-agents: ## apm_modules/ 内の外部スキルを agent-skills/ �
 						target_dir="$(AGENT_SKILLS_DIR)/$$namespace/$$name"; \
 						rm -rf "$$target_dir"; \
 						mkdir -p "$$target_dir"; \
-						cp -as "$$skill_path/." "$$target_dir/"; \
+						if command -v rsync >/dev/null 2>&1; then \
+							rsync -a --delete "$$skill_path/" "$$target_dir/"; \
+						else \
+							(cd "$$skill_path" && tar cf - .) | (cd "$$target_dir" && tar xf -); \
+						fi; \
 						echo "  Linked external skill: $$namespace/$$name"; \
 					done; \
 				fi; \
