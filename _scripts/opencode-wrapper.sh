@@ -62,6 +62,11 @@ fi
 
 # 2. Generate the dynamic config
 (
+    if [ -z "$TEMPLATE" ] || [ -z "$TMP_DIR" ]; then
+        echo "❌ Error: TEMPLATE or TMP_DIR is not set" >&2
+        exit 1
+    fi
+
     if [ -f "$ENV_FILE" ]; then
         set -a
         source "$ENV_FILE"
@@ -69,6 +74,12 @@ fi
     fi
     # Use envsubst to process the template
     envsubst < "$TEMPLATE" > "$TMP_DIR/oh-my-openagent.jsonc"
+
+    # After envsubst substituted values, check if any model configuration has an empty value
+    if grep -qE '"model"\s*:\s*""' "$TMP_DIR/oh-my-openagent.jsonc"; then
+        echo "❌ Error: Empty model configuration detected in generated JSONC" >&2
+        exit 1
+    fi
 )
 
 # 3. Run OpenCode
@@ -79,10 +90,10 @@ export OPENCODE_CONFIG_DIR="$TMP_DIR"
 # Subcommands like auth, mcp, doctor, etc. don't accept --port
 if [[ -n "$PORT" && ( -z "$1" || "$1" == -* ) ]]; then
     echo "✅ Profile [${PROFILE}] | Port [${PORT}]"
-    exec opencode --port "$PORT" "$@"
+    opencode --port "$PORT" "$@"
 else
     echo "✅ Profile [${PROFILE}]"
-    exec opencode "$@"
+    opencode "$@"
 fi
 
 
