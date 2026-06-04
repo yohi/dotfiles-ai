@@ -35,19 +35,23 @@ sync-mcp-gateway: ## Docker MCP Gateway 設定を同期
 	else \
 		echo "⚠️  mcp/config.yaml not found — run 'make sync-mcp' first."; \
 	fi
-	@if [ -f "mcp/docker-mcp-gateway.service" ]; then \
-		sed -e "s|__HOME__|$(HOME_DIR)|g" \
-		    -e "s|__REPO_ROOT__|$(REPO_ROOT)|g" \
-		    -e "s|__ENABLED_SERVERS__|skillport,nexus,chronos-graph|g" \
-		    mcp/docker-mcp-gateway.service > $(HOME_DIR)/.config/systemd/user/docker-mcp-gateway.service; \
-		echo "✅ Service file docker-mcp-gateway.service deployed and configured."; \
+	@if [ ! -f "mcp/docker-mcp-gateway.service" ]; then \
+		echo "❌ Error: mcp/docker-mcp-gateway.service not found." >&2; \
+		exit 1; \
 	fi
-	@if [ -f "mcp/mcp-watchdog.service" ]; then \
-		sed -e "s|__HOME__|$(HOME_DIR)|g" \
-		    -e "s|__REPO_ROOT__|$(REPO_ROOT)|g" \
-		    mcp/mcp-watchdog.service > $(HOME_DIR)/.config/systemd/user/mcp-watchdog.service; \
-		echo "✅ Service file mcp-watchdog.service deployed and configured."; \
+	@sed -e "s|__HOME__|$(HOME_DIR)|g" \
+	    -e "s|__REPO_ROOT__|$(REPO_ROOT)|g" \
+	    -e "s|__ENABLED_SERVERS__|skillport,nexus,chronos-graph|g" \
+	    mcp/docker-mcp-gateway.service > $(HOME_DIR)/.config/systemd/user/docker-mcp-gateway.service
+	@echo "✅ Service file docker-mcp-gateway.service deployed and configured."
+	@if [ ! -f "mcp/mcp-watchdog.service" ]; then \
+		echo "❌ Error: mcp/mcp-watchdog.service not found." >&2; \
+		exit 1; \
 	fi
+	@sed -e "s|__HOME__|$(HOME_DIR)|g" \
+	    -e "s|__REPO_ROOT__|$(REPO_ROOT)|g" \
+	    mcp/mcp-watchdog.service > $(HOME_DIR)/.config/systemd/user/mcp-watchdog.service
+	@echo "✅ Service file mcp-watchdog.service deployed and configured."
 
 status-mcp: ## Docker MCP Gatewayのステータスを確認
 	@echo "📊 Docker MCP Gateway status:"
