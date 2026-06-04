@@ -76,8 +76,10 @@ def main():
         else:
             # Local stdio (Standalone)
             cmd = mcp.get('command')
-            if cmd:
-                server_config["command"] = resolve_binary(cmd)
+            if not cmd:
+                print(f"Error: Standalone Local stdio MCP server '{name}' is missing a 'command' field.", file=sys.stderr)
+                sys.exit(1)
+            server_config["command"] = resolve_binary(cmd)
             
             args = mcp.get('args')
             if args:
