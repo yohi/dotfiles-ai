@@ -136,8 +136,8 @@ For a full list of available skills and their detailed descriptions, see [AVAILA
 ### Key Skills Summary
 
 - **custom/agent-skill-architect**: Designs and generates best-practice-compliant SKILL.md files.
-- **anthropics/* **: Specialized skills for design, API usage, and document handling.
-- **superpowers/* **: Core engineering workflow skills (brainstorming, planning, TDD).
+- **anthropics/***: Specialized skills for design, API usage, and document handling.
+- **superpowers/***: Core engineering workflow skills (brainstorming, planning, TDD).
 - **custom/config-modernizer**: Refactors configuration files based on best practices.
 - **custom/git-master**: Performs Git operations safely and appropriately.
 
@@ -241,30 +241,6 @@ This project employs the [obra/superpowers](https://github.com/obra/superpowers)
 - **Prohibited Access:** Direct file path reads or direct access to skill files are strictly forbidden during runtime and for Pull Requests, **except** for template/asset files (e.g., `{path}/template.md`) that have been explicitly resolved and returned via the `load_skill` call from the SkillPort MCP, which may be read with the native Read tool. All other skill files or runtime skill artifacts (any files produced by or belonging to skills, skill definitions, or SkillPort MCP endpoints) remain strictly prohibited. Reference `load_skill`, `SkillPort MCP`, `{path}/template.md`, and `Read tool` to ensure consistency with Section 5.
 ## END Superpowers Workflow
 
-## 8. Agent Delegation & Skill Loading (Learned Rules)
-
-### 8.1 Prefer Subagents for Plan Execution
-
-Even when a written plan is detailed and complete, **default to delegating execution to subagents** rather than performing it directly. Direct self-execution is only appropriate for:
-- True trivialities (single-line fixes, config typos)
-- Level 0 / Level 3 Low Intensity tasks
-
-**Rationale:** Delegation ensures the plan is interpreted by a fresh execution context, reduces the risk of confirmation bias, and keeps the manager role (Sisyphus) distinct from the worker role (Hephaestus).
-
-### 8.2 Correct Skill Invocation
-
-When loading a skill **in OpenCode**, use the **skill name only**, not the command path:
-- ✅ Correct: `skill(name="subagent-driven-development")`
-- ❌ Wrong: `skill(name="/superpowers/subagent-driven-development")`
-
-The `skill` tool resolves the command prefix internally. Passing the full command path causes a "not found" error.
-
-> **Note for non-OpenCode agents:** This invocation convention is specific to OpenCode's `skill` tool, which resolves command prefixes internally. In other agent environments, skill loading mechanisms and naming conventions may differ; always consult the specific platform's documentation.
-
-### 8.3 Post-Hoc Reflection
-
-If you skip subagent delegation and execute a plan directly, document the reason in your response. After completion, explicitly state whether the direct-execution choice was retrospectively correct and what would have been different with delegation.
-
 ## 7. ChronosGraph Memory System (Autonomous)
 
 <role>
@@ -342,3 +318,30 @@ After calling `memory_save` or `session_flush`, perform a self-verification usin
 
 If any item fails, cancel the save or correct the content before finalizing.
 </quick_rubric>
+
+## 8. Agent Delegation & Skill Loading (Learned Rules)
+
+### 8.1 Prefer Subagents for Plan Execution
+
+Even when a written plan is detailed and complete, **default to delegating execution to subagents** rather than performing it directly. Direct self-execution is only appropriate for:
+
+- True trivialities (single-line fixes, config typos)
+- Level 0 / Level 3 Low Intensity tasks
+
+**Rationale:** Delegation ensures the plan is interpreted by a fresh execution context, reduces the risk of confirmation bias, and keeps the manager role (Sisyphus) distinct from the worker role (Hephaestus).
+
+### 8.2 Correct Skill Invocation
+
+When loading a skill **in OpenCode**, avoid using absolute paths with a leading slash, as they will fail and resolve to a "not found" error (e.g., `skill(name="/superpowers/subagent-driven-development")` fails). Instead, use the base skill name or canonical namespace-qualified formats:
+
+- ✅ Correct (Base name): `skill(name="subagent-driven-development")`
+- ✅ Correct (Canonical namespace-qualified): `skill(name="superpowers/subagent-driven-development")` or `skill(name="superpowers:subagent-driven-development")`
+- ❌ Wrong (Absolute path): `skill(name="/superpowers/subagent-driven-development")`
+
+The `skill` tool resolves the command prefix internally. Canonical namespace-qualified formats are supported and recommended.
+
+> **Note for non-OpenCode agents:** This invocation convention is specific to OpenCode's `skill` tool, which resolves command prefixes internally. In other agent environments, skill loading mechanisms and naming conventions may differ; always consult the specific platform's documentation.
+
+### 8.3 Post-Hoc Reflection
+
+If you skip subagent delegation and execute a plan directly, document the reason in your response. After completion, explicitly state whether the direct-execution choice was retrospectively correct and what would have been different with delegation.
