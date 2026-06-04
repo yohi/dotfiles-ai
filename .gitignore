@@ -36,11 +36,13 @@ codex/skills/.system/
 # OpenCode
 opencode/oh-my-*.json*
 !opencode/oh-my-*.json*.template
-!opencode/*.env
+!opencode/personal.env
+!opencode/work.env
 !opencode/oh-my-openagent.jsonc
 .mcp.json
 .serena/
 .env
+*.env
 antigravity/mcp_config.json
 antigravity/settings.json
 mcp/*.rendered
