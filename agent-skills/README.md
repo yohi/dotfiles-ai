@@ -43,6 +43,8 @@ make apm-install
 > `agent-skills/` ディレクトリでは、**`custom/` 配下の自作スキルのみが Git 管理対象**となります。
 > 外部から導入したスキル（`anthropics/` や `superpowers/` 等）の実体またはリンクは `.gitignore` により除外されます。
 
+<!-- -->
+
 > [!TIP]
 > **ディレクトリ指定の重要性**
 > リポジトリのルートを直接指定（例: `anthropics/skills`）すると、ルートにある `template` フォルダなどがバリデーションエラーを引き起こし、導入に失敗することがあります。
