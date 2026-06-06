@@ -97,7 +97,7 @@ AIエージェント（Claude Code, Gemini CLI, OpenCode, Codex）の設定・�
 
 [Docker MCP Gateway](https://docs.docker.com/ai/mcp-catalog-and-toolkit/mcp-gateway/) は、複数の MCP サーバーを統合し、共通の **SSE (Server-Sent Events)** エンドポイントを提供します。
 
-- **役割**: Claude Code, Gemini CLI, Antigravity, Cursor, OpenCode, VSCode, Codex から、単一の URL (`http://127.0.0.1:10888/sse`) 経由で複数の MCP サーバーにアクセス可能にします。
+- **役割**: Claude Code, Gemini CLI, Cursor, OpenCode, VSCode, Codex から、単一の URL (`http://127.0.0.1:10888/sse`) 経由で複数の MCP サーバーにアクセス可能にします。
 - **管理 (Systemd)**: バックグラウンドサービスとして常駐します。
   - `make start-mcp`: ゲートウェイを起動。
   - `make stop-mcp`: ゲートウェイを停止。
@@ -110,6 +110,12 @@ AIエージェント（Claude Code, Gemini CLI, OpenCode, Codex）の設定・�
   - `mcp/catalogs/custom.yaml`: Docker MCP Gateway のカスタムカタログ定義。
 - **初期セットアップ**: `make setup-docker-mcp` を実行すると、service 設定を含む Gateway の初期配置が完了します。
 - **自動同期**: `apm.yml` の MCP 定義を編集したら `make sync-mcp` を実行してください。
+
+### Antigravity CLI での注意点
+
+Antigravity CLI 1.0.6 では、Docker MCP Gateway の SSE endpoint (`:10888/sse`) に対して、認証済み SSE 接続自体は成立しても `initialize` 送信時に `Bad Request` または `Unauthorized` になることがあります。OpenCode など他クライアントで同じ Gateway が接続できる場合、Gateway や token ではなく Antigravity CLI 側の SSE message endpoint 処理との相性問題として扱います。
+
+そのため、Antigravity CLI では当面 `docker-mcp` 経由ではなく、`skillport` / `nexus` / `chronos-graph` を direct stdio MCP として使う構成を推奨します。Antigravity 設定は `make sync-antigravity` で `antigravity/mcp_config.json` を生成し、`~/.gemini/antigravity-cli/mcp_config.json` へリンクします。
 
 ## SkillPort & MCP の統合
 
@@ -130,7 +136,7 @@ AIエージェント（Claude Code, Gemini CLI, OpenCode, Codex）の設定・�
 |:-----------|:--------|:--------|
 | **Claude Code** | Native SSE | APM (`apm install`) |
 | **Gemini CLI** | Native SSE | APM (`apm install`) |
-| **Antigravity** | Native SSE | Make (`make sync-mcp`) |
+| **Antigravity CLI** | Direct stdio MCP 推奨 | Make (`make sync-antigravity`) |
 | **Cursor** | Native SSE | APM (`apm install`) |
 | **OpenCode** | Remote MCP | APM (`apm install`) |
 | **VSCode** | Native SSE | Make (`make sync-mcp`) |
