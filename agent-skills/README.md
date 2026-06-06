@@ -20,31 +20,31 @@ SkillPort を利用することで、Cursor、VS Code、Claude Code などの異
 
 ### 1. 新しいスキルを作成する (ローカル)
 
-`agent-skills/.skillport/templates/SKILL_TEMPLATE.md` をコピーして新しいディレクトリを作成します。以下のコマンドはリポジトリのルートで実行してください。
+自作スキルは `agent-skills/custom/` ディレクトリ配下で管理します。 `agent-skills/.skillport/templates/SKILL_TEMPLATE.md` をコピーして新しいディレクトリを作成します。以下のコマンドはリポジトリのルートで実行してください。
 
 ```bash
 # 例: my-new-skill というスキルを作成
-mkdir -p agent-skills/my-new-skill
-cp agent-skills/.skillport/templates/SKILL_TEMPLATE.md agent-skills/my-new-skill/SKILL.md
+mkdir -p agent-skills/custom/my-new-skill
+cp agent-skills/.skillport/templates/SKILL_TEMPLATE.md agent-skills/custom/my-new-skill/SKILL.md
 ```
 
 ### 2. 外部スキルを導入する (GitHub等)
 
-GitHub 等で公開されているスキルをプロジェクトに導入します。
+GitHub 等で公開されているスキルをプロジェクトに導入します。このプロジェクトでは原則として `apm` を使用して外部スキルを管理します（`apm.yml` 参照）。
 
 ```bash
-# 推奨: リポジトリ内の特定のディレクトリ (skills/ 等) を指定して導入
-uvx skillport add anthropics/skills skills/ --namespace anthropics --yes
-
-# 単一のスキルを導入
-uvx skillport add https://github.com/user/repo/path/to/skill
+# apm を使用する場合 (推奨)
+# apm.yml に追加して実行
+make apm-install
 ```
 
 > [!IMPORTANT]
-> **Git 管理のルール (ブラックリスト方式)**
-> `agent-skills/` ディレクトリは、原則として**自作スキル（ローカル）を Git で管理する**運用となっています。
-> 外部から導入したスキル（`anthropics/` や `superpowers/` 等）の実体ファイルは Git のトラッキングから除外し、代わりに `EXTERNAL_SKILLS.md` でバージョン（Commit Hash）を管理します。
-> 新しいネームスペースの外部スキルを追加した場合は、プロジェクトルートの `.gitignore` に除外設定（例: `agent-skills/new-namespace/`）を必ず追記してください。
+> **Git 管理のルール**
+> `agent-skills/` ディレクトリでは、**`custom/` 配下の自作スキルのみが Git 管理対象**となります。
+> 外部から導入したスキル（`anthropics/` や `superpowers/` 等）の実体またはリンクは `.gitignore` により除外されます。
+
+<!-- -->
+
 > [!TIP]
 > **ディレクトリ指定の重要性**
 > リポジトリのルートを直接指定（例: `anthropics/skills`）すると、ルートにある `template` フォルダなどがバリデーションエラーを引き起こし、導入に失敗することがあります。
@@ -66,7 +66,7 @@ uvx skillport update --all
 `SKILL.md` の記述が仕様（名称、Objective、Workflow等）に準拠しているか確認します。
 
 ```bash
-uvx skillport validate agent-skills/my-new-skill
+uvx skillport validate agent-skills/custom/my-new-skill
 ```
 
 ## プロジェクト固有の同期フロー
@@ -78,7 +78,7 @@ uvx skillport validate agent-skills/my-new-skill
 make sync-agents
 ```
 
-※ `make sync-agents` は内部で `skillport doc` を実行し、`agent-skills/` をソースとして `agent-skills/AVAILABLE_SKILLS.md` の `<!-- SKILLPORT_START -->` マーカー内にスキルリストを直接反映します。各 `AGENTS.md` はコンテキストの肥大化を避けるため、このファイルへのリンクのみを保持します。
+※ `make sync-agents` は内部で `skillport doc` を実行し、`agent-skills/` をソースとして `agent-skills/AVAILABLE_SKILLS.md` の `<!-- SKILLPORT_START -->` マーカー内にスキルリストを直接反映します。各 `AGENTS.md` はコンテキストの肥大化を避けるため、このファイルへのリンクのみを保持します。自作スキルは `custom/<name>`、配布スキルは `anthropics/<name>` や `superpowers/<name>` といったネームスペース付きで識別されます。
 
 ## スキル設計の原則
 

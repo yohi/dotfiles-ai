@@ -19,7 +19,7 @@ test-all: test-integrity ## Run all tests in the project
 	@echo "Running all tests..."
 	@bash -c 'shopt -s nullglob; \
 	PYTHON_CMD="python3"; \
-	if command -v uv > /dev/null 2>&1; then PYTHON_CMD="uv run python3"; fi; \
+	if command -v uv > /dev/null 2>&1; then PYTHON_CMD="$(PYTHON) python3"; fi; \
 	for f in _scripts/test_*.py; do \
 		[[ "$$f" == "_scripts/test_configs_integrity.py" ]] && continue; \
 		echo "Running python test: $$f"; \

@@ -3,20 +3,33 @@ import json
 import os
 import re
 import sys
+import shutil
+from pathlib import Path
 
-def expand_env_vars(text):
+def resolve_binary(cmd):
+    if cmd in ["uvx", "npx"]:
+        path = shutil.which(cmd)
+        return path if path else cmd
+    return cmd
+
+def expand_placeholders(text):
     if not isinstance(text, str):
         return text
+    
+    home = str(Path.home())
+    repo_root = str(Path(__file__).parent.parent.resolve())
+    
+    res = text.replace("__HOME__", home).replace("__REPO_ROOT__", repo_root)
+    
     # ${env:VAR} or ${env:VAR:-DEFAULT}
     pattern = re.compile(r'\${env:([^:}]+)(?::-([^}]*))?}')
-    def replace(match):
+    def replace_env(match):
         var_name = match.group(1)
         default_value = match.group(2)
         return os.environ.get(var_name, default_value if default_value is not None else '')
     
-    # Also handle simple $VAR or ${VAR} if necessary,
-    # but based on apm.yml, the above format is used.
-    return pattern.sub(replace, text)
+    res = pattern.sub(replace_env, res)
+    return res
 
 def process_item(item):
     if isinstance(item, dict):
@@ -24,15 +37,13 @@ def process_item(item):
     elif isinstance(item, list):
         return [process_item(v) for v in item]
     elif isinstance(item, str):
-        # Special case for PWD in this project context
-        text = item.replace("${env:PWD}", os.getcwd())
-        return expand_env_vars(text)
+        return expand_placeholders(item)
     return item
 
 def main():
-    repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    apm_file = os.path.join(repo_root, 'apm.yml')
-    if not os.path.exists(apm_file):
+    repo_root = Path(__file__).parent.parent.resolve()
+    apm_file = repo_root / 'apm.yml'
+    if not apm_file.exists():
         print(f"Error: {apm_file} not found")
         sys.exit(1)
 
@@ -41,27 +52,50 @@ def main():
 
     mcp_servers = {}
     dependencies = config.get('dependencies', {})
+    gateway_url = "http://localhost:10888/sse" # Default gateway
+
     for mcp in dependencies.get('mcp', []):
         name = mcp.get('name')
         if not name:
             continue
         
-        # Antigravity contract expects serverUrl for SSE Gateway
-        # Default to the unified gateway URL if not explicitly provided
-        server_url = mcp.get('serverUrl')
-        if server_url:
-            server_url = process_item(server_url)
+        standalone = mcp.get('standalone', False)
+        transport = mcp.get('transport', 'stdio')
+        
+        server_config = {}
+        
+        if not standalone and (transport == 'stdio' or mcp.get('type') == 'stdio'):
+            # Bridge to gateway
+            server_config["serverUrl"] = f"{gateway_url}?server={name}"
+        elif transport == 'sse' or mcp.get('type') == 'sse' or name == 'docker-mcp':
+            # Remote SSE
+            url = mcp.get('url', gateway_url)
+            server_config["serverUrl"] = process_item(url)
+            if 'headers' in mcp:
+                server_config["headers"] = process_item(mcp['headers'])
         else:
-            server_url = f"http://localhost:10888/sse?server={name}"
+            # Local stdio (Standalone)
+            cmd = mcp.get('command')
+            if not cmd:
+                print(f"Error: Standalone Local stdio MCP server '{name}' is missing a 'command' field.", file=sys.stderr)
+                sys.exit(1)
+            server_config["command"] = resolve_binary(cmd)
             
-        server_config = {
-            "serverUrl": server_url
-        }
+            args = mcp.get('args')
+            if args:
+                server_config["args"] = process_item(args)
+            
+            env = mcp.get('env')
+            if env:
+                server_config["env"] = process_item(env)
+
         mcp_servers[name] = server_config
 
     output = {"mcpServers": mcp_servers}
     
-    output_path = os.path.join(repo_root, '.agents/mcp_config.json')
+    output_path = repo_root / 'antigravity' / 'mcp_config.json'
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    
     with open(output_path, 'w') as f:
         json.dump(output, f, indent=2)
     

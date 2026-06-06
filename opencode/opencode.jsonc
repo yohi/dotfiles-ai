@@ -1,6 +1,6 @@
 // vim: ft=jsonc
-// Config Modernized: 2026-05-09
-// Target OpenCode Version: v1.14.41
+// Config Modernized: 2026-05-27
+// Target OpenCode Version: v1.15.10
 
 /**
  * OpenCode Core Configuration
@@ -22,10 +22,16 @@
   // --------------------------------------------------------------------------
   // [Plugin]
   "plugin": [
-    "@yohi/opencode-codex-quota@1.0.0",
-    "@yohi/justice@2.2.0",
-    // "@yohi/opencode-cursor-plugin@1.3.8",
-    "oh-my-openagent@4.2.2"
+    "@yohi/justice@2.3.0",
+    "@yohi/akane@latest", // Requires private registry to resolve
+    "oh-my-openagent@4.7.5",
+    "@yohi/opencode-plugin-chronos-gate@1.4.0"
+  ],
+
+  // 使用しないプロバイダーを解決チェーンから明示的にブロック (v4.3.0 新機能)
+  "disabled_providers": [
+    "google",
+    "cursor"
   ],
 
   // --------------------------------------------------------------------------
@@ -34,54 +40,105 @@
   "permission": {
     "*": "ask",
     "read": "allow",
-    "list": "allow",
+    "edit": "allow",
     "glob": "allow",
     "grep": "allow",
-    "edit": "allow",
-    "lsp": "allow",
+    "task": "allow",
     "skill": "allow",
+    "lsp": "allow",
+    "webfetch": "allow",
     "websearch": "allow",
+    "context": "allow",
+    "skillport_*": "allow",
+    "mcp_skillport_*": "allow",
+    "mcp__skillport__*": "allow",
+    "skillport_load_skill": "allow",
+    "nexus_*": "allow",
+    "mcp_nexus_*": "allow",
+    "chronos-graph_*": "allow",
+    "mcp_chronos-graph_*": "allow",
+    "external_directory": "ask",
+    "doom_loop": "ask",
     "bash": {
       "*": "ask",
-      "ls": "allow",
-      "ls *": "allow",
-      "cat": "allow",
-      "cat *": "allow",
-      "head": "allow",
-      "head *": "allow",
-      "tail": "allow",
-      "tail *": "allow",
-      "mkdir": "allow",
-      "mkdir *": "allow",
-      "touch": "allow",
-      "touch *": "allow",
-      "cp": "allow",
-      "cp *": "allow",
-      "mv": "allow",
-      "mv *": "allow",
-      "make": "allow",
-      "make *": "allow",
-      "uv": "allow",
-      "uv *": "allow",
-      "python": "ask",
-      "node": "ask",
-      "bun": "ask",
-      "git status": "allow",
-      "git status *": "allow",
-      "git log": "allow",
-      "git log *": "allow",
-      "git diff": "allow",
-      "git diff *": "allow",
-      "git branch": "allow",
-      "git add": "allow",
-      "git commit": "allow",
-      "git commit *": "allow",
+
+      // --- File Read Operations (Safe) ---
+      "ls*": "allow",
+      "cat*": "allow",
+      "head*": "allow",
+      "tail*": "allow",
+      "grep*": "allow",
+      "rg*": "allow",
+      "echo*": "allow",
+      "test*": "allow",
+      "print*": "allow",
+      "printf*": "allow",
+      "command*": "allow",
+      "true*": "allow",
+      "exit*": "allow",
+      "devcontainer*": "allow",
+      "docker*": "allow",
+
+      // --- Development Tools (Safe) ---
+      "make*": "allow",
+      "uv*": "allow",
+      "bun run lint*": "allow",
+      "bun run typecheck*": "allow",
+      "bun run test*": "allow",
+      "eslint*": "allow",
+      "npm*": "allow",
+      "npx*": "allow",
+      "pnpm*": "allow",
+      "yarn*": "allow",
+      "bun*": "allow",
+
+      // --- Git: Dangerous (Deny) ---
       "git add .": "deny",
-      "git add *": "deny",
       "git add -A": "deny",
       "git add --all": "deny",
       "git add -u": "deny",
       "git add :/": "deny",
+      "git push -f*": "deny",
+      "git reset --hard*": "deny",
+      "git clean -fd*": "deny",
+
+      // --- Git: Investigation (Safe/Allow) ---
+      "git status*": "allow",
+      "git log*": "allow",
+      "git diff*": "allow",
+      "git show*": "allow",
+      "git blame*": "allow",
+      "git ls-files*": "allow",
+      "git rev-parse*": "allow",
+      "git remote*": "allow",
+      "git tag*": "allow",
+      "git branch*": "allow",
+      "git fetch*": "allow",
+      "git merge-base*": "allow",
+      "git ls-remote*": "allow",
+      "git stash list*": "allow",
+      "git stash show*": "allow",
+      "git worktree add*": "allow",
+      "gh*": "allow",
+
+      // --- Git: Modification (Ask/Manual) ---
+      "git add": "allow",
+      "git add *": "ask",
+      "git commit*": "allow",
+      "git checkout*": "ask",
+      "git stash*": "allow",
+      "git reset*": "ask",
+      "git merge": "ask",
+      "git rebase": "ask",
+      "git pull": "ask",
+
+      // --- General Write Operations (Ask for safety) ---
+      "mkdir": "allow",
+      "touch": "allow",
+      "cp": "allow",
+      "mv": "allow",
+
+      // --- Security Guards (Deny) ---
       "rm -rf *": "deny",
       "npm publish*": "deny",
       "sudo *": "deny",
@@ -89,12 +146,12 @@
       "curl* | sh": "deny",
       "curl *|sh": "deny",
       "curl * | sh": "deny",
-      "bash _scripts/*": "deny",
       "curl*|sh": "deny",
-      "bun run lint*": "allow",
-      "bun run typecheck*": "allow",
-      "bun run test*": "allow",
-      "eslint*": "allow"
+      "bash _scripts/*": "deny",
+
+      // --- Interpreter Access (Ask) ---
+      "python": "ask",
+      "node": "ask",
     }
   },
 
@@ -239,7 +296,11 @@
     "nvidia",
     "cloudflare-workers-ai",
     "opencode",
+    "opencode-go",
     // "cursor",
+    "ollama-cloud",
+    "amazon-bedrock",
+    "openrouter",
     "sakura"
   ],
   "provider": {
@@ -266,7 +327,7 @@
       "whitelist": [
         "minimaxai/minimax-m2.5",
         "minimaxai/minimax-m2.7",
-        "z-ai/glm4.7",
+        "z-ai/glm-5.1",
        "qwen/qwen3-coder-480b-a35b-instruct",
       ]
     },
@@ -290,6 +351,26 @@
         "big-pickle",
       ]
     },
+    "opencode-go": {
+      "whitelist": [
+        "deepseek-v4-flash",
+        "deepseek-v4-pro",
+        "glm-5",
+        "glm-5.1",
+        "kimi-k2.5",
+        "kimi-k2.6",
+        "mimo-v2-omni",
+        "mimo-v2-pro",
+        "mimo-v2.5",
+        "mimo-v2.5-pro",
+        "minimax-m2.5",
+        "minimax-m2.7",
+        "minimax-m3",
+        "qwen3.5-plus",
+        "qwen3.6-plus",
+        "qwen3.7-max",
+      ]
+    },
     // "cursor":{
     //   "whitelist": [
     //     "claude-haiku-4-5",
@@ -306,6 +387,146 @@
     //     "gpt-5.5",
     //   ]
     // },
+    "amazon-bedrock": {
+        "whitelist": [
+            // "amazon.nova-2-lite-v1:0",
+            // "amazon.nova-lite-v1:0",
+            // "amazon.nova-micro-v1:0",
+            // "amazon.nova-pro-v1:0",
+            // "anthropic.claude-haiku-4-5-20251001-v1:0",
+            // "anthropic.claude-opus-4-1-20250805-v1:0",
+            // "anthropic.claude-opus-4-5-20251101-v1:0",
+            // "anthropic.claude-opus-4-6-v1",
+            // "anthropic.claude-opus-4-7",
+            // "anthropic.claude-sonnet-4-5-20250929-v1:0",
+            // "anthropic.claude-sonnet-4-6",
+            // "au.anthropic.claude-haiku-4-5-20251001-v1:0",
+            // "au.anthropic.claude-opus-4-6-v1",
+            // "au.anthropic.claude-sonnet-4-5-20250929-v1:0",
+            // "au.anthropic.claude-sonnet-4-6",
+            // "deepseek.r1-v1:0",
+            // "deepseek.v3-v1:0",
+            // "deepseek.v3.2",
+            // "eu.anthropic.claude-haiku-4-5-20251001-v1:0",
+            // "eu.anthropic.claude-opus-4-5-20251101-v1:0",
+            // "eu.anthropic.claude-opus-4-6-v1",
+            // "eu.anthropic.claude-opus-4-7",
+            // "eu.anthropic.claude-sonnet-4-5-20250929-v1:0",
+            // "eu.anthropic.claude-sonnet-4-6",
+            "global.anthropic.claude-haiku-4-5-20251001-v1:0",
+            // "global.anthropic.claude-opus-4-5-20251101-v1:0",
+            "global.anthropic.claude-opus-4-6-v1",
+            "global.anthropic.claude-opus-4-7",
+            "global.anthropic.claude-opus-4-8",
+            // "global.anthropic.claude-sonnet-4-5-20250929-v1:0",
+            "global.anthropic.claude-sonnet-4-6",
+            // "google.gemma-3-12b-it",
+            // "google.gemma-3-27b-it",
+            // "google.gemma-3-4b-it",
+            // "jp.anthropic.claude-opus-4-7",
+            // "jp.anthropic.claude-sonnet-4-5-20250929-v1:0",
+            // "jp.anthropic.claude-sonnet-4-6",
+            // "meta.llama3-1-70b-instruct-v1:0",
+            // "meta.llama3-1-8b-instruct-v1:0",
+            // "meta.llama3-3-70b-instruct-v1:0",
+            // "meta.llama4-maverick-17b-instruct-v1:0",
+            // "meta.llama4-scout-17b-instruct-v1:0",
+            // "minimax.minimax-m2",
+            // "minimax.minimax-m2.1",
+            // "minimax.minimax-m2.5",
+            // "mistral.devstral-2-123b",
+            // "mistral.magistral-small-2509",
+            // "mistral.ministral-3-14b-instruct",
+            // "mistral.ministral-3-3b-instruct",
+            // "mistral.ministral-3-8b-instruct",
+            // "mistral.mistral-large-3-675b-instruct",
+            // "mistral.pixtral-large-2502-v1:0",
+            // "mistral.voxtral-mini-3b-2507",
+            // "mistral.voxtral-small-24b-2507",
+            // "moonshot.kimi-k2-thinking",
+            // "moonshotai.kimi-k2.5",
+            // "nvidia.nemotron-nano-12b-v2",
+            // "nvidia.nemotron-nano-3-30b",
+            // "nvidia.nemotron-nano-9b-v2",
+            // "nvidia.nemotron-super-3-120b",
+            // "openai.gpt-oss-120b-1:0",
+            // "openai.gpt-oss-20b-1:0",
+            // "openai.gpt-oss-safeguard-120b",
+            // "openai.gpt-oss-safeguard-20b",
+            // "qwen.qwen3-235b-a22b-2507-v1:0",
+            // "qwen.qwen3-32b-v1:0",
+            // "qwen.qwen3-coder-30b-a3b-v1:0",
+            // "qwen.qwen3-coder-480b-a35b-v1:0",
+            // "qwen.qwen3-coder-next",
+            // "qwen.qwen3-next-80b-a3b",
+            // "qwen.qwen3-vl-235b-a22b",
+            // "us.anthropic.claude-haiku-4-5-20251001-v1:0",
+            // "us.anthropic.claude-opus-4-1-20250805-v1:0",
+            // "us.anthropic.claude-opus-4-5-20251101-v1:0",
+            // "us.anthropic.claude-opus-4-6-v1",
+            // "us.anthropic.claude-opus-4-7",
+            // "us.anthropic.claude-sonnet-4-5-20250929-v1:0",
+            // "us.anthropic.claude-sonnet-4-6",
+            // "us.deepseek.r1-v1:0",
+            // "us.meta.llama4-maverick-17b-instruct-v1:0",
+            // "us.meta.llama4-scout-17b-instruct-v1:0",
+            // "writer.palmyra-x4-v1:0",
+            // "writer.palmyra-x5-v1:0",
+            // "zai.glm-4.7",
+            // "zai.glm-4.7-flash",
+            // "zai.glm-5",
+        ]
+    },
+    "openrouter": {
+        "whitelist": [
+            "moonshotai/kimi-k2.6:free"
+        ]
+    },
+    "ollama-cloud": {
+        "whitelist": [
+            "cogito-2.1:671b",
+            "deepseek-v3.1:671b",
+            "deepseek-v3.2",
+            "deepseek-v4-flash",
+            "deepseek-v4-pro",
+            "devstral-2:123b",
+            "devstral-small-2:24b",
+            "gemini-3-flash-preview",
+            "gemma3:12b",
+            "gemma3:27b",
+            "gemma3:4b",
+            "gemma4:31b",
+            "glm-4.6",
+            "glm-4.7",
+            "glm-5",
+            "glm-5.1",
+            "gpt-oss:120b",
+            "gpt-oss:20b",
+            "kimi-k2-thinking",
+            "kimi-k2.5",
+            "kimi-k2.6",
+            "kimi-k2:1t",
+            "minimax-m2",
+            "minimax-m2.1",
+            "minimax-m2.5",
+            "minimax-m2.7",
+            "minimax-m3",
+            "ministral-3:14b",
+            "ministral-3:3b",
+            "ministral-3:8b",
+            "mistral-large-3:675b",
+            "nemotron-3-nano:30b",
+            "nemotron-3-super",
+            "qwen3-coder-next",
+            "qwen3-coder:480b",
+            "qwen3-next:80b",
+            "qwen3-vl:235b",
+            "qwen3-vl:235b-instruct",
+            "qwen3.5:397b",
+            "rnj-1:8b",
+        ]
+    },
+
     "sakura": {
       "npm": "@ai-sdk/openai-compatible",
       "name": "sakura aipf",
@@ -324,7 +545,16 @@
     "batch_tool": true,
     "openTelemetry": true,
     "continue_loop_on_deny": false,
-    "mcp_timeout": 15000
+    "mcp_timeout": 120000,
+    "watchdog": {
+      "enabled": true,
+      "stage1Ms": 180000,
+      "stage2Ms": 180000,
+      "maxPings": 1,
+      "tmux": {
+        "highlightWindow": true
+      }
+    }
   },
 
   // --------------------------------------------------------------------------
@@ -339,6 +569,63 @@
       },
       "type": "remote",
       "enabled": true
+    },
+    "skillport": {
+      "type": "local",
+      "enabled": true,
+      "command": [
+        "uvx",
+        "skillport-mcp"
+      ]
+    },
+    "nexus": {
+      "type": "local",
+      "enabled": true,
+      "command": [
+        "npx",
+        "-y",
+        "@yohi/nexus@1.8.0",
+        // "{env:HOME}/program/private/nexus"
+      ]
+    },
+    "chronos-graph": {
+      "type": "local",
+      "enabled": true,
+      "command": [
+        "uvx",
+        "--from",
+        "git+https://github.com/yohi/chronos-graph.git[all]",
+        "context-store"
+      ],
+      "environment": {
+        "CHRONOS_INGESTION_MODE": "{env:CHRONOS_INGESTION_MODE}",
+        "STORAGE_BACKEND": "{env:STORAGE_BACKEND}",
+        "GRAPH_ENABLED": "{env:GRAPH_ENABLED}",
+        "POSTGRES_HOST": "{env:POSTGRES_HOST}",
+        "POSTGRES_PORT": "{env:POSTGRES_PORT}",
+        "POSTGRES_DB": "{env:POSTGRES_DB}",
+        "POSTGRES_USER": "{env:POSTGRES_USER}",
+        "POSTGRES_PASSWORD": "{env:POSTGRES_PASSWORD}",
+        "POSTGRES_SSL": "{env:POSTGRES_SSL}",
+        "POSTGRES_SSL_NO_VERIFY": "{env:POSTGRES_SSL_NO_VERIFY}",
+        "NEO4J_URI": "{env:NEO4J_URI}",
+        "NEO4J_USER": "{env:NEO4J_USER}",
+        "NEO4J_PASSWORD": "{env:NEO4J_PASSWORD}",
+        "CACHE_BACKEND": "{env:CACHE_BACKEND}",
+        "REDIS_URL": "{env:REDIS_URL}",
+        "REDIS_SSL": "{env:REDIS_SSL}",
+        "EMBEDDING_PROVIDER": "{env:EMBEDDING_PROVIDER}",
+        "LOCAL_MODEL_NAME": "{env:LOCAL_MODEL_NAME}",
+        "EMBEDDING_DIMENSION": "{env:EMBEDDING_DIMENSION}",
+        "SIMILARITY_THRESHOLD": "{env:SIMILARITY_THRESHOLD}",
+        "DEDUP_THRESHOLD": "{env:DEDUP_THRESHOLD}",
+        "DEFAULT_TOP_K": "{env:DEFAULT_TOP_K}",
+        "DECAY_HALF_LIFE_DAYS": "{env:DECAY_HALF_LIFE_DAYS}",
+        "ARCHIVE_THRESHOLD": "{env:ARCHIVE_THRESHOLD}",
+        "PURGE_RETENTION_DAYS": "{env:PURGE_RETENTION_DAYS}",
+        "DASHBOARD_HOST": "{env:DASHBOARD_HOST}",
+        "DASHBOARD_PORT": "{env:DASHBOARD_PORT}"
+      }
     }
   }
 }

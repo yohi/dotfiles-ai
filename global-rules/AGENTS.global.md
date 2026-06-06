@@ -40,7 +40,8 @@ The following rules apply to **ALL** projects unless overridden by a local proje
 
 1. **Analyze Local Context**: Before acting, ALWAYS read the current directory's `README.md` or local `AGENTS.md` to understand the specific project constraints.
 2. **Resolve Paths**: Paths in Section 3 are relative to the Central Config Repo. Check accessibility before trying to resolve them.
-3. **Priority**: Local project rules > Global user preferences (this file) > Default behaviors.
+3. **Execution Environment**: If a `devcontainer` environment (e.g., `.devcontainer/`) is available, **ALWAYS** prioritize executing static analysis, linting, and tests **inside the devcontainer** to ensure environment consistency.
+4. **Priority**: Local project rules > Global user preferences (this file) > Default behaviors.
 
 
 
@@ -134,11 +135,11 @@ For a full list of available skills and their detailed descriptions, see [AVAILA
 
 ### Key Skills Summary
 
-- **agent-skill-architect**: Designs and generates best-practice-compliant SKILL.md files.
-- **anthropics/* **: Specialized skills for design, API usage, and document handling.
-- **superpowers/* **: Core engineering workflow skills (brainstorming, planning, TDD).
-- **config-modernizer**: Refactors configuration files based on best practices.
-- **git-master**: Performs Git operations safely and appropriately.
+- **custom/agent-skill-architect**: Designs and generates best-practice-compliant SKILL.md files.
+- **anthropics/***: Specialized skills for design, API usage, and document handling.
+- **superpowers/***: Core engineering workflow skills (brainstorming, planning, TDD).
+- **custom/config-modernizer**: Refactors configuration files based on best practices.
+- **custom/git-master**: Performs Git operations safely and appropriately.
 
 ### Tips
 
@@ -189,8 +190,12 @@ For a full list of available skills and their detailed descriptions, see [AVAILA
 
 ## 6. Agent-Specific Contexts (Unified)
 
-- **CI/CD**: Default to **Bitbucket Pipelines** (`bitbucket-pipelines.yml`).
-- **Git Restrictions (CRITICAL)**: Execute git commands **ONLY** when the user issues a direct, unambiguous instruction.
+- **Git Restrictions (CRITICAL)**:
+  - Execute git commands **ONLY** when the user issues a direct, unambiguous instruction.
+  - **NEVER** execute git commands inside a `devcontainer` environment due to permission issues; always perform git operations on the host.
+  - **STRICTLY FORBIDDEN**:
+    - **NEVER** commit or push directly to the `master` branch.
+    - **NEVER** perform merge operations for Pull Requests; merging is strictly reserved for human operators.
 - **Tone**: Professional, polite (丁寧語), and technical.
 
 ### OpenCode
@@ -313,3 +318,30 @@ After calling `memory_save` or `session_flush`, perform a self-verification usin
 
 If any item fails, cancel the save or correct the content before finalizing.
 </quick_rubric>
+
+## 8. Agent Delegation & Skill Loading (Learned Rules)
+
+### 8.1 Prefer Subagents for Plan Execution
+
+Even when a written plan is detailed and complete, **default to delegating execution to subagents** rather than performing it directly. Direct self-execution is only appropriate for:
+
+- True trivialities (single-line fixes, config typos)
+- Level 0 / Level 3 Low Intensity tasks
+
+**Rationale:** Delegation ensures the plan is interpreted by a fresh execution context, reduces the risk of confirmation bias, and keeps the manager role (Sisyphus) distinct from the worker role (Hephaestus).
+
+### 8.2 Correct Skill Invocation
+
+When loading a skill **in OpenCode**, avoid using absolute paths with a leading slash, as they will fail and resolve to a "not found" error (e.g., `skill(name="/superpowers/subagent-driven-development")` fails). Instead, use the base skill name or canonical namespace-qualified formats:
+
+- ✅ Correct (Base name): `skill(name="subagent-driven-development")`
+- ✅ Correct (Canonical namespace-qualified): `skill(name="superpowers/subagent-driven-development")` or `skill(name="superpowers:subagent-driven-development")`
+- ❌ Wrong (Absolute path): `skill(name="/superpowers/subagent-driven-development")`
+
+The `skill` tool resolves the command prefix internally. Canonical namespace-qualified formats are supported and recommended.
+
+> **Note for non-OpenCode agents:** This invocation convention is specific to OpenCode's `skill` tool, which resolves command prefixes internally. In other agent environments, skill loading mechanisms and naming conventions may differ; always consult the specific platform's documentation.
+
+### 8.3 Post-Hoc Reflection
+
+If you skip subagent delegation and execute a plan directly, document the reason in your response. After completion, explicitly state whether the direct-execution choice was retrospectively correct and what would have been different with delegation.

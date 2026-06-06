@@ -171,7 +171,7 @@ stats-skillport: ## SkillPort の統計情報と MCP の起動状況を表示
 		export MCP_GATEWAY_STATUS; \
 		export SKILLPORT_MCP_VERSION; \
 		export SKILLPORT_MCP_STATUS; \
-		skillport list --json | python3 _scripts/skillport_stats.py; \
+		skillport list --json | $(PYTHON) python3 _scripts/skillport_stats.py; \
 	else \
 		echo "❌ skillport が見つかりません"; \
 		exit 1; \

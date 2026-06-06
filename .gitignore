@@ -6,14 +6,12 @@
 *.log
 fix_all.sh
 # Agent Skills (Exclude external/fetched skills managed by apm)
-agent-skills/*/
-!agent-skills/agent-skill-architect/
-!agent-skills/config-modernizer/
-!agent-skills/doc-sync-verifier/
-!agent-skills/dotfiles-guidelines/
-!agent-skills/git-master/
-!agent-skills/makefile-organization/
+agent-skills/*
+!agent-skills/custom/
+!agent-skills/README.md
+!agent-skills/AVAILABLE_SKILLS.md
 !agent-skills/.skillport/
+!agent-skills/.gitkeep
 .agents/
 .sisyphus/
 .omo/
@@ -37,11 +35,16 @@ codex/skills/.system/
 
 # OpenCode
 opencode/oh-my-*.json*
+!opencode/oh-my-*.json*.template
+!opencode/personal.env
+!opencode/work.env
 !opencode/oh-my-openagent.jsonc
 .mcp.json
 .serena/
 .env
+*.env
 antigravity/mcp_config.json
+antigravity/settings.json
 mcp/*.rendered
 mcp/catalogs/custom.yaml
 node_modules/

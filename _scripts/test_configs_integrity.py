@@ -95,6 +95,8 @@ class TestConfigIntegrity(unittest.TestCase):
                 with open(path, 'r', encoding='utf-8') as f:
                     content = f.read()
                 if content.strip():
+                    if rel.endswith('.template'):
+                        content = re.sub(r'\$\{[A-Za-z0-9_]+\}', 'true', content)
                     json5.loads(content)
             except FileNotFoundError:
                 continue

@@ -9,7 +9,7 @@ OPENCODE_CONFIG_DIR ?= $(CONFIG_DIR)/opencode
 OPENCODE_CONFIG_PATH ?= $(OPENCODE_CONFIG_DIR)/opencode.jsonc
 OPENCODE_DOTFILES_CONFIG ?= $(REPO_ROOT)/opencode/opencode.jsonc
 OH_MY_OPENAGENT_CONFIG_PATH ?= $(OPENCODE_CONFIG_DIR)/oh-my-openagent.jsonc
-OH_MY_OPENAGENT_DOTFILES_CONFIG ?= $(REPO_ROOT)/opencode/oh-my-openagent.jsonc
+OH_MY_OPENAGENT_DOTFILES_CONFIG ?= $(REPO_ROOT)/opencode/oh-my-openagent.jsonc.template
 OPENCODE_ANTIGRAVITY_PATH ?= $(OPENCODE_CONFIG_DIR)/antigravity.json
 OPENCODE_DOTFILES_ANTIGRAVITY ?= $(REPO_ROOT)/opencode/antigravity.json
 OPENCODE_AGENTS_PATH ?= $(OPENCODE_CONFIG_DIR)/AGENTS.md
@@ -61,7 +61,7 @@ define link_config
 	fi
 endef
 
-.PHONY: opencode install-packages-opencode install-opencode opencode-update setup-opencode check-opencode uninstall-opencode
+.PHONY: opencode install-packages-opencode install-opencode opencode-update setup-opencode check-opencode uninstall-opencode opencode-personal opencode-work
 
 # OpenCode (opencode) をインストール & 設定
 opencode: ## OpenCode(opencode)のインストールとセットアップ
@@ -74,14 +74,6 @@ opencode: ## OpenCode(opencode)のインストールとセットアップ
 		}; \
 		if check_link "$(OPENCODE_CONFIG_PATH)" "$(OPENCODE_DOTFILES_CONFIG)"; then \
 			skip=1; \
-			if [ -f "$(OH_MY_OPENAGENT_DOTFILES_CONFIG)" ]; then \
-				if [ -L "$(OH_MY_OPENAGENT_CONFIG_PATH)" ]; then \
-					if ! check_link "$(OH_MY_OPENAGENT_CONFIG_PATH)" "$(OH_MY_OPENAGENT_DOTFILES_CONFIG)"; then skip=0; fi; \
-				else skip=0; fi; \
-				if [ -L "$(OPENCODE_CONFIG_DIR)/oh-my-opencode.jsonc" ]; then \
-					if ! check_link "$(OPENCODE_CONFIG_DIR)/oh-my-opencode.jsonc" "$(OH_MY_OPENAGENT_DOTFILES_CONFIG)"; then skip=0; fi; \
-				else skip=0; fi; \
-			fi; \
 			if [ -f "$(OPENCODE_DOTFILES_ANTIGRAVITY)" ]; then \
 				if [ -L "$(OPENCODE_ANTIGRAVITY_PATH)" ]; then \
 					if ! check_link "$(OPENCODE_ANTIGRAVITY_PATH)" "$(OPENCODE_DOTFILES_ANTIGRAVITY)"; then skip=0; fi; \
@@ -115,7 +107,9 @@ opencode: ## OpenCode(opencode)のインストールとセットアップ
 	fi; \
 	$(MAKE) install-packages-opencode setup-opencode
 
+
 # OpenCode をインストール（公式インストーラ）
+
 install-packages-opencode: ## OpenCode（opencode）をインストール
 	@bash -c 'set -euo pipefail; \
 		if ! command -v curl >/dev/null 2>&1; then \
@@ -156,6 +150,8 @@ install-packages-opencode: ## OpenCode（opencode）をインストール
 			echo "❌ opencode のインストールに失敗しました: $(OPENCODE_BIN) が見つかりません"; \
 			exit 1; \
 		fi; \
+		mkdir -p "$(HOME_DIR)/.local/bin"; \
+		ln -sfn "$(OPENCODE_BIN)" "$(HOME_DIR)/.local/bin/opencode"; \
 		echo "✅ OpenCode（opencode）のインストールが完了しました"'
 	@$(call create_marker,install-packages-opencode,$$($(OPENCODE_BIN) --version 2>/dev/null || echo unknown))
 
@@ -181,6 +177,8 @@ opencode-update: ## OpenCode（opencode）をアップデート
 		echo "❌ opencode のアップデートに失敗しました: $(OPENCODE_BIN) が見つかりません"; \
 		exit 1; \
 	fi
+	@mkdir -p "$(HOME_DIR)/.local/bin"
+	@ln -sfn "$(OPENCODE_BIN)" "$(HOME_DIR)/.local/bin/opencode"
 	@echo "✅ 更新後のバージョン: $$($(OPENCODE_BIN) --version 2>/dev/null || echo unknown)"
 	@$(call create_marker,opencode-update,$$($(OPENCODE_BIN) --version 2>/dev/null || echo unknown))
 
@@ -191,12 +189,10 @@ setup-opencode: ## OpenCode（opencode）の設定ファイルを適用
 	@mkdir -p "$(OPENCODE_HOME)"
 	@# opencode.jsonc の設定
 	@$(call link_config,$(OPENCODE_DOTFILES_CONFIG),$(OPENCODE_CONFIG_PATH),opencode)
-	@# oh-my-openagent.jsonc の設定
-	@$(call link_config,$(OH_MY_OPENAGENT_DOTFILES_CONFIG),$(OH_MY_OPENAGENT_CONFIG_PATH),oh-my-openagent)
-	@$(call link_config,$(OH_MY_OPENAGENT_DOTFILES_CONFIG),$(OPENCODE_CONFIG_DIR)/oh-my-opencode.jsonc,oh-my-opencode)
 	@# antigravity.json の設定
 	@$(call link_config,$(OPENCODE_DOTFILES_ANTIGRAVITY),$(OPENCODE_ANTIGRAVITY_PATH),antigravity)
 	@# AGENTS.md の設定
+
 	@$(call link_config,$(OPENCODE_DOTFILES_AGENTS),$(OPENCODE_AGENTS_PATH),AGENTS.md)
 	@# commands/ の設定
 	@$(call link_config,$(OPENCODE_DOTFILES_COMMANDS),$(OPENCODE_COMMANDS_PATH),commands)
@@ -251,28 +247,14 @@ check-opencode: ## OpenCode（opencode）の状態を確認
 		echo "⚠️  config: $(OPENCODE_CONFIG_PATH) is not configured"; \
 	fi
 	@if [ -f "$(OH_MY_OPENAGENT_DOTFILES_CONFIG)" ]; then \
-		if [ -L "$(OH_MY_OPENAGENT_CONFIG_PATH)" ]; then \
-			actual=$$(readlink -f "$(OH_MY_OPENAGENT_CONFIG_PATH)" 2>/dev/null || readlink "$(OH_MY_OPENAGENT_CONFIG_PATH)" 2>/dev/null || true); \
-			expected=$$(readlink -f "$(OH_MY_OPENAGENT_DOTFILES_CONFIG)" 2>/dev/null || readlink "$(OH_MY_OPENAGENT_DOTFILES_CONFIG)" 2>/dev/null || true); \
-			if [ -n "$$actual" ] && [ "$$actual" = "$$expected" ]; then \
-				echo "✅ oh-my-config: $(OH_MY_OPENAGENT_CONFIG_PATH) -> $(OH_MY_OPENAGENT_DOTFILES_CONFIG)"; \
-			else \
-				echo "⚠️  oh-my-config: $(OH_MY_OPENAGENT_CONFIG_PATH) points to $$actual (expected $$expected)"; \
-			fi; \
-		elif [ -e "$(OH_MY_OPENAGENT_CONFIG_PATH)" ]; then \
-			echo "⚠️  oh-my-config: $(OH_MY_OPENAGENT_CONFIG_PATH) exists but is not a symlink"; \
-		else \
-			echo "⚠️  oh-my-config: $(OH_MY_OPENAGENT_CONFIG_PATH) is not configured"; \
-		fi; \
-		if [ -L "$(OPENCODE_CONFIG_DIR)/oh-my-opencode.jsonc" ]; then \
-			actual=$$(readlink -f "$(OPENCODE_CONFIG_DIR)/oh-my-opencode.jsonc" 2>/dev/null || readlink "$(OPENCODE_CONFIG_DIR)/oh-my-opencode.jsonc" 2>/dev/null || true); \
-			expected=$$(readlink -f "$(OH_MY_OPENAGENT_DOTFILES_CONFIG)" 2>/dev/null || readlink "$(OH_MY_OPENAGENT_DOTFILES_CONFIG)" 2>/dev/null || true); \
-			if [ -n "$$actual" ] && [ "$$actual" = "$$expected" ]; then \
-				echo "✅ oh-my-config: $(OPENCODE_CONFIG_DIR)/oh-my-opencode.jsonc -> $(OH_MY_OPENAGENT_DOTFILES_CONFIG)"; \
-			else \
-				echo "⚠️  oh-my-config: $(OPENCODE_CONFIG_DIR)/oh-my-opencode.jsonc points to $$actual (expected $$expected)"; \
-			fi; \
-		fi; \
+		echo "✅ template: $(OH_MY_OPENAGENT_DOTFILES_CONFIG) exists"; \
+	else \
+		echo "⚠️  template: $(OH_MY_OPENAGENT_DOTFILES_CONFIG) not found"; \
+	fi
+	@if [ -f "$(REPO_ROOT)/_scripts/opencode-wrapper.sh" ]; then \
+		echo "✅ wrapper: $(REPO_ROOT)/_scripts/opencode-wrapper.sh exists"; \
+	else \
+		echo "⚠️  wrapper: $(REPO_ROOT)/_scripts/opencode-wrapper.sh not found"; \
 	fi
 	@if [ -f "$(OPENCODE_DOTFILES_ANTIGRAVITY)" ]; then \
 		if [ -L "$(OPENCODE_ANTIGRAVITY_PATH)" ]; then \
@@ -368,3 +350,9 @@ uninstall-opencode: ## OpenCode（opencode）のアンインストール
 	@rm -f "$(MARKER_DIR)/opencode-update"*
 	@rm -f "$(MARKER_DIR)/setup-opencode"*
 	@echo "✅ OpenCode（opencode）のアンインストールが完了しました"
+
+opencode-personal: opencode ## OpenCode の personal プロファイルを適用して起動
+	@bash _scripts/opencode-wrapper.sh personal
+
+opencode-work: opencode ## OpenCode の work プロファイルを適用して起動
+	@bash _scripts/opencode-wrapper.sh work
