@@ -141,4 +141,4 @@ for output_file in "${OUTPUT_FILES[@]}"; do
     restore_external_skills_note "$output_file"
 done
 
-echo "✅ Successfully synchronized skill listings."
+echo "[+] Successfully synchronized skill listings."
