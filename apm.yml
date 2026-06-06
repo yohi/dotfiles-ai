@@ -28,7 +28,7 @@ dependencies:
       args:
         - "skillport-mcp"
       env:
-        SKILLPORT_SKILLS_DIR: "${env:PWD}/agent-skills"
+        SKILLPORT_SKILLS_DIR: "${env:PWD}/.agents/skills"
       standalone: true
       enabled: true
 

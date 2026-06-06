@@ -1,0 +1,159 @@
+lockfile_version: '1'
+generated_at: '2026-06-06T03:55:27.072099+00:00'
+apm_version: 0.18.0
+dependencies:
+- repo_url: anthropics/skills
+  host: github.com
+  resolved_commit: da20c92503b2e8ff1cf28ca81a0df4673debdbf7
+  package_type: marketplace_plugin
+  deployed_files:
+  - .agents/skills/algorithmic-art
+  - .agents/skills/brand-guidelines
+  - .agents/skills/canvas-design
+  - .agents/skills/claude-api
+  - .agents/skills/doc-coauthoring
+  - .agents/skills/docx
+  - .agents/skills/frontend-design
+  - .agents/skills/internal-comms
+  - .agents/skills/mcp-builder
+  - .agents/skills/pdf
+  - .agents/skills/pptx
+  - .agents/skills/skill-creator
+  - .agents/skills/slack-gif-creator
+  - .agents/skills/theme-factory
+  - .agents/skills/web-artifacts-builder
+  - .agents/skills/webapp-testing
+  - .agents/skills/xlsx
+  - .claude/skills/algorithmic-art
+  - .claude/skills/brand-guidelines
+  - .claude/skills/canvas-design
+  - .claude/skills/claude-api
+  - .claude/skills/doc-coauthoring
+  - .claude/skills/docx
+  - .claude/skills/frontend-design
+  - .claude/skills/internal-comms
+  - .claude/skills/mcp-builder
+  - .claude/skills/pdf
+  - .claude/skills/pptx
+  - .claude/skills/skill-creator
+  - .claude/skills/slack-gif-creator
+  - .claude/skills/theme-factory
+  - .claude/skills/web-artifacts-builder
+  - .claude/skills/webapp-testing
+  - .claude/skills/xlsx
+  content_hash: sha256:5a94c4600dca371e7571be73552f06e11293f558b3d3b295d306b0bfefb4245b
+- repo_url: obra/superpowers
+  host: github.com
+  resolved_commit: 6fd4507659784c351abbd2bc264c7162cfd386dc
+  package_type: marketplace_plugin
+  deployed_files:
+  - .agents/skills/brainstorming
+  - .agents/skills/dispatching-parallel-agents
+  - .agents/skills/executing-plans
+  - .agents/skills/finishing-a-development-branch
+  - .agents/skills/receiving-code-review
+  - .agents/skills/requesting-code-review
+  - .agents/skills/subagent-driven-development
+  - .agents/skills/systematic-debugging
+  - .agents/skills/test-driven-development
+  - .agents/skills/using-git-worktrees
+  - .agents/skills/using-superpowers
+  - .agents/skills/verification-before-completion
+  - .agents/skills/writing-plans
+  - .agents/skills/writing-skills
+  - .claude/hooks/superpowers/hooks/run-hook.cmd
+  - .claude/skills/brainstorming
+  - .claude/skills/dispatching-parallel-agents
+  - .claude/skills/executing-plans
+  - .claude/skills/finishing-a-development-branch
+  - .claude/skills/receiving-code-review
+  - .claude/skills/requesting-code-review
+  - .claude/skills/subagent-driven-development
+  - .claude/skills/systematic-debugging
+  - .claude/skills/test-driven-development
+  - .claude/skills/using-git-worktrees
+  - .claude/skills/using-superpowers
+  - .claude/skills/verification-before-completion
+  - .claude/skills/writing-plans
+  - .claude/skills/writing-skills
+  - .codex/hooks/superpowers/hooks/run-hook.cmd
+  - .cursor/hooks/superpowers/hooks/run-hook.cmd
+  - .gemini/hooks/superpowers/hooks/run-hook.cmd
+  deployed_file_hashes:
+    .claude/hooks/superpowers/hooks/run-hook.cmd: sha256:d3d9c6199678dab2858e60509dde5e7414f13c2a2b5e48a38b1d368b6e1d6abb
+    .codex/hooks/superpowers/hooks/run-hook.cmd: sha256:d3d9c6199678dab2858e60509dde5e7414f13c2a2b5e48a38b1d368b6e1d6abb
+    .cursor/hooks/superpowers/hooks/run-hook.cmd: sha256:d3d9c6199678dab2858e60509dde5e7414f13c2a2b5e48a38b1d368b6e1d6abb
+    .gemini/hooks/superpowers/hooks/run-hook.cmd: sha256:d3d9c6199678dab2858e60509dde5e7414f13c2a2b5e48a38b1d368b6e1d6abb
+  content_hash: sha256:8b91ca49cbf065ffb70c91fc5b4f9a437fc56ab022203e6a617e89f9ca2730c4
+mcp_servers:
+- chronos-graph
+- docker-mcp
+- nexus
+- skillport
+mcp_configs:
+  chronos-graph:
+    name: chronos-graph
+    transport: stdio
+    env:
+      STORAGE_BACKEND: ${env:STORAGE_BACKEND}
+      GRAPH_ENABLED: ${env:GRAPH_ENABLED}
+      POSTGRES_HOST: ${env:POSTGRES_HOST}
+      POSTGRES_PORT: ${env:POSTGRES_PORT}
+      POSTGRES_DB: ${env:POSTGRES_DB}
+      POSTGRES_USER: ${env:POSTGRES_USER}
+      POSTGRES_PASSWORD: ${env:POSTGRES_PASSWORD}
+      POSTGRES_SSL: ${env:POSTGRES_SSL}
+      NEO4J_URI: ${env:NEO4J_URI}
+      NEO4J_USER: ${env:NEO4J_USER}
+      NEO4J_PASSWORD: ${env:NEO4J_PASSWORD}
+      CACHE_BACKEND: ${env:CACHE_BACKEND}
+      REDIS_URL: ${env:REDIS_URL}
+      REDIS_SSL: ${env:REDIS_SSL}
+      EMBEDDING_PROVIDER: ${env:EMBEDDING_PROVIDER}
+      LOCAL_MODEL_NAME: ${env:LOCAL_MODEL_NAME}
+      EMBEDDING_DIMENSION: ${env:EMBEDDING_DIMENSION}
+      SIMILARITY_THRESHOLD: ${env:SIMILARITY_THRESHOLD}
+      DEDUP_THRESHOLD: ${env:DEDUP_THRESHOLD}
+      DEFAULT_TOP_K: ${env:DEFAULT_TOP_K}
+      DECAY_HALF_LIFE_DAYS: ${env:DECAY_HALF_LIFE_DAYS}
+      ARCHIVE_THRESHOLD: ${env:ARCHIVE_THRESHOLD}
+      PURGE_RETENTION_DAYS: ${env:PURGE_RETENTION_DAYS}
+      DASHBOARD_HOST: ${env:DASHBOARD_HOST}
+      DASHBOARD_PORT: ${env:DASHBOARD_PORT}
+    args:
+    - --from
+    - git+https://github.com/yohi/chronos-graph.git[all]
+    - context-store
+    registry: false
+    command: uvx
+  docker-mcp:
+    name: docker-mcp
+    transport: sse
+    registry: false
+    headers:
+      Authorization: Bearer ${env:MCP_GATEWAY_TOKEN}
+    url: http://127.0.0.1:10888/sse
+  nexus:
+    name: nexus
+    transport: stdio
+    env:
+      NEXUS_STORAGE_ROOT_DIR: ${env:HOME}/.nexus
+      LOG_LEVEL: ERROR
+      NEXUS_WATCHER_IGNORE_PATHS: node_modules,opencode/node_modules,.opencode/node_modules,oss/apm/node_modules,oss/apm/docs/node_modules,.git,.nexus,dist,gemini,agent-skills,apm_modules,.agents,.opencode,.gemini,.claude,.codex,.vscode,.devcontainer,oss,codex/.tmp,.worktrees,.venv,target,.mypy_cache,.ruff_cache,build,.serena,.cache,__pycache__,*.db,*.sqlite,*.log
+      CHOKIDAR_USEPOLLING: 'false'
+      CHOKIDAR_INTERVAL: '2000'
+      NO_PROXY: 127.0.0.1,localhost
+    args:
+    - -y
+    - '@yohi/nexus@1.7.4'
+    registry: false
+    command: npx
+  skillport:
+    name: skillport
+    transport: stdio
+    env:
+      SKILLPORT_SKILLS_DIR: ${env:PWD}/.agents/skills
+    args:
+    - skillport-mcp
+    registry: false
+    command: uvx
