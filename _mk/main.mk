@@ -85,6 +85,9 @@ install-requirements:
 	@echo "📦 依存関係をインストール中..."
 	@if command -v uv >/dev/null 2>&1; then \
 		uv sync; \
+	elif curl -LsSf https://astral.sh/uv/install.sh | sh; then \
+		export PATH="$(HOME)/.local/bin:$(PATH)"; \
+		uv sync; \
 	else \
 		if [ ! -d ".venv" ]; then \
 			python3 -m venv .venv; \
