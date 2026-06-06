@@ -1,5 +1,6 @@
 import json
 import os
+from pathlib import Path
 from unittest import mock
 
 # Stub config to mock apm.lock.yaml
@@ -16,46 +17,61 @@ mcp_configs:
       SKILLPORT_SKILLS_DIR: "${env:PWD}/.agents/skills"
 """
 
-def test_sync_antigravity(tmp_path):
+
+def test_sync_antigravity(tmp_path: Path) -> None:
+    """Test successful conversion of the mock lockfile to mcp_config.json."""
     lockfile = tmp_path / "apm.lock.yaml"
     lockfile.write_text(MOCK_LOCKFILE)
     outfile = tmp_path / "mcp_config.json"
-    
+
     # Run conversion logic using mock environment and mock file existence for standard paths
     original_exists = os.path.exists
+
     def mock_exists(path):
-        if path.endswith(".local/bin/uvx") or path.endswith(".local/bin/npx") or path.endswith("uvx") or path.endswith("npx"):
+        if (
+            path.endswith(".local/bin/uvx")
+            or path.endswith(".local/bin/npx")
+            or path.endswith("uvx")
+            or path.endswith("npx")
+        ):
             return True
         return original_exists(path)
 
-    with mock.patch("os.path.exists", side_effect=mock_exists), \
-         mock.patch("shutil.which", return_value=None), \
-         mock.patch.dict(os.environ, {"PWD": "/workspace"}):
+    with (
+        mock.patch("os.path.exists", side_effect=mock_exists),
+        mock.patch("shutil.which", return_value=None),
+        mock.patch.dict(os.environ, {"PWD": "/workspace"}),
+    ):
         from _scripts.sync_antigravity import convert_lockfile
+
         convert_lockfile(str(lockfile), str(outfile))
-        
+
     assert outfile.exists()
     content = json.loads(outfile.read_text())
     assert "mcpServers" in content
     assert "skillport" in content["mcpServers"]
-    
+
     skillport = content["mcpServers"]["skillport"]
     assert skillport["command"].endswith("uvx")
     assert skillport["args"] == ["skillport-mcp"]
     # Verify environment variable substitution
     assert skillport["env"]["SKILLPORT_SKILLS_DIR"] == "/workspace/.agents/skills"
 
-def test_sync_antigravity_missing_lockfile(tmp_path):
+
+def test_sync_antigravity_missing_lockfile(tmp_path: Path) -> None:
+    """Test that convert_lockfile raises FileNotFoundError when the lockfile is missing."""
     import pytest
     from _scripts.sync_antigravity import convert_lockfile
-    
+
     non_existent = tmp_path / "non_existent.yaml"
     outfile = tmp_path / "mcp_config.json"
-    
+
     with pytest.raises(FileNotFoundError):
         convert_lockfile(str(non_existent), str(outfile))
 
-def test_sync_antigravity_extended(tmp_path):
+
+def test_sync_antigravity_extended(tmp_path: Path) -> None:
+    """Test convert_lockfile with custom server configuration and env variable replacement."""
     mock_lockfile = """
 lockfile_version: '1'
 mcp_configs:
@@ -74,23 +90,38 @@ mcp_configs:
     lockfile = tmp_path / "apm.lock.yaml"
     lockfile.write_text(mock_lockfile)
     outfile = tmp_path / "mcp_config.json"
-    
-    with mock.patch("shutil.which", return_value="/usr/local/bin/uvx-custom"), \
-         mock.patch("os.path.exists", return_value=True):
+
+    with (
+        mock.patch("shutil.which", return_value="/usr/local/bin/uvx-custom"),
+        mock.patch("os.path.exists", return_value=True),
+    ):
         from _scripts.sync_antigravity import convert_lockfile
+
         convert_lockfile(str(lockfile), str(outfile))
-        
+
     assert outfile.exists()
     content = json.loads(outfile.read_text())
     assert "mcpServers" in content
     assert "skillport" in content["mcpServers"]
     assert "custom_server" in content["mcpServers"]
-    
+
     skillport = content["mcpServers"]["skillport"]
     assert skillport["command"] == "/usr/local/bin/uvx-custom"
-    
+
     custom_server = content["mcpServers"]["custom_server"]
     assert "serverUrl" in custom_server
     assert custom_server["serverUrl"] == "http://localhost:8000"
     assert custom_server["headers"] == {"Authorization": "Bearer test"}
 
+
+def test_sync_antigravity_invalid_lockfile_format(tmp_path: Path) -> None:
+    """Test that convert_lockfile raises ValueError when lock_data is not a mapping/dict."""
+    import pytest
+    from _scripts.sync_antigravity import convert_lockfile
+
+    lockfile = tmp_path / "apm.lock.yaml"
+    lockfile.write_text("invalid_string_not_a_dict")
+    outfile = tmp_path / "mcp_config.json"
+
+    with pytest.raises(ValueError):
+        convert_lockfile(str(lockfile), str(outfile))

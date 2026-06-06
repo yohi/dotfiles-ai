@@ -23,8 +23,6 @@ run_skillport_doc() {
     # Create temporary combined skills directory
     local tmp_skills_dir
     tmp_skills_dir=$(mktemp -d)
-    # Ensure cleanup on exit (expand variables now so trap executes with absolute paths at exit time)
-    trap "rm -rf '${tmp_skills_dir}' '${tmp_file}'" EXIT INT TERM
 
     # Combine custom skills (using cp -a to preserve symlinks and checking if not empty)
     if [ -d "agent-skills/custom" ] && [ -n "$(ls -A agent-skills/custom 2>/dev/null)" ]; then
@@ -47,15 +45,21 @@ run_skillport_doc() {
     if command -v skillport >/dev/null 2>&1; then
         echo "Running skillport doc for ${output_file}..."
         skillport --skills-dir "$tmp_skills_dir" doc --mode mcp --output "$tmp_file" --force || {
-            echo "Error: skillport doc failed." >&2; exit 1
+            echo "Error: skillport doc failed." >&2
+            rm -rf "${tmp_skills_dir}" "${tmp_file}"
+            exit 1
         }
     elif command -v uvx >/dev/null 2>&1; then
         echo "Running uvx skillport doc for ${output_file}..."
         uvx skillport --skills-dir "$tmp_skills_dir" doc --mode mcp --output "$tmp_file" --force || {
-            echo "Error: uvx skillport doc failed." >&2; exit 1
+            echo "Error: uvx skillport doc failed." >&2
+            rm -rf "${tmp_skills_dir}" "${tmp_file}"
+            exit 1
         }
     else
-        echo "Error: 'skillport' command not found." >&2; exit 1
+        echo "Error: 'skillport' command not found." >&2
+        rm -rf "${tmp_skills_dir}" "${tmp_file}"
+        exit 1
     fi
 
     # Escape regex/sed metacharacters from tmp_skills_dir
@@ -75,6 +79,8 @@ run_skillport_doc() {
         echo "Writing initial skill listings to ${output_file}..."
         cp "$tmp_file" "$output_file"
     fi
+
+    rm -rf "${tmp_skills_dir}" "${tmp_file}"
 }
 
 normalize_locations() {
@@ -101,7 +107,6 @@ restore_external_skills_note() {
     # check if the note already exists anywhere in the file (not just after run_skillport_doc)
     if grep -Eq '^[[:space:]]*<available_skills([[:space:]]|>)' "$file_path" && ! grep -q "External skills (anthropics/\*, superpowers/\*)" "$file_path"; then
         tmp_file=$(mktemp)
-        trap 'rm -f "$tmp_file"' EXIT INT TERM
         awk -v note="$note" '
             $0 ~ /^[[:space:]]*<available_skills([[:space:]]|>)/ {
                 print note
@@ -109,9 +114,9 @@ restore_external_skills_note() {
                 next
             }
             { print }
-        ' "$file_path" > "$tmp_file"
-        mv "$tmp_file" "$file_path"
-        trap - EXIT INT TERM
+        ' "$file_path" > "$tmp_file" || { rm -f "$tmp_file"; return 1; }
+        mv "$tmp_file" "$file_path" || { rm -f "$tmp_file"; return 1; }
+        rm -f "$tmp_file"
     fi
 }
 

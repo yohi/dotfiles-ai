@@ -267,7 +267,7 @@ ai-setup: ## クリーンアップ・同期を一括実行し、全エージェ�
 	@echo ""
 	@echo "📋 実行された処理:"
 	@echo "  1. clean-legacy  — レガシーファイルのクリーンアップ"
-	@echo "  2. sync-agents   — SSOT → 各エージェントへの同期"
+	@echo "  2. sync-agents-core — SSOT → 各エージェントへの同期"
 	@echo ""
 	@echo "📝 次のステップ:"
 	@echo "  - make check-skillport  で skillport の状態を確認"

@@ -584,8 +584,7 @@
       "command": [
         "npx",
         "-y",
-        "@yohi/nexus@1.9.0",
-        // "{env:HOME}/program/private/nexus"
+        "{env:HOME}/program/nexus"
       ]
     },
     "chronos-graph": {
