@@ -20,7 +20,11 @@ help-mcp: ## MCP の使い方を表示
 
 sync-mcp: ## APMを使用してMCP設定を同期
 	@echo "🔄 Synchronizing MCP settings via APM..."
-	@apm install --force
+	@if [ -f ".env" ]; then \
+		set -a && source .env && set +a && apm install --force; \
+	else \
+		apm install --force; \
+	fi
 	@echo "✅ MCP synchronization complete."
 	@$(MAKE) restart-mcp
 
@@ -34,6 +38,20 @@ sync-mcp-gateway: ## Docker MCP Gateway 設定を同期
 		echo "✅ Gateway config synced."; \
 	else \
 		echo "⚠️  mcp/config.yaml not found — run 'make sync-mcp' first."; \
+	fi
+	@mkdir -p $(HOME_DIR)/.docker/mcp/catalogs
+	@if [ -f "mcp/catalogs/custom.yaml.template" ]; then \
+		sed -e "s|__HOME__|$(HOME_DIR)|g" \
+		    -e "s|__REPO_ROOT__|$(REPO_ROOT)|g" \
+		    mcp/catalogs/custom.yaml.template > $(HOME_DIR)/.docker/mcp/catalogs/custom.yaml; \
+		cp $(HOME_DIR)/.docker/mcp/catalogs/custom.yaml mcp/catalogs/custom.yaml; \
+		echo "✅ Custom catalog configured and synced."; \
+	else \
+		echo "⚠️  mcp/catalogs/custom.yaml.template not found."; \
+	fi
+	@if [ -f "mcp/catalogs/bootstrap.yaml" ]; then \
+		cp mcp/catalogs/bootstrap.yaml $(HOME_DIR)/.docker/mcp/catalogs/bootstrap.yaml; \
+		echo "✅ Bootstrap catalog synced."; \
 	fi
 	@if [ ! -f "mcp/docker-mcp-gateway.service" ]; then \
 		echo "❌ Error: mcp/docker-mcp-gateway.service not found." >&2; \

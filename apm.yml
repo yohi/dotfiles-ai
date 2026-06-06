@@ -309,7 +309,6 @@ targets:
   - gemini
   - claude
   - cursor
-  - codex
 
 # Exported Artifacts
 exports:
