@@ -59,9 +59,24 @@ sync-antigravity: ## apm.ymlからAntigravity用のMCP設定を生成して同�
 setup-antigravity: ## 生成された設定をAntigravityのグローバル設定にリンク
 	@echo "🔧 Synchronizing Antigravity config..."
 	@mkdir -p "$(ANTIGRAVITY_CONFIG_DIR)/skills"
-	@# グローバルスキルのリンク作成
-	@ln -sfn "$(REPO_ROOT)/agent-skills" "$(ANTIGRAVITY_CONFIG_DIR)/skills/agent-skills"
-	@echo "✅ Linked Global Skills: $(ANTIGRAVITY_CONFIG_DIR)/skills/agent-skills -> agent-skills"
+	@# Remove old agent-skills link if exists
+	@rm -f "$(ANTIGRAVITY_CONFIG_DIR)/skills/agent-skills"
+	@# グローバルスキルのリンク作成 (custom/ と .agents/skills/ 内のスキルをフラットに配置)
+	@if [ -d "$(REPO_ROOT)/agent-skills/custom" ]; then \
+		for dir in "$(REPO_ROOT)/agent-skills/custom"/*; do \
+			[ -d "$$dir" ] || continue; \
+			name=$$(basename "$$dir"); \
+			ln -sfn "$$dir" "$(ANTIGRAVITY_CONFIG_DIR)/skills/$$name"; \
+		done; \
+	fi
+	@if [ -d "$(REPO_ROOT)/.agents/skills" ]; then \
+		for dir in "$(REPO_ROOT)/.agents/skills"/*; do \
+			[ -d "$$dir" ] || continue; \
+			name=$$(basename "$$dir"); \
+			ln -sfn "$$dir" "$(ANTIGRAVITY_CONFIG_DIR)/skills/$$name"; \
+		done; \
+	fi
+	@echo "✅ Linked all skills to $(ANTIGRAVITY_CONFIG_DIR)/skills/"
 	@# settings.jsonのリンク作成
 	@if [ -f "$(PROJECT_SETTINGS_CONFIG)" ]; then \
 		if [ -e "$(ANTIGRAVITY_SETTINGS_PATH)" ] && [ ! -L "$(ANTIGRAVITY_SETTINGS_PATH)" ]; then \
