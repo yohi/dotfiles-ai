@@ -27,7 +27,7 @@ def test_sync_antigravity(tmp_path: Path) -> None:
     # Run conversion logic using mock environment and mock file existence for standard paths
     original_exists = os.path.exists
 
-    def mock_exists(path):
+    def mock_exists(path: str) -> bool:
         if (
             path.endswith(".local/bin/uvx")
             or path.endswith(".local/bin/npx")
