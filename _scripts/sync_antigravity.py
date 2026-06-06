@@ -59,7 +59,7 @@ def convert_lockfile(lockfile_path, output_path):
             if resolved_path:
                 server_cfg["command"] = resolved_path
             else:
-                for path in [os.path.expanduser("~/.linuxbrew/bin/npx"), "/home/linuxbrew/.linuxbrew/bin/npx", "/usr/local/bin/npx", "/usr/bin/npx"]:
+                for path in [os.path.expanduser("~/.linuxbrew/bin/npx"), "/usr/local/bin/npx", "/usr/bin/npx"]:
                     if os.path.exists(path):
                         server_cfg["command"] = path
                         break

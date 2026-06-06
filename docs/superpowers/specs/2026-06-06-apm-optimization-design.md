@@ -19,7 +19,7 @@ The goal of this optimization is to fully leverage APM's capabilities to manage 
   * External skills (e.g., `obra/superpowers`, `anthropics/skills`) listed in `apm.yml` will be installed directly by APM to their respective target directories (e.g., `.agents/skills/` and agent-specific runtime directories).
   * The custom scripts/make targets that copy external skills from `apm_modules/` to `agent-skills/` will be removed.
 * **Role of `agent-skills/`**:
-  * The [agent-skills/](file:///home/y_ohi/dotfiles/components/dotfiles-ai/agent-skills) directory will strictly house local custom skills (under `agent-skills/custom/`).
+  * The [agent-skills/](file://./agent-skills) directory will strictly house local custom skills (under `agent-skills/custom/`).
   * Legacy folders for external skills (e.g., `agent-skills/anthropics/`, `agent-skills/superpowers/`) will be cleaned up.
 * **Skillport MCP Integration**:
   * The `skillport` MCP configuration in `apm.yml` will point `SKILLPORT_SKILLS_DIR` to `${env:PWD}/.agents/skills` instead of `agent-skills`.
@@ -30,14 +30,14 @@ The goal of this optimization is to fully leverage APM's capabilities to manage 
   * Leverage APM's `targets` compilation (`apm compile`) to generate agent settings.
   * Define post-install/post-compile hooks in `apm.yml` to trigger custom conversion scripts (such as converting markdown commands to Gemini `.toml` files or Codex `.md` rules) automatically.
 * **Antigravity Workaround Hook**:
-  * Since Antigravity is not natively supported as a compilation target by APM yet, implement a custom post-compile script (`_scripts/sync_antigravity.sh`) that parses the resolved MCP configurations from `apm.lock.yaml` (or `apm.yml`) and outputs the Antigravity-specific [antigravity/mcp_config.json](file:///home/y_ohi/dotfiles/components/dotfiles-ai/antigravity/mcp_config.json).
+  * Since Antigravity is not natively supported as a compilation target by APM yet, implement a custom post-compile script (`_scripts/sync_antigravity.sh`) that parses the resolved MCP configurations from `apm.lock.yaml` (or `apm.yml`) and outputs the Antigravity-specific [antigravity/mcp_config.json](file://./antigravity/mcp_config.json).
   * This script will be invoked as a post-compile hook via the Makefile wrapper right after `apm compile`.
 * **Instruction Merging**:
   * Use `apm.yml`'s `instructions` and `exports.instructions` configuration to automatically bundle `global-rules/AGENTS.global.md` during agent configuration compilation, avoiding manual symlink creation.
 
 ### 2.3 Makefile Simplification
 * **Cleanup of Redundant Targets**:
-  * Delete `install-external-skills`, `sync-skills-to-agents`, and `uninstall-superpowers` from [_mk/sync-agents.mk](file:///home/y_ohi/dotfiles/components/dotfiles-ai/_mk/sync-agents.mk).
+  * Delete `install-external-skills`, `sync-skills-to-agents`, and `uninstall-superpowers` from [_mk/sync-agents.mk](file://./_mk/sync-agents.mk).
 * **Wrapper Implementation**:
   * Redefine `make setup` and `make sync-agents` to run `apm install && apm compile` as the core build sequence.
   * Adjust `clean-sync-artifacts` to purge leftover dual-management files.

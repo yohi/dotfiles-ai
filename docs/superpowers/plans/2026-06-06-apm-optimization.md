@@ -117,7 +117,7 @@ def convert_lockfile(lockfile_path, output_path):
         # Standardize command path resolving for typical environment executables
         if "command" in server_cfg and server_cfg["command"] == "uvx":
             # Resolve standard system uvx path if it exists
-            for path in ["/home/y_ohi/.local/bin/uvx", "/usr/local/bin/uvx", "/usr/bin/uvx"]:
+            for path in [os.path.expanduser("~/.local/bin/uvx"), "/usr/local/bin/uvx", "/usr/bin/uvx"]:
                 if os.path.exists(path):
                     server_cfg["command"] = path
                     break
