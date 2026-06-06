@@ -17,7 +17,7 @@ CODEX_CONFIG     := $(REPO_ROOT)/codex/config.toml
 .PHONY: sync-agents-core clean-sync-artifacts ai-setup \
         inject-meta-prompt-opencode inject-meta-prompt-codex \
         sync-skillport-doc link-user-agents link-agent-commands \
-        clean-legacy
+        clean-legacy clean-legacy-skills
 
 # ============================================================
 # sync-agents-core: メインの同期ターゲット (SPEC Feature #1, #2, #3)
@@ -45,8 +45,7 @@ clean-sync-artifacts: ## 同期マーカーおよび生成されたリンク・�
 	@find "$(REPO_ROOT)/.cursor/rules" -maxdepth 1 -type l -name "*.md" -delete 2>/dev/null || true
 	@rm -rf "$(REPO_ROOT)/gemini/commands"
 	@rm -rf "$(REPO_ROOT)/codex/skills"
-	@rm -rf "$(AGENT_SKILLS_DIR)/anthropics"
-	@rm -rf "$(AGENT_SKILLS_DIR)/superpowers"
+	@# NOTE: Legacy directories like agent-skills/anthropics and agent-skills/superpowers are cleaned up via clean-legacy-skills.
 	@echo "✅ clean-sync-artifacts: 同期状態がリセットされました"
 
 # ============================================================
@@ -171,7 +170,7 @@ link-agent-commands: ## agent-commands/ のコマンドを各エージェント�
 		else \
 			name=$$(echo "$$base" | sed 's/-/ /g; s/\b\(.\)/\u\1/g'); \
 			desc=$$(awk '/^---$$/{n++; next} n==1 && /^description:/{sub(/^description: */, ""); print; exit}' "$$cmd" | sed "s/\\\\/\\\\\\\\/g; s/\"/\\\\\"/g"); \
-			body=$$(awk 'BEGIN{n=0} /^---$$/{n>=2} n>=2{print}' "$$cmd"); \
+			body=$$(awk 'BEGIN{n=0} /^---$$/{n++; next} n>=2{print}' "$$cmd"); \
 			printf -- "---\nname: %s\ndescription: \"%s\"\n---\n\n# %s\n\n%s\n" "$$base" "$$desc" "$$name" "$$body" > "$$target"; \
 			echo "  ✅ codex/skills/$$base.md (generated from .md)"; \
 		fi; \
@@ -250,13 +249,19 @@ clean-legacy: ## 統合後に不要となった古いルールファイルを削
 	done
 	@echo "✅ clean-legacy: クリーンアップが完了しました"
 
+clean-legacy-skills: ## 古い外部スキル用ディレクトリ(agent-skills/anthropics, superpowers)を手動でクリーンアップする
+	@echo "🧹 clean-legacy-skills: 古い外部スキルディレクトリを削除中..."
+	@rm -rf "$(AGENT_SKILLS_DIR)/anthropics"
+	@rm -rf "$(AGENT_SKILLS_DIR)/superpowers"
+	@echo "✅ clean-legacy-skills: 完了しました"
+
 # ============================================================
 # ai-setup: 一括実行 (SPEC API Definition)
 # ============================================================
 ai-setup: ## クリーンアップ・同期を一括実行し、全エージェントの開発環境を最新にする
 	@echo "🚀 ai-setup: 全エージェント環境の一括セットアップを開始..."
 	@$(MAKE) clean-legacy
-	@$(MAKE) sync-agents
+	@$(MAKE) sync-agents-core
 	@echo ""
 	@echo "🎉 ai-setup: 全エージェントの開発環境が最新になりました"
 	@echo ""

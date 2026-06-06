@@ -235,7 +235,7 @@ lsp:
 
 instructions:
   - global-rules/AGENTS.global.md
-  - agent-skills/superpowers/using-superpowers/SKILL.md
+  - .agents/skills/superpowers/using-superpowers/SKILL.md
 
 watcher:
   ignore:

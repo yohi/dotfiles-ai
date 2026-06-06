@@ -39,8 +39,8 @@ if ! grep -qF "External skills (anthropics/*, superpowers/*)" "$REPO_ROOT/$f"; t
     echo "FAIL: External skills note not found in $f"
     exit 1
 fi
-if ! grep -qF "<name>anthropics/pdf</name>" "$REPO_ROOT/$f"; then
-    echo "FAIL: anthropics/pdf skill entry not found in $f"
+if ! grep -qF "<name>pdf</name>" "$REPO_ROOT/$f"; then
+    echo "FAIL: pdf skill entry not found in $f"
     exit 1
 fi
 echo "PASS: $f verified."

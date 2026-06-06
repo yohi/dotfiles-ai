@@ -23,23 +23,24 @@ run_skillport_doc() {
     # Create temporary combined skills directory
     local tmp_skills_dir
     tmp_skills_dir=$(mktemp -d)
-    # Ensure cleanup on exit
-    trap 'rm -rf "$tmp_skills_dir" "$tmp_file"' EXIT INT TERM
+    # Ensure cleanup on exit (expand variables now so trap executes with absolute paths at exit time)
+    trap "rm -rf '${tmp_skills_dir}' '${tmp_file}'" EXIT INT TERM
 
-    # Combine custom skills
-    if [ -d "agent-skills/custom" ]; then
+    # Combine custom skills (using cp -a to preserve symlinks and checking if not empty)
+    if [ -d "agent-skills/custom" ] && [ -n "$(ls -A agent-skills/custom 2>/dev/null)" ]; then
         mkdir -p "$tmp_skills_dir/custom"
-        cp -r agent-skills/custom/* "$tmp_skills_dir/custom/"
+        cp -a agent-skills/custom/. "$tmp_skills_dir/custom/"
     fi
 
-    # Combine external skills
+    # Combine external skills (using cp -a to preserve symlinks and checking if not empty)
     if [ -d ".agents/skills" ]; then
         for ns_dir in .agents/skills/*; do
             [ -d "$ns_dir" ] || continue
+            [ -n "$(ls -A "$ns_dir" 2>/dev/null)" ] || continue
             local ns
             ns=$(basename "$ns_dir")
             mkdir -p "$tmp_skills_dir/$ns"
-            cp -r "$ns_dir"/* "$tmp_skills_dir/$ns/"
+            cp -a "$ns_dir"/. "$tmp_skills_dir/$ns/"
         done
     fi
 
@@ -57,9 +58,13 @@ run_skillport_doc() {
         echo "Error: 'skillport' command not found." >&2; exit 1
     fi
 
+    # Escape regex/sed metacharacters from tmp_skills_dir
+    local escaped_tmp_skills_dir
+    escaped_tmp_skills_dir=$(printf '%s' "${tmp_skills_dir}" | sed 's/[.[\*^$/|&]/\\&/g')
+
     # Replace temporary skills directory paths with real repo-relative paths in the temp file
-    sed -i "s|${tmp_skills_dir}/custom/|agent-skills/custom/|g" "$tmp_file"
-    sed -i "s|${tmp_skills_dir}/|.agents/skills/|g" "$tmp_file"
+    sed -i "s|${escaped_tmp_skills_dir}/custom/|agent-skills/custom/|g" "$tmp_file"
+    sed -i "s|${escaped_tmp_skills_dir}/|.agents/skills/|g" "$tmp_file"
 
     if [[ -f "$output_file" ]] && grep -q "<!-- SKILLPORT_START -->" "$output_file" && grep -q "<!-- SKILLPORT_END -->" "$output_file"; then
         echo "Updating SkillPort section in existing ${output_file}..."

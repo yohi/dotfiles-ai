@@ -30,7 +30,7 @@ status: approved
   * 各エージェント向けの設定ファイル生成には APM のターゲットコンパイル機能（`apm compile`）を使用します。
   * `apm.yml` 内にインストール後/コンパイル後フック（post-install / post-compile hooks）を定義し、Markdown形式のコマンドからGemini用 `.toml` ファイルやCodex用 `.md` ルールへの変換スクリプトを自動実行します。
 * **Antigravity向けの回避策フック**:
-  * 現状、AntigravityはAPMのコンパイルターゲットとして標準サポートされていないため、`apm.lock.yaml`（または `apm.yml`）から解決済みのMCP構成を解析し、Antigravity用の [antigravity/mcp_config.json](file://./antigravity/mcp_config.json) を出力するカスタムスクリプト（`_scripts/sync_antigravity.sh`）を実装します。
+  * 現状、AntigravityはAPMのコンパイルターゲットとして標準サポートされていないため、`apm.lock.yaml`（または `apm.yml`）から解決済みのMCP構成を解析し、Antigravity用の [antigravity/mcp_config.json](file://./antigravity/mcp_config.json) を出力するカスタムスクリプト（`_scripts/sync_antigravity.py`）を実装します。
   * このスクリプトは、Makefileラッパーを介して `apm compile` の実行直後に post-compile フックとして実行されます。
 * **共通指示（Instructions）の結合**:
   * `apm.yml` の `instructions` および `exports.instructions` 設定に `global-rules/AGENTS.global.md` を指定し、APMが各エージェント用の設定ファイルをビルドする際に自動結合するようにします。これにより手動でのシンボリックリンク作成を不要にします。
