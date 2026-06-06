@@ -10,7 +10,7 @@
 
 ---
 
-### Task 1: Check requirements and modify _scripts/opencode-wrapper.sh
+## Task 1: Check requirements and modify _scripts/opencode-wrapper.sh
 
 **Files:**
 - Modify: `_scripts/opencode-wrapper.sh`
@@ -54,10 +54,10 @@ Modify lines 82 and 85 to remove `exec` so the script doesn't replace the bash p
 and
 ```diff
 -    exec opencode "$@"
-+    exec opencode "$@"
++    opencode "$@"
 ```
 
-### Task 2: Verify the syntax and run a dry-run / verification
+## Task 2: Verify the syntax and run a dry-run / verification
 
 - [ ] **Step 1: Check bash syntax using `bash -n`**
 

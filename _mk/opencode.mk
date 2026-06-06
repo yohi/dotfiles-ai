@@ -252,11 +252,7 @@ check-opencode: ## OpenCode（opencode）の状態を確認
 		echo "⚠️  template: $(OH_MY_OPENAGENT_DOTFILES_CONFIG) not found"; \
 	fi
 	@if [ -f "$(REPO_ROOT)/_scripts/opencode-wrapper.sh" ]; then \
-		if [ -x "$(REPO_ROOT)/_scripts/opencode-wrapper.sh" ]; then \
-			echo "✅ wrapper: $(REPO_ROOT)/_scripts/opencode-wrapper.sh exists and is executable"; \
-		else \
-			echo "⚠️  wrapper: $(REPO_ROOT)/_scripts/opencode-wrapper.sh exists but is NOT executable"; \
-		fi; \
+		echo "✅ wrapper: $(REPO_ROOT)/_scripts/opencode-wrapper.sh exists"; \
 	else \
 		echo "⚠️  wrapper: $(REPO_ROOT)/_scripts/opencode-wrapper.sh not found"; \
 	fi
@@ -355,8 +351,8 @@ uninstall-opencode: ## OpenCode（opencode）のアンインストール
 	@rm -f "$(MARKER_DIR)/setup-opencode"*
 	@echo "✅ OpenCode（opencode）のアンインストールが完了しました"
 
-opencode-personal: ## OpenCode の personal プロファイルを適用して起動
+opencode-personal: opencode ## OpenCode の personal プロファイルを適用して起動
 	@bash _scripts/opencode-wrapper.sh personal
 
-opencode-work: ## OpenCode の work プロファイルを適用して起動
+opencode-work: opencode ## OpenCode の work プロファイルを適用して起動
 	@bash _scripts/opencode-wrapper.sh work
