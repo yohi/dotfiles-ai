@@ -8,3 +8,4 @@ exclude_paths:
   # Per AGENTMS-MD_BESTPRACTICE.md Section 10, we exclude it to prioritize instruction clarity.
   - "AGENTS.md"
   - "AGENTMS-MD_BESTPRACTICE.md"
+  - "tests/**"
