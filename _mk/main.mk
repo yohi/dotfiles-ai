@@ -86,7 +86,10 @@ install-requirements:
 	@if command -v uv >/dev/null 2>&1; then \
 		uv sync; \
 	else \
-		pip install -r requirements.txt; \
+		if [ ! -d ".venv" ]; then \
+			python3 -m venv .venv; \
+		fi; \
+		.venv/bin/pip install -r requirements.txt; \
 	fi
 
 lint: ## Run Ruff and Mypy on .
