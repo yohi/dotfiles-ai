@@ -30,6 +30,12 @@ test-all: test-integrity ## Run all tests in the project
 		echo "Running bash test: $$f"; \
 		bash "$$f" || exit 1; \
 	done'
+	@echo "Running pytest suite..."
+	@if command -v uv > /dev/null 2>&1; then \
+		PYTHONPATH=. uv run pytest tests/ || exit 1; \
+	else \
+		PYTHONPATH=. pytest tests/ || exit 1; \
+	fi
 	@echo "✅ All tests passed!"
 
 install-hooks: ## Install git hooks (pre-push)

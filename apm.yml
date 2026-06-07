@@ -28,7 +28,7 @@ dependencies:
       args:
         - "skillport-mcp"
       env:
-        SKILLPORT_SKILLS_DIR: "${env:PWD}/agent-skills"
+        SKILLPORT_SKILLS_DIR: "${env:PWD}/.agents/skills"
       standalone: true
       enabled: true
 
@@ -235,7 +235,7 @@ lsp:
 
 instructions:
   - global-rules/AGENTS.global.md
-  - agent-skills/superpowers/using-superpowers/SKILL.md
+  - .agents/skills/superpowers/using-superpowers/SKILL.md
 
 watcher:
   ignore:
@@ -309,7 +309,6 @@ targets:
   - gemini
   - claude
   - cursor
-  - codex
 
 # Exported Artifacts
 exports:

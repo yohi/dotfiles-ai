@@ -274,7 +274,7 @@
 
   "instructions": [
     "global-rules/AGENTS.global.md",
-    "agent-skills/superpowers/using-superpowers/SKILL.md"
+    ".agents/skills/superpowers/using-superpowers/SKILL.md"
   ],
 
   "watcher": {
@@ -584,8 +584,7 @@
       "command": [
         "npx",
         "-y",
-        "@yohi/nexus@1.8.0",
-        // "{env:HOME}/program/private/nexus"
+        "{env:HOME}/program/nexus"
       ]
     },
     "chronos-graph": {

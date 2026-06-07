@@ -20,19 +20,55 @@ run_skillport_doc() {
     local tmp_file
     tmp_file=$(mktemp)
 
+    # Create temporary combined skills directory
+    local tmp_skills_dir
+    tmp_skills_dir=$(mktemp -d)
+
+    # Combine custom skills (using cp -a to preserve symlinks and checking if not empty)
+    if [ -d "agent-skills/custom" ] && [ -n "$(ls -A agent-skills/custom 2>/dev/null)" ]; then
+        mkdir -p "$tmp_skills_dir/custom"
+        cp -a agent-skills/custom/. "$tmp_skills_dir/custom/"
+    fi
+
+    # Combine external skills (using cp -a to preserve symlinks and checking if not empty)
+    if [ -d ".agents/skills" ]; then
+        for ns_dir in .agents/skills/*; do
+            [ -d "$ns_dir" ] || continue
+            [ -n "$(ls -A "$ns_dir" 2>/dev/null)" ] || continue
+            local ns
+            ns=$(basename "$ns_dir")
+            mkdir -p "$tmp_skills_dir/$ns"
+            cp -a "$ns_dir"/. "$tmp_skills_dir/$ns/"
+        done
+    fi
+
     if command -v skillport >/dev/null 2>&1; then
         echo "Running skillport doc for ${output_file}..."
-        skillport doc --mode mcp --output "$tmp_file" --force || {
-            echo "Error: skillport doc failed." >&2; rm "$tmp_file"; exit 1
+        skillport --skills-dir "$tmp_skills_dir" doc --mode mcp --output "$tmp_file" --force || {
+            echo "Error: skillport doc failed." >&2
+            rm -rf "${tmp_skills_dir}" "${tmp_file}"
+            exit 1
         }
     elif command -v uvx >/dev/null 2>&1; then
         echo "Running uvx skillport doc for ${output_file}..."
-        uvx skillport doc --mode mcp --output "$tmp_file" --force || {
-            echo "Error: uvx skillport doc failed." >&2; rm "$tmp_file"; exit 1
+        uvx skillport --skills-dir "$tmp_skills_dir" doc --mode mcp --output "$tmp_file" --force || {
+            echo "Error: uvx skillport doc failed." >&2
+            rm -rf "${tmp_skills_dir}" "${tmp_file}"
+            exit 1
         }
     else
-        echo "Error: 'skillport' command not found." >&2; rm "$tmp_file"; exit 1
+        echo "Error: 'skillport' command not found." >&2
+        rm -rf "${tmp_skills_dir}" "${tmp_file}"
+        exit 1
     fi
+
+    # Escape regex/sed metacharacters from tmp_skills_dir
+    local escaped_tmp_skills_dir
+    escaped_tmp_skills_dir=$(printf '%s' "${tmp_skills_dir}" | sed 's/[.[\*^$/|&]/\\&/g')
+
+    # Replace temporary skills directory paths with real repo-relative paths in the temp file
+    sed -i "s|${escaped_tmp_skills_dir}/custom/|agent-skills/custom/|g" "$tmp_file"
+    sed -i "s|${escaped_tmp_skills_dir}/|.agents/skills/|g" "$tmp_file"
 
     if [[ -f "$output_file" ]] && grep -q "<!-- SKILLPORT_START -->" "$output_file" && grep -q "<!-- SKILLPORT_END -->" "$output_file"; then
         echo "Updating SkillPort section in existing ${output_file}..."
@@ -43,7 +79,8 @@ run_skillport_doc() {
         echo "Writing initial skill listings to ${output_file}..."
         cp "$tmp_file" "$output_file"
     fi
-    rm "$tmp_file"
+
+    rm -rf "${tmp_skills_dir}" "${tmp_file}"
 }
 
 normalize_locations() {
@@ -70,7 +107,6 @@ restore_external_skills_note() {
     # check if the note already exists anywhere in the file (not just after run_skillport_doc)
     if grep -Eq '^[[:space:]]*<available_skills([[:space:]]|>)' "$file_path" && ! grep -q "External skills (anthropics/\*, superpowers/\*)" "$file_path"; then
         tmp_file=$(mktemp)
-        trap 'rm -f "$tmp_file"' EXIT INT TERM
         awk -v note="$note" '
             $0 ~ /^[[:space:]]*<available_skills([[:space:]]|>)/ {
                 print note
@@ -78,9 +114,9 @@ restore_external_skills_note() {
                 next
             }
             { print }
-        ' "$file_path" > "$tmp_file"
-        mv "$tmp_file" "$file_path"
-        trap - EXIT INT TERM
+        ' "$file_path" > "$tmp_file" || { rm -f "$tmp_file"; return 1; }
+        mv "$tmp_file" "$file_path" || { rm -f "$tmp_file"; return 1; }
+        rm -f "$tmp_file"
     fi
 }
 
@@ -105,4 +141,4 @@ for output_file in "${OUTPUT_FILES[@]}"; do
     restore_external_skills_note "$output_file"
 done
 
-echo "✅ Successfully synchronized skill listings."
+echo "[+] Successfully synchronized skill listings."

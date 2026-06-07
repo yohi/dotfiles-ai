@@ -26,5 +26,11 @@ include _mk/main.mk
 -include _mk/test.mk
 # -include _mk/test-ide-cursor.mk
 
-.PHONY: test
+.PHONY: test sync-agents
 test: lint test-all ## Run all tests
+
+sync-agents: ## Run APM install, compile, generate Antigravity config, and sync agents
+	@apm install
+	@apm compile
+	@$(PYTHON) _scripts/sync_antigravity.py
+	@$(MAKE) sync-agents-core

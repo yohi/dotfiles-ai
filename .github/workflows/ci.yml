@@ -32,16 +32,11 @@ jobs:
       run: |
         uv sync
 
-    - name: Install external skills
+    - name: Install APM and Synchronize Configs
       run: |
-        # Use our new make target that handles apm install or git clone fallback
-        make install-external-skills
-
-    - name: Synchronize MCP Configs
-      run: |
-        # Generate config files using APM
         make install-apm
         apm install --force
+        apm compile
         make sync-mcp-gateway
 
     - name: Run Integrity Tests
