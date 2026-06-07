@@ -9,3 +9,8 @@ exclude_paths:
   - "AGENTS.md"
   - "AGENTMS-MD_BESTPRACTICE.md"
   - "tests/**"
+  # The following CLAUDE.md variants are generated instruction files managed by APM CLI.
+  # They share the same directive-heavy content as AGENTS.md and trigger identical false positives.
+  - "CLAUDE.md"
+  - ".github/CLAUDE.md"
+  - "claude/CLAUDE.md"

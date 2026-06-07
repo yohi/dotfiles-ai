@@ -125,3 +125,35 @@ def test_sync_antigravity_invalid_lockfile_format(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError):
         convert_lockfile(str(lockfile), str(outfile))
+
+def test_sync_antigravity_env_var_simple(tmp_path: Path) -> None:
+    """Test environment variable expansion with $VAR and ${VAR} syntax."""
+    mock_lockfile = """
+lockfile_version: '1'
+mcp_configs:
+  test_server:
+    name: test_server
+    command: uvx
+    env:
+      SIMPLE_VAR: "$TEST_SIMPLE"
+      BRACED_VAR: "${TEST_BRACED}"
+"""
+    lockfile = tmp_path / "apm.lock.yaml"
+    lockfile.write_text(mock_lockfile)
+    outfile = tmp_path / "mcp_config.json"
+
+    with (
+        mock.patch("shutil.which", return_value="/usr/local/bin/uvx"),
+        mock.patch("os.path.exists", return_value=True),
+        mock.patch.dict(os.environ, {"TEST_SIMPLE": "simple_value", "TEST_BRACED": "braced_value"}),
+    ):
+        from _scripts.sync_antigravity import convert_lockfile
+
+        convert_lockfile(str(lockfile), str(outfile))
+
+    assert outfile.exists()
+    content = json.loads(outfile.read_text())
+    server = content["mcpServers"]["test_server"]
+    assert server["env"]["SIMPLE_VAR"] == "simple_value"
+    assert server["env"]["BRACED_VAR"] == "braced_value"
+
