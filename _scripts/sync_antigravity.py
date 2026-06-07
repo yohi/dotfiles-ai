@@ -3,7 +3,7 @@ import os
 import re
 import shutil
 import sys
-from typing import Any
+from typing import Any, overload
 import yaml
 
 
@@ -114,6 +114,18 @@ def _replace_env_in_string(val: str) -> str:
         val = val.replace(f"${var}", os.environ.get(var, ""))
 
     return val
+
+
+@overload
+def replace_env_vars(val: str) -> str: ...
+
+
+@overload
+def replace_env_vars(val: dict[str, Any]) -> dict[str, Any]: ...
+
+
+@overload
+def replace_env_vars(val: list[Any]) -> list[Any]: ...
 
 
 def replace_env_vars(val: Any) -> Any:
