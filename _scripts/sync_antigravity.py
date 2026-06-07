@@ -54,7 +54,7 @@ def command_candidates(command: str) -> list[str]:
 
     Example:
         >>> command_candidates("uvx")
-        ['/home/user/.local/bin/uvx', '/usr/local/bin/uvx', '/usr/bin/uvx']
+        ['~/.local/bin/uvx', '/usr/local/bin/uvx', '/usr/bin/uvx']
     """
     paths = FALLBACK_COMMAND_PATHS[command]["posix"].copy()
     if os.name == "nt":
