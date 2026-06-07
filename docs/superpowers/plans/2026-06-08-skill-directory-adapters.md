@@ -219,12 +219,7 @@ SKILL_ADAPTER_TARGETS := \
 .PHONY: setup-skill-adapters check-skill-adapters sync-skills-to-agents
 
 define link_skill_adapter
-	@if [ ! -d "$(RUNTIME_SKILLS_DIR)" ]; then \
-		echo "[x] Runtime skills directory not found: $(RUNTIME_SKILLS_DIR)"; \
-		echo "[i] Run 'apm install' before setting up skill adapters."; \
-		exit 1; \
-	fi; \
-	if [ -e "$(1)" ] && [ ! -L "$(1)" ]; then \
+	@if [ -e "$(1)" ] && [ ! -L "$(1)" ]; then \
 		backup="$(1).bak.$$(date +%Y%m%d%H%M%S)"; \
 		echo "[!] Existing skill directory is not a symlink; moving it to $$backup"; \
 		mv "$(1)" "$$backup"; \
@@ -235,6 +230,11 @@ define link_skill_adapter
 endef
 
 setup-skill-adapters: ## Link native skill directories to .agents/skills
+	@if [ ! -d "$(RUNTIME_SKILLS_DIR)" ]; then \
+		echo "[x] Runtime skills directory not found: $(RUNTIME_SKILLS_DIR)"; \
+		echo "[i] Run 'apm install' before setting up skill adapters."; \
+		exit 1; \
+	fi
 	$(call link_skill_adapter,$(HOME_DIR)/.opencode/skills)
 	$(call link_skill_adapter,$(HOME_DIR)/.claude/skills)
 	$(call link_skill_adapter,$(HOME_DIR)/.skillport/skills)
@@ -512,7 +512,13 @@ Expected: command exits 0 with no output.
 
 ```bash
 git add .skillportrc _scripts/opencode-wrapper.sh _scripts/sync_agents.sh tests/test_sync_antigravity.py
-git add .mcp.json opencode.json .codex/config.toml antigravity/mcp_config.json .agents/mcp_config.json 2>/dev/null || true
+for generated in .mcp.json opencode.json .codex/config.toml antigravity/mcp_config.json .agents/mcp_config.json; do
+    if [ -e "$generated" ]; then
+        git add "$generated"
+    else
+        printf '[i] Generated config not present, skipping: %s\n' "$generated"
+    fi
+done
 git commit -m "fix: align skillport runtime directory"
 ```
 
@@ -714,6 +720,9 @@ Run:
 
 ```bash
 grep -q '<name>using-superpowers</name>' agent-skills/AVAILABLE_SKILLS.md
+grep -q '<name>agent-skill-architect</name>' agent-skills/AVAILABLE_SKILLS.md
+grep -q '.agents/skills/using-superpowers/SKILL.md' agent-skills/AVAILABLE_SKILLS.md
+grep -q 'agent-skills/custom/agent-skill-architect/SKILL.md' agent-skills/AVAILABLE_SKILLS.md
 ```
 
 Expected: all commands exit 0.
