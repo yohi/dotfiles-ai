@@ -13,8 +13,9 @@
 - `skillport search <query>`      - スキルの検索
 
 ## 📂 スキルディレクトリ:
-- **実体**: `agent-skills/`
-- **リンク**: `~/.skillport/skills` -> `agent-skills/`
+- **実体**: `.agents/skills/`
+- **編集元**: `agent-skills/custom/`
+- **設定**: `.skillportrc` の `skills_dir` は `./.agents/skills`
 
 ## 🩺 トラブルシューティング
 設定に不備があると感じた場合は、ターミナルで以下を実行してください。
@@ -23,4 +24,4 @@ make doctor
 ```
 
 ## 🔄 スキルの同期
-`make sync-agents` を実行することで、`agent-skills/` 内の変更が各エージェント（Claude, Gemini, OpenCode等）に反映されます。
+`make sync-agents` を実行することで、`.agents/skills/` の runtime tree と `agent-skills/custom/` の変更が各エージェント（Claude, Gemini, OpenCode等）に反映されます。

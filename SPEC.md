@@ -4,13 +4,13 @@
 
 **目的**:
 
-分散している複数のAIエージェント（Gemini, Claude, Codex, OpenCode）のスキル、プロンプト、ルール設定を単一のソース（Single Source of Truth: SSOT）に統合する。
+分散している複数のAIエージェント（Gemini, Claude, Codex, OpenCode）の runtime skills を `.agents/skills/` に集約し、ローカル custom skill は `agent-skills/custom/` で管理する。
 
 その際、専用ツールである skillport を中核エンジンとして採用し、メンテナンスコストを最小化しつつ、どのツールでも均一な高次元出力を行える基盤を構築する。
 
 **スコープ**:
 
-* agent-skills/ などの共通ディレクトリ群の整理とSSOT化。
+* `.agents/skills/` を runtime、`agent-skills/custom/` を authoring とするディレクトリ整理。
 * skillport を用いた、各エージェント（フォーマット違い）へのスキルのエクスポート・配備・同期。
 * 各エージェント向けの設定ファイル（JSONC, TOML, Markdown等）へのメタプロンプト・パス注入処理の skillport （および Makefile ラッパー）への移譲。
 * ※MCP（Model Context Protocol）の統合は本フェーズではスコープ外とする。
@@ -31,7 +31,8 @@
 SSOT（正のデータ）となるディレクトリと、各エージェントディレクトリの関係性。
 
 dotfiles-ai/  
-├── agent-skills/          <-- [SSOT] 全エージェント共通のスキル定義群 (skillport管理下)  
+├── .agents/skills/        <-- [RUNTIME] 全エージェント共通のスキル実体  
+├── agent-skills/custom/   <-- [AUTHORING] ローカル custom skill の編集元  
 │   ├── config-modernizer/  
 │   ├── agent-skill-architect/  
 │   └── ...  
@@ -51,14 +52,16 @@ dotfiles-ai/
 ```mermaid
 flowchart TD  
     %% SSOT Data  
-    SSOT_Skills[("agent-skills/\n(Markdown)")]  
+    Runtime_Skills[(".agents/skills/\n(Runtime)")]  
+    Custom_Skills[("agent-skills/custom/\n(Authoring)")]  
     SSOT_Rules[("global-rules/\n(Markdown)")]
 
     %% Process Engine  
     Skillport["skillport CLI Engine\n(make sync-skills)"]
 
     %% Edges  
-    SSOT_Skills --> Skillport  
+    Runtime_Skills --> Skillport  
+    Custom_Skills --> Skillport  
     SSOT_Rules --> Skillport  
       
     %% Target Agents (Export / Sync)  
@@ -72,14 +75,14 @@ flowchart TD
 
 ### 1. skillport によるスキルの統合・変換機構 (Must Have)
 
-* **入力**: agent-skills/ のディレクトリ群。
+* **入力**: `.agents/skills/` の runtime tree と `agent-skills/custom/` の authoring tree。
 * **処理**: skillport の機能を用いて、各AIツールの設定フォーマット（Markdownへのインクルード、JSONへのインジェクト等）に合わせて共通スキル・ルールを変換・展開する。
 * **出力**: 各エージェントディレクトリ内に配備された、最適化済みのスキル定義や設定ファイル。
 
 ### 2. メタプロンプト (Meta-Prompt) の定義 (Must Have)
 
 * **処理**: プロンプト内で直接ファイルを読み込ませるツール（例：Claude, Gemini CLI）向けに、skillport 経由で以下の「共通テンプレ文字列」をエクスポートする。
-* **テンプレート例**: "あなたの拡張スキルやプロジェクトのコーディングルールは ../agent-skills/ および ../global-rules/ に定義されています。タスク実行前に必ずこれらを参照してください。"
+* **テンプレート例**: "あなたの拡張スキルは ../.agents/skills/ と ../agent-skills/custom/ に、プロジェクトのコーディングルールは ../global-rules/ に定義されています。タスク実行前に必ずこれらを参照してください。"
 
 ### 3. JIT Sync (Makefileラッパー機構) (Should Have)
 
@@ -111,7 +114,7 @@ SSOTファイル群が遵守すべきフォーマット（LLMがパースしや�
 
 | Command | Description |
 | :---- | :---- |
-| `make sync-agents` | skillport CLIを呼び出し、SSOTのスキル群を各エージェントの設定ファイル・ディレクトリへエクスポート＆同期する。 |
+| `make sync-agents` | skillport CLIを呼び出し、`.agents/skills/` の runtime tree と `agent-skills/custom/` の authoring tree を各エージェント向け一覧へ同期する。 |
 | `make clean-legacy` | 統合後に不要となったツール個別の古いルールファイル・スキルディレクトリを削除する。 |
 | `make ai-setup` | 上記すべて（クリーンアップ、同期）を一括実行し、全エージェントの開発環境を最新にする。 |
 
@@ -120,5 +123,5 @@ SSOTファイル群が遵守すべきフォーマット（LLMがパースしや�
 この仕様書を読み込んで実装を行うAI（Cursor, Windsurf等）へのガイドライン。
 
 1. **skillport 最優先の原則**: 同期処理やファイルのインジェクト処理（JSON/TOMLの書き換えなど）を自作のBashスクリプトや jq / sed でゴリ押ししないでください。まずは _mk/skillport.mk の内容を確認し、skillport のエコシステム内で解決を図ってください。
-2. **SSOTの保護**: 各エージェント（claude/, opencode/等）のディレクトリ内で直接ルールを修正するようなタスクを実行してはなりません。修正は必ず agent-skills/ または global-rules/ に対して行い、その後 make sync-agents を実行してください。
+2. **SSOTの保護**: 各エージェント（claude/, opencode/等）のディレクトリ内で直接ルールを修正するようなタスクを実行してはなりません。修正は必ず `agent-skills/custom/` または `global-rules/` に対して行い、その後 `make sync-agents` を実行してください。
 3. **メタプロンプトの活用**: もし skillport の機能のみで完全に設定ファイル（JSONC等）を上書きするのが難しいエッジケースがある場合、設定ファイルへの「ハードコード」を避け、「メタプロンプト（参照指示）」を注入してLLM自身にファイルを読ませる方針に切り替えてください。
