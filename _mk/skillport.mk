@@ -145,12 +145,14 @@ check-skillport: ## SkillPort の状態確認
 			fi; \
 		}; \
 		actual=$$(get_realpath "$(SKILLPORT_SKILLS_DIR)"); \
-		expected=$$(get_realpath "$(AGENT_SKILLS_REPO_ROOT)"); \
+		expected=$$(get_realpath "$(RUNTIME_SKILLS_DIR)"); \
 		if [ -n "$$actual" ] && [ "$$actual" = "$$expected" ]; then \
-			echo "✅ skills: $(SKILLPORT_SKILLS_DIR) -> $(AGENT_SKILLS_REPO_ROOT)"; \
+			echo "✅ skills: $(SKILLPORT_SKILLS_DIR) -> $(RUNTIME_SKILLS_DIR)"; \
 		else \
 			echo "⚠️  skills: $(SKILLPORT_SKILLS_DIR) points to $$actual (expected $$expected)"; \
 		fi; \
+	elif [ "$(SKILLPORT_SKILLS_DIR)" = "$(RUNTIME_SKILLS_DIR)" ]; then \
+		echo "✅ skills: $(SKILLPORT_SKILLS_DIR) is the runtime directory"; \
 	else \
 		echo "⚠️  skills: $(SKILLPORT_SKILLS_DIR) is not a symlink"; \
 	fi

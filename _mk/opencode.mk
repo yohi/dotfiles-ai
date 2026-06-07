@@ -304,9 +304,9 @@ check-opencode: ## OpenCode（opencode）の状態を確認
 	@if [ -d "$(OPENCODE_DOTFILES_SKILLS)" ]; then \
 		if [ -L "$(OPENCODE_SKILLS_PATH)" ]; then \
 			actual=$$(readlink -f "$(OPENCODE_SKILLS_PATH)" 2>/dev/null || readlink "$(OPENCODE_SKILLS_PATH)" 2>/dev/null || true); \
-			expected=$$(readlink -f "$(OPENCODE_DOTFILES_SKILLS)" 2>/dev/null || readlink "$(OPENCODE_DOTFILES_SKILLS)" 2>/dev/null || true); \
+			expected=$$(readlink -f "$(RUNTIME_SKILLS_DIR)" 2>/dev/null || readlink "$(RUNTIME_SKILLS_DIR)" 2>/dev/null || true); \
 			if [ -n "$$actual" ] && [ "$$actual" = "$$expected" ]; then \
-				echo "✅ skills: $(OPENCODE_SKILLS_PATH) -> $(OPENCODE_DOTFILES_SKILLS)"; \
+				echo "✅ skills: $(OPENCODE_SKILLS_PATH) -> $(RUNTIME_SKILLS_DIR)"; \
 			else \
 				echo "⚠️  skills: $(OPENCODE_SKILLS_PATH) points to $$actual (expected $$expected)"; \
 			fi; \

@@ -15,7 +15,7 @@ test-mcp-connectivity: ## Check MCP connectivity for all CLI tools
 	@./_scripts/test-mcp-connectivity.sh
 
 .PHONY: test-all
-test-all: test-integrity ## Run all tests in the project
+test-all: test-integrity check-skill-adapters ## Run all tests in the project
 	@echo "Running all tests..."
 	@bash -c 'shopt -s nullglob; \
 		PYTHON_CMD="python3"; \
