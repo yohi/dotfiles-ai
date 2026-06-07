@@ -3,7 +3,12 @@
 <!-- Build ID: e08bc8cb6f73 -->
 <!-- APM Version: 0.18.0 -->
 
+Agent identity: act as a concise, technically rigorous engineering assistant.
+Prioritize repository-specific instructions, safe changes, and verified results.
+
 ## Global Instructions
+
+This section defines repository-wide engineering standards.
 
 # Linting (canonical contract)
 
@@ -13,7 +18,7 @@ report) that claims CI is green.
 
 ## CI-mirror commands
 
-The `Lint` job runs (see `.github/workflows/ci.yml`):
+The `Lint` job runs in the workflow file at `.github/workflows/ci.yml`:
 
 1. `uv run --extra dev ruff check src/ tests/`
 2. `uv run --extra dev ruff format --check src/ tests/`
@@ -27,16 +32,18 @@ The `Lint` job runs (see `.github/workflows/ci.yml`):
    --min-similarity-lines=10 --fail-on=R0801 src/apm_cli/`
 7. Auth-protocol boundary check: `bash scripts/lint-auth-signals.sh`
 
-All seven must succeed. CI evaluates these on the **PR merge commit**
-(HEAD merged with current `main`), so duplication introduced by a
-recent main commit can fail your PR even if your own diff is clean.
-Always merge `main` locally before running the mirror.
+All seven checks are required before claiming local parity with CI. CI
+evaluates these on the **PR merge commit** (the current branch head
+merged with current `main`), so duplication introduced by a recent main
+commit can fail your PR even if your own diff is clean. Before claiming
+CI parity, merge `main` locally and run the mirror.
 
 ## Local workflow
 
 - **Auto-fix style+imports:** `uv run --extra dev ruff check src/ tests/ --fix`
 - **Apply formatter:** `uv run --extra dev ruff format src/ tests/`
-- **Verify the full Lint job (must all be silent / exit 0):**
+- **Verify the full Lint job:** each command must exit 0 and produce no
+  unexpected diagnostics.
   ```bash
   uv run --extra dev ruff check src/ tests/ \
     && uv run --extra dev ruff format --check src/ tests/ \
@@ -47,13 +54,14 @@ Always merge `main` locally before running the mirror.
   (The YAML, file-length, and `relative_to` guards are pure-grep one-liners
   from `ci.yml`; run them directly if you have touched those surfaces.)
 
-Always run the verify chain before `git push` -- the CI Lint job
-fails on any remaining diagnostic.
+Run the verify chain before `git push`. The CI Lint job fails on any
+remaining diagnostic.
 
 ## Common surprises
 
-- `RUF043` -- use `match=r"..."` for `pytest.raises` patterns with
-  regex metacharacters (`(`, `)`, `[`, etc.).
+- `RUF043` -- use `match=r"..."` for `pytest.raises` patterns when the
+  expected text contains regular-expression metacharacters such as
+  parentheses or square brackets.
 - `UP006` / `UP045` -- use `list` / `dict` / `X | None` instead of
   `List` / `Dict` / `Optional`.
 - `RUF100` -- drop stale `# noqa` directives.
@@ -68,31 +76,51 @@ fails on any remaining diagnostic.
 This is the canonical lint contract for the repo. Skills that
 produce artifacts asserting green CI -- notably `pr-description-skill`
 (whose "Validation evidence" row covers CI checks) -- inherit this
-gate transitively. Do NOT redefine ruff or pylint commands inside
+gate transitively. Do not redefine ruff or pylint commands inside
 individual skills; honor this instruction before invoking them.
 
 ## Files matching `**`
 
+The following rules apply to all generated instruction content.
+
 # Rules to keep documentation up-to-date
 
-- Rule 1: Whenever changes are made to the codebase, it is important to also update the documentation to reflect those changes. You must ensure that the following documentation is updated: [Starlight content pages in docs/src/content/docs/](../../docs/src/content/docs/). Each page uses Starlight frontmatter (title, sidebar order). Cross-page links use relative paths (e.g., `../../guides/compilation/`).
+- Rule 1: Update documentation when code behavior changes. When
+  [Starlight content pages in docs/src/content/docs/](../../docs/src/content/docs/)
+  are present, update the relevant pages. Each page uses Starlight
+  frontmatter for title and sidebar order. Cross-page links use relative
+  paths such as `../../guides/compilation/`.
 
-- Rule 2: The main [README.md](../../README.md) file is a special case that requires user approval before changes, so, if there is a deviation in the code that affects what is stated in the main [README.md](../../README.md) file, you must warn the user and describe the drift and [README.md](../../README.md) update proposal, and wait for confirmation before updating it.
+- Rule 2: The main [README.md](../../README.md) file requires user
+  approval before changes. If code behavior drifts from README content,
+  warn the user, describe the drift, propose the README update, and wait
+  for confirmation before editing it.
 
-- Rule 3: Documentation is meant to be very simple and straightforward, we must avoid bloating it with unnecessary information. It must be pragmatic, to the point, succinct and practical.
+- Rule 3: Keep documentation simple and straightforward. Avoid bloating
+  it with unnecessary information. Prefer pragmatic, succinct, practical
+  guidance.
 
-- Rule 4: When changing CLI commands, flags, dependency formats, authentication flow, policy schema, or primitive file formats, also update the corresponding resource files in [packages/apm-guide/.apm/skills/apm-usage/](../../packages/apm-guide/.apm/skills/apm-usage/). Map changes to the correct file: commands.md for CLI changes, dependencies.md for reference formats, authentication.md for token resolution, governance.md for policy schema, package-authoring.md for primitive formats.
+- Rule 4: When changing CLI commands, flags, dependency formats,
+  authentication flow, policy schema, or primitive file formats, also
+  update the corresponding resource files in
+  [packages/apm-guide/.apm/skills/apm-usage/](../../packages/apm-guide/.apm/skills/apm-usage/)
+  when present. Use commands.md for CLI changes, dependencies.md for
+  reference formats, authentication.md for token resolution,
+  governance.md for policy schema, and package-authoring.md for
+  primitive formats.
 
 # Encoding Rules
 
 ## Constraint
 
-All source code files and CLI output strings must stay within **printable ASCII** (U+0020–U+007E).
+All source code files and CLI output strings must stay within
+**printable ASCII (American Standard Code for Information Interchange)**,
+U+0020 through U+007E.
 
-Do NOT use:
-- Emojis (e.g. `🚀`, `✨`, `❌`)
-- Unicode box-drawing characters (e.g. `─`, `│`, `┌`)
-- Em dashes (`—`), en dashes (`–`), curly quotes (`"`, `"`, `'`, `'`)
+Do not use:
+- Emojis
+- Unicode box-drawing characters
+- Em dashes, en dashes, or curly quotes
 - Any character outside the ASCII range (codepoint > U+007E)
 
 **Why**: Windows `cp1252` terminals raise `UnicodeEncodeError: 'charmap' codec can't encode character` for any character outside cp1252. Keeping output within ASCII guarantees identical behaviour on every platform without dual-path fallback logic.
@@ -130,7 +158,7 @@ This is a mock plugin providing example coding standards and guidelines.
 
 ## Code Quality
 
-- Follow PEP 8 for Python code
+- Follow Python Enhancement Proposal 8 (PEP 8) for Python code
 - Use type hints in function signatures
 - Write docstrings for all public functions
 - Maintain test coverage above 80%
@@ -158,6 +186,8 @@ Write comprehensive docstrings.
 
 ## Files matching `**/*.{ts,tsx}`
 
+The following TypeScript standards apply to matching files.
+
 ## TypeScript Development Standards
 
 ### Type Safety
@@ -181,6 +211,8 @@ Write comprehensive docstrings.
 See [project architecture](oss/apm/templates/hello-world/.apm/context/architecture.context.md) for detailed patterns.
 
 ## Files matching `**/*{test,spec}*`
+
+The following testing standards apply to matching files.
 
 ## Testing Best Practices
 
@@ -212,6 +244,8 @@ See [project architecture](oss/apm/templates/hello-world/.apm/context/architectu
 
 ## Files matching `CHANGELOG.md`
 
+The following changelog standards apply to `CHANGELOG.md`.
+
 # Changelog Format
 
 This project follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and [Semantic Versioning](https://semver.org/).
@@ -225,15 +259,17 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) an
 ## Entry format
 
 - One line per PR: concise description ending with `(#PR_NUMBER)`.
-- Credit external contributors inline: `— by @username (#PR_NUMBER)`.
+- Credit external contributors inline: `-- by @username (#PR_NUMBER)`.
 - Combine related PRs into a single line when they form one logical change: `(#251, #256, #258)`.
 - Use backticks for code references: commands, file names, config keys, classes.
 
 ## Rules
 
-- Every merged PR that changes code, tests, docs, or dependencies must have a changelog entry.
-- Do NOT include version-bump or release-machinery PRs (e.g., "chore: bump to vX.Y.Z").
-- When releasing, move Unreleased entries into a new versioned section — never delete them.
+- Every merged PR that changes code, tests, docs, or dependencies must
+  have a changelog entry unless maintainers classify it as release
+  machinery only.
+- Do not include version-bump or release-machinery PRs (e.g., "chore: bump to vX.Y.Z").
+- When releasing, move Unreleased entries into a new versioned section -- never delete them.
 
 ## Files matching `src/apm_cli/cli.py`
 
@@ -248,7 +284,7 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) an
 - Wrap Rich imports in try/catch with colorama fallbacks
 
 ### Command Help Text
-- Keep command help strings plain ASCII — no emojis
+- Keep command help strings plain ASCII -- no emojis
 - Format: `help="Initialize a new APM project"`
 
 ### Status Symbols & Feedback
@@ -401,12 +437,12 @@ When changing CLI functionality, update these sections in `docs/cli-reference.md
 
 ## Design philosophy
 
-APM runs inside repositories of any size — from single-package repos to monorepos with thousands of packages and deep dependency trees. Every integrator must assume it will operate at that scale. The architecture is built around two principles:
+APM runs inside repositories of any size -- from single-package repos to monorepos with thousands of packages and deep dependency trees. Every integrator must assume it will operate at that scale. The architecture is built around two principles:
 
 1. **One base, many file types.** All file-level integrators share a single `BaseIntegrator` infrastructure for collision detection, manifest-based sync, path security, link resolution, and file discovery. New integrators add *what* to deploy, never *how* to deploy. When logic belongs to more than one integrator, push it into `BaseIntegrator`.
 2. **Pay only for what you touch.** Operations must be proportional to the files a single package deploys, not the size of the workspace or the total managed-files set. Pre-normalize once, partition once, look up in O(1). Avoid full-tree walks, per-file parent cleanup, or repeated set scans.
 
-When evolving integration logic — new file types, richer transforms, cross-package awareness — preserve these properties. If a change would violate either principle, refactor the base class first.
+When evolving integration logic -- new file types, richer transforms, cross-package awareness -- preserve these properties. If a change would violate either principle, refactor the base class first.
 
 ## Required structure
 
@@ -425,7 +461,7 @@ class FooIntegrator(BaseIntegrator):
                          managed_files: set = None) -> Dict[str, int]: ...
 ```
 
-## Base-class methods — use, don't reimplement
+## Base-class methods -- use, don't reimplement
 
 Before writing custom logic, check whether `BaseIntegrator` already solves the problem. Duplicating behaviour that exists in the base class creates drift, bugs, and performance regressions.
 
@@ -448,11 +484,11 @@ If you need an operation the base class does not support, **add it to `BaseInteg
 
 ## Performance guidance
 
-The specific techniques below exist to serve the "pay only for what you touch" principle. As the codebase evolves, new code must uphold the same standard — if a new feature would regress install/uninstall to O(N × M) where N is packages and M is managed files, find a better design.
+The specific techniques below exist to serve the "pay only for what you touch" principle. As the codebase evolves, new code must uphold the same standard -- if a new feature would regress install/uninstall to O(N x M) where N is packages and M is managed files, find a better design.
 
-- `managed_files` must be pre-normalized with `normalize_managed_files()` for **O(1)** set lookups — never iterate the set to find a path.
-- `partition_managed_files()` runs a **single O(M) pass** over managed files — do not filter per-integrator.
-- `cleanup_empty_parents()` does a **bottom-up batch** — never call `rmdir()` per deleted file.
+- `managed_files` must be pre-normalized with `normalize_managed_files()` for **O(1)** set lookups -- never iterate the set to find a path.
+- `partition_managed_files()` runs a **single O(M) pass** over managed files -- do not filter per-integrator.
+- `cleanup_empty_parents()` does a **bottom-up batch** -- never call `rmdir()` per deleted file.
 - File-discovery globs must be **scoped** to known subdirectories, not walk the entire package tree.
 - All path strings stored in `apm.lock` must use **forward slashes** (`.as_posix()`).
 

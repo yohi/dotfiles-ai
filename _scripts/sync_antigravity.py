@@ -7,6 +7,52 @@ from typing import Any
 import yaml
 
 
+FALLBACK_COMMAND_PATHS = {
+    "uvx": {
+        "posix": [
+            "~/.local/bin/uvx",
+            "/usr/local/bin/uvx",
+            "/usr/bin/uvx",
+        ],
+        "nt": [
+            "%LOCALAPPDATA%\\Programs\\uv\\uvx.exe",
+            "%USERPROFILE%\\.local\\bin\\uvx.exe",
+        ],
+    },
+    "npx": {
+        "posix": [
+            "~/.linuxbrew/bin/npx",
+            "/usr/local/bin/npx",
+            "/usr/bin/npx",
+        ],
+        "nt": [
+            "%APPDATA%\\npm\\npx.cmd",
+            "C:\\Program Files\\nodejs\\npx.cmd",
+        ],
+    },
+}
+
+
+def command_candidates(command: str) -> list[str]:
+    paths = FALLBACK_COMMAND_PATHS[command]["posix"].copy()
+    if os.name == "nt":
+        paths.extend(FALLBACK_COMMAND_PATHS[command]["nt"])
+    return [os.path.expandvars(os.path.expanduser(path)) for path in paths]
+
+
+def resolve_command(command: str) -> str:
+    resolved_path = shutil.which(command)
+    if resolved_path:
+        return resolved_path
+
+    for path in command_candidates(command):
+        normalized = os.path.normpath(path)
+        if os.path.exists(normalized):
+            return normalized
+
+    raise RuntimeError(f"command resolution failed for '{command}'")
+
+
 def replace_env_vars(val: Any) -> Any:
     """Recursively expand environment variables in strings, lists, and dicts.
 
@@ -80,63 +126,8 @@ def convert_lockfile(lockfile_path: str, output_path: str) -> None:
             server_cfg["headers"] = cfg["headers"]
 
         # Standardize command path resolving for typical environment executables
-        if "command" in server_cfg and server_cfg["command"] == "uvx":
-            resolved_path = shutil.which("uvx")
-            if resolved_path:
-                server_cfg["command"] = resolved_path
-            else:
-                # Add cross-platform fallback paths (Windows friendly paths included)
-                candidates = [
-                    os.path.expanduser("~/.local/bin/uvx"),
-                    "/usr/local/bin/uvx",
-                    "/usr/bin/uvx",
-                ]
-                if os.name == "nt":
-                    candidates.extend(
-                        [
-                            os.path.expandvars("%LOCALAPPDATA%\\Programs\\uv\\uvx.exe"),
-                            os.path.expandvars("%USERPROFILE%\\.local\\bin\\uvx.exe"),
-                        ]
-                    )
-
-                found = False
-                for path in candidates:
-                    normalized = os.path.normpath(path)
-                    if os.path.exists(normalized):
-                        server_cfg["command"] = normalized
-                        found = True
-                        break
-                if not found:
-                    raise RuntimeError("command resolution failed for 'uvx'")
-
-        elif "command" in server_cfg and server_cfg["command"] == "npx":
-            resolved_path = shutil.which("npx")
-            if resolved_path:
-                server_cfg["command"] = resolved_path
-            else:
-                # Add cross-platform fallback paths (Windows friendly paths included)
-                candidates = [
-                    os.path.expanduser("~/.linuxbrew/bin/npx"),
-                    "/usr/local/bin/npx",
-                    "/usr/bin/npx",
-                ]
-                if os.name == "nt":
-                    candidates.extend(
-                        [
-                            os.path.expandvars("%APPDATA%\\npm\\npx.cmd"),
-                            "C:\\Program Files\\nodejs\\npx.cmd",
-                        ]
-                    )
-
-                found = False
-                for path in candidates:
-                    normalized = os.path.normpath(path)
-                    if os.path.exists(normalized):
-                        server_cfg["command"] = normalized
-                        found = True
-                        break
-                if not found:
-                    raise RuntimeError("command resolution failed for 'npx'")
+        if server_cfg.get("command") in FALLBACK_COMMAND_PATHS:
+            server_cfg["command"] = resolve_command(server_cfg["command"])
 
         # Apply environment variable replacement
         mcp_servers[name] = replace_env_vars(server_cfg)
