@@ -19,6 +19,7 @@ include _mk/main.mk
 -include _mk/opencode.mk
 -include _mk/antigravity.mk
 -include _mk/skillport.mk
+-include _mk/skills-adapters.mk
 -include _mk/sync-agents.mk
 -include _mk/mcp.mk
 -include _mk/ide-cursor.mk
