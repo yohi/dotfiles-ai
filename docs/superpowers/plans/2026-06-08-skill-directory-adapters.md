@@ -65,17 +65,28 @@ fail() {
     exit 1
 }
 
-assert_dir() {
-    path="$1"
-    [ -d "$path" ] || fail "directory not found: $path"
-}
-
 assert_link_target() {
     link_path="$1"
     expected="$2"
     [ -L "$link_path" ] || fail "not a symlink: $link_path"
     actual="$(readlink "$link_path")"
     [ "$actual" = "$expected" ] || fail "$link_path points to $actual, expected $expected"
+}
+
+assert_runtime_skill_links() {
+    [ -d "$RUNTIME_SKILLS_DIR" ] || fail "directory not found: $RUNTIME_SKILLS_DIR"
+
+    found=0
+    while IFS= read -r link_path; do
+        found=1
+        target="$(readlink "$link_path")"
+        if [ "${target#/}" = "$target" ]; then
+            target="$(dirname "$link_path")/$target"
+        fi
+        [ -e "$target" ] || fail "broken runtime skill link: $link_path -> $target"
+    done < <(find "$RUNTIME_SKILLS_DIR" -type l)
+
+    [ "$found" -eq 1 ] || fail "no runtime skill links found under $RUNTIME_SKILLS_DIR"
 }
 
 assert_no_runtime_skillport_agent_skills() {
@@ -89,9 +100,7 @@ assert_no_runtime_skillport_agent_skills() {
     fi
 }
 
-assert_dir "$RUNTIME_SKILLS_DIR"
-assert_dir "$RUNTIME_SKILLS_DIR/using-superpowers"
-assert_dir "$RUNTIME_SKILLS_DIR/custom"
+assert_runtime_skill_links
 
 assert_link_target "$HOME/.opencode/skills" "$RUNTIME_SKILLS_DIR"
 assert_link_target "$HOME/.claude/skills" "$RUNTIME_SKILLS_DIR"
@@ -139,7 +148,7 @@ The relevant block should remain:
 		[[ "$$f" == "_scripts/test-mcp-connectivity.sh" ]] && continue; \
 		echo "Running bash test: $$f"; \
 		bash "$$f" || exit 1; \
-	done'
+	done
 ```
 
 - [ ] **Step 5: Commit**
