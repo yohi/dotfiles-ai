@@ -67,8 +67,22 @@ def _manual_walk_files(root, pattern):
     return files
 
 
-def check_path_leak(content, candidates, regex):
-    """Check for personal path leaks in content."""
+def check_path_leak(content: str, candidates: set[str], regex: re.Pattern) -> bool:
+    """Check for personal path leaks in file content.
+
+    Scans the given content for absolute home-directory paths that could
+    expose the user's personal username or machine name. First, strips
+    placeholder tokens like ${HOME} or __HOME__, then applies the regex
+    and falls back to literal candidate checks.
+
+    Args:
+        content: The text to scan, typically a whole file read as a string.
+        candidates: A set of literal home-directory paths (e.g., {'/home/alice'}).
+        regex: A compiled re.Pattern that matches known home-directory prefixes.
+
+    Returns:
+        True if a personal path leak is detected, False otherwise.
+    """
     clean = content.replace("${HOME}", "").replace("__HOME__", "")
     if regex.search(clean):
         return True
@@ -81,9 +95,9 @@ def check_path_leak(content, candidates, regex):
 class TestConfigIntegrity(unittest.TestCase):
     PROJECT_ROOT: str = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     HOME_REGEX: re.Pattern[str] = re.compile(
-        r'(?:/home/|/Users/|C:\\Users\\)(?!(?:username|user|<[^>]+>|skillport)(?:[/\s"\'\\`,.:;()（）]|$))[^/\s"\'\\`,.:;()（）]+'
+        r'(?:/home/|/Users/|C:\\Users\\)(?!(?:username|user|<[^>]+>|skillport)(?:[/\s"\'\\`,.:;()]|$))[^/\s"\'\\`,.:;()]+'
     )
-    home_candidates: set[str] = set()
+    home_candidates: set[str]
 
     def setUp(self):
         user = os.environ.get("USER") or os.environ.get("USERNAME") or "user"
@@ -140,8 +154,18 @@ class TestConfigIntegrity(unittest.TestCase):
                         json5.loads(content)
             except FileNotFoundError:
                 continue
-            except Exception as e:
+            except (UnicodeDecodeError, OSError, yaml.YAMLError) as e:
                 self.fail(f"Invalid config in {rel}: {e}")
+            except Exception as e:
+                # Only swallow parsing errors from the json5 module; propagate
+                # unexpected programming errors so they are not masked.
+                if (
+                    json5 is not None
+                    and hasattr(json5, "Json5Exception")
+                    and isinstance(e, json5.Json5Exception)
+                ):
+                    self.fail(f"Invalid config in {rel}: {e}")
+                raise
 
 
 if __name__ == "__main__":
