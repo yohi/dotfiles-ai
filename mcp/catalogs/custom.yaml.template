@@ -52,7 +52,7 @@ registry:
     title: "Skillport"
     description: "Professional development and AI skill management toolkit."
     type: server
-    image: ghcr.io/yohi/skillport:latest
+    image: ghcr.io/yohi/skillport:1.1.1
     command:
       - --reindex
     env:

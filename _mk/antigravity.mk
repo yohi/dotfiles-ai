@@ -61,6 +61,22 @@ setup-antigravity: ## 生成された設定をAntigravityのグローバル設�
 	@mkdir -p "$(ANTIGRAVITY_CONFIG_DIR)/skills"
 	@# Remove old agent-skills link if exists
 	@rm -f "$(ANTIGRAVITY_CONFIG_DIR)/skills/agent-skills"
+	@# Remove stale skill links before recreating current links
+	@if [ -d "$(ANTIGRAVITY_CONFIG_DIR)/skills" ]; then \
+		for link in "$(ANTIGRAVITY_CONFIG_DIR)/skills"/*; do \
+			[ -L "$$link" ] || continue; \
+			target=$$(readlink "$$link"); \
+			if [ ! -e "$$link" ] || { \
+				[ "$$target" != "$${target#$(REPO_ROOT)/agent-skills/custom/}" ] && \
+				[ ! -d "$(REPO_ROOT)/agent-skills/custom/$$(basename "$$link")" ]; \
+			} || { \
+				[ "$$target" != "$${target#$(REPO_ROOT)/.agents/skills/}" ] && \
+				[ ! -d "$(REPO_ROOT)/.agents/skills/$$(basename "$$link")" ]; \
+			}; then \
+				rm -f "$$link"; \
+			fi; \
+		done; \
+	fi
 	@# グローバルスキルのリンク作成 (custom/ と .agents/skills/ 内のスキルをフラットに配置)
 	@if [ -d "$(REPO_ROOT)/agent-skills/custom" ]; then \
 		for dir in "$(REPO_ROOT)/agent-skills/custom"/*; do \

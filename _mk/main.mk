@@ -1,5 +1,7 @@
 .PHONY: all install install-agents install-ides setup setup-agents setup-ides mcp-render link clean-internal install-requirements lint init sync secrets status clean test clean-legacy configure-git-ignore doctor apm-install install-apm
 
+UV_VERSION ?= 0.11.19
+
 # --- APM Entry Point ---
 apm-install: ## APM install と全設定の同期を実行
 	$(Q_ECHO) "📦 APM install を実行中..."
@@ -85,14 +87,26 @@ install-requirements:
 	@echo "📦 依存関係をインストール中..."
 	@if command -v uv >/dev/null 2>&1; then \
 		uv sync; \
-	elif curl -LsSf https://astral.sh/uv/install.sh | sh; then \
+	else \
+		installer=$$(mktemp /tmp/uv-installer.XXXXXX.sh); \
+		checksums=$$(mktemp /tmp/uv-sha256.XXXXXX.sum); \
+		base_url="https://releases.astral.sh/github/uv/releases/download/$(UV_VERSION)"; \
+		if curl -fSL --retry 3 --retry-delay 2 --max-time 60 "$$base_url/uv-installer.sh" -o "$$installer" && \
+			curl -fSL --retry 3 --retry-delay 2 --max-time 60 "$$base_url/sha256.sum" -o "$$checksums" && \
+			expected=$$(grep ' uv-installer.sh$$' "$$checksums" | awk '{print $$1}') && \
+			actual=$$( (command -v sha256sum >/dev/null 2>&1 && sha256sum "$$installer" | cut -d" " -f1) || shasum -a 256 "$$installer" | cut -d" " -f1 ) && \
+			[ "$$actual" = "$$expected" ]; then \
+			sh "$$installer"; \
+			rm -f "$$installer" "$$checksums"; \
 		export PATH="$(HOME)/.local/bin:$(PATH)"; \
 		uv sync; \
-	else \
-		if [ ! -d ".venv" ]; then \
-			python3 -m venv .venv; \
+		else \
+			rm -f "$$installer" "$$checksums"; \
+			if [ ! -d ".venv" ]; then \
+				python3 -m venv .venv; \
+			fi; \
+			.venv/bin/pip install -r requirements.txt; \
 		fi; \
-		.venv/bin/pip install -r requirements.txt; \
 	fi
 
 lint: ## Run Ruff and Mypy on .
