@@ -1,7 +1,7 @@
 # SkillPort Configuration
 # See: https://github.com/gotalab/skillport
 
-skills_dir: ./agent-skills
+skills_dir: ./.agents/skills
 instructions:
   - AGENTS.md
   - global-rules/AGENTS.global.md

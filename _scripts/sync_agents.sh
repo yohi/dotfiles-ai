@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
 #
 # _scripts/sync_agents.sh
-# description: skillport doc を実行して、agent-skills/ をソースに
-#              global-rules/AGENTS.global.md および AGENTS.md の skill 一覧を
-#              直接更新する。
+# description: Generate agent-skills/AVAILABLE_SKILLS.md from the runtime
+# .agents/skills tree plus local custom skills under agent-skills/custom.
 #
 
 set -euo pipefail
