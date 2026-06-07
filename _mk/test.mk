@@ -25,7 +25,7 @@ test-all: test-integrity ## Run all tests in the project
 			echo "Running python test: $$f"; \
 			$$PYTHON_CMD "$$f" || exit 1; \
 		done; \
-		# This glob picks up _scripts/test-skill-adapters.sh automatically. \
+		# Shell glob picks up _scripts/test-skill-adapters.sh. \
 		for f in _scripts/test-*.sh; do \
 			[[ "$$f" == "_scripts/test-mcp-connectivity.sh" ]] && continue; \
 			echo "Running bash test: $$f"; \
