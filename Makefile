@@ -32,6 +32,7 @@ test: lint test-all ## Run all tests
 
 sync-agents: ## Run APM install, compile, generate Antigravity config, and sync agents
 	@apm install
+	@$(MAKE) setup-skill-adapters
 	@apm compile
 	@$(PYTHON) _scripts/sync_antigravity.py
 	@$(MAKE) sync-agents-core
