@@ -58,16 +58,14 @@ AIエージェント（Claude Code, Gemini CLI, OpenCode, Codex）の設定・�
 
 [SkillPort](https://github.com/gotalab/skillport) は、複数の AI エージェント間で再利用可能な「スキル」を一元管理するためのツールです。
 
-- **スキルの実体**: `agent-skills/` ディレクトリ配下に、各スキルの `SKILL.md`（インストラクション）が格納されています。
-- **外部スキルの管理 (APM)**: `superpowers` などの高品質な外部スキルは、`apm.yml` の `dependencies` で管理され、`apm.lock.yaml` でバージョン（コミットハッシュ）が固定されます。
-  - **スキルインストール**: `apm install` で `apm.yml` に記載された全外部スキルをインストールします。
-  - この操作は `make setup` 実行時にも自動で行われます。
-- **構成**: `.skillportrc` で設定され、`~/.skillport/skills` からリポジトリの `agent-skills/` へシンボリックリンクが張られます。
+- **Runtime skill directory**: `.agents/skills/` が SkillPort MCP およびネイティブエージェントスキル検出の際に読み込まれるディレクトリです。
+- **Custom skill authoring**: ローカルカスタムスキルは `agent-skills/custom/` で編集し、`.agents/skills/custom/` として公開されます。
+- **Native adapters**: `~/.opencode/skills`、`~/.claude/skills`、`~/.skillport/skills` は `.agents/skills/` へのシンボリックリンクです。(`.skillportrc` の `skills_dir` も `.agents/skills` を指します)
 - **スキル配置**: `.agents/skills/` に集約（全エージェントが参照）
 - **コマンド**:
   - `make skillport`: SkillPort と `skillport-mcp` をインストールし、本環境の**初期セットアップ**を行います。
   - `make check-skillport`: インストール状態とシンボリックリンクの整合性を確認します。
-  - `make sync-agents` / `make sync-skills-to-agents`: `agent-skills/` をソースとして、`.agents/skills/` にスキルを同期します。
+  - `make sync-agents` / `make sync-skills-to-agents`: `.agents/skills/` の runtime tree と `agent-skills/custom/` のカスタムツリーを統合し、スキルアダプターを設定してインデックスを生成します。
   - `make sync-agents-rules`: `agent-skills/` をソースとして、`AGENTS.md` と `global-rules/AGENTS.global.md` の SkillPort ブロックを直接更新します。
   - `skillport <command>`: スキルの追加・削除・更新などの**管理操作**は、`skillport` CLI を直接実行してください（`make` 経由ではありません）。
     - 例: `skillport add anthropics/skills skills/ --namespace anthropics`
