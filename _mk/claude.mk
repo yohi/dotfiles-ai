@@ -158,6 +158,16 @@ check-claude: ## Claude Code の診断を実行
 	else \
 		echo "❌ settings.json が見つかりません。'make setup-claude' を実行してください。"; \
 	fi
+	@if [ -L "$(HOME_DIR)/.claude/skills" ]; then \
+		target="$$(readlink "$(HOME_DIR)/.claude/skills")"; \
+		if [ "$$target" = "$(RUNTIME_SKILLS_DIR)" ]; then \
+			echo "[+] skills: linked to $(RUNTIME_SKILLS_DIR)"; \
+		else \
+			echo "[x] skills: linked to $$target, expected $(RUNTIME_SKILLS_DIR)"; \
+		fi; \
+	else \
+		echo "[x] skills: not linked. Run 'make setup-claude'."; \
+	fi
 
 # Claude Code の起動（プロジェクト固有設定）
 .PHONY: run-claude
@@ -202,6 +212,13 @@ setup-claude: ## Claude Codeの設定を適用
 	else \
 		ln -sf "$(REPO_ROOT)/claude/settings.json" "$(HOME_DIR)/.claude/settings.json"; \
 	fi
+	@# skills/
+	@if [ -e "$(HOME_DIR)/.claude/skills" ] && [ ! -L "$(HOME_DIR)/.claude/skills" ]; then \
+		backup="$(HOME_DIR)/.claude/skills.bak.$$(date +%Y%m%d%H%M%S)"; \
+		echo "[!] Existing Claude skills directory is not a symlink; moving it to $$backup"; \
+		mv "$(HOME_DIR)/.claude/skills" "$$backup"; \
+	fi
+	@ln -sfn "$(RUNTIME_SKILLS_DIR)" "$(HOME_DIR)/.claude/skills"
 	@# statusline.sh
 	@chmod +x "$(REPO_ROOT)/claude/statusline.sh"
 	@if [ -e "$(HOME_DIR)/.claude/statusline.sh" ] && [ ! -L "$(HOME_DIR)/.claude/statusline.sh" ]; then \

@@ -192,7 +192,8 @@ clean: ## 生成されたアーティファクトとキャッシュを削除
 	@$(MAKE) -s clean-internal 2>/dev/null || true
 	@rm -rf build/ dist/ *.pyc __pycache__ .ruff_cache .mypy_cache
 	@# ルートの不要な一時隠しフォルダやバグフォルダを完全削除
-	@rm -rf "$(REPO_ROOT)/.claude" "$(REPO_ROOT)/.gemini" "$(REPO_ROOT)/.agents"
+	@rm -rf "$(REPO_ROOT)/.claude" "$(REPO_ROOT)/.gemini"
+	@echo "[i] Preserved runtime skills directory: $(RUNTIME_SKILLS_DIR)"
 	@# バグでできた特殊フォルダの削除（シングルクォートで変数展開を防ぐ）
 	@rm -rf '$(REPO_ROOT)/$$' '$(REPO_ROOT)/$${HOME}' '$(REPO_ROOT)/$${env:HOME}'
 	@echo "✅ クリーンアップが完了しました"

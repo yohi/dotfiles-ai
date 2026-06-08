@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
 #
 # _scripts/sync_agents.sh
-# description: skillport doc を実行して、agent-skills/ をソースに
-#              global-rules/AGENTS.global.md および AGENTS.md の skill 一覧を
-#              直接更新する。
+# description: Generate agent-skills/AVAILABLE_SKILLS.md from the runtime
+# .agents/skills tree plus local custom skills under agent-skills/custom.
 #
 
 set -euo pipefail
@@ -24,22 +23,15 @@ run_skillport_doc() {
     local tmp_skills_dir
     tmp_skills_dir=$(mktemp -d)
 
-    # Combine custom skills (using cp -a to preserve symlinks and checking if not empty)
+    # Combine runtime skills first (using cp -a to preserve symlinks)
+    if [ -d ".agents/skills" ]; then
+        cp -a .agents/skills/. "$tmp_skills_dir/"
+    fi
+
+    # Overlay custom skills (using cp -a to preserve symlinks and checking if not empty)
     if [ -d "agent-skills/custom" ] && [ -n "$(ls -A agent-skills/custom 2>/dev/null)" ]; then
         mkdir -p "$tmp_skills_dir/custom"
         cp -a agent-skills/custom/. "$tmp_skills_dir/custom/"
-    fi
-
-    # Combine external skills (using cp -a to preserve symlinks and checking if not empty)
-    if [ -d ".agents/skills" ]; then
-        for ns_dir in .agents/skills/*; do
-            [ -d "$ns_dir" ] || continue
-            [ -n "$(ls -A "$ns_dir" 2>/dev/null)" ] || continue
-            local ns
-            ns=$(basename "$ns_dir")
-            mkdir -p "$tmp_skills_dir/$ns"
-            cp -a "$ns_dir"/. "$tmp_skills_dir/$ns/"
-        done
     fi
 
     if command -v skillport >/dev/null 2>&1; then

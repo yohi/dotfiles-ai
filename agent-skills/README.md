@@ -6,7 +6,8 @@
 
 SkillPort を利用することで、Cursor、VS Code、Claude Code などの異なるエージェント間で共通のプロンプト、ルール、専門知識を共有（Write Once, Run Anywhere）できます。
 
-- **SSOT (Single Source of Truth)**: `agent-skills/` 配下の `SKILL.md` が全スキルの正のデータです。
+- **Runtime SSOT**: `.agents/skills/` が全エージェント共通の runtime skills です。
+- **Authoring Source**: `agent-skills/custom/` がローカル custom skill の編集元です。
 - **管理ツール**: [skillport CLI](https://github.com/gotalab/skillport) を使用して、スキルの追加・検証・同期を行います。
 
 ## 前提条件
@@ -78,7 +79,7 @@ uvx skillport validate agent-skills/custom/my-new-skill
 make sync-agents
 ```
 
-※ `make sync-agents` は内部で `skillport doc` を実行し、`agent-skills/` をソースとして `agent-skills/AVAILABLE_SKILLS.md` の `<!-- SKILLPORT_START -->` マーカー内にスキルリストを直接反映します。各 `AGENTS.md` はコンテキストの肥大化を避けるため、このファイルへのリンクのみを保持します。自作スキルは `custom/<name>`、配布スキルは `anthropics/<name>` や `superpowers/<name>` といったネームスペース付きで識別されます。
+※ `make sync-agents` は内部で `skillport doc` を実行し、`.agents/skills/` の runtime tree と `agent-skills/custom/` の custom tree を元に `agent-skills/AVAILABLE_SKILLS.md` の `<!-- SKILLPORT_START -->` マーカー内にスキルリストを直接反映します。各 `AGENTS.md` はコンテキストの肥大化を避けるため、このファイルへのリンクのみを保持します。自作スキルは `custom/<name>`、配布スキルは `anthropics/<name>` や `superpowers/<name>` といったネームスペース付きで識別されます。
 
 ## スキル設計の原則
 

@@ -307,7 +307,6 @@ experimental:
 targets:
   - opencode
   - gemini
-  - claude
   - cursor
 
 # Exported Artifacts

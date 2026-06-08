@@ -15,21 +15,22 @@ test-mcp-connectivity: ## Check MCP connectivity for all CLI tools
 	@./_scripts/test-mcp-connectivity.sh
 
 .PHONY: test-all
-test-all: test-integrity ## Run all tests in the project
+test-all: test-integrity check-skill-adapters ## Run all tests in the project
 	@echo "Running all tests..."
 	@bash -c 'shopt -s nullglob; \
-	PYTHON_CMD="python3"; \
-	if command -v uv > /dev/null 2>&1; then PYTHON_CMD="$(PYTHON) python3"; fi; \
-	for f in _scripts/test_*.py; do \
-		[[ "$$f" == "_scripts/test_configs_integrity.py" ]] && continue; \
-		echo "Running python test: $$f"; \
-		$$PYTHON_CMD "$$f" || exit 1; \
-	done; \
-	for f in _scripts/test-*.sh; do \
-		[[ "$$f" == "_scripts/test-mcp-connectivity.sh" ]] && continue; \
-		echo "Running bash test: $$f"; \
-		bash "$$f" || exit 1; \
-	done'
+		PYTHON_CMD="python3"; \
+		if command -v uv > /dev/null 2>&1; then PYTHON_CMD="$(PYTHON) python3"; fi; \
+		for f in _scripts/test_*.py; do \
+			[[ "$$f" == "_scripts/test_configs_integrity.py" ]] && continue; \
+			echo "Running python test: $$f"; \
+			$$PYTHON_CMD "$$f" || exit 1; \
+		done; \
+		# Shell glob picks up _scripts/test-skill-adapters.sh. \
+		for f in _scripts/test-*.sh; do \
+			[[ "$$f" == "_scripts/test-mcp-connectivity.sh" ]] && continue; \
+			echo "Running bash test: $$f"; \
+			bash "$$f" || exit 1; \
+		done'
 	@echo "Running pytest suite..."
 	@if command -v uv > /dev/null 2>&1; then \
 		PYTHONPATH=. uv run pytest tests/ || exit 1; \

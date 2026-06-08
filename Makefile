@@ -19,6 +19,7 @@ include _mk/main.mk
 -include _mk/opencode.mk
 -include _mk/antigravity.mk
 -include _mk/skillport.mk
+-include _mk/skills-adapters.mk
 -include _mk/sync-agents.mk
 -include _mk/mcp.mk
 -include _mk/ide-cursor.mk
@@ -31,6 +32,7 @@ test: lint test-all ## Run all tests
 
 sync-agents: ## Run APM install, compile, generate Antigravity config, and sync agents
 	@apm install
+	@$(MAKE) setup-skill-adapters
 	@apm compile
 	@$(PYTHON) _scripts/sync_antigravity.py
 	@$(MAKE) sync-agents-core

@@ -34,7 +34,7 @@ The following rules apply to **ALL** projects unless overridden by a local proje
 - **Git Standards**: Follow Conventional Commits in Japanese.
   - Reference: `global-rules/GIT_STANDARDS.md`
 - **Agent Skills**: Reusable skill definitions for specialized tasks.
-  - Reference: `agent-skills/` directory
+  - Reference: `agent-skills/AVAILABLE_SKILLS.md`
 
 ## 5. Workflow & Context Awareness
 
