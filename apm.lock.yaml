@@ -1,5 +1,5 @@
 lockfile_version: '1'
-generated_at: '2026-06-07T16:44:30.550003+00:00'
+generated_at: '2026-06-08T13:06:36.538141+00:00'
 apm_version: 0.18.0
 dependencies:
 - repo_url: anthropics/skills
@@ -44,11 +44,9 @@ dependencies:
   - .agents/skills/verification-before-completion
   - .agents/skills/writing-plans
   - .agents/skills/writing-skills
-  - .claude/hooks/superpowers/hooks/run-hook.cmd
   - .cursor/hooks/superpowers/hooks/run-hook.cmd
   - .gemini/hooks/superpowers/hooks/run-hook.cmd
   deployed_file_hashes:
-    .claude/hooks/superpowers/hooks/run-hook.cmd: sha256:d3d9c6199678dab2858e60509dde5e7414f13c2a2b5e48a38b1d368b6e1d6abb
     .cursor/hooks/superpowers/hooks/run-hook.cmd: sha256:d3d9c6199678dab2858e60509dde5e7414f13c2a2b5e48a38b1d368b6e1d6abb
     .gemini/hooks/superpowers/hooks/run-hook.cmd: sha256:d3d9c6199678dab2858e60509dde5e7414f13c2a2b5e48a38b1d368b6e1d6abb
   content_hash: sha256:8b91ca49cbf065ffb70c91fc5b4f9a437fc56ab022203e6a617e89f9ca2730c4
