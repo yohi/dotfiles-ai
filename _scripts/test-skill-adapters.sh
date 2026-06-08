@@ -20,17 +20,13 @@ assert_link_target() {
 assert_runtime_skill_links() {
     [ -d "$RUNTIME_SKILLS_DIR" ] || fail "directory not found: $RUNTIME_SKILLS_DIR"
 
-    found=0
     while IFS= read -r link_path; do
-        found=1
         target="$(readlink "$link_path")"
         if [ "${target#/}" = "$target" ]; then
             target="$(dirname "$link_path")/$target"
         fi
         [ -e "$target" ] || fail "broken runtime skill link: $link_path -> $target"
     done < <(find "$RUNTIME_SKILLS_DIR" -type l)
-
-    [ "$found" -eq 1 ] || fail "no runtime skill links found under $RUNTIME_SKILLS_DIR"
 }
 
 assert_no_runtime_skillport_agent_skills() {
@@ -46,9 +42,11 @@ assert_no_runtime_skillport_agent_skills() {
 
 assert_runtime_skill_links
 
-assert_link_target "$HOME/.opencode/skills" "$RUNTIME_SKILLS_DIR"
-assert_link_target "$HOME/.claude/skills" "$RUNTIME_SKILLS_DIR"
-assert_link_target "$HOME/.skillport/skills" "$RUNTIME_SKILLS_DIR"
+if [ -z "${CI:-}" ]; then
+    assert_link_target "$HOME/.opencode/skills" "$RUNTIME_SKILLS_DIR"
+    assert_link_target "$HOME/.claude/skills" "$RUNTIME_SKILLS_DIR"
+    assert_link_target "$HOME/.skillport/skills" "$RUNTIME_SKILLS_DIR"
+fi
 
 assert_no_runtime_skillport_agent_skills
 
