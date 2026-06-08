@@ -60,7 +60,7 @@
     "external_directory": "ask",
     "doom_loop": "ask",
     "bash": {
-      "*": "allow",
+      "*": "ask",
 
       // --- File Read Operations (Safe) ---
       "ls*": "allow",

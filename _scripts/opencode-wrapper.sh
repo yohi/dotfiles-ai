@@ -44,7 +44,7 @@ if [ ! -f "$ENV_FILE" ]; then
     echo "⚠️  Warning: Profile env file not found at $ENV_FILE, using default environment"
 fi
 
-export SKILLPORT_SKILLS_DIR="$REPO_ROOT/.agents/skills"
+export SKILLPORT_SKILLS_DIR="${SKILLPORT_SKILLS_DIR:-$REPO_ROOT/.agents/skills}"
 
 # --- Execution ---
 TMP_DIR=$(mktemp -d)
