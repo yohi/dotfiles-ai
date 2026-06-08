@@ -87,12 +87,12 @@ individual skills; honor this instruction before invoking them.
 
 ## Constraint
 
-All source code files and CLI output strings must stay within **printable ASCII** (U+0020–U+007E).
+All source code files and CLI output strings must stay within **printable ASCII** (U+0020 to U+007E).
 
 Do NOT use:
-- Emojis (e.g. `🚀`, `✨`, `❌`)
-- Unicode box-drawing characters (e.g. `─`, `│`, `┌`)
-- Em dashes (`—`), en dashes (`–`), curly quotes (`"`, `"`, `'`, `'`)
+- Emojis (e.g. `:-)`)
+- Unicode box-drawing characters (e.g. `+`, `-`, `|` as ASCII equivalents)
+- Em dashes (e.g. `--`), en dashes (e.g. `-`), curly quotes (e.g. `"`, `'`)
 - Any character outside the ASCII range (codepoint > U+007E)
 
 **Why**: Windows `cp1252` terminals raise `UnicodeEncodeError: 'charmap' codec can't encode character` for any character outside cp1252. Keeping output within ASCII guarantees identical behaviour on every platform without dual-path fallback logic.
@@ -225,7 +225,7 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) an
 ## Entry format
 
 - One line per PR: concise description ending with `(#PR_NUMBER)`.
-- Credit external contributors inline: `— by @username (#PR_NUMBER)`.
+- Credit external contributors inline: `-- by @username (#PR_NUMBER)`.
 - Combine related PRs into a single line when they form one logical change: `(#251, #256, #258)`.
 - Use backticks for code references: commands, file names, config keys, classes.
 
@@ -233,7 +233,7 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) an
 
 - Every merged PR that changes code, tests, docs, or dependencies must have a changelog entry.
 - Do NOT include version-bump or release-machinery PRs (e.g., "chore: bump to vX.Y.Z").
-- When releasing, move Unreleased entries into a new versioned section — never delete them.
+- When releasing, move Unreleased entries into a new versioned section -- never delete them.
 
 ## Files matching `src/apm_cli/cli.py`
 
@@ -248,7 +248,7 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) an
 - Wrap Rich imports in try/catch with colorama fallbacks
 
 ### Command Help Text
-- Keep command help strings plain ASCII — no emojis
+- Keep command help strings plain ASCII -- no emojis
 - Format: `help="Initialize a new APM project"`
 
 ### Status Symbols & Feedback
@@ -401,12 +401,12 @@ When changing CLI functionality, update these sections in `docs/cli-reference.md
 
 ## Design philosophy
 
-APM runs inside repositories of any size — from single-package repos to monorepos with thousands of packages and deep dependency trees. Every integrator must assume it will operate at that scale. The architecture is built around two principles:
+APM runs inside repositories of any size -- from single-package repos to monorepos with thousands of packages and deep dependency trees. Every integrator must assume it will operate at that scale. The architecture is built around two principles:
 
 1. **One base, many file types.** All file-level integrators share a single `BaseIntegrator` infrastructure for collision detection, manifest-based sync, path security, link resolution, and file discovery. New integrators add *what* to deploy, never *how* to deploy. When logic belongs to more than one integrator, push it into `BaseIntegrator`.
 2. **Pay only for what you touch.** Operations must be proportional to the files a single package deploys, not the size of the workspace or the total managed-files set. Pre-normalize once, partition once, look up in O(1). Avoid full-tree walks, per-file parent cleanup, or repeated set scans.
 
-When evolving integration logic — new file types, richer transforms, cross-package awareness — preserve these properties. If a change would violate either principle, refactor the base class first.
+When evolving integration logic -- new file types, richer transforms, cross-package awareness -- preserve these properties. If a change would violate either principle, refactor the base class first.
 
 ## Required structure
 
@@ -425,7 +425,7 @@ class FooIntegrator(BaseIntegrator):
                          managed_files: set = None) -> Dict[str, int]: ...
 ```
 
-## Base-class methods — use, don't reimplement
+## Base-class methods -- use, don't reimplement
 
 Before writing custom logic, check whether `BaseIntegrator` already solves the problem. Duplicating behaviour that exists in the base class creates drift, bugs, and performance regressions.
 
@@ -448,11 +448,11 @@ If you need an operation the base class does not support, **add it to `BaseInteg
 
 ## Performance guidance
 
-The specific techniques below exist to serve the "pay only for what you touch" principle. As the codebase evolves, new code must uphold the same standard — if a new feature would regress install/uninstall to O(N × M) where N is packages and M is managed files, find a better design.
+The specific techniques below exist to serve the "pay only for what you touch" principle. As the codebase evolves, new code must uphold the same standard -- if a new feature would regress install/uninstall to O(N x M) where N is packages and M is managed files, find a better design.
 
-- `managed_files` must be pre-normalized with `normalize_managed_files()` for **O(1)** set lookups — never iterate the set to find a path.
-- `partition_managed_files()` runs a **single O(M) pass** over managed files — do not filter per-integrator.
-- `cleanup_empty_parents()` does a **bottom-up batch** — never call `rmdir()` per deleted file.
+- `managed_files` must be pre-normalized with `normalize_managed_files()` for **O(1)** set lookups -- never iterate the set to find a path.
+- `partition_managed_files()` runs a **single O(M) pass** over managed files -- do not filter per-integrator.
+- `cleanup_empty_parents()` does a **bottom-up batch** -- never call `rmdir()` per deleted file.
 - File-discovery globs must be **scoped** to known subdirectories, not walk the entire package tree.
 - All path strings stored in `apm.lock` must use **forward slashes** (`.as_posix()`).
 
