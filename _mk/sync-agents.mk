@@ -24,7 +24,6 @@ CODEX_CONFIG     := $(REPO_ROOT)/codex/config.toml
 sync-agents-core: ## SSOTのスキル群を各エージェントの設定ファイルへ同期する
 	@echo "🔄 sync-agents: SSOT → 各エージェントへの同期を開始..."
 	@$(MAKE) clean-sync-artifacts
-	@$(MAKE) clean-legacy-skills
 	@$(MAKE) sync-skillport-doc
 	@$(MAKE) link-user-agents
 	@$(MAKE) link-agent-commands
@@ -46,7 +45,7 @@ clean-sync-artifacts: ## 同期マーカーおよび生成されたリンク・�
 	@find "$(REPO_ROOT)/.cursor/rules" -maxdepth 1 -type l -name "*.md" -delete 2>/dev/null || true
 	@rm -rf "$(REPO_ROOT)/gemini/commands"
 	@rm -rf "$(REPO_ROOT)/codex/skills"
-	@# NOTE: Legacy directories like agent-skills/anthropics and agent-skills/superpowers are cleaned up via clean-legacy-skills.
+	@# NOTE: Legacy directories (agent-skills/anthropics, agent-skills/superpowers) can be cleaned up manually via `make clean-legacy-skills`.
 	@echo "✅ clean-sync-artifacts: 同期状態がリセットされました"
 
 # ============================================================
