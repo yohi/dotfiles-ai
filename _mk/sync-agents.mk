@@ -24,6 +24,7 @@ CODEX_CONFIG     := $(REPO_ROOT)/codex/config.toml
 sync-agents-core: ## SSOTのスキル群を各エージェントの設定ファイルへ同期する
 	@echo "🔄 sync-agents: SSOT → 各エージェントへの同期を開始..."
 	@$(MAKE) clean-sync-artifacts
+	@$(MAKE) clean-legacy-skills
 	@$(MAKE) sync-skillport-doc
 	@$(MAKE) link-user-agents
 	@$(MAKE) link-agent-commands

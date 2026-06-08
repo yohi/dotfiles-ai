@@ -5,7 +5,7 @@ UV_VERSION ?= 0.11.19
 # --- APM Entry Point ---
 apm-install: ## APM install と全設定の同期を実行
 	$(Q_ECHO) "📦 APM install を実行中..."
-	@apm install --target agent-skills
+	@apm install
 	$(Q_ECHO) "🔄 エージェントを同期中..."
 	@$(MAKE) sync-agents
 	$(Q_ECHO) "🔗 MCP設定を同期中..."
@@ -79,7 +79,6 @@ clean-internal:
 	-$(MAKE) uninstall-antigravity
 	-$(MAKE) uninstall-skillport
 	-$(MAKE) uninstall-mcp
-	-$(MAKE) uninstall-superpowers
 	-$(MAKE) uninstall-cursor FORCE=true
 	-$(MAKE) uninstall-vscode FORCE=true
 
