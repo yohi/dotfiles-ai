@@ -6,12 +6,16 @@ UV_VERSION ?= 0.11.19
 apm-install: ## APM install と全設定の同期を実行
 	$(Q_ECHO) "📦 APM install を実行中..."
 	@apm install
+	$(Q_ECHO) "🔄 opencode.jsonc を生成中..."
+	@$(MAKE) sync-opencode
 	$(Q_ECHO) "🔄 エージェントを同期中..."
 	@$(MAKE) sync-agents
 	$(Q_ECHO) "🔗 MCP設定を同期中..."
 	@$(MAKE) sync-mcp
 	$(Q_ECHO) "📝 .env 雛形を確認中..."
 	@$(MAKE) setup-apm-env
+	$(Q_ECHO) "🔗 OpenCode 設定を適用中..."
+	@$(MAKE) setup-opencode
 	$(Q_ECHO) "✅ APM install と全設定の同期が完了しました"
 
 # --- Standard Entry Points ---
