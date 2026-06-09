@@ -200,7 +200,7 @@ opencode-update: ## OpenCode（opencode）をアップデート
 	@$(call create_marker,opencode-update,$$($(OPENCODE_BIN) --version 2>/dev/null || echo unknown))
 
 # OpenCode の設定を適用（XDG config へシンボリックリンク）
-setup-opencode: ## OpenCode（opencode）の設定ファイルを適用
+setup-opencode: sync-opencode ## OpenCode（opencode）の設定ファイルを適用
 	@echo "🔧 OpenCode（opencode）の設定を適用中..."
 	@mkdir -p "$(OPENCODE_CONFIG_DIR)"
 	@mkdir -p "$(OPENCODE_HOME)"
