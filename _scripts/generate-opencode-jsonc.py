@@ -69,7 +69,11 @@ def _convert_mcp_entry(entry: dict[str, Any]) -> tuple[str, dict[str, Any]]:
 
 
 def _normalize_env_syntax(value: str) -> str:
-    """Normalize ${env:VAR} (apm.yml) -> {env:VAR} (OpenCode)."""
+    """Normalize ${env:VAR} (apm.yml) -> {env:VAR} (OpenCode).
+    If it already matches {env:VAR}, keep it as is.
+    """
+    if re.match(r"^{env:[^}]+}$", value):
+        return value
     return re.sub(r"\$\{(env:[^}]+)\}", r"{\1}", value)
 
 

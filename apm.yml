@@ -28,7 +28,7 @@ dependencies:
       args:
         - "skillport-mcp"
       env:
-        SKILLPORT_SKILLS_DIR: "${env:PWD}/.agents/skills"
+        SKILLPORT_SKILLS_DIR: "${env:SKILLPORT_SKILLS_DIR}"
       standalone: true
       enabled: true
 
@@ -98,7 +98,7 @@ snapshot: true
 
 plugin:
   - "@yohi/justice@2.3.0"
-  - "@yohi/akane@latest"
+  - "@yohi/akane@1.1.1"
   - "oh-my-openagent@4.7.5"
   - "@yohi/opencode-plugin-chronos-gate@1.4.0"
 
