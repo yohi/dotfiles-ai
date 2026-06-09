@@ -49,9 +49,11 @@ clean-sync-artifacts: ## 同期マーカーおよび生成されたリンク・�
 	@echo "✅ clean-sync-artifacts: 同期状態がリセットされました"
 
 # ============================================================
-# sync-skillport-doc: skillport doc の実行と各 AGENTS への直接反映
+# sync-agents-rules: skillport doc の実行と各 AGENTS への直接反映
 # ============================================================
-sync-skillport-doc: ## _scripts/sync_agents.sh を実行し、agent-skills/ から AGENTS 群のスキル一覧を更新する
+sync-skillport-doc: sync-agents-rules
+
+sync-agents-rules: ## _scripts/sync_agents.sh を実行し、agent-skills/ から AGENTS 群のスキル一覧を更新する
 	@echo "📝 skillport doc: agent-skills/ から AGENTS 群のスキル一覧を更新中..."
 	@bash "$(REPO_ROOT)/_scripts/sync_agents.sh"
 

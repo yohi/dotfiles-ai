@@ -12,6 +12,7 @@ cd "$(dirname "$0")/.." || exit 1
 
 readonly OUTPUT_FILES=(
     "agent-skills/AVAILABLE_SKILLS.md"
+    "global-rules/AGENTS.global.md"
 )
 
 run_skillport_doc() {
