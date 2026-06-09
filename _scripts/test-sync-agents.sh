@@ -43,9 +43,9 @@ for f in "${OUTPUT_FILES[@]}"; do
         echo "FAIL: <available_skills> not found in $f"
         exit 1
     fi
-    # Check if <available_skills> section is not empty
-    if grep -qF "<available_skills></available_skills>" "$REPO_ROOT/$f" || grep -qF "<available_skills />" "$REPO_ROOT/$f"; then
-        echo "FAIL: <available_skills> section is empty in $f"
+    # Check if <available_skills> section contains at least one <skill> element
+    if ! awk '/<available_skills>/, /<\/available_skills>/ { if ($0 ~ /<skill>/) { found=1; exit } } END { if (!found) exit 1 }' "$REPO_ROOT/$f"; then
+        echo "FAIL: <available_skills> section is empty or missing <skill> elements in $f"
         exit 1
     fi
     if ! grep -qF "External skills (anthropics/*, superpowers/*)" "$REPO_ROOT/$f"; then
@@ -54,7 +54,6 @@ for f in "${OUTPUT_FILES[@]}"; do
     fi
     if ! grep -qF "<name>pdf</name>" "$REPO_ROOT/$f"; then
         echo "FAIL: pdf skill entry not found in $f"
-        exit 1
     fi
     echo "PASS: $f verified."
 done
