@@ -65,7 +65,7 @@ claude/claude-settings.json
 gemini/settings.json
 .gemini/settings.json
 ide/vscode/settings.json
-# opencode/opencode.jsonc
+opencode/opencode.jsonc
 *.bk*
 *.test
 # test.mk (Removed to allow git tracking)

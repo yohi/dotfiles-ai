@@ -61,7 +61,24 @@ define link_config
 	fi
 endef
 
-.PHONY: opencode install-packages-opencode install-opencode opencode-update setup-opencode check-opencode uninstall-opencode opencode-personal opencode-work
+# opencode.jsonc を apm.yml から生成する
+sync-opencode: ## apm.yml (SSOT) から opencode/opencode.jsonc を生成する
+	$(Q_ECHO) "🔄 opencode.jsonc を apm.yml から生成中..."
+	@if command -v uv >/dev/null 2>&1; then \
+		uv run python "$(REPO_ROOT)/_scripts/generate-opencode-jsonc.py"; \
+	else \
+		python3 "$(REPO_ROOT)/_scripts/generate-opencode-jsonc.py"; \
+	fi
+	$(Q_ECHO) "✅ opencode.jsonc の生成が完了しました"
+
+# opencode.jsonc が apm.yml と同期しているか確認する (CI 用)
+check-sync-opencode: ## opencode.jsonc が apm.yml と同期しているか確認する
+	$(Q_ECHO) "🔍 opencode.jsonc の同期状態を確認中..."
+	@if command -v uv >/dev/null 2>&1; then \
+		uv run python "$(REPO_ROOT)/_scripts/generate-opencode-jsonc.py" --check; \
+	else \
+		python3 "$(REPO_ROOT)/_scripts/generate-opencode-jsonc.py" --check; \
+	fi
 
 # OpenCode (opencode) をインストール & 設定
 opencode: ## OpenCode(opencode)のインストールとセットアップ
@@ -217,7 +234,7 @@ setup-opencode: ## OpenCode（opencode）の設定ファイルを適用
 		fi; \
 	fi
 
-.PHONY: help-opencode
+.PHONY: opencode install-packages-opencode install-opencode opencode-update setup-opencode check-opencode uninstall-opencode opencode-personal opencode-work sync-opencode check-sync-opencode help-opencode
 help-opencode: ## OpenCode の使い方を表示
 	$(call show-guide,$(REPO_ROOT)/_docs/guides/opencode.md)
 

@@ -28,7 +28,7 @@ dependencies:
       args:
         - "skillport-mcp"
       env:
-        SKILLPORT_SKILLS_DIR: "${env:PWD}/.agents/skills"
+        SKILLPORT_SKILLS_DIR: "${env:SKILLPORT_SKILLS_DIR}"
       standalone: true
       enabled: true
 
@@ -39,7 +39,7 @@ dependencies:
       command: "npx"
       args:
         - "-y"
-        - "@yohi/nexus@1.7.4"
+        - "@yohi/nexus@1.9.1"
       env:
         NEXUS_STORAGE_ROOT_DIR: "${env:HOME}/.nexus"
         LOG_LEVEL: "ERROR"
@@ -98,7 +98,9 @@ snapshot: true
 
 plugin:
   - "@yohi/justice@2.3.0"
-  - "oh-my-openagent@4.5.1"
+  - "@yohi/akane@1.1.1"
+  - "oh-my-openagent@4.7.5"
+  - "@yohi/opencode-plugin-chronos-gate@1.4.0"
 
 disabled_providers:
   - google
@@ -250,7 +252,10 @@ enabled_providers:
   - nvidia
   - cloudflare-workers-ai
   - opencode
+  - opencode-go
+  - ollama-cloud
   - amazon-bedrock
+  - openrouter
   - sakura
 
 provider:
@@ -265,7 +270,7 @@ provider:
     whitelist:
       - "minimaxai/minimax-m2.5"
       - "minimaxai/minimax-m2.7"
-      - "z-ai/glm4.7"
+      - "z-ai/glm-5.1"
       - "qwen/qwen3-coder-480b-a35b-instruct"
   cloudflare-workers-ai:
     whitelist:
@@ -288,12 +293,19 @@ provider:
       - "global.anthropic.claude-opus-4-6-v1"
       - "global.anthropic.claude-opus-4-7"
       - "global.anthropic.claude-sonnet-4-6"
+      - "global.anthropic.claude-opus-4-8"
   sakura:
     npm: "@ai-sdk/openai-compatible"
     name: "sakura aipf"
     options:
       baseURL: "https://api.ai.sakura.ad.jp/v1"
     models:
+      "Qwen3-Coder-30B-A3B-Instruct":
+        name: "Qwen3-Coder-30B-A3B-Instruct"
+      "Qwen3-Coder-480B-A35B-Instruct-FP8":
+        name: "Qwen3-Coder-480B-A35B-Instruct-FP8"
+      "gpt-oss-120b":
+        name: "gpt-oss-120b"
       "preview/Kimi-K2.6":
         name: "Kimi-K2.6"
 
@@ -302,6 +314,13 @@ experimental:
   openTelemetry: true
   continue_loop_on_deny: false
   mcp_timeout: 120000
+  watchdog:
+    enabled: true
+    stage1Ms: 180000
+    stage2Ms: 180000
+    maxPings: 1
+    tmux:
+      highlightWindow: true
 
 # APM Standard Targets
 targets:
@@ -315,3 +334,7 @@ exports:
     - agent-skills/**
   instructions:
     - global-rules/AGENTS.global.md
+  # OpenCode platform config (symlinked to ~/.config/opencode/ via `make setup-opencode`)
+  # Deployed by: apm-install -> setup-opencode -> _mk/opencode.mk link_config
+  configs:
+    - opencode/opencode.jsonc
