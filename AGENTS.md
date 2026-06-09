@@ -150,6 +150,13 @@ This is a mock plugin providing example coding standards and guidelines.
 # Test instruction
 Placeholder instruction for compile test.
 
+## Files matching `opencode/**`
+
+### Configuration Management (SSOT)
+
+- **`opencode.jsonc`**: This file is the Single Source of Truth (SSOT) derived from `apm.yml`. It is automatically generated via `make sync-opencode` and is ignored by Git. **NEVER** edit this file directly; apply changes to `apm.yml` instead.
+- **`oh-my-openagent.jsonc`**: This is a manually managed configuration file and is tracked by Git. It contains agent-specific logic and roles that are not yet abstracted into `apm.yml`.
+
 ## Files matching `**/*.py`
 
 Use type hints for all function parameters and return values.
