@@ -82,7 +82,7 @@ AIエージェント（Claude Code, Gemini CLI, OpenCode, Codex）の設定・�
 - **Docker Catalog 標準 MCP**: GitHub, SQLite, sequentialthinking は Docker Desktop 側で管理
 - **スキル配置**: `.agents/skills/` に集約（全エージェントが参照）
 - **自動生成ファイルと Git**:
-  `opencode.json` などのルート直下の設定ファイルは、`apm install` 時に APM が「プロジェクトの目印」として自動生成します。これらは `.gitignore` で除外されており、Git 管理（コミット）の対象外です。
+  `opencode/opencode.jsonc` などの設定ファイルは、`make setup` または `apm install` 時に `apm.yml` をソースとして自動生成されます。これらは `.gitignore` で除外されており、Git 管理（コミット）の対象外です。SSOT 原則に基づき、常に最新の `apm.yml` から生成されるようになっています。
 
 ### 環境変数の3層モデル
 
