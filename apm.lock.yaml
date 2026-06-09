@@ -1,6 +1,6 @@
 lockfile_version: '1'
-generated_at: '2026-06-08T13:06:36.538141+00:00'
-apm_version: 0.18.0
+generated_at: '2026-06-09T08:14:41.289068+00:00'
+apm_version: 0.13.0
 dependencies:
 - repo_url: anthropics/skills
   host: github.com
@@ -24,6 +24,23 @@ dependencies:
   - .agents/skills/web-artifacts-builder
   - .agents/skills/webapp-testing
   - .agents/skills/xlsx
+  - .claude/skills/algorithmic-art
+  - .claude/skills/brand-guidelines
+  - .claude/skills/canvas-design
+  - .claude/skills/claude-api
+  - .claude/skills/doc-coauthoring
+  - .claude/skills/docx
+  - .claude/skills/frontend-design
+  - .claude/skills/internal-comms
+  - .claude/skills/mcp-builder
+  - .claude/skills/pdf
+  - .claude/skills/pptx
+  - .claude/skills/skill-creator
+  - .claude/skills/slack-gif-creator
+  - .claude/skills/theme-factory
+  - .claude/skills/web-artifacts-builder
+  - .claude/skills/webapp-testing
+  - .claude/skills/xlsx
   content_hash: sha256:5a94c4600dca371e7571be73552f06e11293f558b3d3b295d306b0bfefb4245b
 - repo_url: obra/superpowers
   host: github.com
@@ -44,11 +61,27 @@ dependencies:
   - .agents/skills/verification-before-completion
   - .agents/skills/writing-plans
   - .agents/skills/writing-skills
-  - .cursor/hooks/superpowers/hooks/run-hook.cmd
-  - .gemini/hooks/superpowers/hooks/run-hook.cmd
+  - .claude/skills/brainstorming
+  - .claude/skills/dispatching-parallel-agents
+  - .claude/skills/executing-plans
+  - .claude/skills/finishing-a-development-branch
+  - .claude/skills/receiving-code-review
+  - .claude/skills/requesting-code-review
+  - .claude/skills/subagent-driven-development
+  - .claude/skills/systematic-debugging
+  - .claude/skills/test-driven-development
+  - .claude/skills/using-git-worktrees
+  - .claude/skills/using-superpowers
+  - .claude/skills/verification-before-completion
+  - .claude/skills/writing-plans
+  - .claude/skills/writing-skills
+  - .github/hooks/superpowers-hooks-cursor.json
+  - .github/hooks/superpowers-hooks-cursor.json
+  - .github/hooks/superpowers-hooks.json
+  - .github/hooks/superpowers-hooks.json
   deployed_file_hashes:
-    .cursor/hooks/superpowers/hooks/run-hook.cmd: sha256:d3d9c6199678dab2858e60509dde5e7414f13c2a2b5e48a38b1d368b6e1d6abb
-    .gemini/hooks/superpowers/hooks/run-hook.cmd: sha256:d3d9c6199678dab2858e60509dde5e7414f13c2a2b5e48a38b1d368b6e1d6abb
+    .github/hooks/superpowers-hooks-cursor.json: sha256:53d8ceb3ff5d8bb1c4f283f238cc868b8c1af22e40a3ac30f6d6e4173effefbd
+    .github/hooks/superpowers-hooks.json: sha256:01616c57b96cc234cc984e77d2fc241dfd0e0bfacda54fe54589cd669a0d998e
   content_hash: sha256:8b91ca49cbf065ffb70c91fc5b4f9a437fc56ab022203e6a617e89f9ca2730c4
 mcp_servers:
 - chronos-graph
@@ -110,7 +143,7 @@ mcp_configs:
       NO_PROXY: 127.0.0.1,localhost
     args:
     - -y
-    - '@yohi/nexus@1.7.4'
+    - '@yohi/nexus@1.9.1'
     registry: false
     command: npx
   skillport:
