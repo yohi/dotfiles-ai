@@ -16,7 +16,7 @@ CODEX_CONFIG     := $(REPO_ROOT)/codex/config.toml
 
 .PHONY: sync-agents-core clean-sync-artifacts ai-setup \
         inject-meta-prompt-opencode inject-meta-prompt-codex \
-        sync-skillport-doc link-user-agents link-agent-commands \
+        sync-skillport-doc sync-agents-rules link-user-agents link-agent-commands \
         clean-legacy clean-legacy-skills
 
 # ============================================================
