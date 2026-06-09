@@ -60,7 +60,7 @@
     "external_directory": "ask",
     "doom_loop": "ask",
     "bash": {
-      "*": "allow",
+      "*": "ask",
 
       // --- File Read Operations (Safe) ---
       "ls*": "allow",
@@ -121,16 +121,19 @@
       "git worktree add*": "allow",
       "gh*": "allow",
 
-      // --- Git: Modification (Allow) ---
+      // --- Git: Modification (Ask for destructive ops) ---
       "git add": "allow",
       "git add *": "ask",
       "git commit*": "allow",
-      "git checkout*": "allow",
+      "git checkout*": "ask",
+      "git stash drop*": "ask",
+      "git stash clear*": "ask",
+      "git stash pop*": "ask",
       "git stash*": "allow",
-      "git reset*": "allow",
-      "git merge": "allow",
-      "git rebase": "allow",
-      "git pull": "allow",
+      "git reset*": "ask",
+      "git merge": "ask",
+      "git rebase": "ask",
+      "git pull": "ask",
 
       // --- General Write Operations (Ask for safety) ---
       "mkdir": "allow",
@@ -149,8 +152,14 @@
       "curl*|sh": "deny",
       "bash _scripts/*": "deny",
 
-      // --- Interpreter Access (Allow) ---
+      // --- Interpreter Access ---
+      // Inline one-liners that can bypass bash/rm guards are denied
+      "python -c *": "deny",
+      "python3 -c *": "deny",
+      "node -e *": "deny",
+      "node --eval *": "deny",
       "python": "allow",
+      "python3": "allow",
       "node": "allow",
     }
   },

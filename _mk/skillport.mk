@@ -99,8 +99,12 @@ install-apm: ## Microsoft APM をインストール
 # SkillPort の設定（ディレクトリ作成とリンク）
 setup-skillport: ## SkillPort のディレクトリ構成をセットアップ
 	@if $(call check_marker,setup-skillport); then \
-		echo "$(call IDEMPOTENCY_SKIP_MSG,setup-skillport)"; \
-		exit 0; \
+		if [ -L "$(SKILLPORT_SKILLS_DIR)" ] && \
+		   [ "$$(readlink "$(SKILLPORT_SKILLS_DIR)")" = "$(SKILLPORT_RUNTIME_SKILLS_DIR)" ]; then \
+			echo "$(call IDEMPOTENCY_SKIP_MSG,setup-skillport)"; \
+			exit 0; \
+		fi; \
+		echo "⚠️  skills リンク先が変更されています。再リンクします..."; \
 	fi
 	@echo "🚀 SkillPort のセットアップを開始中..."
 	@mkdir -p "$(HOME)/.skillport"
@@ -145,13 +149,13 @@ check-skillport: ## SkillPort の状態確認
 			fi; \
 		}; \
 		actual=$$(get_realpath "$(SKILLPORT_SKILLS_DIR)"); \
-		expected=$$(get_realpath "$(RUNTIME_SKILLS_DIR)"); \
+		expected=$$(get_realpath "$(SKILLPORT_RUNTIME_SKILLS_DIR)"); \
 		if [ -n "$$actual" ] && [ "$$actual" = "$$expected" ]; then \
-			echo "✅ skills: $(SKILLPORT_SKILLS_DIR) -> $(RUNTIME_SKILLS_DIR)"; \
+			echo "✅ skills: $(SKILLPORT_SKILLS_DIR) -> $(SKILLPORT_RUNTIME_SKILLS_DIR)"; \
 		else \
 			echo "⚠️  skills: $(SKILLPORT_SKILLS_DIR) points to $$actual (expected $$expected)"; \
 		fi; \
-	elif [ "$(SKILLPORT_SKILLS_DIR)" = "$(RUNTIME_SKILLS_DIR)" ]; then \
+	elif [ "$(SKILLPORT_SKILLS_DIR)" = "$(SKILLPORT_RUNTIME_SKILLS_DIR)" ]; then \
 		echo "✅ skills: $(SKILLPORT_SKILLS_DIR) is the runtime directory"; \
 	else \
 		echo "⚠️  skills: $(SKILLPORT_SKILLS_DIR) is not a symlink"; \

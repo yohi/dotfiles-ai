@@ -48,11 +48,13 @@ install-antigravity-cli: ## Antigravity CLI をインストール
 	@echo "✅ Antigravity CLI installed"
 
 # Antigravityの設定を生成して同期
-sync-antigravity: ## apm.ymlからAntigravity用のMCP設定を生成して同期
-	@echo "🔄 Generating Antigravity MCP config from apm.yml..."
+sync-antigravity: ## apm.lock.yamlからAntigravity用のMCP設定を生成して同期
+	@echo "🔄 Generating Antigravity MCP config from apm.lock.yaml..."
 	@mkdir -p "$(REPO_ROOT)/antigravity"
 	@set -a; [ -f "$(REPO_ROOT)/.env" ] && . "$(REPO_ROOT)/.env"; set +a; \
-	uv run python3 "$(REPO_ROOT)/_scripts/render-antigravity-config.py"
+	uv run python3 "$(REPO_ROOT)/_scripts/sync_antigravity.py" \
+		--lockfile "$(REPO_ROOT)/apm.lock.yaml" \
+		--output "$(REPO_ROOT)/antigravity/mcp_config.json"
 	@$(MAKE) setup-antigravity
 
 # Antigravityの設定を同期

@@ -23,8 +23,8 @@ AIエージェント（Claude Code, Gemini CLI, OpenCode, Codex）の設定・�
 ├── AGENTS.md
 ├── apm.yml                 # [SSOT] APM 設定・外部スキル依存関係
 ├── .env.example            # 環境変数テンプレート
-├── .agents/skills/         # [APM 標準] 全エージェント向けスキル配置
-├── agent-skills/           # [SSOT] Skill definitions (skillport)
+├── .agents/skills/         # [RUNTIME] 全エージェント共通スキル実体
+├── agent-skills/           # [AUTHORING] custom スキル編集元 + 生成インデックス
 ├── agent-commands/         # [SSOT] Slash commands
 ├── global-rules/           # [SSOT] Global AI rules
 ├── claude/                 # Claude Code specific settings
@@ -58,14 +58,17 @@ AIエージェント（Claude Code, Gemini CLI, OpenCode, Codex）の設定・�
 
 [SkillPort](https://github.com/gotalab/skillport) は、複数の AI エージェント間で再利用可能な「スキル」を一元管理するためのツールです。
 
-- **Runtime skill directory**: `.agents/skills/` が SkillPort MCP およびネイティブエージェントスキル検出の際に読み込まれるディレクトリです。
-- **Custom skill authoring**: ローカルカスタムスキルは `agent-skills/custom/` で編集し、`.agents/skills/custom/` として公開されます。
-- **Native adapters**: `~/.opencode/skills`、`~/.claude/skills`、`~/.skillport/skills` は `.agents/skills/` へのシンボリックリンクです。(`.skillportrc` の `skills_dir` も `.agents/skills` を指します)
+- **スキルの実体 (Runtime)**: `.agents/skills/` 配下に全エージェント共通のスキル実体が配置されます。ローカル custom スキルの編集元は `agent-skills/custom/` で、`.agents/skills/custom/` を通じて公開されます。
+- **外部スキルの管理 (APM)**: `superpowers` などの高品質な外部スキルは、`apm.yml` の `dependencies` で管理され、`apm.lock.yaml` でバージョン（コミットハッシュ）が固定されます。
+  - **スキルインストール**: `apm install` で `apm.yml` に記載された全外部スキルをインストールします。
+  - この操作は `make setup` 実行時にも自動で行われます。
+- **構成**: `.skillportrc` の `skills_dir` は `./.agents/skills` を指します。`~/.skillport/skills`・`~/.opencode/skills`・`~/.claude/skills` は `.agents/skills/` への symlink アダプタです。
 - **スキル配置**: `.agents/skills/` に集約（全エージェントが参照）
 - **コマンド**:
   - `make skillport`: SkillPort と `skillport-mcp` をインストールし、本環境の**初期セットアップ**を行います。
   - `make check-skillport`: インストール状態とシンボリックリンクの整合性を確認します。
-  - `make sync-agents` / `make sync-skills-to-agents`: `.agents/skills/` の runtime tree と `agent-skills/custom/` のカスタムツリーを統合し、スキルアダプターを設定してインデックスを生成します。
+  - `make sync-agents`: APM install/compile、各設定生成、skill adapter セットアップ、SkillPort インデックス（`agent-skills/AVAILABLE_SKILLS.md`）生成を一括実行します。
+  - `make sync-skills-to-agents`: ネイティブエージェントディレクトリ（`~/.opencode/skills`・`~/.claude/skills`・`~/.skillport/skills`）を `.agents/skills/` への symlink アダプタとして設定します。
   - `make sync-agents-rules`: `agent-skills/` をソースとして、`AGENTS.md` と `global-rules/AGENTS.global.md` の SkillPort ブロックを直接更新します。
   - `skillport <command>`: スキルの追加・削除・更新などの**管理操作**は、`skillport` CLI を直接実行してください（`make` 経由ではありません）。
     - 例: `skillport add anthropics/skills skills/ --namespace anthropics`
@@ -122,7 +125,7 @@ Antigravity CLI 1.0.6 では、Docker MCP Gateway の SSE endpoint (`:10888/sse`
 1. **仕組み**: `skillport-mcp` が起動時にスキルディレクトリをスキャンし、各スキルを MCP ツールとして公開します。
 2. **利用方法**: `mcp/config.yaml` で `skillport` を有効にしている限り、全エージェントは Docker MCP Gateway (`:10888/sse`) 経由で自動的に全スキルを利用できます。
 3. **スキル配置先**: `.agents/skills/` (APM 標準クロスプラットフォーム)
-4. **実体**: `agent-skills/` (SSOT)
+4. **実体 (Runtime)**: `.agents/skills/`（ローカル custom スキルの編集元は `agent-skills/custom/`）
 
 ## エージェント設定の自動同期 (APM)
 
@@ -159,12 +162,12 @@ Antigravity CLI 1.0.6 では、Docker MCP Gateway の SSE endpoint (`:10888/sse`
 
 - **ルールの編集**: 
   - ユーザー共通設定は `global-rules/AGENTS.global.md` を編集。
-  - 個別のスキルは `agent-skills/*/SKILL.md` を編集。
+  - ローカル custom スキルは `agent-skills/custom/*/SKILL.md` を編集（外部スキルは `apm.yml` で管理）。
   - **カスタム MCP サーバーの追加・変更・有効化**、および**エージェント/IDE の接続設定変更**は、全て **`apm.yml`** を編集してください。
 - **同期コマンド**:
   - `make setup-docker-mcp`: Docker MCP Gateway のセットアップ。
   - `make sync-mcp`: MCP 設定の再生成と同期。
-  - `make sync-agents`: `agent-skills/` から各 AGENTS instruction file のスキル一覧を同期。
+  - `make sync-agents`: `.agents/skills/` の runtime tree と `agent-skills/custom/` から `agent-skills/AVAILABLE_SKILLS.md` を再生成し、各エージェントへ配備。
 
 ## 主要な make ターゲット
 
@@ -174,7 +177,8 @@ Antigravity CLI 1.0.6 では、Docker MCP Gateway の SSE endpoint (`:10888/sse`
 | `make apm-install` | APM インストール + 同期 |
 | `make setup-apm-env` | .env ファイルの雛形作成 |
 | `make setup-docker-mcp` | Docker MCP Gateway のセットアップ |
-| `make sync-agents` / `make sync-skills-to-agents` | スキルを .agents/skills/ に集約 |
+| `make sync-agents` | APM install/compile・設定生成・アダプタ設定・インデックス生成を一括実行 |
+| `make sync-skills-to-agents` | ネイティブスキルディレクトリを `.agents/skills/` への symlink アダプタとして設定 |
 | `make sync-mcp` | MCP 設定の再生成 |
 | `make start-mcp` | MCP Gateway を起動 |
 | `make stop-mcp` | MCP Gateway を停止 |
