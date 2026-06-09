@@ -31,9 +31,9 @@ OUTPUT = REPO_ROOT / "opencode" / "opencode.jsonc"
 # ---------------------------------------------------------------------------
 # MCP format conversion: apm.yml dependencies.mcp -> OpenCode mcp object
 # ---------------------------------------------------------------------------
-def _convert_mcp_entry(entry: dict[str, Any]) -> dict[str, Any]:
+def _convert_mcp_entry(entry: dict[str, Any]) -> tuple[str, dict[str, Any]]:
     """Convert a single apm.yml MCP entry to OpenCode mcp format."""
-    name = entry["name"]
+    name = str(entry["name"])
     transport = entry.get("transport", "stdio")
     enabled = entry.get("enabled", True)
 
@@ -93,7 +93,8 @@ def _load_template_providers(template_path: Path) -> dict[str, Any]:
         obj = json.loads(stripped)
     except json.JSONDecodeError as exc:
         raise SystemExit(f"[error] Failed to parse template: {exc}") from exc
-    return obj.get("provider_opencode_specific", {})
+    providers = obj.get("provider_opencode_specific", {})
+    return providers if isinstance(providers, dict) else {}
 
 
 def _strip_jsonc_comments(text: str) -> str:
