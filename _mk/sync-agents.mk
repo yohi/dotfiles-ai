@@ -16,7 +16,7 @@ CODEX_CONFIG     := $(REPO_ROOT)/codex/config.toml
 
 .PHONY: sync-agents-core clean-sync-artifacts ai-setup \
         inject-meta-prompt-opencode inject-meta-prompt-codex \
-        sync-skillport-doc link-user-agents link-agent-commands \
+        sync-skillport-doc sync-agents-rules link-user-agents link-agent-commands \
         clean-legacy clean-legacy-skills
 
 # ============================================================
@@ -49,9 +49,11 @@ clean-sync-artifacts: ## 同期マーカーおよび生成されたリンク・�
 	@echo "✅ clean-sync-artifacts: 同期状態がリセットされました"
 
 # ============================================================
-# sync-skillport-doc: skillport doc の実行と各 AGENTS への直接反映
+# sync-agents-rules: skillport doc の実行と各 AGENTS への直接反映
 # ============================================================
-sync-skillport-doc: ## _scripts/sync_agents.sh を実行し、agent-skills/ から AGENTS 群のスキル一覧を更新する
+sync-skillport-doc: sync-agents-rules
+
+sync-agents-rules: ## _scripts/sync_agents.sh を実行し、agent-skills/ から AGENTS 群のスキル一覧を更新する
 	@echo "📝 skillport doc: agent-skills/ から AGENTS 群のスキル一覧を更新中..."
 	@bash "$(REPO_ROOT)/_scripts/sync_agents.sh"
 

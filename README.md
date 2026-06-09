@@ -69,6 +69,7 @@ AIエージェント（Claude Code, Gemini CLI, OpenCode, Codex）の設定・�
   - `make check-skillport`: インストール状態とシンボリックリンクの整合性を確認します。
   - `make sync-agents`: APM install/compile、各設定生成、skill adapter セットアップ、SkillPort インデックス（`agent-skills/AVAILABLE_SKILLS.md`）生成を一括実行します。
   - `make sync-skills-to-agents`: ネイティブエージェントディレクトリ（`~/.opencode/skills`・`~/.claude/skills`・`~/.skillport/skills`）を `.agents/skills/` への symlink アダプタとして設定します。
+  - `make sync-agents-rules`: `agent-skills/` をソースとして、`global-rules/AGENTS.global.md` 等の SkillPort ブロックを直接更新します。
   - `skillport <command>`: スキルの追加・削除・更新などの**管理操作**は、`skillport` CLI を直接実行してください（`make` 経由ではありません）。
     - 例: `skillport add anthropics/skills skills/ --namespace anthropics`
   - `skillport check`: スキル定義ファイル（.md）の構文や整合性をチェックします。
