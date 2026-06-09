@@ -61,8 +61,6 @@ define link_config
 	fi
 endef
 
-sync-opencode
-
 # opencode.jsonc を apm.yml から生成する
 sync-opencode: ## apm.yml (SSOT) から opencode/opencode.jsonc を生成する
 	$(Q_ECHO) "🔄 opencode.jsonc を apm.yml から生成中..."
@@ -236,7 +234,7 @@ setup-opencode: ## OpenCode（opencode）の設定ファイルを適用
 		fi; \
 	fi
 
-.PHONY: help-opencode
+.PHONY: opencode install-packages-opencode install-opencode opencode-update setup-opencode check-opencode uninstall-opencode opencode-personal opencode-work sync-opencode check-sync-opencode help-opencode
 help-opencode: ## OpenCode の使い方を表示
 	$(call show-guide,$(REPO_ROOT)/_docs/guides/opencode.md)
 

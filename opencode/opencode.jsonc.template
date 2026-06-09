@@ -1,7 +1,7 @@
 // vim: ft=jsonc
-// AUTO-GENERATED: Do not edit directly.
+// TEMPLATE: Edit this file; changes are source for generated opencode.jsonc.
+// Regenerate: run `make sync-opencode` to propagate changes.
 // Source: apm.yml (SSOT) + opencode.jsonc.template (opencode-only static fields)
-// Regenerate: make sync-opencode
 // Target OpenCode Version: v1.15.10
 
 /**

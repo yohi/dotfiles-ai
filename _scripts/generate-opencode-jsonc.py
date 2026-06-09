@@ -106,8 +106,15 @@ def _strip_jsonc_comments(text: str) -> str:
     i = 0
     while i < len(text):
         ch = text[i]
-        if ch == '"' and (i == 0 or text[i - 1] != "\\"):
-            in_string = not in_string
+        if ch == '"':
+            # Count preceding backslashes to see if this quote is escaped
+            bs_count = 0
+            j = i - 1
+            while j >= 0 and text[j] == "\\":
+                bs_count += 1
+                j -= 1
+            if bs_count % 2 == 0:
+                in_string = not in_string
             result.append(ch)
         elif not in_string and ch == "/" and i + 1 < len(text) and text[i + 1] == "/":
             # Skip to end of line
