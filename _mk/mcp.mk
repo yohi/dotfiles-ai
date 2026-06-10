@@ -5,6 +5,8 @@ mcp: setup-docker-mcp
 setup-docker-mcp: sync-mcp sync-mcp-gateway ## Docker MCP Gateway のセットアップ（APM同期→設定反映→サービス起動）
 	$(Q_ECHO) "🐳 Docker MCPの設定をセットアップ中..."
 	@bash _scripts/setup-docker-mcp.sh
+	systemctl --user daemon-reload
+	$(MAKE) restart-mcp
 	$(Q_ECHO) "✅ Docker MCPの設定が完了しました。"
 	$(Q_ECHO) "💡 使い方を確認するには 'make help-mcp' を実行してください。"
 
@@ -59,7 +61,7 @@ sync-mcp-gateway: ## Docker MCP Gateway 設定を同期
 	fi
 	@sed -e "s|__HOME__|$(HOME_DIR)|g" \
 	    -e "s|__REPO_ROOT__|$(REPO_ROOT)|g" \
-	    -e "s|__ENABLED_SERVERS__|skillport,nexus,chronos-graph|g" \
+	    -e "s|__ENABLED_SERVERS__|nexus,chronos-graph|g" \
 	    mcp/docker-mcp-gateway.service > $(HOME_DIR)/.config/systemd/user/docker-mcp-gateway.service
 	@echo "✅ Service file docker-mcp-gateway.service deployed and configured."
 	@if [ ! -f "mcp/mcp-watchdog.service" ]; then \

@@ -53,15 +53,7 @@
       "variant": "${HEPHAESTUS_VARIANT}",
       "fallback_models": [
         "${HEPHAESTUS_FALLBACK_MODEL}"
-      ],
-      "permission": {
-        "edit": "allow",
-        "bash": {
-          "git": "allow",
-          "test": "allow",
-          "npm": "allow"
-        }
-      }
+      ]
     },
     "oracle": {
       // 【大規模解析・監査: Oracle】 読み取り専用のコンサルタント。
