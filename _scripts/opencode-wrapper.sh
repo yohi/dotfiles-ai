@@ -75,7 +75,12 @@ fi
         source "$ENV_FILE"
         set +a
     fi
-    # Use envsubst to process the template
+    # Use envsubst to process the template, but only for variables that should be replaced.
+    # We exclude $schema by explicitly providing the list of variables if possible, 
+    # or just use a safer approach.
+    # Here we use a trick: export a variable named 'schema' with value '$schema' 
+    # so envsubst replaces $schema with $schema.
+    export schema='$schema'
     envsubst < "$TEMPLATE" > "$TMP_DIR/oh-my-openagent.jsonc"
 
     # After envsubst substituted values, check if any model configuration has an empty value
