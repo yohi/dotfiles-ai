@@ -128,8 +128,8 @@ permission:
   external_directory: ask
   doom_loop: ask
   # Bash: base ASK, common-safe commands ALLOW, dangerous commands DENY.
-  # Matching is most-specific-wins: the broad allows below are safely
-  # overridden by the specific deny rules in the DANGEROUS section.
+  # Matching is sequential (last-match-wins): rules are evaluated top-down,
+  # so the dangerous deny rules MUST be placed after the broad allows below.
   bash:
     "*": ask
 
@@ -254,6 +254,7 @@ permission:
     "git add -A*": deny
     "git add --all*": deny
     "git add :/*": deny
+    "git add -u*": deny
     "git push -f*": deny
     "git push --force*": deny
     "git reset --hard*": deny

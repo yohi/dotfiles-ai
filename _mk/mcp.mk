@@ -5,6 +5,8 @@ mcp: setup-docker-mcp
 setup-docker-mcp: sync-mcp sync-mcp-gateway ## Docker MCP Gateway のセットアップ（APM同期→設定反映→サービス起動）
 	$(Q_ECHO) "🐳 Docker MCPの設定をセットアップ中..."
 	@bash _scripts/setup-docker-mcp.sh
+	systemctl --user daemon-reload
+	$(MAKE) restart-mcp
 	$(Q_ECHO) "✅ Docker MCPの設定が完了しました。"
 	$(Q_ECHO) "💡 使い方を確認するには 'make help-mcp' を実行してください。"
 
