@@ -1,0 +1,48 @@
+{
+  "skill_name": "jmeter-scenario-builder",
+  "notes": "Run these when shell/subagent access is available. In the current sandbox bash, web, and subagent tools were blocked, so the quantitative with-skill vs baseline loop and description-optimization loop could not be executed. Each prompt below should yield a runnable .jmx; assertions check structural correctness because JMeter silently mis-loads malformed plans.",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Make a JMeter load test for https://shop.example.com : 200 concurrent users for 5 minutes, ramping up over a minute, hitting GET /api/products?category=shoes and expecting HTTP 200. Add a summary report.",
+      "expected_output": "A .jmx with one Thread Group (num_threads=200, ramp_time=60, scheduler=true, duration=300, loops=-1), an HTTPSamplerProxy GET /api/products with category=shoes as an HTTPArgument, a ResponseAssertion on response_code equals 200, and a SummaryReport ResultCollector.",
+      "files": [],
+      "assertions": [
+        {"name": "well_formed_xml", "text": "Output parses as well-formed XML with root <jmeterTestPlan>."},
+        {"name": "thread_count_200", "text": "ThreadGroup.num_threads is 200 and ramp_time is 60."},
+        {"name": "time_bounded", "text": "ThreadGroup.scheduler is true, duration is 300, and LoopController.loops is -1."},
+        {"name": "query_param", "text": "The products sampler carries category=shoes as an HTTPArgument with use_equals=true."},
+        {"name": "status_assertion", "text": "A ResponseAssertion checks Assertion.response_code equals 200 (test_type 8)."},
+        {"name": "hashtree_consistent", "text": "Every test element is followed by exactly one hashTree (builder structural check passes)."}
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "I need a jmeter scenario that logs in via POST /auth/login with a JSON body {email,password}, grabs the access_token from the JSON response, then calls GET /orders with that token as a Bearer header. 50 users, 200 iterations each, against api.example.com over https.",
+      "expected_output": "A .jmx with a Thread Group (threads=50, loops=200, scheduler=false), a POST /auth/login sampler with a raw JSON body (postBodyRaw=true) and a JSONPostProcessor extracting access_token into a variable, followed by a GET /orders sampler with an Authorization: Bearer ${token} header.",
+      "files": [],
+      "assertions": [
+        {"name": "well_formed_xml", "text": "Output parses as well-formed XML with root <jmeterTestPlan>."},
+        {"name": "fixed_iterations", "text": "ThreadGroup has threads=50, LoopController.loops=200, and scheduler is false (no duration)."},
+        {"name": "raw_json_body", "text": "The login sampler uses a single nameless HTTPArgument and HTTPSampler.postBodyRaw=true (not query params)."},
+        {"name": "json_extractor", "text": "A JSONPostProcessor extracts access_token (jsonPathExprs $.access_token) into a referenceName."},
+        {"name": "bearer_header", "text": "The orders sampler has an HTTP Header Manager with Authorization: Bearer referencing the extracted variable."},
+        {"name": "ordering", "text": "The login sampler precedes the orders sampler within the same thread group."}
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "負荷テストのシナリオを作って。example.org に対して、CSVファイル(user_ids.csv の user_id 列)を使って GET /users/${user_id} を叩く。100ユーザー、3分間、リクエスト間に1〜2秒のランダムな待機を入れて。レスポンスは200を期待。",
+      "expected_output": "A .jmx with a CSV Data Set Config reading user_ids.csv into user_id, a Thread Group (threads=100, duration=180), a GET /users/${user_id} sampler with a Uniform Random Timer (~1000-2000ms total) and a response_code 200 assertion.",
+      "files": [],
+      "assertions": [
+        {"name": "well_formed_xml", "text": "Output parses as well-formed XML with root <jmeterTestPlan>."},
+        {"name": "csv_dataset", "text": "A CSVDataSet has filename user_ids.csv and variableNames user_id."},
+        {"name": "path_variable", "text": "The sampler path is /users/${user_id} (variable used in the path, not as a query param)."},
+        {"name": "time_bounded_100", "text": "ThreadGroup.num_threads is 100, scheduler true, duration 180."},
+        {"name": "random_think_time", "text": "A UniformRandomTimer is present with delay+range covering roughly 1000-2000 ms."},
+        {"name": "status_assertion", "text": "A ResponseAssertion checks response_code equals 200."}
+      ]
+    }
+  ]
+}

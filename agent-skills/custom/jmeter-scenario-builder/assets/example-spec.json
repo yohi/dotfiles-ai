@@ -1,0 +1,56 @@
+{
+  "test_plan": {
+    "name": "Sample API Load Test",
+    "comments": "Copyable starting point. Edit values, then: python scripts/build_jmx.py assets/example-spec.json -o plan.jmx"
+  },
+  "variables": {
+    "BASE_URL": "example.com"
+  },
+  "defaults": {
+    "protocol": "https",
+    "domain": "${BASE_URL}",
+    "port": "443"
+  },
+  "headers": {
+    "Content-Type": "application/json",
+    "Accept": "application/json"
+  },
+  "thread_groups": [
+    {
+      "name": "Stock API",
+      "threads": 100,
+      "ramp_up": 30,
+      "duration": 300,
+      "csv_data": [
+        {"filename": "codes.csv", "variables": ["code"], "recycle": true}
+      ],
+      "samplers": [
+        {
+          "name": "POST /login",
+          "method": "POST",
+          "path": "/api/login",
+          "body": {"user": "perf", "pass": "perf"},
+          "assertions": [
+            {"field": "response_code", "type": "equals", "value": "200"}
+          ],
+          "extractors": [
+            {"type": "json", "var": "token", "jsonpath": "$.token"}
+          ]
+        },
+        {
+          "name": "GET /stock",
+          "method": "GET",
+          "path": "/api/stock",
+          "params": {"code": "${code}"},
+          "headers": {"Authorization": "Bearer ${token}"},
+          "assertions": [
+            {"field": "response_code", "type": "equals", "value": "200"},
+            {"field": "response_data", "type": "substring", "value": "quantity"}
+          ],
+          "timer": {"type": "uniform", "delay": 500, "range": 1000}
+        }
+      ]
+    }
+  ],
+  "listeners": ["summary", "aggregate"]
+}
