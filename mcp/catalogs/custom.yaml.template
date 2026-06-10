@@ -48,23 +48,3 @@ registry:
         value: "2000"
       - name: NO_PROXY
         value: "127.0.0.1,localhost"
-  skillport:
-    title: "Skillport"
-    description: "Professional development and AI skill management toolkit."
-    type: server
-    image: ghcr.io/yohi/skillport:1.1.1
-    command:
-      - --reindex
-    env:
-      - name: SKILLPORT_SKILLS_DIR
-        value: "__REPO_ROOT__/agent-skills"
-      - name: SKILLS_DIR
-        value: "__REPO_ROOT__/agent-skills"
-      - name: SKILLPORT_DB_PATH
-        value: "/mcp/db"
-      - name: DB_PATH
-        value: "/mcp/db"
-    volumes:
-      - "__HOME__/.skillport:/mcp"
-      - "__HOME__/.skillport:__HOME__/.skillport"
-      - "__REPO_ROOT__:__REPO_ROOT__:ro"
