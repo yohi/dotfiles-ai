@@ -127,26 +127,104 @@ permission:
   mcp_chronos-graph_*: allow
   external_directory: ask
   doom_loop: ask
+  # Bash: base ASK, common-safe commands ALLOW, dangerous commands DENY.
+  # Matching is most-specific-wins: the broad allows below are safely
+  # overridden by the specific deny rules in the DANGEROUS section.
   bash:
     "*": ask
+
+    # --- read-only inspection ---
     "ls*": allow
     "cat*": allow
     "head*": allow
     "tail*": allow
+    "less*": allow
+    "more*": allow
+    "wc*": allow
+    "cut*": allow
+    "sort*": allow
+    "uniq*": allow
+    "tr*": allow
+    "column*": allow
+    "tee*": allow
+    "xargs*": allow
+    "diff*": allow
+    "comm*": allow
     "grep*": allow
-    "devcontainer*": allow
-    "docker*": allow
+    "rg*": allow
+    "find*": allow
+    "fd*": allow
+    "tree*": allow
+    "stat*": allow
+    "file*": allow
+    "basename*": allow
+    "dirname*": allow
+    "realpath*": allow
+    "readlink*": allow
+    "du*": allow
+    "df*": allow
+
+    # --- system info ---
+    "pwd*": allow
+    "cd*": allow
+    "echo*": allow
+    "printf*": allow
+    "which*": allow
+    "whereis*": allow
+    "type*": allow
+    "id*": allow
+    "whoami*": allow
+    "uname*": allow
+    "hostname*": allow
+    "date*": allow
+    "env*": allow
+    "printenv*": allow
+    "ps*": allow
+    "lsof*": allow
+    "ss*": allow
+    "netstat*": allow
+    "sleep*": allow
+    "seq*": allow
+    "test*": allow
+
+    # --- text processing ---
+    "jq*": allow
+    "yq*": allow
+    "sed*": allow
+    "awk*": allow
+
+    # --- archives ---
+    "tar*": allow
+    "zip*": allow
+    "unzip*": allow
+    "gzip*": allow
+    "gunzip*": allow
+
+    # --- file ops (create/copy; destructive forms denied below) ---
+    "mkdir*": allow
+    "touch*": allow
+    "cp*": allow
+    "mv*": allow
+    "ln*": allow
+
+    # --- build / package managers / runtimes ---
     "make*": allow
     "uv*": allow
-    "bun run lint*": allow
-    "bun run typecheck*": allow
-    "bun run test*": allow
-    "eslint*": allow
     "npm*": allow
     "npx*": allow
     "pnpm*": allow
     "yarn*": allow
     "bun*": allow
+    "node*": allow
+    "python*": allow
+    "python3*": allow
+    "pip*": allow
+    "pip3*": allow
+    "eslint*": allow
+    "devcontainer*": allow
+    "docker*": allow
+
+    # --- git: read-only & safe operations ---
     "git status*": allow
     "git log*": allow
     "git diff*": allow
@@ -158,37 +236,57 @@ permission:
     "git tag*": allow
     "git branch*": allow
     "git fetch*": allow
-    "git add": allow
+    "git stash*": allow
+    "git describe*": allow
+    "git shortlog*": allow
+    "git check-ignore*": allow
+    "git config --get*": allow
     "git commit*": allow
-    "git checkout": ask
-    "git checkout *": ask
-    "git merge": ask
-    "git rebase": ask
-    "git pull": ask
+    "git checkout*": allow
+    "git merge*": allow
+    "git rebase*": allow
+    "git pull*": allow
+    "git add*": allow
+
+    # === DANGEROUS: hard deny (most-specific match overrides allows) ===
+    # destructive git
     "git add .": deny
-    "git add *": ask
-    "git add -A": deny
-    "git add --all": deny
-    "git add -u": deny
-    "git add :/": deny
+    "git add -A*": deny
+    "git add --all*": deny
+    "git add :/*": deny
     "git push -f*": deny
+    "git push --force*": deny
     "git reset --hard*": deny
     "git clean -fd*": deny
-    "mkdir": allow
-    "touch": allow
-    "cp": allow
-    "mv": allow
-    "rm -rf *": deny
-    "npm publish*": deny
-    "sudo *": deny
+    "git clean -xfd*": deny
+    # destructive filesystem
+    "rm -rf*": deny
+    "rm -fr*": deny
+    "rm -r *": deny
+    "dd *": deny
+    "mkfs*": deny
+    "shred*": deny
+    # privilege escalation
+    "sudo*": deny
     "su *": deny
+    "doas*": deny
+    # pipe-to-shell (remote code execution)
     "curl* | sh": deny
-    "curl *|sh": deny
-    "curl * | sh": deny
+    "curl* | bash": deny
     "curl*|sh": deny
+    "curl*|bash": deny
+    "wget* | sh": deny
+    "wget* | bash": deny
+    "wget*|sh": deny
+    "wget*|bash": deny
+    # publish / system power
+    "npm publish*": deny
+    "shutdown*": deny
+    "reboot*": deny
+    "halt*": deny
+    "poweroff*": deny
+    # repo-specific
     "bash _scripts/*": deny
-    "python": ask
-    "node": ask
 
 compaction:
   auto: true
