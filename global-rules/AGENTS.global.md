@@ -19,6 +19,8 @@ You are an expert AI software engineer assisting the user across various project
   - Use environment variables (e.g., `$HOME`, `$PWD`) or relative paths.
   - This ensures environment-agnostic portability and prevents leaking local directory structures.
 - **Credential Protection**: Never log, print, or commit secrets, API keys, or sensitive credentials. Rigorously protect `.env` files, `.git`, and system configuration folders.
+- **No New Agent Config Files**: **NEVER** create *new* AI agent configuration files or directories (e.g., `.opencode/` or `.claude/` directories, `opencode.json(c)`, `claude.json(c)`, and similar agent settings files). **Overwriting or editing an EXISTING** configuration file is permitted.
+  - **Rationale**: Newly created config files (especially project-level ones) silently shadow the centrally-managed SSOT configuration and cause hard-to-debug overrides. Agent configuration must flow only through the established SSOT pipeline (e.g., `apm.yml` -> generated `opencode.jsonc`).
 
 ## 4. Universal Coding Standards
 
@@ -42,6 +44,10 @@ The following rules apply to **ALL** projects unless overridden by a local proje
 2. **Resolve Paths**: Paths in Section 3 are relative to the Central Config Repo. Check accessibility before trying to resolve them.
 3. **Execution Environment**: If a `devcontainer` environment (e.g., `.devcontainer/`) is available, **ALWAYS** prioritize executing static analysis, linting, and tests **inside the devcontainer** to ensure environment consistency.
 4. **Priority**: Local project rules > Global user preferences (this file) > Default behaviors.
+
+
+
+
 
 
 
@@ -343,6 +349,8 @@ Each skill contains step-by-step instructions, templates, and scripts.
 </skill>
 </available_skills>
 <!-- SKILLPORT_END -->
+
+
 
 
 
