@@ -1,7 +1,22 @@
 lockfile_version: '1'
-generated_at: '2026-06-15T06:15:53.466698+00:00'
+generated_at: '2026-06-15T12:50:33.079047+00:00'
 apm_version: 0.18.0
 dependencies:
+- repo_url: anthropics/claude-code
+  host: github.com
+  resolved_commit: ca9f6045fc90c8244f9e787fb57d54b380f9a27c
+  virtual_path: plugins/code-review
+  is_virtual: true
+  package_type: marketplace_plugin
+  deployed_files:
+  - .cursor/commands/code-review.md
+  - .gemini/commands/code-review.toml
+  - .opencode/commands/code-review.md
+  deployed_file_hashes:
+    .cursor/commands/code-review.md: sha256:ecab79f22b6e2bef07a524d2015aaa9e0b7abce82445f38b31a231b19c7bd43a
+    .gemini/commands/code-review.toml: sha256:ea451002aca3c98e27b6c5e8a3cf77e9c6e6cd93c72944b496adcf0c78f5f966
+    .opencode/commands/code-review.md: sha256:ecab79f22b6e2bef07a524d2015aaa9e0b7abce82445f38b31a231b19c7bd43a
+  content_hash: sha256:d25f797947bbd724551746c24ed4ac40788aaf370a7857eb120180fbb00ac2be
 - repo_url: anthropics/skills
   host: github.com
   resolved_commit: da20c92503b2e8ff1cf28ca81a0df4673debdbf7

@@ -9,6 +9,7 @@ dependencies:
   apm:
     - obra/superpowers
     - anthropics/skills
+    - anthropics/claude-code//plugins/code-review
 
   # MCP Servers
   mcp:
@@ -112,6 +113,7 @@ disabled_providers:
 
 permission:
   "*": ask
+  "todowrite": allow
   read: allow
   edit: allow
   glob: allow
@@ -224,6 +226,7 @@ permission:
     "python3*": allow
     "pip*": allow
     "pip3*": allow
+    "gh*": allow
     "eslint*": allow
     "devcontainer*": allow
     "docker*": allow
@@ -252,30 +255,48 @@ permission:
     "git pull*": allow
     "git add*": allow
 
-    # === DANGEROUS: hard deny (most-specific match overrides allows) ===
+    # git: env-var-prefixed read-only (GIT_MASTER=1 etc)
+    "GIT_MASTER=1 git status*": allow
+    "GIT_MASTER=1 git diff*": allow
+    "GIT_MASTER=1 git log*": allow
+    "GIT_MASTER=1 git branch*": allow
+    "GIT_MASTER=1 git merge-base*": allow
+    "GIT_MASTER=1 git rev-parse*": allow
+
+    # === DANGEROUS: ask for confirmation instead of hard deny for most ops ===
     # destructive git
-    "git add .": deny
-    "git add -A*": deny
-    "git add --all*": deny
-    "git add :/*": deny
-    "git add -u*": deny
-    "git push -f*": deny
-    "git push --force*": deny
-    "git reset --hard*": deny
-    "git clean -fd*": deny
-    "git clean -xfd*": deny
+    "git add .": ask
+    "git add -A*": ask
+    "git add --all*": ask
+    "git add :/*": ask
+    "git add -u*": ask
+    "git push*": ask
+    "git reset --hard*": ask
+    "git clean -fd*": ask
+    "git clean -xfd*": ask
     # destructive filesystem
-    "rm -rf*": deny
-    "rm -fr*": deny
-    "rm -r *": deny
+    "rm -rf*": ask
+    "rm -fr*": ask
+    "rm -r *": ask
+    # publish / system power
+    "npm publish*": ask
+    "shutdown*": ask
+    "reboot*": ask
+    "halt*": ask
+    "poweroff*": ask
+    # repo-specific
+    "bash _scripts/*": ask
+
+    # git master branch push (last-match-wins after the ask rule)
+    "git push* master": deny
+    "git push* master *": deny
+    # === TRULY DANGEROUS: hard deny (privilege escalation, disk destruction, RCE) ===
     "dd *": deny
     "mkfs*": deny
     "shred*": deny
-    # privilege escalation
     "sudo*": deny
     "su *": deny
     "doas*": deny
-    # pipe-to-shell (remote code execution)
     "curl* | sh": deny
     "curl* | bash": deny
     "curl*|sh": deny
@@ -284,14 +305,6 @@ permission:
     "wget* | bash": deny
     "wget*|sh": deny
     "wget*|bash": deny
-    # publish / system power
-    "npm publish*": deny
-    "shutdown*": deny
-    "reboot*": deny
-    "halt*": deny
-    "poweroff*": deny
-    # repo-specific
-    "bash _scripts/*": deny
 
 compaction:
   auto: true
@@ -344,8 +357,6 @@ instructions:
 
 watcher:
   ignore:
-    - "**/node_modules/**"
-    - "**/dist/**"
     - "**/coverage/**"
     - "**/*.lock"
     - "**/.git/**"
