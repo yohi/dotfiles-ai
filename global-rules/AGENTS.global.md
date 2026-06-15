@@ -134,6 +134,22 @@ The following rules apply to **ALL** projects unless overridden by a local proje
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 <!-- SKILLPORT_START -->
 ## SkillPort Skills
 
@@ -217,6 +233,11 @@ Each skill contains step-by-step instructions, templates, and scripts.
   <name>custom/makefile-organization</name>
   <description>Guidelines for organizing and maintaining modular Makefiles. Use when refactoring, creating new .mk files, or ensuring consistency across the project's Makefile structure. Covers naming conventions, inclusion order, idempotency management, and error handling for a robust development environment.</description>
   <location>agent-skills/custom/makefile-organization/SKILL.md</location>
+</skill>
+<skill>
+  <name>custom/update-opencode-models</name>
+  <description>Updates the LLM models in apm.yml, personal.env, and work.env using the latest model-schema from models.dev, and updates opencode/README.md from the latest release of oh-my-openagent.</description>
+  <location>agent-skills/custom/update-opencode-models/SKILL.md</location>
 </skill>
 <skill>
   <name>dispatching-parallel-agents</name>
@@ -350,6 +371,14 @@ Each skill contains step-by-step instructions, templates, and scripts.
 </skill>
 </available_skills>
 <!-- SKILLPORT_END -->
+
+
+
+
+
+
+
+
 
 
 
@@ -552,3 +581,24 @@ The `skill` tool resolves the command prefix internally. Canonical namespace-qua
 ### 8.3 Post-Hoc Reflection
 
 If you skip subagent delegation and execute a plan directly, document the reason in your response. After completion, explicitly state whether the direct-execution choice was retrospectively correct and what would have been different with delegation.
+
+---
+
+## 9. Nexus MCP Server Usage Guidelines
+
+When using **Nexus MCP** tools for codebase exploration and semantic search, adhere to these instructions for optimal performance and token budget.
+
+### 9.1 WHAT & WHY (Project Overview)
+- **Purpose**: Nexus is a local-first code indexing and search platform for AI agents, providing hybrid semantic search, ripgrep, and AST-based context parsing.
+
+### 9.2 Tool Usage Rules (Playbook)
+- **Index Status**: Run `index_status` before searching. If `isIndexing` is `true`, search results may be incomplete.
+- **Search Strategy**:
+  - Use `hybrid_search` for semantic queries, vague feature exploration, or architectural questions (combines vector & ripgrep via RRF).
+  - Use `grep_search` to pinpoint exact symbols, class/function names, or error strings.
+- **Context Budgeting**:
+  - When calling `get_context`, **DO NOT** read the entire file. Always specify `startLine` and `endLine` parameters to retrieve the minimal relevant snippet to conserve context tokens.
+  - If you switch branches or make massive code changes, manually call `reindex` to refresh the local LanceDB store.
+
+### 9.3 Project-Specific Context
+- **Local Documentation**: In repositories where Nexus is active, refer to the project-local `SPEC.md` for architecture details and `AGENTS.md` for specific development constraints, if they exist.

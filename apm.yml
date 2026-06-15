@@ -1,6 +1,7 @@
 name: dotfiles-ai
 version: 2.0.0
-description: AI Agent settings, skills, and unified MCP configuration for dotfiles
+description: AI Agent settings, skills, and unified MCP configuration for 
+  dotfiles
 
 # APM Standard Dependencies
 dependencies:
@@ -39,7 +40,7 @@ dependencies:
       command: "npx"
       args:
         - "-y"
-        - "@yohi/nexus@1.9.1"
+        - "@yohi/nexus@1.11.0"
       env:
         NEXUS_STORAGE_ROOT_DIR: "${env:HOME}/.nexus"
         LOG_LEVEL: "ERROR"
@@ -99,7 +100,7 @@ snapshot: true
 plugin:
   - "@yohi/justice@2.3.0"
   - "@yohi/akane@1.1.1"
-  - "oh-my-openagent@4.7.5"
+  - "oh-my-openagent@4.10.0"
   - "@yohi/opencode-plugin-chronos-gate@1.4.0"
 
 disabled_providers:
@@ -360,39 +361,336 @@ enabled_providers:
 provider:
   openai:
     whitelist:
-      - "gpt-5.3-codex"
-      - "gpt-5.3-codex-spark"
-      - "gpt-5.4"
-      - "gpt-5.4-mini"
-      - "gpt-5.5"
+      - chatgpt-image-latest
+      - gpt-3.5-turbo
+      - gpt-4
+      - gpt-4-turbo
+      - gpt-4.1
+      - gpt-4.1-mini
+      - gpt-4.1-nano
+      - gpt-4o
+      - gpt-4o-2024-05-13
+      - gpt-4o-2024-08-06
+      - gpt-4o-2024-11-20
+      - gpt-4o-mini
+      - gpt-5
+      - gpt-5-chat-latest
+      - gpt-5-codex
+      - gpt-5-mini
+      - gpt-5-nano
+      - gpt-5-pro
+      - gpt-5.1
+      - gpt-5.1-chat-latest
+      - gpt-5.1-codex
+      - gpt-5.1-codex-max
+      - gpt-5.1-codex-mini
+      - gpt-5.2
+      - gpt-5.2-chat-latest
+      - gpt-5.2-codex
+      - gpt-5.2-pro
+      - gpt-5.3-chat-latest
+      - gpt-5.3-codex
+      - gpt-5.3-codex-spark
+      - gpt-5.4
+      - gpt-5.4-mini
+      - gpt-5.4-nano
+      - gpt-5.4-pro
+      - gpt-5.5
+      - gpt-5.5-pro
+      - gpt-image-1
+      - gpt-image-1-mini
+      - gpt-image-1.5
+      - o1
+      - o1-pro
+      - o3
+      - o3-deep-research
+      - o3-mini
+      - o3-pro
+      - o4-mini
+      - o4-mini-deep-research
+      - text-embedding-3-large
+      - text-embedding-3-small
+      - text-embedding-ada-002
   nvidia:
     whitelist:
-      - "minimaxai/minimax-m2.5"
-      - "minimaxai/minimax-m2.7"
-      - "z-ai/glm-5.1"
-      - "qwen/qwen3-coder-480b-a35b-instruct"
+      - abacusai/dracarys-llama-3_1-70b-instruct
+      - baai/bge-m3
+      - black-forest-labs/flux.1-dev
+      - black-forest-labs/flux_1-kontext-dev
+      - black-forest-labs/flux_1-schnell
+      - black-forest-labs/flux_2-klein-4b
+      - bytedance/seed-oss-36b-instruct
+      - deepseek-ai/deepseek-v4-flash
+      - deepseek-ai/deepseek-v4-pro
+      - google/gemma-2-2b-it
+      - google/gemma-3n-e2b-it
+      - google/gemma-3n-e4b-it
+      - google/gemma-4-31b-it
+      - google/google-paligemma
+      - meta/esm2-650m
+      - meta/esmfold
+      - meta/llama-3.1-70b-instruct
+      - meta/llama-3.1-8b-instruct
+      - meta/llama-3.2-11b-vision-instruct
+      - meta/llama-3.2-1b-instruct
+      - meta/llama-3.2-3b-instruct
+      - meta/llama-3.2-90b-vision-instruct
+      - meta/llama-3.3-70b-instruct
+      - meta/llama-4-maverick-17b-128e-instruct
+      - meta/llama-guard-4-12b
+      - microsoft/phi-4-mini-instruct
+      - microsoft/phi-4-multimodal-instruct
+      - minimaxai/minimax-m2.7
+      - mistralai/magistral-small-2506
+      - mistralai/mistral-7b-instruct-v03
+      - mistralai/mistral-large-3-675b-instruct-2512
+      - mistralai/mistral-medium-3-instruct
+      - mistralai/mistral-nemotron
+      - mistralai/mistral-small-4-119b-2603
+      - mistralai/mixtral-8x22b-instruct
+      - mistralai/mixtral-8x7b-instruct
+      - moonshotai/kimi-k2-instruct-0905
+      - moonshotai/kimi-k2.6
+      - nvidia/active-speaker-detection
+      - nvidia/bevformer
+      - nvidia/cosmos-predict1-5b
+      - nvidia/cosmos-transfer1-7b
+      - nvidia/cosmos-transfer2_5-2b
+      - nvidia/gliner-pii
+      - nvidia/llama-3_1-nemotron-safety-guard-8b-v3
+      - nvidia/llama-3_2-nemoretriever-300m-embed-v1
+      - nvidia/llama-nemotron-embed-vl-1b-v2
+      - nvidia/llama-nemotron-rerank-vl-1b-v2
+      - nvidia/magpie-tts-zeroshot
+      - nvidia/nemotron-3-content-safety
+      - nvidia/nemotron-3-nano-30b-a3b
+      - nvidia/nemotron-3-nano-omni-30b-a3b-reasoning
+      - nvidia/nemotron-3-super-120b-a12b
+      - nvidia/nemotron-3-ultra-550b-a55b
+      - nvidia/nemotron-content-safety-reasoning-4b
+      - nvidia/nemotron-mini-4b-instruct
+      - nvidia/nemotron-voicechat
+      - nvidia/nv-embed-v1
+      - nvidia/nv-embedcode-7b-v1
+      - nvidia/nvidia-nemotron-nano-9b-v2
+      - nvidia/rerank-qa-mistral-4b
+      - nvidia/riva-translate-4b-instruct-v1_1
+      - nvidia/sparsedrive
+      - nvidia/streampetr
+      - nvidia/studiovoice
+      - nvidia/synthetic-video-detector
+      - nvidia/usdcode
+      - nvidia/usdvalidate
+      - openai/gpt-oss-120b
+      - openai/gpt-oss-20b
+      - openai/whisper-large-v3
+      - qwen/qwen-image
+      - qwen/qwen-image-edit
+      - qwen/qwen2.5-coder-32b-instruct
+      - qwen/qwen3-coder-480b-a35b-instruct
+      - qwen/qwen3-next-80b-a3b-instruct
+      - qwen/qwen3.5-122b-a10b
+      - qwen/qwen3.5-397b-a17b
+      - sarvamai/sarvam-m
+      - stepfun-ai/step-3.5-flash
+      - stepfun-ai/step-3.7-flash
+      - upstage/solar-10_7b-instruct
+      - z-ai/glm-5.1
   cloudflare-workers-ai:
     whitelist:
-      - "@cf/google/gemma-4-26b-a4b-it"
-      - "@cf/meta/llama-4-scout-17b-16e-instruct"
-      - "@cf/moonshotai/kimi-k2.6"
-      - "@cf/nvidia/nemotron-3-120b-a12b"
-      - "@cf/openai/gpt-oss-120b"
-      - "@cf/openai/gpt-oss-20b"
-      - "@cf/zai-org/glm-4.7-flash"
+      - '@cf/aisingapore/gemma-sea-lion-v4-27b-it'
+      - '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b'
+      - '@cf/google/gemma-4-26b-a4b-it'
+      - '@cf/ibm-granite/granite-4.0-h-micro'
+      - '@cf/meta/llama-3.1-8b-instruct-fp8'
+      - '@cf/meta/llama-3.2-11b-vision-instruct'
+      - '@cf/meta/llama-3.2-1b-instruct'
+      - '@cf/meta/llama-3.2-3b-instruct'
+      - '@cf/meta/llama-3.3-70b-instruct-fp8-fast'
+      - '@cf/meta/llama-4-scout-17b-16e-instruct'
+      - '@cf/meta/llama-guard-3-8b'
+      - '@cf/mistralai/mistral-small-3.1-24b-instruct'
+      - '@cf/moonshotai/kimi-k2.6'
+      - '@cf/moonshotai/kimi-k2.7-code'
+      - '@cf/nvidia/nemotron-3-120b-a12b'
+      - '@cf/openai/gpt-oss-120b'
+      - '@cf/openai/gpt-oss-20b'
+      - '@cf/qwen/qwen2.5-coder-32b-instruct'
+      - '@cf/qwen/qwen3-30b-a3b-fp8'
+      - '@cf/qwen/qwq-32b'
+      - '@cf/zai-org/glm-4.7-flash'
   opencode:
     whitelist:
-      - "minimax-m2.5-free"
-      - "nemotron-3-super-free"
-      - "deepseek-v4-flash-free"
-      - "big-pickle"
+      - big-pickle
+      - claude-3-5-haiku
+      - claude-fable-5
+      - claude-haiku-4-5
+      - claude-opus-4-1
+      - claude-opus-4-5
+      - claude-opus-4-6
+      - claude-opus-4-7
+      - claude-opus-4-8
+      - claude-sonnet-4
+      - claude-sonnet-4-5
+      - claude-sonnet-4-6
+      - deepseek-v4-flash
+      - deepseek-v4-flash-free
+      - deepseek-v4-pro
+      - gemini-3-flash
+      - gemini-3-pro
+      - gemini-3.1-pro
+      - gemini-3.5-flash
+      - glm-4.6
+      - glm-4.7
+      - glm-4.7-free
+      - glm-5
+      - glm-5-free
+      - glm-5.1
+      - gpt-5
+      - gpt-5-codex
+      - gpt-5-nano
+      - gpt-5.1
+      - gpt-5.1-codex
+      - gpt-5.1-codex-max
+      - gpt-5.1-codex-mini
+      - gpt-5.2
+      - gpt-5.2-codex
+      - gpt-5.3-codex
+      - gpt-5.3-codex-spark
+      - gpt-5.4
+      - gpt-5.4-mini
+      - gpt-5.4-nano
+      - gpt-5.4-pro
+      - gpt-5.5
+      - gpt-5.5-pro
+      - grok-build-0.1
+      - grok-code
+      - hy3-preview-free
+      - kimi-k2
+      - kimi-k2-thinking
+      - kimi-k2.5
+      - kimi-k2.5-free
+      - kimi-k2.6
+      - ling-2.6-flash-free
+      - mimo-v2-flash-free
+      - mimo-v2-omni-free
+      - mimo-v2-pro-free
+      - mimo-v2.5-free
+      - minimax-m2.1
+      - minimax-m2.1-free
+      - minimax-m2.5
+      - minimax-m2.5-free
+      - minimax-m2.7
+      - minimax-m3-free
+      - nemotron-3-super-free
+      - nemotron-3-ultra-free
+      - north-mini-code-free
+      - qwen3-coder
+      - qwen3.5-plus
+      - qwen3.6-plus
+      - qwen3.6-plus-free
+      - ring-2.6-1t-free
+      - trinity-large-preview-free
   amazon-bedrock:
     whitelist:
-      - "global.anthropic.claude-haiku-4-5-20251001-v1:0"
-      - "global.anthropic.claude-opus-4-6-v1"
-      - "global.anthropic.claude-opus-4-7"
-      - "global.anthropic.claude-sonnet-4-6"
-      - "global.anthropic.claude-opus-4-8"
+      - amazon.nova-2-lite-v1:0
+      - amazon.nova-lite-v1:0
+      - amazon.nova-micro-v1:0
+      - amazon.nova-pro-v1:0
+      - anthropic.claude-haiku-4-5-20251001-v1:0
+      - anthropic.claude-opus-4-1-20250805-v1:0
+      - anthropic.claude-opus-4-5-20251101-v1:0
+      - anthropic.claude-opus-4-6-v1
+      - anthropic.claude-opus-4-7
+      - anthropic.claude-opus-4-8
+      - anthropic.claude-sonnet-4-5-20250929-v1:0
+      - anthropic.claude-sonnet-4-6
+      - au.anthropic.claude-haiku-4-5-20251001-v1:0
+      - au.anthropic.claude-opus-4-6-v1
+      - au.anthropic.claude-opus-4-8
+      - au.anthropic.claude-sonnet-4-5-20250929-v1:0
+      - au.anthropic.claude-sonnet-4-6
+      - deepseek.r1-v1:0
+      - deepseek.v3-v1:0
+      - deepseek.v3.2
+      - eu.anthropic.claude-fable-5
+      - eu.anthropic.claude-haiku-4-5-20251001-v1:0
+      - eu.anthropic.claude-opus-4-5-20251101-v1:0
+      - eu.anthropic.claude-opus-4-6-v1
+      - eu.anthropic.claude-opus-4-7
+      - eu.anthropic.claude-opus-4-8
+      - eu.anthropic.claude-sonnet-4-5-20250929-v1:0
+      - eu.anthropic.claude-sonnet-4-6
+      - global.anthropic.claude-fable-5
+      - global.anthropic.claude-haiku-4-5-20251001-v1:0
+      - global.anthropic.claude-opus-4-5-20251101-v1:0
+      - global.anthropic.claude-opus-4-6-v1
+      - global.anthropic.claude-opus-4-7
+      - global.anthropic.claude-opus-4-8
+      - global.anthropic.claude-sonnet-4-5-20250929-v1:0
+      - global.anthropic.claude-sonnet-4-6
+      - google.gemma-3-12b-it
+      - google.gemma-3-27b-it
+      - google.gemma-3-4b-it
+      - jp.anthropic.claude-opus-4-7
+      - jp.anthropic.claude-opus-4-8
+      - jp.anthropic.claude-sonnet-4-5-20250929-v1:0
+      - jp.anthropic.claude-sonnet-4-6
+      - meta.llama3-1-70b-instruct-v1:0
+      - meta.llama3-1-8b-instruct-v1:0
+      - meta.llama3-3-70b-instruct-v1:0
+      - meta.llama4-maverick-17b-instruct-v1:0
+      - meta.llama4-scout-17b-instruct-v1:0
+      - minimax.minimax-m2
+      - minimax.minimax-m2.1
+      - minimax.minimax-m2.5
+      - mistral.devstral-2-123b
+      - mistral.magistral-small-2509
+      - mistral.ministral-3-14b-instruct
+      - mistral.ministral-3-3b-instruct
+      - mistral.ministral-3-8b-instruct
+      - mistral.mistral-large-3-675b-instruct
+      - mistral.pixtral-large-2502-v1:0
+      - mistral.voxtral-mini-3b-2507
+      - mistral.voxtral-small-24b-2507
+      - moonshot.kimi-k2-thinking
+      - moonshotai.kimi-k2.5
+      - nvidia.nemotron-nano-12b-v2
+      - nvidia.nemotron-nano-3-30b
+      - nvidia.nemotron-nano-9b-v2
+      - nvidia.nemotron-super-3-120b
+      - openai.gpt-5.4
+      - openai.gpt-5.5
+      - openai.gpt-oss-120b
+      - openai.gpt-oss-120b-1:0
+      - openai.gpt-oss-20b
+      - openai.gpt-oss-20b-1:0
+      - openai.gpt-oss-safeguard-120b
+      - openai.gpt-oss-safeguard-20b
+      - qwen.qwen3-235b-a22b-2507-v1:0
+      - qwen.qwen3-32b-v1:0
+      - qwen.qwen3-coder-30b-a3b-v1:0
+      - qwen.qwen3-coder-480b-a35b-v1:0
+      - qwen.qwen3-coder-next
+      - qwen.qwen3-next-80b-a3b
+      - qwen.qwen3-vl-235b-a22b
+      - us.anthropic.claude-fable-5
+      - us.anthropic.claude-haiku-4-5-20251001-v1:0
+      - us.anthropic.claude-opus-4-1-20250805-v1:0
+      - us.anthropic.claude-opus-4-5-20251101-v1:0
+      - us.anthropic.claude-opus-4-6-v1
+      - us.anthropic.claude-opus-4-7
+      - us.anthropic.claude-opus-4-8
+      - us.anthropic.claude-sonnet-4-5-20250929-v1:0
+      - us.anthropic.claude-sonnet-4-6
+      - us.deepseek.r1-v1:0
+      - us.meta.llama4-maverick-17b-instruct-v1:0
+      - us.meta.llama4-scout-17b-instruct-v1:0
+      - writer.palmyra-x4-v1:0
+      - writer.palmyra-x5-v1:0
+      - zai.glm-4.7
+      - zai.glm-4.7-flash
+      - zai.glm-5
   sakura:
     npm: "@ai-sdk/openai-compatible"
     name: "sakura aipf"
@@ -407,7 +705,26 @@ provider:
         name: "gpt-oss-120b"
       "preview/Kimi-K2.6":
         name: "Kimi-K2.6"
-
+  opencode-go:
+    whitelist:
+      - deepseek-v4-flash
+      - deepseek-v4-pro
+      - glm-5
+      - glm-5.1
+      - kimi-k2.5
+      - kimi-k2.6
+      - kimi-k2.7-code
+      - mimo-v2-omni
+      - mimo-v2-pro
+      - mimo-v2.5
+      - mimo-v2.5-pro
+      - minimax-m2.5
+      - minimax-m2.7
+      - minimax-m3
+      - qwen3.5-plus
+      - qwen3.6-plus
+      - qwen3.7-max
+      - qwen3.7-plus
 experimental:
   batch_tool: true
   openTelemetry: true

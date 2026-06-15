@@ -36,6 +36,22 @@ This document provides a comprehensive list of skills available through SkillPor
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 <!-- SKILLPORT_START -->
 ## SkillPort Skills
 
@@ -119,6 +135,11 @@ Each skill contains step-by-step instructions, templates, and scripts.
   <name>custom/makefile-organization</name>
   <description>Guidelines for organizing and maintaining modular Makefiles. Use when refactoring, creating new .mk files, or ensuring consistency across the project's Makefile structure. Covers naming conventions, inclusion order, idempotency management, and error handling for a robust development environment.</description>
   <location>agent-skills/custom/makefile-organization/SKILL.md</location>
+</skill>
+<skill>
+  <name>custom/update-opencode-models</name>
+  <description>Updates the LLM models in apm.yml, personal.env, and work.env using the latest model-schema from models.dev, and updates opencode/README.md from the latest release of oh-my-openagent.</description>
+  <location>agent-skills/custom/update-opencode-models/SKILL.md</location>
 </skill>
 <skill>
   <name>dispatching-parallel-agents</name>
@@ -252,6 +273,14 @@ Each skill contains step-by-step instructions, templates, and scripts.
 </skill>
 </available_skills>
 <!-- SKILLPORT_END -->
+
+
+
+
+
+
+
+
 
 
 

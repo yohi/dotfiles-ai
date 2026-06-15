@@ -9,7 +9,7 @@ OpenCode プラットフォーム自体のコア設定ファイルです。
 
 ### `oh-my-openagent.jsonc`
 エージェントの知能構成、役割定義、ツール権限などを管理するメイン設定ファイルです。
-*Target Version: v4.5.1*
+*Target Version: v4.10.0*
 
 ## 2. 使い方
 
@@ -27,16 +27,16 @@ Sisyphus（監督）は、タスクの性質に応じて最適な「知能カテ
 
 タスクの難易度や種類に応じてモデルとパラメータを最適化する定義です。
 
-| カテゴリー | 特徴・バリアント | 想定される用途 |
-| :--- | :--- | :--- |
-| **ultrabrain** | `xhigh` / 最強推論 | 複雑な計画立案、コード監査、アーキテクチャ設計、リスク分析。 |
-| **deep** | `medium` / 自律解決 | 難解なバグ修正、機能実装、リファクタリングなど職人的作業。 |
-| **quick** | `fast` / 高速応答 | ドキュメント検索、コード探索、些細な修正、プロトタイピング。 |
-| **visual-engineering** | UI/UX 特化 | UIデザイン解析、CSSアニメーション、フロントエンド最適化。 |
-| **writing** | 文書作成 特化 | 技術解説、ドキュメンテーション、リリースノートの作成。 |
-| **artistry** | 創造性 特化 | ジェネレーティブアート、クリエイティブな発想、芸術的表現。 |
-| **unspecified-high** | 高負荷汎用 | 特定の役割に当てはまらないが、高い知能を要する汎用作業。 |
-| **unspecified-low** | 低負荷汎用 | 定形的な作業、単純なデータ変換などの低コストな汎用作業。 |
+| カテゴリー | 特徴・バリアント | 想定される用途 | 推奨モデル (Brain) |
+| :--- | :--- | :--- | :--- |
+| **ultrabrain** | `xhigh` / 最強推論 | 複雑な計画立案、コード監査、アーキテクチャ設計、リスク分析。 | GPT-5.5 (xhigh), Claude Fable 5 |
+| **deep** | `medium` / 自律解決 | 難解なバグ修正、機能実装、リファクタリングなど職人的作業。 | GPT-5.5 (medium) |
+| **quick** | `fast` / 高速応答 | ドキュメント検索、コード探索、些細な修正、プロトタイピング。 | GPT-5.4 Mini, Qwen 3.5 Plus |
+| **visual-engineering** | UI/UX 特化 | UIデザイン解析、CSSアニメーション、フロントエンド最適化。 | Gemini 3.1 Pro, Qwen 3.6 Plus |
+| **writing** | 文書作成 特化 | 技術解説、ドキュメンテーション、リリースノートの作成。 | Kimi K2.7-Code, Gemini 3 Flash |
+| **artistry** | 創造性 特化 | ジェネレーティブアート、クリエイティブな発想、芸術的表現。 | Gemini 3.1 Pro |
+| **unspecified-high** | 高負荷汎用 | 特定の役割に当てはまらないが、高い知能を要する汎用作業。 | Claude Fable 5, Opus 4.8/4.7 |
+| **unspecified-low** | 低負荷汎用 | 定形的な作業、単純なデータ変換などの低コストな汎用作業。 | Claude Sonnet 4.6, Kimi K2.7-Code |
 
 ### エージェント一覧とカテゴリー・マッピング
 
@@ -44,21 +44,21 @@ Sisyphus（監督）は、タスクの性質に応じて最適な「知能カテ
 
 | エージェント | カテゴリー | 推奨/フォールバックチェーン (優先順) | 役割・専門領域 |
 | :--- | :--- | :--- | :--- |
-| **Sisyphus** | `ultrabrain` | `claude-opus-4-7` (max) → `kimi-k2.6` → `k2p5` → `kimi-k2.5` → `gpt-5.5` (medium) → `glm-5` → `big-pickle` | 司令塔。全体の品質管理、タスクの分解と委譲。 |
+| **Sisyphus** | `ultrabrain` | `claude-fable-5` → `claude-opus-4-8` → `claude-opus-4-7` (max) → `kimi-k2.7-code` → `kimi-k2.6` → `gpt-5.5` (medium) → `glm-5` | 司令塔。全体の品質管理、タスクの分解と委譲。 |
 | **Hephaestus** | `deep` | `gpt-5.5` (medium) | 実装職人。自律的なコードの書き込み、複雑なロジック実装。 |
 | **Oracle** | `ultrabrain` | `gpt-5.5` (high) → `gemini-3.1-pro` (high) → `claude-opus-4-7` (max) → `glm-5.1` | 賢者。アーキテクチャ設計の相談、難解なバグのデバッグ。 |
-| **Librarian** | `quick` | `gpt-5.4-mini-fast` → `qwen3.5-plus` → `minimax-m2.7-highspeed` → `minimax-m2.7` → `claude-haiku-4-5` → `gpt-5.4-nano` | 司書。外部ドキュメントやOSSの実装例の高速検索。 |
-| **Explore** | `quick` | `gpt-5.4-mini-fast` → `qwen3.5-plus` → `minimax-m2.7-highspeed` → `minimax-m2.7` → `claude-haiku-4-5` → `gpt-5.4-nano` | 探検家。コードベースの高速探索、grep検索、スキャフォールディング。 |
+| **Librarian** | `quick` | `gpt-5.4-mini-fast` → `qwen3.5-plus` → `minimax-m3` → `minimax-m2.7-highspeed` → `claude-haiku-4-5` | 司書。外部ドキュメントやOSSの実装例の高速検索。 |
+| **Explore** | `quick` | `gpt-5.4-mini-fast` → `qwen3.5-plus` → `minimax-m3` → `minimax-m2.7-highspeed` → `claude-haiku-4-5` | 探検家。コードベースの高速探索、grep検索、スキャフォールディング 。 |
 | **Prometheus** | `ultrabrain` | `claude-opus-4-7` (max) → `gpt-5.5` (high) → `glm-5.1` → `gemini-3.1-pro` | 流れ者。タスクの分解と並列実行計画（Agent Swarm）の作成。 |
 | **Metis** | `ultrabrain` | `claude-sonnet-4-6` → `claude-opus-4-7` (max) → `gpt-5.5` (high) → `glm-5.1` → `k2p5` | 計画コンサル。計画前のリスク特定と曖昧さの排除。 |
 | **Momus** | `ultrabrain` | `gpt-5.5` (xhigh) → `claude-opus-4-7` (max) → `gemini-3.1-pro` (high) → `glm-5.1` | 計画レビュアー。Prometheusが作成した計画の厳格な検証。 |
-| **Atlas** | `ultrabrain` | `claude-sonnet-4-6` → `kimi-k2.6` → `gpt-5.5` (medium) → `minimax-m2.7` | 現場監督。環境管理、Todo項目の体系的な管理と調整。 |
-| **Multimodal-Looker** | `ultrabrain` | `gpt-5.5` (medium) → `kimi-k2.6` → `glm-4.6v` → `gpt-5-nano` | 視覚アナリスト。UIデザイン、画像、図解、PDFの解析。 |
-| **Sisyphus-Junior** | (動的) | `claude-sonnet-4-6` → `kimi-k2.6` → `gpt-5.5` (medium) → `minimax-m2.7` → `big-pickle` | 作業員. 特定のカテゴリーに特化して生成される実行用エージェント. |
+| **Atlas** | `ultrabrain` | `claude-sonnet-4-6` → `kimi-k2.7-code` → `kimi-k2.6` → `gpt-5.5` (medium) | 現場監督。環境管理、Todo項目の体系的な管理と調整。 |
+| **Multimodal-Looker** | `ultrabrain` | `gpt-5.5` (medium) → `kimi-k2.7-code` → `kimi-k2.6` → `glm-4.6v` | 視覚アナリスト。UIデザイン、画像、図解、PDFの解析。 |
+| **Sisyphus-Junior** | (動的) | `claude-sonnet-4-6` → `kimi-k2.7-code` → `kimi-k2.6` → `gpt-5.5` (medium) → `minimax-m3` | 作業員. 特定のカテゴリーに特化して生成される実行用エージェント. |
 
 ## 4. LLMモデル選択のベストプラクティス
 
-エージェントの能力を最大限に引き出すためには、カテゴリーごとに適した「脳（モデルファミリー）」を割り当てることが重要です。
+エージェントの能力を最大限に引き出すためには、エージェントの思考スタイルに合った「脳（モデルファミリー）」を割り当てることが重要です。
 
 ### 推奨スタック: OpenCode Go + OpenAI (Best Value)
 最も効率的でバランスの良い組み合わせです。
@@ -66,29 +66,29 @@ Sisyphus（監督）は、タスクの性質に応じて最適な「知能カテ
 - **OpenCode Go ($10/mo)**: Kimi (Claude系代替), Qwen (Gemini系代替), MiniMax を提供。
 - **OpenAI Plus/Pro ($20/mo)**: GPT-5.5/5.4 (実装・監査系) を提供。
 
-### モデルファミリーの特性と使い分け
+### 思考スタイルとモデルの相性
 
-| ファミリー | 特徴 | 最適なカテゴリー / エージェント |
-| :--- | :--- | :--- |
-| **Claude系**<br>(Opus, Kimi, GLM) | **指示追従型。** 長大で複雑な手順、多段のTodo管理に極めて強い。 | `ultrabrain`, `unspecified` / Sisyphus, Atlas |
-| **GPT系**<br>(GPT-5.5/5.4) | **原則駆動型。** 最小限の指示で自律的に解決策を見出す。深い実装に強い。 | `deep`, `ultrabrain` / Hephaestus, Oracle, Momus |
-| **Gemini系**<br>(Gemini, Qwen) | **視覚・推論型。** デザイン解析、CSS、UIの構造理解に特化。 | `visual-engineering`, `artistry` / Looker |
+| スタイル | 特徴 | 適合モデル | 最適なエージェント |
+| :--- | :--- | :--- | :--- |
+| **メカニクス駆動** | **指示追従型。** 長大で複雑な手順、多段のTodo管理に極めて強い。 | Claude Family, Kimi, GLM | Sisyphus, Atlas, Metis |
+| **原則駆動** | **自律探索型。** 最小限の指示で自律的に解決策を見出す。深い実装に強い。 | GPT Family, DeepSeek | Hephaestus, Oracle, Momus |
+| **視覚推論型** | **UI・構造理解。** デザイン解析、CSS、レイアウトの理解に特化。 | Gemini Family, Qwen | Looker |
 
-### カテゴリー別・推奨モデルと代替ルール
+### カテゴリー別・推奨モデルと代替ルール (v4.10.0)
 
 | カテゴリー | デフォルトモデル | フォールバックチェーン (優先順) |
 | :--- | :--- | :--- |
 | **ultrabrain** | `openai/gpt-5.5` (xhigh) | `openai/gpt-5.5` (xhigh) → `google/gemini-3.1-pro` (high) → `anthropic/claude-opus-4-7` (max) → `opencode-go/glm-5.1` |
 | **deep** | `openai/gpt-5.5` (medium) | `openai/gpt-5.5` (medium) → `anthropic/claude-opus-4-7` (max) → `google/gemini-3.1-pro` (high) |
-| **quick** | `openai/gpt-5.4-mini` | `openai/gpt-5.4-mini` → `anthropic/claude-haiku-4-5` → `google/gemini-3-flash` → `opencode-go/minimax-m2.7` → `opencode/gpt-5-nano` |
+| **quick** | `openai/gpt-5.4-mini` | `openai/gpt-5.4-mini` → `anthropic/claude-haiku-4-5` → `google/gemini-3-flash` → `opencode-go/minimax-m3` → `opencode/gpt-5-nano` |
 | **visual-engineering** | `google/gemini-3.1-pro` (high) | `google/gemini-3.1-pro` (high) → `zai-coding-plan/glm-5` → `anthropic/claude-opus-4-7` (max) → `opencode-go/glm-5.1` → `kimi-for-coding/k2p5` |
 | **artistry** | `google/gemini-3.1-pro` (high) | `google/gemini-3.1-pro` (high) → `anthropic/claude-opus-4-7` (max) → `openai/gpt-5.5` |
-| **unspecified-high** | `anthropic/claude-opus-4-7` (max) | `anthropic/claude-opus-4-7` (max) → `openai/gpt-5.5` (high) → `zai-coding-plan/glm-5` → `kimi-for-coding/k2p5` → `opencode-go/glm-5.1` → `opencode/kimi-k2.5` → `moonshotai/kimi-k2.5` |
-| **unspecified-low** | `anthropic/claude-sonnet-4-6` | `anthropic/claude-sonnet-4-6` → `openai/gpt-5.3-codex` (medium) → `opencode-go/kimi-k2.6` → `google/gemini-3-flash` → `opencode-go/minimax-m2.7` |
-| **writing** | `kimi-for-coding/k2p5` | `google/gemini-3-flash` → `opencode-go/kimi-k2.6` → `anthropic/claude-sonnet-4-6` → `opencode-go/minimax-m2.7` |
+| **unspecified-high** | `anthropic/claude-fable-5` | `anthropic/claude-fable-5` → `anthropic/claude-opus-4-8` → `anthropic/claude-opus-4-7` (max) → `openai/gpt-5.5` (high) → `opencode-go/kimi-k2.7-code` |
+| **unspecified-low** | `anthropic/claude-sonnet-4-6` | `anthropic/claude-sonnet-4-6` → `opencode-go/kimi-k2.7-code` → `opencode-go/kimi-k2.6` → `google/gemini-3-flash` |
+| **writing** | `opencode-go/kimi-k2.7-code` | `google/gemini-3-flash` → `opencode-go/kimi-k2.6` → `anthropic/claude-sonnet-4-6` → `opencode-go/minimax-m3` |
 
 ---
-*Updated: 2026-05-28*
+*Updated: 2026-06-15*
 
 ## 5. 環境の切り替え (Switching Environments)
 
@@ -134,6 +134,3 @@ opencode
 PROFILE=work opencode
 # 出力例: ✅ Profile [work] | Port [4091] (4090が使用中の場合)
 ```
-
-
-

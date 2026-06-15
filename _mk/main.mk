@@ -19,7 +19,7 @@ apm-install: ## APM install と全設定の同期を実行
 	$(Q_ECHO) "✅ APM install と全設定の同期が完了しました"
 
 # --- Standard Entry Points ---
-all: install init-env setup ## [完全セットアップ] インストール、環境構築、エージェント/IDE/MCPの設定をすべて行う
+all: install setup ## [完全セットアップ] インストール、環境構築、エージェント/IDE/MCPの設定をすべて行う
 
 install: install-requirements install-agents install-ides ## Install all AI agents and IDE binaries
 
