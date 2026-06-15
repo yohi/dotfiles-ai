@@ -40,7 +40,8 @@ dependencies:
       command: "npx"
       args:
         - "-y"
-        - "@yohi/nexus@1.11.0"
+        # - "/home/y_ohi/program/nexus"
+        - "@yohi/nexus@1.13.1"
       env:
         NEXUS_STORAGE_ROOT_DIR: "${env:HOME}/.nexus"
         LOG_LEVEL: "ERROR"
@@ -102,6 +103,8 @@ plugin:
   - "@yohi/akane@1.1.1"
   - "oh-my-openagent@4.10.0"
   - "@yohi/opencode-plugin-chronos-gate@1.4.0"
+  - "@nick-vi/opencode-type-inject@latest"
+  - "opencode-vibeguard@latest"
 
 disabled_providers:
   - google
