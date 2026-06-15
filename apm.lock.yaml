@@ -137,3 +137,7 @@ mcp_configs:
     - skillport-mcp
     registry: false
     command: uvx
+local_deployed_files:
+- .cursor/rules/agent-commands.mdc
+local_deployed_file_hashes:
+  .cursor/rules/agent-commands.mdc: sha256:de037ca92ad5bb65be804d929789aa4ffe0027c7d94b6917d5146c7e91ebf7f7
