@@ -137,7 +137,7 @@ PROFILE=work opencode
 
 ## 7. プラグイン (機能拡張)
 
-OpenCode の機能を拡張するため、現在以下のプラグインが [apm.yml](file:///home/y_ohi/dotfiles/components/dotfiles-ai/apm.yml) (SSOT) 経由で導入されています。
+OpenCode の機能を拡張するため、現在以下のプラグインが [apm.yml](../apm.yml) (SSOT) 経由で導入されています。
 
 ### 導入済みプラグイン
 
@@ -150,9 +150,9 @@ OpenCode の機能を拡張するため、現在以下のプラグインが [apm
 
 ### プラグインの追加・変更手順
 
-プラグインは [opencode.jsonc](file:///home/y_ohi/dotfiles/components/dotfiles-ai/opencode/opencode.jsonc) に直接記述せず、必ず SSOT である [apm.yml](file:///home/y_ohi/dotfiles/components/dotfiles-ai/apm.yml) の `plugin:` セクションに追加してください。
+プラグインは [opencode.jsonc](opencode.jsonc) に直接記述せず、必ず SSOT である [apm.yml](../apm.yml) の `plugin:` セクションに追加してください。
 
-1. **[apm.yml](file:///home/y_ohi/dotfiles/components/dotfiles-ai/apm.yml) の編集**:
+1. **[apm.yml](../apm.yml) の編集**:
    ```yaml
    plugin:
      - "@nick-vi/opencode-type-inject@latest"
