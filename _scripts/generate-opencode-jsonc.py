@@ -167,7 +167,7 @@ def build_config(apm: dict[str, Any]) -> dict[str, Any]:
     if "enabled_providers" in apm:
         cfg["enabled_providers"] = apm["enabled_providers"]
 
-    # --- provider (merge apm.yml + template opencode-specific) ---
+    # --- provider (extracted from apm.yml with sakura normalization) ---
     providers: dict[str, Any] = {}
     for name, prov in (apm.get("provider") or {}).items():
         if name == "sakura":

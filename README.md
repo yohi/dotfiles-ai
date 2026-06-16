@@ -21,7 +21,11 @@ AIエージェント（Claude Code, Gemini CLI, OpenCode, Codex）の設定・�
 - **管理方式**: 公式リポジトリの特定パス（例: `anthropics/claude-code//plugins/code-review`）を依存関係として定義します。
 - **デプロイプロセス**:
     1.  `apm install` によりプラグインが `apm_modules/` にダウンロードされます。
-    2.  `agent-commands/` に配置されたコマンド定義（`.md`）が、`make sync-agents` を通じて各エージェント（Claude, OpenCode, Gemini CLI, Cursor）のネイティブディレクトリへ自動配備されます。
+    2.  `agent-commands/` に配置されたコマンド定義（`.md`）が、`make sync-agents` を通じて各エージェントのネイティブ/作業ディレクトリへ自動配備されます。具体的には以下のパスへ配備・同期されます：
+        *   **Claude Code**: `claude/commands/` (および `~/.claude/agent-commands/` 等へのシンボリックリンク)
+        *   **OpenCode**: `opencode/commands/` (および `~/.config/opencode/commands/` 等へのシンボリックリンク)
+        *   **Gemini CLI**: `gemini/commands/` (TOML形式に自動変換して配備)
+        *   **Cursor IDE**: `.cursor/rules/` (および `ide/cursor/commands/agent/` へのシンボリックリンク)
 - **カスタマイズ**: `agent-commands/` 配下のファイルは、公式テンプレートをベースにしつつ、本プロジェクトの環境（MCPツール等）に最適化されたカスタマイズ版です。
 
 ## ディレクトリ構成

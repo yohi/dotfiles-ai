@@ -625,4 +625,4 @@ When using **Nexus MCP** tools for codebase exploration and semantic search, adh
   - If you switch branches or make massive code changes, manually call `reindex` to refresh the local LanceDB store.
 
 ### 9.3 Project-Specific Context
-- **Local Documentation**: In repositories where Nexus is active, refer to the project-local `SPEC.md` for architecture details and `AGENTS.md` for specific development constraints, if they exist.
+- **Local Documentation**: In repositories where Nexus is active, refer to the project-local `SPEC.md` for architecture details and `AGENTS.md` for Agent Commands & Plugins guidelines, if they exist.

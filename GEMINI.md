@@ -3,4 +3,4 @@
 <!-- Build ID: 9f2e76a3c166 -->
 <!-- APM Version: 0.20.0 -->
 
-@./AGENTS.md
+@./global-rules/AGENTS.global.md

@@ -155,12 +155,11 @@ OpenCode の機能を拡張するため、現在以下のプラグインが [apm
 1. **[apm.yml](../apm.yml) の編集**:
    ```yaml
    plugin:
-     - "@nick-vi/opencode-type-inject@latest"
-     - "opencode-vibeguard@latest"
+     - "@nick-vi/opencode-type-inject@1.2.3"
+     - "opencode-vibeguard@1.0.0"
    ```
 2. **同期の実行**:
    ```bash
    make sync-opencode
    make setup-opencode
    ```
-

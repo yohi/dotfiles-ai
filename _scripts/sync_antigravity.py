@@ -97,9 +97,15 @@ def resolve_command(command: str) -> str:
 
 def _replace_env_in_string(val: str) -> str:
     """Expand environment variables in a single string value."""
-    # Match ${env:VAR} (APM-specific format)
-    for var in re.findall(r"\$\{env:([^}]+)\}", val):
-        val = val.replace(f"${{env:{var}}}", os.environ.get(var, ""))
+    # Match ${env:VAR} or ${env:VAR:-default} (APM-specific format)
+    for match in re.finditer(r"\$\{env:([^}:]+)(?::-([^}]+))?\}", val):
+        full_match = match.group(0)
+        var = match.group(1)
+        fallback = match.group(2) if match.group(2) is not None else ""
+        env_val = os.environ.get(var)
+        if env_val is None or env_val == "":
+            env_val = fallback
+        val = val.replace(full_match, env_val)
 
     # Standard env expansion for $VAR / ${VAR}
     val = os.path.expandvars(val)

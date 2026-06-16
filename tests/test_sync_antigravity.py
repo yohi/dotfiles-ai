@@ -14,7 +14,7 @@ mcp_configs:
     args:
       - skillport-mcp
     env:
-      SKILLPORT_SKILLS_DIR: "${env:PWD}/.agents/skills"
+      SKILLPORT_SKILLS_DIR: "${env:SKILLPORT_SKILLS_DIR:-.agents/skills}"
 """
 
 
@@ -40,7 +40,7 @@ def test_sync_antigravity(tmp_path: Path) -> None:
     with (
         mock.patch("os.path.exists", side_effect=mock_exists),
         mock.patch("shutil.which", return_value=None),
-        mock.patch.dict(os.environ, {"PWD": "/workspace"}),
+        mock.patch.dict(os.environ, {"SKILLPORT_SKILLS_DIR": "/workspace/.agents/skills"}),
     ):
         from _scripts.sync_antigravity import convert_lockfile
 
