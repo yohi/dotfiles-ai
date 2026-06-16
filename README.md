@@ -14,6 +14,20 @@ AIエージェント（Claude Code, Gemini CLI, OpenCode, Codex）の設定・�
 >
 > 推奨される使用方法は、`dotfiles-core` リポジトリから `make setup` を実行し、適切なディレクトリ構造とシンボリックリンクが構成された状態で利用することです。
 
+## Claude Code プラグインの管理 (APM)
+
+[Claude Code](https://github.com/anthropics/claude-code) のプラグイン（コードベースの拡張）は、`apm.yml` の `dependencies` セクションで一元管理されます。
+
+- **管理方式**: 公式リポジトリの特定パス（例: `anthropics/claude-code//plugins/code-review`）を依存関係として定義します。
+- **デプロイプロセス**:
+    1.  `apm install` によりプラグインが `apm_modules/` にダウンロードされます。
+    2.  `agent-commands/` に配置されたコマンド定義（`.md`）が、`make sync-agents` を通じて各エージェントのネイティブ/作業ディレクトリへ自動配備されます。具体的には以下のパスへ配備・同期されます：
+        *   **Claude Code**: `claude/commands/` (および `~/.claude/agent-commands/` 等へのシンボリックリンク)
+        *   **OpenCode**: `opencode/commands/` (および `~/.config/opencode/commands/` 等へのシンボリックリンク)
+        *   **Gemini CLI**: `gemini/commands/` (TOML形式に自動変換して配備)
+        *   **Cursor IDE**: `.cursor/rules/` (および `ide/cursor/commands/agent/` へのシンボリックリンク)
+- **カスタマイズ**: `agent-commands/` 配下のファイルは、公式テンプレートをベースにしつつ、本プロジェクトの環境（MCPツール等）に最適化されたカスタマイズ版です。
+
 ## ディレクトリ構成
 
 ```text

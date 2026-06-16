@@ -16,7 +16,7 @@ OS_NAME := $(shell uname -s)
 
 # APM Installation
 APM_INSTALL_URL := https://aka.ms/apm-unix
-APM_INSTALLER_HASH := d23a34d40342ea6cc8816c830aecdd4060106d92b1b01b7695612578e8590b68
+APM_INSTALLER_HASH := bdc06da2875547a55167bcb3eecb6aa7e5bdf264c4799e72be91d7641940aee7
 
 # Opcode (Claude Code GUI) Version Detection
 # Uses GitHub API to get the latest tag name (vX.Y.Z) and strips the 'v'
