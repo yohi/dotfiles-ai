@@ -169,6 +169,7 @@ permission:
     "readlink*": allow
     "du*": allow
     "df*": allow
+    "curl*": allow
 
     # --- system info ---
     "pwd*": allow
