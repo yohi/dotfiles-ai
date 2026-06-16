@@ -58,6 +58,45 @@ def test_sync_antigravity(tmp_path: Path) -> None:
     assert skillport["env"]["SKILLPORT_SKILLS_DIR"] == "/workspace/.agents/skills"
 
 
+
+def test_sync_antigravity_fallback(tmp_path: Path) -> None:
+    """Test that SKILLPORT_SKILLS_DIR resolves to its fallback default when the environment variable is not set."""
+    lockfile = tmp_path / "apm.lock.yaml"
+    lockfile.write_text(MOCK_LOCKFILE)
+    outfile = tmp_path / "mcp_config.json"
+
+    original_exists = os.path.exists
+
+    def mock_exists(path: str) -> bool:
+        if (
+            path.endswith(".local/bin/uvx")
+            or path.endswith(".local/bin/npx")
+            or path.endswith("uvx")
+            or path.endswith("npx")
+        ):
+            return True
+        return original_exists(path)
+
+    # Clean SKILLPORT_SKILLS_DIR from environment if exists
+    clean_env = os.environ.copy()
+    clean_env.pop("SKILLPORT_SKILLS_DIR", None)
+
+    with (
+        mock.patch("os.path.exists", side_effect=mock_exists),
+        mock.patch("shutil.which", return_value=None),
+        mock.patch.dict(os.environ, clean_env, clear=True),
+    ):
+        from _scripts.sync_antigravity import convert_lockfile
+
+        convert_lockfile(str(lockfile), str(outfile))
+
+    assert outfile.exists()
+    content = json.loads(outfile.read_text())
+    skillport = content["mcpServers"]["skillport"]
+    # Fallback to default ".agents/skills"
+    assert skillport["env"]["SKILLPORT_SKILLS_DIR"] == ".agents/skills"
+
+
 def test_sync_antigravity_missing_lockfile(tmp_path: Path) -> None:
     """Test that convert_lockfile raises FileNotFoundError when the lockfile is missing."""
     import pytest
