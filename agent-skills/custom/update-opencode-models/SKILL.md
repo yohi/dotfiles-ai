@@ -18,7 +18,10 @@ description: Updates the LLM models in apm.yml, personal.env, and work.env using
 
 ### 2. apm.yml の更新 (SSOT)
 - `apm.yml` はモデル定義の Single Source of Truth (SSOT) です。`opencode.jsonc` を直接編集してはいけません。
-- `provider` セクション配下の各プロバイダー（`openai`, `nvidia`, `cloudflare-workers-ai`, `opencode`, `amazon-bedrock`, `opencode-go` など） of `whitelist` もしくは `models` リストを、最新スキーマで定義されている有効なモデル名と一致するように更新します。
+- `provider` セクション配下の各プロバイダー（`openai`, `nvidia`, `cloudflare-workers-ai`, `opencode`, `amazon-bedrock`, `opencode-go` など）の `whitelist` もしくは `models` リストを、最新スキーマで定義されている有効なモデル名と一致するように更新します。
+- **Bedrock モデル（`amazon-bedrock`）の制限**:
+  - `amazon-bedrock` の `whitelist` に含めるモデルは、**`global.anthropic.claude-*`（グローバルプレフィックス付きの最新 Claude モデル）および `openai.gpt-*`（Bedrock上で提供される OpenAI モデル）のみ**とします。
+  - その他のリージョン固有モデルや古い世代のモデルは whitelist に含めず、除外してください。
 - 更新後、以下のコマンドを実行して `opencode/opencode.jsonc` を再生成します：
   ```bash
   make sync-opencode
@@ -35,9 +38,9 @@ description: Updates the LLM models in apm.yml, personal.env, and work.env using
   - 最新の Bedrock Claude モデル（`global.anthropic.claude-*`）を割り当てます。
 
 ### 4. opencode/README.md の更新
-- GitHub の `https://github.com/code-yeongyu/oh-my-openagent` から最新のリリース（Release Tag）を確認します。
-- 最新リリースに含まれる日本語版 README（`README.ja.md` が存在すればそれ、なければ `README.md`）のコンテンツを取得します。
-- 取得したコンテンツをベースに、`opencode/README.md` を最新の内容に更新します。
+- GitHub の `https://github.com/code-yeongyu/oh-my-openagent` から最新のリリース（Release Tag）および変更内容を確認します。
+- 公式の変更内容に基づいて、`opencode/README.md` に記載されている `Target Version` や、知能カテゴリー・エージェント構成のデフォルト推奨モデルなどの差分のみを部分的にアップデートします。
+- **注意**: 当プロジェクト固有の説明（`work.env`/`personal.env` の切り替え方法、zsh連携、apm.yml からのプラグイン同期など）を消去してしまわないよう、丸ごとの置き換えは絶対に避けてください。
 
 ### 5. 整合性の検証とクリーンアップ
 - 更新完了後、静的解析・構文チェック等のチェックを実施します：
