@@ -43,7 +43,7 @@ dependencies:
       args:
         - "-y"
         # - "/home/y_ohi/program/nexus"
-        - "@yohi/nexus@1.14.0"
+        - "@yohi/nexus@1.15.0"
       env:
         NEXUS_STORAGE_ROOT_DIR: "${env:HOME}/.nexus"
         LOG_LEVEL: "ERROR"
