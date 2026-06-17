@@ -9,6 +9,7 @@ dependencies:
   apm:
     - obra/superpowers
     - anthropics/skills
+    - coderabbitai/skills
     - anthropics/claude-code//plugins/code-review
 
   # MCP Servers
@@ -30,7 +31,7 @@ dependencies:
       args:
         - "skillport-mcp"
       env:
-        SKILLPORT_SKILLS_DIR: "${env:SKILLPORT_SKILLS_DIR:-.agents/skills}"
+        SKILLPORT_SKILLS_DIR: "${env:HOME}/dotfiles/components/dotfiles-ai/.agents/skills"
       standalone: true
       enabled: true
 
@@ -42,7 +43,7 @@ dependencies:
       args:
         - "-y"
         # - "/home/y_ohi/program/nexus"
-        - "@yohi/nexus@1.13.1"
+        - "@yohi/nexus@1.14.0"
       env:
         NEXUS_STORAGE_ROOT_DIR: "${env:HOME}/.nexus"
         LOG_LEVEL: "ERROR"

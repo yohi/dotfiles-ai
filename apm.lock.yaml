@@ -1,5 +1,5 @@
 lockfile_version: '1'
-generated_at: '2026-06-16T04:34:12.969799+00:00'
+generated_at: '2026-06-17T04:06:07.427249+00:00'
 apm_version: 0.20.0
 dependencies:
 - repo_url: anthropics/claude-code
@@ -817,6 +817,29 @@ dependencies:
     .agents/skills/xlsx/scripts/office/validators/redlining.py: sha256:f4c33fdb9da0651d1d9aa76f0d5294cc9955869339ae131b2f75f3b2e366cb40
     .agents/skills/xlsx/scripts/recalc.py: sha256:cf419d15e02965aeaec17773c05b61303f7f520f67fa2696547e7da07502eac7
   content_hash: sha256:5a94c4600dca371e7571be73552f06e11293f558b3d3b295d306b0bfefb4245b
+- repo_url: coderabbitai/skills
+  host: github.com
+  resolved_commit: a81eb76a1539e4a3f2b5c6fc133849124e72d303
+  package_type: marketplace_plugin
+  deployed_files:
+  - .agents/skills/autofix
+  - .agents/skills/autofix/SKILL.md
+  - .agents/skills/autofix/github.md
+  - .agents/skills/code-review
+  - .agents/skills/code-review/SKILL.md
+  - .cursor/commands/coderabbit-review.md
+  - .gemini/commands/coderabbit-review.toml
+  - .opencode/agents/code-reviewer.md
+  - .opencode/commands/coderabbit-review.md
+  deployed_file_hashes:
+    .agents/skills/autofix/SKILL.md: sha256:09430a914debe143f646dd369b56c9bca27704c159aebf28c07e41f411046acf
+    .agents/skills/autofix/github.md: sha256:466780fcf8c883a5f30532956b5b08645691a79d6755c8a02cc879de14649aff
+    .agents/skills/code-review/SKILL.md: sha256:18c9c3c69a6a58ae0b7baa5b19637eaa9aaf02c21b1242f0bb073dc24942fe0a
+    .cursor/commands/coderabbit-review.md: sha256:cba1e6915ee98d24f288e3fb2dfb4b9b5bdc9e3164abf66b885aa9b66d8ce17d
+    .gemini/commands/coderabbit-review.toml: sha256:9848b7ccce2a249a06b72523877fa5ea280f6fc491ca5f066bc5c7b956b478c0
+    .opencode/agents/code-reviewer.md: sha256:5677b371344cdc444390fbb366041eee7ad204fdbc85b6a37f92671afa8bce7f
+    .opencode/commands/coderabbit-review.md: sha256:cba1e6915ee98d24f288e3fb2dfb4b9b5bdc9e3164abf66b885aa9b66d8ce17d
+  content_hash: sha256:9175a296d5fc107148623b2f2673f5381eee51e156d109b3d8d4ae23107b9af6
 - repo_url: obra/superpowers
   host: github.com
   resolved_commit: 6fd4507659784c351abbd2bc264c7162cfd386dc
@@ -994,14 +1017,14 @@ mcp_configs:
       NO_PROXY: 127.0.0.1,localhost
     args:
     - -y
-    - '@yohi/nexus@1.13.1'
+    - '@yohi/nexus@1.13.2'
     registry: false
     command: npx
   skillport:
     name: skillport
     transport: stdio
     env:
-      SKILLPORT_SKILLS_DIR: ${env:SKILLPORT_SKILLS_DIR}
+      SKILLPORT_SKILLS_DIR: ${env:SKILLPORT_SKILLS_DIR:-.agents/skills}
     args:
     - skillport-mcp
     registry: false
