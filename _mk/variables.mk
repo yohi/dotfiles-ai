@@ -1,6 +1,6 @@
-# Load environment variables from .env if it exists
-ifneq (,$(wildcard .env))
-    include .env
+# Load environment variables from .env.make if it exists (safe for GNU Make)
+ifneq (,$(wildcard .env.make))
+    include .env.make
     export
 endif
 

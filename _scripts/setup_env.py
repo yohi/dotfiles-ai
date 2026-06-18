@@ -116,6 +116,7 @@ def main():
     # Now we write to .env, preserving the structure of .env.example if possible
     # We read .env.example line by line, and replace keys with their configured values
     output_lines = []
+    make_output_lines = []
     with open(example_path, "r", encoding="utf-8") as f:
         for line in f:
             stripped = line.strip()
@@ -125,27 +126,42 @@ def main():
                 key = match.group(1)
                 if key in new_env and new_env[key]:
                     val = new_env[key]
-                    # Escape/quote check if necessary, or output as is
+                    # For standard .env:
                     # If value contains spaces, quote it
-                    if " " in val and not (val.startswith('"') and val.endswith('"')):
-                        val = f'"{val}"'
-                    output_lines.append(f"{key}={val}\n")
+                    env_val = val
+                    if " " in env_val and not (env_val.startswith('"') and env_val.endswith('"')):
+                        env_val = f'"{env_val}"'
+                    output_lines.append(f"{key}={env_val}\n")
+
+                    # For Make-specific .env.make:
+                    # Strip any surrounding quotes and escape '$' as '$$'
+                    make_val = val.strip('"' + "'")
+                    make_val = make_val.replace('$', '$$')
+                    make_output_lines.append(f"{key}={make_val}\n")
                 else:
                     output_lines.append(f"# {key}=\n")
+                    make_output_lines.append(f"# {key}=\n")
             else:
                 output_lines.append(line)
+                make_output_lines.append(line.replace('$', '$$'))
 
     # Write back to .env
     with open(env_path, "w", encoding="utf-8") as f:
         f.writelines(output_lines)
 
-    # Set secure permissions
-    try:
-        os.chmod(env_path, 0o600)
-    except Exception:
-        pass
+    # Write back to .env.make
+    make_env_path = env_path + ".make"
+    with open(make_env_path, "w", encoding="utf-8") as f:
+        f.writelines(make_output_lines)
 
-    print(f"\n[+] Successfully updated {env_path}")
+    # Set secure permissions
+    for path in (env_path, make_env_path):
+        try:
+            os.chmod(path, 0o600)
+        except Exception:
+            pass
+
+    print(f"\n[+] Successfully updated {env_path} and {make_env_path}")
 
 if __name__ == "__main__":
     main()
