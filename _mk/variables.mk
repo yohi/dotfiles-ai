@@ -1,3 +1,9 @@
+# Load environment variables from .env if it exists
+ifneq (,$(wildcard .env))
+    include .env
+    export
+endif
+
 # Global Variables
 REQUIRE_NODEJS := 1
 SHELL := /bin/bash
