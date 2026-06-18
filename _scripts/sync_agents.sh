@@ -84,7 +84,7 @@ normalize_locations() {
     # Fix vague tips from skillport doc
     sed -i 's/If search returns too many results, use more specific terms/If search returns 10+ results, refine your query/' "$file_path"
     # Fix overly complex sentence for anthropics/claude-api
-    sed -i 's|<description>Build, debug, and optimize Claude API \/ Anthropic SDK apps.*</description>|<description>Build apps with Claude API/Anthropic SDK. Trigger on: imports (anthropic, @anthropic-ai/sdk) or direct requests. Not for: openai, ML tasks.</description>|g' "$file_path"
+    sed -i 's|<description>Reference for the Claude API / Anthropic SDK.*</description>|<description>Reference for the Claude API / Anthropic SDK. Use when working with Claude/Anthropic APIs, model selection, pricing, tool use. Skip when working with other providers like OpenAI or Gemini.</description>|g' "$file_path"
 }
 
 restore_external_skills_note() {
