@@ -3,16 +3,57 @@ version: 2.0.0
 description: AI Agent settings, skills, and unified MCP configuration for 
   dotfiles
 
+# CodeRabbit & Greptile Skills
+skills:
+  - coderabbitai/skills
+  - greptileai/skills//check-pr
+  - greptileai/skills//greploop
+
 # APM Standard Dependencies
 dependencies:
   # Skills
   apm:
-    - obra/superpowers
+    - obra/superpowers#v6.0.2
     - anthropics/skills
+    - coderabbitai/skills
+    - greptileai/skills//check-pr
+    - greptileai/skills//greploop
     - anthropics/claude-code//plugins/code-review
 
   # MCP Servers
   mcp:
+    - name: coderabbit
+      title: "CodeRabbit MCP"
+      registry: false
+      transport: stdio
+      command: "npx"
+      args:
+        - "-y"
+        - "@coderabbitai/mcp-server"
+      env:
+        GITHUB_TOKEN: "${env:GITHUB_TOKEN}"
+      enabled: true
+
+    - name: codegraph
+      title: "CodeGraph MCP"
+      registry: false
+      transport: stdio
+      command: "npx"
+      args:
+        - "-y"
+        - "@colbymchenry/codegraph"
+      enabled: true
+
+    - name: greptile
+      title: "Greptile MCP"
+      registry: false
+      transport: sse
+      url: "https://api.greptile.com/mcp"
+      headers:
+        Authorization: "Bearer ${env:GREPTILE_API_KEY}"
+        X-GitHub-Token: "${env:GITHUB_TOKEN}"
+      enabled: true
+
     - name: docker-mcp
       title: "Docker MCP Gateway"
       registry: false
@@ -42,7 +83,7 @@ dependencies:
       args:
         - "-y"
         # - "/home/y_ohi/program/nexus"
-        - "@yohi/nexus@1.13.1"
+        - "@yohi/nexus@1.15.1"
       env:
         NEXUS_STORAGE_ROOT_DIR: "${env:HOME}/.nexus"
         LOG_LEVEL: "ERROR"
@@ -101,8 +142,8 @@ snapshot: true
 
 plugin:
   - "@yohi/justice@2.3.0"
-  - "@yohi/akane@1.1.1"
-  - "oh-my-openagent@4.10.0"
+  - "@yohi/akane@1.2.0"
+  - "oh-my-openagent@4.11.0"
   - "@yohi/opencode-plugin-chronos-gate@1.4.0"
   - "@nick-vi/opencode-type-inject@latest"
   - "opencode-vibeguard@latest"
@@ -536,6 +577,7 @@ provider:
       - '@cf/qwen/qwen3-30b-a3b-fp8'
       - '@cf/qwen/qwq-32b'
       - '@cf/zai-org/glm-4.7-flash'
+      - '@cf/zai-org/glm-5.2'
   opencode:
     whitelist:
       - big-pickle
@@ -610,34 +652,6 @@ provider:
       - trinity-large-preview-free
   amazon-bedrock:
     whitelist:
-      - amazon.nova-2-lite-v1:0
-      - amazon.nova-lite-v1:0
-      - amazon.nova-micro-v1:0
-      - amazon.nova-pro-v1:0
-      - anthropic.claude-haiku-4-5-20251001-v1:0
-      - anthropic.claude-opus-4-1-20250805-v1:0
-      - anthropic.claude-opus-4-5-20251101-v1:0
-      - anthropic.claude-opus-4-6-v1
-      - anthropic.claude-opus-4-7
-      - anthropic.claude-opus-4-8
-      - anthropic.claude-sonnet-4-5-20250929-v1:0
-      - anthropic.claude-sonnet-4-6
-      - au.anthropic.claude-haiku-4-5-20251001-v1:0
-      - au.anthropic.claude-opus-4-6-v1
-      - au.anthropic.claude-opus-4-8
-      - au.anthropic.claude-sonnet-4-5-20250929-v1:0
-      - au.anthropic.claude-sonnet-4-6
-      - deepseek.r1-v1:0
-      - deepseek.v3-v1:0
-      - deepseek.v3.2
-      - eu.anthropic.claude-fable-5
-      - eu.anthropic.claude-haiku-4-5-20251001-v1:0
-      - eu.anthropic.claude-opus-4-5-20251101-v1:0
-      - eu.anthropic.claude-opus-4-6-v1
-      - eu.anthropic.claude-opus-4-7
-      - eu.anthropic.claude-opus-4-8
-      - eu.anthropic.claude-sonnet-4-5-20250929-v1:0
-      - eu.anthropic.claude-sonnet-4-6
       - global.anthropic.claude-fable-5
       - global.anthropic.claude-haiku-4-5-20251001-v1:0
       - global.anthropic.claude-opus-4-5-20251101-v1:0
@@ -646,36 +660,6 @@ provider:
       - global.anthropic.claude-opus-4-8
       - global.anthropic.claude-sonnet-4-5-20250929-v1:0
       - global.anthropic.claude-sonnet-4-6
-      - google.gemma-3-12b-it
-      - google.gemma-3-27b-it
-      - google.gemma-3-4b-it
-      - jp.anthropic.claude-opus-4-7
-      - jp.anthropic.claude-opus-4-8
-      - jp.anthropic.claude-sonnet-4-5-20250929-v1:0
-      - jp.anthropic.claude-sonnet-4-6
-      - meta.llama3-1-70b-instruct-v1:0
-      - meta.llama3-1-8b-instruct-v1:0
-      - meta.llama3-3-70b-instruct-v1:0
-      - meta.llama4-maverick-17b-instruct-v1:0
-      - meta.llama4-scout-17b-instruct-v1:0
-      - minimax.minimax-m2
-      - minimax.minimax-m2.1
-      - minimax.minimax-m2.5
-      - mistral.devstral-2-123b
-      - mistral.magistral-small-2509
-      - mistral.ministral-3-14b-instruct
-      - mistral.ministral-3-3b-instruct
-      - mistral.ministral-3-8b-instruct
-      - mistral.mistral-large-3-675b-instruct
-      - mistral.pixtral-large-2502-v1:0
-      - mistral.voxtral-mini-3b-2507
-      - mistral.voxtral-small-24b-2507
-      - moonshot.kimi-k2-thinking
-      - moonshotai.kimi-k2.5
-      - nvidia.nemotron-nano-12b-v2
-      - nvidia.nemotron-nano-3-30b
-      - nvidia.nemotron-nano-9b-v2
-      - nvidia.nemotron-super-3-120b
       - openai.gpt-5.4
       - openai.gpt-5.5
       - openai.gpt-oss-120b
@@ -684,30 +668,6 @@ provider:
       - openai.gpt-oss-20b-1:0
       - openai.gpt-oss-safeguard-120b
       - openai.gpt-oss-safeguard-20b
-      - qwen.qwen3-235b-a22b-2507-v1:0
-      - qwen.qwen3-32b-v1:0
-      - qwen.qwen3-coder-30b-a3b-v1:0
-      - qwen.qwen3-coder-480b-a35b-v1:0
-      - qwen.qwen3-coder-next
-      - qwen.qwen3-next-80b-a3b
-      - qwen.qwen3-vl-235b-a22b
-      - us.anthropic.claude-fable-5
-      - us.anthropic.claude-haiku-4-5-20251001-v1:0
-      - us.anthropic.claude-opus-4-1-20250805-v1:0
-      - us.anthropic.claude-opus-4-5-20251101-v1:0
-      - us.anthropic.claude-opus-4-6-v1
-      - us.anthropic.claude-opus-4-7
-      - us.anthropic.claude-opus-4-8
-      - us.anthropic.claude-sonnet-4-5-20250929-v1:0
-      - us.anthropic.claude-sonnet-4-6
-      - us.deepseek.r1-v1:0
-      - us.meta.llama4-maverick-17b-instruct-v1:0
-      - us.meta.llama4-scout-17b-instruct-v1:0
-      - writer.palmyra-x4-v1:0
-      - writer.palmyra-x5-v1:0
-      - zai.glm-4.7
-      - zai.glm-4.7-flash
-      - zai.glm-5
   openrouter:
     npm: "@ai-sdk/openai-compatible"
     options:
@@ -779,6 +739,7 @@ provider:
       - deepseek-v4-pro
       - glm-5
       - glm-5.1
+      - glm-5.2
       - kimi-k2.5
       - kimi-k2.6
       - kimi-k2.7-code

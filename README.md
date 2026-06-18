@@ -88,38 +88,39 @@ AIエージェント（Claude Code, Gemini CLI, OpenCode, Codex）の設定・�
     - 例: `skillport add anthropics/skills skills/ --namespace anthropics`
   - `skillport check`: スキル定義ファイル（.md）の構文や整合性をチェックします。
 
-## APM による一元管理
+## APM による一元管理とハイブリッド MCP アーキテクチャ
 
 [Agent Package Manager (APM)](https://github.com/microsoft/apm) ([Docs](https://microsoft.github.io/apm/)) は AI エージェント設定の Single Source of Truth (SSOT) です。
+本プロジェクトでは、APMとDocker MCP Gatewayの強みを活かした**ハイブリッドアーキテクチャ**を採用しています。
 
-- **管理対象**: 外部スキル依存関係（`obra/superpowers`, `anthropics/skills`）+ カスタムMCP（Docker Catalog にないもの）
-- **Docker Catalog 標準 MCP**: GitHub, SQLite, sequentialthinking は Docker Desktop 側で管理
+- **APMが直接管理するコアインフラ**: ローカル環境に直接アクセスする必要があるツール（Nexus, Chronos, Skillport）や、外部APIと通信する独立したスキル群（CodeRabbit, Greptile）は、APMからホストプロセスとして直接起動・管理されます。
+- **Docker MCP Gatewayの役割**: ホスト環境から隔離して安全に動かすべきコンテナツール（Filesystem, SQLite等）や、AIエージェントが会話中にカタログから動的にツールを追加する「Dynamic MCP」のためのサンドボックス環境を提供します。
 - **スキル配置**: `.agents/skills/` に集約（全エージェントが参照）
 - **自動生成ファイルと Git**:
-  `opencode/opencode.jsonc` などの設定ファイルは、`make setup` または `apm install` 時に `apm.yml` をソースとして自動生成されます。これらは `.gitignore` で除外されており、Git 管理（コミット）の対象外です。SSOT 原則に基づき、常に最新の `apm.yml` から生成されるようになっています。
+  `opencode/opencode.jsonc` などの設定ファイルは、`make setup` または `apm install` 時に `apm.yml` をソースとして自動生成されます。これらは `.gitignore` で除外されており、Git 管理（コミット）の対象外です。
 
 ### 環境変数の3層モデル
 
 | Tier | ソース | コンテンツ |
 | :--- | :--- | :--- |
-| Tier 1 | OS / シェル環境 | API Keys, PATs |
+| Tier 1 | OS / シェル環境 | API Keys, PATs, GITHUB_TOKEN, GREPTILE_API_KEY |
 | Tier 2 | `.env` (Git除外) | 環境固有設定 |
 | Tier 3 | `apm.yml` | デフォルト値 |
 
 `.env.example` を `.env` にコピーして使用してください。
 
-## Docker MCP Gateway (Unified SSE)
+## Docker MCP Gateway (Unified SSE / Sandbox)
 
-[Docker MCP Gateway](https://docs.docker.com/ai/mcp-catalog-and-toolkit/mcp-gateway/) は、複数の MCP サーバーを統合し、共通の **SSE (Server-Sent Events)** エンドポイントを提供します。
+[Docker MCP Gateway](https://docs.docker.com/ai/mcp-catalog-and-toolkit/mcp-gateway/) は、隔離されたコンテナ群と **SSE (Server-Sent Events)** エンドポイントを提供します。
 
-- **役割**: Claude Code, Gemini CLI, Cursor, OpenCode, VSCode, Codex から、単一の URL (`http://127.0.0.1:10888/sse`) 経由で複数の MCP サーバーにアクセス可能にします。
+- **役割**: AIエージェントに「Dynamic MCP（`mcp-add`等）」による自己拡張能力を与え、ローカルファイルを汚染したくないツール（SQLite等）を安全なコンテナ内で実行します。
 - **管理 (Systemd)**: バックグラウンドサービスとして常駐します。
   - `make start-mcp`: ゲートウェイを起動。
   - `make stop-mcp`: ゲートウェイを停止。
   - `make setup-docker-mcp`: Docker MCP Gateway 自体のセットアップを行います。
   - `make sync-mcp`: `apm.yml` のカスタム MCP 定義から各エージェント/IDE 向け設定と Gateway 実行設定を再生成し、Gateway を再読み込みします。
 - **Source of Truth**:
-  - **`apm.yml`**: 外部スキル依存関係と Docker Catalog にないカスタム MCP 定義の **SSOT** です。
+  - **`apm.yml`**: Docker Catalog にないカスタム MCP 定義の **SSOT** です。APMで管理すべきコアインフラはGatewayから除外され、APMが直接ハンドリングします。
 - **自動生成されるファイル**: `make sync-mcp` を実行すると、以下のファイルが `apm.yml` から自動生成されます。
   - `mcp/config.yaml`: Docker MCP Gateway で有効化するサーバー一覧。
   - `mcp/catalogs/custom.yaml`: Docker MCP Gateway のカスタムカタログ定義。
