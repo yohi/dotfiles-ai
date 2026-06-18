@@ -4,7 +4,7 @@ Copy and adapt these templates when generating repository setup files.
 
 ## Table of contents
 
-1. [`.coderabbit.yaml`](#coderrabbityaml)
+1. [`.coderabbit.yaml`](#coderabbityaml)
 2. [`.github/dependabot.yml`](#githubdependabotyml)
 3. [`.github/workflows/codeql.yml`](#githubworkflowscodeqlyml)
 4. [`.github/workflows/semgrep.yml`](#githubworkflowssemgrepyml)
@@ -42,7 +42,7 @@ reviews:
     enabled: true
     drafts: false
     base_branches:
-      - "main"
+      - "<DEFAULT_BRANCH>"
   tools:
     shellcheck:
       enabled: true
@@ -84,9 +84,9 @@ name: "CodeQL"
 
 on:
   push:
-    branches: ["main"]
+    branches: ["<DEFAULT_BRANCH>"]
   pull_request:
-    branches: ["main"]
+    branches: ["<DEFAULT_BRANCH>"]
   schedule:
     - cron: "0 9 * * 1"
 
@@ -102,7 +102,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: ["python", "javascript"]
+        language: ["<PRIMARY_LANGUAGE>"]
 
     steps:
       - name: Checkout repository
@@ -129,9 +129,9 @@ name: Semgrep
 
 on:
   push:
-    branches: ["main"]
+    branches: ["<DEFAULT_BRANCH>"]
   pull_request:
-    branches: ["main"]
+    branches: ["<DEFAULT_BRANCH>"]
 
 jobs:
   semgrep:
@@ -154,9 +154,9 @@ name: SonarCloud
 
 on:
   push:
-    branches: ["main"]
+    branches: ["<DEFAULT_BRANCH>"]
   pull_request:
-    branches: ["main"]
+    branches: ["<DEFAULT_BRANCH>"]
 
 jobs:
   sonarcloud:
@@ -167,19 +167,19 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Set up <PRIMARY_LANGUAGE>
+        uses: actions/setup-<PRIMARY_LANGUAGE>@v5
         with:
-          python-version: "3.11"
+          <PRIMARY_LANGUAGE>-version: "3.11"
 
       - name: Install dependencies and run tests with coverage
         run: |
-          python -m pip install --upgrade pip
+          <PRIMARY_LANGUAGE> -m pip install --upgrade pip
           pip install -e ".[dev]"
           pytest --cov=src --cov-report=xml
 
       - name: SonarCloud Scan
-        uses: SonarSource/sonarcloud-github-action@v3.0.0
+        uses: SonarSource/sonarqube-scan-action@v7
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -205,9 +205,9 @@ name: Coverage
 
 on:
   push:
-    branches: ["main"]
+    branches: ["<DEFAULT_BRANCH>"]
   pull_request:
-    branches: ["main"]
+    branches: ["<DEFAULT_BRANCH>"]
 
 jobs:
   coverage:
@@ -216,21 +216,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Set up <PRIMARY_LANGUAGE>
+        uses: actions/setup-<PRIMARY_LANGUAGE>@v5
         with:
-          python-version: "3.11"
+          <PRIMARY_LANGUAGE>-version: "3.11"
 
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
+          <PRIMARY_LANGUAGE> -m pip install --upgrade pip
           pip install -e ".[dev]"
 
       - name: Run tests with coverage
         run: pytest --cov=src --cov-report=xml
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v7
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./coverage.xml
@@ -263,9 +263,9 @@ name: Trivy container scan
 
 on:
   push:
-    branches: ["main"]
+    branches: ["<DEFAULT_BRANCH>"]
   pull_request:
-    branches: ["main"]
+    branches: ["<DEFAULT_BRANCH>"]
   schedule:
     - cron: "0 10 * * 1"
 
@@ -278,7 +278,7 @@ jobs:
       security-events: write
     steps:
       - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@v2.12.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: "<DOCKER_IMAGE>"
           format: "sarif"
@@ -298,9 +298,9 @@ name: Snyk Security
 
 on:
   push:
-    branches: ["main"]
+    branches: ["<DEFAULT_BRANCH>"]
   pull_request:
-    branches: ["main"]
+    branches: ["<DEFAULT_BRANCH>"]
 
 jobs:
   security:
@@ -309,7 +309,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Run Snyk to check for vulnerabilities
-        uses: snyk/actions/python@v3.0.0
+        uses: snyk/actions/<PRIMARY_LANGUAGE>@v1.0.0
         continue-on-error: true
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}

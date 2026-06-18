@@ -54,6 +54,8 @@ Ask the user (or infer from the repository) for the minimum required context:
 5. **Package ecosystem(s)** for Dependabot (default: pip + github-actions for Python;
    npm + github-actions for Node.js).
 6. **Workflow triggers** (default: `push` to default branch and `pull_request`).
+7. **Repository access level** (public or private; important for configuring tools like SonarCloud and Trivy).
+
 
 ## Output layout
 
