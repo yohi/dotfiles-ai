@@ -7,7 +7,7 @@ Copy and adapt these templates when generating repository setup files.
 1. [`.coderabbit.yaml`](#coderrabbityaml)
 2. [`.github/dependabot.yml`](#githubdependabotyml)
 3. [`.github/workflows/codeql.yml`](#githubworkflowscodeqlyml)
-4. [`.github/workflows/semgrep.yml`](#githubworkflowssemgremlyml)
+4. [`.github/workflows/semgrep.yml`](#githubworkflowssemgrepyml)
 5. [`.github/workflows/sonarcloud.yml`](#githubworkflowssonarcloudyml)
 6. [`sonar-project.properties`](#sonar-projectproperties)
 7. [`.github/workflows/codecov.yml`](#githubworkflowscodecovyml)
@@ -179,7 +179,7 @@ jobs:
           pytest --cov=src --cov-report=xml
 
       - name: SonarCloud Scan
-        uses: SonarSource/sonarcloud-github-action@master
+        uses: SonarSource/sonarcloud-github-action@v3.0.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -278,7 +278,7 @@ jobs:
       security-events: write
     steps:
       - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v2.12.0
         with:
           image-ref: "<DOCKER_IMAGE>"
           format: "sarif"
@@ -309,7 +309,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Run Snyk to check for vulnerabilities
-        uses: snyk/actions/python@master
+        uses: snyk/actions/python@v3.0.0
         continue-on-error: true
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}

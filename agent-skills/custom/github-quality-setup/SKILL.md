@@ -9,9 +9,6 @@ description: >
   like "make my repo production-ready", "add CI quality gates", "set up GitHub security",
   "configure PR automation", or "add workflow files for code review/security".
   Works for any language; Python and TypeScript examples are provided in the bundled reference.
-metadata:
-  version: "0.1.0"
-  author: dotfiles-ai
 ---
 
 # GitHub Repository Quality & Security Setup
