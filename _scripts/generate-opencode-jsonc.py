@@ -120,6 +120,29 @@ def _build_permission(perm: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
+def _validate_bedrock_models(prov: dict[str, Any]) -> None:
+    """Validate that Bedrock models match whitelisted patterns."""
+    whitelist = prov.get("whitelist") or []
+    models = prov.get("models") or {}
+    model_names = list(whitelist)
+    if isinstance(models, dict):
+        model_names.extend(models.keys())
+    elif isinstance(models, list):
+        model_names.extend(models)
+
+    allowed_patterns = [
+        r"^global\.anthropic\.claude-.*",
+        r"^openai\.gpt-.*",
+    ]
+
+    for model in model_names:
+        if not any(re.match(pat, model) for pat in allowed_patterns):
+            raise ValueError(
+                f"Model '{model}' in amazon-bedrock is not whitelisted. "
+                "Only 'global.anthropic.claude-*' and 'openai.gpt-*' are allowed."
+            )
+
+
 # ---------------------------------------------------------------------------
 # Build the full opencode config dict from apm.yml
 # ---------------------------------------------------------------------------
@@ -172,6 +195,9 @@ def build_config(apm: dict[str, Any]) -> dict[str, Any]:
     for name, prov in (apm.get("provider") or {}).items():
         if name == "sakura":
             providers[name] = _normalize_sakura(prov)
+        elif name == "amazon-bedrock":
+            _validate_bedrock_models(prov)
+            providers[name] = prov
         else:
             providers[name] = prov
 
