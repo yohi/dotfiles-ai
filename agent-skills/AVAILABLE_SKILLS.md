@@ -84,6 +84,26 @@ This document provides a comprehensive list of skills available through SkillPor
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 <!-- SKILLPORT_START -->
 ## SkillPort Skills
 
@@ -137,6 +157,11 @@ Each skill contains step-by-step instructions, templates, and scripts.
   <name>canvas-design</name>
   <description>Create beautiful visual art in .png and .pdf documents using design philosophy. You should use this skill when the user asks to create a poster, piece of art, design, or other static piece. Create original visual designs, never copying existing artists' work to avoid copyright violations.</description>
   <location>.agents/skills/canvas-design/SKILL.md</location>
+</skill>
+<skill>
+  <name>check-pr</name>
+  <description>Checks a GitHub, GitLab, or Perforce (p4) pull request (or merge request, or shelved changelist) for unresolved review comments, failing status checks, and incomplete PR descriptions. Waits for pending checks to complete, categorizes issues as actionable or informational, and optionally fixes and resolves them. Use when the user wants to check a PR/MR/CL, address review feedback, or prepare a change for submission.</description>
+  <location>.agents/skills/check-pr/SKILL.md</location>
 </skill>
 <skill>
   <name>claude-api</name>
@@ -212,6 +237,11 @@ Each skill contains step-by-step instructions, templates, and scripts.
   <name>frontend-design</name>
   <description>Guidance for distinctive, intentional visual design when building new UI or reshaping an existing one. Helps with aesthetic direction, typography, and making choices that don't read as templated defaults.</description>
   <location>.agents/skills/frontend-design/SKILL.md</location>
+</skill>
+<skill>
+  <name>greploop</name>
+  <description>Iteratively improves a PR (GitHub), MR (GitLab), or shelved changelist (Perforce) until Greptile gives it a 5/5 confidence score with zero unresolved comments. Triggers Greptile review, fixes all actionable comments, pushes/re-shelves, re-triggers review, and repeats. Use when the user wants to fully optimize a PR/MR/CL against Greptile's code review standards.</description>
+  <location>.agents/skills/greploop/SKILL.md</location>
 </skill>
 <skill>
   <name>internal-comms</name>
@@ -315,6 +345,16 @@ Each skill contains step-by-step instructions, templates, and scripts.
 </skill>
 </available_skills>
 <!-- SKILLPORT_END -->
+
+
+
+
+
+
+
+
+
+
 
 
 

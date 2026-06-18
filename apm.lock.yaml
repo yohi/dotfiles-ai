@@ -1,5 +1,5 @@
 lockfile_version: '1'
-generated_at: '2026-06-17T20:42:58.174404+00:00'
+generated_at: '2026-06-18T16:00:38.057302+00:00'
 apm_version: 0.20.0
 dependencies:
 - repo_url: anthropics/claude-code
@@ -850,6 +850,38 @@ dependencies:
     .opencode/agents/code-reviewer.md: sha256:5677b371344cdc444390fbb366041eee7ad204fdbc85b6a37f92671afa8bce7f
     .opencode/commands/coderabbit-review.md: sha256:cba1e6915ee98d24f288e3fb2dfb4b9b5bdc9e3164abf66b885aa9b66d8ce17d
   content_hash: sha256:9175a296d5fc107148623b2f2673f5381eee51e156d109b3d8d4ae23107b9af6
+- repo_url: greptileai/skills
+  host: github.com
+  resolved_commit: bda66cce07d1c59c83d387b87aeeed042b13369d
+  virtual_path: check-pr
+  is_virtual: true
+  package_type: claude_skill
+  deployed_files:
+  - .agents/skills/check-pr
+  - .agents/skills/check-pr/SKILL.md
+  - .agents/skills/check-pr/references/gitlab-api.md
+  - .agents/skills/check-pr/references/graphql-queries.md
+  deployed_file_hashes:
+    .agents/skills/check-pr/SKILL.md: sha256:34eb01152ce5c99a162a14aa9a43ee227e4c5bf3e767e87a15ba3e43ba2737ee
+    .agents/skills/check-pr/references/gitlab-api.md: sha256:7a92fcf46e0152c693012fbdc02d61a04c940599f5a60b7ab28bcbdf18952968
+    .agents/skills/check-pr/references/graphql-queries.md: sha256:f850841783ef3df4f28f4f45731f08591c8994fbe3e742eef5a370454d575d02
+  content_hash: sha256:54dc158641c3857ad6cd147860017c1494d3dbfdfae16a16c30819e7b36900a5
+- repo_url: greptileai/skills
+  host: github.com
+  resolved_commit: bda66cce07d1c59c83d387b87aeeed042b13369d
+  virtual_path: greploop
+  is_virtual: true
+  package_type: claude_skill
+  deployed_files:
+  - .agents/skills/greploop
+  - .agents/skills/greploop/SKILL.md
+  - .agents/skills/greploop/references/gitlab-api.md
+  - .agents/skills/greploop/references/graphql-queries.md
+  deployed_file_hashes:
+    .agents/skills/greploop/SKILL.md: sha256:b515e64c91eaeca900682cd9bfc319e665d8fa9a5759d3e8157b16d6de338caa
+    .agents/skills/greploop/references/gitlab-api.md: sha256:56ed1f30b4a5fe8c3286503505de1d4f9704f361ed158c162a0027c6bbbd2c80
+    .agents/skills/greploop/references/graphql-queries.md: sha256:99a689cf5318332316353a3fe2e68d5f6096f9c48b6428ca5ddf434ee5c75a42
+  content_hash: sha256:abbe92d33f94ec5cd027bf1c3073592ceb74aae7bc3c36a8a2b908df0b6e2a49
 - repo_url: obra/superpowers
   host: github.com
   resolved_commit: b62616fc12f6a007c6fd5118146821d748da0d33
@@ -978,7 +1010,10 @@ dependencies:
   content_hash: sha256:8206d720fc4f340c4bc83dec27a1632debb5065a3ceeca53a7cd96a90425038f
 mcp_servers:
 - chronos-graph
+- codegraph
+- coderabbit
 - docker-mcp
+- greptile
 - nexus
 - skillport
 mcp_configs:
@@ -1017,6 +1052,24 @@ mcp_configs:
     - context-store
     registry: false
     command: uvx
+  codegraph:
+    name: codegraph
+    transport: stdio
+    args:
+    - -y
+    - '@colbymchenry/codegraph'
+    registry: false
+    command: npx
+  coderabbit:
+    name: coderabbit
+    transport: stdio
+    env:
+      GITHUB_TOKEN: ${env:GITHUB_TOKEN}
+    args:
+    - -y
+    - '@coderabbitai/mcp-server'
+    registry: false
+    command: npx
   docker-mcp:
     name: docker-mcp
     transport: sse
@@ -1024,6 +1077,14 @@ mcp_configs:
     headers:
       Authorization: Bearer ${env:MCP_GATEWAY_TOKEN}
     url: http://127.0.0.1:10888/sse
+  greptile:
+    name: greptile
+    transport: sse
+    registry: false
+    headers:
+      Authorization: Bearer ${env:GREPTILE_API_KEY}
+      X-GitHub-Token: ${env:GITHUB_TOKEN}
+    url: https://api.greptile.com/mcp
   nexus:
     name: nexus
     transport: stdio
@@ -1050,5 +1111,7 @@ mcp_configs:
     command: uvx
 local_deployed_files:
 - .cursor/rules/agent-commands.mdc
+- .cursor/rules/architecture.mdc
 local_deployed_file_hashes:
   .cursor/rules/agent-commands.mdc: sha256:de037ca92ad5bb65be804d929789aa4ffe0027c7d94b6917d5146c7e91ebf7f7
+  .cursor/rules/architecture.mdc: sha256:976a508f7c575dcaa34a332f714ef4f0e791c486306cf12760b35aaa1d3d79ea

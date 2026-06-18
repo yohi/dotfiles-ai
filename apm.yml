@@ -3,6 +3,12 @@ version: 2.0.0
 description: AI Agent settings, skills, and unified MCP configuration for 
   dotfiles
 
+# CodeRabbit & Greptile Skills
+skills:
+  - coderabbitai/skills
+  - greptileai/skills//check-pr
+  - greptileai/skills//greploop
+
 # APM Standard Dependencies
 dependencies:
   # Skills
@@ -10,10 +16,44 @@ dependencies:
     - obra/superpowers#v6.0.2
     - anthropics/skills
     - coderabbitai/skills
+    - greptileai/skills//check-pr
+    - greptileai/skills//greploop
     - anthropics/claude-code//plugins/code-review
 
   # MCP Servers
   mcp:
+    - name: coderabbit
+      title: "CodeRabbit MCP"
+      registry: false
+      transport: stdio
+      command: "npx"
+      args:
+        - "-y"
+        - "@coderabbitai/mcp-server"
+      env:
+        GITHUB_TOKEN: "${env:GITHUB_TOKEN}"
+      enabled: true
+
+    - name: codegraph
+      title: "CodeGraph MCP"
+      registry: false
+      transport: stdio
+      command: "npx"
+      args:
+        - "-y"
+        - "@colbymchenry/codegraph"
+      enabled: true
+
+    - name: greptile
+      title: "Greptile MCP"
+      registry: false
+      transport: sse
+      url: "https://api.greptile.com/mcp"
+      headers:
+        Authorization: "Bearer ${env:GREPTILE_API_KEY}"
+        X-GitHub-Token: "${env:GITHUB_TOKEN}"
+      enabled: true
+
     - name: docker-mcp
       title: "Docker MCP Gateway"
       registry: false
