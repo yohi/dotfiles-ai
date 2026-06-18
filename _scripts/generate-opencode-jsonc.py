@@ -136,6 +136,10 @@ def _validate_bedrock_models(prov: dict[str, Any]) -> None:
     ]
 
     for model in model_names:
+        if not isinstance(model, str):
+            raise ValueError(
+                f"Model name must be a string, got {type(model).__name__}: {model}"
+            )
         if not any(re.match(pat, model) for pat in allowed_patterns):
             raise ValueError(
                 f"Model '{model}' in amazon-bedrock is not whitelisted. "
