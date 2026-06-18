@@ -44,8 +44,14 @@ The following rules apply to **ALL** projects unless overridden by a local proje
 1. **Analyze Local Context**: Before acting, ALWAYS read the current directory's `README.md` or local `AGENTS.md` to understand the specific project constraints.
 2. **Resolve Paths**: Paths in Section 3 are relative to the Central Config Repo. Check accessibility before trying to resolve them.
 3. **Execution Environment**: If a `devcontainer` environment (e.g., `.devcontainer/`) is available, **ALWAYS** prioritize executing static analysis, linting, and tests **inside the devcontainer** to ensure environment consistency.
-4. **Token Management**: `GITHUB_TOKEN` is synced automatically via GitHub CLI and is stored locally in `~/.gh_token`. It is a hybrid async/sync retrieval system established in `../dotfiles-zsh/zshrc`.
+4. **Token Management**: `GITHUB_TOKEN` is synced automatically via GitHub CLI and is stored locally in `~/.gh_token` (established in `../dotfiles-zsh/zshrc`), which may then be written directly to the `.env` file during interactive repository setup (`make init-env`).
 5. **Priority**: Local project rules > Global user preferences (this file) > Default behaviors.
+
+
+
+
+
+
 
 
 
@@ -262,7 +268,7 @@ Each skill contains step-by-step instructions, templates, and scripts.
 </skill>
 <skill>
   <name>claude-api</name>
-  <description>Reference for the Claude API / Anthropic SDK — model ids, pricing, params, streaming, tool use, MCP, agents, caching, token counting, model migration. TRIGGER — read BEFORE opening the target file; don't skip because it "looks like a one-liner" — whenever: the prompt names Claude/Anthropic in any form (Claude, Anthropic, Fable, Opus, Sonnet, Haiku, `anthropic`, `@anthropic-ai`, `claude-*`, `us.anthropic.*`, `[1m]`); the user asks about an LLM (pricing/model choice/limits/caching) — never answer from memory; OR the task is LLM-shaped with provider unstated (agent/MCP/tool-definition/multi-agent/RAG/LLM-judge/computer-use; generate/summarize/extract/classify/rewrite/converse over NL; debugging refusals/cutoffs/streaming/tool-calls/tokens). SKIP only when another provider is being worked on (overrides all triggers): OpenAI/GPT/Gemini/Llama/Mistral/Cohere/Ollama named in the query; OR `grep -rE 'openai|langchain_openai|google.generativeai|genai|mistralai|cohere|ollama'` over the project hits (run this grep FIRST if no provider named — don't Read the file).</description>
+  <description>Reference for the Claude API / Anthropic SDK. Use when working with Claude/Anthropic APIs, model selection, pricing, tool use. Skip when working with other providers like OpenAI or Gemini.</description>
   <location>.agents/skills/claude-api/SKILL.md</location>
 </skill>
 <skill>
@@ -297,7 +303,7 @@ Each skill contains step-by-step instructions, templates, and scripts.
 </skill>
 <skill>
   <name>custom/github-quality-setup</name>
-  <description>Set up a comprehensive GitHub repository quality and security toolchain. Use this skill whenever the user wants to configure GitHub Actions, code review bots, static analysis, security scanning, dependency updates, or coverage reporting for a repository — even if they only mention some of the tools (CodeRabbit, SonarCloud, Semgrep, Dependabot, CodeQL, Snyk, Trivy, Codecov). Also use when the user says things like "make my repo production-ready", "add CI quality gates", "set up GitHub security", or "configure PR automation". Works for any language; Python and TypeScript examples are provided in the bundled reference.</description>
+  <description>Set up a comprehensive GitHub repository quality and security toolchain. Use this skill whenever the user wants to configure GitHub Actions, code review bots, static analysis, security scanning, dependency updates, or coverage reporting for a repository -- even if they only mention some of the tools (CodeRabbit, SonarCloud, Semgrep, Dependabot, CodeQL, Snyk, Trivy, Codecov). Also use when the user says things like "make my repo production-ready", "add CI quality gates", "set up GitHub security", "configure PR automation", or "add workflow files for code review/security". Works for any language; Python and TypeScript examples are provided in the bundled reference.</description>
   <location>agent-skills/custom/github-quality-setup/SKILL.md</location>
 </skill>
 <skill>
@@ -447,6 +453,9 @@ Each skill contains step-by-step instructions, templates, and scripts.
 </skill>
 </available_skills>
 <!-- SKILLPORT_END -->
+
+
+
 
 
 

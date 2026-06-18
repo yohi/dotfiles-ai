@@ -41,6 +41,13 @@ description: Updates the LLM models in apm.yml, personal.env, and work.env using
 - GitHub の `https://github.com/code-yeongyu/oh-my-openagent` から最新のリリース（Release Tag）および変更内容を確認します。
 - 公式の変更内容に基づいて、`opencode/README.md` に記載されている `Target Version` や、知能カテゴリー・エージェント構成のデフォルト推奨モデルなどの差分のみを部分的にアップデートします。
 - **注意**: 当プロジェクト固有の説明（`work.env`/`personal.env` の切り替え方法、zsh連携、apm.yml からのプラグイン同期など）を消去してしまわないよう、丸ごとの置き換えは絶対に避けてください。
+  - **更新すべき対象範囲**:
+    - `Target Version` セクション
+    - 知能カテゴリー・エージェント構成のデフォルト推奨モデル一覧
+  - **維持（保護）すべき対象範囲**:
+    - `work.env` / `personal.env` の環境切り替え手順
+    - zsh 連携スクリプトやエイリアスの設定解説
+    - `apm.yml` からのプラグイン同期手順およびその構造的説明
 
 ### 5. 整合性の検証とクリーンアップ
 - 更新完了後、静的解析・構文チェック等のチェックを実施します：

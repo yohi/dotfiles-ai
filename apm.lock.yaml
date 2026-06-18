@@ -1,5 +1,5 @@
 lockfile_version: '1'
-generated_at: '2026-06-18T16:36:33.878426+00:00'
+generated_at: '2026-06-18T17:19:11.565237+00:00'
 apm_version: 0.20.0
 dependencies:
 - repo_url: anthropics/claude-code
@@ -333,6 +333,10 @@ dependencies:
   - .agents/skills/skill-creator/eval-viewer/viewer.html
   - .agents/skills/skill-creator/references/schemas.md
   - .agents/skills/skill-creator/scripts/__init__.py
+  - .agents/skills/skill-creator/scripts/__pycache__/__init__.cpython-314.pyc
+  - .agents/skills/skill-creator/scripts/__pycache__/aggregate_benchmark.cpython-314.pyc
+  - .agents/skills/skill-creator/scripts/__pycache__/package_skill.cpython-314.pyc
+  - .agents/skills/skill-creator/scripts/__pycache__/quick_validate.cpython-314.pyc
   - .agents/skills/skill-creator/scripts/aggregate_benchmark.py
   - .agents/skills/skill-creator/scripts/generate_report.py
   - .agents/skills/skill-creator/scripts/improve_description.py
@@ -731,6 +735,10 @@ dependencies:
     .agents/skills/skill-creator/eval-viewer/viewer.html: sha256:a53213426ee1100441d701a3a0d49cda7a842f992d2c36463f4d3cc0258575fa
     .agents/skills/skill-creator/references/schemas.md: sha256:8e8876180a8989b406a4d3edddf875b04cdfd5805cc8616686d552b11ce4455f
     .agents/skills/skill-creator/scripts/__init__.py: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+    .agents/skills/skill-creator/scripts/__pycache__/__init__.cpython-314.pyc: sha256:7ba85e6267822c1b89b09ffe7895dfec5ccf43c92ae3b86d33830e8680f41bd8
+    .agents/skills/skill-creator/scripts/__pycache__/aggregate_benchmark.cpython-314.pyc: sha256:dd2ebd95173f6d441b3f919bace6e4034f45a152bd7e9d373a71de89d6161df5
+    .agents/skills/skill-creator/scripts/__pycache__/package_skill.cpython-314.pyc: sha256:6aff9d6273799611f898eedb681d08f20942b08fbbd825a014703a6ea0e764bc
+    .agents/skills/skill-creator/scripts/__pycache__/quick_validate.cpython-314.pyc: sha256:dbbdba20f569807a8bc3a4829d010b4eb43a0003db4ddc6177eeb14e97bf8b19
     .agents/skills/skill-creator/scripts/aggregate_benchmark.py: sha256:123ef128ea5ccc01a4b1ac212ef5567f21e9c13d3d240609780beeb3200c49aa
     .agents/skills/skill-creator/scripts/generate_report.py: sha256:13df7118a3c50c83c4c3250a606d5f2b20b25a3d44cbc392b3d669ec75281453
     .agents/skills/skill-creator/scripts/improve_description.py: sha256:87d864570220b699fac52da309d2d6efdb060647bfebc74f768128e646accf80
