@@ -1,5 +1,5 @@
 lockfile_version: '1'
-generated_at: '2026-06-18T16:00:38.057302+00:00'
+generated_at: '2026-06-18T16:36:33.878426+00:00'
 apm_version: 0.20.0
 dependencies:
 - repo_url: anthropics/claude-code
@@ -1104,7 +1104,7 @@ mcp_configs:
     name: skillport
     transport: stdio
     env:
-      SKILLPORT_SKILLS_DIR: ${env:HOME}/dotfiles/components/dotfiles-ai/.agents/skills
+      SKILLPORT_SKILLS_DIR: ${env:SKILLPORT_SKILLS_DIR:-.agents/skills}
     args:
     - skillport-mcp
     registry: false

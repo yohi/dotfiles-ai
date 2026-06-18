@@ -71,7 +71,7 @@ dependencies:
       args:
         - "skillport-mcp"
       env:
-        SKILLPORT_SKILLS_DIR: "${env:HOME}/dotfiles/components/dotfiles-ai/.agents/skills"
+        SKILLPORT_SKILLS_DIR: "${env:SKILLPORT_SKILLS_DIR:-.agents/skills}"
       standalone: true
       enabled: true
 
