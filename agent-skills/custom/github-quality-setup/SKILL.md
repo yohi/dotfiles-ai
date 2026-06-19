@@ -47,7 +47,7 @@ Ask the user (or infer from the repository) for the minimum required context:
 
 1. **Primary language / stack** (e.g., Python, TypeScript/Node.js, Go, Java, Ruby). If
    unknown, default to Python examples in workflow comments.
-2. **Tools to include** (default: all seven below). Respect exclusions if the user
+2. **Tools to include** (default: all eight below). Respect exclusions if the user
    explicitly opts out of a tool.
 3. **Default branch name** (default: `main`).
 4. **Container image** (only if Trivy is selected and the repo builds a Docker image).
@@ -126,7 +126,7 @@ substitutions:
 - `<ECOSYSTEMS>` -> Dependabot ecosystems appropriate for the stack.
 
 Use the file names and directory layout defined above. Do not invent extra tools or
-options beyond the seven listed below unless the user asks.
+options beyond the eight listed below unless the user asks.
 
 ### 4. Provide the setup checklist
 
@@ -161,7 +161,7 @@ Example structure:
 # GitHub quality & security setup for <repo>
 
 Generated configuration for: CodeRabbit, SonarCloud, Semgrep, Dependabot, CodeQL,
-Trivy, Codecov.
+Snyk, Trivy, Codecov.
 
 ## Files created
 

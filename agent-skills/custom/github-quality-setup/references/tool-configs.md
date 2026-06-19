@@ -54,6 +54,11 @@ chat:
 
 ## `.github/dependabot.yml`
 
+:::tip
+The ecosystems listed below are examples. Replace them with `<ECOSYSTEMS>`
+appropriate for the target repository's stack (e.g., pip, npm, gomod, maven).
+:::
+
 ```yaml
 version: 2
 updates:
@@ -144,7 +149,12 @@ jobs:
       security-events: write
     steps:
       - uses: actions/checkout@v4
-      - run: semgrep ci --config=auto
+      - run: semgrep ci --config=auto --sarif --output semgrep.sarif
+      - name: Upload SARIF to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: semgrep.sarif
 ```
 
 ## `.github/workflows/sonarcloud.yml`
@@ -170,7 +180,7 @@ jobs:
       - name: Set up <PRIMARY_LANGUAGE>
         uses: actions/setup-<PRIMARY_LANGUAGE>@v5
         with:
-          <PRIMARY_LANGUAGE>-version: "3.11"
+          <PRIMARY_LANGUAGE>-version: "3.11"  # Adjust version for the actual stack
 
       - name: Install dependencies and run tests with coverage
         run: |
@@ -187,13 +197,18 @@ jobs:
 
 ## `sonar-project.properties`
 
+:::tip
+The properties below use Python as an example. Adjust `sonar.language`,
+coverage paths, and exclusions for the actual stack.
+:::
+
 ```properties
 sonar.projectKey=<SONAR_PROJECT_KEY>
 sonar.organization=<SONAR_ORG>
 sonar.host.url=https://sonarcloud.io
 sonar.sources=src
 sonar.tests=tests
-sonar.python.coverage.reportPaths=coverage.xml
+sonar.python.coverage.reportPaths=coverage.xml  # Adjust for the actual language
 sonar.python.version=3.11
 sonar.exclusions=**/tests/**, **/migrations/**, **/node_modules/**
 ```
@@ -278,7 +293,7 @@ jobs:
       security-events: write
     steps:
       - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@v0.36.0
+        uses: aquasecurity/trivy-action@v0.35.0
         with:
           image-ref: "<DOCKER_IMAGE>"
           format: "sarif"
