@@ -1,10 +1,10 @@
 lockfile_version: '1'
-generated_at: '2026-06-18T19:04:07.366945+00:00'
+generated_at: '2026-06-19T02:16:39.774559+00:00'
 apm_version: 0.20.0
 dependencies:
 - repo_url: anthropics/claude-code
   host: github.com
-  resolved_commit: 843959fad9c3e5977c6295397da88df81604c94c
+  resolved_commit: 4fa369b5b38811dbef7274433131b11d2276bc37
   virtual_path: plugins/code-review
   is_virtual: true
   package_type: marketplace_plugin
@@ -1024,6 +1024,7 @@ mcp_servers:
 - greptile
 - nexus
 - skillport
+- sonarqube
 mcp_configs:
   chronos-graph:
     name: chronos-graph
@@ -1064,18 +1065,18 @@ mcp_configs:
     name: codegraph
     transport: stdio
     args:
-    - -y
-    - '@colbymchenry/codegraph'
+    - serve
+    - --mcp
     registry: false
-    command: npx
+    command: codegraph
   coderabbit:
     name: coderabbit
     transport: stdio
     env:
-      GITHUB_TOKEN: ${env:GITHUB_TOKEN}
+      GITHUB_PAT: ${env:GITHUB_TOKEN}
     args:
     - -y
-    - '@coderabbitai/mcp-server'
+    - coderabbitai-mcp
     registry: false
     command: npx
   docker-mcp:
@@ -1097,7 +1098,6 @@ mcp_configs:
     name: nexus
     transport: stdio
     env:
-      NEXUS_STORAGE_ROOT_DIR: ${env:HOME}/.nexus
       LOG_LEVEL: ERROR
       NEXUS_WATCHER_IGNORE_PATHS: node_modules,opencode/node_modules,.opencode/node_modules,oss/apm/node_modules,oss/apm/docs/node_modules,.git,.nexus,dist,gemini,agent-skills,apm_modules,.agents,.opencode,.gemini,.claude,.codex,.vscode,.devcontainer,oss,codex/.tmp,.worktrees,.venv,target,.mypy_cache,.ruff_cache,build,.serena,.cache,__pycache__,*.db,*.sqlite,*.log
       CHOKIDAR_USEPOLLING: 'false'
@@ -1117,6 +1117,18 @@ mcp_configs:
     - skillport-mcp
     registry: false
     command: uvx
+  sonarqube:
+    name: sonarqube
+    transport: stdio
+    env:
+      SONARQUBE_TOKEN: ${env:SONARQUBE_TOKEN}
+      SONARQUBE_URL: ${env:SONARQUBE_URL}
+      SONARQUBE_ORG: ${env:SONARQUBE_ORG}
+    args:
+    - -y
+    - sonarqube-mcp-server
+    registry: false
+    command: npx
 local_deployed_files:
 - .cursor/rules/agent-commands.mdc
 - .cursor/rules/architecture.mdc

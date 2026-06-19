@@ -29,19 +29,19 @@ dependencies:
       command: "npx"
       args:
         - "-y"
-        - "@coderabbitai/mcp-server"
+        - "coderabbitai-mcp"
       env:
-        GITHUB_TOKEN: "${env:GITHUB_TOKEN}"
+        GITHUB_PAT: "${env:GITHUB_TOKEN}"
       enabled: true
 
     - name: codegraph
       title: "CodeGraph MCP"
       registry: false
       transport: stdio
-      command: "npx"
+      command: "codegraph"
       args:
-        - "-y"
-        - "@colbymchenry/codegraph"
+        - "serve"
+        - "--mcp"
       enabled: true
 
     - name: greptile
@@ -61,6 +61,20 @@ dependencies:
       url: "http://127.0.0.1:10888/sse"
       headers:
         Authorization: "Bearer ${env:MCP_GATEWAY_TOKEN}"
+      enabled: true
+
+    - name: sonarqube
+      title: "SonarQube MCP"
+      registry: false
+      transport: stdio
+      command: "npx"
+      args:
+        - "-y"
+        - "sonarqube-mcp-server"
+      env:
+        SONARQUBE_TOKEN: "${env:SONARQUBE_TOKEN}"
+        SONARQUBE_URL: "${env:SONARQUBE_URL}"
+        SONARQUBE_ORG: "${env:SONARQUBE_ORG}"
       enabled: true
 
     - name: skillport
@@ -85,7 +99,6 @@ dependencies:
         # - "/home/y_ohi/program/nexus"
         - "@yohi/nexus@1.18.0"
       env:
-        NEXUS_STORAGE_ROOT_DIR: "${env:HOME}/.nexus"
         LOG_LEVEL: "ERROR"
         NEXUS_WATCHER_IGNORE_PATHS: "node_modules,opencode/node_modules,.opencode/node_modules,oss/apm/node_modules,oss/apm/docs/node_modules,.git,.nexus,dist,gemini,agent-skills,apm_modules,.agents,.opencode,.gemini,.claude,.codex,.vscode,.devcontainer,oss,codex/.tmp,.worktrees,.venv,target,.mypy_cache,.ruff_cache,build,.serena,.cache,__pycache__,*.db,*.sqlite,*.log"
         CHOKIDAR_USEPOLLING: "false"
@@ -144,7 +157,7 @@ plugin:
   - "@yohi/justice@2.3.0"
   - "@yohi/akane@1.2.0"
   - "oh-my-openagent@4.11.0"
-  - "@yohi/opencode-plugin-chronos-gate@1.4.0"
+  # - "@yohi/opencode-plugin-chronos-gate@1.4.0"
   - "@nick-vi/opencode-type-inject@latest"
   - "opencode-vibeguard@latest"
 
