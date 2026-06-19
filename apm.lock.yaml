@@ -1,5 +1,5 @@
 lockfile_version: '1'
-generated_at: '2026-06-19T02:16:39.774559+00:00'
+generated_at: '2026-06-19T06:48:05.788488+00:00'
 apm_version: 0.20.0
 dependencies:
 - repo_url: anthropics/claude-code
@@ -1023,6 +1023,7 @@ mcp_servers:
 - docker-mcp
 - greptile
 - nexus
+- semgrep
 - skillport
 - sonarqube
 mcp_configs:
@@ -1108,6 +1109,17 @@ mcp_configs:
     - '@yohi/nexus@1.18.0'
     registry: false
     command: npx
+  semgrep:
+    name: semgrep
+    transport: stdio
+    env:
+      SEMGREP_APP_TOKEN: ${env:SEMGREP_APP_TOKEN}
+    args:
+    - semgrep-mcp
+    - -t
+    - stdio
+    registry: false
+    command: uvx
   skillport:
     name: skillport
     transport: stdio

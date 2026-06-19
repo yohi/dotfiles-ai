@@ -77,6 +77,19 @@ dependencies:
         SONARQUBE_ORG: "${env:SONARQUBE_ORG}"
       enabled: true
 
+    - name: semgrep
+      title: "Semgrep MCP"
+      registry: false
+      transport: stdio
+      command: "uvx"
+      args:
+        - "semgrep-mcp"
+        - "-t"
+        - "stdio"
+      env:
+        SEMGREP_APP_TOKEN: "${env:SEMGREP_APP_TOKEN}"
+      enabled: true
+
     - name: skillport
       title: "Skillport"
       registry: false
