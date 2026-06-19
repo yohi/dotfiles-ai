@@ -1,5 +1,5 @@
 lockfile_version: '1'
-generated_at: '2026-06-19T06:48:05.788488+00:00'
+generated_at: '2026-06-19T08:33:13.843932+00:00'
 apm_version: 0.20.0
 dependencies:
 - repo_url: anthropics/claude-code
@@ -1118,6 +1118,8 @@ mcp_configs:
     - semgrep-mcp
     - -t
     - stdio
+    - --semgrep-path
+    - ${env:HOME}/.local/bin/semgrep
     registry: false
     command: uvx
   skillport:

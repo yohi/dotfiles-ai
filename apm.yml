@@ -86,6 +86,8 @@ dependencies:
         - "semgrep-mcp"
         - "-t"
         - "stdio"
+        - "--semgrep-path"
+        - "${env:HOME}/.local/bin/semgrep"
       env:
         SEMGREP_APP_TOKEN: "${env:SEMGREP_APP_TOKEN}"
       enabled: true
