@@ -22,6 +22,10 @@ help-mcp: ## MCP の使い方を表示
 
 sync-mcp: ## APMを使用してMCP設定を同期
 	@echo "🔄 Synchronizing MCP settings via APM..."
+	@if ! command -v semgrep &> /dev/null; then \
+		echo "[*] Installing semgrep via uv..."; \
+		uv tool install semgrep; \
+	fi
 	@if [ -f ".env" ]; then \
 		set -a && source .env && set +a && apm install --force; \
 	else \

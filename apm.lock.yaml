@@ -1,10 +1,10 @@
 lockfile_version: '1'
-generated_at: '2026-06-18T17:19:11.565237+00:00'
+generated_at: '2026-06-19T08:33:13.843932+00:00'
 apm_version: 0.20.0
 dependencies:
 - repo_url: anthropics/claude-code
   host: github.com
-  resolved_commit: 843959fad9c3e5977c6295397da88df81604c94c
+  resolved_commit: 4fa369b5b38811dbef7274433131b11d2276bc37
   virtual_path: plugins/code-review
   is_virtual: true
   package_type: marketplace_plugin
@@ -1023,7 +1023,9 @@ mcp_servers:
 - docker-mcp
 - greptile
 - nexus
+- semgrep
 - skillport
+- sonarqube
 mcp_configs:
   chronos-graph:
     name: chronos-graph
@@ -1064,18 +1066,18 @@ mcp_configs:
     name: codegraph
     transport: stdio
     args:
-    - -y
-    - '@colbymchenry/codegraph'
+    - serve
+    - --mcp
     registry: false
-    command: npx
+    command: codegraph
   coderabbit:
     name: coderabbit
     transport: stdio
     env:
-      GITHUB_TOKEN: ${env:GITHUB_TOKEN}
+      GITHUB_PAT: ${env:GITHUB_TOKEN}
     args:
     - -y
-    - '@coderabbitai/mcp-server'
+    - coderabbitai-mcp
     registry: false
     command: npx
   docker-mcp:
@@ -1097,7 +1099,6 @@ mcp_configs:
     name: nexus
     transport: stdio
     env:
-      NEXUS_STORAGE_ROOT_DIR: ${env:HOME}/.nexus
       LOG_LEVEL: ERROR
       NEXUS_WATCHER_IGNORE_PATHS: node_modules,opencode/node_modules,.opencode/node_modules,oss/apm/node_modules,oss/apm/docs/node_modules,.git,.nexus,dist,gemini,agent-skills,apm_modules,.agents,.opencode,.gemini,.claude,.codex,.vscode,.devcontainer,oss,codex/.tmp,.worktrees,.venv,target,.mypy_cache,.ruff_cache,build,.serena,.cache,__pycache__,*.db,*.sqlite,*.log
       CHOKIDAR_USEPOLLING: 'false'
@@ -1105,9 +1106,22 @@ mcp_configs:
       NO_PROXY: 127.0.0.1,localhost
     args:
     - -y
-    - '@yohi/nexus@1.15.1'
+    - '@yohi/nexus@1.18.0'
     registry: false
     command: npx
+  semgrep:
+    name: semgrep
+    transport: stdio
+    env:
+      SEMGREP_APP_TOKEN: ${env:SEMGREP_APP_TOKEN}
+    args:
+    - semgrep-mcp
+    - -t
+    - stdio
+    - --semgrep-path
+    - ${env:HOME}/.local/bin/semgrep
+    registry: false
+    command: uvx
   skillport:
     name: skillport
     transport: stdio
@@ -1117,6 +1131,18 @@ mcp_configs:
     - skillport-mcp
     registry: false
     command: uvx
+  sonarqube:
+    name: sonarqube
+    transport: stdio
+    env:
+      SONARQUBE_TOKEN: ${env:SONARQUBE_TOKEN}
+      SONARQUBE_URL: ${env:SONARQUBE_URL}
+      SONARQUBE_ORG: ${env:SONARQUBE_ORG}
+    args:
+    - -y
+    - sonarqube-mcp-server
+    registry: false
+    command: npx
 local_deployed_files:
 - .cursor/rules/agent-commands.mdc
 - .cursor/rules/architecture.mdc

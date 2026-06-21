@@ -29,19 +29,19 @@ dependencies:
       command: "npx"
       args:
         - "-y"
-        - "@coderabbitai/mcp-server"
+        - "coderabbitai-mcp"
       env:
-        GITHUB_TOKEN: "${env:GITHUB_TOKEN}"
+        GITHUB_PAT: "${env:GITHUB_TOKEN}"
       enabled: true
 
     - name: codegraph
       title: "CodeGraph MCP"
       registry: false
       transport: stdio
-      command: "npx"
+      command: "codegraph"
       args:
-        - "-y"
-        - "@colbymchenry/codegraph"
+        - "serve"
+        - "--mcp"
       enabled: true
 
     - name: greptile
@@ -61,6 +61,35 @@ dependencies:
       url: "http://127.0.0.1:10888/sse"
       headers:
         Authorization: "Bearer ${env:MCP_GATEWAY_TOKEN}"
+      enabled: true
+
+    - name: sonarqube
+      title: "SonarQube MCP"
+      registry: false
+      transport: stdio
+      command: "npx"
+      args:
+        - "-y"
+        - "sonarqube-mcp-server"
+      env:
+        SONARQUBE_TOKEN: "${env:SONARQUBE_TOKEN}"
+        SONARQUBE_URL: "${env:SONARQUBE_URL}"
+        SONARQUBE_ORG: "${env:SONARQUBE_ORG}"
+      enabled: true
+
+    - name: semgrep
+      title: "Semgrep MCP"
+      registry: false
+      transport: stdio
+      command: "uvx"
+      args:
+        - "semgrep-mcp"
+        - "-t"
+        - "stdio"
+        - "--semgrep-path"
+        - "${env:HOME}/.local/bin/semgrep"
+      env:
+        SEMGREP_APP_TOKEN: "${env:SEMGREP_APP_TOKEN}"
       enabled: true
 
     - name: skillport
@@ -83,9 +112,8 @@ dependencies:
       args:
         - "-y"
         # - "/home/y_ohi/program/nexus"
-        - "@yohi/nexus@1.15.1"
+        - "@yohi/nexus@1.18.0"
       env:
-        NEXUS_STORAGE_ROOT_DIR: "${env:HOME}/.nexus"
         LOG_LEVEL: "ERROR"
         NEXUS_WATCHER_IGNORE_PATHS: "node_modules,opencode/node_modules,.opencode/node_modules,oss/apm/node_modules,oss/apm/docs/node_modules,.git,.nexus,dist,gemini,agent-skills,apm_modules,.agents,.opencode,.gemini,.claude,.codex,.vscode,.devcontainer,oss,codex/.tmp,.worktrees,.venv,target,.mypy_cache,.ruff_cache,build,.serena,.cache,__pycache__,*.db,*.sqlite,*.log"
         CHOKIDAR_USEPOLLING: "false"
@@ -144,7 +172,7 @@ plugin:
   - "@yohi/justice@2.3.0"
   - "@yohi/akane@1.2.0"
   - "oh-my-openagent@4.11.0"
-  - "@yohi/opencode-plugin-chronos-gate@1.4.0"
+  # - "@yohi/opencode-plugin-chronos-gate@1.4.0"
   - "@nick-vi/opencode-type-inject@latest"
   - "opencode-vibeguard@latest"
 
@@ -480,6 +508,7 @@ provider:
       - bytedance/seed-oss-36b-instruct
       - deepseek-ai/deepseek-v4-flash
       - deepseek-ai/deepseek-v4-pro
+      - google/diffusiongemma-26b-a4b-it
       - google/gemma-2-2b-it
       - google/gemma-3n-e2b-it
       - google/gemma-3n-e4b-it
@@ -494,15 +523,21 @@ provider:
       - meta/llama-3.2-3b-instruct
       - meta/llama-3.2-90b-vision-instruct
       - meta/llama-3.3-70b-instruct
+      - meta/llama-3_1-70b-instruct
+      - meta/llama-3_1-8b-instruct
+      - meta/llama-3_3-70b-instruct
       - meta/llama-4-maverick-17b-128e-instruct
       - meta/llama-guard-4-12b
       - microsoft/phi-4-mini-instruct
       - microsoft/phi-4-multimodal-instruct
       - minimaxai/minimax-m2.7
+      - minimaxai/minimax-m3
       - mistralai/magistral-small-2506
+      - mistralai/ministral-14b-instruct-2512
       - mistralai/mistral-7b-instruct-v03
       - mistralai/mistral-large-3-675b-instruct-2512
       - mistralai/mistral-medium-3-instruct
+      - mistralai/mistral-medium-3.5-128b
       - mistralai/mistral-nemotron
       - mistralai/mistral-small-4-119b-2603
       - mistralai/mixtral-8x22b-instruct
@@ -511,12 +546,20 @@ provider:
       - moonshotai/kimi-k2.6
       - nvidia/active-speaker-detection
       - nvidia/bevformer
+      - nvidia/bnr
       - nvidia/cosmos-predict1-5b
       - nvidia/cosmos-transfer1-7b
       - nvidia/cosmos-transfer2_5-2b
+      - nvidia/cosmos3-nano
+      - nvidia/cosmos3-nano-reasoner
       - nvidia/gliner-pii
+      - nvidia/ising-calibration-1-35b-a3b
+      - nvidia/llama-3.1-nemotron-nano-vl-8b-v1
+      - nvidia/llama-3_1-nemotron-nano-8b-v1
       - nvidia/llama-3_1-nemotron-safety-guard-8b-v3
       - nvidia/llama-3_2-nemoretriever-300m-embed-v1
+      - nvidia/llama-3_3-nemotron-super-49b-v1
+      - nvidia/llama-3_3-nemotron-super-49b-v1_5
       - nvidia/llama-nemotron-embed-vl-1b-v2
       - nvidia/llama-nemotron-rerank-vl-1b-v2
       - nvidia/magpie-tts-zeroshot
@@ -525,8 +568,10 @@ provider:
       - nvidia/nemotron-3-nano-omni-30b-a3b-reasoning
       - nvidia/nemotron-3-super-120b-a12b
       - nvidia/nemotron-3-ultra-550b-a55b
+      - nvidia/nemotron-3.5-content-safety
       - nvidia/nemotron-content-safety-reasoning-4b
       - nvidia/nemotron-mini-4b-instruct
+      - nvidia/nemotron-nano-12b-v2-vl
       - nvidia/nemotron-voicechat
       - nvidia/nv-embed-v1
       - nvidia/nv-embedcode-7b-v1
@@ -552,6 +597,7 @@ provider:
       - sarvamai/sarvam-m
       - stepfun-ai/step-3.5-flash
       - stepfun-ai/step-3.7-flash
+      - stockmark/stockmark-2-100b-instruct
       - upstage/solar-10_7b-instruct
       - z-ai/glm-5.1
   cloudflare-workers-ai:

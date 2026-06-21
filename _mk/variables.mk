@@ -1,3 +1,8 @@
+# Load environment variables from .env.make if it exists (safe for GNU Make)
+ifneq (,$(wildcard .env.make))
+    include .env.make
+endif
+
 # Global Variables
 REQUIRE_NODEJS := 1
 SHELL := /bin/bash

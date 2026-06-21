@@ -42,6 +42,7 @@ opencode/oh-my-*.json*
 .mcp.json
 .serena/
 .env
+.env.make
 *.env
 antigravity/mcp_config.json
 antigravity/settings.json

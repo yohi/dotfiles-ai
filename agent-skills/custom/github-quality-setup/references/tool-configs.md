@@ -324,7 +324,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Run Snyk to check for vulnerabilities
-        uses: snyk/actions/<PRIMARY_LANGUAGE>@v1.0.0
+        uses: snyk/actions/<PRIMARY_LANGUAGE>@master
         continue-on-error: true
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
