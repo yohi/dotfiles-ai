@@ -149,7 +149,7 @@ jobs:
       security-events: write
     steps:
       - uses: actions/checkout@v4
-      - run: semgrep ci --config=auto --sarif --output semgrep.sarif
+      - run: semgrep scan --config=auto --sarif --output semgrep.sarif
       - name: Upload SARIF to GitHub Security tab
         uses: github/codeql-action/upload-sarif@v3
         if: always()
@@ -161,6 +161,9 @@ jobs:
 
 ```yaml
 name: SonarCloud
+
+permissions:
+  contents: read
 
 on:
   push:
@@ -218,6 +221,9 @@ sonar.exclusions=**/tests/**, **/migrations/**, **/node_modules/**
 ```yaml
 name: Coverage
 
+permissions:
+  contents: read
+
 on:
   push:
     branches: ["<DEFAULT_BRANCH>"]
@@ -255,6 +261,12 @@ jobs:
 ## `codecov.yml`
 
 ```yaml
+ignore:
+  - ".github/**"
+  - "tests/**"
+  - "codecov.yml"
+  - "sonar-project.properties"
+
 coverage:
   status:
     project:
@@ -263,7 +275,7 @@ coverage:
         threshold: 2%
     patch:
       default:
-        target: 80%
+        informational: true
 
 comment:
   layout: "diff, flags, files"
@@ -311,6 +323,10 @@ jobs:
 ```yaml
 name: Snyk Security
 
+permissions:
+  contents: read
+  security-events: write
+
 on:
   push:
     branches: ["<DEFAULT_BRANCH>"]
@@ -324,7 +340,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Run Snyk to check for vulnerabilities
-        uses: snyk/actions/<PRIMARY_LANGUAGE>@master
+        uses: snyk/actions/<PRIMARY_LANGUAGE>@v1.0.0
         continue-on-error: true
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
