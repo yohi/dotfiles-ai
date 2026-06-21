@@ -1,0 +1,23 @@
+{
+  "skill_name": "github-quality-setup",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Set up my Python FastAPI repo with CodeRabbit, SonarCloud, Semgrep, Dependabot, CodeQL, Trivy, and Codecov. The default branch is main and the Docker image is ghcr.io/myorg/myrepo:latest.",
+      "expected_output": "A complete set of GitHub config files for all seven tools plus a setup checklist, with Python-specific defaults.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "I want to add GitHub security scanning and code quality tools to my TypeScript Node.js project. Generate the workflow files. Skip container scanning.",
+      "expected_output": "Workflow files and configs for CodeRabbit, SonarCloud, Semgrep, Dependabot, CodeQL, and Codecov, with npm/Node defaults and no Trivy/Snyk workflow.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Create a minimal GitHub Actions setup for AI code review and static analysis for a Python project. Only include CodeRabbit, Semgrep, and Dependabot.",
+      "expected_output": "Only the requested three tools are configured; no SonarCloud, CodeQL, Codecov, Snyk, or Trivy files are generated.",
+      "files": []
+    }
+  ]
+}
