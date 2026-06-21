@@ -116,16 +116,6 @@ This document provides a comprehensive list of skills available through SkillPor
 
 
 
-
-
-
-
-
-
-
-
-
-
 <!-- SKILLPORT_START -->
 ## SkillPort Skills
 
@@ -219,11 +209,6 @@ Each skill contains step-by-step instructions, templates, and scripts.
   <name>custom/git-master</name>
   <description>A specialized skill for performing Git operations safely and appropriately. Particularly focuses on splitting changes correctly and creating Japanese commit messages following Conventional Commits.</description>
   <location>agent-skills/custom/git-master/SKILL.md</location>
-</skill>
-<skill>
-  <name>custom/github-quality-setup</name>
-  <description>Set up a comprehensive GitHub repository quality and security toolchain. Use this skill whenever the user wants to configure GitHub Actions, code review bots, static analysis, security scanning, dependency updates, or coverage reporting for a repository -- even if they only mention some of the tools (CodeRabbit, SonarCloud, Semgrep, Dependabot, CodeQL, Snyk, Trivy, Codecov). Also use when the user says things like "make my repo production-ready", "add CI quality gates", "set up GitHub security", "configure PR automation", or "add workflow files for code review/security". Works for any language; Python and TypeScript examples are provided in the bundled reference.</description>
-  <location>agent-skills/custom/github-quality-setup/SKILL.md</location>
 </skill>
 <skill>
   <name>custom/makefile-organization</name>
@@ -372,11 +357,6 @@ Each skill contains step-by-step instructions, templates, and scripts.
 </skill>
 </available_skills>
 <!-- SKILLPORT_END -->
-
-
-
-
-
 
 
 

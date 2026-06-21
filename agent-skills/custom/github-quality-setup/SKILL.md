@@ -18,11 +18,15 @@ review, static analysis, security scanning, dependency management, and test cove
 
 ## What this skill produces
 
-- Ready-to-commit workflow files under `.github/workflows/`
-- A `.github/dependabot.yml` for automated dependency updates
-- A `.coderabbit.yaml` for CodeRabbit AI review configuration
-- A `sonar-project.properties` for SonarCloud scan settings
-- A `codecov.yml` for Codecov upload behavior and thresholds
+Generates configuration files and setup instructions for up to 8 quality and security tools:
+- **CodeRabbit**: `.coderabbit.yaml` for AI-driven PR reviews
+- **Dependabot**: `.github/dependabot.yml` for automated dependency updates
+- **CodeQL**: `.github/workflows/codeql.yml` for semantic code analysis
+- **Semgrep**: `.github/workflows/semgrep.yml` for lightweight static analysis
+- **SonarCloud**: `.github/workflows/sonarcloud.yml` and `sonar-project.properties` for code quality scans
+- **Codecov**: `.github/workflows/codecov.yml` and `codecov.yml` for test coverage thresholds
+- **Trivy**: `.github/workflows/trivy.yml` for container vulnerability scanning (only if Trivy selected)
+- **Snyk**: `.github/workflows/snyk.yml` for dependency vulnerability scanning (only if Snyk selected)
 - A concise setup checklist (GitHub settings, required secrets, third-party sign-ups)
 
 ## When to use this skill
@@ -47,7 +51,7 @@ Ask the user (or infer from the repository) for the minimum required context:
 
 1. **Primary language / stack** (e.g., Python, TypeScript/Node.js, Go, Java, Ruby). If
    unknown, default to Python examples in workflow comments.
-2. **Tools to include** (default: all seven below). Respect exclusions if the user
+2. **Tools to include** (default: all eight below). Respect exclusions if the user
    explicitly opts out of a tool.
 3. **Default branch name** (default: `main`).
 4. **Container image** (only if Trivy is selected and the repo builds a Docker image).
@@ -70,7 +74,7 @@ Create files in this structure when all tools are selected:
     sonarcloud.yml
     codecov.yml
     trivy.yml          # only if Trivy selected
-    # snyk.yml         # only if Snyk selected (user must provide SNYK_TOKEN)
+    # snyk.yml         # only if Snyk selected (requires SNYK_TOKEN in setup)
 .coderabbit.yaml
 sonar-project.properties
 codecov.yml
@@ -126,7 +130,7 @@ substitutions:
 - `<ECOSYSTEMS>` -> Dependabot ecosystems appropriate for the stack.
 
 Use the file names and directory layout defined above. Do not invent extra tools or
-options beyond the seven listed below unless the user asks.
+options beyond the eight listed below unless the user asks.
 
 ### 4. Provide the setup checklist
 
@@ -137,7 +141,8 @@ After writing files, output a concise checklist in this exact format:
 
 - [ ] Sign up / log in to CodeRabbit (https://coderabbit.ai) and grant repo access.
 - [ ] Sign up to SonarCloud (https://sonarcloud.io), import the repository, and add
-      `SONAR_TOKEN` plus `SONAR_HOST_URL` (optional) as GitHub repository secrets.
+      `SONAR_TOKEN` as a GitHub repository secret. (Note: `SONAR_HOST_URL` is only
+      required if using a self-hosted SonarQube instance instead of SonarCloud.)
 - [ ] Add `CODECOV_TOKEN` as a GitHub repository secret (get it from https://codecov.io).
 - [ ] If using Snyk, add `SNYK_TOKEN` as a GitHub repository secret.
 - [ ] If using Trivy for a container image, ensure the image is published to a registry
@@ -161,7 +166,7 @@ Example structure:
 # GitHub quality & security setup for <repo>
 
 Generated configuration for: CodeRabbit, SonarCloud, Semgrep, Dependabot, CodeQL,
-Trivy, Codecov.
+Snyk, Trivy, Codecov.
 
 ## Files created
 
