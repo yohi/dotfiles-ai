@@ -1,7 +1,6 @@
 # Load environment variables from .env.make if it exists (safe for GNU Make)
 ifneq (,$(wildcard .env.make))
     include .env.make
-    export
 endif
 
 # Global Variables

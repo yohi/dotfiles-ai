@@ -1,13 +1,31 @@
 #!/usr/bin/env python3
+"""Environment configuration setup helper script."""
 import os
 import sys
 import re
+import getpass
 
 def is_secret(key: str) -> bool:
+    """Check if the environment variable key represents a sensitive secret.
+
+    Args:
+        key: The environment variable name.
+
+    Returns:
+        True if the key is sensitive, False otherwise.
+    """
     key_lower = key.lower()
     return any(x in key_lower for x in ["key", "token", "secret", "password"])
 
-def load_env(filepath: str) -> dict:
+def load_env(filepath: str) -> dict[str, str]:
+    """Load existing environment variables from a file.
+
+    Args:
+        filepath: Path to the .env file.
+
+    Returns:
+        A dictionary mapping keys to values.
+    """
     env: dict[str, str] = {}
     if not os.path.exists(filepath):
         return env
@@ -28,7 +46,15 @@ def load_env(filepath: str) -> dict:
                 env[key] = val
     return env
 
-def parse_example_keys(filepath: str) -> list:
+def parse_example_keys(filepath: str) -> list[str]:
+    """Parse environment variable keys defined in the example file.
+
+    Args:
+        filepath: Path to the .env.example file.
+
+    Returns:
+        A list of variable names.
+    """
     keys: list[str] = []
     if not os.path.exists(filepath):
         return keys
@@ -47,46 +73,56 @@ def parse_example_keys(filepath: str) -> list:
                     keys.append(key)
     return keys
 
-def main():
-    example_path = ".env.example"
-    env_path = ".env"
+def resolve_default_value(key: str, existing_env: dict[str, str]) -> str:
+    """Resolve the default value for a key, checking existing env and fallback files/commands.
 
-    if not os.path.exists(example_path):
-        print(f"[x] Error: {example_path} not found.")
-        sys.exit(1)
+    Args:
+        key: The variable name.
+        existing_env: A dictionary of already configured variables.
 
-    print("[*] Loading configurations...")
-    existing_env = load_env(env_path)
-    example_keys = parse_example_keys(example_path)
+    Returns:
+        The resolved default value as a string.
+    """
+    current_val = existing_env.get(key, "").strip()
+    
+    if not current_val:
+        current_val = os.environ.get(key, "").strip()
+        
+    if not current_val and key in ["GITHUB_TOKEN", "GH_TOKEN", "GITHUB_PERSONAL_ACCESS_TOKEN"]:
+        # Fallback A: ~/.gh_token
+        gh_token_path = os.path.expanduser("~/.gh_token")
+        if os.path.exists(gh_token_path):
+            try:
+                with open(gh_token_path, "r", encoding="utf-8") as gtf:
+                    current_val = gtf.read().strip()
+            except Exception:
+                pass
+        # Fallback B: gh auth token
+        if not current_val:
+            try:
+                import subprocess
+                res = subprocess.run(["gh", "auth", "token"], capture_output=True, text=True, check=True)
+                current_val = res.stdout.strip()
+            except Exception:
+                pass
+    return current_val
 
-    new_env = {}
-    print("\n📝 Interactive .env configuration setup")
+def collect_interactive_inputs(example_keys: list[str], existing_env: dict[str, str]) -> dict[str, str]:
+    """Interactively prompt user for each environment variable value.
+
+    Args:
+        example_keys: List of keys defined in example file.
+        existing_env: Dict of currently configured variables.
+
+    Returns:
+        A dict of final variable mappings.
+    """
+    new_env: dict[str, str] = {}
+    print("\n[*] Interactive .env configuration setup")
     print("Press Enter to keep the default/current value.\n")
 
     for key in example_keys:
-        # Resolve default value with fallbacks
-        current_val = existing_env.get(key, "").strip()
-        
-        if not current_val:
-            current_val = os.environ.get(key, "").strip()
-            
-        if not current_val and key in ["GITHUB_TOKEN", "GH_TOKEN", "GITHUB_PERSONAL_ACCESS_TOKEN"]:
-            # Fallback A: ~/.gh_token
-            gh_token_path = os.path.expanduser("~/.gh_token")
-            if os.path.exists(gh_token_path):
-                try:
-                    with open(gh_token_path, "r", encoding="utf-8") as gtf:
-                        current_val = gtf.read().strip()
-                except Exception:
-                    pass
-            # Fallback B: gh auth token
-            if not current_val:
-                try:
-                    import subprocess
-                    res = subprocess.run(["gh", "auth", "token"], capture_output=True, text=True, check=True)
-                    current_val = res.stdout.strip()
-                except Exception:
-                    pass
+        current_val = resolve_default_value(key, existing_env)
 
         # Determine display default
         if current_val:
@@ -98,7 +134,11 @@ def main():
             display_default = "empty"
 
         try:
-            val = input(f"🔹 {key} [{display_default}]: ").strip()
+            prompt_str = f"[*] {key} [{display_default}]: "
+            if is_secret(key):
+                val = getpass.getpass(prompt_str).strip()
+            else:
+                val = input(prompt_str).strip()
         except KeyboardInterrupt:
             print("\n[!] Setup cancelled.")
             sys.exit(1)
@@ -112,54 +152,103 @@ def main():
                 new_env[key] = current_val
             else:
                 new_env[key] = val
+    return new_env
 
-    # Now we write to .env, preserving the structure of .env.example if possible
-    # We read .env.example line by line, and replace keys with their configured values
-    output_lines = []
-    make_output_lines = []
+def write_env_file(example_path: str, env_path: str, new_env: dict[str, str]) -> None:
+    """Generate and write the standard .env file.
+
+    Args:
+        example_path: Path to the .env.example template.
+        env_path: Target path to write the .env file.
+        new_env: Dict of configured environment variables.
+    """
+    output_lines: list[str] = []
     with open(example_path, "r", encoding="utf-8") as f:
         for line in f:
             stripped = line.strip()
-            # Try to match key definition (active or commented out)
             match = re.match(r"^(?:#\s*)?(?:export\s+)?([\w_]+)=(.*)$", stripped)
             if match:
                 key = match.group(1)
                 if key in new_env and new_env[key]:
                     val = new_env[key]
-                    # For standard .env:
-                    # If value contains spaces, quote it
                     env_val = val
                     if " " in env_val and not (env_val.startswith('"') and env_val.endswith('"')):
                         env_val = f'"{env_val}"'
                     output_lines.append(f"{key}={env_val}\n")
-
-                    # For Make-specific .env.make:
-                    # Strip any surrounding quotes and escape '$' as '$$'
-                    make_val = val.strip('"' + "'")
-                    make_val = make_val.replace('$', '$$')
-                    make_output_lines.append(f"{key}={make_val}\n")
                 else:
                     output_lines.append(f"# {key}=\n")
-                    make_output_lines.append(f"# {key}=\n")
             else:
                 output_lines.append(line)
-                make_output_lines.append(line.replace('$', '$$'))
-
-    # Write back to .env
+                
     with open(env_path, "w", encoding="utf-8") as f:
         f.writelines(output_lines)
 
-    # Write back to .env.make
-    make_env_path = env_path + ".make"
+def write_env_make_file(example_path: str, make_env_path: str, new_env: dict[str, str]) -> None:
+    """Generate and write the Make-specific .env.make file.
+
+    Args:
+        example_path: Path to the .env.example template.
+        make_env_path: Target path to write the .env.make file.
+        new_env: Dict of configured environment variables.
+    """
+    make_output_lines: list[str] = []
+    with open(example_path, "r", encoding="utf-8") as f:
+        for line in f:
+            stripped = line.strip()
+            match = re.match(r"^(?:#\s*)?(?:export\s+)?([\w_]+)=(.*)$", stripped)
+            if match:
+                key = match.group(1)
+                if key in new_env and new_env[key]:
+                    val = new_env[key]
+                    # Strip any surrounding quotes, escape '$' as '$$' and '#' as '\#'
+                    make_val = val.strip('"' + "'")
+                    make_val = make_val.replace('$', '$$')
+                    make_val = make_val.replace('#', r'\#')
+                    make_output_lines.append(f"export {key}={make_val}\n")
+                else:
+                    make_output_lines.append(f"# export {key}=\n")
+            else:
+                make_output_lines.append(line.replace('$', '$$'))
+                
     with open(make_env_path, "w", encoding="utf-8") as f:
         f.writelines(make_output_lines)
 
-    # Set secure permissions
-    for path in (env_path, make_env_path):
+def set_file_permissions(paths: list[str]) -> None:
+    """Set secure (0o600) file permissions for the generated files.
+
+    Args:
+        paths: List of file paths.
+    """
+    for path in paths:
         try:
             os.chmod(path, 0o600)
         except Exception:
             pass
+
+def main() -> None:
+    """Main orchestration function for the environment setup script."""
+    example_path = ".env.example"
+    env_path = ".env"
+    make_env_path = ".env.make"
+
+    if not os.path.exists(example_path):
+        print(f"[x] Error: {example_path} not found.")
+        sys.exit(1)
+
+    print("[*] Loading configurations...")
+    existing_env = load_env(env_path)
+    example_keys = parse_example_keys(example_path)
+
+    new_env = collect_interactive_inputs(example_keys, existing_env)
+
+    # Write standard .env file
+    write_env_file(example_path, env_path, new_env)
+
+    # Write Make-specific .env.make file
+    write_env_make_file(example_path, make_env_path, new_env)
+
+    # Set secure permissions
+    set_file_permissions([env_path, make_env_path])
 
     print(f"\n[+] Successfully updated {env_path} and {make_env_path}")
 
