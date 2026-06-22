@@ -217,6 +217,10 @@ The following rules apply to **ALL** projects unless overridden by a local proje
 
 
 
+
+
+
+
 <!-- SKILLPORT_START -->
 ## SkillPort Skills
 
@@ -297,29 +301,9 @@ Each skill contains step-by-step instructions, templates, and scripts.
   <location>agent-skills/custom/config-modernizer/SKILL.md</location>
 </skill>
 <skill>
-  <name>custom/doc-sync-verifier</name>
-  <description>A specialized skill for verifying document consistency in a multi-phase review pipeline. Use this skill when you need to validate Phase 1 review findings (e.g., from Gemini) against actual project documentation files, applying strict evidence-based judgment without touching source code. Trigger whenever the user provides a review_results block with issue IDs to verify, asks to "裏取り" (fact-check) review findings, or mentions "DocSync Verifier", "整合性検証", "ドキュメント照合", or "指摘事項の検証". Also trigger when the user wants to cross-reference YAML frontmatter, Mermaid diagrams, or Markdown tables between documents.</description>
-  <location>agent-skills/custom/doc-sync-verifier/SKILL.md</location>
-</skill>
-<skill>
   <name>custom/dotfiles-guidelines</name>
   <description>Core principles, persona definitions, and command workflows for the dotfiles project. Use when seeking development guidance, selecting an appropriate expert persona (Architect, Developer, Tester, DevOps, Analyst), or following standard project commands (analyze, implement, design, etc.). Ensures consistency, quality, and adherence to project-wide best practices.</description>
   <location>agent-skills/custom/dotfiles-guidelines/SKILL.md</location>
-</skill>
-<skill>
-  <name>custom/git-master</name>
-  <description>A specialized skill for performing Git operations safely and appropriately. Particularly focuses on splitting changes correctly and creating Japanese commit messages following Conventional Commits.</description>
-  <location>agent-skills/custom/git-master/SKILL.md</location>
-</skill>
-<skill>
-  <name>custom/github-quality-setup</name>
-  <description>Set up a comprehensive GitHub repository quality and security toolchain. Use this skill whenever the user wants to configure GitHub Actions, code review bots, static analysis, security scanning, dependency updates, or coverage reporting for a repository -- even if they only mention some of the tools (CodeRabbit, SonarCloud, Semgrep, Dependabot, CodeQL, Snyk, Trivy, Codecov). Also use when the user says things like "make my repo production-ready", "add CI quality gates", "set up GitHub security", "configure PR automation", or "add workflow files for code review/security". Works for any language; Python and TypeScript examples are provided in the bundled reference.</description>
-  <location>agent-skills/custom/github-quality-setup/SKILL.md</location>
-</skill>
-<skill>
-  <name>custom/makefile-organization</name>
-  <description>Guidelines for organizing and maintaining modular Makefiles. Use when refactoring, creating new .mk files, or ensuring consistency across the project's Makefile structure. Covers naming conventions, inclusion order, idempotency management, and error handling for a robust development environment.</description>
-  <location>agent-skills/custom/makefile-organization/SKILL.md</location>
 </skill>
 <skill>
   <name>custom/update-opencode-models</name>
@@ -335,6 +319,11 @@ Each skill contains step-by-step instructions, templates, and scripts.
   <name>doc-coauthoring</name>
   <description>Guide users through a structured workflow for co-authoring documentation. Use when user wants to write documentation, proposals, technical specs, decision docs, or similar structured content. This workflow helps users efficiently transfer context, refine content through iteration, and verify the doc works for readers. Trigger when user mentions writing docs, creating proposals, drafting specs, or similar documentation tasks.</description>
   <location>.agents/skills/doc-coauthoring/SKILL.md</location>
+</skill>
+<skill>
+  <name>doc-sync-verifier</name>
+  <description>A specialized skill for verifying document consistency in a multi-phase review pipeline. Use this skill when you need to validate Phase 1 review findings (e.g., from Gemini) against actual project documentation files, applying strict evidence-based judgment without touching source code. Trigger whenever the user provides a review_results block with issue IDs to verify, asks to "裏取り" (fact-check) review findings, or mentions "DocSync Verifier", "整合性検証", "ドキュメント照合", or "指摘事項の検証". Also trigger when the user wants to cross-reference YAML frontmatter, Mermaid diagrams, or Markdown tables between documents.</description>
+  <location>.agents/skills/doc-sync-verifier/SKILL.md</location>
 </skill>
 <skill>
   <name>docx</name>
@@ -357,6 +346,16 @@ Each skill contains step-by-step instructions, templates, and scripts.
   <location>.agents/skills/frontend-design/SKILL.md</location>
 </skill>
 <skill>
+  <name>git-master</name>
+  <description>A specialized skill for performing Git operations safely and appropriately. Particularly focuses on splitting changes correctly and creating Japanese commit messages following Conventional Commits.</description>
+  <location>.agents/skills/git-master/SKILL.md</location>
+</skill>
+<skill>
+  <name>github-quality-setup</name>
+  <description>Set up a comprehensive GitHub repository quality and security toolchain. Use this skill whenever the user wants to configure GitHub Actions, code review bots, static analysis, security scanning, dependency updates, or coverage reporting for a repository -- even if they only mention some of the tools (CodeRabbit, SonarCloud, Semgrep, Dependabot, CodeQL, Snyk, Trivy, Codecov). Also use when the user says things like "make my repo production-ready", "add CI quality gates", "set up GitHub security", "configure PR automation", or "add workflow files for code review/security".</description>
+  <location>.agents/skills/github-quality-setup/SKILL.md</location>
+</skill>
+<skill>
   <name>greploop</name>
   <description>Iteratively improves a PR (GitHub), MR (GitLab), or shelved changelist (Perforce) until Greptile gives it a 5/5 confidence score with zero unresolved comments. Triggers Greptile review, fixes all actionable comments, pushes/re-shelves, re-triggers review, and repeats. Use when the user wants to fully optimize a PR/MR/CL against Greptile's code review standards.</description>
   <location>.agents/skills/greploop/SKILL.md</location>
@@ -365,6 +364,11 @@ Each skill contains step-by-step instructions, templates, and scripts.
   <name>internal-comms</name>
   <description>A set of resources to help me write all kinds of internal communications, using the formats that my company likes to use. Claude should use this skill whenever asked to write some sort of internal communications (status reports, leadership updates, 3P updates, company newsletters, FAQs, incident reports, project updates, etc.).</description>
   <location>.agents/skills/internal-comms/SKILL.md</location>
+</skill>
+<skill>
+  <name>makefile-organization</name>
+  <description>Guidelines for organizing and maintaining modular Makefiles. Use when refactoring, creating new .mk files, or ensuring consistency across the project's Makefile structure. Covers naming conventions, inclusion order, idempotency management, and error handling for a robust development environment.</description>
+  <location>.agents/skills/makefile-organization/SKILL.md</location>
 </skill>
 <skill>
   <name>mcp-builder</name>
@@ -463,6 +467,8 @@ Each skill contains step-by-step instructions, templates, and scripts.
 </skill>
 </available_skills>
 <!-- SKILLPORT_END -->
+
+
 
 
 

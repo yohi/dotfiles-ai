@@ -9,7 +9,7 @@ OpenCode プラットフォーム自体のコア設定ファイルです。
 
 ### `oh-my-openagent.jsonc`
 エージェントの知能構成、役割定義、ツール権限などを管理するメイン設定ファイルです。
-*Target Version: v4.11.0*
+*Target Version: v4.13.0*
 
 ## 2. 使い方
 
@@ -74,7 +74,7 @@ Sisyphus（監督）は、タスクの性質に応じて最適な「知能カテ
 | **原則駆動** | **自律探索型。** 最小限の指示で自律的に解決策を見出す。深い実装に強い。 | GPT Family, DeepSeek | Hephaestus, Oracle, Momus |
 | **視覚推論型** | **UI・構造理解。** デザイン解析、CSS、レイアウトの理解に特化。 | Gemini Family, Qwen | Looker |
 
-### カテゴリー別・推奨モデルと代替ルール (v4.11.0)
+### カテゴリー別・推奨モデルと代替ルール (v4.13.0)
 
 | カテゴリー | デフォルトモデル | フォールバックチェーン (優先順) |
 | :--- | :--- | :--- |
@@ -88,7 +88,7 @@ Sisyphus（監督）は、タスクの性質に応じて最適な「知能カテ
 | **writing** | `opencode-go/kimi-k2.7-code` | `google/gemini-3-flash` → `opencode-go/kimi-k2.6` → `anthropic/claude-sonnet-4-6` → `opencode-go/minimax-m3` |
 
 ---
-*Updated: 2026-06-15*
+*Updated: 2026-06-23*
 
 ## 5. 環境の切り替え (Switching Environments)
 
@@ -163,3 +163,17 @@ OpenCode の機能を拡張するため、現在以下のプラグインが [apm
    make sync-opencode
    make setup-opencode
    ```
+
+## 8. v4.13.0 主要新機能
+
+最新の v4.13.0 にて強化・導入された主要機能です。
+
+### Insane Search / Ultimate Browsing
+多重のフォールバック経路（APIプロキシ、アーカイブ/キャッシュ、Playwright、TLSインパーソネーション等）を利用し、通常のフェッチではアクセスが困難なWAF保護されたサイト等からCookieやコンテンツを強行突破して取得する高度なWebブラウジング機能です。
+
+### Ultraresearch / Ultrasearch
+非コード領域の調査・研究において、収集したソースと推論・結論を明確に紐付ける「事実検証ゲート（claim-ledger verification gate）」を搭載。主張の監査と推論プロセスを追跡可能にし、正確なファクトチェックをサポートします。
+
+### Codex Team Mode (v2)
+複数のエージェントが耐久性の高いCodexスレッドとして自律走行し、作業状態や成果物をシームレスに同期・共有しながら共同で開発を行うマルチエージェント協調開発環境です。
+
