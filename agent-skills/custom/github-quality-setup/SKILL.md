@@ -54,11 +54,14 @@ Ask the user (or infer from the repository) for the minimum required context:
 2. **Tools to include** (default: all eight below). Respect exclusions if the user
    explicitly opts out of a tool.
 3. **Default branch name** (default: `main`).
-4. **Container image** (only if Trivy is selected and the repo builds a Docker image).
-5. **Package ecosystem(s)** for Dependabot (default: pip + github-actions for Python;
+4. **CodeQL Configuration Status**: Check if the repository already uses GitHub's
+   "Default setup" for CodeQL. If yes, skip generating `codeql.yml` to avoid duplicate scans.
+5. **Container image** (only if Trivy is selected and the repo builds a Docker image).
+6. **Package ecosystem(s)** for Dependabot (default: pip + github-actions for Python;
    npm + github-actions for Node.js).
-6. **Workflow triggers** (default: `push` to default branch and `pull_request`).
-7. **Repository access level** (public or private; important for configuring tools like SonarCloud and Trivy).
+7. **Workflow triggers** (default: `push` to default branch and `pull_request`).
+8. **Repository access level** (public or private; important for configuring tools like SonarCloud and Trivy).
+
 
 
 ## Output layout
@@ -149,7 +152,8 @@ After writing files, output a concise checklist in this exact format:
       accessible from GitHub Actions.
 - [ ] Enable GitHub Advanced Security:
       Settings -> Code security and analysis -> Enable "Dependency graph",
-      "Dependabot alerts", "Dependabot security updates", and "Code scanning".
+      "Dependabot alerts", "Dependabot security updates", and "Code scanning"
+      (Use "Default setup" if you want GitHub to manage CodeQL automatically without a workflow file. If you use the generated `codeql.yml`, select "Advanced setup").
 - [ ] Commit the generated files and open a pull request.
 ```
 
