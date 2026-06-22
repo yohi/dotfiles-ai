@@ -275,7 +275,7 @@ coverage:
         threshold: 2%
     patch:
       default:
-        informational: true
+        informational: true  # Patch coverage is informational only. Set to target: 80% to block PRs
 
 comment:
   layout: "diff, flags, files"
@@ -340,7 +340,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Run Snyk to check for vulnerabilities
-        uses: snyk/actions/<PRIMARY_LANGUAGE>@v1.0.0
+        uses: snyk/actions/<PRIMARY_LANGUAGE>@v1.0.0  # Verify the latest tag at https://github.com/snyk/actions before use
         continue-on-error: true
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
