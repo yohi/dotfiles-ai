@@ -221,6 +221,8 @@ The following rules apply to **ALL** projects unless overridden by a local proje
 
 
 
+
+
 <!-- SKILLPORT_START -->
 ## SkillPort Skills
 
@@ -356,6 +358,11 @@ Each skill contains step-by-step instructions, templates, and scripts.
   <location>.agents/skills/github-quality-setup/SKILL.md</location>
 </skill>
 <skill>
+  <name>github-release-packages</name>
+  <description>Automates GitHub release and package publishing workflows using googleapis/release-please-action. Covers npm (Node.js), Docker (ghcr.io), Python, Go, and Rust projects. Make sure to use this skill whenever the user asks to set up automated releases, GitHub Packages publishing, release-please configuration, CI/CD for library distribution, or versioning automation. Triggers for: 'release to GitHub Packages', 'setup release please', 'automated versioning', 'publish npm package to GitHub Packages', 'docker image CI/CD', 'library release automation', 'semantic release'.</description>
+  <location>.agents/skills/github-release-packages/SKILL.md</location>
+</skill>
+<skill>
   <name>greploop</name>
   <description>Iteratively improves a PR (GitHub), MR (GitLab), or shelved changelist (Perforce) until Greptile gives it a 5/5 confidence score with zero unresolved comments. Triggers Greptile review, fixes all actionable comments, pushes/re-shelves, re-triggers review, and repeats. Use when the user wants to fully optimize a PR/MR/CL against Greptile's code review standards.</description>
   <location>.agents/skills/greploop/SKILL.md</location>
@@ -467,6 +474,7 @@ Each skill contains step-by-step instructions, templates, and scripts.
 </skill>
 </available_skills>
 <!-- SKILLPORT_END -->
+
 
 
 

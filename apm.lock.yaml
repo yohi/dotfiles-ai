@@ -1,5 +1,5 @@
 lockfile_version: '1'
-generated_at: '2026-06-22T19:22:40.244973+00:00'
+generated_at: '2026-06-22T20:06:35.018181+00:00'
 apm_version: 0.20.0
 dependencies:
 - repo_url: anthropics/claude-code
@@ -1059,6 +1059,34 @@ dependencies:
 - repo_url: yohi/agent-skills
   host: github.com
   resolved_commit: 6639be91f0cdb1bbd28d7b045acac8a1aeae3ae2
+  virtual_path: skills/github-release-packages
+  is_virtual: true
+  package_type: claude_skill
+  deployed_files:
+  - .agents/skills/github-release-packages
+  - .agents/skills/github-release-packages/SKILL.md
+  - .agents/skills/github-release-packages/evals/evals.json
+  - .agents/skills/github-release-packages/references/docker.md
+  - .agents/skills/github-release-packages/references/go.md
+  - .agents/skills/github-release-packages/references/nodejs.md
+  - .agents/skills/github-release-packages/references/python.md
+  - .agents/skills/github-release-packages/references/rust.md
+  - .agents/skills/github-release-packages/scripts/generate-workflow.sh
+  - .agents/skills/github-release-packages/scripts/grade.sh
+  deployed_file_hashes:
+    .agents/skills/github-release-packages/SKILL.md: sha256:5e5ca2732c12b3c34955a79aa6d5f155e7e87d8ec5be32223865e6ad31885c0c
+    .agents/skills/github-release-packages/evals/evals.json: sha256:3084b69017007b0537d92f1f6b4c3d70621c38227bba5b558cfd2e5825aa5d3d
+    .agents/skills/github-release-packages/references/docker.md: sha256:178a60b53862b7cb939ffa8119e61c8489142111340cebbab9cf35a24aa90c57
+    .agents/skills/github-release-packages/references/go.md: sha256:a788582cff8aca478f855be646d9ac365cd5763aadf15fef082e01bd2c2c3903
+    .agents/skills/github-release-packages/references/nodejs.md: sha256:3c268721971648d452d43bd399a5d911740bc56479647ea81094bd0db152870f
+    .agents/skills/github-release-packages/references/python.md: sha256:36ab86e47687bdfa7f505acb2f6eb03adcddf08357544a4c8cdcfd9b2e5dadb5
+    .agents/skills/github-release-packages/references/rust.md: sha256:f44d5c9d14c49409a2532c434aa2dc6e88132e004c6b21836eb3607a6bfe0921
+    .agents/skills/github-release-packages/scripts/generate-workflow.sh: sha256:57937dade73a1ac3f1ce92c4d1f1cd27f55cdbac5fde2e2524509d23d3cf700b
+    .agents/skills/github-release-packages/scripts/grade.sh: sha256:621def19270a49b5ea0e51df007f0ab6973af33660e57cc10cdec7bf9e849250
+  content_hash: sha256:6c3826c2c778255d54f3278058a05762d8f2c95125bbd0d03c65ddf8720dfbff
+- repo_url: yohi/agent-skills
+  host: github.com
+  resolved_commit: 6639be91f0cdb1bbd28d7b045acac8a1aeae3ae2
   virtual_path: skills/makefile-organization
   is_virtual: true
   package_type: claude_skill
@@ -1160,7 +1188,7 @@ mcp_configs:
       NO_PROXY: 127.0.0.1,localhost
     args:
     - -y
-    - '@yohi/nexus@1.20.0'
+    - '@yohi/nexus@1.22.0'
     registry: false
     command: npx
   semgrep:
