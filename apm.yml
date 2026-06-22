@@ -19,6 +19,10 @@ dependencies:
     - greptileai/skills//check-pr
     - greptileai/skills//greploop
     - anthropics/claude-code//plugins/code-review
+    - yohi/agent-skills//skills/doc-sync-verifier
+    - yohi/agent-skills//skills/git-master
+    - yohi/agent-skills//skills/github-quality-setup
+    - yohi/agent-skills//skills/makefile-organization
 
   # MCP Servers
   mcp:
@@ -112,7 +116,7 @@ dependencies:
       args:
         - "-y"
         # - "/home/y_ohi/program/nexus"
-        - "@yohi/nexus@1.20.0"
+        - "@yohi/nexus@1.22.0"
       env:
         LOG_LEVEL: "ERROR"
         NEXUS_WATCHER_IGNORE_PATHS: "node_modules,opencode/node_modules,.opencode/node_modules,oss/apm/node_modules,oss/apm/docs/node_modules,.git,.nexus,dist,gemini,agent-skills,apm_modules,.agents,.opencode,.gemini,.claude,.codex,.vscode,.devcontainer,oss,codex/.tmp,.worktrees,.venv,target,.mypy_cache,.ruff_cache,build,.serena,.cache,__pycache__,*.db,*.sqlite,*.log"
@@ -170,8 +174,8 @@ snapshot: true
 
 plugin:
   - "@yohi/justice@2.3.0"
-  - "@yohi/akane@1.2.0"
-  - "oh-my-openagent@4.12.1"
+  - "@yohi/akane@1.3.0"
+  - "oh-my-openagent@4.13.0"
   # - "@yohi/opencode-plugin-chronos-gate@1.4.0"
   - "@nick-vi/opencode-type-inject@latest"
   - "opencode-vibeguard@latest"

@@ -1,5 +1,5 @@
 lockfile_version: '1'
-generated_at: '2026-06-21T14:54:41.392455+00:00'
+generated_at: '2026-06-22T19:22:40.244973+00:00'
 apm_version: 0.20.0
 dependencies:
 - repo_url: anthropics/claude-code
@@ -1016,6 +1016,60 @@ dependencies:
     .cursor/hooks/superpowers/hooks/run-hook.cmd: sha256:d3d9c6199678dab2858e60509dde5e7414f13c2a2b5e48a38b1d368b6e1d6abb
     .gemini/hooks/superpowers/hooks/run-hook.cmd: sha256:d3d9c6199678dab2858e60509dde5e7414f13c2a2b5e48a38b1d368b6e1d6abb
   content_hash: sha256:8206d720fc4f340c4bc83dec27a1632debb5065a3ceeca53a7cd96a90425038f
+- repo_url: yohi/agent-skills
+  host: github.com
+  resolved_commit: 6639be91f0cdb1bbd28d7b045acac8a1aeae3ae2
+  virtual_path: skills/doc-sync-verifier
+  is_virtual: true
+  package_type: claude_skill
+  deployed_files:
+  - .agents/skills/doc-sync-verifier
+  - .agents/skills/doc-sync-verifier/SKILL.md
+  deployed_file_hashes:
+    .agents/skills/doc-sync-verifier/SKILL.md: sha256:7c7c67e3bf0eaea5202306e973c8a935825f435c8fb360602079ec644c55d85d
+  content_hash: sha256:2ee5eda43c238df72aad09175999454d14a094b4bb164384301704ace9488651
+- repo_url: yohi/agent-skills
+  host: github.com
+  resolved_commit: 6639be91f0cdb1bbd28d7b045acac8a1aeae3ae2
+  virtual_path: skills/git-master
+  is_virtual: true
+  package_type: claude_skill
+  deployed_files:
+  - .agents/skills/git-master
+  - .agents/skills/git-master/SKILL.md
+  deployed_file_hashes:
+    .agents/skills/git-master/SKILL.md: sha256:9ff44ee28ce077e90c80f791af06c53f67b1b8028cb60819430be02b1510a485
+  content_hash: sha256:2168dbeeaedea51ef70208201c9cddbe93e8e1e3f2916c953d2e36b13a55fb08
+- repo_url: yohi/agent-skills
+  host: github.com
+  resolved_commit: 6639be91f0cdb1bbd28d7b045acac8a1aeae3ae2
+  virtual_path: skills/github-quality-setup
+  is_virtual: true
+  package_type: claude_skill
+  deployed_files:
+  - .agents/skills/github-quality-setup
+  - .agents/skills/github-quality-setup/SKILL.md
+  - .agents/skills/github-quality-setup/evals/evals.json
+  - .agents/skills/github-quality-setup/references/tool-configs.md
+  deployed_file_hashes:
+    .agents/skills/github-quality-setup/SKILL.md: sha256:9bba8ef74c82ed37c0372a7c6e61e12c45e0f92bc97abd79040fb0f431dba587
+    .agents/skills/github-quality-setup/evals/evals.json: sha256:64b35ea043c1c42abc5c2ad3b385f14909e2c498ccf73a839adff908a421dd86
+    .agents/skills/github-quality-setup/references/tool-configs.md: sha256:2cd02c5aaea923fd7a5aed449d04596d3b8f8cfcaec8c8de5374e5cbd5c9a02a
+  content_hash: sha256:fa03d324626cabd515f07f265c8416e3a419d18c31542d4305c59e2035a1d88a
+- repo_url: yohi/agent-skills
+  host: github.com
+  resolved_commit: 6639be91f0cdb1bbd28d7b045acac8a1aeae3ae2
+  virtual_path: skills/makefile-organization
+  is_virtual: true
+  package_type: claude_skill
+  deployed_files:
+  - .agents/skills/makefile-organization
+  - .agents/skills/makefile-organization/REFERENCE.md
+  - .agents/skills/makefile-organization/SKILL.md
+  deployed_file_hashes:
+    .agents/skills/makefile-organization/REFERENCE.md: sha256:e2e8babe76bccef0b2bc032d5edda06eec748b1e2b79630b4078df13d3107057
+    .agents/skills/makefile-organization/SKILL.md: sha256:d88ed176c1a5a3f7399468366993fc60220bb7d1a879ea41fd8b4bd1f85de6a9
+  content_hash: sha256:1082322d10ecdcf2f10e7abec37710b4c928c5793138537bb8ca8ca30c374ef5
 mcp_servers:
 - chronos-graph
 - codegraph
