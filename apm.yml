@@ -23,6 +23,7 @@ dependencies:
     - yohi/agent-skills//skills/git-master
     - yohi/agent-skills//skills/github-quality-setup
     - yohi/agent-skills//skills/makefile-organization
+    - yohi/agent-skills//skills/github-release-packages
 
   # MCP Servers
   mcp:
