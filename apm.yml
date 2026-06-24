@@ -453,9 +453,6 @@ provider:
   openai:
     whitelist:
       - chatgpt-image-latest
-      - gpt-3.5-turbo
-      - gpt-4
-      - gpt-4-turbo
       - gpt-4.1
       - gpt-4.1-mini
       - gpt-4.1-nano
@@ -633,24 +630,10 @@ provider:
   opencode:
     whitelist:
       - deepseek-v4-flash-free
-      - glm-4.7-free
-      - glm-5-free
-      - hy3-preview-free
-      - kimi-k2.5-free
-      - ling-2.6-flash-free
-      - mimo-v2-flash-free
-      - mimo-v2-omni-free
-      - mimo-v2-pro-free
       - mimo-v2.5-free
-      - minimax-m2.1-free
-      - minimax-m2.5-free
-      - minimax-m3-free
-      - nemotron-3-super-free
-      - nemotron-3-ultra-free
       - north-mini-code-free
-      - qwen3.6-plus-free
-      - ring-2.6-1t-free
-      - trinity-large-preview-free
+      - nemotron-3-ultra-free
+      - big-pickle
   amazon-bedrock:
     whitelist:
       - global.anthropic.claude-fable-5
