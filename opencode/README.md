@@ -29,14 +29,14 @@ Sisyphus（監督）は、タスクの性質に応じて最適な「知能カテ
 
 | カテゴリー | 特徴・バリアント | 想定される用途 | 推奨モデル (Brain) |
 | :--- | :--- | :--- | :--- |
-| **ultrabrain** | `xhigh` / 最強推論 | 複雑な計画立案、コード監査、アーキテクチャ設計、リスク分析。 | GPT-5.5 (xhigh), Claude Fable 5 |
+| **ultrabrain** | `xhigh` / 最強推論 | 複雑な計画立案、コード監査、アーキテクチャ設計、リスク分析。 | GPT-5.5 (xhigh) |
 | **deep** | `medium` / 自律解決 | 難解なバグ修正、機能実装、リファクタリングなど職人的作業。 | GPT-5.5 (medium) |
-| **quick** | `fast` / 高速応答 | ドキュメント検索、コード探索、些細な修正、プロトタイピング。 | GPT-5.4 Mini, Qwen 3.5 Plus |
-| **visual-engineering** | UI/UX 特化 | UIデザイン解析、CSSアニメーション、フロントエンド最適化。 | Gemini 3.1 Pro, Qwen 3.6 Plus |
-| **writing** | 文書作成 特化 | 技術解説、ドキュメンテーション、リリースノートの作成。 | Kimi K2.7-Code, Gemini 3 Flash |
-| **artistry** | 創造性 特化 | ジェネレーティブアート、クリエイティブな発想、芸術的表現。 | Gemini 3.1 Pro |
-| **unspecified-high** | 高負荷汎用 | 特定の役割に当てはまらないが、高い知能を要する汎用作業。 | Claude Fable 5, Opus 4.8/4.7 |
-| **unspecified-low** | 低負荷汎用 | 定形的な作業、単純なデータ変換などの低コストな汎用作業。 | Claude Sonnet 4.6, Kimi K2.7-Code |
+| **quick** | `fast` / 高速応答 | ドキュメント検索、コード探索、些細な修正、プロトタイピング。 | GPT-5.4 Mini |
+| **visual-engineering** | UI/UX 特化 | UIデザイン解析、CSSアニメーション、フロントエンド最適化。 | Gemini 3.1 Pro (high) |
+| **writing** | 文書作成 特化 | 技術解説、ドキュメンテーション、リリースノートの作成。 | Kimi (k2p5) |
+| **artistry** | 創造性 特化 | ジェネレーティブアート、クリエイティブな発想、芸術的表現。 | Gemini 3.1 Pro (high) |
+| **unspecified-high** | 高負荷汎用 | 特定の役割に当てはまらないが、高い知能を要する汎用作業。 | Claude Opus 4.7 (max) |
+| **unspecified-low** | 低負荷汎用 | 定形的な作業、単純なデータ変換などの低コストな汎用作業。 | Claude Sonnet 4.6 |
 
 ### エージェント一覧とカテゴリー・マッピング
 
@@ -80,12 +80,12 @@ Sisyphus（監督）は、タスクの性質に応じて最適な「知能カテ
 | :--- | :--- | :--- |
 | **ultrabrain** | `openai/gpt-5.5` (xhigh) | `openai/gpt-5.5` (xhigh) → `google/gemini-3.1-pro` (high) → `anthropic/claude-opus-4-7` (max) → `opencode-go/glm-5.1` |
 | **deep** | `openai/gpt-5.5` (medium) | `openai/gpt-5.5` (medium) → `anthropic/claude-opus-4-7` (max) → `google/gemini-3.1-pro` (high) |
-| **quick** | `openai/gpt-5.4-mini` | `openai/gpt-5.4-mini` → `anthropic/claude-haiku-4-5` → `google/gemini-3-flash` → `opencode-go/minimax-m3` → `opencode/gpt-5-nano` |
+| **quick** | `openai/gpt-5.4-mini` | `openai/gpt-5.4-mini` → `anthropic/claude-haiku-4-5` → `google/gemini-3-flash` → `opencode-go/minimax-m3` → `opencode-go/minimax-m2.7` → `opencode/gpt-5-nano` |
 | **visual-engineering** | `google/gemini-3.1-pro` (high) | `google/gemini-3.1-pro` (high) → `zai-coding-plan/glm-5` → `anthropic/claude-opus-4-7` (max) → `opencode-go/glm-5.1` → `kimi-for-coding/k2p5` |
 | **artistry** | `google/gemini-3.1-pro` (high) | `google/gemini-3.1-pro` (high) → `anthropic/claude-opus-4-7` (max) → `openai/gpt-5.5` |
-| **unspecified-high** | `anthropic/claude-fable-5` | `anthropic/claude-fable-5` → `anthropic/claude-opus-4-8` → `anthropic/claude-opus-4-7` (max) → `openai/gpt-5.5` (high) → `opencode-go/kimi-k2.7-code` |
-| **unspecified-low** | `anthropic/claude-sonnet-4-6` | `anthropic/claude-sonnet-4-6` → `opencode-go/kimi-k2.7-code` → `opencode-go/kimi-k2.6` → `google/gemini-3-flash` |
-| **writing** | `opencode-go/kimi-k2.7-code` | `google/gemini-3-flash` → `opencode-go/kimi-k2.6` → `anthropic/claude-sonnet-4-6` → `opencode-go/minimax-m3` |
+| **unspecified-high** | `anthropic/claude-opus-4-7` (max) | `anthropic/claude-opus-4-7` (max) → `openai/gpt-5.5` (high) → `zai-coding-plan/glm-5` → `kimi-for-coding/k2p5` → `opencode-go/glm-5.1` → `opencode/kimi-k2.5` → `moonshotai/kimi-k2.5` |
+| **unspecified-low** | `anthropic/claude-sonnet-4-6` | `anthropic/claude-sonnet-4-6` → `gpt-5.5-codex` (medium) → `opencode-go/kimi-k2.6` → `google/gemini-3-flash` → `opencode-go/minimax-m3` → `opencode-go/minimax-m2.7` |
+| **writing** | `kimi-for-coding/k2p5` | `google/gemini-3-flash` → `opencode-go/kimi-k2.6` → `anthropic/claude-sonnet-4-6` → `opencode-go/minimax-m3` → `opencode-go/minimax-m2.7` |
 
 ---
 *Updated: 2026-06-23*
