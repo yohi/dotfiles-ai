@@ -1,10 +1,10 @@
 lockfile_version: '1'
-generated_at: '2026-06-22T20:06:35.018181+00:00'
+generated_at: '2026-06-28T09:02:52.804503+00:00'
 apm_version: 0.20.0
 dependencies:
 - repo_url: anthropics/claude-code
   host: github.com
-  resolved_commit: 4fa369b5b38811dbef7274433131b11d2276bc37
+  resolved_commit: 0bd954331e2dbf76024ac53b0fd997314f653e51
   virtual_path: plugins/code-review
   is_virtual: true
   package_type: marketplace_plugin
@@ -333,10 +333,6 @@ dependencies:
   - .agents/skills/skill-creator/eval-viewer/viewer.html
   - .agents/skills/skill-creator/references/schemas.md
   - .agents/skills/skill-creator/scripts/__init__.py
-  - .agents/skills/skill-creator/scripts/__pycache__/__init__.cpython-314.pyc
-  - .agents/skills/skill-creator/scripts/__pycache__/aggregate_benchmark.cpython-314.pyc
-  - .agents/skills/skill-creator/scripts/__pycache__/package_skill.cpython-314.pyc
-  - .agents/skills/skill-creator/scripts/__pycache__/quick_validate.cpython-314.pyc
   - .agents/skills/skill-creator/scripts/aggregate_benchmark.py
   - .agents/skills/skill-creator/scripts/generate_report.py
   - .agents/skills/skill-creator/scripts/improve_description.py
@@ -735,10 +731,6 @@ dependencies:
     .agents/skills/skill-creator/eval-viewer/viewer.html: sha256:a53213426ee1100441d701a3a0d49cda7a842f992d2c36463f4d3cc0258575fa
     .agents/skills/skill-creator/references/schemas.md: sha256:8e8876180a8989b406a4d3edddf875b04cdfd5805cc8616686d552b11ce4455f
     .agents/skills/skill-creator/scripts/__init__.py: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
-    .agents/skills/skill-creator/scripts/__pycache__/__init__.cpython-314.pyc: sha256:7ba85e6267822c1b89b09ffe7895dfec5ccf43c92ae3b86d33830e8680f41bd8
-    .agents/skills/skill-creator/scripts/__pycache__/aggregate_benchmark.cpython-314.pyc: sha256:dd2ebd95173f6d441b3f919bace6e4034f45a152bd7e9d373a71de89d6161df5
-    .agents/skills/skill-creator/scripts/__pycache__/package_skill.cpython-314.pyc: sha256:6aff9d6273799611f898eedb681d08f20942b08fbbd825a014703a6ea0e764bc
-    .agents/skills/skill-creator/scripts/__pycache__/quick_validate.cpython-314.pyc: sha256:dbbdba20f569807a8bc3a4829d010b4eb43a0003db4ddc6177eeb14e97bf8b19
     .agents/skills/skill-creator/scripts/aggregate_benchmark.py: sha256:123ef128ea5ccc01a4b1ac212ef5567f21e9c13d3d240609780beeb3200c49aa
     .agents/skills/skill-creator/scripts/generate_report.py: sha256:13df7118a3c50c83c4c3250a606d5f2b20b25a3d44cbc392b3d669ec75281453
     .agents/skills/skill-creator/scripts/improve_description.py: sha256:87d864570220b699fac52da309d2d6efdb060647bfebc74f768128e646accf80
@@ -835,7 +827,7 @@ dependencies:
   content_hash: sha256:4f6d306e750b5b4f3b0dfc0f50418fa8403b3fc99867d5c2f7c170eccf94203b
 - repo_url: coderabbitai/skills
   host: github.com
-  resolved_commit: a81eb76a1539e4a3f2b5c6fc133849124e72d303
+  resolved_commit: 2fd091d9582deccf19929e21f934921d0e8f686e
   package_type: marketplace_plugin
   deployed_files:
   - .agents/skills/autofix
@@ -857,10 +849,10 @@ dependencies:
     .gemini/commands/coderabbit-review.toml: sha256:9848b7ccce2a249a06b72523877fa5ea280f6fc491ca5f066bc5c7b956b478c0
     .opencode/agents/code-reviewer.md: sha256:5677b371344cdc444390fbb366041eee7ad204fdbc85b6a37f92671afa8bce7f
     .opencode/commands/coderabbit-review.md: sha256:cba1e6915ee98d24f288e3fb2dfb4b9b5bdc9e3164abf66b885aa9b66d8ce17d
-  content_hash: sha256:9175a296d5fc107148623b2f2673f5381eee51e156d109b3d8d4ae23107b9af6
+  content_hash: sha256:6c4d9f9fa574b8546857ce3ce5f08d02c0c236dc3071023d6d0b45d62127bdbd
 - repo_url: greptileai/skills
   host: github.com
-  resolved_commit: bda66cce07d1c59c83d387b87aeeed042b13369d
+  resolved_commit: 7a34572951f296d7f2a05e69e8494136cb00c85e
   virtual_path: check-pr
   is_virtual: true
   package_type: claude_skill
@@ -876,7 +868,7 @@ dependencies:
   content_hash: sha256:54dc158641c3857ad6cd147860017c1494d3dbfdfae16a16c30819e7b36900a5
 - repo_url: greptileai/skills
   host: github.com
-  resolved_commit: bda66cce07d1c59c83d387b87aeeed042b13369d
+  resolved_commit: 7a34572951f296d7f2a05e69e8494136cb00c85e
   virtual_path: greploop
   is_virtual: true
   package_type: claude_skill
@@ -1018,7 +1010,7 @@ dependencies:
   content_hash: sha256:8206d720fc4f340c4bc83dec27a1632debb5065a3ceeca53a7cd96a90425038f
 - repo_url: yohi/agent-skills
   host: github.com
-  resolved_commit: 6639be91f0cdb1bbd28d7b045acac8a1aeae3ae2
+  resolved_commit: a6c469866207c944c1f5ec86ae30c967f31bbf4d
   virtual_path: skills/doc-sync-verifier
   is_virtual: true
   package_type: claude_skill
@@ -1030,7 +1022,7 @@ dependencies:
   content_hash: sha256:2ee5eda43c238df72aad09175999454d14a094b4bb164384301704ace9488651
 - repo_url: yohi/agent-skills
   host: github.com
-  resolved_commit: 6639be91f0cdb1bbd28d7b045acac8a1aeae3ae2
+  resolved_commit: a6c469866207c944c1f5ec86ae30c967f31bbf4d
   virtual_path: skills/git-master
   is_virtual: true
   package_type: claude_skill
@@ -1042,7 +1034,7 @@ dependencies:
   content_hash: sha256:2168dbeeaedea51ef70208201c9cddbe93e8e1e3f2916c953d2e36b13a55fb08
 - repo_url: yohi/agent-skills
   host: github.com
-  resolved_commit: 6639be91f0cdb1bbd28d7b045acac8a1aeae3ae2
+  resolved_commit: a6c469866207c944c1f5ec86ae30c967f31bbf4d
   virtual_path: skills/github-quality-setup
   is_virtual: true
   package_type: claude_skill
@@ -1058,7 +1050,7 @@ dependencies:
   content_hash: sha256:fa03d324626cabd515f07f265c8416e3a419d18c31542d4305c59e2035a1d88a
 - repo_url: yohi/agent-skills
   host: github.com
-  resolved_commit: 6639be91f0cdb1bbd28d7b045acac8a1aeae3ae2
+  resolved_commit: a6c469866207c944c1f5ec86ae30c967f31bbf4d
   virtual_path: skills/github-release-packages
   is_virtual: true
   package_type: claude_skill
@@ -1068,25 +1060,27 @@ dependencies:
   - .agents/skills/github-release-packages/evals/evals.json
   - .agents/skills/github-release-packages/references/docker.md
   - .agents/skills/github-release-packages/references/go.md
+  - .agents/skills/github-release-packages/references/manifest-mode.md
   - .agents/skills/github-release-packages/references/nodejs.md
   - .agents/skills/github-release-packages/references/python.md
   - .agents/skills/github-release-packages/references/rust.md
   - .agents/skills/github-release-packages/scripts/generate-workflow.sh
   - .agents/skills/github-release-packages/scripts/grade.sh
   deployed_file_hashes:
-    .agents/skills/github-release-packages/SKILL.md: sha256:5e5ca2732c12b3c34955a79aa6d5f155e7e87d8ec5be32223865e6ad31885c0c
+    .agents/skills/github-release-packages/SKILL.md: sha256:e99c4b99bdd1d3c85cc78c801f25b3831847c6578f99dd3c3b4c88501015ad7d
     .agents/skills/github-release-packages/evals/evals.json: sha256:3084b69017007b0537d92f1f6b4c3d70621c38227bba5b558cfd2e5825aa5d3d
     .agents/skills/github-release-packages/references/docker.md: sha256:178a60b53862b7cb939ffa8119e61c8489142111340cebbab9cf35a24aa90c57
     .agents/skills/github-release-packages/references/go.md: sha256:a788582cff8aca478f855be646d9ac365cd5763aadf15fef082e01bd2c2c3903
+    .agents/skills/github-release-packages/references/manifest-mode.md: sha256:df55884df5ff298b51cfc99d7b7c52ce6cc75139e3b4837789987763171b5ea0
     .agents/skills/github-release-packages/references/nodejs.md: sha256:3c268721971648d452d43bd399a5d911740bc56479647ea81094bd0db152870f
     .agents/skills/github-release-packages/references/python.md: sha256:36ab86e47687bdfa7f505acb2f6eb03adcddf08357544a4c8cdcfd9b2e5dadb5
     .agents/skills/github-release-packages/references/rust.md: sha256:f44d5c9d14c49409a2532c434aa2dc6e88132e004c6b21836eb3607a6bfe0921
-    .agents/skills/github-release-packages/scripts/generate-workflow.sh: sha256:57937dade73a1ac3f1ce92c4d1f1cd27f55cdbac5fde2e2524509d23d3cf700b
+    .agents/skills/github-release-packages/scripts/generate-workflow.sh: sha256:9ee87655c95279ee57acf3642b944014f9cca7cb6dc6436146a73110824f4b9b
     .agents/skills/github-release-packages/scripts/grade.sh: sha256:621def19270a49b5ea0e51df007f0ab6973af33660e57cc10cdec7bf9e849250
-  content_hash: sha256:6c3826c2c778255d54f3278058a05762d8f2c95125bbd0d03c65ddf8720dfbff
+  content_hash: sha256:2cd3a8e07844ce20d789c92dfa4d069cb5a4faabad8da57dcedf8f52d63e5b23
 - repo_url: yohi/agent-skills
   host: github.com
-  resolved_commit: 6639be91f0cdb1bbd28d7b045acac8a1aeae3ae2
+  resolved_commit: a6c469866207c944c1f5ec86ae30c967f31bbf4d
   virtual_path: skills/makefile-organization
   is_virtual: true
   package_type: claude_skill
@@ -1230,4 +1224,4 @@ local_deployed_files:
 - .cursor/rules/architecture.mdc
 local_deployed_file_hashes:
   .cursor/rules/agent-commands.mdc: sha256:de037ca92ad5bb65be804d929789aa4ffe0027c7d94b6917d5146c7e91ebf7f7
-  .cursor/rules/architecture.mdc: sha256:976a508f7c575dcaa34a332f714ef4f0e791c486306cf12760b35aaa1d3d79ea
+  .cursor/rules/architecture.mdc: sha256:715dbb7b99a0f4ae1cbe443b3d63c072332b33cc33955c63de044852ea31a5c1

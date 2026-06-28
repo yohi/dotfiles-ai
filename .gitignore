@@ -55,6 +55,8 @@ node_modules/
 ide/cursor/mcp.json
 .vscode/mcp.json
 .opencode/
+.akane/
+.codegraph/
 .cursor/
 .gemini/
 !.claude/
