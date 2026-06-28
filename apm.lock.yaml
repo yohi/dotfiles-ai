@@ -1,10 +1,12 @@
 lockfile_version: '1'
-generated_at: '2026-06-28T09:02:52.804503+00:00'
-apm_version: 0.20.0
+generated_at: '2026-06-28T16:11:15.580469+00:00'
+apm_version: 0.22.0
 dependencies:
 - repo_url: anthropics/claude-code
+  name: code-review
   host: github.com
-  resolved_commit: 0bd954331e2dbf76024ac53b0fd997314f653e51
+  resolved_commit: 01f1617f14452ac78bf319cef2236d87c0fe05cb
+  version: 1.0.0
   virtual_path: plugins/code-review
   is_virtual: true
   package_type: marketplace_plugin
@@ -18,8 +20,10 @@ dependencies:
     .opencode/commands/code-review.md: sha256:ecab79f22b6e2bef07a524d2015aaa9e0b7abce82445f38b31a231b19c7bd43a
   content_hash: sha256:d25f797947bbd724551746c24ed4ac40788aaf370a7857eb120180fbb00ac2be
 - repo_url: anthropics/skills
+  name: skills
   host: github.com
-  resolved_commit: 57546260929473d4e0d1c1bb75297be2fdfa1949
+  resolved_commit: 35414756ca55738e050562e272a6bbc6273aa926
+  version: '3541475'
   package_type: marketplace_plugin
   deployed_files:
   - .agents/skills/algorithmic-art
@@ -117,14 +121,28 @@ dependencies:
   - .agents/skills/claude-api
   - .agents/skills/claude-api/LICENSE.txt
   - .agents/skills/claude-api/SKILL.md
-  - .agents/skills/claude-api/csharp/claude-api.md
+  - .agents/skills/claude-api/csharp/claude-api/README.md
+  - .agents/skills/claude-api/csharp/claude-api/batches.md
+  - .agents/skills/claude-api/csharp/claude-api/files-api.md
+  - .agents/skills/claude-api/csharp/claude-api/streaming.md
+  - .agents/skills/claude-api/csharp/claude-api/tool-use.md
   - .agents/skills/claude-api/curl/examples.md
   - .agents/skills/claude-api/curl/managed-agents.md
-  - .agents/skills/claude-api/go/claude-api.md
+  - .agents/skills/claude-api/go/claude-api/README.md
+  - .agents/skills/claude-api/go/claude-api/files-api.md
+  - .agents/skills/claude-api/go/claude-api/streaming.md
+  - .agents/skills/claude-api/go/claude-api/tool-use.md
   - .agents/skills/claude-api/go/managed-agents/README.md
-  - .agents/skills/claude-api/java/claude-api.md
+  - .agents/skills/claude-api/java/claude-api/README.md
+  - .agents/skills/claude-api/java/claude-api/files-api.md
+  - .agents/skills/claude-api/java/claude-api/streaming.md
+  - .agents/skills/claude-api/java/claude-api/tool-use.md
   - .agents/skills/claude-api/java/managed-agents/README.md
-  - .agents/skills/claude-api/php/claude-api.md
+  - .agents/skills/claude-api/php/claude-api/README.md
+  - .agents/skills/claude-api/php/claude-api/batches.md
+  - .agents/skills/claude-api/php/claude-api/files-api.md
+  - .agents/skills/claude-api/php/claude-api/streaming.md
+  - .agents/skills/claude-api/php/claude-api/tool-use.md
   - .agents/skills/claude-api/php/managed-agents/README.md
   - .agents/skills/claude-api/python/claude-api/README.md
   - .agents/skills/claude-api/python/claude-api/batches.md
@@ -132,7 +150,9 @@ dependencies:
   - .agents/skills/claude-api/python/claude-api/streaming.md
   - .agents/skills/claude-api/python/claude-api/tool-use.md
   - .agents/skills/claude-api/python/managed-agents/README.md
-  - .agents/skills/claude-api/ruby/claude-api.md
+  - .agents/skills/claude-api/ruby/claude-api/README.md
+  - .agents/skills/claude-api/ruby/claude-api/streaming.md
+  - .agents/skills/claude-api/ruby/claude-api/tool-use.md
   - .agents/skills/claude-api/ruby/managed-agents/README.md
   - .agents/skills/claude-api/shared/agent-design.md
   - .agents/skills/claude-api/shared/anthropic-cli.md
@@ -155,6 +175,7 @@ dependencies:
   - .agents/skills/claude-api/shared/managed-agents-webhooks.md
   - .agents/skills/claude-api/shared/model-migration.md
   - .agents/skills/claude-api/shared/models.md
+  - .agents/skills/claude-api/shared/platform-availability.md
   - .agents/skills/claude-api/shared/prompt-caching.md
   - .agents/skills/claude-api/shared/token-counting.md
   - .agents/skills/claude-api/shared/tool-use-concepts.md
@@ -522,53 +543,70 @@ dependencies:
     .agents/skills/canvas-design/canvas-fonts/YoungSerif-OFL.txt: sha256:cdcb8039606b40a027a6d24586ec62d5fe29c701343d82a048c829cb28a3dd28
     .agents/skills/canvas-design/canvas-fonts/YoungSerif-Regular.ttf: sha256:f8dc08f77abad753a00670af70756a8ace938e5c3f0b770f4f4c2071c4bd8fc6
     .agents/skills/claude-api/LICENSE.txt: sha256:bc6b3af2f331cbc7fb0da1344efb2cbe5877a31498b4d70dbc7000f3405a1362
-    .agents/skills/claude-api/SKILL.md: sha256:290beaca25c5938cb94355ff3a452712e4e32d1b202cc6af75991160af147e3d
-    .agents/skills/claude-api/csharp/claude-api.md: sha256:7fd8b6e7eeffdd6d282d1f378db5bd6a5e785b15f266989e53d1b3d6d3900e4e
-    .agents/skills/claude-api/curl/examples.md: sha256:4051a40cc2a00db73f94cd48c2286ace417b3b82387af772a0b46d43437357ae
+    .agents/skills/claude-api/SKILL.md: sha256:398bbd480bf46bbc46d47b9c1cdc67322bb631c4ab15260a9b090686369155e1
+    .agents/skills/claude-api/csharp/claude-api/README.md: sha256:16481a361eda1fb0a58ac4581553e3dafab80b6c90ba9be7dcbe426905a8df0f
+    .agents/skills/claude-api/csharp/claude-api/batches.md: sha256:19d17c89efe01f13a2a173a05169dee9b6bbdd5274ec2716395c4faa6ee7029a
+    .agents/skills/claude-api/csharp/claude-api/files-api.md: sha256:413d08653a31766fdc3196f25af6ce386b085c41372dcbf33e9205cd35253731
+    .agents/skills/claude-api/csharp/claude-api/streaming.md: sha256:8cd323dceb3d28963fcde3ecd18f2fecde0c7d87b441f7361dab5e8795f5fee2
+    .agents/skills/claude-api/csharp/claude-api/tool-use.md: sha256:80013059920daaea42a32ccb1786071c36068871c84115fc3dffca334bdd90f6
+    .agents/skills/claude-api/curl/examples.md: sha256:9ddc35cfa47d47e307a9346c569c15c83b0d6185ec2e3cae26d353150c04bbcf
     .agents/skills/claude-api/curl/managed-agents.md: sha256:b710fe91ba1fde843559a6898f33cd2b41a5a929d30ce62cd9baf67734329920
-    .agents/skills/claude-api/go/claude-api.md: sha256:2957cc509f2d4644ebed74c4f613b8aa5ef3fb4889cf1dbb28c7e3f4fec0bdea
-    .agents/skills/claude-api/go/managed-agents/README.md: sha256:30759cc3c58049215edb9011d0a996abcc53285ee592cd3467fd9d85ffa0a539
-    .agents/skills/claude-api/java/claude-api.md: sha256:4583f59eb1d175b3a27a95e34edb8b1b37ff6736cfca4fe0c7a7b108ce8c3d4e
-    .agents/skills/claude-api/java/managed-agents/README.md: sha256:c48defa56f7c2b86bb464c91e8c516671eaec724df72614fe39b9dd3c4fde2f3
-    .agents/skills/claude-api/php/claude-api.md: sha256:896215a05b3b6f9a87ad47afd4d9c44b6c3acbc911753cd0fd5e2781c24681b1
-    .agents/skills/claude-api/php/managed-agents/README.md: sha256:133a2c13d61c39adba33ee863d816303d328ce5f61aeb3ed082df3ae741857b7
-    .agents/skills/claude-api/python/claude-api/README.md: sha256:b965ed461393cad9699103cdec60bc90c279d3817a1a652dd4d2b5f84e7cc0a3
+    .agents/skills/claude-api/go/claude-api/README.md: sha256:24816178eaa12ffd7464326dbbcaedb911e2695bd6aa17fa6184cd346c54631c
+    .agents/skills/claude-api/go/claude-api/files-api.md: sha256:144c12678497f872436aed71944e0e9ba73fea08f4a771e0bec5c1c40d620866
+    .agents/skills/claude-api/go/claude-api/streaming.md: sha256:066a5195398a1c66835d306f5d725708788046e34bf70a0f3a2df53e397537ca
+    .agents/skills/claude-api/go/claude-api/tool-use.md: sha256:8a447360fc87b439aff89ef57730f206e76e3ca3f483602f4148638da13b70ec
+    .agents/skills/claude-api/go/managed-agents/README.md: sha256:b04af539db3b0d01db460a8e33c83f5a1d32b2b50f8ed03240f86298626d8766
+    .agents/skills/claude-api/java/claude-api/README.md: sha256:f69567754943deebaaedb848c5b19193ca8890e2f5c863a0e9108a2f3d00a3f6
+    .agents/skills/claude-api/java/claude-api/files-api.md: sha256:81550cec88f2de0c9af8d6826a4e624668a18ffa25ff7217595e403045a88800
+    .agents/skills/claude-api/java/claude-api/streaming.md: sha256:de8d63789e440eb00610908007f6a1593d5fdbdca5708fcafb8e6a50a4f58f3d
+    .agents/skills/claude-api/java/claude-api/tool-use.md: sha256:d61ec94bc6d57db1ac6c1eeb6ca8cd852c8bf00124874ef4fe75b2d87155814f
+    .agents/skills/claude-api/java/managed-agents/README.md: sha256:8029204fcb698960bbd17a12aa24588e8c85fd4c5aaef4b51a8ba27fd87a0aa5
+    .agents/skills/claude-api/php/claude-api/README.md: sha256:80caa60268f2d27472cef4470312eadde0bae9d765cb80e87f2d22507a290a59
+    .agents/skills/claude-api/php/claude-api/batches.md: sha256:45cc12df38c2452d28cfb46ef85300b620f7efce0d2c3117f4a1af6916b62b76
+    .agents/skills/claude-api/php/claude-api/files-api.md: sha256:a1f2467c6674696b4036ca13026c1f19c0e661bbf94b6e1da0deeb1492958871
+    .agents/skills/claude-api/php/claude-api/streaming.md: sha256:f4b6b685ff1b0c54631e9a456d9933d1b2f31f50825e0959a74384014808da4c
+    .agents/skills/claude-api/php/claude-api/tool-use.md: sha256:d4474a01bea5fa4bb6d5c27270333dc76bf5be8e71587e1c440fbd217df5345a
+    .agents/skills/claude-api/php/managed-agents/README.md: sha256:923c6bb68a724bfd3356a100fc9966d214ceffcccde72eb77d039ee61a1e8f4d
+    .agents/skills/claude-api/python/claude-api/README.md: sha256:3eac189c2db8321730ba4f22a82d0fd66e1118de6796564e0cc26bd2519af08e
     .agents/skills/claude-api/python/claude-api/batches.md: sha256:6849033ccaaf140ac52a0cf4c923fd6ae545754f67d7a72d20c36036cdacbe68
     .agents/skills/claude-api/python/claude-api/files-api.md: sha256:68d034200244045b7f8b8ba31e2860ca633d0b7141a151317a5d8aeba013a603
-    .agents/skills/claude-api/python/claude-api/streaming.md: sha256:69731caae2e313aa1b9fe90571705ed092817e13257e478c5afd6007d5ed0d78
+    .agents/skills/claude-api/python/claude-api/streaming.md: sha256:a3c980a9256bee23bfd4fbfe044637d58f7ba66464ed6a192f61ee622bd96f5a
     .agents/skills/claude-api/python/claude-api/tool-use.md: sha256:490dc14dbaa0cf471bff456aea5eba95101b7c69f767cc9d7032d93feb0f6f43
     .agents/skills/claude-api/python/managed-agents/README.md: sha256:6bda5859a8ae9fa45a1a9071d338c663a81fddb74a43bcf05d4c624232d11df4
-    .agents/skills/claude-api/ruby/claude-api.md: sha256:68f92eb0d239fd185a04c221ca65e5ff4ea93a59a852870978bb85eec3d340eb
-    .agents/skills/claude-api/ruby/managed-agents/README.md: sha256:810a53abe00396ba8ba80df51867444aa05c46aad590d9fd234a065192d45cb5
-    .agents/skills/claude-api/shared/agent-design.md: sha256:13c26bea8bdbdc627a708458e1e0d51fdb96db6ed4fb457c9c036ef553f6503e
+    .agents/skills/claude-api/ruby/claude-api/README.md: sha256:036021fee02420d8d9fe9c7283eba932b4ebe9f2ebbcc1be4bf8e3e89d6a8d30
+    .agents/skills/claude-api/ruby/claude-api/streaming.md: sha256:e1edcb452ceeadeead3f58732c33cf58f45af9907f9b30230e88fe2db839c51c
+    .agents/skills/claude-api/ruby/claude-api/tool-use.md: sha256:ea7e1cd0a20c9b40e0bfae0b0390ab0f00d6c67d11df87c8abec76121a962551
+    .agents/skills/claude-api/ruby/managed-agents/README.md: sha256:0a7d617f662c4f52c53589f7727221e9ad1c02667accc2b57f54577a81d941d4
+    .agents/skills/claude-api/shared/agent-design.md: sha256:7e242504c57eda76e5d31216344192367fb62ffc62f553207041f11ef39887a3
     .agents/skills/claude-api/shared/anthropic-cli.md: sha256:693eda916c2298373dd45b1a09f6d7aa5383ea958cef9beab412c55a401e01e9
-    .agents/skills/claude-api/shared/claude-platform-on-aws.md: sha256:7f25cc319def7c000f17dc66809b607c1f3e8fb7a369199ae6c312016defdce3
-    .agents/skills/claude-api/shared/error-codes.md: sha256:d14061b855e14662ab299e00fd652698c41df16293e0b4a66db9d9a9914e0273
+    .agents/skills/claude-api/shared/claude-platform-on-aws.md: sha256:b5b0d2cf9c96ca143d5f2dac4ecb1e05a2193f83469345565135b5875f5df667
+    .agents/skills/claude-api/shared/error-codes.md: sha256:30f469fdf1ef7ac423e01d8b66e150bee6017bb3f4238841ac744d0ce206c871
     .agents/skills/claude-api/shared/live-sources.md: sha256:46ca91c1bb757b97b10a78d8b29152ad11c52213aa328397267535a86de1c949
-    .agents/skills/claude-api/shared/managed-agents-api-reference.md: sha256:a5715a13b1231d92c0e8952c4f8c537c110efde83b8057ebdffff3f0630b68f2
-    .agents/skills/claude-api/shared/managed-agents-client-patterns.md: sha256:f8a5d42fb5ae6bfb410870db4528d953602d3b7c37f484fbccace64bce8d6b97
+    .agents/skills/claude-api/shared/managed-agents-api-reference.md: sha256:46f0eb833f74814948c783031b737a74af33cb392e9480e54089c24ff31f5f7c
+    .agents/skills/claude-api/shared/managed-agents-client-patterns.md: sha256:de288a933ed7702edba6e6ec54afdb3addcc861245a09255da3496fce2d0f3a8
     .agents/skills/claude-api/shared/managed-agents-core.md: sha256:bb197c1089b389f96690644eb5a78b45d153e2f54f05d2ed5a6a5e37c9123512
     .agents/skills/claude-api/shared/managed-agents-environments.md: sha256:c26934889eaccb936b2eb900ec2c5a648881784280c1beba0e249864078b90b0
     .agents/skills/claude-api/shared/managed-agents-events.md: sha256:e329146941709db3558c558780b5ca47acf4fcb4254b5fcd6ef3ce69a88c1377
     .agents/skills/claude-api/shared/managed-agents-memory.md: sha256:1c2825364115ccf9d0a779447336764ebbaaf875f79c2a064075ca9235d16c16
     .agents/skills/claude-api/shared/managed-agents-multiagent.md: sha256:6f150526edf942aecbeb054cf878d5a7829ff9e16b6792c67cabc64439bb5171
-    .agents/skills/claude-api/shared/managed-agents-onboarding.md: sha256:4a070f8085eef9989221f19883bd7a1468b3b7a2692558046916fca0f3937024
+    .agents/skills/claude-api/shared/managed-agents-onboarding.md: sha256:fa44c171a0c12104836f75f9abd51d3ea07c1e3b488f650755ebd12899a24732
     .agents/skills/claude-api/shared/managed-agents-outcomes.md: sha256:bf195965dca27a07a996c66df16ccb62c745dd000039f1f364b8a4e75dd73b96
-    .agents/skills/claude-api/shared/managed-agents-overview.md: sha256:e48e842d899d12f1ccfc3b31c9188f98851935ebe47b3028c0910a4e4aec3969
+    .agents/skills/claude-api/shared/managed-agents-overview.md: sha256:aa4d4659c5249122ca102d849cd175c1093de38010f878301e89c9a6824feaac
     .agents/skills/claude-api/shared/managed-agents-scheduled-deployments.md: sha256:3c61168ac012ae57ed522fe2739f7f604c24179c9017c023e4e1f14dd88de967
     .agents/skills/claude-api/shared/managed-agents-self-hosted-sandboxes.md: sha256:225865291eb1eda677451a416849523b9be1bf81661c6c0306408501b089e8bc
     .agents/skills/claude-api/shared/managed-agents-tools.md: sha256:89a3dfdcde13b313b919f6fba8c04cd19ff2a89531f1f07114a831bf2774900d
     .agents/skills/claude-api/shared/managed-agents-webhooks.md: sha256:6fa05e6f8ae950e164d06990de1b3f69ddc7cbc744e404a32ffd7f556ac8f64e
-    .agents/skills/claude-api/shared/model-migration.md: sha256:cefa112e69d929028ed93addfe74364821e750a1732ca4e52d2e960a63e3f916
-    .agents/skills/claude-api/shared/models.md: sha256:53d52ebdfdc159368b8520765a964d50fdbc1c4ce3f32ab8e8632421f905d564
-    .agents/skills/claude-api/shared/prompt-caching.md: sha256:a3c5252969b3818ec7f472fc49ee52f5ca78d7733c83512129727637818f1029
+    .agents/skills/claude-api/shared/model-migration.md: sha256:34d774239f42afdb8d7145ee85054d30852bf1af0d2b3a7c23aaeff7e76e4cc2
+    .agents/skills/claude-api/shared/models.md: sha256:c576a41418c730c97249356090cc9237f5089a58531ccc18250a3bc43c940ba1
+    .agents/skills/claude-api/shared/platform-availability.md: sha256:54895cf5e812706cd4c6379b41c0781b3292237236a2e71cfbdc3d02f434348c
+    .agents/skills/claude-api/shared/prompt-caching.md: sha256:7c242024cfdfb0b3c9a5a884248df73d1377ab497e7097a4bed1c4444542a7a2
     .agents/skills/claude-api/shared/token-counting.md: sha256:231c4d669618915958adb2db2d73470f3e2a376aaf5472e39b651d3e5efa044d
-    .agents/skills/claude-api/shared/tool-use-concepts.md: sha256:5db0d3b847b653b9d27069f4c395664d3547f663087066bee46c99f108374eca
-    .agents/skills/claude-api/typescript/claude-api/README.md: sha256:d491107781a06b685d2e1d0dc4a69dab092529fdf5165178bd010f3fe096ced8
+    .agents/skills/claude-api/shared/tool-use-concepts.md: sha256:ec13bca1430f8742ecab5d12bdae236fe22334790f0691fc7cec008df74b96b5
+    .agents/skills/claude-api/typescript/claude-api/README.md: sha256:4668edb425e307708040a87ae20cb5c2d2ca3e5fca8c9c0c3bcd39778df14940
     .agents/skills/claude-api/typescript/claude-api/batches.md: sha256:07e75f7e6864aa79fad1f4135a06f1907dc0149ce3234f0851c950b93e0a9e8f
     .agents/skills/claude-api/typescript/claude-api/files-api.md: sha256:0e70fae5742e78d93314744777dc9359d71d6e3511ca67abe3d51aaf1e107331
-    .agents/skills/claude-api/typescript/claude-api/streaming.md: sha256:b279eb47f348e23bf54237ece965527d81ca880edfbab6f85a2a5a93ece4ae7f
-    .agents/skills/claude-api/typescript/claude-api/tool-use.md: sha256:320f17ca6909642abb5194fe84c526ad6552afe6a57c90869b52fa56d82e1b88
+    .agents/skills/claude-api/typescript/claude-api/streaming.md: sha256:7af1abfc92f45b8fff0bab3bcbb3d99a011cc19f93f0a8cf0e0cf73e0a1a3276
+    .agents/skills/claude-api/typescript/claude-api/tool-use.md: sha256:1f7108408432767cf277090ef9e5b7b75b1fa04a8bcf62f8d48e9dc3dac28039
     .agents/skills/claude-api/typescript/managed-agents/README.md: sha256:5665a34c90e26a743441787713a36f3375bcbc8d18b60487227b98b4813e8a51
     .agents/skills/doc-coauthoring/SKILL.md: sha256:2e47d78846faeea4a56e9809c52700087a15a2155a3f293a3efbaded81398ef4
     .agents/skills/docx/LICENSE.txt: sha256:79f6d8f5b427252fa3b1c11ecdbdb6bf610b944f7530b4de78f770f38741cfaa
@@ -824,10 +862,12 @@ dependencies:
     .agents/skills/xlsx/scripts/office/validators/pptx.py: sha256:f937961e62a5fa0d002b8dc51a4c4e2cd8fcd59fe65853fa54edaca3fe99eccc
     .agents/skills/xlsx/scripts/office/validators/redlining.py: sha256:f4c33fdb9da0651d1d9aa76f0d5294cc9955869339ae131b2f75f3b2e366cb40
     .agents/skills/xlsx/scripts/recalc.py: sha256:cf419d15e02965aeaec17773c05b61303f7f520f67fa2696547e7da07502eac7
-  content_hash: sha256:4f6d306e750b5b4f3b0dfc0f50418fa8403b3fc99867d5c2f7c170eccf94203b
+  content_hash: sha256:0cd4c5aa5731b0e49ba55f14f9e2878c41438353e8b5d0d8c716da62f71b72cf
 - repo_url: coderabbitai/skills
+  name: coderabbit
   host: github.com
   resolved_commit: 2fd091d9582deccf19929e21f934921d0e8f686e
+  version: 1.1.1
   package_type: marketplace_plugin
   deployed_files:
   - .agents/skills/autofix
@@ -850,9 +890,12 @@ dependencies:
     .opencode/agents/code-reviewer.md: sha256:5677b371344cdc444390fbb366041eee7ad204fdbc85b6a37f92671afa8bce7f
     .opencode/commands/coderabbit-review.md: sha256:cba1e6915ee98d24f288e3fb2dfb4b9b5bdc9e3164abf66b885aa9b66d8ce17d
   content_hash: sha256:6c4d9f9fa574b8546857ce3ce5f08d02c0c236dc3071023d6d0b45d62127bdbd
+  declared_license: MIT
 - repo_url: greptileai/skills
+  name: skills
   host: github.com
   resolved_commit: 7a34572951f296d7f2a05e69e8494136cb00c85e
+  version: unknown
   virtual_path: check-pr
   is_virtual: true
   package_type: claude_skill
@@ -867,8 +910,10 @@ dependencies:
     .agents/skills/check-pr/references/graphql-queries.md: sha256:f850841783ef3df4f28f4f45731f08591c8994fbe3e742eef5a370454d575d02
   content_hash: sha256:54dc158641c3857ad6cd147860017c1494d3dbfdfae16a16c30819e7b36900a5
 - repo_url: greptileai/skills
+  name: skills
   host: github.com
   resolved_commit: 7a34572951f296d7f2a05e69e8494136cb00c85e
+  version: unknown
   virtual_path: greploop
   is_virtual: true
   package_type: claude_skill
@@ -883,11 +928,14 @@ dependencies:
     .agents/skills/greploop/references/graphql-queries.md: sha256:99a689cf5318332316353a3fe2e68d5f6096f9c48b6428ca5ddf434ee5c75a42
   content_hash: sha256:abbe92d33f94ec5cd027bf1c3073592ceb74aae7bc3c36a8a2b908df0b6e2a49
 - repo_url: obra/superpowers
+  name: superpowers
   host: github.com
   resolved_commit: b62616fc12f6a007c6fd5118146821d748da0d33
   resolved_ref: v6.0.2
+  version: 6.0.2
   package_type: marketplace_plugin
   deployed_files:
+  - .agents/hooks/superpowers/hooks/run-hook.cmd
   - .agents/skills/brainstorming
   - .agents/skills/brainstorming/SKILL.md
   - .agents/skills/brainstorming/scripts/frame-template.html
@@ -955,6 +1003,7 @@ dependencies:
   - .cursor/hooks/superpowers/hooks/run-hook.cmd
   - .gemini/hooks/superpowers/hooks/run-hook.cmd
   deployed_file_hashes:
+    .agents/hooks/superpowers/hooks/run-hook.cmd: sha256:d3d9c6199678dab2858e60509dde5e7414f13c2a2b5e48a38b1d368b6e1d6abb
     .agents/skills/brainstorming/SKILL.md: sha256:e14914605f640e0841758e45d0ab2a53243b59b921f929e47921c99668f2e61d
     .agents/skills/brainstorming/scripts/frame-template.html: sha256:6a8a4e58bd6a44b904e2e3c57de774481d909204597e1498de53f1b2fecc4c4e
     .agents/skills/brainstorming/scripts/helper.js: sha256:43c6d69954a46ec34a2a262bcc62a9a7e83e839c739f199cb72646d397c686e3
@@ -1008,9 +1057,12 @@ dependencies:
     .cursor/hooks/superpowers/hooks/run-hook.cmd: sha256:d3d9c6199678dab2858e60509dde5e7414f13c2a2b5e48a38b1d368b6e1d6abb
     .gemini/hooks/superpowers/hooks/run-hook.cmd: sha256:d3d9c6199678dab2858e60509dde5e7414f13c2a2b5e48a38b1d368b6e1d6abb
   content_hash: sha256:8206d720fc4f340c4bc83dec27a1632debb5065a3ceeca53a7cd96a90425038f
+  declared_license: MIT
 - repo_url: yohi/agent-skills
+  name: agent-skills
   host: github.com
   resolved_commit: a6c469866207c944c1f5ec86ae30c967f31bbf4d
+  version: unknown
   virtual_path: skills/doc-sync-verifier
   is_virtual: true
   package_type: claude_skill
@@ -1021,8 +1073,10 @@ dependencies:
     .agents/skills/doc-sync-verifier/SKILL.md: sha256:7c7c67e3bf0eaea5202306e973c8a935825f435c8fb360602079ec644c55d85d
   content_hash: sha256:2ee5eda43c238df72aad09175999454d14a094b4bb164384301704ace9488651
 - repo_url: yohi/agent-skills
+  name: agent-skills
   host: github.com
   resolved_commit: a6c469866207c944c1f5ec86ae30c967f31bbf4d
+  version: unknown
   virtual_path: skills/git-master
   is_virtual: true
   package_type: claude_skill
@@ -1033,8 +1087,10 @@ dependencies:
     .agents/skills/git-master/SKILL.md: sha256:9ff44ee28ce077e90c80f791af06c53f67b1b8028cb60819430be02b1510a485
   content_hash: sha256:2168dbeeaedea51ef70208201c9cddbe93e8e1e3f2916c953d2e36b13a55fb08
 - repo_url: yohi/agent-skills
+  name: agent-skills
   host: github.com
   resolved_commit: a6c469866207c944c1f5ec86ae30c967f31bbf4d
+  version: unknown
   virtual_path: skills/github-quality-setup
   is_virtual: true
   package_type: claude_skill
@@ -1049,8 +1105,10 @@ dependencies:
     .agents/skills/github-quality-setup/references/tool-configs.md: sha256:2cd02c5aaea923fd7a5aed449d04596d3b8f8cfcaec8c8de5374e5cbd5c9a02a
   content_hash: sha256:fa03d324626cabd515f07f265c8416e3a419d18c31542d4305c59e2035a1d88a
 - repo_url: yohi/agent-skills
+  name: agent-skills
   host: github.com
   resolved_commit: a6c469866207c944c1f5ec86ae30c967f31bbf4d
+  version: unknown
   virtual_path: skills/github-release-packages
   is_virtual: true
   package_type: claude_skill
@@ -1079,8 +1137,10 @@ dependencies:
     .agents/skills/github-release-packages/scripts/grade.sh: sha256:621def19270a49b5ea0e51df007f0ab6973af33660e57cc10cdec7bf9e849250
   content_hash: sha256:2cd3a8e07844ce20d789c92dfa4d069cb5a4faabad8da57dcedf8f52d63e5b23
 - repo_url: yohi/agent-skills
+  name: agent-skills
   host: github.com
   resolved_commit: a6c469866207c944c1f5ec86ae30c967f31bbf4d
+  version: unknown
   virtual_path: skills/makefile-organization
   is_virtual: true
   package_type: claude_skill
@@ -1138,6 +1198,9 @@ mcp_configs:
     - context-store
     registry: false
     command: uvx
+    title: Chronos Graph
+    standalone: true
+    enabled: true
   codegraph:
     name: codegraph
     transport: stdio
@@ -1146,6 +1209,8 @@ mcp_configs:
     - --mcp
     registry: false
     command: codegraph
+    title: CodeGraph MCP
+    enabled: true
   coderabbit:
     name: coderabbit
     transport: stdio
@@ -1156,6 +1221,8 @@ mcp_configs:
     - coderabbitai-mcp
     registry: false
     command: npx
+    title: CodeRabbit MCP
+    enabled: true
   docker-mcp:
     name: docker-mcp
     transport: sse
@@ -1163,6 +1230,8 @@ mcp_configs:
     headers:
       Authorization: Bearer ${env:MCP_GATEWAY_TOKEN}
     url: http://127.0.0.1:10888/sse
+    title: Docker MCP Gateway
+    enabled: true
   greptile:
     name: greptile
     transport: sse
@@ -1171,6 +1240,8 @@ mcp_configs:
       Authorization: Bearer ${env:GREPTILE_API_KEY}
       X-GitHub-Token: ${env:GITHUB_TOKEN}
     url: https://api.greptile.com/mcp
+    title: Greptile MCP
+    enabled: true
   nexus:
     name: nexus
     transport: stdio
@@ -1185,6 +1256,10 @@ mcp_configs:
     - '@yohi/nexus@1.22.0'
     registry: false
     command: npx
+    title: Nexus
+    timeout: 30000
+    standalone: true
+    enabled: true
   semgrep:
     name: semgrep
     transport: stdio
@@ -1198,6 +1273,8 @@ mcp_configs:
     - ${env:HOME}/.local/bin/semgrep
     registry: false
     command: uvx
+    title: Semgrep MCP
+    enabled: true
   skillport:
     name: skillport
     transport: stdio
@@ -1207,6 +1284,9 @@ mcp_configs:
     - skillport-mcp
     registry: false
     command: uvx
+    title: Skillport
+    standalone: true
+    enabled: true
   sonarqube:
     name: sonarqube
     transport: stdio
@@ -1219,9 +1299,15 @@ mcp_configs:
     - sonarqube-mcp-server
     registry: false
     command: npx
+    title: SonarQube MCP
+    enabled: true
 local_deployed_files:
+- .agents/rules/agent-commands.md
+- .agents/rules/architecture.md
 - .cursor/rules/agent-commands.mdc
 - .cursor/rules/architecture.mdc
 local_deployed_file_hashes:
+  .agents/rules/agent-commands.md: sha256:fd7a20ad41b1f49d284d223811bf180e724d5de5ce161091422d95cf72bb3c83
+  .agents/rules/architecture.md: sha256:22040b5ab4a3a5e16d4281f88ec162a6db7d299e3b75d514861c454564f38726
   .cursor/rules/agent-commands.mdc: sha256:de037ca92ad5bb65be804d929789aa4ffe0027c7d94b6917d5146c7e91ebf7f7
   .cursor/rules/architecture.mdc: sha256:715dbb7b99a0f4ae1cbe443b3d63c072332b33cc33955c63de044852ea31a5c1

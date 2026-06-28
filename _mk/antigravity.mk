@@ -17,7 +17,7 @@ ANTIGRAVITY_MCP_PATH := $(ANTIGRAVITY_CONFIG_DIR)/mcp_config.json
 ANTIGRAVITY_SETTINGS_PATH := $(ANTIGRAVITY_CONFIG_DIR)/settings.json
 
 # プロジェクト内で管理されるマスター設定
-PROJECT_MCP_CONFIG := $(REPO_ROOT)/antigravity/mcp_config.json
+PROJECT_MCP_CONFIG := $(REPO_ROOT)/.agents/mcp_config.json
 PROJECT_SETTINGS_CONFIG := $(REPO_ROOT)/antigravity/settings.json
 
 .PHONY: install-antigravity install-antigravity-ide install-antigravity-hub install-antigravity-cli
@@ -48,13 +48,10 @@ install-antigravity-cli: ## Antigravity CLI をインストール
 	@echo "✅ Antigravity CLI installed"
 
 # Antigravityの設定を生成して同期
-sync-antigravity: ## apm.lock.yamlからAntigravity用のMCP設定を生成して同期
-	@echo "🔄 Generating Antigravity MCP config from apm.lock.yaml..."
-	@mkdir -p "$(REPO_ROOT)/antigravity"
-	@set -a; [ -f "$(REPO_ROOT)/.env" ] && . "$(REPO_ROOT)/.env"; set +a; \
-	uv run python3 "$(REPO_ROOT)/_scripts/sync_antigravity.py" \
-		--lockfile "$(REPO_ROOT)/apm.lock.yaml" \
-		--output "$(REPO_ROOT)/antigravity/mcp_config.json"
+sync-antigravity: ## APMを使用してAntigravity用の設定を生成して同期
+	@echo "🔄 Generating Antigravity MCP config using APM..."
+	@uv run apm install
+	@uv run apm compile
 	@$(MAKE) setup-antigravity
 
 # Antigravityの設定を同期

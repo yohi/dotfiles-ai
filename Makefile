@@ -31,8 +31,8 @@ include _mk/main.mk
 test: lint test-all ## Run all tests
 
 sync-agents: ## Run APM install, compile, generate Antigravity config, and sync agents
-	@apm install
+	@uv run apm install
 	@$(MAKE) setup-skill-adapters
-	@apm compile
-	@$(PYTHON) _scripts/sync_antigravity.py
+	@uv run apm compile
+	@$(MAKE) setup-antigravity
 	@$(MAKE) sync-agents-core

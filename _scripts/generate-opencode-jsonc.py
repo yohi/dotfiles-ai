@@ -53,6 +53,7 @@ def _convert_mcp_entry(entry: dict[str, Any]) -> tuple[str, dict[str, Any]]:
         cmd_str = entry.get("command", "")
         args = entry.get("args", [])
         full_cmd = [cmd_str, *[str(a) for a in args]] if cmd_str else []
+        full_cmd = [_normalize_env_syntax(a) for a in full_cmd]
         result = {
             "type": "local",
             "enabled": enabled,
@@ -315,6 +316,19 @@ def main() -> None:
 
     OUTPUT.write_text(output, encoding="utf-8")
     print(f"[ok] Generated: {OUTPUT}")
+
+    opencode_json = REPO_ROOT / "opencode.json"
+    if opencode_json.exists():
+        try:
+            data = json.loads(opencode_json.read_text(encoding="utf-8"))
+            if "mcp" in data:
+                for entry in data["mcp"].values():
+                    if entry.get("type") == "local" and "command" in entry:
+                        entry["command"] = [_normalize_env_syntax(str(arg)) for arg in entry["command"]]
+            opencode_json.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+            print(f"[ok] Normalized: {opencode_json}")
+        except Exception as e:
+            print(f"[warning] Failed to normalize opencode.json: {e}")
 
 
 if __name__ == "__main__":
