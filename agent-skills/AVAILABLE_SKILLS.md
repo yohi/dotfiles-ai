@@ -154,6 +154,8 @@ This document provides a comprehensive list of skills available through SkillPor
 
 
 
+
+
 <!-- SKILLPORT_START -->
 ## SkillPort Skills
 
@@ -234,11 +236,6 @@ Each skill contains step-by-step instructions, templates, and scripts.
   <location>agent-skills/custom/config-modernizer/SKILL.md</location>
 </skill>
 <skill>
-  <name>dotfiles-guidelines</name>
-  <description>Core principles, persona definitions, and command workflows for the dotfiles project. Use when seeking development guidance, selecting an appropriate expert persona (Architect, Developer, Tester, DevOps, Analyst), or following standard project commands (analyze, implement, design, etc.). Ensures consistency, quality, and adherence to project-wide best practices.</description>
-  <location>.claude/skills/dotfiles-guidelines/SKILL.md</location>
-</skill>
-<skill>
   <name>custom/update-opencode-models</name>
   <description>Updates the LLM models in apm.yml, personal.env, and work.env using the latest model-schema from models.dev, and updates opencode/README.md from the latest release of oh-my-openagent.</description>
   <location>agent-skills/custom/update-opencode-models/SKILL.md</location>
@@ -302,6 +299,11 @@ Each skill contains step-by-step instructions, templates, and scripts.
   <name>internal-comms</name>
   <description>A set of resources to help me write all kinds of internal communications, using the formats that my company likes to use. Claude should use this skill whenever asked to write some sort of internal communications (status reports, leadership updates, 3P updates, company newsletters, FAQs, incident reports, project updates, etc.).</description>
   <location>.agents/skills/internal-comms/SKILL.md</location>
+</skill>
+<skill>
+  <name>local/dotfiles-guidelines</name>
+  <description>Core principles, persona definitions, and command workflows for the dotfiles project. Use when seeking development guidance, selecting an appropriate expert persona (Architect, Developer, Tester, DevOps, Analyst), or following standard project commands (analyze, implement, design, etc.). Ensures consistency, quality, and adherence to project-wide best practices.</description>
+  <location>.claude/skills/dotfiles-guidelines/SKILL.md</location>
 </skill>
 <skill>
   <name>makefile-organization</name>
@@ -405,6 +407,7 @@ Each skill contains step-by-step instructions, templates, and scripts.
 </skill>
 </available_skills>
 <!-- SKILLPORT_END -->
+
 
 
 
