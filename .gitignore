@@ -12,6 +12,10 @@ agent-skills/*
 !agent-skills/AVAILABLE_SKILLS.md
 !agent-skills/.skillport/
 !agent-skills/.gitkeep
+agent-skills/external/
+!agent-skills/external/
+agent-skills/external/*
+!agent-skills/external/.gitkeep
 .agents/
 .sisyphus/
 .omo/
