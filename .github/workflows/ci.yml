@@ -34,7 +34,7 @@ jobs:
 
     - name: Install APM and Synchronize Configs
       run: |
-        make install-apm
+        uv tool install ./oss/apm --force
         apm install --force
         apm compile
         make sync-mcp-gateway
