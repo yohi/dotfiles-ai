@@ -6,6 +6,13 @@ Usage:
 Options:
     --dry-run   Print generated output without writing file
     --check     Exit 1 if generated output differs from existing file (CI use)
+
+Side effects (normal mode only):
+    In addition to writing opencode/opencode.jsonc, this script normalises
+    opencode.json at the repository root (if it exists) by converting MCP
+    command arguments to use portable environment-variable syntax.  This
+    side effect is also validated in --check mode: if opencode.json exists
+    and is not normalised, the script exits with code 1.
 """
 
 from __future__ import annotations
@@ -45,8 +52,7 @@ def _convert_mcp_entry(entry: dict[str, Any]) -> tuple[str, dict[str, Any]]:
         if "headers" in entry:
             # Convert ${env:VAR} -> {env:VAR}
             result["headers"] = {
-                k: _normalize_env_syntax(v)
-                for k, v in entry["headers"].items()
+                k: _normalize_env_syntax(v) for k, v in entry["headers"].items()
             }
     else:
         # stdio
@@ -61,8 +67,7 @@ def _convert_mcp_entry(entry: dict[str, Any]) -> tuple[str, dict[str, Any]]:
         }
         if "env" in entry:
             result["environment"] = {
-                k: _normalize_env_syntax(str(v))
-                for k, v in entry["env"].items()
+                k: _normalize_env_syntax(str(v)) for k, v in entry["env"].items()
             }
 
     return name, result
@@ -83,9 +88,6 @@ def _build_mcp_section(mcp_entries: list[dict[str, Any]]) -> dict[str, Any]:
         name, converted = _convert_mcp_entry(entry)
         mcp[name] = converted
     return mcp
-
-
-
 
 
 # ---------------------------------------------------------------------------
@@ -305,13 +307,41 @@ def main() -> None:
 
     if check_mode:
         if not OUTPUT.exists():
-            print("[check] FAIL: opencode.jsonc does not exist. Run: make sync-opencode")
+            print(
+                "[check] FAIL: opencode.jsonc does not exist. Run: make sync-opencode"
+            )
             sys.exit(1)
         current = OUTPUT.read_text(encoding="utf-8")
         if current != output:
-            print("[check] FAIL: opencode.jsonc is out of sync with apm.yml. Run: make sync-opencode")
+            print(
+                "[check] FAIL: opencode.jsonc is out of sync with apm.yml. Run: make sync-opencode"
+            )
             sys.exit(1)
         print("[check] OK: opencode.jsonc is up to date.")
+
+        # Also verify opencode.json normalisation state
+        opencode_json = REPO_ROOT / "opencode.json"
+        if opencode_json.exists():
+            try:
+                data = json.loads(opencode_json.read_text(encoding="utf-8"))
+                normalised = json.loads(opencode_json.read_text(encoding="utf-8"))
+                if "mcp" in normalised:
+                    for entry in normalised["mcp"].values():
+                        if entry.get("type") == "local" and "command" in entry:
+                            entry["command"] = [
+                                _normalize_env_syntax(str(arg))
+                                for arg in entry["command"]
+                            ]
+                expected = json.dumps(normalised, indent=2, ensure_ascii=False) + "\n"
+                actual = json.dumps(data, indent=2, ensure_ascii=False) + "\n"
+                if actual != expected:
+                    print(
+                        "[check] FAIL: opencode.json is not normalised. Run: make sync-opencode"
+                    )
+                    sys.exit(1)
+                print("[check] OK: opencode.json is normalised.")
+            except Exception as e:
+                print(f"[check] WARN: could not verify opencode.json: {e}")
         return
 
     OUTPUT.write_text(output, encoding="utf-8")
@@ -324,8 +354,12 @@ def main() -> None:
             if "mcp" in data:
                 for entry in data["mcp"].values():
                     if entry.get("type") == "local" and "command" in entry:
-                        entry["command"] = [_normalize_env_syntax(str(arg)) for arg in entry["command"]]
-            opencode_json.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+                        entry["command"] = [
+                            _normalize_env_syntax(str(arg)) for arg in entry["command"]
+                        ]
+            opencode_json.write_text(
+                json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+            )
             print(f"[ok] Normalized: {opencode_json}")
         except Exception as e:
             print(f"[warning] Failed to normalize opencode.json: {e}")
