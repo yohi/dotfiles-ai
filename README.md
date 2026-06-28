@@ -72,12 +72,15 @@ AIエージェント（Claude Code, Gemini CLI, OpenCode, Codex）の設定・�
 
 [SkillPort](https://github.com/gotalab/skillport) は、複数の AI エージェント間で再利用可能な「スキル」を一元管理するためのツールです。
 
-- **スキルの実体 (Runtime)**: `.agents/skills/` 配下に全エージェント共通のスキル実体が配置されます。ローカル custom スキルの編集元は `agent-skills/custom/` で、`.agents/skills/custom/` を通じて公開されます。
+- **スキルの 3 層配置**:
+  - **外部 skill（Runtime）**: `.agents/skills/` 配下に APM インストール済みの外部 skill が配置されます。
+  - **グローバル自作 skill**: `agent-skills/custom/` に `yohi/agent-skills` 由来の自作 skill を配置します（APM 管理）。
+  - **プロジェクト固有 skill**: `.claude/skills/<name>/` にプロジェクト固有 skill を配置します（Claude Code / OpenCode 両対応）。`make sync-agents` により `AVAILABLE_SKILLS.md` 等へ反映されます。
 - **外部スキルの管理 (APM)**: `superpowers` などの高品質な外部スキルは、`apm.yml` の `dependencies` で管理され、`apm.lock.yaml` でバージョン（コミットハッシュ）が固定されます。
   - **スキルインストール**: `apm install` で `apm.yml` に記載された全外部スキルをインストールします。
   - この操作は `make setup` 実行時にも自動で行われます。
 - **構成**: `.skillportrc` の `skills_dir` は `./.agents/skills` を指します。`~/.skillport/skills`・`~/.opencode/skills`・`~/.claude/skills` は `.agents/skills/` への symlink アダプタです。
-- **スキル配置**: `.agents/skills/` に集約（全エージェントが参照）
+- **スキル配置**: `.agents/skills/` に外部 skill を集約。プロジェクト固有 skill は `.claude/skills/` に、グローバル自作 skill は `agent-skills/custom/`（`yohi/agent-skills` 経由）に配置。
 - **コマンド**:
   - `make skillport`: SkillPort と `skillport-mcp` をインストールし、本環境の**初期セットアップ**を行います。
   - `make check-skillport`: インストール状態とシンボリックリンクの整合性を確認します。

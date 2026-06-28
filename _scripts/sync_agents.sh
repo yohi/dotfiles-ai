@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 #
 # _scripts/sync_agents.sh
-# description: Generate agent-skills/AVAILABLE_SKILLS.md from the runtime
-# .agents/skills tree plus local custom skills under agent-skills/custom.
+# description: Generate agent-skills/AVAILABLE_SKILLS.md and global-rules/AGENTS.global.md
+# from the runtime .agents/skills tree, local custom skills under agent-skills/custom,
+# and project-local skills tracked under .claude/skills/.
 #
 
 set -euo pipefail
@@ -35,6 +36,20 @@ run_skillport_doc() {
         cp -a agent-skills/custom/. "$tmp_skills_dir/custom/"
     fi
 
+    # Overlay project-local skills tracked under .claude/skills/
+    if command -v git >/dev/null 2>&1; then
+        local tracked_local_skills
+        tracked_local_skills=$(git ls-files .claude/skills/ 2>/dev/null | awk -F'/' '{print $3}' | sort -u)
+        if [ -n "$tracked_local_skills" ]; then
+            mkdir -p "$tmp_skills_dir/local"
+            echo "$tracked_local_skills" | while IFS= read -r skill_dir; do
+                if [ -d ".claude/skills/$skill_dir" ]; then
+                    cp -a ".claude/skills/$skill_dir" "$tmp_skills_dir/local/"
+                fi
+            done
+        fi
+    fi
+
     if command -v skillport >/dev/null 2>&1; then
         echo "Running skillport doc for ${output_file}..."
         skillport --skills-dir "$tmp_skills_dir" doc --mode mcp --output "$tmp_file" --force || {
@@ -60,6 +75,7 @@ run_skillport_doc() {
     escaped_tmp_skills_dir=$(printf '%s' "${tmp_skills_dir}" | sed 's/[.[\*^$/|&]/\\&/g')
 
     # Replace temporary skills directory paths with real repo-relative paths in the temp file
+    sed -i "s|${escaped_tmp_skills_dir}/local/|.claude/skills/|g" "$tmp_file"
     sed -i "s|${escaped_tmp_skills_dir}/custom/|agent-skills/custom/|g" "$tmp_file"
     sed -i "s|${escaped_tmp_skills_dir}/|.agents/skills/|g" "$tmp_file"
 
