@@ -12,7 +12,6 @@ agent-skills/*
 !agent-skills/AVAILABLE_SKILLS.md
 !agent-skills/.skillport/
 !agent-skills/.gitkeep
-agent-skills/external/
 !agent-skills/external/
 agent-skills/external/*
 !agent-skills/external/.gitkeep
@@ -56,9 +55,13 @@ node_modules/
 ide/cursor/mcp.json
 .vscode/mcp.json
 .opencode/
+.akane/
+.codegraph/
 .cursor/
 .gemini/
-.claude/
+!.claude/
+.claude/*
+!.claude/skills/
 
 # Worktrees
 .worktrees/

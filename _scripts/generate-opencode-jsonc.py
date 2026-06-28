@@ -147,6 +147,16 @@ def _validate_bedrock_models(prov: dict[str, Any]) -> None:
             )
 
 
+def _normalize_env_in_obj(obj: Any) -> Any:
+    if isinstance(obj, dict):
+        return {k: _normalize_env_in_obj(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [_normalize_env_in_obj(x) for x in obj]
+    elif isinstance(obj, str):
+        return _normalize_env_syntax(obj)
+    return obj
+
+
 # ---------------------------------------------------------------------------
 # Build the full opencode config dict from apm.yml
 # ---------------------------------------------------------------------------
@@ -197,13 +207,14 @@ def build_config(apm: dict[str, Any]) -> dict[str, Any]:
     # --- provider (extracted from apm.yml with sakura normalization) ---
     providers: dict[str, Any] = {}
     for name, prov in (apm.get("provider") or {}).items():
+        prov_normalized = _normalize_env_in_obj(prov)
         if name == "sakura":
-            providers[name] = _normalize_sakura(prov)
+            providers[name] = _normalize_sakura(prov_normalized)
         elif name == "amazon-bedrock":
-            _validate_bedrock_models(prov)
-            providers[name] = prov
+            _validate_bedrock_models(prov_normalized)
+            providers[name] = prov_normalized
         else:
-            providers[name] = prov
+            providers[name] = prov_normalized
 
     if providers:
         cfg["provider"] = providers

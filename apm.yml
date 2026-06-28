@@ -175,7 +175,7 @@ snapshot: true
 
 plugin:
   - "@yohi/justice@2.3.0"
-  - "@yohi/akane@1.3.1"
+  - "@yohi/akane@1.4.1"
   - "oh-my-openagent@4.13.0"
   - "@yohi/chronos-gate@1.1.0"
   - "@nick-vi/opencode-type-inject@latest"
@@ -440,16 +440,31 @@ watcher:
 
 enabled_providers:
   - openai
-  - nvidia
-  - cloudflare-workers-ai
+  - cloudflare-ai-gateway-custom
   - opencode
   - opencode-go
   - ollama-cloud
   - amazon-bedrock
-  - openrouter
-  - sakura
 
 provider:
+  cloudflare-ai-gateway-custom:
+    npm: "@ai-sdk/openai-compatible"
+    name: "Cloudflare AI Gateway(Custom)"
+    options:
+      baseURL: "https://gateway.ai.cloudflare.com/v1/${env:CLOUDFLARE_ACCOUNT_ID}/${env:CLOUDFLARE_GATEWAY_ID}/compat"
+      headers:
+        cf-aig-authorization: "Bearer ${env:CLOUDFLARE_API_TOKEN}"
+    models:
+      dynamic/kimi-k2.6:
+        name: Kimi K2.6
+      dynamic/kimi-k2.7-code:
+        name: Kimi K2.7 Code
+      dynamic/glm-5.2:
+        name: GLM 5.2
+      # dynamic/test:
+      #   name: test
+      # custom-nvidia/moonshotai/kimi-k2.6:
+      #   name: Kimi K2.6(Nvidia)
   openai:
     whitelist:
       - chatgpt-image-latest
@@ -491,133 +506,6 @@ provider:
       - o4-mini-deep-research
       - text-embedding-3-large
       - text-embedding-3-small
-  nvidia:
-    whitelist:
-      - abacusai/dracarys-llama-3_1-70b-instruct
-      - baai/bge-m3
-      - black-forest-labs/flux.1-dev
-      - black-forest-labs/flux_1-kontext-dev
-      - black-forest-labs/flux_1-schnell
-      - black-forest-labs/flux_2-klein-4b
-      - bytedance/seed-oss-36b-instruct
-      - deepseek-ai/deepseek-v4-flash
-      - deepseek-ai/deepseek-v4-pro
-      - google/diffusiongemma-26b-a4b-it
-      - google/gemma-2-2b-it
-      - google/gemma-3n-e2b-it
-      - google/gemma-3n-e4b-it
-      - google/gemma-4-31b-it
-      - google/google-paligemma
-      - meta/esm2-650m
-      - meta/esmfold
-      - meta/llama-3.1-70b-instruct
-      - meta/llama-3.1-8b-instruct
-      - meta/llama-3.2-11b-vision-instruct
-      - meta/llama-3.2-1b-instruct
-      - meta/llama-3.2-3b-instruct
-      - meta/llama-3.2-90b-vision-instruct
-      - meta/llama-3.3-70b-instruct
-      - meta/llama-3_1-70b-instruct
-      - meta/llama-3_1-8b-instruct
-      - meta/llama-3_3-70b-instruct
-      - meta/llama-4-maverick-17b-128e-instruct
-      - meta/llama-guard-4-12b
-      - microsoft/phi-4-mini-instruct
-      - microsoft/phi-4-multimodal-instruct
-      - minimaxai/minimax-m2.7
-      - minimaxai/minimax-m3
-      - mistralai/magistral-small-2506
-      - mistralai/ministral-14b-instruct-2512
-      - mistralai/mistral-7b-instruct-v03
-      - mistralai/mistral-large-3-675b-instruct-2512
-      - mistralai/mistral-medium-3-instruct
-      - mistralai/mistral-medium-3.5-128b
-      - mistralai/mistral-nemotron
-      - mistralai/mistral-small-4-119b-2603
-      - mistralai/mixtral-8x22b-instruct
-      - mistralai/mixtral-8x7b-instruct
-      - moonshotai/kimi-k2-instruct-0905
-      - moonshotai/kimi-k2.6
-      - nvidia/active-speaker-detection
-      - nvidia/bevformer
-      - nvidia/bnr
-      - nvidia/cosmos-predict1-5b
-      - nvidia/cosmos-transfer1-7b
-      - nvidia/cosmos-transfer2_5-2b
-      - nvidia/cosmos3-nano
-      - nvidia/cosmos3-nano-reasoner
-      - nvidia/gliner-pii
-      - nvidia/ising-calibration-1-35b-a3b
-      - nvidia/llama-3.1-nemotron-nano-vl-8b-v1
-      - nvidia/llama-3_1-nemotron-nano-8b-v1
-      - nvidia/llama-3_1-nemotron-safety-guard-8b-v3
-      - nvidia/llama-3_2-nemoretriever-300m-embed-v1
-      - nvidia/llama-3_3-nemotron-super-49b-v1
-      - nvidia/llama-3_3-nemotron-super-49b-v1_5
-      - nvidia/llama-nemotron-embed-vl-1b-v2
-      - nvidia/llama-nemotron-rerank-vl-1b-v2
-      - nvidia/magpie-tts-zeroshot
-      - nvidia/nemotron-3-content-safety
-      - nvidia/nemotron-3-nano-30b-a3b
-      - nvidia/nemotron-3-nano-omni-30b-a3b-reasoning
-      - nvidia/nemotron-3-super-120b-a12b
-      - nvidia/nemotron-3-ultra-550b-a55b
-      - nvidia/nemotron-3.5-content-safety
-      - nvidia/nemotron-content-safety-reasoning-4b
-      - nvidia/nemotron-mini-4b-instruct
-      - nvidia/nemotron-nano-12b-v2-vl
-      - nvidia/nemotron-voicechat
-      - nvidia/nv-embed-v1
-      - nvidia/nv-embedcode-7b-v1
-      - nvidia/nvidia-nemotron-nano-9b-v2
-      - nvidia/rerank-qa-mistral-4b
-      - nvidia/riva-translate-4b-instruct-v1_1
-      - nvidia/sparsedrive
-      - nvidia/streampetr
-      - nvidia/studiovoice
-      - nvidia/synthetic-video-detector
-      - nvidia/usdcode
-      - nvidia/usdvalidate
-      - openai/gpt-oss-120b
-      - openai/gpt-oss-20b
-      - openai/whisper-large-v3
-      - qwen/qwen-image
-      - qwen/qwen-image-edit
-      - qwen/qwen2.5-coder-32b-instruct
-      - qwen/qwen3-coder-480b-a35b-instruct
-      - qwen/qwen3-next-80b-a3b-instruct
-      - qwen/qwen3.5-122b-a10b
-      - qwen/qwen3.5-397b-a17b
-      - sarvamai/sarvam-m
-      - stepfun-ai/step-3.5-flash
-      - stepfun-ai/step-3.7-flash
-      - stockmark/stockmark-2-100b-instruct
-      - upstage/solar-10_7b-instruct
-      - z-ai/glm-5.1
-  cloudflare-workers-ai:
-    whitelist:
-      - '@cf/aisingapore/gemma-sea-lion-v4-27b-it'
-      - '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b'
-      - '@cf/google/gemma-4-26b-a4b-it'
-      - '@cf/ibm-granite/granite-4.0-h-micro'
-      - '@cf/meta/llama-3.1-8b-instruct-fp8'
-      - '@cf/meta/llama-3.2-11b-vision-instruct'
-      - '@cf/meta/llama-3.2-1b-instruct'
-      - '@cf/meta/llama-3.2-3b-instruct'
-      - '@cf/meta/llama-3.3-70b-instruct-fp8-fast'
-      - '@cf/meta/llama-4-scout-17b-16e-instruct'
-      - '@cf/meta/llama-guard-3-8b'
-      - '@cf/mistralai/mistral-small-3.1-24b-instruct'
-      - '@cf/moonshotai/kimi-k2.6'
-      - '@cf/moonshotai/kimi-k2.7-code'
-      - '@cf/nvidia/nemotron-3-120b-a12b'
-      - '@cf/openai/gpt-oss-120b'
-      - '@cf/openai/gpt-oss-20b'
-      - '@cf/qwen/qwen2.5-coder-32b-instruct'
-      - '@cf/qwen/qwen3-30b-a3b-fp8'
-      - '@cf/qwen/qwq-32b'
-      - '@cf/zai-org/glm-4.7-flash'
-      - '@cf/zai-org/glm-5.2'
   opencode:
     whitelist:
       - deepseek-v4-flash-free
@@ -643,15 +531,6 @@ provider:
       - openai.gpt-oss-20b-1:0
       - openai.gpt-oss-safeguard-120b
       - openai.gpt-oss-safeguard-20b
-  openrouter:
-    npm: "@ai-sdk/openai-compatible"
-    options:
-      baseURL: "https://openrouter.ai/api/v1"
-    models:
-      "qwen/qwen3.6-plus-preview:free":
-        name: "Qwen 3.6 Free"
-      "google/gemini-3.1-pro-preview":
-        name: "Gemini 3.1 Pro"
   ollama-cloud:
     whitelist:
       - cogito-2.1:671b
@@ -697,20 +576,6 @@ provider:
       - "qwen3-vl:235b-instruct"
       - "qwen3.5:397b"
       - "rnj-1:8b"
-  sakura:
-    npm: "@ai-sdk/openai-compatible"
-    name: "sakura aipf"
-    options:
-      baseURL: "https://api.ai.sakura.ad.jp/v1"
-    models:
-      "Qwen3-Coder-30B-A3B-Instruct":
-        name: "Qwen3-Coder-30B-A3B-Instruct"
-      "Qwen3-Coder-480B-A35B-Instruct-FP8":
-        name: "Qwen3-Coder-480B-A35B-Instruct-FP8"
-      "gpt-oss-120b":
-        name: "gpt-oss-120b"
-      "preview/Kimi-K2.6":
-        name: "Kimi-K2.6"
   opencode-go:
     whitelist:
       - deepseek-v4-flash
