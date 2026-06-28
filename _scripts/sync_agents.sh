@@ -42,7 +42,7 @@ run_skillport_doc() {
         tracked_local_skills=$(git ls-files .claude/skills/ 2>/dev/null | awk -F'/' '{print $3}' | sort -u)
         if [ -n "$tracked_local_skills" ]; then
             mkdir -p "$tmp_skills_dir/local"
-            for skill_dir in $tracked_local_skills; do
+            echo "$tracked_local_skills" | while IFS= read -r skill_dir; do
                 if [ -d ".claude/skills/$skill_dir" ]; then
                     cp -a ".claude/skills/$skill_dir" "$tmp_skills_dir/local/"
                 fi
