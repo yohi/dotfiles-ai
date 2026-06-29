@@ -147,3 +147,36 @@ uninstall-mcp:
 	echo "Removing configuration directory: $$MCP_CONFIG_DIR"; \
 	rm -rf "$$MCP_CONFIG_DIR"; \
 	echo "✅ Docker MCPの設定が削除されました。"
+
+.PHONY: install-codegraph setup-codegraph uninstall-codegraph
+
+install-codegraph: ## Install codegraph CLI
+	$(Q_ECHO) "📦 codegraph CLI をインストール中..."
+	@if ! command -v codegraph &> /dev/null && [ ! -f "$(HOME_DIR)/.local/bin/codegraph" ]; then \
+		curl -fsSL https://raw.githubusercontent.com/colbymchenry/codegraph/main/install.sh | sh; \
+	else \
+		echo "  [SKIP] codegraph CLI は既にインストールされています。"; \
+	fi
+
+setup-codegraph: install-codegraph ## Wire up codegraph to agents
+	$(Q_ECHO) "🚀 codegraph を各エージェントに紐付け中..."
+	@export PATH="$(HOME_DIR)/.local/bin:$$PATH"; \
+	if command -v codegraph &> /dev/null; then \
+		codegraph install --yes || codegraph install || yes | codegraph install; \
+	else \
+		echo "❌ codegraph が見つかりません。パスを確認してください。"; \
+		exit 1; \
+	fi
+	$(Q_ECHO) "✅ codegraph の紐付けが完了しました。"
+
+uninstall-codegraph: ## Uninstall codegraph from agents and system
+	$(Q_ECHO) "🗑️ codegraph をアンインストール中..."
+	@export PATH="$(HOME_DIR)/.local/bin:$$PATH"; \
+	if command -v codegraph &> /dev/null; then \
+		codegraph uninstall --yes || true; \
+	fi
+	@if [ -f "$(HOME_DIR)/.local/bin/codegraph" ] || [ -d "$(HOME_DIR)/.codegraph" ]; then \
+		curl -fsSL https://raw.githubusercontent.com/colbymchenry/codegraph/main/install.sh | sh -s -- --uninstall || true; \
+	fi
+	$(Q_ECHO) "✅ codegraph のアンインストールが完了しました。"
+

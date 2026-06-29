@@ -43,6 +43,7 @@ install-agents:
 	$(MAKE) install-packages-codex
 	$(MAKE) install-packages-opencode
 	$(MAKE) install-packages-opcode
+	$(MAKE) install-codegraph
 
 install-ides:
 	$(Q_ECHO) "📦 dotfiles-ai IDE ツールをインストール中..."
@@ -62,6 +63,7 @@ setup-agents:
 	$(MAKE) setup-codex
 	$(MAKE) setup-opencode
 	$(MAKE) setup-antigravity
+	$(MAKE) setup-codegraph
 
 setup-ides:
 	$(Q_ECHO) "🚀 dotfiles-ai IDE 設定をセットアップ中..."
@@ -83,6 +85,7 @@ clean-internal:
 	-$(MAKE) uninstall-antigravity
 	-$(MAKE) uninstall-skillport
 	-$(MAKE) uninstall-mcp
+	-$(MAKE) uninstall-codegraph
 	-$(MAKE) uninstall-cursor FORCE=true
 	-$(MAKE) uninstall-vscode FORCE=true
 
