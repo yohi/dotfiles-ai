@@ -614,7 +614,6 @@ experimental:
 targets:
   - opencode
   - cursor
-  - antigravity
 
 # Exported Artifacts
 exports:
