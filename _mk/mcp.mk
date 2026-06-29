@@ -148,12 +148,25 @@ uninstall-mcp:
 	rm -rf "$$MCP_CONFIG_DIR"; \
 	echo "✅ Docker MCPの設定が削除されました。"
 
+CODEGRAPH_VERSION ?= v1.1.3
+CODEGRAPH_HASH ?= 6dc5a5b932eab90aafbabb7744d44d6df6fff7061df981c82d11497497f4ff7a
+
 .PHONY: install-codegraph setup-codegraph uninstall-codegraph
 
 install-codegraph: ## Install codegraph CLI
 	$(Q_ECHO) "📦 codegraph CLI をインストール中..."
 	@if ! command -v codegraph &> /dev/null && [ ! -f "$(HOME_DIR)/.local/bin/codegraph" ]; then \
-		curl -fsSL https://raw.githubusercontent.com/colbymchenry/codegraph/main/install.sh | sh; \
+		installer=$$(mktemp /tmp/codegraph-installer.XXXXXX.sh); \
+		if curl -fsSL --retry 3 --retry-delay 2 --max-time 60 "https://raw.githubusercontent.com/colbymchenry/codegraph/$(CODEGRAPH_VERSION)/install.sh" -o "$$installer" && \
+			actual=$$( (command -v sha256sum >/dev/null 2>&1 && sha256sum "$$installer" | cut -d" " -f1) || shasum -a 256 "$$installer" | cut -d" " -f1 ) && \
+			[ "$$actual" = "$(CODEGRAPH_HASH)" ]; then \
+			sh "$$installer"; \
+			rm -f "$$installer"; \
+		else \
+			rm -f "$$installer"; \
+			echo "❌ codegraph installer のチェックサム検証に失敗しました。"; \
+			exit 1; \
+		fi; \
 	else \
 		echo "  [SKIP] codegraph CLI は既にインストールされています。"; \
 	fi
@@ -162,7 +175,7 @@ setup-codegraph: install-codegraph ## Wire up codegraph to agents
 	$(Q_ECHO) "🚀 codegraph を各エージェントに紐付け中..."
 	@export PATH="$(HOME_DIR)/.local/bin:$$PATH"; \
 	if command -v codegraph &> /dev/null; then \
-		codegraph install --yes || codegraph install || yes | codegraph install; \
+		codegraph install --yes; \
 	else \
 		echo "❌ codegraph が見つかりません。パスを確認してください。"; \
 		exit 1; \
@@ -175,8 +188,8 @@ uninstall-codegraph: ## Uninstall codegraph from agents and system
 	if command -v codegraph &> /dev/null; then \
 		codegraph uninstall --yes || true; \
 	fi
-	@if [ -f "$(HOME_DIR)/.local/bin/codegraph" ] || [ -d "$(HOME_DIR)/.codegraph" ]; then \
-		curl -fsSL https://raw.githubusercontent.com/colbymchenry/codegraph/main/install.sh | sh -s -- --uninstall || true; \
-	fi
+	@rm -f "$(HOME_DIR)/.local/bin/codegraph"
+	@rm -rf "$(HOME_DIR)/.codegraph"
 	$(Q_ECHO) "✅ codegraph のアンインストールが完了しました。"
+
 
