@@ -13,9 +13,10 @@ if [ -e "$REPO_ROOT/_scripts/render-antigravity-config.py" ]; then
     fail "legacy generator still present: _scripts/render-antigravity-config.py"
 fi
 
-# 2. sync-antigravity must invoke the canonical lockfile-based generator.
-if ! grep -q "sync_antigravity.py" "$REPO_ROOT/_mk/antigravity.mk"; then
-    fail "_mk/antigravity.mk does not invoke sync_antigravity.py"
+# 2. sync-antigravity must not invoke the legacy generator.
+# (sync_antigravity.py has been consolidated/removed as APM official handles it now).
+if grep -q "sync_antigravity.py" "$REPO_ROOT/_mk/antigravity.mk" "$REPO_ROOT/Makefile"; then
+    fail "_mk/antigravity.mk or Makefile still references sync_antigravity.py"
 fi
 
 # 3. No reference to the legacy generator may remain in the Make wiring.

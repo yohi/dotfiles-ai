@@ -613,7 +613,6 @@ experimental:
 # APM Standard Targets
 targets:
   - opencode
-  - gemini
   - cursor
 
 # Exported Artifacts

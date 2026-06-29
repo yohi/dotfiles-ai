@@ -32,10 +32,14 @@ test-all: test-integrity check-skill-adapters ## Run all tests in the project
 			bash "$$f" || exit 1; \
 		done'
 	@echo "Running pytest suite..."
-	@if command -v uv > /dev/null 2>&1; then \
-		PYTHONPATH=. uv run pytest tests/ || exit 1; \
+	@if [ "$$(find tests -name 'test_*.py' 2>/dev/null | wc -l)" -gt 0 ]; then \
+		if command -v uv > /dev/null 2>&1; then \
+			PYTHONPATH=. uv run pytest tests/ || exit 1; \
+		else \
+			PYTHONPATH=. pytest tests/ || exit 1; \
+		fi \
 	else \
-		PYTHONPATH=. pytest tests/ || exit 1; \
+		echo "No pytest files found in tests/. Skipping pytest suite."; \
 	fi
 	@echo "✅ All tests passed!"
 

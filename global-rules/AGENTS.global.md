@@ -253,6 +253,12 @@ The following rules apply to **ALL** projects unless overridden by a local proje
 
 
 
+
+
+
+
+
+
 <!-- SKILLPORT_START -->
 ## SkillPort Skills
 
@@ -608,6 +614,9 @@ Each skill contains step-by-step instructions, templates, and scripts.
 
 
 
+
+
+
 ## 6. Agent-Specific Contexts (Unified)
 
 - **Git Restrictions (CRITICAL)**:
@@ -657,8 +666,8 @@ This project employs the [obra/superpowers](https://github.com/obra/superpowers)
 - **Requirement:** Formal skills may be skipped for speed, but the final state MUST be verified and reported.
 
 ## Skill Integration (SkillPort)
-- **Mandatory MCP Priority:** Agents MUST always use the `load_skill` tool whenever a SkillPort MCP connection is available and MUST immediately terminate the task and report an error without any automatic fallback if `load_skill` fails or the SkillPort MCP server is unavailable; the use of `skillport show` via CLI is permitted only for manual operations by human operators in explicitly identified non-MCP environments. **EXCEPTION**: This requirement does NOT apply to Level 0 (Zero Intensity) tasks, which must skip formal skills and proceed directly to response.
-- **Prohibited Access:** Direct file path reads or direct access to skill files are strictly forbidden during runtime and for Pull Requests, **except** for template/asset files (e.g., `{path}/template.md`) that have been explicitly resolved and returned via the `load_skill` call from the SkillPort MCP, which may be read with the native Read tool. All other skill files or runtime skill artifacts (any files produced by or belonging to skills, skill definitions, or SkillPort MCP endpoints) remain strictly prohibited. Reference `load_skill`, `SkillPort MCP`, `{path}/template.md`, and `Read tool` to ensure consistency with Section 5.
+- **Mandatory MCP Priority:** Agents MUST always use the `load_skill` tool whenever a SkillPort MCP connection is available. If `load_skill` fails or the SkillPort MCP server is unavailable, agents may fall back to loading the skill from its designated local configuration path (e.g., within `.agents/skills/` or `.claude/skills/`); however, if this fallback attempt also fails, the agent MUST immediately terminate the task and report an error. The use of `skillport show` via CLI is permitted only for manual operations by human operators in explicitly identified non-MCP environments. **EXCEPTION**: This requirement does NOT apply to Level 0 (Zero Intensity) tasks, which must skip formal skills and proceed directly to response.
+- **Prohibited Access:** Direct file path reads or direct access to skill files are strictly forbidden during runtime and for Pull Requests, **except** in the following cases: (1) template/asset files (e.g., `{path}/template.md`) that have been explicitly resolved and returned via the `load_skill` call from the SkillPort MCP, which may be read with the native Read tool; and (2) the fallback path permitted by the Mandatory MCP Priority rule above — when `load_skill` fails or the SkillPort MCP server is unavailable, the agent may read the skill's `SKILL.md` directly from its designated local configuration path (e.g., within `.agents/skills/` or `.claude/skills/`). All other skill files or runtime skill artifacts (any files produced by or belonging to skills, skill definitions, or SkillPort MCP endpoints) remain strictly prohibited. Reference `load_skill`, `SkillPort MCP`, `{path}/template.md`, and `Read tool` to ensure consistency with Section 5.
 ## END Superpowers Workflow
 
 ## 7. ChronosGraph Memory System (Autonomous)

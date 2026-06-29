@@ -34,9 +34,10 @@ jobs:
 
     - name: Install APM and Synchronize Configs
       run: |
-        make install-apm
+        uv tool install "apm-cli==0.22.0" --force
         apm install --force
         apm compile
+        apm compile --target antigravity
         make sync-mcp-gateway
 
     - name: Run Integrity Tests

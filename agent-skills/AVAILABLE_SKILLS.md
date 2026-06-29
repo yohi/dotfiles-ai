@@ -158,6 +158,12 @@ This document provides a comprehensive list of skills available through SkillPor
 
 
 
+
+
+
+
+
+
 <!-- SKILLPORT_START -->
 ## SkillPort Skills
 
@@ -409,6 +415,9 @@ Each skill contains step-by-step instructions, templates, and scripts.
 </skill>
 </available_skills>
 <!-- SKILLPORT_END -->
+
+
+
 
 
 
