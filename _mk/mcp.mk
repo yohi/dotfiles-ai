@@ -160,8 +160,7 @@ install-codegraph: ## Install codegraph CLI
 		if curl -fsSL --retry 3 --retry-delay 2 --max-time 60 "https://raw.githubusercontent.com/colbymchenry/codegraph/$(CODEGRAPH_VERSION)/install.sh" -o "$$installer" && \
 			actual=$$( (command -v sha256sum >/dev/null 2>&1 && sha256sum "$$installer" | cut -d" " -f1) || shasum -a 256 "$$installer" | cut -d" " -f1 ) && \
 			[ "$$actual" = "$(CODEGRAPH_HASH)" ]; then \
-			sh "$$installer"; \
-			rm -f "$$installer"; \
+			sh "$$installer" && rm -f "$$installer" || { rc=$$?; rm -f "$$installer"; exit $$rc; }; \
 		else \
 			rm -f "$$installer"; \
 			echo "❌ codegraph installer のチェックサム検証に失敗しました。"; \
