@@ -51,6 +51,7 @@ install-antigravity-cli: ## Antigravity CLI をインストール
 sync-antigravity: ## APMを使用してAntigravity用の設定を生成して同期
 	@echo "🔄 Generating Antigravity MCP config using APM..."
 	@uv run apm install
+	@$(MAKE) setup-skill-adapters
 	@uv run apm compile
 	@$(MAKE) setup-antigravity
 

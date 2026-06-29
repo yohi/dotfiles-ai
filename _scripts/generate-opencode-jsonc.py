@@ -17,6 +17,7 @@ Side effects (normal mode only):
 
 from __future__ import annotations
 
+import copy
 import json
 import re
 import sys
@@ -80,6 +81,19 @@ def _normalize_env_syntax(value: str) -> str:
     if re.match(r"^{env:[^}]+}$", value):
         return value
     return re.sub(r"\$\{(env:[^}]+)\}", r"{\1}", value)
+
+
+def _normalize_opencode_json_data(data: dict[str, Any]) -> dict[str, Any]:
+    """Return a deep-copied normalised dict of opencode.json data."""
+    normalized = copy.deepcopy(data)
+    if "mcp" in normalized:
+        for entry in normalized["mcp"].values():
+            if entry.get("type") == "local" and "command" in entry:
+                entry["command"] = [
+                    _normalize_env_syntax(str(arg))
+                    for arg in entry["command"]
+                ]
+    return normalized
 
 
 def _build_mcp_section(mcp_entries: list[dict[str, Any]]) -> dict[str, Any]:
@@ -324,14 +338,7 @@ def main() -> None:
         if opencode_json.exists():
             try:
                 data = json.loads(opencode_json.read_text(encoding="utf-8"))
-                normalised = json.loads(opencode_json.read_text(encoding="utf-8"))
-                if "mcp" in normalised:
-                    for entry in normalised["mcp"].values():
-                        if entry.get("type") == "local" and "command" in entry:
-                            entry["command"] = [
-                                _normalize_env_syntax(str(arg))
-                                for arg in entry["command"]
-                            ]
+                normalised = _normalize_opencode_json_data(data)
                 expected = json.dumps(normalised, indent=2, ensure_ascii=False) + "\n"
                 actual = json.dumps(data, indent=2, ensure_ascii=False) + "\n"
                 if actual != expected:
@@ -340,7 +347,7 @@ def main() -> None:
                     )
                     sys.exit(1)
                 print("[check] OK: opencode.json is normalised.")
-            except Exception as e:
+            except (json.JSONDecodeError, OSError) as e:
                 print(f"[check] WARN: could not verify opencode.json: {e}")
         return
 
@@ -351,17 +358,12 @@ def main() -> None:
     if opencode_json.exists():
         try:
             data = json.loads(opencode_json.read_text(encoding="utf-8"))
-            if "mcp" in data:
-                for entry in data["mcp"].values():
-                    if entry.get("type") == "local" and "command" in entry:
-                        entry["command"] = [
-                            _normalize_env_syntax(str(arg)) for arg in entry["command"]
-                        ]
+            normalized = _normalize_opencode_json_data(data)
             opencode_json.write_text(
-                json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+                json.dumps(normalized, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
             )
             print(f"[ok] Normalized: {opencode_json}")
-        except Exception as e:
+        except (json.JSONDecodeError, OSError) as e:
             print(f"[warning] Failed to normalize opencode.json: {e}")
 
 

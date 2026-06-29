@@ -15,8 +15,8 @@ fi
 
 # 2. sync-antigravity must not invoke the legacy generator.
 # (sync_antigravity.py has been consolidated/removed as APM official handles it now).
-if grep -q "sync_antigravity.py" "$REPO_ROOT/_mk/antigravity.mk"; then
-    fail "_mk/antigravity.mk still references sync_antigravity.py"
+if grep -q "sync_antigravity.py" "$REPO_ROOT/_mk/antigravity.mk" "$REPO_ROOT/Makefile"; then
+    fail "_mk/antigravity.mk or Makefile still references sync_antigravity.py"
 fi
 
 # 3. No reference to the legacy generator may remain in the Make wiring.
