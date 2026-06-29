@@ -34,7 +34,7 @@ jobs:
 
     - name: Install APM and Synchronize Configs
       run: |
-        uv tool install ./oss/apm --force
+        uv tool install "apm-cli==0.22.0" --force
         apm install --force
         apm compile
         make sync-mcp-gateway
