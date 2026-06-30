@@ -24,7 +24,7 @@ install-packages-cursor: ## Cursor IDE のインストール / アップデー�
 	LATEST_VERSION=$$(echo "$$LATEST_URL" | sed -n 's/.*cursor_\([0-9.]*\)_amd64.deb.*/\1/p'); \
 	if [ -z "$$LATEST_VERSION" ]; then LATEST_VERSION="error"; fi; \
 	CURRENT_VERSION=$$( (dpkg-query -W -f='$${Version}' cursor 2>/dev/null || echo "none") | cut -d'-' -f1 ); \
-	if [ "$$LATEST_VERSION" = "error" ] || [ -z "$$LATEST_VERSION" ] || [ "$$LATEST_VERSION" = "null" ]; then \
+	if [ "$$LATEST_VERSION" = "error" ]; then \
 		echo "⚠️  最新バージョンの取得に失敗しました。"; \
 		$(MAKE) _cursor_download; \
 	elif [ "$$CURRENT_VERSION" = "$$LATEST_VERSION" ]; then \
@@ -159,24 +159,12 @@ check-cursor-version:
 		echo "❌ Cursor IDE (.deb) がインストールされていません"; \
 	fi
 	@echo "🌐 最新バージョンを確認中..."
-	@if command -v jq >/dev/null 2>&1; then \
-		API_RESPONSE=$$(curl -sLf -A "$(CURSOR_USER_AGENT)" --connect-timeout 10 --max-time 30 "$(CURSOR_API_URL)" 2>/dev/null); \
-		if [ $$? -ne 0 ]; then \
-			echo "⚠️ 警告: Cursor API に接続できません"; \
-		elif [ -z "$$API_RESPONSE" ]; then \
-			echo "⚠️ 警告: Cursor バージョン情報が取得できません: 応答が空です"; \
-		elif ! echo "$$API_RESPONSE" | jq . >/dev/null 2>&1; then \
-			echo "⚠️ 警告: Cursor バージョン情報が取得できません: 不正なJSONです"; \
-		else \
-			LATEST_VERSION=$$(echo "$$API_RESPONSE" | jq -r '.version' 2>/dev/null); \
-			if [ -z "$$LATEST_VERSION" ] || [ "$$LATEST_VERSION" = "null" ]; then \
-				echo "⚠️ 警告: Cursor バージョン情報が取得できません: .versionがnullです"; \
-			else \
-				echo "🆕 最新バージョン: $$LATEST_VERSION"; \
-			fi; \
-		fi; \
+	@LATEST_URL=$$(curl -sI -A "$(CURSOR_USER_AGENT)" --connect-timeout 10 --max-time 30 "$(CURSOR_API_URL)" | grep -i "location:" | awk '{print $$2}' | tr -d '\r'); \
+	LATEST_VERSION=$$(echo "$$LATEST_URL" | sed -n 's/.*cursor_\([0-9.]*\)_amd64.deb.*/\1/p'); \
+	if [ -z "$$LATEST_VERSION" ]; then \
+		echo "⚠️ 警告: Cursor の最新バージョン情報を取得できませんでした。"; \
 	else \
-		echo "⚠️ 警告: jqコマンドがないため確認をスキップします"; \
+		echo "🆕 最新バージョン: $$LATEST_VERSION"; \
 	fi
 
 # Cursor の起動
