@@ -48,7 +48,8 @@ fail() {
     exit 1
 }
 
-mkdir -p "$WORKDIR/bin" "$WORKDIR/project"
+mkdir -p "$WORKDIR/bin" "$WORKDIR/project/_scripts"
+ln -sf "$REPO_ROOT/_scripts/codegraph-bootstrap.sh" "$WORKDIR/project/_scripts/codegraph-bootstrap.sh"
 
 # Realistic codegraph stub that logs all invocations
 cat >"$WORKDIR/bin/codegraph" <<'EOF'
@@ -80,7 +81,7 @@ cd "$WORKDIR/project"
 export PATH="$WORKDIR/bin:$PATH"
 export CODEGRAPH_LOG_FILE="$WORKDIR/codegraph.log"
 
-bash "$REPO_ROOT/_scripts/codegraph-bootstrap.sh" serve --mcp \
+bash "$WORKDIR/project/_scripts/codegraph-bootstrap.sh" serve --mcp \
     >"$WORKDIR/stdout" 2>"$WORKDIR/stderr"
 
 [ -d "$WORKDIR/project/.codegraph" ] || fail ".codegraph was not created"
@@ -91,7 +92,7 @@ grep -q '^codegraph serve --mcp$' "$WORKDIR/codegraph.log" || fail "serve was no
 
 # ---- Second run: idempotency check ----
 rm -f "$WORKDIR/codegraph.log" "$WORKDIR/stderr"
-bash "$REPO_ROOT/_scripts/codegraph-bootstrap.sh" serve --mcp \
+bash "$WORKDIR/project/_scripts/codegraph-bootstrap.sh" serve --mcp \
     >/dev/null 2>"$WORKDIR/stderr"
 
 # init must NOT be called when .codegraph/ already exists
