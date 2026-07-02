@@ -1,10 +1,12 @@
 lockfile_version: '1'
-generated_at: '2026-06-30T05:46:35.255856+00:00'
-apm_version: 0.20.0
+generated_at: '2026-06-29T21:00:33.878847+00:00'
+apm_version: 0.22.0
 dependencies:
 - repo_url: anthropics/claude-code
+  name: code-review
   host: github.com
   resolved_commit: 01f1617f14452ac78bf319cef2236d87c0fe05cb
+  version: 1.0.0
   virtual_path: plugins/code-review
   is_virtual: true
   package_type: marketplace_plugin
@@ -18,8 +20,10 @@ dependencies:
     .opencode/commands/code-review.md: sha256:ecab79f22b6e2bef07a524d2015aaa9e0b7abce82445f38b31a231b19c7bd43a
   content_hash: sha256:d25f797947bbd724551746c24ed4ac40788aaf370a7857eb120180fbb00ac2be
 - repo_url: anthropics/skills
+  name: skills
   host: github.com
   resolved_commit: 35414756ca55738e050562e272a6bbc6273aa926
+  version: '3541475'
   package_type: marketplace_plugin
   deployed_files:
   - .agents/skills/algorithmic-art
@@ -860,8 +864,10 @@ dependencies:
     .agents/skills/xlsx/scripts/recalc.py: sha256:cf419d15e02965aeaec17773c05b61303f7f520f67fa2696547e7da07502eac7
   content_hash: sha256:0cd4c5aa5731b0e49ba55f14f9e2878c41438353e8b5d0d8c716da62f71b72cf
 - repo_url: coderabbitai/skills
+  name: coderabbit
   host: github.com
   resolved_commit: 2fd091d9582deccf19929e21f934921d0e8f686e
+  version: 1.1.1
   package_type: marketplace_plugin
   deployed_files:
   - .agents/skills/autofix
@@ -884,9 +890,12 @@ dependencies:
     .opencode/agents/code-reviewer.md: sha256:5677b371344cdc444390fbb366041eee7ad204fdbc85b6a37f92671afa8bce7f
     .opencode/commands/coderabbit-review.md: sha256:cba1e6915ee98d24f288e3fb2dfb4b9b5bdc9e3164abf66b885aa9b66d8ce17d
   content_hash: sha256:6c4d9f9fa574b8546857ce3ce5f08d02c0c236dc3071023d6d0b45d62127bdbd
+  declared_license: MIT
 - repo_url: greptileai/skills
+  name: skills
   host: github.com
   resolved_commit: 7a34572951f296d7f2a05e69e8494136cb00c85e
+  version: unknown
   virtual_path: check-pr
   is_virtual: true
   package_type: claude_skill
@@ -901,8 +910,10 @@ dependencies:
     .agents/skills/check-pr/references/graphql-queries.md: sha256:f850841783ef3df4f28f4f45731f08591c8994fbe3e742eef5a370454d575d02
   content_hash: sha256:54dc158641c3857ad6cd147860017c1494d3dbfdfae16a16c30819e7b36900a5
 - repo_url: greptileai/skills
+  name: skills
   host: github.com
   resolved_commit: 7a34572951f296d7f2a05e69e8494136cb00c85e
+  version: unknown
   virtual_path: greploop
   is_virtual: true
   package_type: claude_skill
@@ -917,9 +928,11 @@ dependencies:
     .agents/skills/greploop/references/graphql-queries.md: sha256:99a689cf5318332316353a3fe2e68d5f6096f9c48b6428ca5ddf434ee5c75a42
   content_hash: sha256:abbe92d33f94ec5cd027bf1c3073592ceb74aae7bc3c36a8a2b908df0b6e2a49
 - repo_url: obra/superpowers
+  name: superpowers
   host: github.com
   resolved_commit: b62616fc12f6a007c6fd5118146821d748da0d33
   resolved_ref: v6.0.2
+  version: 6.0.2
   package_type: marketplace_plugin
   deployed_files:
   - .agents/skills/brainstorming
@@ -1042,9 +1055,12 @@ dependencies:
     .cursor/hooks/superpowers/hooks/run-hook.cmd: sha256:d3d9c6199678dab2858e60509dde5e7414f13c2a2b5e48a38b1d368b6e1d6abb
     .gemini/hooks/superpowers/hooks/run-hook.cmd: sha256:d3d9c6199678dab2858e60509dde5e7414f13c2a2b5e48a38b1d368b6e1d6abb
   content_hash: sha256:8206d720fc4f340c4bc83dec27a1632debb5065a3ceeca53a7cd96a90425038f
+  declared_license: MIT
 - repo_url: yohi/agent-skills
+  name: doc-sync-verifier
   host: github.com
   resolved_commit: 6dd072e0e6298286d5e9486b4e4df66b514b5a06
+  version: 1.0.0
   virtual_path: skills/doc-sync-verifier
   is_virtual: true
   package_type: claude_skill
@@ -1055,8 +1071,10 @@ dependencies:
     .agents/skills/doc-sync-verifier/SKILL.md: sha256:7c7c67e3bf0eaea5202306e973c8a935825f435c8fb360602079ec644c55d85d
   content_hash: sha256:2ee5eda43c238df72aad09175999454d14a094b4bb164384301704ace9488651
 - repo_url: yohi/agent-skills
+  name: git-master
   host: github.com
   resolved_commit: 6dd072e0e6298286d5e9486b4e4df66b514b5a06
+  version: 1.0.0
   virtual_path: skills/git-master
   is_virtual: true
   package_type: claude_skill
@@ -1067,8 +1085,10 @@ dependencies:
     .agents/skills/git-master/SKILL.md: sha256:9ff44ee28ce077e90c80f791af06c53f67b1b8028cb60819430be02b1510a485
   content_hash: sha256:2168dbeeaedea51ef70208201c9cddbe93e8e1e3f2916c953d2e36b13a55fb08
 - repo_url: yohi/agent-skills
+  name: github-quality-setup
   host: github.com
   resolved_commit: 6dd072e0e6298286d5e9486b4e4df66b514b5a06
+  version: 1.0.0
   virtual_path: skills/github-quality-setup
   is_virtual: true
   package_type: claude_skill
@@ -1083,8 +1103,10 @@ dependencies:
     .agents/skills/github-quality-setup/references/tool-configs.md: sha256:2cd02c5aaea923fd7a5aed449d04596d3b8f8cfcaec8c8de5374e5cbd5c9a02a
   content_hash: sha256:fa03d324626cabd515f07f265c8416e3a419d18c31542d4305c59e2035a1d88a
 - repo_url: yohi/agent-skills
+  name: github-release-packages
   host: github.com
   resolved_commit: 6dd072e0e6298286d5e9486b4e4df66b514b5a06
+  version: 1.0.0
   virtual_path: skills/github-release-packages
   is_virtual: true
   package_type: claude_skill
@@ -1113,8 +1135,10 @@ dependencies:
     .agents/skills/github-release-packages/scripts/grade.sh: sha256:621def19270a49b5ea0e51df007f0ab6973af33660e57cc10cdec7bf9e849250
   content_hash: sha256:2cd3a8e07844ce20d789c92dfa4d069cb5a4faabad8da57dcedf8f52d63e5b23
 - repo_url: yohi/agent-skills
+  name: makefile-organization
   host: github.com
   resolved_commit: 6dd072e0e6298286d5e9486b4e4df66b514b5a06
+  version: 1.0.0
   virtual_path: skills/makefile-organization
   is_virtual: true
   package_type: claude_skill
@@ -1172,6 +1196,9 @@ mcp_configs:
     - context-store
     registry: false
     command: uvx
+    title: Chronos Graph
+    standalone: true
+    enabled: true
   codegraph:
     name: codegraph
     transport: stdio
@@ -1180,6 +1207,8 @@ mcp_configs:
     - --mcp
     registry: false
     command: codegraph
+    title: CodeGraph MCP
+    enabled: true
   coderabbit:
     name: coderabbit
     transport: stdio
@@ -1190,6 +1219,8 @@ mcp_configs:
     - coderabbitai-mcp
     registry: false
     command: npx
+    title: CodeRabbit MCP
+    enabled: true
   docker-mcp:
     name: docker-mcp
     transport: sse
@@ -1197,6 +1228,8 @@ mcp_configs:
     headers:
       Authorization: Bearer ${env:MCP_GATEWAY_TOKEN}
     url: http://127.0.0.1:10888/sse
+    title: Docker MCP Gateway
+    enabled: true
   greptile:
     name: greptile
     transport: sse
@@ -1205,6 +1238,8 @@ mcp_configs:
       Authorization: Bearer ${env:GREPTILE_API_KEY}
       X-GitHub-Token: ${env:GITHUB_TOKEN}
     url: https://api.greptile.com/mcp
+    title: Greptile MCP
+    enabled: true
   nexus:
     name: nexus
     transport: stdio
@@ -1219,6 +1254,10 @@ mcp_configs:
     - '@yohi/nexus@1.22.0'
     registry: false
     command: npx
+    title: Nexus
+    timeout: 30000
+    standalone: true
+    enabled: true
   semgrep:
     name: semgrep
     transport: stdio
@@ -1232,6 +1271,8 @@ mcp_configs:
     - ${env:HOME}/.local/bin/semgrep
     registry: false
     command: uvx
+    title: Semgrep MCP
+    enabled: true
   skillport:
     name: skillport
     transport: stdio
@@ -1241,6 +1282,9 @@ mcp_configs:
     - skillport-mcp
     registry: false
     command: uvx
+    title: Skillport
+    standalone: true
+    enabled: true
   sonarqube:
     name: sonarqube
     transport: stdio
@@ -1253,6 +1297,8 @@ mcp_configs:
     - sonarqube-mcp-server
     registry: false
     command: npx
+    title: SonarQube MCP
+    enabled: true
 local_deployed_files:
 - .cursor/rules/agent-commands.mdc
 - .cursor/rules/architecture.mdc
