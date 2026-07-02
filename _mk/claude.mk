@@ -184,13 +184,22 @@ run-claude: ## Claude Code を起動
 # エイリアス
 # ========================================
 
-.PHONY: install-claude-code install-opcode setup-claude uninstall-claude
+.PHONY: install-claude-code install-opcode setup-claude uninstall-claude sync-claude
 
 install-claude-code: install-packages-claude-code  ## Claude Codeをインストール(エイリアス)
 
 install-opcode: install-packages-opcode  ## Opcodeをインストール(エイリアス)
 
-setup-claude: ## Claude Codeの設定を適用
+sync-claude: ## apm.yml (SSOT) から Claude 用設定ファイルを生成する
+	$(Q_ECHO) "🔄 Claude 設定ファイルを apm.yml から生成中..."
+	@if command -v uv >/dev/null 2>&1; then \
+		uv run python "$(REPO_ROOT)/_scripts/generate-claude-settings.py"; \
+	else \
+		python3 "$(REPO_ROOT)/_scripts/generate-claude-settings.py"; \
+	fi
+	$(Q_ECHO) "✅ Claude 設定ファイルの生成が完了しました"
+
+setup-claude: sync-claude ## Claude Codeの設定を適用
 	@echo "📝 Claude Codeの設定を適用中..."
 	@# グローバル設定ディレクトリ (~/.claude) を作成
 	@mkdir -p "$(HOME_DIR)/.claude"
@@ -238,3 +247,66 @@ uninstall-claude: ## Claude Codeの設定を削除
 		fi; \
 	done
 	@echo "✅ Claude Codeの設定を削除しました"
+
+.PHONY: install-claude-desktop
+install-claude-desktop: ## Install Claude Desktop on Linux (Beta)
+	@echo "[*] Starting installation of Claude Desktop (Linux Beta)..."
+	@if [ -f /etc/apt/sources.list.d/claude-desktop.list ]; then \
+		echo "[+] Claude Desktop apt repository is already registered."; \
+	else \
+		if [ -n "$$CI" ] || [ -n "$$AGENT_MODE" ] || ! [ -t 0 ]; then \
+			echo "[!] Non-interactive or agent execution environment detected. Skipping repository configuration with sudo."; \
+			echo "[i] Please run the following commands manually:"; \
+			echo "    sudo curl -fsSLo /usr/share/keyrings/claude-desktop-archive-keyring.asc https://downloads.claude.ai/claude-desktop/key.asc"; \
+			echo "    echo \"deb [arch=amd64,arm64 signed-by=/usr/share/keyrings/claude-desktop-archive-keyring.asc] https://downloads.claude.ai/claude-desktop/apt/stable stable main\" | sudo tee /etc/apt/sources.list.d/claude-desktop.list"; \
+			echo "    sudo apt-get update && sudo apt-get install -y claude-desktop"; \
+			exit 1; \
+		else \
+			echo "[*] Configuring apt repository using sudo..."; \
+			if sudo curl -fsSLo /usr/share/keyrings/claude-desktop-archive-keyring.asc https://downloads.claude.ai/claude-desktop/key.asc && \
+			   echo "deb [arch=amd64,arm64 signed-by=/usr/share/keyrings/claude-desktop-archive-keyring.asc] https://downloads.claude.ai/claude-desktop/apt/stable stable main" | sudo tee /etc/apt/sources.list.d/claude-desktop.list; then \
+				echo "[+] Repository added successfully."; \
+			else \
+				echo "[x] Failed to add repository."; \
+				exit 1; \
+			fi; \
+		fi; \
+	fi
+	@if dpkg-query -W -f='$${Status}' claude-desktop 2>/dev/null | grep -q "ok installed"; then \
+		echo "[+] claude-desktop is already installed."; \
+	else \
+		if [ -n "$$CI" ] || [ -n "$$AGENT_MODE" ] || ! [ -t 0 ]; then \
+			echo "[!] Non-interactive or agent execution environment detected. Skipping installation with sudo."; \
+			echo "[i] Please run the following commands manually:"; \
+			echo "    sudo apt-get update && sudo apt-get install -y claude-desktop"; \
+			exit 1; \
+		else \
+			echo "[*] Installing claude-desktop using sudo..."; \
+			if sudo apt-get update -q && sudo apt-get install -y claude-desktop; then \
+				echo "[+] Installation complete."; \
+			else \
+				echo "[x] Installation failed."; \
+				exit 1; \
+			fi; \
+		fi; \
+	fi
+	@echo "[+] Claude Desktop installation complete."
+
+.PHONY: uninstall-claude-desktop
+uninstall-claude-desktop: ## Uninstall Claude Desktop on Linux
+	@echo "[*] Starting uninstallation of Claude Desktop..."
+	@if [ -n "$$CI" ] || [ -n "$$AGENT_MODE" ] || ! [ -t 0 ]; then \
+		echo "[!] Non-interactive or agent execution environment detected. Skipping uninstallation with sudo."; \
+		echo "[i] Please run the following commands manually:"; \
+		echo "    sudo apt remove claude-desktop"; \
+		echo "    sudo rm /etc/apt/sources.list.d/claude-desktop.list"; \
+		exit 1; \
+	else \
+		echo "[*] Uninstalling claude-desktop using sudo..."; \
+		sudo apt remove -y claude-desktop || true; \
+		if [ -f /etc/apt/sources.list.d/claude-desktop.list ]; then \
+			sudo rm /etc/apt/sources.list.d/claude-desktop.list || true; \
+		fi; \
+		echo "[+] Uninstallation complete."; \
+	fi
+

@@ -35,4 +35,5 @@ sync-agents: ## Run APM install, compile, generate Antigravity config, and sync 
 	@$(MAKE) setup-skill-adapters
 	@uv run apm compile
 	@$(MAKE) setup-antigravity
+	@$(MAKE) sync-claude
 	@$(MAKE) sync-agents-core
