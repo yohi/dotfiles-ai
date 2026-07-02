@@ -51,6 +51,7 @@ def build_mcp_servers(apm: dict[str, Any]) -> dict[str, Any]:
 
 
 def update_json_file(file_path: Path, mcp_servers: dict[str, Any]) -> None:
+    data: dict[str, Any]
     if not file_path.exists():
         data = {"mcpServers": {}}
     else:
