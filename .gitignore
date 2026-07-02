@@ -57,6 +57,7 @@ ide/cursor/mcp.json
 .opencode/
 .akane/
 .codegraph/
+.codegraph-bootstrap.lock
 .cursor/
 .gemini/
 !.claude/
