@@ -43,7 +43,7 @@ dependencies:
       title: "CodeGraph MCP"
       registry: false
       transport: stdio
-      command: "codegraph"
+      command: "_scripts/codegraph-bootstrap.sh"
       args:
         - "serve"
         - "--mcp"

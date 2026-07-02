@@ -89,6 +89,9 @@ codex/config.toml
 resolved_config.json
 /opencode.json
 
+# CodeGraph runtime files
+.codegraph/
+.codegraph-bootstrap.lock
 
 # Generated agent commands & skills (derived from agent-commands/)
 codex/skills/
