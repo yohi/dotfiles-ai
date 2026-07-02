@@ -7,16 +7,11 @@ in the mcpServers configuration to comply with Claude Desktop's validation schem
 from __future__ import annotations
 
 import json
+import os
 import sys
-from pathlib import Path
 from typing import Any
 
 import yaml
-
-# Use relative paths from the repository root directly to prevent SonarCloud Path Injection warnings.
-APM_YML = Path("apm.yml")
-CLAUDE_JSON = Path(".claude.json")
-SETTINGS_JSON = Path("claude/settings.json")
 
 
 def build_mcp_servers(apm: dict[str, Any]) -> dict[str, Any]:
@@ -51,63 +46,65 @@ def build_mcp_servers(apm: dict[str, Any]) -> dict[str, Any]:
 
 
 def update_claude_json(mcp_servers: dict[str, Any]) -> None:
-    file_path = CLAUDE_JSON
+    target_path = ".claude.json"
     data: dict[str, Any]
-    if not file_path.exists():
+    try:
+        with open(target_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except (json.JSONDecodeError, OSError) as e:
+        print(f"[warning] Failed to parse existing {target_path}: {e}")
         data = {"mcpServers": {}}
-    else:
-        try:
-            data = json.loads(file_path.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, OSError) as e:
-            print(f"[warning] Failed to parse existing {file_path.name}: {e}")
-            data = {"mcpServers": {}}
 
     data["mcpServers"] = mcp_servers
 
     try:
-        file_path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-        print(f"[ok] Updated: {file_path}")
+        with open(target_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+            f.write("\n")
+        print(f"[ok] Updated: {target_path}")
     except OSError as e:
-        print(f"[error] Failed to write {file_path}: {e}")
+        print(f"[error] Failed to write {target_path}: {e}")
         sys.exit(1)
 
 
 def update_settings_json(mcp_servers: dict[str, Any]) -> None:
-    file_path = SETTINGS_JSON
+    target_dir = "claude"
+    target_path = "claude/settings.json"
     try:
-        file_path.parent.mkdir(parents=True, exist_ok=True)
+        os.makedirs(target_dir, exist_ok=True)
     except OSError as e:
-        print(f"[error] Failed to create directory {file_path.parent}: {e}")
+        print(f"[error] Failed to create directory {target_dir}: {e}")
         sys.exit(1)
 
     data: dict[str, Any]
-    if not file_path.exists():
+    try:
+        with open(target_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except (json.JSONDecodeError, OSError) as e:
+        print(f"[warning] Failed to parse existing {target_path}: {e}")
         data = {"mcpServers": {}}
-    else:
-        try:
-            data = json.loads(file_path.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, OSError) as e:
-            print(f"[warning] Failed to parse existing {file_path.name}: {e}")
-            data = {"mcpServers": {}}
 
     data["mcpServers"] = mcp_servers
 
     try:
-        file_path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-        print(f"[ok] Updated: {file_path}")
+        with open(target_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+            f.write("\n")
+        print(f"[ok] Updated: {target_path}")
     except OSError as e:
-        print(f"[error] Failed to write {file_path}: {e}")
+        print(f"[error] Failed to write {target_path}: {e}")
         sys.exit(1)
 
 
 def main() -> None:
-    if not APM_YML.exists():
-        print(f"[error] apm.yml not found: {APM_YML}")
-        sys.exit(1)
-
+    apm_yml_path = "apm.yml"
     try:
-        apm = yaml.safe_load(APM_YML.read_text(encoding="utf-8"))
-    except (yaml.YAMLError, OSError) as e:
+        with open(apm_yml_path, "r", encoding="utf-8") as f:
+            apm = yaml.safe_load(f)
+    except OSError as e:
+        print(f"[error] apm.yml not found or failed to read: {e}")
+        sys.exit(1)
+    except yaml.YAMLError as e:
         print(f"[error] Failed to parse apm.yml: {e}")
         sys.exit(1)
 
