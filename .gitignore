@@ -57,6 +57,7 @@ ide/cursor/mcp.json
 .opencode/
 .akane/
 .codegraph/
+.codegraph-bootstrap.lock
 .cursor/
 .gemini/
 !.claude/
@@ -96,6 +97,9 @@ codex/config.toml
 resolved_config.json
 /opencode.json
 
+# CodeGraph runtime files
+.codegraph/
+.codegraph-bootstrap.lock
 
 # Generated agent commands & skills (derived from agent-commands/)
 codex/skills/
