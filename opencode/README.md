@@ -88,7 +88,7 @@ Sisyphus（監督）は、タスクの性質に応じて最適な「知能カテ
 | **writing** | `kimi-k2.7-code` | `kimi-k2.7-code` → `gemini-3-flash` → `kimi-k2.6` → `claude-sonnet-5` → `minimax-m3` → `minimax-m2.7` |
 
 ---
-*Updated: 2026-07-01*
+*Updated: 2026-07-03*
 
 ## 5. 環境の切り替え (Switching Environments)
 
