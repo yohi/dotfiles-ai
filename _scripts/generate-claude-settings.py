@@ -50,11 +50,13 @@ def build_mcp_servers(apm: dict[str, Any]) -> dict[str, Any]:
     return mcp_servers
 
 
-def update_json_file(file_path: Path, mcp_servers: dict[str, Any]) -> None:
-    # Restrict target paths to allowed configuration files to prevent Path Injection warnings
-    resolved_path = file_path.resolve()
-    if resolved_path not in (CLAUDE_JSON.resolve(), SETTINGS_JSON.resolve()):
-        raise ValueError(f"Invalid target path for settings update: {file_path}")
+def update_json_file(target: str, mcp_servers: dict[str, Any]) -> None:
+    if target == "claude_json":
+        file_path = CLAUDE_JSON
+    elif target == "settings_json":
+        file_path = SETTINGS_JSON
+    else:
+        raise ValueError(f"Invalid target: {target}")
 
     data: dict[str, Any]
     if not file_path.exists():
@@ -91,8 +93,8 @@ def main() -> None:
 
     mcp_servers = build_mcp_servers(apm)
 
-    update_json_file(CLAUDE_JSON, mcp_servers)
-    update_json_file(SETTINGS_JSON, mcp_servers)
+    update_json_file("claude_json", mcp_servers)
+    update_json_file("settings_json", mcp_servers)
 
 
 if __name__ == "__main__":
