@@ -1,10 +1,10 @@
 {
-  // Config Modernized: 2026-06-23, Target oh-my-openagent Version: v4.13.0
+  // Config Modernized: 2026-07-03, Target oh-my-openagent Version: v4.15.1
   // スキーマ定義：エディタでの補完とバリデーションを有効化
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/master/assets/oh-my-opencode.schema.json",
-  // Team Mode: チーム開発・マルチエージェント連携 (v4.13.0 強化)
+  // Team Mode: チーム開発・マルチエージェント連携 (v4.15.1)
   // 【チーム開発の心臓部】
-  // v4.13.0 (v4.12.0) では、複数のメンバーが耐久性の高いCodexスレッドとして自律走行し、作業状態や成果物をシームレスに同期・共有しながら共同で開発を行うTeam Mode (v2)へと大幅強化されました。
+  // v4.15.1 (v4.15.0) では、フロントエンドのライブURL解析・LazyCodexキャッシュ修復・Codexスキルの整理が強化されました。
   // エージェントたちが一つの Todo 計画を共有し、互いの作業を妨げずに並列走行するための設定です。
   "team_mode": {
     "enabled": true,
