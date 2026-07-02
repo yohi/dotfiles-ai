@@ -40,9 +40,9 @@ def build_mcp_servers(apm: dict[str, Any]) -> dict[str, Any]:
         server_cfg: dict[str, Any] = {
             "type": "stdio",
             "command": str(command),
-            "args": [str(arg) for arg in entry.get("args", [])],
+            "args": [str(arg) for arg in (entry.get("args") or [])],
         }
-        if "env" in entry:
+        if entry.get("env"):
             server_cfg["env"] = {k: str(v) for k, v in entry["env"].items()}
 
         mcp_servers[name] = server_cfg
