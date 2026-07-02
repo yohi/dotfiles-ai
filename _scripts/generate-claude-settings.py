@@ -50,13 +50,35 @@ def build_mcp_servers(apm: dict[str, Any]) -> dict[str, Any]:
     return mcp_servers
 
 
-def update_json_file(target: str, mcp_servers: dict[str, Any]) -> None:
-    if target == "claude_json":
-        file_path = CLAUDE_JSON
-    elif target == "settings_json":
-        file_path = SETTINGS_JSON
+def update_claude_json(mcp_servers: dict[str, Any]) -> None:
+    file_path = CLAUDE_JSON
+    data: dict[str, Any]
+    if not file_path.exists():
+        data = {"mcpServers": {}}
     else:
-        raise ValueError(f"Invalid target: {target}")
+        try:
+            data = json.loads(file_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError) as e:
+            print(f"[warning] Failed to parse existing {file_path.name}: {e}")
+            data = {"mcpServers": {}}
+
+    data["mcpServers"] = mcp_servers
+
+    try:
+        file_path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        print(f"[ok] Updated: {file_path}")
+    except OSError as e:
+        print(f"[error] Failed to write {file_path}: {e}")
+        sys.exit(1)
+
+
+def update_settings_json(mcp_servers: dict[str, Any]) -> None:
+    file_path = SETTINGS_JSON
+    try:
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+    except OSError as e:
+        print(f"[error] Failed to create directory {file_path.parent}: {e}")
+        sys.exit(1)
 
     data: dict[str, Any]
     if not file_path.exists():
@@ -71,8 +93,6 @@ def update_json_file(target: str, mcp_servers: dict[str, Any]) -> None:
     data["mcpServers"] = mcp_servers
 
     try:
-        # Create parent directories if they don't exist
-        file_path.parent.mkdir(parents=True, exist_ok=True)
         file_path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
         print(f"[ok] Updated: {file_path}")
     except OSError as e:
@@ -93,8 +113,8 @@ def main() -> None:
 
     mcp_servers = build_mcp_servers(apm)
 
-    update_json_file("claude_json", mcp_servers)
-    update_json_file("settings_json", mcp_servers)
+    update_claude_json(mcp_servers)
+    update_settings_json(mcp_servers)
 
 
 if __name__ == "__main__":
