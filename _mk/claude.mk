@@ -193,9 +193,14 @@ install-opcode: install-packages-opcode  ## Opcodeをインストール(エイ�
 sync-claude: ## apm.yml (SSOT) から Claude 用設定ファイルを生成する
 	$(Q_ECHO) "🔄 Claude 設定ファイルを apm.yml から生成中..."
 	@if command -v uv >/dev/null 2>&1; then \
-		uv run python "$(REPO_ROOT)/_scripts/generate-claude-settings.py"; \
+		uv run --with pyyaml python "$(REPO_ROOT)/_scripts/generate-claude-settings.py"; \
 	else \
-		python3 "$(REPO_ROOT)/_scripts/generate-claude-settings.py"; \
+		if python3 -c "import yaml" >/dev/null 2>&1; then \
+			python3 "$(REPO_ROOT)/_scripts/generate-claude-settings.py"; \
+		else \
+			echo "❌ Error: 'pyyaml' is required but not installed in system python. Please run 'pip install pyyaml' or install 'uv'."; \
+			exit 1; \
+		fi; \
 	fi
 	$(Q_ECHO) "✅ Claude 設定ファイルの生成が完了しました"
 

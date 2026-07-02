@@ -32,9 +32,14 @@ def build_mcp_servers(apm: dict[str, Any]) -> dict[str, Any]:
             continue
 
         name = str(entry["name"])
+        command = entry.get("command")
+        if not command:
+            print(f"[warning] Skipping MCP server '{name}': command is missing or empty.")
+            continue
+
         server_cfg: dict[str, Any] = {
             "type": "stdio",
-            "command": str(entry.get("command", "")),
+            "command": str(command),
             "args": [str(arg) for arg in entry.get("args", [])],
         }
         if "env" in entry:
@@ -58,6 +63,8 @@ def update_json_file(file_path: Path, mcp_servers: dict[str, Any]) -> None:
     data["mcpServers"] = mcp_servers
 
     try:
+        # Create parent directories if they don't exist
+        file_path.parent.mkdir(parents=True, exist_ok=True)
         file_path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
         print(f"[ok] Updated: {file_path}")
     except OSError as e:
