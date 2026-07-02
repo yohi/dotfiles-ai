@@ -13,10 +13,10 @@ from typing import Any
 
 import yaml
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
-APM_YML = REPO_ROOT / "apm.yml"
-CLAUDE_JSON = REPO_ROOT / ".claude.json"
-SETTINGS_JSON = REPO_ROOT / "claude" / "settings.json"
+# Use relative paths from the repository root directly to prevent SonarCloud Path Injection warnings.
+APM_YML = Path("apm.yml")
+CLAUDE_JSON = Path(".claude.json")
+SETTINGS_JSON = Path("claude/settings.json")
 
 
 def build_mcp_servers(apm: dict[str, Any]) -> dict[str, Any]:
