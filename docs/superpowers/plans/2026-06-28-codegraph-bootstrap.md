@@ -27,6 +27,7 @@ Required invariants after implementation:
 - Modify `opencode/opencode.jsonc`: regenerate or mirror the generated MCP entry so it references the bootstrap wrapper.
 - Modify any other generated MCP config that APM emits for the current workspace, if regeneration updates them.
 - Create `_scripts/test-codegraph-bootstrap.sh`: verify the wrapper is idempotent and forwards to `codegraph serve --mcp` after initialization.
+- Modify `.gitignore`: add `.codegraph-bootstrap.lock`, the transient `flock` guard file created by the wrapper.
 
 ### Task 1: Add a failing bootstrap test
 
@@ -119,9 +120,19 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
+# Atomic guard: prevents a TOCTOU race when multiple MCP clients
+# (OpenCode, Claude Code, ...) launch this wrapper concurrently on a
+# fresh checkout and would otherwise both observe .codegraph as missing.
+LOCK_FILE="$REPO_ROOT/.codegraph-bootstrap.lock"
+exec 200>"$LOCK_FILE"
+flock 200
+
 if [ ! -d ".codegraph" ]; then
     codegraph init
 fi
+
+flock -u 200
+exec 200>&-
 
 exec codegraph "$@"
 ```
@@ -162,7 +173,7 @@ Expected: `opencode/opencode.jsonc` and any sibling generated MCP configs now re
 
 - [ ] **Step 3: Verify the generated config**
 
-Run: `grep -R "codegraph-bootstrap.sh" opencode/ . -n`
+Run: `grep -R -n --exclude-dir=.git --include='*.json' --include='*.jsonc' "codegraph-bootstrap.sh" .`
 Expected: all generated `codegraph` entries reference the wrapper, and no generated config still points to `codegraph serve --mcp` directly.
 
 **cwd invariant:** Check that the generated MCP entry includes an explicit `cwd` field pointing to the repo root (e.g., `.` or `$PWD` at generation time). If absent, the wrapper's own `cd` logic is the safety net, but explicit `cwd` prevents launch-directory mismatch across clients. If the generated config lacks `cwd`, add a line to the YAML entry before regeneration.
