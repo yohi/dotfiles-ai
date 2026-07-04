@@ -7,6 +7,8 @@ OPENCODE_HOME ?= $(HOME_DIR)/.opencode
 OPENCODE_BIN ?= $(OPENCODE_HOME)/bin/opencode
 OPENCODE_CONFIG_DIR ?= $(CONFIG_DIR)/opencode
 OPENCODE_CONFIG_PATH ?= $(OPENCODE_CONFIG_DIR)/opencode.jsonc
+OPENCODE_TUI_CONFIG_PATH ?= $(OPENCODE_CONFIG_DIR)/tui.json
+OPENCODE_TUI_DOTFILES_CONFIG ?= $(REPO_ROOT)/opencode/tui.jsonc
 OPENCODE_DOTFILES_CONFIG ?= $(REPO_ROOT)/opencode/opencode.jsonc
 OH_MY_OPENAGENT_CONFIG_PATH ?= $(OPENCODE_CONFIG_DIR)/oh-my-openagent.jsonc
 OH_MY_OPENAGENT_DOTFILES_CONFIG ?= $(REPO_ROOT)/opencode/oh-my-openagent.jsonc.template
@@ -217,6 +219,8 @@ setup-opencode: sync-opencode ## OpenCode（opencode）の設定ファイルを�
 	@$(call link_config,$(OPENCODE_DOTFILES_SKILLS),$(OPENCODE_SKILLS_PATH),skills)
 	@# _docs/ の設定
 	@$(call link_config,$(OPENCODE_DOTFILES_DOCS),$(OPENCODE_DOCS_PATH),docs)
+	@# tui.jsonc の設定
+	@$(call link_config,$(OPENCODE_TUI_DOTFILES_CONFIG),$(OPENCODE_TUI_CONFIG_PATH),tui)
 	@$(call create_marker,setup-opencode,1)
 	$(Q_ECHO) "✅ OpenCode（opencode）の設定を適用しました"
 	$(Q_ECHO) "💡 使い方を確認するには 'make help-opencode' を実行してください。"
