@@ -7,7 +7,7 @@ OPENCODE_HOME ?= $(HOME_DIR)/.opencode
 OPENCODE_BIN ?= $(OPENCODE_HOME)/bin/opencode
 OPENCODE_CONFIG_DIR ?= $(CONFIG_DIR)/opencode
 OPENCODE_CONFIG_PATH ?= $(OPENCODE_CONFIG_DIR)/opencode.jsonc
-OPENCODE_TUI_CONFIG_PATH ?= $(OPENCODE_CONFIG_DIR)/tui.json
+OPENCODE_TUI_CONFIG_PATH ?= $(OPENCODE_CONFIG_DIR)/tui.jsonc
 OPENCODE_TUI_DOTFILES_CONFIG ?= $(REPO_ROOT)/opencode/tui.jsonc
 OPENCODE_DOTFILES_CONFIG ?= $(REPO_ROOT)/opencode/opencode.jsonc
 OH_MY_OPENAGENT_CONFIG_PATH ?= $(OPENCODE_CONFIG_DIR)/oh-my-openagent.jsonc
@@ -116,6 +116,11 @@ opencode: sync-opencode ## OpenCode(opencode)のインストールとセット�
 			if [ -d "$(OPENCODE_DOTFILES_DOCS)" ]; then \
 				if [ -L "$(OPENCODE_DOCS_PATH)" ]; then \
 					if ! check_link "$(OPENCODE_DOCS_PATH)" "$(OPENCODE_DOTFILES_DOCS)"; then skip=0; fi; \
+				else skip=0; fi; \
+			fi; \
+			if [ -f "$(OPENCODE_TUI_DOTFILES_CONFIG)" ]; then \
+				if [ -L "$(OPENCODE_TUI_CONFIG_PATH)" ]; then \
+					if ! check_link "$(OPENCODE_TUI_CONFIG_PATH)" "$(OPENCODE_TUI_DOTFILES_CONFIG)"; then skip=0; fi; \
 				else skip=0; fi; \
 			fi; \
 			if [ "$$skip" = "1" ]; then \
@@ -350,6 +355,21 @@ check-opencode: ## OpenCode（opencode）の状態を確認
 			echo "⚠️  docs: $(OPENCODE_DOCS_PATH) exists but is not a symlink"; \
 		else \
 			echo "⚠️  docs: $(OPENCODE_DOCS_PATH) is not configured"; \
+		fi; \
+	fi
+	@if [ -f "$(OPENCODE_TUI_DOTFILES_CONFIG)" ]; then \
+		if [ -L "$(OPENCODE_TUI_CONFIG_PATH)" ]; then \
+			actual=$$(readlink -f "$(OPENCODE_TUI_CONFIG_PATH)" 2>/dev/null || readlink "$(OPENCODE_TUI_CONFIG_PATH)" 2>/dev/null || true); \
+			expected=$$(readlink -f "$(OPENCODE_TUI_DOTFILES_CONFIG)" 2>/dev/null || readlink "$(OPENCODE_TUI_DOTFILES_CONFIG)" 2>/dev/null || true); \
+			if [ -n "$$actual" ] && [ "$$actual" = "$$expected" ]; then \
+				echo "✅ tui: $(OPENCODE_TUI_CONFIG_PATH) -> $(OPENCODE_TUI_DOTFILES_CONFIG)"; \
+			else \
+				echo "⚠️  tui: $(OPENCODE_TUI_CONFIG_PATH) points to $$actual (expected $$expected)"; \
+			fi; \
+		elif [ -e "$(OPENCODE_TUI_CONFIG_PATH)" ]; then \
+			echo "⚠️  tui: $(OPENCODE_TUI_CONFIG_PATH) exists but is not a symlink"; \
+		else \
+			echo "⚠️  tui: $(OPENCODE_TUI_CONFIG_PATH) is not configured"; \
 		fi; \
 	fi
 
