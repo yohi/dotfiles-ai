@@ -61,8 +61,9 @@ def main():
             encoded = base64.b64encode(raw_auth.encode("utf-8")).decode("utf-8")
             expected_header = f"Basic {encoded}"
 
-    update_file(".env", expected_header, is_make=False)
-    update_file(".env.make", expected_header, is_make=True)
+    if expected_header:
+        update_file(".env", expected_header, is_make=False)
+        update_file(".env.make", expected_header, is_make=True)
 
 if __name__ == "__main__":
     main()

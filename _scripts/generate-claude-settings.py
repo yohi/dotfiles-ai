@@ -8,10 +8,28 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 from typing import Any
 
 import yaml
+
+
+def expand_env_vars(val: Any) -> Any:
+    if isinstance(val, str):
+        def repl(match: re.Match[str]) -> str:
+            var_part = match.group(1)
+            if ":-" in var_part:
+                var_name, default_val = var_part.split(":-", 1)
+                return os.environ.get(var_name, default_val)
+            return os.environ.get(var_part, "")
+        return re.sub(r"\$\{env:([^}]+)\}", repl, val)
+    elif isinstance(val, list):
+        return [expand_env_vars(x) for x in val]
+    elif isinstance(val, dict):
+        return {k: expand_env_vars(v) for k, v in val.items()}
+    return val
+
 
 
 def build_mcp_servers(apm: dict[str, Any]) -> dict[str, Any]:
@@ -30,10 +48,12 @@ def build_mcp_servers(apm: dict[str, Any]) -> dict[str, Any]:
             if not url:
                 print(f"[warning] Skipping MCP server '{name}': url is missing for sse transport.")
                 continue
-            args = ["-y", "mcp-remote", str(url)]
+            expanded_url = expand_env_vars(str(url))
+            args = ["-y", "mcp-remote", expanded_url]
             if "headers" in entry:
                 for k, v in entry["headers"].items():
-                    args.extend(["--header", f"{k}:{v}"])
+                    expanded_v = expand_env_vars(str(v))
+                    args.extend(["--header", f"{k}:{expanded_v}"])
 
             mcp_servers[name] = {
                 "type": "stdio",
@@ -49,11 +69,11 @@ def build_mcp_servers(apm: dict[str, Any]) -> dict[str, Any]:
 
         server_cfg: dict[str, Any] = {
             "type": "stdio",
-            "command": str(command),
-            "args": [str(arg) for arg in (entry.get("args") or [])],
+            "command": expand_env_vars(str(command)),
+            "args": [expand_env_vars(str(arg)) for arg in (entry.get("args") or [])],
         }
         if entry.get("env"):
-            server_cfg["env"] = {k: str(v) for k, v in entry["env"].items()}
+            server_cfg["env"] = {k: expand_env_vars(str(v)) for k, v in entry["env"].items()}
 
         mcp_servers[name] = server_cfg
 
