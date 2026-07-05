@@ -22,11 +22,26 @@ def build_mcp_servers(apm: dict[str, Any]) -> dict[str, Any]:
         if not entry.get("enabled", True):
             continue
         transport = entry.get("transport", "stdio")
-        # Filter out remote SSE / HTTP transport servers as Claude Desktop does not support them natively
+        name = str(entry["name"])
+
+        # Convert remote SSE / HTTP transport servers to stdio using mcp-remote bridge for Claude
         if transport in ("sse", "http", "streamable-http"):
+            url = entry.get("url")
+            if not url:
+                print(f"[warning] Skipping MCP server '{name}': url is missing for sse transport.")
+                continue
+            args = ["-y", "mcp-remote", str(url)]
+            if "headers" in entry:
+                for k, v in entry["headers"].items():
+                    args.extend(["--header", f"{k}:{v}"])
+
+            mcp_servers[name] = {
+                "type": "stdio",
+                "command": "npx",
+                "args": args,
+            }
             continue
 
-        name = str(entry["name"])
         command = entry.get("command")
         if not command:
             print(f"[warning] Skipping MCP server '{name}': command is missing or empty.")

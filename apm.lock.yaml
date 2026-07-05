@@ -1,5 +1,5 @@
 lockfile_version: '1'
-generated_at: '2026-06-29T21:00:33.878847+00:00'
+generated_at: '2026-07-05T07:02:54.161262+00:00'
 apm_version: 0.22.0
 dependencies:
 - repo_url: anthropics/claude-code
@@ -1057,10 +1057,10 @@ dependencies:
   content_hash: sha256:8206d720fc4f340c4bc83dec27a1632debb5065a3ceeca53a7cd96a90425038f
   declared_license: MIT
 - repo_url: yohi/agent-skills
-  name: doc-sync-verifier
+  name: agent-skills
   host: github.com
   resolved_commit: 6dd072e0e6298286d5e9486b4e4df66b514b5a06
-  version: 1.0.0
+  version: unknown
   virtual_path: skills/doc-sync-verifier
   is_virtual: true
   package_type: claude_skill
@@ -1071,10 +1071,10 @@ dependencies:
     .agents/skills/doc-sync-verifier/SKILL.md: sha256:7c7c67e3bf0eaea5202306e973c8a935825f435c8fb360602079ec644c55d85d
   content_hash: sha256:2ee5eda43c238df72aad09175999454d14a094b4bb164384301704ace9488651
 - repo_url: yohi/agent-skills
-  name: git-master
+  name: agent-skills
   host: github.com
   resolved_commit: 6dd072e0e6298286d5e9486b4e4df66b514b5a06
-  version: 1.0.0
+  version: unknown
   virtual_path: skills/git-master
   is_virtual: true
   package_type: claude_skill
@@ -1085,10 +1085,10 @@ dependencies:
     .agents/skills/git-master/SKILL.md: sha256:9ff44ee28ce077e90c80f791af06c53f67b1b8028cb60819430be02b1510a485
   content_hash: sha256:2168dbeeaedea51ef70208201c9cddbe93e8e1e3f2916c953d2e36b13a55fb08
 - repo_url: yohi/agent-skills
-  name: github-quality-setup
+  name: agent-skills
   host: github.com
   resolved_commit: 6dd072e0e6298286d5e9486b4e4df66b514b5a06
-  version: 1.0.0
+  version: unknown
   virtual_path: skills/github-quality-setup
   is_virtual: true
   package_type: claude_skill
@@ -1103,10 +1103,10 @@ dependencies:
     .agents/skills/github-quality-setup/references/tool-configs.md: sha256:2cd02c5aaea923fd7a5aed449d04596d3b8f8cfcaec8c8de5374e5cbd5c9a02a
   content_hash: sha256:fa03d324626cabd515f07f265c8416e3a419d18c31542d4305c59e2035a1d88a
 - repo_url: yohi/agent-skills
-  name: github-release-packages
+  name: agent-skills
   host: github.com
   resolved_commit: 6dd072e0e6298286d5e9486b4e4df66b514b5a06
-  version: 1.0.0
+  version: unknown
   virtual_path: skills/github-release-packages
   is_virtual: true
   package_type: claude_skill
@@ -1135,10 +1135,10 @@ dependencies:
     .agents/skills/github-release-packages/scripts/grade.sh: sha256:621def19270a49b5ea0e51df007f0ab6973af33660e57cc10cdec7bf9e849250
   content_hash: sha256:2cd3a8e07844ce20d789c92dfa4d069cb5a4faabad8da57dcedf8f52d63e5b23
 - repo_url: yohi/agent-skills
-  name: makefile-organization
+  name: agent-skills
   host: github.com
   resolved_commit: 6dd072e0e6298286d5e9486b4e4df66b514b5a06
-  version: 1.0.0
+  version: unknown
   virtual_path: skills/makefile-organization
   is_virtual: true
   package_type: claude_skill
@@ -1151,6 +1151,7 @@ dependencies:
     .agents/skills/makefile-organization/SKILL.md: sha256:d88ed176c1a5a3f7399468366993fc60220bb7d1a879ea41fd8b4bd1f85de6a9
   content_hash: sha256:1082322d10ecdcf2f10e7abec37710b4c928c5793138537bb8ca8ca30c374ef5
 mcp_servers:
+- atlassian
 - chronos-graph
 - codegraph
 - coderabbit
@@ -1161,6 +1162,15 @@ mcp_servers:
 - skillport
 - sonarqube
 mcp_configs:
+  atlassian:
+    name: atlassian
+    transport: sse
+    registry: false
+    headers:
+      Authorization: ${env:ATLASSIAN_AUTH_HEADER}
+    url: https://mcp.atlassian.com/v1/mcp
+    title: Atlassian MCP
+    enabled: true
   chronos-graph:
     name: chronos-graph
     transport: stdio
@@ -1206,7 +1216,7 @@ mcp_configs:
     - serve
     - --mcp
     registry: false
-    command: codegraph
+    command: _scripts/codegraph-bootstrap.sh
     title: CodeGraph MCP
     enabled: true
   coderabbit:
