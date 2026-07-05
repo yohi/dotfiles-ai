@@ -59,17 +59,17 @@ def build_mcp_servers(apm: dict[str, Any]) -> dict[str, Any]:
                 for k, v in headers.items():
                     args.extend(["--header", f"{k}:{v}"])
 
-            server_cfg: dict[str, Any] = {
+            remote_cfg: dict[str, Any] = {
                 "type": "stdio",
                 "command": "npx",
                 "args": args,
             }
             if entry.get("env"):
-                server_cfg["env"] = {
+                remote_cfg["env"] = {
                     k: expand_env_vars(str(v)) for k, v in entry["env"].items()
                 }
 
-            mcp_servers[name] = server_cfg
+            mcp_servers[name] = remote_cfg
             continue
 
         command = entry.get("command")
