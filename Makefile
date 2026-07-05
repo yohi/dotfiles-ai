@@ -27,13 +27,18 @@ include _mk/main.mk
 -include _mk/test.mk
 # -include _mk/test-ide-cursor.mk
 
-.PHONY: test sync-agents
+.PHONY: test sync-agents sync-agents-run
 test: lint test-all ## Run all tests
 
 sync-agents: ## Run APM install, compile, generate Antigravity config, and sync agents
+	@python3 _scripts/generate_atlassian_auth.py
+	@$(MAKE) sync-agents-run
+
+sync-agents-run:
 	@uv run apm install
 	@$(MAKE) setup-skill-adapters
 	@uv run apm compile
 	@$(MAKE) setup-antigravity
 	@$(MAKE) sync-claude
+	@$(MAKE) setup-opencode
 	@$(MAKE) sync-agents-core

@@ -166,6 +166,36 @@ This document provides a comprehensive list of skills available through SkillPor
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 <!-- SKILLPORT_START -->
 ## SkillPort Skills
 
@@ -195,6 +225,11 @@ Each skill contains step-by-step instructions, templates, and scripts.
      IMPORTANT: Custom skills are tracked in Git. External namespaces should generally be ignored
      in the project root .gitignore (blacklist strategy) unless explicitly required for the repository's configuration. -->
 <available_skills>
+<skill>
+  <name>agents-sdk</name>
+  <description>Build AI agents on Cloudflare Workers using the Agents SDK. Load when creating stateful agents, durable workflows, real-time WebSocket apps, scheduled tasks, MCP servers, chat applications, voice agents, or browser automation. Covers Agent class, state management, callable RPC, Workflows, durable execution, queues, retries, observability, and React hooks. Biases towards retrieval from Cloudflare docs over pre-trained knowledge.</description>
+  <location>.agents/skills/agents-sdk/SKILL.md</location>
+</skill>
 <skill>
   <name>algorithmic-art</name>
   <description>Creating algorithmic art using p5.js with seeded randomness and interactive parameter exploration. Use this when users request creating art using code, generative art, algorithmic art, flow fields, or particle systems. Create original algorithmic art rather than copying existing artists' work to avoid copyright violations.</description>
@@ -229,6 +264,26 @@ Each skill contains step-by-step instructions, templates, and scripts.
   <name>claude-api</name>
   <description>Reference for the Claude API / Anthropic SDK. Use when working with Claude/Anthropic APIs, model selection, pricing, tool use. Skip when working with other providers like OpenAI or Gemini.</description>
   <location>.agents/skills/claude-api/SKILL.md</location>
+</skill>
+<skill>
+  <name>cloudflare</name>
+  <description>Comprehensive Cloudflare platform skill covering Workers, Pages, storage (KV, D1, R2), AI (Workers AI, Vectorize, Agents SDK), feature flags (Flagship), networking (Tunnel, Spectrum), security (WAF, DDoS), and infrastructure-as-code (Terraform, Pulumi). Use for any Cloudflare development task. Biases towards retrieval from Cloudflare docs over pre-trained knowledge.</description>
+  <location>.agents/skills/cloudflare/SKILL.md</location>
+</skill>
+<skill>
+  <name>cloudflare-email-service</name>
+  <description>Send and receive transactional emails with Cloudflare Email Service (Email Sending + Email Routing). Use when building email sending (Workers binding or REST API), email routing, Agents SDK email handling, or integrating email into any app — Workers, Node.js, Python, Go, etc. Also use for email deliverability, SPF/DKIM/DMARC, wrangler email setup, MCP email tools, or when a coding agent needs to send emails. Even for simple requests like "add email to my Worker" — this skill has critical config details.</description>
+  <location>.agents/skills/cloudflare-email-service/SKILL.md</location>
+</skill>
+<skill>
+  <name>cloudflare-one</name>
+  <description>Guides Cloudflare One Zero Trust and SASE work across Access, Gateway, WARP, Tunnel, Cloudflare WAN, DLP, CASB, device posture, and identity. Use when designing, configuring, troubleshooting, or reviewing Cloudflare One deployments. Retrieval-first: use current Cloudflare docs/API schemas instead of embedded product docs.</description>
+  <location>.agents/skills/cloudflare-one/SKILL.md</location>
+</skill>
+<skill>
+  <name>cloudflare-one-migrations</name>
+  <description>Plans migrations from Zscaler ZIA/ZPA, Palo Alto, legacy VPN, SWG, or SASE stacks to Cloudflare One. Use for migration assessments, policy mapping, rollout plans, and parity/gap analysis.</description>
+  <location>.agents/skills/cloudflare-one-migrations/SKILL.md</location>
 </skill>
 <skill>
   <name>code-review</name>
@@ -269,6 +324,11 @@ Each skill contains step-by-step instructions, templates, and scripts.
   <name>docx</name>
   <description>Use this skill whenever the user wants to create, read, edit, or manipulate Word documents (.docx files). Triggers include: any mention of 'Word doc', 'word document', '.docx', or requests to produce professional documents with formatting like tables of contents, headings, page numbers, or letterheads. Also use when extracting or reorganizing content from .docx files, inserting or replacing images in documents, performing find-and-replace in Word files, working with tracked changes or comments, or converting content into a polished Word document. If the user asks for a 'report', 'memo', 'letter', 'template', or similar deliverable as a Word or .docx file, use this skill. Do NOT use for PDFs, spreadsheets, Google Docs, or general coding tasks unrelated to document generation.</description>
   <location>.agents/skills/docx/SKILL.md</location>
+</skill>
+<skill>
+  <name>durable-objects</name>
+  <description>Create and review Cloudflare Durable Objects. Use when building stateful coordination (chat rooms, multiplayer games, booking systems), implementing RPC methods, SQLite storage, alarms, WebSockets, or reviewing DO code for best practices. Covers Workers integration, wrangler config, and testing with Vitest. Biases towards retrieval from Cloudflare docs over pre-trained knowledge.</description>
+  <location>.agents/skills/durable-objects/SKILL.md</location>
 </skill>
 <skill>
   <name>executing-plans</name>
@@ -346,6 +406,11 @@ Each skill contains step-by-step instructions, templates, and scripts.
   <location>.agents/skills/requesting-code-review/SKILL.md</location>
 </skill>
 <skill>
+  <name>sandbox-sdk</name>
+  <description>Build sandboxed applications for secure code execution. Load when building AI code execution, code interpreters, CI/CD systems, interactive dev environments, or executing untrusted code. Covers Sandbox SDK lifecycle, commands, files, code interpreter, and preview URLs. Biases towards retrieval from Cloudflare docs over pre-trained knowledge.</description>
+  <location>.agents/skills/sandbox-sdk/SKILL.md</location>
+</skill>
+<skill>
   <name>skill-creator</name>
   <description>Create new skills, modify and improve existing skills, and measure skill performance. Use when users want to create a skill from scratch, edit, or optimize an existing skill, run evals to test a skill, benchmark skill performance with variance analysis, or optimize a skill's description for better triggering accuracy.</description>
   <location>.agents/skills/skill-creator/SKILL.md</location>
@@ -376,6 +441,11 @@ Each skill contains step-by-step instructions, templates, and scripts.
   <location>.agents/skills/theme-factory/SKILL.md</location>
 </skill>
 <skill>
+  <name>turnstile-spin</name>
+  <description>Set up Cloudflare Turnstile end-to-end in a project — scan the codebase, create the widget via the Cloudflare API, deploy the managed siteverify Worker, write the frontend snippets, validate, and persist the skill. Load this when a user asks to add Turnstile, set up CAPTCHA, protect a form from bots, or fix a Turnstile integration. Mirrors developers.cloudflare.com/turnstile/spin.</description>
+  <location>.agents/skills/turnstile-spin/SKILL.md</location>
+</skill>
+<skill>
   <name>using-git-worktrees</name>
   <description>Use when starting feature work that needs isolation from current workspace or before executing implementation plans - ensures an isolated workspace exists via native tools or git worktree fallback</description>
   <location>.agents/skills/using-git-worktrees/SKILL.md</location>
@@ -396,9 +466,24 @@ Each skill contains step-by-step instructions, templates, and scripts.
   <location>.agents/skills/web-artifacts-builder/SKILL.md</location>
 </skill>
 <skill>
+  <name>web-perf</name>
+  <description>Analyzes web performance using Chrome DevTools MCP. Measures Core Web Vitals (LCP, INP, CLS) and supplementary metrics (FCP, TBT, Speed Index), identifies render-blocking resources, network dependency chains, layout shifts, caching issues, and accessibility gaps. Use when asked to audit, profile, debug, or optimize page load performance, Lighthouse scores, or site speed. Biases towards retrieval from current documentation over pre-trained knowledge.</description>
+  <location>.agents/skills/web-perf/SKILL.md</location>
+</skill>
+<skill>
   <name>webapp-testing</name>
   <description>Toolkit for interacting with and testing local web applications using Playwright. Supports verifying frontend functionality, debugging UI behavior, capturing browser screenshots, and viewing browser logs.</description>
   <location>.agents/skills/webapp-testing/SKILL.md</location>
+</skill>
+<skill>
+  <name>workers-best-practices</name>
+  <description>Reviews and authors Cloudflare Workers code against production best practices. Load when writing new Workers, reviewing Worker code, configuring wrangler.jsonc, or checking for common Workers anti-patterns (streaming, floating promises, global state, secrets, bindings, observability). Biases towards retrieval from Cloudflare docs over pre-trained knowledge.</description>
+  <location>.agents/skills/workers-best-practices/SKILL.md</location>
+</skill>
+<skill>
+  <name>wrangler</name>
+  <description>Cloudflare Workers CLI for deploying, developing, and managing Workers, KV, R2, D1, Vectorize, Hyperdrive, Workers AI, Containers, Queues, Workflows, Pipelines, and Secrets Store. Load before running wrangler commands to ensure correct syntax and best practices. Biases towards retrieval from Cloudflare docs over pre-trained knowledge.</description>
+  <location>.agents/skills/wrangler/SKILL.md</location>
 </skill>
 <skill>
   <name>writing-plans</name>
@@ -417,6 +502,21 @@ Each skill contains step-by-step instructions, templates, and scripts.
 </skill>
 </available_skills>
 <!-- SKILLPORT_END -->
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

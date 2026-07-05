@@ -8,10 +8,29 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 from typing import Any
 
 import yaml
+
+
+def expand_env_vars(val: Any) -> Any:
+    if isinstance(val, str):
+
+        def repl(match: re.Match[str]) -> str:
+            var_part = match.group(1)
+            if ":-" in var_part:
+                var_name, default_val = var_part.split(":-", 1)
+                return os.environ.get(var_name, default_val)
+            return os.environ.get(var_part, "")
+
+        return re.sub(r"\$\{env:([^}]+)\}", repl, val)
+    elif isinstance(val, list):
+        return [expand_env_vars(x) for x in val]
+    elif isinstance(val, dict):
+        return {k: expand_env_vars(v) for k, v in val.items()}
+    return val
 
 
 def build_mcp_servers(apm: dict[str, Any]) -> dict[str, Any]:
@@ -22,30 +41,62 @@ def build_mcp_servers(apm: dict[str, Any]) -> dict[str, Any]:
         if not entry.get("enabled", True):
             continue
         transport = entry.get("transport", "stdio")
-        # Filter out remote SSE / HTTP transport servers as Claude Desktop does not support them natively
+        name = str(entry["name"])
+
+        # Convert remote SSE / HTTP transport servers to stdio using mcp-remote bridge for Claude
         if transport in ("sse", "http", "streamable-http"):
+            url = entry.get("url")
+            if not url:
+                print(
+                    f"[warning] Skipping MCP server '{name}': url is missing for sse transport."
+                )
+                continue
+            expanded_url = expand_env_vars(str(url))
+            args = ["-y", "mcp-remote", expanded_url]
+
+            headers = entry.get("headers")
+            if headers:
+                for k, v in headers.items():
+                    args.extend(["--header", f"{k}:{v}"])
+
+            remote_cfg: dict[str, Any] = {
+                "type": "stdio",
+                "command": "npx",
+                "args": args,
+            }
+            if entry.get("env"):
+                remote_cfg["env"] = {
+                    k: expand_env_vars(str(v)) for k, v in entry["env"].items()
+                }
+
+            mcp_servers[name] = remote_cfg
             continue
 
-        name = str(entry["name"])
         command = entry.get("command")
         if not command:
-            print(f"[warning] Skipping MCP server '{name}': command is missing or empty.")
+            print(
+                f"[warning] Skipping MCP server '{name}': command is missing or empty."
+            )
             continue
 
         server_cfg: dict[str, Any] = {
             "type": "stdio",
-            "command": str(command),
-            "args": [str(arg) for arg in (entry.get("args") or [])],
+            "command": expand_env_vars(str(command)),
+            "args": [expand_env_vars(str(arg)) for arg in (entry.get("args") or [])],
         }
         if entry.get("env"):
-            server_cfg["env"] = {k: str(v) for k, v in entry["env"].items()}
+            server_cfg["env"] = {
+                k: expand_env_vars(str(v)) for k, v in entry["env"].items()
+            }
 
         mcp_servers[name] = server_cfg
 
     return mcp_servers
 
 
-def save_settings(target_path: str, mcp_servers: dict[str, Any], create_dir: bool = False) -> None:
+def save_settings(
+    target_path: str, mcp_servers: dict[str, Any], create_dir: bool = False
+) -> None:
     if create_dir:
         target_dir = os.path.dirname(target_path)
         if target_dir:
