@@ -184,7 +184,7 @@ snapshot: true
 
 plugin:
   - "@yohi/justice@2.3.0"
-  - "@yohi/akane@1.4.1"
+  - "@yohi/akane@1.5.1"
   - "oh-my-openagent@4.15.1"
   - "@yohi/chronos-gate@1.1.0"
   - "@nick-vi/opencode-type-inject@latest"
