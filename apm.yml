@@ -144,7 +144,7 @@ dependencies:
       command: "uvx"
       args:
         - "--from"
-        - "git+https://github.com/yohi/chronos-graph.git[all]"
+        - "git+https://github.com/yohi/chronos-graph.git@cb1f33f15ad74fac6a11d1938decbe80a1cc222c[all]"
         - "context-store"
       env:
         STORAGE_BACKEND: "${env:STORAGE_BACKEND}"
@@ -184,7 +184,7 @@ snapshot: true
 
 plugin:
   - "@yohi/justice@2.3.0"
-  - "@yohi/akane@1.4.1"
+  - "@yohi/akane@1.5.1"
   - "oh-my-openagent@4.15.1"
   - "@yohi/chronos-gate@1.1.0"
   - "@nick-vi/opencode-type-inject@latest"

@@ -1,5 +1,5 @@
 lockfile_version: '1'
-generated_at: '2026-07-05T07:02:54.161262+00:00'
+generated_at: '2026-07-06T09:41:17.768847+00:00'
 apm_version: 0.22.0
 dependencies:
 - repo_url: anthropics/claude-code
@@ -1202,7 +1202,7 @@ mcp_configs:
       DASHBOARD_PORT: ${env:DASHBOARD_PORT}
     args:
     - --from
-    - git+https://github.com/yohi/chronos-graph.git[all]
+    - git+https://github.com/yohi/chronos-graph.git@cb1f33f15ad74fac6a11d1938decbe80a1cc222c[all]
     - context-store
     registry: false
     command: uvx
