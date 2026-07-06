@@ -243,7 +243,7 @@ setup-opencode: sync-opencode ## OpenCode（opencode）の設定ファイルを�
 		fi; \
 	fi
 
-.PHONY: opencode install-packages-opencode install-opencode opencode-update setup-opencode check-opencode uninstall-opencode opencode-personal opencode-work sync-opencode check-sync-opencode help-opencode
+.PHONY: opencode install-packages-opencode install-opencode opencode-update setup-opencode check-opencode uninstall-opencode opencode-personal opencode-work sync-opencode check-sync-opencode help-opencode install-opencode-desktop uninstall-opencode-desktop
 help-opencode: ## OpenCode の使い方を表示
 	$(call show-guide,$(REPO_ROOT)/_docs/guides/opencode.md)
 
@@ -397,3 +397,56 @@ opencode-personal: opencode ## OpenCode の personal プロファイルを適用
 
 opencode-work: opencode ## OpenCode の work プロファイルを適用して起動
 	@bash _scripts/opencode-wrapper.sh work
+
+.PHONY: install-opencode-desktop
+install-opencode-desktop: ## Install OpenCode Desktop GUI on Linux
+	@echo "[*] Starting installation of OpenCode Desktop..."
+	@if dpkg-query -W -f='$${Status}' opencode-desktop 2>/dev/null | grep -q "ok installed"; then \
+		echo "[+] opencode-desktop is already installed."; \
+	elif dpkg-query -W -f='$${Status}' opencode 2>/dev/null | grep -q "ok installed"; then \
+		echo "[+] opencode package is already installed."; \
+	else \
+		if [ -n "$$CI" ] || [ -n "$$AGENT_MODE" ] || ! [ -t 0 ]; then \
+			echo "[!] Non-interactive or agent execution environment detected. Skipping installation with sudo."; \
+			echo "[i] Please run the following commands manually:"; \
+			echo '    TEMP_DIR=$$(mktemp -d)'; \
+			echo '    curl -fL -o "$$TEMP_DIR/opencode.deb" "https://opencode.ai/ja/download/stable/linux-x64-deb"'; \
+			echo '    sudo apt-get update && sudo apt-get install -y "$$TEMP_DIR/opencode.deb"'; \
+			echo '    rm -rf "$$TEMP_DIR"'; \
+			exit 1; \
+		else \
+			echo "[*] Downloading OpenCode Desktop deb package..."; \
+			TEMP_DIR=$$(mktemp -d); \
+			trap 'rm -rf "$$TEMP_DIR"' EXIT; \
+			if curl -fL --retry 3 --connect-timeout 10 --max-time 180 -o "$$TEMP_DIR/opencode.deb" "https://opencode.ai/ja/download/stable/linux-x64-deb"; then \
+				echo "[*] Installing OpenCode Desktop using sudo..."; \
+				if sudo apt-get update -q && sudo apt-get install -y "$$TEMP_DIR/opencode.deb"; then \
+					echo "[+] Installation complete."; \
+				else \
+					echo "[x] Installation failed."; \
+					exit 1; \
+				fi; \
+			else \
+				echo "[x] Failed to download OpenCode Desktop package."; \
+				exit 1; \
+			fi; \
+		fi; \
+	fi
+
+.PHONY: uninstall-opencode-desktop
+uninstall-opencode-desktop: ## Uninstall OpenCode Desktop GUI on Linux
+	@echo "[*] Starting uninstallation of OpenCode Desktop..."
+	@if [ -n "$$CI" ] || [ -n "$$AGENT_MODE" ] || ! [ -t 0 ]; then \
+		echo "[!] Non-interactive or agent execution environment detected. Skipping uninstallation with sudo."; \
+		echo "[i] Please run the following commands manually:"; \
+		echo "    sudo apt-get remove -y opencode-desktop || sudo apt-get remove -y opencode"; \
+		exit 1; \
+	else \
+		echo "[*] Uninstalling OpenCode Desktop using sudo..."; \
+		if dpkg-query -W -f='$${Status}' opencode-desktop 2>/dev/null | grep -q "ok installed"; then \
+			sudo apt-get remove -y opencode-desktop || true; \
+		elif dpkg-query -W -f='$${Status}' opencode 2>/dev/null | grep -q "ok installed"; then \
+			sudo apt-get remove -y opencode || true; \
+		fi; \
+		echo "[+] Uninstallation complete."; \
+	fi
