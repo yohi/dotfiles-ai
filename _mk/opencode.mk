@@ -445,8 +445,11 @@ uninstall-opencode-desktop: ## Uninstall OpenCode Desktop GUI on Linux
 		echo "[*] Uninstalling OpenCode Desktop using sudo..."; \
 		if dpkg-query -W -f='$${Status}' opencode-desktop 2>/dev/null | grep -q "ok installed"; then \
 			sudo apt-get remove -y opencode-desktop || true; \
+			echo "[+] Uninstallation complete."; \
 		elif dpkg-query -W -f='$${Status}' opencode 2>/dev/null | grep -q "ok installed"; then \
 			sudo apt-get remove -y opencode || true; \
+			echo "[+] Uninstallation complete."; \
+		else \
+			echo "[i] opencode-desktop / opencode is not installed. Nothing to do."; \
 		fi; \
-		echo "[+] Uninstallation complete."; \
 	fi
