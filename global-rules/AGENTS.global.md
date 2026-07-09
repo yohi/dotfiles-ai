@@ -297,6 +297,12 @@ The following rules apply to **ALL** projects unless overridden by a local proje
 
 
 
+
+
+
+
+
+
 <!-- SKILLPORT_START -->
 ## SkillPort Skills
 
@@ -472,6 +478,11 @@ Each skill contains step-by-step instructions, templates, and scripts.
   <location>.agents/skills/internal-comms/SKILL.md</location>
 </skill>
 <skill>
+  <name>local/apm-version-updater</name>
+  <description>Checks and updates the pinned dependency versions and commit hashes in THIS repository's apm.yml -- the APM skill git refs (owner/repo#tag), the npm plugins under `plugin:`, and the MCP server packages under `dependencies.mcp` (npm versions and git+https commit hashes) -- and always summarizes what changed between the current and latest version of each before writing anything. Use whenever the user wants to bump, update, refresh, upgrade, or check for newer versions or commit hashes of apm.yml dependencies, plugins, or MCP servers; asks whether the apm.yml pins are outdated; or wants a version-diff / changelog summary for them, even if they do not name this skill or say 'apm.yml' explicitly. Do NOT use for updating LLM model whitelists in apm.yml (use the update-opencode-models skill for that), for package.json / uv / other lockfile bumps, for GitHub Actions version updates, or for adding brand-new MCP server entries.</description>
+  <location>.claude/skills/apm-version-updater/SKILL.md</location>
+</skill>
+<skill>
   <name>local/dotfiles-guidelines</name>
   <description>Core principles, persona definitions, and command workflows for the dotfiles project. Use when seeking development guidance, selecting an appropriate expert persona (Architect, Developer, Tester, DevOps, Analyst), or following standard project commands (analyze, implement, design, etc.). Ensures consistency, quality, and adherence to project-wide best practices.</description>
   <location>.claude/skills/dotfiles-guidelines/SKILL.md</location>
@@ -603,6 +614,9 @@ Each skill contains step-by-step instructions, templates, and scripts.
 </skill>
 </available_skills>
 <!-- SKILLPORT_END -->
+
+
+
 
 
 
