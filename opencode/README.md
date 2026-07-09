@@ -9,7 +9,7 @@ OpenCode プラットフォーム自体のコア設定ファイルです。
 
 ### `oh-my-openagent.jsonc`
 メインの設定ファイルであり、各専門エージェントに割り当てる LLM モデルや知能カテゴリーなどを管理します。
-*Target Version: v4.15.1*
+*Target Version: v4.16.1*
 
 ## 2. 使い方
 
@@ -32,11 +32,11 @@ Sisyphus（監督）は、タスクの性質に応じて最適な「知能カテ
 | **ultrabrain** | `xhigh` / 最強推論 | 複雑な計画立案、コード監査、アーキテクチャ設計、リスク分析。 | GPT-5.5 (xhigh) |
 | **deep** | `medium` / 自律解決 | 難解なバグ修正、機能実装、リファクタリングなど職人的作業。 | GPT-5.5 (medium) |
 | **quick** | `fast` / 高速応答 | ドキュメント検索、コード探索、些細な修正、プロトタイピング。 | GPT-5.4 Mini |
-| **visual-engineering** | UI/UX 特化 | UIデザイン解析、CSSアニメーション、フロントエンド最適化。 | Gemini 3.1 Pro (high) |
+| **visual-engineering** | UI/UX 特化 | UIデザイン解析、CSSアニメーション、フロントエンド最適化。 | Qwen 3.6 Plus (high) |
+| **unspecified-high** | 高負荷汎用 | 特定の役割に当てはまらないが、高い知能を要する汎用作業。 | GPT-5.5 (high) |
+| **unspecified-low** | 低負荷汎用 | 定形的な作業、単純なデータ変換などの低コストな汎用作業。 | Kimi K2.7 Code |
 | **writing** | 文書作成 特化 | 技術解説、ドキュメンテーション、リリースノートの作成。 | Kimi (k2.7-code) |
 | **artistry** | 創造性 特化 | ジェネレーティブアート、クリエイティブな発想、芸術的表現。 | Gemini 3.1 Pro (high) |
-| **unspecified-high** | 高負荷汎用 | 特定の役割に当てはまらないが、高い知能を要する汎用作業。 | Claude Opus 4.7 (max) |
-| **unspecified-low** | 低負荷汎用 | 定形的な作業、単純なデータ変換などの低コストな汎用作業。 | Claude Sonnet 5 |
 
 ### エージェント一覧とカテゴリー・マッピング
 
@@ -44,16 +44,16 @@ Sisyphus（監督）は、タスクの性質に応じて最適な「知能カテ
 
 | エージェント | カテゴリー | 推奨/フォールバックチェーン (優先順) | 役割・専門領域 |
 | :--- | :--- | :--- | :--- |
-| **Sisyphus** | `ultrabrain` | `claude-fable-5` → `claude-opus-4-8` → `claude-opus-4-7` (max) → `kimi-k2.7-code` → `kimi-k2.6` → `gpt-5.5` (medium) → `glm-5` | 司令塔。全体の品質管理、タスクの分解と委譲。 |
+| **Sisyphus** | `ultrabrain` | `claude-fable-5` → `claude-opus-4-8` → `claude-opus-4-7` (max) → `kimi-k2.7-code` → `kimi-k2.6` → `gpt-5.5` (medium) → `glm-5.2` | 司令塔。全体の品質管理、タスクの分解と委譲。 |
 | **Hephaestus** | `deep` | `gpt-5.5` (medium) | 実装職人。自律的なコードの書き込み、複雑なロジック実装。 |
-| **Oracle** | `ultrabrain` | `gpt-5.5` (high) → `gemini-3.1-pro` (high) → `claude-opus-4-7` (max) → `glm-5.1` | 賢者。アーキテクチャ設計の相談、難解なバグのデバッグ。 |
-| **Librarian** | `quick` | `gpt-5.4-mini` → `qwen3.5-plus` → `minimax-m3` → `minimax-m2.7-highspeed` → `claude-haiku-4-5` | 司書。外部ドキュメントやOSSの実装例の高速検索。 |
-| **Explore** | `quick` | `gpt-5.4-mini` → `qwen3.5-plus` → `minimax-m3` → `minimax-m2.7-highspeed` → `claude-haiku-4-5` | 探検家。コードベースの高速探索、grep検索、スキャフォールディング 。 |
-| **Prometheus** | `ultrabrain` | `claude-opus-4-7` (max) → `gpt-5.5` (high) → `glm-5.1` → `gemini-3.1-pro` | 流れ者。タスクの分解と並列実行計画（Agent Swarm）の作成。 |
-| **Metis** | `ultrabrain` | `claude-sonnet-5` → `claude-sonnet-4-6` → `claude-opus-4-7` (max) → `gpt-5.5` (high) → `glm-5.1` → `k2p5` | 計画コンサル。計画前のリスク特定と曖昧さの排除。 |
-| **Momus** | `ultrabrain` | `gpt-5.5` (xhigh) → `claude-opus-4-7` (max) → `gemini-3.1-pro` (high) → `glm-5.1` | 計画レビュアー。Prometheusが作成した計画の厳格な検証。 |
-| **Atlas** | `ultrabrain` | `claude-sonnet-5` → `claude-sonnet-4-6` → `kimi-k2.7-code` → `kimi-k2.6` → `gpt-5.5` (medium) | 現場監督。環境管理、Todo項目の体系的な管理と調整。 |
-| **Multimodal-Looker** | `ultrabrain` | `gpt-5.5` (medium) → `kimi-k2.7-code` → `kimi-k2.6` → `glm-4.6v` | 視覚アナリスト。UIデザイン、画像、図解、PDFの解析。 |
+| **Oracle** | `ultrabrain` | `gpt-5.5` (high) → `qwen3.6-plus` (high) → `claude-opus-4-8` (max) → `glm-5.2` | 賢者。アーキテクチャ設計の相談、難解なバグのデバッグ。 |
+| **Librarian** | `quick` | `gpt-5.4-mini` → `qwen3.5-plus` → `minimax-m3` → `minimax-m2.7` → `claude-haiku-4-5` | 司書。外部ドキュメントやOSSの実装例の高速検索。 |
+| **Explore** | `quick` | `gpt-5.4-mini` → `qwen3.5-plus` → `minimax-m3` → `minimax-m2.7` → `claude-haiku-4-5` | 探検家。コードベースの高速探索、grep検索、スキャフォールディング 。 |
+| **Prometheus** | `ultrabrain` | `claude-opus-4-8` (max) → `gpt-5.5` (high) → `glm-5.2` → `qwen3.6-plus` | 流れ者。タスクの分解と並列実行計画（Agent Swarm）の作成。 |
+| **Metis** | `ultrabrain` | `claude-sonnet-5` → `claude-sonnet-4-6` → `claude-opus-4-8` (max) → `gpt-5.5` (high) → `glm-5.2` → `kimi-k2.5` | 計画コンサル。計画前のリスク特定と曖昧さの排除。 |
+| **Momus** | `ultrabrain` | `gpt-5.5` (xhigh) → `claude-opus-4-8` (max) → `qwen3.6-plus` (high) → `glm-5.2` | 計画レビュアー。Prometheusが作成した計画の厳格な検証。 |
+| **Atlas** | `ultrabrain` | `claude-sonnet-5` → `claude-sonnet-4-6` → `kimi-k2.7-code` → `kimi-k2.6` → `gpt-5.5` (medium) → `glm-5.2` | 現場監督。環境管理、Todo項目の体系的な管理と調整。 |
+| **Multimodal-Looker** | `ultrabrain` | `gpt-5.5` (medium) → `kimi-k2.7-code` → `kimi-k2.6` → `glm-5.2` | 視覚アナリスト。UIデザイン、画像、図解、PDFの解析。 |
 | **Sisyphus-Junior** | (動的) | `claude-sonnet-5` → `claude-sonnet-4-6` → `kimi-k2.7-code` → `kimi-k2.6` → `gpt-5.5` (medium) → `minimax-m3` | 作業員. 特定のカテゴリーに特化して生成される実行用エージェント. |
 
 ## 4. LLMモデル選択のベストプラクティス
@@ -71,24 +71,25 @@ Sisyphus（監督）は、タスクの性質に応じて最適な「知能カテ
 | スタイル | 特徴 | 適合モデル | 最適なエージェント |
 | :--- | :--- | :--- | :--- |
 | **メカニクス駆動** | **指示追従型。** 長大で複雑な手順、多段のTodo管理に極めて強い。 | Claude Family, Kimi, GLM | Sisyphus, Atlas, Metis |
-| **原則駆動** | **自律探索型。** 最小限の指示で自律的に解決策を見出す。深い実装に強い。 | GPT Family, DeepSeek | Hephaestus, Oracle, Momus |
+| **原則駆動** | **自律探索型。** 最小限の指示で自律的に解決策を見出す。深い実装に強い。 | GPT Family, DeepSeek, Qwen | Hephaestus, Oracle, Momus |
 | **視覚推論型** | **UI・構造理解。** デザイン解析、CSS、レイアウトの理解に特化。 | Gemini Family, Qwen | Looker |
 
-### カテゴリー別・推奨モデルと代替ルール (v4.15.1)
+### カテゴリー別・推奨モデルと代替ルール (v4.16.1)
 
 | カテゴリー | デフォルトモデル | フォールバックチェーン (優先順) |
 | :--- | :--- | :--- |
-| **ultrabrain** | `gpt-5.5` (xhigh) | `gpt-5.5` (xhigh) → `gemini-3.1-pro` (high) → `claude-opus-4-7` (max) → `glm-5.1` |
-| **deep** | `gpt-5.5` (medium) | `gpt-5.5` (medium) → `claude-opus-4-7` (max) → `gemini-3.1-pro` (high) |
-| **quick** | `gpt-5.4-mini` | `gpt-5.4-mini` → `claude-haiku-4-5` → `gemini-3-flash` → `minimax-m3` → `minimax-m2.7` → `gpt-5-nano` |
-| **visual-engineering** | `gemini-3.1-pro` (high) | `gemini-3.1-pro` (high) → `glm-5` → `claude-opus-4-7` (max) → `glm-5.1` → `kimi-k2.7-code` |
-| **artistry** | `gemini-3.1-pro` (high) | `gemini-3.1-pro` (high) → `claude-opus-4-7` (max) → `gpt-5.5` |
-| **unspecified-high** | `claude-opus-4-7` (max) | `claude-opus-4-7` (max) → `gpt-5.5` (high) → `glm-5` → `kimi-k2.7-code` → `glm-5.1` → `kimi-k2.5` |
-| **unspecified-low** | `claude-sonnet-5` | `claude-sonnet-5` → `claude-sonnet-4-6` → `gpt-5.1-codex` (medium) → `kimi-k2.6` → `gemini-3-flash` → `minimax-m3` → `minimax-m2.7` |
-| **writing** | `kimi-k2.7-code` | `kimi-k2.7-code` → `gemini-3-flash` → `kimi-k2.6` → `claude-sonnet-5` → `minimax-m3` → `minimax-m2.7` |
+| **ultrabrain** | `gpt-5.5` (xhigh) | `gpt-5.5` (xhigh) → `qwen3.6-plus` (high) → `claude-opus-4-8` (max) → `glm-5.2` |
+| **deep** | `gpt-5.5` (medium) | `gpt-5.5` (medium) → `claude-opus-4-8` (max) → `qwen3.6-plus` (high) |
+| **quick** | `gpt-5.4-mini` | `gpt-5.4-mini` → `claude-haiku-4-5` → `qwen3.5-plus` → `minimax-m3` → `minimax-m2.7` → `gpt-5-nano` |
+| **visual-engineering** | `qwen3.6-plus` (high) | `qwen3.6-plus` (high) → `glm-5.2` → `claude-opus-4-8` (max) → `kimi-k2.7-code` |
+| **artistry** | `qwen3.6-plus` (high) | `qwen3.6-plus` (high) → `claude-opus-4-8` (max) → `gpt-5.5` |
+| **unspecified-high** | `gpt-5.5` (high) | `gpt-5.5` (high) → `claude-opus-4-8` (max) → `glm-5.2` → `kimi-k2.7-code` → `qwen3.6-plus` → `kimi-k2.5` |
+| **unspecified-low** | `kimi-k2.7-code` | `kimi-k2.7-code` → `kimi-k2.6` → `gpt-5.4-mini` → `qwen3.5-plus` → `minimax-m3` → `minimax-m2.7` |
+| **writing** | `kimi-k2.7-code` | `kimi-k2.7-code` → `qwen3.5-plus` → `kimi-k2.6` → `claude-sonnet-5` → `minimax-m3` → `minimax-m2.7` |
 
 ---
-*Updated: 2026-07-03*
+*Updated: 2026-07-10*
+
 
 ## 5. 環境の切り替え (Switching Environments)
 
@@ -164,17 +165,25 @@ OpenCode の機能を拡張するため、現在以下のプラグインが [apm
    make setup-opencode
    ```
 
-## 8. v4.15.0 / v4.15.1 主要新機能
+## 8. v4.16.1 主要新機能
 
-最新の v4.15.0 および v4.15.1 にて強化・導入された主要機能です。
+最新の v4.16.1 にて強化・導入された主要機能です。
 
-### Smarter Frontend Cloning & Visual QA
-フロントエンド開発（`frontend`）スキルにおいて、ライブURLを本当のデザインリファレンスとしてブラウザ経由でレンダリング・解析できるようになりました。`getComputedStyle` 値やレスポンシブレイアウト、遷移状態、アセットなどを自動取得し、実装前に `DESIGN.md` の設計コントラクトを作成します。また、`/visual-qa` によりホバー、フォーカス、クリック、スクロール、トランジションの各状態をキャプチャし、無駄な装飾アニメーションなどを厳格に検証します。
+### ulw-loop Memory Leak Fix
+長時間の `ultrawork` 実行でメモリが膨張したり、大量の固まった `bun` プロセスが発生していた問題を修正しました。
+- **Fork-bomb 防止**: `omo` ランタイムラッパーが自分自身を無限に呼び出す再帰ループに陥らないよう、1ホップのセンチネルで生成済みラッパーを除外。
+- **Ledger 圧縮**: steering entry 内に同じ計画が4重に埋め込まれていたため `.omo/ulw-loop/ledger.jsonl` が二次関数的に肥大化していました。変更のあったゴールのみをコンパクトにスナップショット保存し、189 KB のエントリが **7.8 KB** に削減。
+- **固まった子プロセスの排除**: `ulw-loop status` の spawn が stderr パイフルで停止していた問題を修正。30秒のハードタイムアウト付き detached 実行に変更。
 
-### LazyCodex Install Repair
-LazyCodex の信頼性を向上させました。ローカルキャッシュや管理コマンドリンクが壊れている場合に、アップデート処理をスキップせず明示的にキャッシュ修復を試みます。
+### Release Pipeline Hardening
+リリースパイプラインの信頼性を向上しました。
+- provenance 公開がクラッシュしていた破損 `npm@12.0.0` から `npm@11.18.0` へピン。
+- リリース時に `omo-senpi` パッケージのバージョンをルートと常に同期。
 
-### Clean Codex Skills
-Codexスキルのクリーンアップを実施。レガシーな `ultraresearch` の非表示化や、`designpowers` などのドキュメントが意図せずトップレベルスキルとして露出する問題を修正しました。
+### Frontend Skill Research Contract
+フロントエンド（`frontend`）スキルの調査フェーズに logged deliverable contract を導入。designpowers、ui-ux-db、a11y/debt schema をデフォルトフローに統合し、クリーンなデザインシステム gate を強化しました。
+
+### Bun Runtime Regression Fix
+Bun ランタイム呼び出しを shim 経由にルーティングし、#3824 の回帰を修正。`omo-opencode` 上での raw bun モジュール import を監査するテストも追加しました。
 
 

@@ -13,7 +13,7 @@ skills:
 dependencies:
   # Skills
   apm:
-    - obra/superpowers#v6.0.2
+    - obra/superpowers#v6.1.1
     - anthropics/skills
     - coderabbitai/skills
     - greptileai/skills//check-pr
@@ -125,8 +125,7 @@ dependencies:
       command: "npx"
       args:
         - "-y"
-        # - "/home/y_ohi/program/nexus"
-        - "@yohi/nexus@1.22.0"
+        - "@yohi/nexus@1.25.0"
       env:
         LOG_LEVEL: "ERROR"
         NEXUS_WATCHER_IGNORE_PATHS: "node_modules,opencode/node_modules,.opencode/node_modules,oss/apm/node_modules,oss/apm/docs/node_modules,.git,.nexus,dist,gemini,agent-skills,apm_modules,.agents,.opencode,.gemini,.claude,.codex,.vscode,.devcontainer,oss,codex/.tmp,.worktrees,.venv,target,.mypy_cache,.ruff_cache,build,.serena,.cache,__pycache__,*.db,*.sqlite,*.log"
@@ -144,7 +143,7 @@ dependencies:
       command: "uvx"
       args:
         - "--from"
-        - "git+https://github.com/yohi/chronos-graph.git@cb1f33f15ad74fac6a11d1938decbe80a1cc222c[all]"
+        - "git+https://github.com/yohi/chronos-graph.git@1dd22274b28f8118b3e601a7b5b6a43af93b0d6e[all]"
         - "context-store"
       env:
         STORAGE_BACKEND: "${env:STORAGE_BACKEND}"
@@ -183,9 +182,9 @@ shell: bash
 snapshot: true
 
 plugin:
-  - "@yohi/justice@2.3.0"
-  - "@yohi/akane@1.5.1"
-  - "oh-my-openagent@4.15.1"
+  - "@yohi/justice@2.4.0"
+  - "@yohi/akane@1.6.0"
+  - "oh-my-openagent@4.16.1"
   - "@yohi/chronos-gate@1.1.0"
   - "@nick-vi/opencode-type-inject@latest"
   - "opencode-vibeguard@latest"
@@ -513,15 +512,97 @@ provider:
       - o3-pro
       - o4-mini
       - o4-mini-deep-research
+      - gpt-4.1
+      - gpt-4.1-mini
+      - gpt-4.1-nano
+      - gpt-4o
+      - gpt-4o-2024-05-13
+      - gpt-4o-2024-08-06
+      - gpt-4o-2024-11-20
+      - gpt-4o-mini
+      - gpt-5.6
+      - gpt-5.6-luna
+      - gpt-5.6-sol
+      - gpt-5.6-terra
       - text-embedding-3-large
       - text-embedding-3-small
   opencode:
     whitelist:
+      - claude-3-5-haiku
+      - claude-fable-5
+      - claude-haiku-4-5
+      - claude-opus-4-1
+      - claude-opus-4-5
+      - claude-opus-4-6
+      - claude-opus-4-7
+      - claude-opus-4-8
+      - claude-sonnet-4
+      - claude-sonnet-4-5
+      - claude-sonnet-4-6
+      - claude-sonnet-5
+      - deepseek-v4-flash
       - deepseek-v4-flash-free
+      - deepseek-v4-pro
+      - gemini-3-flash
+      - gemini-3-pro
+      - gemini-3.1-pro
+      - gemini-3.5-flash
+      - glm-4.6
+      - glm-4.7
+      - glm-5
+      - glm-5-free
+      - glm-5.1
+      - glm-5.2
+      - grok-build-0.1
+      - grok-code
+      - gpt-5
+      - gpt-5-codex
+      - gpt-5-nano
+      - gpt-5.1
+      - gpt-5.1-codex
+      - gpt-5.1-codex-max
+      - gpt-5.1-codex-mini
+      - gpt-5.2
+      - gpt-5.2-codex
+      - gpt-5.3-codex
+      - gpt-5.3-codex-spark
+      - gpt-5.4
+      - gpt-5.4-mini
+      - gpt-5.4-nano
+      - gpt-5.4-pro
+      - gpt-5.5
+      - gpt-5.5-pro
+      - hy3-free
+      - hy3-preview-free
+      - kimi-k2
+      - kimi-k2-thinking
+      - kimi-k2-thinking-turbo
+      - kimi-k2.5
+      - kimi-k2.5-free
+      - kimi-k2.6
+      - kimi-k2.7-code
+      - ling-2.6-flash-free
+      - minimax-m2.1
+      - minimax-m2.1-free
+      - minimax-m2.5
+      - minimax-m2.5-free
+      - minimax-m2.7
+      - minimax-m2.7-free
+      - minimax-m3
+      - minimax-m3-free
+      - mimo-v2-flash-free
+      - mimo-v2-omni-free
+      - mimo-v2-pro-free
+      - mimo-v2.5
       - mimo-v2.5-free
+      - nemotron-3-super-free
       - north-mini-code-free
-      - nemotron-3-ultra-free
-      - big-pickle
+      - qwen3-coder
+      - qwen3.5-plus
+      - qwen3.6-plus
+      - qwen3.6-plus-free
+      - ring-2.6-1t-free
+      - trinity-large-preview-free
   amazon-bedrock:
     whitelist:
       - global.anthropic.claude-fable-5
