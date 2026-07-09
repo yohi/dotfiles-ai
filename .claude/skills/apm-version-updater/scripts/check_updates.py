@@ -37,16 +37,14 @@ NPM_RE = re.compile(
     r'-\s*"?(@?[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)?)'
     r'@([0-9]+\.[0-9]+\.[0-9]+[A-Za-z0-9.\-]*|latest)"?\s*$'
 )
-SEMVER_RE = re.compile(r'^v?(\d+)\.(\d+)\.(\d+)')
-FULL_SHA_RE = re.compile(r'^[0-9a-fA-F]{40}$')
+SEMVER_RE = re.compile(r"^v?(\d+)\.(\d+)\.(\d+)(?![\d.+\-])")
+FULL_SHA_RE = re.compile(r"^[0-9a-fA-F]{40}$")
 
 
 def run(cmd):
     """Run a command, returning stripped stdout or None on any failure."""
     try:
-        proc = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=TIMEOUT
-        )
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=TIMEOUT)
     except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
         return None
     if proc.returncode != 0:
@@ -55,12 +53,12 @@ def run(cmd):
 
 
 def url_to_slug(url):
-    slug = re.sub(r'^https?://[^/]+/', '', url)
-    return re.sub(r'\.git$', '', slug)
+    slug = re.sub(r"^https?://[^/]+/", "", url)
+    return re.sub(r"\.git$", "", slug)
 
 
 def norm(value):
-    return (value or '').lstrip('vV').strip().lower()
+    return (value or "").lstrip("vV").strip().lower()
 
 
 def short(value):
@@ -69,12 +67,21 @@ def short(value):
     return value
 
 
+def same_hash(current, latest):
+    """Return True if current matches latest, supporting short hashes."""
+    current = (current or "").strip().lower()
+    latest = (latest or "").strip().lower()
+    if FULL_SHA_RE.match(current):
+        return current == latest
+    return latest.startswith(current)
+
+
 def detect(text):
     """Return a list of pinned-dependency records found in apm.yml text."""
     records = []
     section = None
     for idx, line in enumerate(text.splitlines(), start=1):
-        top = re.match(r'^([A-Za-z0-9_-]+):', line)
+        top = re.match(r"^([A-Za-z0-9_-]+):", line)
         if top:
             section = top.group(1)
 
@@ -82,48 +89,66 @@ def detect(text):
         if m:
             url, sha = m.group(1), m.group(2)
             slug = url_to_slug(url)
-            records.append({
-                'kind': 'mcp-git', 'name': slug, 'current': sha,
-                'line': idx, 'spec': 'hash', 'repo': slug, 'git_url': url,
-            })
+            records.append(
+                {
+                    "kind": "mcp-git",
+                    "name": slug,
+                    "current": sha,
+                    "line": idx,
+                    "spec": "hash",
+                    "repo": slug,
+                    "git_url": url,
+                }
+            )
             continue
 
         m = SKILL_REF_RE.search(line)
-        if m and '/' in m.group(1):
+        if m and "/" in m.group(1):
             name, ref = m.group(1), m.group(2)
-            repo = name.split('//')[0]
-            records.append({
-                'kind': 'apm-skill', 'name': name, 'current': ref,
-                'line': idx, 'spec': 'tag', 'repo': repo,
-                'git_url': 'https://github.com/%s.git' % repo,
-            })
+            repo = name.split("//")[0]
+            records.append(
+                {
+                    "kind": "apm-skill",
+                    "name": name,
+                    "current": ref,
+                    "line": idx,
+                    "spec": "tag",
+                    "repo": repo,
+                    "git_url": "https://github.com/%s.git" % repo,
+                }
+            )
             continue
 
         m = NPM_RE.search(line)
         if m:
             name, ver = m.group(1), m.group(2)
-            kind = 'plugin' if section == 'plugin' else 'mcp-npm'
-            records.append({
-                'kind': kind, 'name': name, 'current': ver,
-                'line': idx, 'spec': 'latest' if ver == 'latest' else 'semver',
-            })
+            kind = "plugin" if section == "plugin" else "mcp-npm"
+            records.append(
+                {
+                    "kind": kind,
+                    "name": name,
+                    "current": ver,
+                    "line": idx,
+                    "spec": "latest" if ver == "latest" else "semver",
+                }
+            )
     return records
 
 
 def latest_npm(name):
-    return run(['npm', 'view', name, 'version'])
+    return run(["npm", "view", name, "version"])
 
 
 def latest_tag(url):
-    out = run(['git', 'ls-remote', '--tags', '--refs', url])
+    out = run(["git", "ls-remote", "--tags", "--refs", url])
     if not out:
         return None
     best, best_key = None, None
     for line in out.splitlines():
-        parts = line.split('\t')
+        parts = line.split("\t")
         if len(parts) != 2:
             continue
-        tag = parts[1].replace('refs/tags/', '')
+        tag = parts[1].replace("refs/tags/", "")
         m = SEMVER_RE.match(tag)
         if not m:
             continue
@@ -134,7 +159,7 @@ def latest_tag(url):
 
 
 def latest_head(url):
-    out = run(['git', 'ls-remote', url, 'HEAD'])
+    out = run(["git", "ls-remote", url, "HEAD"])
     if not out:
         return None
     fields = out.split()
@@ -143,79 +168,101 @@ def latest_head(url):
 
 def resolve(rec):
     """Populate rec['latest'] and rec['update'] (best-effort)."""
-    if rec['spec'] == 'latest':
-        rec['latest'] = '(tracks latest)'
-        rec['update'] = False
+    if rec["spec"] == "latest":
+        rec["latest"] = "(tracks latest)"
+        rec["update"] = False
         return
     latest = None
-    if rec['kind'] in ('plugin', 'mcp-npm'):
-        latest = latest_npm(rec['name'])
-    elif rec['kind'] == 'apm-skill':
-        latest = latest_tag(rec['git_url'])
-    elif rec['kind'] == 'mcp-git':
-        latest = latest_head(rec['git_url'])
-    rec['latest'] = latest or 'unresolved'
-    rec['update'] = bool(latest) and norm(latest) != norm(rec['current'])
+    if rec["kind"] in ("plugin", "mcp-npm"):
+        latest = latest_npm(rec["name"])
+    elif rec["kind"] == "apm-skill":
+        latest = latest_tag(rec["git_url"])
+    elif rec["kind"] == "mcp-git":
+        latest = latest_head(rec["git_url"])
+    rec["latest"] = latest or "unresolved"
+    if rec["kind"] == "mcp-git":
+        rec["update"] = bool(latest) and not same_hash(rec["current"], latest)
+    else:
+        rec["update"] = bool(latest) and norm(latest) != norm(rec["current"])
 
 
 def render_table(records):
-    headers = ['KIND', 'NAME', 'CURRENT', 'LATEST', 'UPDATE']
+    headers = ["KIND", "NAME", "CURRENT", "LATEST", "UPDATE"]
     rows = []
     for r in records:
-        rows.append([
-            r['kind'], r['name'], short(r['current']),
-            short(r.get('latest', '?')),
-            'yes' if r.get('update') else ('-' if r['spec'] != 'latest' else 'track'),
-        ])
+        rows.append(
+            [
+                r["kind"],
+                r["name"],
+                short(r["current"]),
+                short(r.get("latest", "?")),
+                "yes"
+                if r.get("update")
+                else ("-" if r["spec"] != "latest" else "track"),
+            ]
+        )
     widths = [len(h) for h in headers]
     for row in rows:
         for i, cell in enumerate(row):
             widths[i] = max(widths[i], len(cell))
     lines = []
-    fmt = '  '.join('%-*s' for _ in headers)
+    fmt = "  ".join("%-*s" for _ in headers)
     flat = []
     for i, h in enumerate(headers):
         flat.extend([widths[i], h])
     lines.append(fmt % tuple(flat))
-    lines.append('  '.join('-' * w for w in widths))
+    lines.append("  ".join("-" * w for w in widths))
     for row in rows:
         flat = []
         for i, cell in enumerate(row):
             flat.extend([widths[i], cell])
         lines.append(fmt % tuple(flat))
-    updates = sum(1 for r in records if r.get('update'))
-    lines.append('')
-    lines.append('%d update(s) available out of %d pinned dependencies.'
-                 % (updates, len(records)))
-    return '\n'.join(lines)
+    updates = sum(1 for r in records if r.get("update"))
+    lines.append("")
+    lines.append(
+        "%d update(s) available out of %d pinned dependencies."
+        % (updates, len(records))
+    )
+    return "\n".join(lines)
 
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--apm', default='apm.yml', help='path to apm.yml')
-    parser.add_argument('--json', action='store_true', help='emit JSON')
-    parser.add_argument('--no-network', action='store_true',
-                        help='inventory only, skip latest resolution')
+    parser.add_argument("--apm", default="apm.yml", help="path to apm.yml")
+    parser.add_argument("--json", action="store_true", help="emit JSON")
+    parser.add_argument(
+        "--no-network",
+        action="store_true",
+        help="inventory only, skip latest resolution",
+    )
     args = parser.parse_args(argv)
 
     apm_path = Path(args.apm)
     if not apm_path.is_file():
-        fallback = Path(__file__).resolve().parents[4] / 'apm.yml'
-        if fallback.is_file():
-            apm_path = fallback
+        repo_root = run(["git", "rev-parse", "--show-toplevel"])
+        if repo_root:
+            fallback = Path(repo_root) / "apm.yml"
+            if fallback.is_file():
+                apm_path = fallback
+            else:
+                sys.stderr.write(
+                    "error: apm.yml not found (tried %s and %s)\n"
+                    % (args.apm, fallback)
+                )
+                return 2
         else:
-            sys.stderr.write('error: apm.yml not found (tried %s)\n' % args.apm)
+            sys.stderr.write("error: apm.yml not found (tried %s)\n" % args.apm)
             return 2
 
-    records = detect(apm_path.read_text(encoding='utf-8'))
+    records = detect(apm_path.read_text(encoding="utf-8"))
 
     if not args.no_network:
         for rec in records:
             resolve(rec)
     else:
         for rec in records:
-            rec.setdefault('latest', '(skipped)')
-            rec.setdefault('update', False)
+            rec.setdefault("latest", "(skipped)")
+            rec.setdefault("update", False)
 
     if args.json:
         print(json.dumps(records, indent=2))
@@ -224,5 +271,5 @@ def main(argv=None):
     return 0
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())
