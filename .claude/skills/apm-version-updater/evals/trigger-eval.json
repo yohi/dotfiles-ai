@@ -1,0 +1,23 @@
+[
+  {"query": "apm.yml の依存、そろそろ古くなってない? superpowers とか nexus とか最新に上げたいんだけど、上げる前に何が変わるか教えて", "should_trigger": true},
+  {"query": "chronos-graph の commit hash、apm.yml でピン留めしてるやつを最新コミットに更新しといて", "should_trigger": true},
+  {"query": "can you bump oh-my-openagent and the @yohi/* plugins in apm.yml to their latest versions? show me the changelog diffs first before you touch the file", "should_trigger": true},
+  {"query": "apm.yml の superpowers を v6.0.2 から最新の release tag に上げたい。バージョン間の差分も見たい", "should_trigger": true},
+  {"query": "外部依存のバージョン全部チェックして、更新あるやつだけ最新にして。apm.yml のやつね", "should_trigger": true},
+  {"query": "nexus の MCP、1.22.0 のままだけど新しいの出てる? 出てたら apm.yml 更新して変更点まとめて", "should_trigger": true},
+  {"query": "update the pinned versions and commit hashes in apm.yml and tell me what changed between the old and new for each dependency", "should_trigger": true},
+  {"query": "apm.yml のプラグインとMCPサーバのバージョン、まとめて最新化して。破壊的変更が入ってないか気になるから差分も", "should_trigger": true},
+  {"query": "@yohi/justice と @yohi/akane、apm.yml で古いバージョン刺さってない? 最新にして差分説明ちょうだい", "should_trigger": true},
+  {"query": "そろそろ apm.yml の外部依存をリフレッシュしたい。何が更新できるか一覧出して、それぞれのバージョン間の変更点も添えて", "should_trigger": true},
+
+  {"query": "package.json の依存を最新にして。npm outdated で古いの出てるやつ全部 bump したい", "should_trigger": false},
+  {"query": "apm.yml の openai と amazon-bedrock の whitelist、最新の LLM モデル（gpt-5.5 とか claude-opus-4-8 とか）に更新して", "should_trigger": false},
+  {"query": "uv.lock の Python 依存を更新したいんだけど uv lock --upgrade でいいんだっけ", "should_trigger": false},
+  {"query": "apm.yml に新しい MCP サーバ（社内の linter 用のやつ）を追加したいんだけど、args とか env の書き方教えて", "should_trigger": false},
+  {"query": "この apm.yml、docker-mcp の url の port が間違ってる気がする。10888 に直して", "should_trigger": false},
+  {"query": "opencode のプラグイン @yohi/chronos-gate って何をする子なの? ドキュメントか README 読みたい", "should_trigger": false},
+  {"query": "リポジトリの CHANGELOG.md を更新して、今回のリリース分のエントリを Keep a Changelog 形式で追加して", "should_trigger": false},
+  {"query": ".github/workflows の actions のバージョン（actions/checkout@v4 とか）を最新に上げて、SHA ピンにもしたい", "should_trigger": false},
+  {"query": "apm install が apm.lock.yaml のコンフリクトで失敗する。ロックのコンフリクト解消して再インストールできるようにして", "should_trigger": false},
+  {"query": "chronos-graph の cb1f33f と 1dd2227 のコミット差分だけ git log で見せて。apm.yml 自体は今回触らなくていい", "should_trigger": false}
+]
