@@ -83,7 +83,7 @@ Sisyphus（監督）は、タスクの性質に応じて最適な「知能カテ
 | **quick** | `gpt-5.4-mini` | `gpt-5.4-mini` → `claude-haiku-4-5` → `qwen3.5-plus` → `minimax-m3` → `minimax-m2.7` → `gpt-5-nano` |
 | **visual-engineering** | `qwen3.6-plus` (high) | `qwen3.6-plus` (high) → `glm-5.2` → `claude-opus-4-8` (max) → `kimi-k2.7-code` |
 | **artistry** | `qwen3.6-plus` (high) | `qwen3.6-plus` (high) → `claude-opus-4-8` (max) → `gpt-5.5` |
-| **unspecified-high** | `claude-opus-4-8` (max) | `claude-opus-4-8` (max) → `gpt-5.5` (high) → `glm-5.2` → `kimi-k2.7-code` → `qwen3.6-plus` → `kimi-k2.5` |
+| **unspecified-high** | `gpt-5.5` (high) | `gpt-5.5` (high) → `claude-opus-4-8` (max) → `glm-5.2` → `kimi-k2.7-code` → `qwen3.6-plus` → `kimi-k2.5` |
 | **unspecified-low** | `kimi-k2.7-code` | `kimi-k2.7-code` → `kimi-k2.6` → `gpt-5.4-mini` → `qwen3.5-plus` → `minimax-m3` → `minimax-m2.7` |
 | **writing** | `kimi-k2.7-code` | `kimi-k2.7-code` → `qwen3.5-plus` → `kimi-k2.6` → `claude-sonnet-5` → `minimax-m3` → `minimax-m2.7` |
 
