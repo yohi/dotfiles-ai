@@ -125,7 +125,7 @@ dependencies:
       command: "npx"
       args:
         - "-y"
-        - "@yohi/nexus@1.25.0"
+        - "@yohi/nexus@1.26.3"
       env:
         LOG_LEVEL: "ERROR"
         NEXUS_WATCHER_IGNORE_PATHS: "node_modules,opencode/node_modules,.opencode/node_modules,oss/apm/node_modules,oss/apm/docs/node_modules,.git,.nexus,dist,gemini,agent-skills,apm_modules,.agents,.opencode,.gemini,.claude,.codex,.vscode,.devcontainer,oss,codex/.tmp,.worktrees,.venv,target,.mypy_cache,.ruff_cache,build,.serena,.cache,__pycache__,*.db,*.sqlite,*.log"
@@ -184,7 +184,7 @@ snapshot: true
 plugin:
   - "@yohi/justice@2.4.0"
   - "@yohi/akane@1.6.0"
-  - "oh-my-openagent@4.16.1"
+  - "oh-my-openagent@4.16.3"
   - "@yohi/chronos-gate@1.1.0"
   - "@nick-vi/opencode-type-inject@latest"
   - "opencode-vibeguard@latest"
@@ -476,6 +476,17 @@ provider:
   openai:
     whitelist:
       - chatgpt-image-latest
+      - gpt-3.5-turbo
+      - gpt-4
+      - gpt-4-turbo
+      - gpt-4.1
+      - gpt-4.1-mini
+      - gpt-4.1-nano
+      - gpt-4o
+      - gpt-4o-2024-05-13
+      - gpt-4o-2024-08-06
+      - gpt-4o-2024-11-20
+      - gpt-4o-mini
       - gpt-5
       - gpt-5-chat-latest
       - gpt-5-codex
@@ -500,10 +511,15 @@ provider:
       - gpt-5.4-pro
       - gpt-5.5
       - gpt-5.5-pro
+      - gpt-5.6
+      - gpt-5.6-luna
+      - gpt-5.6-sol
+      - gpt-5.6-terra
       - gpt-image-1
       - gpt-image-1-mini
       - gpt-image-1.5
       - gpt-image-2
+      - gpt-realtime-2.1
       - o1
       - o1-pro
       - o3
@@ -512,22 +528,12 @@ provider:
       - o3-pro
       - o4-mini
       - o4-mini-deep-research
-      - gpt-4.1
-      - gpt-4.1-mini
-      - gpt-4.1-nano
-      - gpt-4o
-      - gpt-4o-2024-05-13
-      - gpt-4o-2024-08-06
-      - gpt-4o-2024-11-20
-      - gpt-4o-mini
-      - gpt-5.6
-      - gpt-5.6-luna
-      - gpt-5.6-sol
-      - gpt-5.6-terra
       - text-embedding-3-large
       - text-embedding-3-small
+      - text-embedding-ada-002
   opencode:
     whitelist:
+      - big-pickle
       - claude-3-5-haiku
       - claude-fable-5
       - claude-haiku-4-5
@@ -549,12 +555,11 @@ provider:
       - gemini-3.5-flash
       - glm-4.6
       - glm-4.7
+      - glm-4.7-free
       - glm-5
       - glm-5-free
       - glm-5.1
       - glm-5.2
-      - grok-build-0.1
-      - grok-code
       - gpt-5
       - gpt-5-codex
       - gpt-5-nano
@@ -572,30 +577,34 @@ provider:
       - gpt-5.4-pro
       - gpt-5.5
       - gpt-5.5-pro
+      - gpt-5.6-luna
+      - gpt-5.6-sol
+      - gpt-5.6-terra
+      - grok-4.5
+      - grok-build-0.1
+      - grok-code
       - hy3-free
       - hy3-preview-free
       - kimi-k2
       - kimi-k2-thinking
-      - kimi-k2-thinking-turbo
       - kimi-k2.5
       - kimi-k2.5-free
       - kimi-k2.6
       - kimi-k2.7-code
       - ling-2.6-flash-free
+      - mimo-v2-flash-free
+      - mimo-v2-omni-free
+      - mimo-v2-pro-free
+      - mimo-v2.5-free
       - minimax-m2.1
       - minimax-m2.1-free
       - minimax-m2.5
       - minimax-m2.5-free
       - minimax-m2.7
-      - minimax-m2.7-free
       - minimax-m3
       - minimax-m3-free
-      - mimo-v2-flash-free
-      - mimo-v2-omni-free
-      - mimo-v2-pro-free
-      - mimo-v2.5
-      - mimo-v2.5-free
       - nemotron-3-super-free
+      - nemotron-3-ultra-free
       - north-mini-code-free
       - qwen3-coder
       - qwen3.5-plus
@@ -647,26 +656,26 @@ provider:
       - kimi-k2.5
       - kimi-k2.6
       - kimi-k2.7-code
-      - "kimi-k2:1t"
+      - kimi-k2:1t
       - minimax-m2
       - minimax-m2.1
       - minimax-m2.5
       - minimax-m2.7
       - minimax-m3
-      - "ministral-3:14b"
-      - "ministral-3:3b"
-      - "ministral-3:8b"
-      - "mistral-large-3:675b"
-      - "nemotron-3-nano:30b"
+      - ministral-3:14b
+      - ministral-3:3b
+      - ministral-3:8b
+      - mistral-large-3:675b
+      - nemotron-3-nano:30b
       - nemotron-3-super
       - nemotron-3-ultra
       - qwen3-coder-next
-      - "qwen3-coder:480b"
-      - "qwen3-next:80b"
-      - "qwen3-vl:235b"
-      - "qwen3-vl:235b-instruct"
-      - "qwen3.5:397b"
-      - "rnj-1:8b"
+      - qwen3-coder:480b
+      - qwen3-next:80b
+      - qwen3-vl:235b
+      - qwen3-vl:235b-instruct
+      - qwen3.5:397b
+      - rnj-1:8b
   opencode-go:
     whitelist:
       - deepseek-v4-flash
