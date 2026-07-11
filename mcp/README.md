@@ -89,3 +89,85 @@ Docker MCP Gateway を介して統合的に提供されます。ボリューム�
 - **`make sync-mcp`**: `apm install` を実行し、`apm.yml` の定義に基づいて各エージェントの設定ファイルと Gateway 実行設定を同期。
 - **`make setup-docker-mcp`**: Docker MCP Gateway の systemd サービスと環境をセットアップ。
 - **`_scripts/check-skillport-version.sh`**: Skillport イメージが PyPI の最新版と一致するか確認。
+
+---
+
+## 5. Docker MCP Gateway の OAuth 認証 (Docker Desktop 不要 / CLI Only)
+
+Docker Desktop アプリを起動せず、`docker mcp` CLI だけでリモート OAuth 系サーバー（Sentry Remote, Apify 等）の認証を完了させる手順。
+
+### 前提条件
+
+1. **`docker mcp` CLI プラグインが最新版であること**
+   - 古いビルドには CE (Community Edition) Mode の OAuth 実装が存在せず、常に Docker Desktop のバックエンドソケット (`~/.docker/desktop/tools.sock`) への接続を試みて `dial unix ...: no such file or directory` で失敗する。
+   - 確認: `docker mcp version`
+   - 更新:
+
+     ```bash
+     curl -sL -o /tmp/docker-mcp.tar.gz \
+       https://github.com/docker/mcp-gateway/releases/latest/download/docker-mcp-linux-amd64.tar.gz
+     tar -xzf /tmp/docker-mcp.tar.gz -C /tmp
+     rm -f ~/.docker/cli-plugins/docker-mcp   # 実行中バイナリの "text file busy" 対策
+     cp /tmp/docker-mcp ~/.docker/cli-plugins/docker-mcp
+     chmod +x ~/.docker/cli-plugins/docker-mcp
+     ```
+
+2. **Docker Credential Helper が設定されていること**
+   - 未設定だと `invalid config: empty credsStore` → `docker-credential-notfound: executable file not found` で失敗する。
+   - Linux Desktop 環境（`org.freedesktop.secrets` が D-Bus 上で稼働中、gnome-keyring 等）の場合:
+
+     ```bash
+     curl -sL -o ~/.local/bin/docker-credential-secretservice \
+       https://github.com/docker/docker-credential-helpers/releases/latest/download/docker-credential-secretservice-v0.9.8.linux-amd64
+     chmod +x ~/.local/bin/docker-credential-secretservice
+     ```
+
+     `~/.docker/config.json` に `"credsStore": "secretservice"` を追加する。
+   - ヘッドレス環境では `pass`（GPG バックエンド）用の `docker-credential-pass` を使用する。
+
+### 認証手順
+
+```bash
+export DOCKER_MCP_USE_CE=true
+docker mcp oauth authorize <server-name> --open-browser
+docker mcp oauth ls   # 認証状態の確認
+```
+
+- ローカルに `http://127.0.0.1:<port>/callback` が立ち、ブラウザでの認可完了を待機する。
+- 認可後は Docker のプロキシページ (`https://mcp.docker.com/oauth/callback`) を経由するが、これは `state` パラメータからポート番号を読み取ってブラウザ側 JS で `127.0.0.1:<port>` へクライアントサイド・リダイレクトする設計であり、Docker Desktop 非稼働でも機能する。
+- **待機コマンドにタイムアウトを付けずに実行すること**（ブラウザでの操作が完了するまで待つ必要がある）。
+
+### 公式カタログ未収録のリモートサーバーを追加する
+
+[docker/mcp-registry](https://github.com/docker/mcp-registry) に定義済みでも、Docker 公式カタログ (`desktop.docker.com`) への反映にはラグがあり、`docker mcp oauth authorize <name>` が `server <name> not found in catalog` で失敗することがある。その場合はローカルに独自カタログとして登録する。
+
+```bash
+# 1. registry から定義を取得
+mkdir -p /tmp/mcp-def && curl -sL \
+  -o /tmp/mcp-def/server.yaml \
+  https://raw.githubusercontent.com/docker/mcp-registry/main/servers/<name>/server.yaml
+
+# 2. oauth フィールドのスキーマ差異を手動で修正する場合がある（配列 -> providers: 配下）
+#    oauth:
+#      providers:
+#        - provider: <name>
+#          secret: <name>.personal_access_token
+#          env: <NAME>_PERSONAL_ACCESS_TOKEN
+
+# 3. 独立カタログとして登録（file:// は ~/.docker/mcp/catalogs/ 配下の相対/絶対パス）
+docker mcp catalog create local-<name> --title "Local <Name>" \
+  --server "file:///tmp/mcp-def/server.yaml"
+```
+
+> [!WARNING]
+> `docker mcp profile server add` はプロファイルへの追加にしかならず、`docker mcp oauth authorize` からは引き続き "not found in catalog" となる。**`docker mcp catalog create` での正式なカタログ登録が必須**。
+> また、本リポジトリの `mcp/catalogs/custom.yaml`（`~/.docker/mcp/catalogs/custom.yaml` へのシンボリックリンク）は `apm.yml` から自動生成される SSOT 管理対象のため、上記の一時的な調査・登録には**絶対に使用しないこと**。独立カタログ名（`local-<name>` 等）で登録すること。
+
+### トラブルシューティング
+
+| エラー | 原因 | 対処 |
+| :--- | :--- | :--- |
+| `dial unix .../tools.sock: no such file or directory` | `docker mcp` バイナリが古く CE Mode 未対応。常に Docker Desktop 接続を試みる | バイナリを最新版に更新 |
+| `invalid config: empty credsStore` → `docker-credential-notfound` | Credential Helper 未設定 | `docker-credential-secretservice`（Desktop環境）または `docker-credential-pass`（ヘッドレス）を導入し `credsStore` を設定 |
+| `server <name> not found in catalog` | サーバーが公式カタログ未収録、または `catalog create` で正式登録されていない | `docker mcp catalog create local-<name> --server file://...` で登録 |
+| `callback timeout: context canceled` | ブラウザでの認可待ちの間にコマンド自体がタイムアウト/中断された | タイムアウトなしで再実行し、表示された URL をブラウザで開いて認可を完了する |
