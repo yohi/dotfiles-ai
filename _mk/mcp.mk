@@ -55,9 +55,26 @@ sync-mcp-gateway: ## Docker MCP Gateway 設定を同期
 	else \
 		echo "⚠️  mcp/catalogs/custom.yaml.template not found."; \
 	fi
+	@# Docker MCP Gateway refuses catalogs that resolve outside its catalogs directory,
+	@# so ensure the deployed files are real copies rather than symlinks.
+	@# Only materialize if the source file exists, to avoid deleting the symlink and leaving nothing.
+	@if [ -L $(HOME_DIR)/.docker/mcp/catalogs/custom.yaml ] && [ -f mcp/catalogs/custom.yaml ]; then \
+		rm -f $(HOME_DIR)/.docker/mcp/catalogs/custom.yaml; \
+		cp mcp/catalogs/custom.yaml $(HOME_DIR)/.docker/mcp/catalogs/custom.yaml; \
+		echo "✅ Custom catalog materialized to a regular file."; \
+	elif [ -L $(HOME_DIR)/.docker/mcp/catalogs/custom.yaml ]; then \
+		echo "[!] Custom catalog is a symlink but source mcp/catalogs/custom.yaml is missing; leaving symlink intact."; \
+	fi
 	@if [ -f "mcp/catalogs/bootstrap.yaml" ]; then \
 		cp mcp/catalogs/bootstrap.yaml $(HOME_DIR)/.docker/mcp/catalogs/bootstrap.yaml; \
 		echo "✅ Bootstrap catalog synced."; \
+	fi
+	@if [ -L $(HOME_DIR)/.docker/mcp/catalogs/bootstrap.yaml ] && [ -f mcp/catalogs/bootstrap.yaml ]; then \
+		rm -f $(HOME_DIR)/.docker/mcp/catalogs/bootstrap.yaml; \
+		cp mcp/catalogs/bootstrap.yaml $(HOME_DIR)/.docker/mcp/catalogs/bootstrap.yaml; \
+		echo "✅ Bootstrap catalog materialized to a regular file."; \
+	elif [ -L $(HOME_DIR)/.docker/mcp/catalogs/bootstrap.yaml ]; then \
+		echo "[!] Bootstrap catalog is a symlink but source mcp/catalogs/bootstrap.yaml is missing; leaving symlink intact."; \
 	fi
 	@if [ ! -f "mcp/docker-mcp-gateway.service" ]; then \
 		echo "❌ Error: mcp/docker-mcp-gateway.service not found." >&2; \
