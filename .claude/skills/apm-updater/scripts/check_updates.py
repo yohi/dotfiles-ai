@@ -85,8 +85,12 @@ def same_hash(current, latest):
 
 def fetch_model_schema():
     """Fetch and return the models.dev model schema as a dict."""
+    req = urllib.request.Request(
+        MODEL_SCHEMA_URL,
+        headers={"User-Agent": "apm-updater/1.0"},
+    )
     try:
-        with urllib.request.urlopen(MODEL_SCHEMA_URL, timeout=TIMEOUT) as response:
+        with urllib.request.urlopen(req, timeout=TIMEOUT) as response:
             return json.loads(response.read().decode("utf-8"))
     except (urllib.error.URLError, json.JSONDecodeError, OSError):
         return None
@@ -141,22 +145,46 @@ def validate_apm_models(apm_path: Path) -> int:
     text = apm_path.read_text(encoding="utf-8")
     issues = []
     section = None
+    provider_name = None
+    in_provider_section = False
+    provider_indent = None
     for idx, line in enumerate(text.splitlines(), start=1):
-        stripped = line.strip()
-        if stripped.endswith(":") and not stripped.startswith("-"):
-            section = stripped[:-1]
+        indent = len(line) - len(line.lstrip())
+        top = re.match(r"^([A-Za-z0-9_-]+):", line)
+        if top:
+            section = top.group(1)
+            if section == "provider":
+                in_provider_section = True
+                provider_name = None
+                provider_indent = indent
+                continue
+            if in_provider_section:
+                if indent <= provider_indent:
+                    in_provider_section = False
+                    provider_name = None
+                    provider_indent = None
+                elif section != "whitelist":
+                    provider_name = section
             continue
 
-        if section in ("provider", "models") or (section and "whitelist" in section):
-            m = re.match(r'^\s*-\s*"?([^"\s#]+)"?\s*$', line)
-            if m:
-                model = m.group(1)
-                if model not in valid_models:
-                    issues.append((idx, model, "not in models.dev schema"))
-                elif section == "amazon-bedrock" or "amazon" in model.lower():
-                    if not model.startswith(BEDROCK_ALLOWED_PREFIXES):
-                        issues.append((idx, model, "not allowed in Bedrock whitelist"))
+        if not in_provider_section or not provider_name:
+            continue
 
+        m = re.match(r'^\s*-\s*"?([^"\s#]+)"?\s*$', line)
+        if not m:
+            continue
+
+        model = m.group(1)
+        if provider_name == "amazon-bedrock":
+            full_model = "amazon-bedrock/%s" % model
+            if not model.startswith(BEDROCK_ALLOWED_PREFIXES):
+                issues.append((idx, model, "not allowed in Bedrock whitelist"))
+                continue
+        else:
+            full_model = "%s/%s" % (provider_name, model)
+
+        if full_model not in valid_models:
+            issues.append((idx, model, "not in models.dev schema (%s)" % full_model))
     if issues:
         print("MODEL VALIDATION ISSUES: %d" % len(issues))
         for line_no, model, reason in issues:
