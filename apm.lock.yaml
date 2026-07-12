@@ -1,5 +1,5 @@
 lockfile_version: '1'
-generated_at: '2026-07-10T01:16:24.293431+00:00'
+generated_at: '2026-07-12T01:13:18.919621+00:00'
 apm_version: 0.22.0
 dependencies:
 - repo_url: anthropics/claude-code
@@ -1198,7 +1198,7 @@ mcp_configs:
       DASHBOARD_PORT: ${env:DASHBOARD_PORT}
     args:
     - --from
-    - git+https://github.com/yohi/chronos-graph.git@1dd22274b28f8118b3e601a7b5b6a43af93b0d6e[all]
+    - context-store-mcp[all] @ https://github.com/yohi/chronos-graph/archive/refs/tags/v3.0.0.tar.gz
     - context-store
     registry: false
     command: uvx
@@ -1257,7 +1257,7 @@ mcp_configs:
       NO_PROXY: 127.0.0.1,localhost
     args:
     - -y
-    - '@yohi/nexus@1.25.0'
+    - '@yohi/nexus@1.26.3'
     registry: false
     command: npx
     title: Nexus

@@ -9,7 +9,7 @@ OpenCode プラットフォーム自体のコア設定ファイルです。
 
 ### `oh-my-openagent.jsonc`
 メインの設定ファイルであり、各専門エージェントに割り当てる LLM モデルや知能カテゴリーなどを管理します。
-*Target Version: v4.16.3*
+*Target Version: v4.17.0*
 
 ## 2. 使い方
 
@@ -30,11 +30,11 @@ Sisyphus（監督）は、タスクの性質に応じて最適な「知能カテ
 | カテゴリー | 特徴・バリアント | 想定される用途 | 推奨モデル (Brain) |
 | :--- | :--- | :--- | :--- |
 | **ultrabrain** | `xhigh` / 最強推論 | 複雑な計画立案、コード監査、アーキテクチャ設計、リスク分析。 | GPT-5.6 Sol (xhigh) |
-| **deep** | `medium` / 自律解決 | 難解なバグ修正、機能実装、リファクタリングなど職人的作業。 | GPT-5.6 Sol (medium) |
-| **quick** | `fast` / 高速応答 | ドキュメント検索、コード探索、些細な修正、プロトタイピング。 | gpt-5.6-terra (medium) |
+| **deep** | `xhigh` / 自律解決 | 難解なバグ修正、機能実装、リファクタリングなど職人的作業。 | gpt-5.6-terra (xhigh) |
+| **quick** | `low` / 高速応答 | ドキュメント検索、コード探索、些細な修正、プロトタイピング。 | gpt-5.6-luna (low) |
 | **visual-engineering** | UI/UX 特化 | UIデザイン解析、CSSアニメーション、フロントエンド最適化。 | Qwen 3.6 Plus (high) |
 | **unspecified-high** | 高負荷汎用 | 特定の役割に当てはまらないが、高い知能を要する汎用作業。 | GPT-5.6 Sol (high) |
-| **unspecified-low** | 低負荷汎用 | 定形的な作業、単純なデータ変換などの低コストな汎用作業。 | Kimi K2.7 Code |
+| **unspecified-low** | `xhigh` / 低負荷汎用 | 定形的な作業、単純なデータ変換などの低コストな汎用作業。 | gpt-5.6-luna (xhigh) |
 | **writing** | 文書作成 特化 | 技術解説、ドキュメンテーション、リリースノートの作成。 | Kimi (k2.7-code) |
 | **artistry** | 創造性 特化 | ジェネレーティブアート、クリエイティブな発想、芸術的表現。 | Gemini 3.1 Pro (high) |
 
@@ -45,10 +45,10 @@ Sisyphus（監督）は、タスクの性質に応じて最適な「知能カテ
 | エージェント | カテゴリー | 推奨/フォールバックチェーン (優先順) | 役割・専門領域 |
 | :--- | :--- | :--- | :--- |
 | **Sisyphus** | `ultrabrain` | `claude-fable-5` → `claude-opus-4-8` → `claude-opus-4-7` (max) → `kimi-k2.7-code` → `kimi-k2.6` → `gpt-5.6-sol` (medium) → `glm-5.2` | 司令塔。全体の品質管理、タスクの分解と委譲。 |
-| **Hephaestus** | `deep` | `gpt-5.6-sol` (medium) | 実装職人。自律的なコードの書き込み、複雑なロジック実装。 |
+| **Hephaestus** | `deep` | `gpt-5.6-terra` (xhigh) → `gpt-5.6-sol` (medium) | 実装職人。自律的なコードの書き込み、複雑なロジック実装。 |
 | **Oracle** | `ultrabrain` | `gpt-5.6-sol` (high) → `qwen3.6-plus` (high) → `claude-opus-4-8` (max) → `glm-5.2` | 賢者。アーキテクチャ設計の相談、難解なバグのデバッグ。 |
-| **Librarian** | `quick` | `gpt-5.6-terra` (medium) → `qwen3.5-plus` → `minimax-m3` → `minimax-m2.7` → `claude-haiku-4-5` | 司書。外部ドキュメントやOSSの実装例の高速検索。 |
-| **Explore** | `quick` | `gpt-5.6-terra` (medium) → `qwen3.5-plus` → `minimax-m3` → `minimax-m2.7` → `claude-haiku-4-5` | 探検家。コードベースの高速探索、grep検索、スキャフォールディング 。 |
+| **Librarian** | `quick` | `gpt-5.6-luna` (low) → `gpt-5.6-terra` (medium) → `qwen3.5-plus` → `minimax-m3` → `minimax-m2.7` → `claude-haiku-4-5` | 司書。外部ドキュメントやOSSの実装例の高速検索。 |
+| **Explore** | `quick` | `gpt-5.6-luna` (low) → `gpt-5.6-terra` (medium) → `qwen3.5-plus` → `minimax-m3` → `minimax-m2.7` → `claude-haiku-4-5` | 探検家。コードベースの高速探索、grep検索、スキャフォールディング 。 |
 | **Prometheus** | `ultrabrain` | `claude-opus-4-8` (max) → `gpt-5.6-sol` (high) → `glm-5.2` → `qwen3.6-plus` | 流れ者。タスクの分解と並列実行計画（Agent Swarm）の作成。 |
 | **Metis** | `ultrabrain` | `claude-sonnet-5` → `claude-sonnet-4-6` → `claude-opus-4-8` (max) → `gpt-5.6-sol` (high) → `glm-5.2` → `kimi-k2.5` | 計画コンサル。計画前のリスク特定と曖昧さの排除。 |
 | **Momus** | `ultrabrain` | `gpt-5.6-sol` (xhigh) → `claude-opus-4-8` (max) → `qwen3.6-plus` (high) → `glm-5.2` | 計画レビュアー。Prometheusが作成した計画の厳格な検証。 |
@@ -74,17 +74,17 @@ Sisyphus（監督）は、タスクの性質に応じて最適な「知能カテ
 | **原則駆動** | **自律探索型。** 最小限の指示で自律的に解決策を見出す。深い実装に強い。 | GPT Family, DeepSeek, Qwen | Hephaestus, Oracle, Momus |
 | **視覚推論型** | **UI・構造理解。** デザイン解析、CSS、レイアウトの理解に特化。 | Gemini Family, Qwen | Looker |
 
-### カテゴリー別・推奨モデルと代替ルール (v4.16.3)
+### カテゴリー別・推奨モデルと代替ルール (v4.17.0)
 
 | カテゴリー | デフォルトモデル | フォールバックチェーン (優先順) |
 | :--- | :--- | :--- |
 | **ultrabrain** | `gpt-5.6-sol` (xhigh) | `gpt-5.6-sol` (xhigh) → `qwen3.6-plus` (high) → `claude-opus-4-8` (max) → `glm-5.2` |
-| **deep** | `gpt-5.6-sol` (medium) | `gpt-5.6-sol` (medium) → `claude-opus-4-8` (max) → `qwen3.6-plus` (high) |
-| **quick** | `gpt-5.6-terra` (medium) | `gpt-5.6-terra` (medium) → `claude-haiku-4-5` → `qwen3.5-plus` → `minimax-m3` → `minimax-m2.7` → `gpt-5-nano` |
+| **deep** | `gpt-5.6-terra` (xhigh) | `gpt-5.6-terra` (xhigh) → `gpt-5.6-sol` (medium) → `claude-opus-4-8` (max) → `qwen3.6-plus` (high) |
+| **quick** | `gpt-5.6-luna` (low) | `gpt-5.6-luna` (low) → `gpt-5.6-terra` (medium) → `claude-haiku-4-5` → `qwen3.5-plus` → `minimax-m3` → `minimax-m2.7` |
 | **visual-engineering** | `qwen3.6-plus` (high) | `qwen3.6-plus` (high) → `glm-5.2` → `claude-opus-4-8` (max) → `kimi-k2.7-code` |
 | **artistry** | `qwen3.6-plus` (high) | `qwen3.6-plus` (high) → `claude-opus-4-8` (max) → `gpt-5.6-sol` |
 | **unspecified-high** | `gpt-5.6-sol` (high) | `gpt-5.6-sol` (high) → `claude-opus-4-8` (max) → `glm-5.2` → `kimi-k2.7-code` → `qwen3.6-plus` → `kimi-k2.5` |
-| **unspecified-low** | `kimi-k2.7-code` | `kimi-k2.7-code` → `kimi-k2.6` → `gpt-5.4-mini` → `qwen3.5-plus` → `minimax-m3` → `minimax-m2.7` |
+| **unspecified-low** | `gpt-5.6-luna` (xhigh) | `gpt-5.6-luna` (xhigh) → `kimi-k2.7-code` → `kimi-k2.6` → `gpt-5.4-mini` → `qwen3.5-plus` → `minimax-m3` |
 | **writing** | `kimi-k2.7-code` | `kimi-k2.7-code` → `qwen3.5-plus` → `kimi-k2.6` → `claude-sonnet-5` → `minimax-m3` → `minimax-m2.7` |
 
 ---
@@ -165,23 +165,18 @@ OpenCode の機能を拡張するため、現在以下のプラグインが [apm
    make setup-opencode
    ```
 
-## 8. v4.16.3 主要新機能
+## 8. v4.17.0 主要新機能
 
-最新の v4.16.3 にて強化・導入された主要機能です。
+最新の v4.17.0 にて強化・導入された主要機能です。
 
-### GPT-5.6 Orchestration, Hardened End to End
-GPT-5.6 が OMO の深層業務の優先パスとなり、エージェントワークフローの継続性が強化されました。
-- **インテリジェントルーティング**: Hephaestus, Momus, `deep`, `ultrabrain` は適切な推論レベルを持つ GPT-5.6 Sol を優先し、GPT-5.5 を互換性フォールバックとして保持。フォールバックチェーンの GLM は GLM 5.2 に移行。
-- **エージェント・ガイダンスの最適化**: OpenCode と LazyCodex が GPT-5.6 向けにチューニングされたプロンプト/ルールバリアントを選択可能に。
+### Codex Work That Scales to the Task
+LazyCodex は、すべての実装を1つの汎用実行エージェントにルーティングする代わりに、実際の変更サイズとリスクから低・中・高難易度のワーカーを選択するようになりました。新規インストール時のデフォルトは372Kコンテキストウィンドウを持つ GPT-5.6 Sol となり、探索（exploration）およびディープアナリティクス（deep-analysis）カテゴリーは新しい Luna および Terra ルート（`gpt-5.6-luna`, `gpt-5.6-terra`）を使用します。これにより、軽微な作業は低コストで、真に推論能力が必要な変更はより強力に対応できるようになります。
 
-### Native MultiAgentV2 Teams in LazyCodex
-Codex のチームモードで MultiAgentV2 をネイティブ実行可能に。
-- Codex App スレッドをフォールバックとして保持しつつ、MultiAgentV2 でチームを直接実行。状態管理や Durable Worktree / Messaging の互換性を維持。
+### ULW Loops Recover and Prove the Right Revision
+中断された ULW 実行は、制限付きの Stop フックを介して自動的に再開できるようになりました。証拠（evidence）は試行ごとに分離され、それを生成したコミットに関連付けられ、最終レビュアーが開始する前にチェックされます。スポーンガードとレビュアーのプリフライトチェックにより、暴走ファンアウトを防ぎ、古い証拠が新しい HEAD の証明として誤って再ラベル付けされるのを防ぎます。
 
-### Safer Codex Installation and Rule Switching
-インストールプロセスと動的ルール切り替えの堅牢化。
-- `model_catalog_json` からのマルチエージェント動作の動的解決、インストール時の不要なスレッド制限の排除。
-- モデル変更時に動的バンドルルールを自動再インジェクト。Librarian や Explorer のデフォルトモデルを最新に適合。
+### More Useful, Safer Task Output
+Senpi タスク TUI は、解決されたモデルの詳細とコンテキストステータス、制御、および出力の抜粋を表示するようになりました。行幅が制限され、ターミナル制御シーケンスがクリーンアップされたため、狭いターミナルや信頼できないタスク出力によってインターフェースが崩れることがなくなりました。
 
-### Background Agents Stop Waiting Forever
-バックグラウンドタスクが回復不能なプロバイダや認証エラーで即時終了し、親プロセスに通知されるように改善。
+### Cleaner Plugin Installs and Honest Prompt QA
+Codex バンドルは、無効な相対デーモンパスを持つネストされたコンポーネントの MCP マニフェスト（`.mcp.json`）を同梱しなくなりました。プロンプトとスキルの変更は、文言の完全一致や単語数のテストといった脆い手法ではなく、パースされた値、ランタイムセンチネル、出荷される成果物の等価性などの振る舞いの境界線でテストされるようになりました。
