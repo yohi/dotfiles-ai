@@ -89,7 +89,6 @@ run_skillport_doc() {
 from pathlib import Path
 import re
 import sys
-import re
 
 p = Path(sys.argv[1])
 text = p.read_text(encoding="utf-8")
@@ -102,8 +101,6 @@ if start != -1 and end != -1 and end > start:
     inner = text[start:end + len("<!-- SKILLPORT_END -->")]
     suffix = text[end + len("<!-- SKILLPORT_END -->"):].lstrip("\n")
 
-    # Remove leading blank lines after the start marker.
-    inner = re.sub(r"^(<!-- SKILLPORT_START -->\s*\n+)", r"\1", inner)
     # Actually strip all newlines after start marker, let single newline follow.
     inner = re.sub(r"<!-- SKILLPORT_START -->\s*\n+", "<!-- SKILLPORT_START -->\n", inner)
     inner = re.sub(r"\n+<!-- SKILLPORT_END -->", "\n<!-- SKILLPORT_END -->", inner)
@@ -166,7 +163,6 @@ PY
 from pathlib import Path
 import re
 import sys
-import re
 
 p = Path(sys.argv[1])
 text = p.read_text(encoding="utf-8")
