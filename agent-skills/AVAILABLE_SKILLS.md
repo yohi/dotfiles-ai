@@ -313,11 +313,6 @@ Each skill contains step-by-step instructions, templates, and scripts.
   <location>agent-skills/custom/config-modernizer/SKILL.md</location>
 </skill>
 <skill>
-  <name>custom/update-opencode-models</name>
-  <description>Updates the LLM models in apm.yml, personal.env, and work.env using the latest model-schema from models.dev, and updates opencode/README.md from the latest release of oh-my-openagent.</description>
-  <location>agent-skills/custom/update-opencode-models/SKILL.md</location>
-</skill>
-<skill>
   <name>dispatching-parallel-agents</name>
   <description>Use when facing 2+ independent tasks that can be worked on without shared state or sequential dependencies</description>
   <location>.agents/skills/dispatching-parallel-agents/SKILL.md</location>
@@ -383,9 +378,9 @@ Each skill contains step-by-step instructions, templates, and scripts.
   <location>.agents/skills/internal-comms/SKILL.md</location>
 </skill>
 <skill>
-  <name>local/apm-version-updater</name>
-  <description>Checks and updates the pinned dependency versions and commit hashes in THIS repository's apm.yml -- the APM skill git refs (owner/repo#tag), the npm plugins under `plugin:`, and the MCP server packages under `dependencies.mcp` (npm versions and git+https commit hashes) -- and always summarizes what changed between the current and latest version of each before writing anything. Use whenever the user wants to bump, update, refresh, upgrade, or check for newer versions or commit hashes of apm.yml dependencies, plugins, or MCP servers; asks whether the apm.yml pins are outdated; or wants a version-diff / changelog summary for them, even if they do not name this skill or say 'apm.yml' explicitly. Do NOT use for updating LLM model whitelists in apm.yml (use the update-opencode-models skill for that), for package.json / uv / other lockfile bumps, for GitHub Actions version updates, or for adding brand-new MCP server entries.</description>
-  <location>.claude/skills/apm-version-updater/SKILL.md</location>
+  <name>local/apm-updater</name>
+  <description>Checks and updates THIS repository's apm.yml and the OpenCode files derived from it. Handles (1) pinned dependency versions and commit hashes in apm.yml -- APM skill git refs (owner/repo#tag), npm plugins under `plugin:`, and MCP server packages under `dependencies.mcp` -- and (2) LLM model whitelists in apm.yml plus the OpenCode environment profiles (opencode/personal.env, opencode/work.env) and opencode/README.md using the latest model-schema from models.dev. Use whenever the user wants to bump apm.yml dependencies, refresh MCP/plugin/skill pins, check if apm.yml is outdated, update OpenCode LLM model settings, or sync opencode/README.md with the latest oh-my-openagent release. Do NOT use for package.json / uv / other lockfile bumps, GitHub Actions version updates, or adding brand-new MCP/skill/plugin entries to apm.yml.</description>
+  <location>.claude/skills/apm-updater/SKILL.md</location>
 </skill>
 <skill>
   <name>local/dotfiles-guidelines</name>

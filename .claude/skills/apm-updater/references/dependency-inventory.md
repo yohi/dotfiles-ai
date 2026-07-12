@@ -1,12 +1,16 @@
-# 依存の種類別レシピ + 現在のインベントリ
+# 依存の種類別レシピ + モデルスキーマ更新手順
 
-このファイルは [SKILL.md](../SKILL.md) のステップ2・3から参照される補助資料です。`apm.yml` に固定された依存を「どう最新化するか」「バージョン間の差分をどこから取るか」を種類別にまとめています。
+このファイルは [SKILL.md](../SKILL.md) のワークフローから参照される補助資料です。
+
+1. `apm.yml` に固定された依存を「どう最新化するか」「バージョン間の差分をどこから取るか」を種類別にまとめています。
+2. `models.dev/model-schema.json` を使った OpenCode LLM モデル更新手順をまとめています。
 
 ## 目次
 
 - [種類別レシピ一覧](#種類別レシピ一覧)
 - [差分説明の取得手順（種類別）](#差分説明の取得手順種類別)
 - [現在の apm.yml インベントリ（スナップショット）](#現在の-apmyml-インベントリスナップショット)
+- [LLM モデルスキーマ更新手順](#llm-モデルスキーマ更新手順)
 - [注意点](#注意点)
 
 ## 種類別レシピ一覧
@@ -67,8 +71,49 @@
 - トップレベル `skills:`: `coderabbitai/skills`, `greptileai/skills//check-pr`, `greptileai/skills//greploop`
 - 版数なしの MCP コマンド: `coderabbitai-mcp`, `sonarqube-mcp-server`, `skillport-mcp`, `semgrep-mcp`
 
+## LLM モデルスキーマ更新手順
+
+### 1. 最新モデル一覧の取得
+
+```bash
+python .claude/skills/apm-updater/scripts/check_updates.py --models
+```
+
+`https://models.dev/model-schema.json` から `[$defs][Model][enum]` を抽出し、プロバイダーごとにグループ化して表示します。ネットワーク不通時は `unresolved` として報告します。
+
+### 2. apm.yml provider セクションの検証
+
+```bash
+python .claude/skills/apm-updater/scripts/check_updates.py --validate-models
+```
+
+`apm.yml` 内の YAML リスト形式のモデル識別子を読み取り、以下を検証します:
+
+- 各モデルが `models.dev/model-schema.json` の `enum` に含まれているか
+- `amazon-bedrock` セクションのモデルが `global.anthropic.claude-*` または `openai.gpt-*` で始まっているか
+
+検証結果は行番号付きで出力されます。問題がなければ「all whitelist entries match models.dev schema」と表示されます。
+
+### 3. apm.yml の更新ルール
+
+- `provider` セクション配下の各プロバイダーの `whitelist` または `models` リストを、最新スキーマで定義されている有効なモデル名と一致させます。
+- **Bedrock 制限**: `amazon-bedrock` の whitelist は `global.anthropic.claude-*` と `openai.gpt-*` のみにします。リージョン固有モデルや古い世代は含めません。
+- `opencode.jsonc` を直接編集してはいけません。`apm.yml` 更新後に `make sync-opencode` で再生成します。
+
+### 4. personal.env / work.env の更新ルール
+
+- `personal.env`: Bedrock モデル（`amazon-bedrock/*`）を含めず、OpenAI・Kimi・Gemini・GLM・Qwen・Minimax 等の最新モデルを割り当てます。
+- `work.env`: Bedrock モデルのみを使用します（`HEPHAESTUS_DISABLED=true` 等の例外設定は維持）。最新の Bedrock Claude モデル（`global.anthropic.claude-*`）を割り当てます。
+
+### 5. opencode/README.md の更新ルール
+
+- `https://github.com/code-yeongyu/oh-my-openagent` の最新リリースを確認します。
+- 更新対象: `Target Version` セクション、知能カテゴリー・エージェント構成のデフォルト推奨モデル一覧。
+- **保護対象**: `work.env`/`personal.env` の切り替え手順、zsh 連携スクリプトやエイリアスの設定解説、`apm.yml` からのプラグイン同期手順および構造的説明。
+- 丸ごとの置き換えは絶対に避け、差分のみを部分的にアップデートします。
+
 ## 注意点
 
 - `apm.yml` は SSOT。書き換えは対象行のみの最小差分にし、YAML 全体を再整形しない。
 - 版数だけ / ハッシュだけを差し替え、引用符・インデント・`[all]` などの extras・`//subpath` は保持する。
-- 適用後の再解決には `make apm-install`（`apm.lock.yaml` を更新）が必要。MCP 版数変更時は `make sync-mcp`、スキル/プラグイン変更時は `make sync-agents` を案内する（このスキルでは自動実行しない）。
+- 適用後の再解決には `make apm-install`（`apm.lock.yaml` を更新）が必要。MCP 版数変更時は `make sync-mcp`、スキル/プラグイン変更時は `make sync-agents`、OpenCode モデル/環境変更時は `make sync-opencode` を案内する（このスキルでは自動実行しない）。
