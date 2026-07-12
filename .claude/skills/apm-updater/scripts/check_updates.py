@@ -144,16 +144,18 @@ def validate_apm_models(apm_path: Path) -> int:
 
     text = apm_path.read_text(encoding="utf-8")
     issues = []
-    section = None
     provider_name = None
-    in_provider_section = False
     provider_indent = None
+    in_provider_section = False
     for idx, line in enumerate(text.splitlines(), start=1):
-        indent = len(line) - len(line.lstrip())
-        top = re.match(r"^([A-Za-z0-9_-]+):", line)
+        stripped = line.lstrip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        indent = len(line) - len(stripped)
+        top = re.match(r"^([A-Za-z0-9_-]+):", stripped)
         if top:
             section = top.group(1)
-            if section == "provider":
+            if section == "provider" and indent == 0:
                 in_provider_section = True
                 provider_name = None
                 provider_indent = indent
