@@ -171,3 +171,5 @@ docker mcp catalog create local-<name> --title "Local <Name>" \
 | `invalid config: empty credsStore` → `docker-credential-notfound` | Credential Helper 未設定 | `docker-credential-secretservice`（Desktop環境）または `docker-credential-pass`（ヘッドレス）を導入し `credsStore` を設定 |
 | `server <name> not found in catalog` | サーバーが公式カタログ未収録、または `catalog create` で正式登録されていない | `docker mcp catalog create local-<name> --server file://...` で登録 |
 | `callback timeout: context canceled` | ブラウザでの認可待ちの間にコマンド自体がタイムアウト/中断された | タイムアウトなしで再実行し、表示された URL をブラウザで開いて認可を完了する |
+| `invalid_target` (The resource parameter does not match...) | Sentryなどの一部の認可サーバーが、`docker mcp` が自動付与する `resource` パラメータを拒否している | 認可URLから `&resource=...` を手動で削除してブラウザで開く。※本リポジトリの `make auth-mcp` （`_scripts/auth-mcp.py`）では自動的にこのパラメータを除去してブラウザを開くよう対策されています |
+

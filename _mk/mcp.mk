@@ -1,4 +1,4 @@
-.PHONY: setup-docker-mcp sync-mcp mcp uninstall-mcp status-mcp start-mcp stop-mcp restart-mcp logs-mcp status-watchdog logs-watchdog fix-ubuntu-rootless sync-mcp-gateway
+.PHONY: setup-docker-mcp sync-mcp mcp uninstall-mcp status-mcp start-mcp stop-mcp restart-mcp logs-mcp status-watchdog logs-watchdog fix-ubuntu-rootless sync-mcp-gateway auth-mcp
 
 mcp: setup-docker-mcp
 
@@ -208,4 +208,5 @@ uninstall-codegraph: ## Uninstall codegraph from agents and system
 	@rm -rf "$(HOME_DIR)/.codegraph"
 	$(Q_ECHO) "✅ codegraph のアンインストールが完了しました。"
 
-
+auth-mcp: ## Docker MCP Gateway OAuth 認証を対話的に実行
+	@python3 _scripts/auth-mcp.py
