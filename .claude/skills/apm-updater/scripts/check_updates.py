@@ -144,9 +144,13 @@ def validate_apm_models(apm_path: Path) -> int:
 
     text = apm_path.read_text(encoding="utf-8")
     issues = []
-    provider_name = None
-    provider_indent = None
     in_provider_section = False
+    provider_indent = 0
+    provider_name = None
+    provider_name_indent = None
+    list_key = None
+    list_key_indent = None
+
     for idx, line in enumerate(text.splitlines(), start=1):
         stripped = line.lstrip()
         if not stripped or stripped.startswith("#"):
@@ -155,21 +159,43 @@ def validate_apm_models(apm_path: Path) -> int:
         top = re.match(r"^([A-Za-z0-9_-]+):", stripped)
         if top:
             section = top.group(1)
-            if section == "provider" and indent == 0:
-                in_provider_section = True
-                provider_name = None
-                provider_indent = indent
-                continue
             if in_provider_section:
                 if indent <= provider_indent:
                     in_provider_section = False
                     provider_name = None
-                    provider_indent = None
-                elif section != "whitelist":
+                    provider_name_indent = None
+                    list_key = None
+                    list_key_indent = None
+                else:
+                    if (
+                        provider_name_indent is not None
+                        and indent <= provider_name_indent
+                    ):
+                        provider_name = None
+                        provider_name_indent = None
+                    if list_key_indent is not None and indent <= list_key_indent:
+                        list_key = None
+                        list_key_indent = None
+
+            if section == "provider" and indent == 0:
+                in_provider_section = True
+                provider_indent = indent
+                provider_name = None
+                provider_name_indent = None
+                list_key = None
+                list_key_indent = None
+                continue
+
+            if in_provider_section:
+                if section in ("whitelist", "models") and provider_name is not None:
+                    list_key = section
+                    list_key_indent = indent
+                else:
                     provider_name = section
+                    provider_name_indent = indent
             continue
 
-        if not in_provider_section or not provider_name:
+        if not in_provider_section or not provider_name or not list_key:
             continue
 
         m = re.match(r'^\s*-\s*"?([^"\s#]+)"?\s*$', line)
