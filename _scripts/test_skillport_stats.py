@@ -9,14 +9,12 @@ from skillport_stats import parse_input, get_env_status, print_stats
 class TestSkillportStats(unittest.TestCase):
     def test_get_env_status(self):
         with patch.dict(os.environ, {
-            "MCP_GATEWAY_STATUS": "active",
             "SKILLPORT_MCP_VERSION": "1.1.0",
-            "SKILLPORT_MCP_STATUS": "active (Gateway)"
+            "SKILLPORT_MCP_STATUS": "active"
         }):
-            gw, ver, status = get_env_status()
-            self.assertEqual(gw, "active")
+            ver, status = get_env_status()
             self.assertEqual(ver, "1.1.0")
-            self.assertEqual(status, "active (Gateway)")
+            self.assertEqual(status, "active")
 
     def test_parse_input_valid(self):
         test_data = {
@@ -44,12 +42,12 @@ class TestSkillportStats(unittest.TestCase):
         skills = [{"id": "test/skill1"}, {"id": "root-skill"}]
         total = 2
         with patch('sys.stdout', new=io.StringIO()) as fake_out:
-            print_stats(skills, total, "active (Gateway)", "1.1.0", "active")
+            print_stats(skills, total, "1.1.0", "active")
             output = fake_out.getvalue()
             
             self.assertIn("Total Skills: 2", output)
             self.assertIn("1.1.0", output)
-            self.assertIn("active (Gateway)", output)
+            self.assertIn("active", output)
             self.assertIn("test", output) # Namespace
             self.assertIn("root-skill", output) # Root skill ID
 

@@ -35,17 +35,15 @@ def parse_input() -> Tuple[List[Dict[str, Any]], int]:
     return skills, total
 
 
-def get_env_status() -> Tuple[str, str, str]:
-    mcp_gateway_status = os.environ.get("MCP_GATEWAY_STATUS", "unknown")
+def get_env_status() -> Tuple[str, str]:
     skillport_mcp_version = os.environ.get("SKILLPORT_MCP_VERSION", "unknown")
     skillport_mcp_status = os.environ.get("SKILLPORT_MCP_STATUS", "unknown")
-    return mcp_gateway_status, skillport_mcp_version, skillport_mcp_status
+    return skillport_mcp_version, skillport_mcp_status
 
 
 def print_stats(
     skills: List[Dict[str, Any]],
     total: int,
-    mcp_gateway_status: str,
     skillport_mcp_version: str,
     skillport_mcp_status: str,
 ) -> None:
@@ -76,11 +74,8 @@ def print_stats(
     print("Service Status")
     print("────────────────────────────────────────")
 
-    gateway_icon = "✅" if mcp_gateway_status.startswith("active") else "❌"
-    # "active (Gateway)" なども許容するため startswith("active") を使用
     mcp_icon = "✅" if skillport_mcp_status.startswith("active") else "❌"
 
-    print(f"Docker MCP Gateway: {gateway_icon} {mcp_gateway_status}")
     print(f"SkillPort MCP Status: {mcp_icon} {skillport_mcp_status}")
     print(f"SkillPort MCP Tool:   📦 {skillport_mcp_version}")
     print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
@@ -102,8 +97,8 @@ def print_stats(
 
 def main() -> None:
     skills, total = parse_input()
-    gw_status, mcp_ver, mcp_status = get_env_status()
-    print_stats(skills, total, gw_status, mcp_ver, mcp_status)
+    mcp_ver, mcp_status = get_env_status()
+    print_stats(skills, total, mcp_ver, mcp_status)
 
 
 if __name__ == "__main__":

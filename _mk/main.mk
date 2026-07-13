@@ -1,4 +1,4 @@
-.PHONY: all install install-agents install-ides setup setup-agents setup-ides mcp-render link clean-internal install-requirements lint init sync secrets status clean test clean-legacy configure-git-ignore doctor apm-install install-apm
+.PHONY: all install install-agents install-ides setup setup-agents setup-ides link clean-internal install-requirements lint init sync secrets status clean test clean-legacy configure-git-ignore doctor apm-install install-apm
 
 UV_VERSION ?= 0.11.19
 
@@ -27,7 +27,7 @@ setup: install-requirements install-apm ## APMインストール、エージェ�
 	$(Q_ECHO) "🚀 APMによるエージェント設定の自動セットアップを実行中..."
 	@$(MAKE) sync-agents
 	@$(MAKE) setup-apm-env
-	@$(MAKE) setup-docker-mcp
+	@$(MAKE) sync-mcp
 	@$(MAKE) setup-agents
 	@$(MAKE) setup-ides
 	$(Q_ECHO) "✅ dotfiles-ai の全設定が適用されました"
@@ -69,9 +69,6 @@ setup-ides:
 	$(Q_ECHO) "🚀 dotfiles-ai IDE 設定をセットアップ中..."
 	$(MAKE) setup-cursor
 	$(MAKE) setup-vscode
-
-mcp-render:
-	@sed "s|__HOME__|$$HOME|g" mcp/catalogs/custom.yaml.template > mcp/catalogs/custom.yaml
 
 link: setup
 	@echo "🔗 dotfiles-ai をリンク中 (Handled in setup targets)"
@@ -166,27 +163,19 @@ doctor: ## [診断] 設定の不備や同期が必要な箇所を特定し、解
 	elif [ -n "$$LATEST_SKILL" ] || [ -n "$$LATEST_CMD" ]; then \
 		echo "⚠️  [ACTION REQUIRED] 同期が一度も実行されていません。'make sync-agents' を実行してください。"; \
 	fi
-	@# 3. Component specific checks
-	@if [ ! -L "$(HOME_DIR)/.claude/CLAUDE.md" ]; then \
-		echo "⚠️  [ACTION REQUIRED] Claude の設定が未完了です。'make setup-claude' を実行してください。"; \
-	fi
-	@if [ ! -e "$(HOME_DIR)/.gemini/settings.json" ]; then \
-		echo "⚠️  [ACTION REQUIRED] Gemini の設定が未完了です。'make setup-gemini' を実行してください。"; \
-	fi
-	@if ! command -v skillport >/dev/null 2>&1; then \
-		echo "⚠️  [ACTION REQUIRED] SkillPort がインストールされていません。'make install-skillport' を実行してください。"; \
-	fi
-	@# 4. OS-aware MCP check
-	@if [ "$(OS_NAME)" = "Linux" ]; then \
-		if ! systemctl --user list-unit-files docker-mcp-gateway.service >/dev/null 2>&1; then \
-			echo "❌ [ACTION REQUIRED] Docker MCP Gateway がセットアップされていません。'make setup-docker-mcp' を実行してください。"; \
-		elif ! systemctl --user is-active docker-mcp-gateway.service > /dev/null 2>&1; then \
-			echo "ℹ️  [INFO] Docker MCP Gateway が起動していません。'make start-mcp' で起動できます。"; \
+	@# 4. Direct MCP runtime check
+	@missing_runtime=""; \
+	for cmd in uv npx; do \
+		if ! command -v $$cmd >/dev/null 2>&1; then \
+			missing_runtime="$$missing_runtime $$cmd"; \
 		fi; \
-	elif [ "$(OS_NAME)" = "Darwin" ]; then \
-		echo "ℹ️  [INFO] macOS (Darwin) 環境です。Docker MCP Gateway の自動起動診断は現在制限されています。"; \
-	else \
-		echo "ℹ️  [INFO] $(OS_NAME) 環境です。Docker MCP Gateway の自動診断はスキップされました。"; \
+	done; \
+	if [ -n "$$missing_runtime" ]; then \
+		echo "⚠️  [ACTION REQUIRED] Direct MCP runtime が見つかりません:$$missing_runtime。'make install-requirements' を実行してください。"; \
+	fi
+	@# 5. GitHub MCP server binary check
+	@if ! command -v github-mcp-server >/dev/null 2>&1; then \
+		echo "⚠️  [ACTION REQUIRED] github-mcp-server バイナリが見つかりません。'go install github.com/github/github-mcp-server/cmd/github-mcp-server@latest' を実行してください。"; \
 	fi
 	$(Q_ECHO) "✅ 診断完了"
 

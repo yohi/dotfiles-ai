@@ -43,27 +43,24 @@ def build_mcp_servers(apm: dict[str, Any]) -> dict[str, Any]:
         transport = entry.get("transport", "stdio")
         name = str(entry["name"])
 
-        # Convert remote SSE / HTTP transport servers to stdio using mcp-remote bridge for Claude
+        # Emit remote SSE / HTTP / streamable-http servers directly for Claude Code.
+        # Claude Code 2.1.1+ supports streamable-http with an Authorization header.
         if transport in ("sse", "http", "streamable-http"):
             url = entry.get("url")
             if not url:
                 print(
-                    f"[warning] Skipping MCP server '{name}': url is missing for sse transport."
+                    f"[warning] Skipping MCP server '{name}': url is missing for {transport} transport."
                 )
                 continue
-            expanded_url = expand_env_vars(str(url))
-            args = ["-y", "mcp-remote", expanded_url]
-
+            remote_cfg: dict[str, Any] = {
+                "type": "http" if transport in ("sse", "http") else transport,
+                "url": expand_env_vars(str(url)),
+            }
             headers = entry.get("headers")
             if headers:
-                for k, v in headers.items():
-                    args.extend(["--header", f"{k}:{v}"])
-
-            remote_cfg: dict[str, Any] = {
-                "type": "stdio",
-                "command": "npx",
-                "args": args,
-            }
+                remote_cfg["headers"] = {
+                    k: expand_env_vars(str(v)) for k, v in headers.items()
+                }
             if entry.get("env"):
                 remote_cfg["env"] = {
                     k: expand_env_vars(str(v)) for k, v in entry["env"].items()

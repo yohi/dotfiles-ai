@@ -68,13 +68,116 @@ dependencies:
         X-GitHub-Token: "${env:GITHUB_TOKEN}"
       enabled: true
 
-    - name: docker-mcp
-      title: "Docker MCP Gateway"
+    - name: sqlite
+      title: "SQLite MCP"
+      registry: false
+      transport: stdio
+      command: "uvx"
+      args:
+        - "mcp-server-sqlite"
+        - "--db-path"
+        - "${env:HOME}/.mcp/sqlite/sqlite.db"
+      standalone: true
+      enabled: true
+
+    - name: filesystem
+      title: "Filesystem MCP"
+      registry: false
+      transport: stdio
+      command: "npx"
+      args:
+        - "-y"
+        - "@modelcontextprotocol/server-filesystem"
+        - "${env:PWD}"
+      standalone: true
+      enabled: true
+
+    - name: sequentialthinking
+      title: "Sequential Thinking MCP"
+      registry: false
+      transport: stdio
+      command: "npx"
+      args:
+        - "-y"
+        - "@modelcontextprotocol/server-sequential-thinking"
+      env:
+        DISABLE_THOUGHT_LOGGING: "${env:DISABLE_THOUGHT_LOGGING:-true}"
+      standalone: true
+      enabled: true
+
+    - name: github-official
+      title: "GitHub Official MCP"
       registry: false
       transport: sse
-      url: "http://127.0.0.1:10888/sse"
+      url: "https://api.githubcopilot.com/mcp/"
       headers:
-        Authorization: "Bearer ${env:MCP_GATEWAY_TOKEN}"
+        Authorization: "Bearer ${env:GITHUB_TOKEN}"
+      standalone: true
+      enabled: true
+
+    - name: aws-api
+      title: "AWS API MCP"
+      registry: false
+      transport: stdio
+      command: "uvx"
+      args:
+        - "awslabs.aws-api-mcp-server"
+      env:
+        AWS_REGION: "${env:AWS_REGION:-us-east-1}"
+        AWS_API_MCP_PROFILE_NAME: "${env:AWS_PROFILE:-default}"
+        AWS_API_MCP_TRANSPORT: "stdio"
+        FASTMCP_LOG_LEVEL: "ERROR"
+      standalone: true
+      enabled: true
+
+    - name: aws-iac
+      title: "AWS IaC MCP"
+      registry: false
+      transport: stdio
+      command: "uvx"
+      args:
+        - "awslabs.aws-iac-mcp-server"
+      env:
+        AWS_PROFILE: "${env:AWS_PROFILE:-default}"
+        AWS_REGION: "${env:AWS_REGION:-us-east-1}"
+        FASTMCP_LOG_LEVEL: "ERROR"
+      standalone: true
+      enabled: true
+
+
+    - name: aws-documentation
+      title: "AWS Documentation MCP"
+      registry: false
+      transport: stdio
+      command: "uvx"
+      args:
+        - "awslabs.aws-documentation-mcp-server"
+      env:
+        FASTMCP_LOG_LEVEL: "ERROR"
+        AWS_DOCUMENTATION_PARTITION: "${env:AWS_DOCUMENTATION_PARTITION:-aws}"
+      standalone: true
+      enabled: true
+
+    - name: aws-mcp
+      title: "AWS Managed MCP"
+      registry: false
+      transport: stdio
+      command: "uvx"
+      args:
+        - "mcp-proxy-for-aws@latest"
+        - "https://aws-mcp.us-east-1.api.aws/mcp"
+      env:
+        AWS_REGION: "${env:AWS_REGION:-us-east-1}"
+      standalone: true
+      enabled: true
+
+    - name: sentry-remote
+      title: "Sentry Remote MCP"
+      registry: false
+      transport: sse
+      url: "https://mcp.sentry.dev/mcp"
+      headers:
+        Authorization: "Sentry-Bearer ${env:SENTRY_AUTH_TOKEN}"
       enabled: true
 
     - name: sonarqube

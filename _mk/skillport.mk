@@ -5,7 +5,7 @@
 SKILLPORT_SKILLS_DIR ?= $(HOME)/.skillport/skills
 SKILLPORT_RUNTIME_SKILLS_DIR ?= $(RUNTIME_SKILLS_DIR)
 
-.PHONY: skillport install-skillport setup-skillport check-skillport check-skillport-version install-apm
+.PHONY: skillport install-skillport setup-skillport check-skillport check-skillport-version install-apm stats-skillport status-skillport
 
 # SkillPort のインストールとセットアップ
 skillport: ## SkillPortのインストールとセットアップ
@@ -161,21 +161,8 @@ check-skillport: ## SkillPort の状態確認
 		echo "⚠️  skills: $(SKILLPORT_SKILLS_DIR) is not a symlink"; \
 	fi
 
-.PHONY: stats-skillport status-skillport
-stats-skillport: ## SkillPort の統計情報と MCP の起動状況を表示
+stats-skillport: ## SkillPort の統計情報を表示
 	@if command -v skillport >/dev/null 2>&1; then \
-		MCP_GATEWAY_STATUS=$$(systemctl --user is-active docker-mcp-gateway.service 2>/dev/null || echo "not-running"); \
-		SKILLPORT_MCP_VERSION=$$(uv tool list 2>/dev/null | grep -A 1 "skillport-mcp" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n 1 || echo "not-installed"); \
-		if [ "$$MCP_GATEWAY_STATUS" = "active" ] && command -v yq >/dev/null 2>&1 && yq '.gateway.enabled_servers[]' mcp/config.yaml 2>/dev/null | grep -qx "skillport"; then \
-			SKILLPORT_MCP_STATUS="active (Gateway)"; \
-		elif pgrep -f "skillport-mcp" >/dev/null 2>&1; then \
-			SKILLPORT_MCP_STATUS="active (local)"; \
-		else \
-			SKILLPORT_MCP_STATUS="inactive"; \
-		fi; \
-		export MCP_GATEWAY_STATUS; \
-		export SKILLPORT_MCP_VERSION; \
-		export SKILLPORT_MCP_STATUS; \
 		skillport list --json | $(PYTHON) python3 _scripts/skillport_stats.py; \
 	else \
 		echo "❌ skillport が見つかりません"; \
@@ -183,7 +170,6 @@ stats-skillport: ## SkillPort の統計情報と MCP の起動状況を表示
 	fi
 
 status-skillport: stats-skillport ## stats-skillport のエイリアス
-
 
 # SkillPort のバージョン確認 (GHCR vs PyPI)
 check-skillport-version: ## SkillPort のコンテナと PyPI のバージョンを比較

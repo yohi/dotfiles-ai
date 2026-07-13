@@ -229,7 +229,7 @@ setup-opencode: sync-opencode ## OpenCode（opencode）の設定ファイルを�
 	@$(call create_marker,setup-opencode,1)
 	$(Q_ECHO) "✅ OpenCode（opencode）の設定を適用しました"
 	$(Q_ECHO) "💡 使い方を確認するには 'make help-opencode' を実行してください。"
-	@# Load .env from .zshrc for MCP_GATEWAY_TOKEN etc.
+	@# Load the project .env from .zshrc for direct MCP server credentials.
 	@if [ -f "$(REPO_ROOT)/.env" ]; then \
 		RC="$$HOME/.zshrc"; \
 		MARKER="# dotfiles-ai .env"; \

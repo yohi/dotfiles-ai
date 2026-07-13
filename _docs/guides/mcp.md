@@ -1,20 +1,34 @@
 # MCP (Model Context Protocol) 使用ガイド
 
-🐳 Docker MCP Gateway のセットアップが完了しました！
+このプロジェクトでは、すべての MCP サーバーを `apm.yml` で直接管理しています。
 
-## 🚀 サービス管理:
-- `make start-mcp`                - MCP Gateway を起動
-- `make stop-mcp`                 - MCP Gateway を停止
-- `make restart-mcp`              - MCP Gateway を再起動
-- `make status-mcp`               - ステータス確認
-- `make logs-mcp`                 - ログを表示 (`journalctl`)
+## 設定の同期
 
-## 🔄 設定の同期:
-- `make sync-mcp`                 - `mcp/config.yaml` などの設定を反映して再起動
+- `make sync-mcp` — `apm.yml` を元に各エージェントの MCP 設定を再生成
 
-## 📂 設定ディレクトリ:
-- **実体**: `mcp/`
-- **配置先**: `~/.docker/mcp/` (Docker MCP Gateway が参照)
+## 管理対象サーバー
 
-## 🛠️ トラブルシューティング:
-もしサービスが起動しない場合は、`make logs-mcp` でエラー内容を確認してください。Docker が起動している必要があります。
+`apm.yml` の `dependencies.mcp` に定義されたサーバーがそのまま各 AI ツールで
+利用可能になります。主なサーバーは以下の通りです。
+
+- `sqlite` — ローカル SQLite DB 操作
+- `filesystem` — プロジェクトルート以下のファイルアクセス
+- `sequentialthinking` — 段階的な思考支援
+- `github-official` — GitHub 連携
+- `aws-api`, `aws-cdk-mcp-server`, `aws-diagram`, `aws-documentation`,
+  `aws-terraform` — AWS 関連支援
+- `sentry-remote` — Sentry リモート連携
+- `nexus`, `chronos-graph`, `skillport` — ローカルコンテキスト・知識ベース
+
+## トラブルシューティング
+
+- `.env` が存在し、必要なトークンが設定されていることを確認してください。
+- `github-mcp-server` バイナリが `PATH` に含まれている必要があります。
+  未インストールの場合は以下を実行してください。
+
+  ```bash
+  go install github.com/github/github-mcp-server/cmd/github-mcp-server@latest
+  ```
+
+- AWS サーバーを使用する場合は `AWS_PROFILE` / `AWS_REGION` が設定されていることを
+  確認してください。

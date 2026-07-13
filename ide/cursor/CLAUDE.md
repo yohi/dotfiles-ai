@@ -27,7 +27,7 @@ This repository manages multiple MCP server configurations:
 **Generated Configuration** (`mcp.json`):
 
 - Rendered from the repository-wide SSOT: `apm.yml`
-- Points Cursor directly at the local Docker MCP Gateway SSE endpoint
+- Uses the stdio and remote server definitions generated directly from `apm.yml`
 - Refreshed by `make sync-mcp`
 
 ### Custom Slash Commands

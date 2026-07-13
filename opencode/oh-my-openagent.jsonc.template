@@ -300,7 +300,6 @@
   "hashline_edit": true,
   "env": [
     "HOME",
-    "MCP_GATEWAY_TOKEN",
     "CHRONOS_POSTGRES_HOST",
     "CHRONOS_POSTGRES_PASSWORD",
     "CHRONOS_NEO4J_URI",
