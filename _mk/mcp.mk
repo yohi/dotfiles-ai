@@ -207,5 +207,6 @@ uninstall-codegraph: ## Uninstall codegraph from agents and system
 	@rm -f "$(HOME_DIR)/.local/bin/codegraph"
 	@rm -rf "$(HOME_DIR)/.codegraph"
 	$(Q_ECHO) "✅ codegraph のアンインストールが完了しました。"
+
 auth-mcp: ## Docker MCP Gateway OAuth 認証を対話的に実行
 	@python3 _scripts/auth-mcp.py

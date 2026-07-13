@@ -3,6 +3,7 @@ import subprocess
 import sys
 import re
 import os
+import shlex
 
 def run_cmd(cmd, env=None):
     full_env = os.environ.copy()
@@ -33,7 +34,7 @@ def main():
     # 2. Extract OAuth servers from catalogs
     oauth_servers = []
     for ref in refs:
-        show_stdout, show_code = run_cmd(f"docker mcp catalog show {ref}", env=env)
+        show_stdout, show_code = run_cmd(f"docker mcp catalog show {shlex.quote(ref)}", env=env)
         if show_code != 0:
             continue
             
@@ -115,17 +116,24 @@ def main():
             match = url_pattern.search(line)
             if match and not browser_opened:
                 url = match.group(1)
+                is_patched = False
                 if target_server == "sentry-remote":
                     # Strip resource parameter
-                    clean_url = re.sub(r'&resource=[^&\s]+', '', url)
-                    line = line.replace(url, clean_url)
-                    url = clean_url
+                    clean_url = re.sub(r'([?&])resource=[^&\s]+', lambda m: '' if m.group(1) == '?' else '', url)
+                    clean_url = re.sub(r'\?&', '?', clean_url)
+                    if clean_url != url:
+                        line = line.replace(url, clean_url)
+                        url = clean_url
+                        is_patched = True
                 
                 print(line, end="")
                 try:
                     webbrowser.open(url)
                     browser_opened = True
-                    print("[*] Automatically opened browser with patched URL (stripped resource parameter).")
+                    if is_patched:
+                        print("[*] Automatically opened browser with patched URL (stripped resource parameter).")
+                    else:
+                        print("[*] Automatically opened browser with authorization URL.")
                 except Exception as e:
                     print(f"[!] Failed to open browser automatically: {e}")
                 continue
