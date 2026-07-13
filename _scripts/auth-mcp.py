@@ -105,6 +105,7 @@ def main():
         env=auth_env
     )
     
+    assert process.stdout is not None
     url_pattern = re.compile(r'(https?://[^\s\)]+)')
     browser_opened = False
     
