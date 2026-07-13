@@ -79,14 +79,111 @@ run_skillport_doc() {
     sed -i "s|${escaped_tmp_skills_dir}/custom/|agent-skills/custom/|g" "$tmp_file"
     sed -i "s|${escaped_tmp_skills_dir}/|.agents/skills/|g" "$tmp_file"
 
+    # Normalize whitespace inside the generated SkillPort block so that repeated
+    # syncs do not produce blank-line-only diffs in AGENTS.md files.
+    # - Trim leading blank lines before the first marker.
+    # - Trim trailing blank lines after the last marker.
+    # - Collapse runs of blank lines inside the block to a single blank line.
+    if command -v python3 >/dev/null 2>&1; then
+        python3 - "$tmp_file" <<'PY'
+from pathlib import Path
+import re
+import sys
+
+p = Path(sys.argv[1])
+text = p.read_text(encoding="utf-8")
+
+start = text.find("<!-- SKILLPORT_START -->")
+end = text.rfind("<!-- SKILLPORT_END -->")
+
+if start != -1 and end != -1 and end > start:
+    prefix = text[:start].rstrip("\n")
+    inner = text[start:end + len("<!-- SKILLPORT_END -->")]
+    suffix = text[end + len("<!-- SKILLPORT_END -->"):].lstrip("\n")
+
+    # Actually strip all newlines after start marker, let single newline follow.
+    inner = re.sub(r"<!-- SKILLPORT_START -->\s*\n+", "<!-- SKILLPORT_START -->\n", inner)
+    inner = re.sub(r"\n+<!-- SKILLPORT_END -->", "\n<!-- SKILLPORT_END -->", inner)
+
+    # Collapse 3+ consecutive newlines (i.e. 2+ blank lines) to 2 newlines (1 blank line).
+    inner = re.sub(r"\n{3,}", "\n\n", inner)
+
+    text = prefix + "\n" + inner + "\n" + suffix
+
+p.write_text(text, encoding="utf-8")
+PY
+    fi
+
     if [[ -f "$output_file" ]] && grep -q "<!-- SKILLPORT_START -->" "$output_file" && grep -q "<!-- SKILLPORT_END -->" "$output_file"; then
         echo "Updating SkillPort section in existing ${output_file}..."
-        # Slurp the entire tmp_file into $s and perform a tag-based replacement in the output_file.
-        # This replaces everything between SKILLPORT_START and SKILLPORT_END tags.
-        perl -0777 -i -pe "BEGIN{undef $/; open(F, '<', '$tmp_file') or die; \$s=<F>; close F;} s/<!-- SKILLPORT_START -->.*?<!-- SKILLPORT_END -->/\$s/gs" "$output_file"
+        # Replace the SkillPort block while preserving the blank lines that
+        # existed immediately before and after the markers in the original file.
+        if command -v python3 >/dev/null 2>&1; then
+            python3 - "$tmp_file" "$output_file" <<'PY'
+from pathlib import Path
+import sys
+
+tmp = Path(sys.argv[1]).read_text(encoding="utf-8")
+orig = Path(sys.argv[2]).read_text(encoding="utf-8")
+
+start_marker = "<!-- SKILLPORT_START -->"
+end_marker = "<!-- SKILLPORT_END -->"
+
+# Extract inner block from generated tmp file.
+tmp_start = tmp.find(start_marker)
+tmp_end = tmp.rfind(end_marker)
+if tmp_start == -1 or tmp_end == -1 or tmp_end <= tmp_start:
+    sys.exit(0)
+new_inner = tmp[tmp_start:tmp_end + len(end_marker)]
+
+# Split original file around the markers, keeping surrounding whitespace.
+orig_start = orig.find(start_marker)
+orig_end = orig.rfind(end_marker)
+if orig_start == -1 or orig_end == -1 or orig_end <= orig_start:
+    sys.exit(0)
+
+orig_prefix = orig[:orig_start]
+orig_suffix = orig[orig_end + len(end_marker):]
+
+Path(sys.argv[2]).write_text(orig_prefix + new_inner + orig_suffix, encoding="utf-8")
+PY
+        else
+            # Fallback for environments without python3.
+            perl -0777 -i -pe "BEGIN{undef $/; open(F, '<', '$tmp_file') or die; \$s=<F>; close F;} s/<!-- SKILLPORT_START -->.*?<!-- SKILLPORT_END -->/\$s/gs" "$output_file"
+        fi
     else
         echo "Writing initial skill listings to ${output_file}..."
         cp "$tmp_file" "$output_file"
+    fi
+
+    # Normalize runs of blank lines inside the generated SkillPort block to a
+    # single blank line, but leave the whitespace around the markers untouched.
+    if command -v python3 >/dev/null 2>&1; then
+        python3 - "$output_file" <<'PY'
+from pathlib import Path
+import re
+import sys
+
+p = Path(sys.argv[1])
+text = p.read_text(encoding="utf-8")
+
+start = text.find("<!-- SKILLPORT_START -->")
+end = text.rfind("<!-- SKILLPORT_END -->")
+
+if start != -1 and end != -1 and end > start:
+    inner = text[start:end + len("<!-- SKILLPORT_END -->")]
+
+    # Ensure exactly one newline follows the start marker and one precedes the end marker.
+    inner = re.sub(r"<!-- SKILLPORT_START -->\s*\n+", "<!-- SKILLPORT_START -->\n", inner)
+    inner = re.sub(r"\n+<!-- SKILLPORT_END -->", "\n<!-- SKILLPORT_END -->", inner)
+
+    # Collapse runs of 3+ newlines (i.e. 2+ blank lines) to a single blank line.
+    inner = re.sub(r"\n{3,}", "\n\n", inner)
+
+    text = text[:start] + inner + text[end + len("<!-- SKILLPORT_END -->"):]
+
+p.write_text(text, encoding="utf-8")
+PY
     fi
 
     rm -rf "${tmp_skills_dir}" "${tmp_file}"

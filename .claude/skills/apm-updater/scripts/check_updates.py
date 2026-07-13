@@ -11,11 +11,13 @@ latest available version or commit hash for each. Handles four kinds:
 
 `@latest` entries are reported for information only (never auto-changed).
 
-Output is ASCII only. Network calls (npm, git) are best-effort; a failure is
-reported as 'unresolved' rather than aborting the whole run.
+Output is ASCII only. Network calls (npm, git, HTTP) are best-effort; a
+failure is reported as 'unresolved' rather than aborting the whole run.
 
 Usage:
   python check_updates.py [--apm PATH] [--json] [--no-network]
+  python check_updates.py --models
+  python check_updates.py --validate-models [--apm PATH]
 """
 
 from __future__ import annotations
@@ -25,9 +27,14 @@ import json
 import re
 import subprocess
 import sys
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 TIMEOUT = 30
+
+MODEL_SCHEMA_URL = "https://models.dev/model-schema.json"
+BEDROCK_ALLOWED_PREFIXES = ("global.anthropic.claude-", "openai.gpt-")
 
 GIT_HASH_RE = re.compile(r'git\+(https?://[^\s@"]+?\.git)@([0-9a-fA-F]{7,40})')
 SKILL_REF_RE = re.compile(
@@ -74,6 +81,145 @@ def same_hash(current, latest):
     if FULL_SHA_RE.match(current):
         return current == latest
     return latest.startswith(current)
+
+
+def fetch_model_schema():
+    """Fetch and return the models.dev model schema as a dict."""
+    req = urllib.request.Request(
+        MODEL_SCHEMA_URL,
+        headers={"User-Agent": "apm-updater/1.0"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=TIMEOUT) as response:
+            return json.loads(response.read().decode("utf-8"))
+    except (urllib.error.URLError, json.JSONDecodeError, OSError):
+        return None
+
+
+def extract_models(schema):
+    """Extract the list of model identifiers from the schema."""
+    try:
+        return schema["$defs"]["Model"]["enum"]
+    except (KeyError, TypeError):
+        return []
+
+
+def list_models():
+    """Print the available models from models.dev, grouped by provider."""
+    schema = fetch_model_schema()
+    if schema is None:
+        sys.stderr.write(
+            "error: failed to fetch model schema from %s\n" % MODEL_SCHEMA_URL
+        )
+        return 1
+    models = extract_models(schema)
+    if not models:
+        sys.stderr.write("error: no models found in schema\n")
+        return 1
+
+    groups = {}
+    for model in models:
+        provider = model.split("/", 1)[0] if "/" in model else "unknown"
+        groups.setdefault(provider, []).append(model)
+
+    lines = ["MODEL SCHEMA: %d model(s)" % len(models), ""]
+    for provider in sorted(groups):
+        lines.append("[%s]" % provider)
+        for model in sorted(groups[provider]):
+            lines.append("  %s" % model)
+        lines.append("")
+    print("\n".join(lines))
+    return 0
+
+
+def validate_apm_models(apm_path: Path) -> int:
+    """Check apm.yml provider/model whitelist entries against the schema."""
+    schema = fetch_model_schema()
+    if schema is None:
+        sys.stderr.write(
+            "error: failed to fetch model schema from %s\n" % MODEL_SCHEMA_URL
+        )
+        return 1
+    valid_models = set(extract_models(schema))
+
+    text = apm_path.read_text(encoding="utf-8")
+    issues = []
+    in_provider_section = False
+    provider_indent = 0
+    provider_name = None
+    provider_name_indent = None
+    list_key = None
+    list_key_indent = None
+
+    for idx, line in enumerate(text.splitlines(), start=1):
+        stripped = line.lstrip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        indent = len(line) - len(stripped)
+        top = re.match(r"^([A-Za-z0-9_-]+):", stripped)
+        if top:
+            section = top.group(1)
+            if in_provider_section:
+                if indent <= provider_indent:
+                    in_provider_section = False
+                    provider_name = None
+                    provider_name_indent = None
+                    list_key = None
+                    list_key_indent = None
+                else:
+                    if (
+                        provider_name_indent is not None
+                        and indent <= provider_name_indent
+                    ):
+                        provider_name = None
+                        provider_name_indent = None
+                    if list_key_indent is not None and indent <= list_key_indent:
+                        list_key = None
+                        list_key_indent = None
+
+            if section == "provider" and indent == 0:
+                in_provider_section = True
+                provider_indent = indent
+                provider_name = None
+                provider_name_indent = None
+                list_key = None
+                list_key_indent = None
+                continue
+
+            if in_provider_section:
+                if section in ("whitelist", "models") and provider_name is not None:
+                    list_key = section
+                    list_key_indent = indent
+                else:
+                    provider_name = section
+                    provider_name_indent = indent
+            continue
+
+        if not in_provider_section or not provider_name or not list_key:
+            continue
+
+        m = re.match(r'^\s*-\s*"?([^"\s#]+)"?\s*$', line)
+        if not m:
+            continue
+
+        model = m.group(1)
+        if provider_name == "amazon-bedrock":
+            full_model = "amazon-bedrock/%s" % model
+            if not model.startswith(BEDROCK_ALLOWED_PREFIXES):
+                issues.append((idx, model, "not allowed in Bedrock whitelist"))
+                continue
+        else:
+            full_model = "%s/%s" % (provider_name, model)
+
+        if full_model not in valid_models:
+            issues.append((idx, model, "not in models.dev schema (%s)" % full_model))
+    if issues:
+        print("MODEL VALIDATION ISSUES: %d" % len(issues))
+        for line_no, model, reason in issues:
+            print("  line %d: %s (%s)" % (line_no, model, reason))
+    else:
+        print("MODEL VALIDATION: all whitelist entries match models.dev schema")
+    return 0 if not issues else 1
 
 
 def detect(text):
@@ -235,7 +381,20 @@ def main(argv=None):
         action="store_true",
         help="inventory only, skip latest resolution",
     )
+    parser.add_argument(
+        "--models",
+        action="store_true",
+        help="list models from models.dev schema",
+    )
+    parser.add_argument(
+        "--validate-models",
+        action="store_true",
+        help="validate apm.yml model whitelist entries against models.dev schema",
+    )
     args = parser.parse_args(argv)
+
+    if args.models:
+        return list_models()
 
     apm_path = Path(args.apm)
     if not apm_path.is_file():
@@ -253,6 +412,9 @@ def main(argv=None):
         else:
             sys.stderr.write("error: apm.yml not found (tried %s)\n" % args.apm)
             return 2
+
+    if args.validate_models:
+        return validate_apm_models(apm_path)
 
     records = detect(apm_path.read_text(encoding="utf-8"))
 
