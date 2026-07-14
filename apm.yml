@@ -800,7 +800,6 @@ experimental:
 # APM Standard Targets
 targets:
   - opencode
-  - cursor
 
 # Exported Artifacts
 exports:

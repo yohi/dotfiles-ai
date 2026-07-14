@@ -16,7 +16,7 @@ sync-mcp: ## APMを使用してMCP設定を同期
 	else \
 		apm install --force; \
 	fi
-	@-$(MAKE) sync-gemini-codex
+	#	@-$(MAKE) sync-gemini-codex  # disabled: Codex/Gemini CLI integration disabled (see apm.yml targets:)
 	@echo "[+] MCP synchronization complete."
 
 

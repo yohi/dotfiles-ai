@@ -59,16 +59,16 @@ setup-agents:
 		fi \
 	fi
 	$(MAKE) setup-claude
-	$(MAKE) setup-gemini
-	$(MAKE) setup-codex
+	#	$(MAKE) setup-gemini  # disabled: Gemini CLI integration disabled (see apm.yml targets:)
+	#	$(MAKE) setup-codex  # disabled: Codex integration disabled (see apm.yml targets:)
 	$(MAKE) setup-opencode
 	$(MAKE) setup-antigravity
 	$(MAKE) setup-codegraph
 
 setup-ides:
 	$(Q_ECHO) "🚀 dotfiles-ai IDE 設定をセットアップ中..."
-	$(MAKE) setup-cursor
-	$(MAKE) setup-vscode
+	#	$(MAKE) setup-cursor  # disabled: Cursor IDE integration disabled (see apm.yml targets:)
+	#	$(MAKE) setup-vscode  # disabled: VSCode integration disabled (see apm.yml targets:)
 
 link: setup
 	@echo "🔗 dotfiles-ai をリンク中 (Handled in setup targets)"
