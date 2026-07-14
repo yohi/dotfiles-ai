@@ -1,5 +1,5 @@
 lockfile_version: '1'
-generated_at: '2026-07-14T08:59:16.819534+00:00'
+generated_at: '2026-07-14T14:51:33.619384+00:00'
 apm_version: 0.22.0
 dependencies:
 - repo_url: anthropics/claude-code
@@ -1180,7 +1180,7 @@ mcp_configs:
       FASTMCP_LOG_LEVEL: ERROR
       AWS_DOCUMENTATION_PARTITION: ${env:AWS_DOCUMENTATION_PARTITION:-aws}
     args:
-    - awslabs.aws-documentation-mcp-server
+    - awslabs.aws-documentation-mcp-server==1.0.0
     registry: false
     command: uvx
     title: AWS Documentation MCP
@@ -1205,10 +1205,17 @@ mcp_configs:
     name: aws-mcp
     transport: stdio
     env:
-      AWS_REGION: ${env:AWS_REGION:-us-east-1}
+      AWS_REGION: us-east-1
+      AWS_PROFILE: prod
     args:
-    - mcp-proxy-for-aws@latest
+    - mcp-proxy-for-aws==1.6.3
     - https://aws-mcp.us-east-1.api.aws/mcp
+    - --service
+    - aws-mcp
+    - --region
+    - us-east-1
+    - --profile
+    - prod
     registry: false
     command: uvx
     title: AWS Managed MCP
@@ -1346,7 +1353,7 @@ mcp_configs:
     transport: sse
     registry: false
     headers:
-      Authorization: Sentry-Bearer ${env:SENTRY_AUTH_TOKEN}
+      Authorization: Sentry-Bearer ${env:SENTRY_ACCESS_TOKEN}
     url: https://mcp.sentry.dev/mcp
     title: Sentry Remote MCP
     enabled: true

@@ -125,7 +125,7 @@ dependencies:
       transport: stdio
       command: "uvx"
       args:
-        - "awslabs.aws-documentation-mcp-server"
+        - "awslabs.aws-documentation-mcp-server==1.0.0"
       env:
         FASTMCP_LOG_LEVEL: "ERROR"
         AWS_DOCUMENTATION_PARTITION: "${env:AWS_DOCUMENTATION_PARTITION:-aws}"
@@ -138,10 +138,17 @@ dependencies:
       transport: stdio
       command: "uvx"
       args:
-        - "mcp-proxy-for-aws@latest"
+        - "mcp-proxy-for-aws==1.6.3"
         - "https://aws-mcp.us-east-1.api.aws/mcp"
+        - "--service"
+        - "aws-mcp"
+        - "--region"
+        - "us-east-1"
+        - "--profile"
+        - "prod"
       env:
-        AWS_REGION: "${env:AWS_REGION:-us-east-1}"
+        AWS_REGION: "us-east-1"
+        AWS_PROFILE: "prod"
       standalone: true
       timeout: 60000
       enabled: true
@@ -153,7 +160,7 @@ dependencies:
       url: "https://mcp.sentry.dev/mcp"
       enabled: true
       headers:
-        Authorization: "Sentry-Bearer ${env:SENTRY_AUTH_TOKEN}"
+        Authorization: "Sentry-Bearer ${env:SENTRY_ACCESS_TOKEN}"
 
     - name: sonarqube
       title: "SonarQube MCP"
