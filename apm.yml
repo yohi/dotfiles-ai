@@ -115,6 +115,7 @@ dependencies:
         AWS_REGION: "${env:AWS_REGION:-us-east-1}"
         FASTMCP_LOG_LEVEL: "ERROR"
       standalone: true
+      timeout: 60000
       enabled: true
 
 
@@ -142,6 +143,7 @@ dependencies:
       env:
         AWS_REGION: "${env:AWS_REGION:-us-east-1}"
       standalone: true
+      timeout: 60000
       enabled: true
 
     - name: sentry-remote
@@ -181,6 +183,7 @@ dependencies:
       env:
         SEMGREP_APP_TOKEN: "${env:SEMGREP_APP_TOKEN}"
       enabled: true
+      timeout: 60000
 
     - name: skillport
       title: "Skillport"
@@ -192,6 +195,7 @@ dependencies:
       env:
         SKILLPORT_SKILLS_DIR: "${env:SKILLPORT_SKILLS_DIR:-.agents/skills}"
       standalone: true
+      timeout: 60000
       enabled: true
 
     - name: nexus
