@@ -71,6 +71,9 @@ def _convert_mcp_entry(entry: dict[str, Any]) -> tuple[str, dict[str, Any]]:
                 k: _normalize_env_syntax(str(v)) for k, v in entry["env"].items()
             }
 
+    if "timeout" in entry:
+        result["timeout"] = entry["timeout"]
+
     return name, result
 
 
@@ -90,8 +93,7 @@ def _normalize_opencode_json_data(data: dict[str, Any]) -> dict[str, Any]:
         for entry in normalized["mcp"].values():
             if entry.get("type") == "local" and "command" in entry:
                 entry["command"] = [
-                    _normalize_env_syntax(str(arg))
-                    for arg in entry["command"]
+                    _normalize_env_syntax(str(arg)) for arg in entry["command"]
                 ]
     return normalized
 
@@ -358,9 +360,11 @@ def main() -> None:
     if opencode_json.exists():
         try:
             data = json.loads(opencode_json.read_text(encoding="utf-8"))
+            data["mcp"] = cfg.get("mcp", {})
             normalized = _normalize_opencode_json_data(data)
             opencode_json.write_text(
-                json.dumps(normalized, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+                json.dumps(normalized, indent=2, ensure_ascii=False) + "\n",
+                encoding="utf-8",
             )
             print(f"[ok] Normalized: {opencode_json}")
         except (json.JSONDecodeError, OSError) as e:
