@@ -1,5 +1,5 @@
 lockfile_version: '1'
-generated_at: '2026-07-14T03:03:04.311426+00:00'
+generated_at: '2026-07-14T05:48:21.058361+00:00'
 apm_version: 0.22.0
 dependencies:
 - repo_url: anthropics/claude-code
@@ -1289,8 +1289,6 @@ mcp_configs:
     name: github-official
     transport: sse
     registry: false
-    headers:
-      Authorization: Bearer ${env:GITHUB_TOKEN}
     url: https://api.githubcopilot.com/mcp/
     title: GitHub Official MCP
     standalone: true
@@ -1342,8 +1340,6 @@ mcp_configs:
     name: sentry-remote
     transport: sse
     registry: false
-    headers:
-      Authorization: Sentry-Bearer ${env:SENTRY_AUTH_TOKEN}
     url: https://mcp.sentry.dev/mcp
     title: Sentry Remote MCP
     enabled: true

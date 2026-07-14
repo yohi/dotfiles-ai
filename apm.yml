@@ -98,8 +98,6 @@ dependencies:
       registry: false
       transport: sse
       url: "https://api.githubcopilot.com/mcp/"
-      headers:
-        Authorization: "Bearer ${env:GITHUB_TOKEN}"
       standalone: true
       enabled: true
 
@@ -149,8 +147,6 @@ dependencies:
       registry: false
       transport: sse
       url: "https://mcp.sentry.dev/mcp"
-      headers:
-        Authorization: "Sentry-Bearer ${env:SENTRY_AUTH_TOKEN}"
       enabled: true
 
     - name: sonarqube
