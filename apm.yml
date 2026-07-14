@@ -68,18 +68,6 @@ dependencies:
         X-GitHub-Token: "${env:GITHUB_TOKEN}"
       enabled: true
 
-    - name: sqlite
-      title: "SQLite MCP"
-      registry: false
-      transport: stdio
-      command: "uvx"
-      args:
-        - "mcp-server-sqlite"
-        - "--db-path"
-        - "${env:HOME}/.mcp/sqlite/sqlite.db"
-      standalone: true
-      enabled: true
-
     - name: filesystem
       title: "Filesystem MCP"
       registry: false
@@ -112,21 +100,6 @@ dependencies:
       url: "https://api.githubcopilot.com/mcp/"
       headers:
         Authorization: "Bearer ${env:GITHUB_TOKEN}"
-      standalone: true
-      enabled: true
-
-    - name: aws-api
-      title: "AWS API MCP"
-      registry: false
-      transport: stdio
-      command: "uvx"
-      args:
-        - "awslabs.aws-api-mcp-server"
-      env:
-        AWS_REGION: "${env:AWS_REGION:-us-east-1}"
-        AWS_API_MCP_PROFILE_NAME: "${env:AWS_PROFILE:-default}"
-        AWS_API_MCP_TRANSPORT: "stdio"
-        FASTMCP_LOG_LEVEL: "ERROR"
       standalone: true
       enabled: true
 

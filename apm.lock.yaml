@@ -1,11 +1,11 @@
 lockfile_version: '1'
-generated_at: '2026-07-13T15:30:20.097047+00:00'
+generated_at: '2026-07-14T03:03:04.311426+00:00'
 apm_version: 0.22.0
 dependencies:
 - repo_url: anthropics/claude-code
   name: code-review
   host: github.com
-  resolved_commit: d4d8fbbb333c627d8fe2c1c583a5ccc26fdb1aed
+  resolved_commit: 1fb278b85d4546c7c04db3b3590e031b5a8a7571
   version: 1.0.0
   virtual_path: plugins/code-review
   is_virtual: true
@@ -1148,7 +1148,6 @@ dependencies:
   content_hash: sha256:1082322d10ecdcf2f10e7abec37710b4c928c5793138537bb8ca8ca30c374ef5
 mcp_servers:
 - atlassian
-- aws-api
 - aws-documentation
 - aws-iac
 - aws-mcp
@@ -1164,7 +1163,6 @@ mcp_servers:
 - sequentialthinking
 - skillport
 - sonarqube
-- sqlite
 mcp_configs:
   atlassian:
     name: atlassian
@@ -1174,21 +1172,6 @@ mcp_configs:
       Authorization: ${env:ATLASSIAN_AUTH_HEADER}
     url: https://mcp.atlassian.com/v1/mcp
     title: Atlassian MCP
-    enabled: true
-  aws-api:
-    name: aws-api
-    transport: stdio
-    env:
-      AWS_REGION: ${env:AWS_REGION:-us-east-1}
-      AWS_API_MCP_PROFILE_NAME: ${env:AWS_PROFILE:-default}
-      AWS_API_MCP_TRANSPORT: stdio
-      FASTMCP_LOG_LEVEL: ERROR
-    args:
-    - awslabs.aws-api-mcp-server
-    registry: false
-    command: uvx
-    title: AWS API MCP
-    standalone: true
     enabled: true
   aws-documentation:
     name: aws-documentation
@@ -1402,18 +1385,6 @@ mcp_configs:
     registry: false
     command: npx
     title: SonarQube MCP
-    enabled: true
-  sqlite:
-    name: sqlite
-    transport: stdio
-    args:
-    - mcp-server-sqlite
-    - --db-path
-    - ${env:HOME}/.mcp/sqlite/sqlite.db
-    registry: false
-    command: uvx
-    title: SQLite MCP
-    standalone: true
     enabled: true
 local_deployed_files:
 - .cursor/rules/agent-commands.mdc

@@ -54,12 +54,10 @@ check_client_server() {
 }
 
 # Servers that should be present in all clients after migration
-    EXPECTED_SERVERS=(
-    sqlite
+EXPECTED_SERVERS=(
+    github-official
     filesystem
     sequentialthinking
-    github-official
-    aws-api
     aws-iac
     aws-mcp
     aws-documentation
