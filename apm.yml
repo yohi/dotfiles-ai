@@ -100,6 +100,8 @@ dependencies:
       url: "https://api.githubcopilot.com/mcp/"
       standalone: true
       enabled: true
+      headers:
+        Authorization: "Bearer ${env:GITHUB_TOKEN}"
 
     - name: aws-iac
       title: "AWS IaC MCP"
@@ -148,6 +150,8 @@ dependencies:
       transport: sse
       url: "https://mcp.sentry.dev/mcp"
       enabled: true
+      headers:
+        Authorization: "Sentry-Bearer ${env:SENTRY_AUTH_TOKEN}"
 
     - name: sonarqube
       title: "SonarQube MCP"
