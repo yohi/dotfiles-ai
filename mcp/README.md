@@ -138,3 +138,56 @@ APM によって直接管理されます。
 | `command not found: github-mcp-server` | バイナリ未インストール | `go install` でインストール |
 | `Error: AWS credentials not found` | AWS 認証情報未設定 | `aws configure` か環境変数で設定 |
 | `SQLite database is locked` | 同じ DB を複数プロセスが開いている | DB ファイルの排他アクセスを確認 |
+
+---
+
+## 6. MCP サーバー公式リンク集
+
+### MCP 本体 & 公式実装
+
+| MCP | リンク |
+| :--- | :--- |
+| **MCP 仕様** | https://modelcontextprotocol.io |
+| **公式リポジトリ** | https://github.com/modelcontextprotocol/modelcontextprotocol |
+| **公式サーバー実装** | https://github.com/modelcontextprotocol/servers |
+| **公開 Registry** | https://registry.modelcontextprotocol.io/ |
+
+### コード分析・検索系
+
+| サーバー | GitHub | ドキュメント |
+| :--- | :--- | :--- |
+| **Greptile** | (非公開) | https://www.greptile.com/docs/mcp/setup |
+| **CodeGraph** | https://github.com/colbymchenry/codegraph | https://colbymchenry.github.io/codegraph/ |
+| **Nexus** | https://github.com/yohi/nexus | https://github.com/yohi/nexus/tree/v1.26.3 |
+
+### クラウド・API 統合系
+
+| サーバー | GitHub | ドキュメント |
+| :--- | :--- | :--- |
+| **GitHub Official** | https://github.com/github/github-mcp-server | https://github.com/github/github-mcp-server/tree/main/docs |
+| **Atlassian Rovo** | https://github.com/atlassian/atlassian-mcp-server | https://support.atlassian.com/atlassian-rovo-mcp-server/ |
+| **Sentry** | https://github.com/getsentry/sentry-mcp | https://docs.sentry.io/product/sentry-mcp/ |
+
+### AWS 統合系
+
+| サーバー | GitHub | ドキュメント | PyPI |
+| :--- | :--- | :--- | :--- |
+| **AWS IaC** | https://github.com/awslabs/mcp/tree/main/src/aws-iac-mcp-server | https://awslabs.github.io/mcp/servers/aws-iac-mcp-server | https://pypi.org/project/awslabs.aws-iac-mcp-server/ |
+| **AWS Documentation** | https://github.com/awslabs/mcp/tree/main/src/aws-documentation-mcp-server | https://awslabs.github.io/mcp/servers/aws-documentation-mcp-server | https://pypi.org/project/awslabs.aws-documentation-mcp-server/ |
+
+### コード品質・セキュリティ系
+
+| サーバー | GitHub | ドキュメント |
+| :--- | :--- | :--- |
+| **SonarQube** | https://github.com/SonarSource/sonarqube-mcp-server | https://docs.sonarsource.com/sonarqube-mcp-server |
+| **Semgrep** | https://github.com/semgrep/semgrep | https://github.com/semgrep/semgrep/tree/develop/cli/src/semgrep/mcp |
+| **CodeRabbit** | https://github.com/coderabbitai/mcp-server | https://docs.coderabbit.ai |
+
+### スキル・メモリ・思考系
+
+| サーバー | GitHub | ドキュメント |
+| :--- | :--- | :--- |
+| **SkillPort** | https://github.com/gotalab/skillport | https://github.com/gotalab/skillport#readme |
+| **Chronos Graph** | https://github.com/yohi/chronos-graph | https://github.com/yohi/chronos-graph/tree/v3.0.0 |
+| **Sequential Thinking** | https://github.com/modelcontextprotocol/servers/tree/main/src/sequentialthinking | npm: @modelcontextprotocol/server-sequential-thinking |
+| **Filesystem** | https://github.com/modelcontextprotocol/servers/tree/main/src/filesystem | npm: @modelcontextprotocol/server-filesystem |
