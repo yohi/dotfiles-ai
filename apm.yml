@@ -46,6 +46,7 @@ dependencies:
         - "coderabbitai-mcp"
       env:
         GITHUB_PAT: "${env:GITHUB_TOKEN}"
+      timeout: 60000
       enabled: true
 
     - name: codegraph
@@ -78,6 +79,7 @@ dependencies:
         - "@modelcontextprotocol/server-filesystem"
         - "${env:PWD}"
       standalone: true
+      timeout: 60000
       enabled: true
 
     - name: sequentialthinking
@@ -91,6 +93,7 @@ dependencies:
       env:
         DISABLE_THOUGHT_LOGGING: "${env:DISABLE_THOUGHT_LOGGING:-true}"
       standalone: true
+      timeout: 60000
       enabled: true
 
     - name: github-official
@@ -174,6 +177,7 @@ dependencies:
         SONARQUBE_TOKEN: "${env:SONARQUBE_TOKEN}"
         SONARQUBE_URL: "${env:SONARQUBE_URL}"
         SONARQUBE_ORG: "${env:SONARQUBE_ORG}"
+      timeout: 60000
       enabled: true
 
     - name: semgrep
@@ -220,7 +224,7 @@ dependencies:
         CHOKIDAR_USEPOLLING: "false"
         CHOKIDAR_INTERVAL: "2000"
         NO_PROXY: "127.0.0.1,localhost"
-      timeout: 30000
+      timeout: 60000
       standalone: true
       enabled: true
 
@@ -260,6 +264,7 @@ dependencies:
         DASHBOARD_HOST: "${env:DASHBOARD_HOST}"
         DASHBOARD_PORT: "${env:DASHBOARD_PORT}"
       standalone: true
+      timeout: 120000
       enabled: true
 
 # --------------------------------------------------------------------------

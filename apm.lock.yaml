@@ -1,5 +1,5 @@
 lockfile_version: '1'
-generated_at: '2026-07-14T14:51:33.619384+00:00'
+generated_at: '2026-07-15T13:22:09.594359+00:00'
 apm_version: 0.22.0
 dependencies:
 - repo_url: anthropics/claude-code
@@ -1259,6 +1259,7 @@ mcp_configs:
     command: uvx
     title: Chronos Graph
     standalone: true
+    timeout: 90000
     enabled: true
   codegraph:
     name: codegraph
@@ -1281,6 +1282,7 @@ mcp_configs:
     registry: false
     command: npx
     title: CodeRabbit MCP
+    timeout: 60000
     enabled: true
   filesystem:
     name: filesystem
@@ -1293,6 +1295,7 @@ mcp_configs:
     command: npx
     title: Filesystem MCP
     standalone: true
+    timeout: 60000
     enabled: true
   github-official:
     name: github-official
@@ -1325,11 +1328,12 @@ mcp_configs:
       NO_PROXY: 127.0.0.1,localhost
     args:
     - -y
-    - '@yohi/nexus@1.26.3'
+    - '@yohi/nexus@1.28.0'
+    - http-bridge
     registry: false
     command: npx
     title: Nexus
-    timeout: 30000
+    timeout: 60000
     standalone: true
     enabled: true
   semgrep:
@@ -1369,6 +1373,7 @@ mcp_configs:
     command: npx
     title: Sequential Thinking MCP
     standalone: true
+    timeout: 60000
     enabled: true
   skillport:
     name: skillport
@@ -1396,6 +1401,7 @@ mcp_configs:
     registry: false
     command: npx
     title: SonarQube MCP
+    timeout: 60000
     enabled: true
 local_deployed_files:
 - .cursor/rules/agent-commands.mdc
