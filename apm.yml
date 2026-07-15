@@ -212,7 +212,8 @@ dependencies:
       command: "npx"
       args:
         - "-y"
-        - "@yohi/nexus@1.26.3"
+        - "@yohi/nexus@1.28.0"
+        - "http-bridge"
       env:
         LOG_LEVEL: "ERROR"
         NEXUS_WATCHER_IGNORE_PATHS: "node_modules,opencode/node_modules,.opencode/node_modules,oss/apm/node_modules,oss/apm/docs/node_modules,.git,.nexus,dist,gemini,agent-skills,apm_modules,.agents,.opencode,.gemini,.claude,.codex,.vscode,.devcontainer,oss,codex/.tmp,.worktrees,.venv,target,.mypy_cache,.ruff_cache,build,.serena,.cache,__pycache__,*.db,*.sqlite,*.log"
