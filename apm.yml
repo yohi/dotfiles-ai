@@ -148,10 +148,10 @@ dependencies:
         - "--region"
         - "us-east-1"
         - "--profile"
-        - "prod"
+        - "default"
       env:
         AWS_REGION: "us-east-1"
-        AWS_PROFILE: "prod"
+        AWS_PROFILE: "default"
       standalone: true
       timeout: 60000
       enabled: true
