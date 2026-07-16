@@ -1259,7 +1259,7 @@ mcp_configs:
     command: uvx
     title: Chronos Graph
     standalone: true
-    timeout: 90000
+    timeout: 120000
     enabled: true
   codegraph:
     name: codegraph
@@ -1328,7 +1328,7 @@ mcp_configs:
       NO_PROXY: 127.0.0.1,localhost
     args:
     - -y
-    - '@yohi/nexus@1.28.0'
+    - '@yohi/nexus@1.28.1'
     - http-bridge
     registry: false
     command: npx
