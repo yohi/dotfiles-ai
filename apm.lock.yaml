@@ -1,5 +1,5 @@
 lockfile_version: '1'
-generated_at: '2026-07-16T21:20:31.766141+00:00'
+generated_at: '2026-07-18T23:47:36.834395+00:00'
 apm_version: 0.22.0
 dependencies:
 - repo_url: anthropics/claude-code
@@ -1057,20 +1057,6 @@ dependencies:
   host: github.com
   resolved_commit: 6dd072e0e6298286d5e9486b4e4df66b514b5a06
   version: unknown
-  virtual_path: skills/doc-sync-verifier
-  is_virtual: true
-  package_type: claude_skill
-  deployed_files:
-  - .agents/skills/doc-sync-verifier
-  - .agents/skills/doc-sync-verifier/SKILL.md
-  deployed_file_hashes:
-    .agents/skills/doc-sync-verifier/SKILL.md: sha256:7c7c67e3bf0eaea5202306e973c8a935825f435c8fb360602079ec644c55d85d
-  content_hash: sha256:2ee5eda43c238df72aad09175999454d14a094b4bb164384301704ace9488651
-- repo_url: yohi/agent-skills
-  name: agent-skills
-  host: github.com
-  resolved_commit: 6dd072e0e6298286d5e9486b4e4df66b514b5a06
-  version: unknown
   virtual_path: skills/git-master
   is_virtual: true
   package_type: claude_skill
@@ -1356,8 +1342,6 @@ mcp_configs:
     name: sentry-remote
     transport: sse
     registry: false
-    headers:
-      Authorization: Sentry-Bearer ${env:SENTRY_ACCESS_TOKEN}
     url: https://mcp.sentry.dev/mcp
     title: Sentry Remote MCP
     enabled: true

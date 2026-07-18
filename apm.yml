@@ -19,7 +19,7 @@ dependencies:
     - greptileai/skills//check-pr
     - greptileai/skills//greploop
     - anthropics/claude-code//plugins/code-review
-    - yohi/agent-skills//skills/doc-sync-verifier
+    # - yohi/agent-skills//skills/doc-sync-verifier
     - yohi/agent-skills//skills/git-master
     - yohi/agent-skills//skills/github-quality-setup
     - yohi/agent-skills//skills/makefile-organization
@@ -162,8 +162,6 @@ dependencies:
       transport: sse
       url: "https://mcp.sentry.dev/mcp"
       enabled: true
-      headers:
-        Authorization: "Sentry-Bearer ${env:SENTRY_ACCESS_TOKEN}"
 
     - name: sonarqube
       title: "SonarQube MCP"
