@@ -1,5 +1,5 @@
 lockfile_version: '1'
-generated_at: '2026-07-18T23:47:36.834395+00:00'
+generated_at: '2026-07-19T01:27:37.405741+00:00'
 apm_version: 0.22.0
 dependencies:
 - repo_url: anthropics/claude-code
@@ -1191,17 +1191,17 @@ mcp_configs:
     name: aws-mcp
     transport: stdio
     env:
-      AWS_REGION: us-east-1
-      AWS_PROFILE: default
+      AWS_REGION: ${env:AWS_REGION:-us-east-1}
+      AWS_PROFILE: ${env:AWS_PROFILE:-default}
     args:
     - mcp-proxy-for-aws==1.6.3
-    - https://aws-mcp.us-east-1.api.aws/mcp
+    - https://aws-mcp.${env:AWS_REGION:-us-east-1}.api.aws/mcp
     - --service
     - aws-mcp
     - --region
-    - us-east-1
+    - ${env:AWS_REGION:-us-east-1}
     - --profile
-    - default
+    - ${env:AWS_PROFILE:-default}
     registry: false
     command: uvx
     title: AWS Managed MCP

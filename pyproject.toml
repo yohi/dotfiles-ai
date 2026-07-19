@@ -9,6 +9,7 @@ dependencies = [
     "types-PyYAML",
     "toml>=0.10.0",
     "types-toml",
+    "tomli>=2.0.1; python_version < '3.11'",
     "json5>=0.9.22",
     "pytest>=8.0.0",
     "typeguard>=4.0.0",

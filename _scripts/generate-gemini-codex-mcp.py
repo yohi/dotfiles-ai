@@ -53,10 +53,15 @@ def _build_mcp_server(entry: dict[str, Any]) -> dict[str, Any]:
         }
         if "headers" in entry:
             server["headers"] = _convert_value(entry["headers"])
-        return server
+    command = entry.get("command")
+    if not command:
+        print(
+            f"[warning] Skipping MCP server '{entry.get('name', '?')}': command is missing for stdio transport."
+        )
+        raise KeyError("command")
 
     server = {
-        "command": _convert_value(entry["command"]),
+        "command": _convert_value(command),
         "args": _convert_value(entry.get("args") or []),
         "type": "stdio",
     }

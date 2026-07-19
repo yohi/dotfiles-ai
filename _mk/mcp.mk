@@ -1,4 +1,4 @@
-.PHONY: sync-mcp sync-gemini-codex help-mcp
+.PHONY: sync-mcp help-mcp
 
 mcp: sync-mcp
 

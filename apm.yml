@@ -142,16 +142,16 @@ dependencies:
       command: "uvx"
       args:
         - "mcp-proxy-for-aws==1.6.3"
-        - "https://aws-mcp.us-east-1.api.aws/mcp"
+        - "https://aws-mcp.${env:AWS_REGION:-us-east-1}.api.aws/mcp"
         - "--service"
         - "aws-mcp"
         - "--region"
-        - "us-east-1"
+        - "${env:AWS_REGION:-us-east-1}"
         - "--profile"
-        - "default"
+        - "${env:AWS_PROFILE:-default}"
       env:
-        AWS_REGION: "us-east-1"
-        AWS_PROFILE: "default"
+        AWS_REGION: "${env:AWS_REGION:-us-east-1}"
+        AWS_PROFILE: "${env:AWS_PROFILE:-default}"
       standalone: true
       timeout: 60000
       enabled: true
