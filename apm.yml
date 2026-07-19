@@ -77,7 +77,7 @@ dependencies:
       args:
         - "-y"
         - "@modelcontextprotocol/server-filesystem"
-        - "${env:PWD}"
+        - "${env:MCP_FILESYSTEM_ROOT:-${env:PWD}}"
       standalone: true
       timeout: 60000
       enabled: true

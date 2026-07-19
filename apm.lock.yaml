@@ -1,5 +1,5 @@
 lockfile_version: '1'
-generated_at: '2026-07-19T01:27:37.405741+00:00'
+generated_at: '2026-07-19T03:14:26.050543+00:00'
 apm_version: 0.22.0
 dependencies:
 - repo_url: anthropics/claude-code
@@ -1276,7 +1276,7 @@ mcp_configs:
     args:
     - -y
     - '@modelcontextprotocol/server-filesystem'
-    - ${env:PWD}
+    - ${env:MCP_FILESYSTEM_ROOT:-${env:PWD}}
     registry: false
     command: npx
     title: Filesystem MCP
