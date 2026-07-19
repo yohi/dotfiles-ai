@@ -9,7 +9,10 @@ from __future__ import annotations
 import json
 import re
 import sys
-import tomli as tomllib
+try:
+    import tomllib
+except ImportError:
+    import tomli as tomllib
 from pathlib import Path
 from typing import Any
 
@@ -115,18 +118,22 @@ def _toml_dump_table(key_path: list[str], data: dict[str, Any], lines: list[str]
             lines.append("")
 
 
+def _dump_mcp_servers(mcp_servers: dict[str, Any], lines: list[str]) -> None:
+    if mcp_servers:
+        lines.append("")
+        lines.append("[mcp_servers]")
+        lines.append("")
+        for server_name, server_cfg in mcp_servers.items():
+            _toml_dump_table(["mcp_servers", server_name], server_cfg, lines)
+            lines.append("")
+
+
 def _dump_codex_config(data: dict[str, Any], trailing_comments: list[str]) -> str:
     lines: list[str] = []
     mcp_servers = data.get("mcp_servers", {})
     for key, value in data.items():
         if key == "mcp_servers":
-            if mcp_servers:
-                lines.append("")
-                lines.append("[mcp_servers]")
-                lines.append("")
-                for server_name, server_cfg in mcp_servers.items():
-                    _toml_dump_table(["mcp_servers", server_name], server_cfg, lines)
-                    lines.append("")
+            _dump_mcp_servers(mcp_servers, lines)
             continue
         if isinstance(value, dict):
             lines.append("")
@@ -146,6 +153,7 @@ def _dump_codex_config(data: dict[str, Any], trailing_comments: list[str]) -> st
         lines.extend(trailing_comments)
 
     return "\n".join(lines).rstrip() + "\n"
+
 
 
 def _extract_trailing_comments(text: str) -> list[str]:
@@ -169,13 +177,16 @@ def update_gemini(apm: dict[str, Any]) -> None:
 
     data: dict[str, Any]
     if GEMINI_PATH.exists():
-        data = json.loads(GEMINI_PATH.read_text(encoding="utf-8"))
+        with open(GEMINI_PATH, "r", encoding="utf-8") as f:
+            data = json.load(f)
     else:
         data = {}
 
     data["mcpServers"] = mcp_servers
 
-    GEMINI_PATH.write_text(json.dumps(data, indent=2, ensure_ascii=True) + "\n", encoding="utf-8")
+    with open(GEMINI_PATH, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=True)
+        f.write("\n")
     print(f"[ok] Updated: {GEMINI_PATH}")
 
 
@@ -183,7 +194,10 @@ def update_codex(apm: dict[str, Any]) -> None:
     entries = _mcp_entries(apm)
     mcp_servers = {str(e["name"]): _build_codex_server(e) for e in entries}
 
-    original_text = CODEX_PATH.read_text(encoding="utf-8") if CODEX_PATH.exists() else ""
+    original_text = ""
+    if CODEX_PATH.exists():
+        with open(CODEX_PATH, "r", encoding="utf-8") as f:
+            original_text = f.read()
     trailing_comments = _extract_trailing_comments(original_text)
 
     data: dict[str, Any]
@@ -194,7 +208,8 @@ def update_codex(apm: dict[str, Any]) -> None:
 
     data["mcp_servers"] = mcp_servers
 
-    CODEX_PATH.write_text(_dump_codex_config(data, trailing_comments), encoding="utf-8")
+    with open(CODEX_PATH, "w", encoding="utf-8") as f:
+        f.write(_dump_codex_config(data, trailing_comments))
     print(f"[ok] Updated: {CODEX_PATH}")
 
 
