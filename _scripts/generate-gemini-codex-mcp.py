@@ -53,6 +53,7 @@ def _build_mcp_server(entry: dict[str, Any]) -> dict[str, Any]:
         }
         if "headers" in entry:
             server["headers"] = _convert_value(entry["headers"])
+        return server
     command = entry.get("command")
     if not command:
         print(
