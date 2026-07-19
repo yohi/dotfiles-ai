@@ -44,7 +44,7 @@ def _mcp_entries(apm: dict[str, Any]) -> list[dict[str, Any]]:
     return [e for e in entries if e.get("enabled", True)]
 
 
-def _build_gemini_server(entry: dict[str, Any]) -> dict[str, Any]:
+def _build_mcp_server(entry: dict[str, Any]) -> dict[str, Any]:
     transport = entry.get("transport", "stdio")
     if transport in ("sse", "http", "streamable-http"):
         server: dict[str, Any] = {
@@ -64,26 +64,6 @@ def _build_gemini_server(entry: dict[str, Any]) -> dict[str, Any]:
         server["env"] = _convert_value(entry["env"])
     return server
 
-
-def _build_codex_server(entry: dict[str, Any]) -> dict[str, Any]:
-    transport = entry.get("transport", "stdio")
-    if transport in ("sse", "http", "streamable-http"):
-        server: dict[str, Any] = {
-            "url": _convert_value(entry["url"]),
-            "type": "sse",
-        }
-        if "headers" in entry:
-            server["headers"] = _convert_value(entry["headers"])
-        return server
-
-    server = {
-        "command": _convert_value(entry["command"]),
-        "args": _convert_value(entry.get("args") or []),
-        "type": "stdio",
-    }
-    if "env" in entry:
-        server["env"] = _convert_value(entry["env"])
-    return server
 
 
 def _toml_escape(value: str) -> str:
@@ -173,7 +153,7 @@ def _extract_trailing_comments(text: str) -> list[str]:
 
 def update_gemini(apm: dict[str, Any]) -> None:
     entries = _mcp_entries(apm)
-    mcp_servers = {str(e["name"]): _build_gemini_server(e) for e in entries}
+    mcp_servers = {str(e["name"]): _build_mcp_server(e) for e in entries}
 
     data: dict[str, Any]
     if GEMINI_PATH.exists():
@@ -192,7 +172,7 @@ def update_gemini(apm: dict[str, Any]) -> None:
 
 def update_codex(apm: dict[str, Any]) -> None:
     entries = _mcp_entries(apm)
-    mcp_servers = {str(e["name"]): _build_codex_server(e) for e in entries}
+    mcp_servers = {str(e["name"]): _build_mcp_server(e) for e in entries}
 
     original_text = ""
     if CODEX_PATH.exists():
