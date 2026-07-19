@@ -1,4 +1,4 @@
-.PHONY: sync-mcp help-mcp
+.PHONY: sync-mcp sync-gemini-codex help-mcp
 
 mcp: sync-mcp
 
@@ -18,6 +18,11 @@ sync-mcp: ## APMを使用してMCP設定を同期
 	fi
 	#	@-$(MAKE) sync-gemini-codex  # disabled: Codex/Gemini CLI integration disabled (see apm.yml targets:)
 	@echo "[+] MCP synchronization complete."
+
+sync-gemini-codex: ## Gemini / Codex の MCP 設定を同期
+	@echo "🔄 Synchronizing Gemini / Codex MCP settings..."
+	@uv run --with pyyaml --with tomli python3 _scripts/generate-gemini-codex-mcp.py
+
 
 
 
