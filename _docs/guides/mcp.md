@@ -4,7 +4,7 @@
 
 ## 設定の同期
 
-- `make sync-mcp` — `apm.yml` を元に各エージェントの MCP 設定を再生成
+- `make sync-mcp` — `apm.yml` を元に各エージェント（Claude Code, OpenCode, VSCode, Cursor, Antigravity）の MCP 設定を再生成（Gemini CLI や Codex CLI は自動同期対象外）
 
 ## 管理対象サーバー
 

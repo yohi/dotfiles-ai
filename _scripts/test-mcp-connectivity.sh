@@ -53,16 +53,16 @@ check_client_server() {
     fi
 }
 
-# Servers that should be present in all clients after migration
-EXPECTED_SERVERS=(
-    github-official
-    filesystem
-    sequentialthinking
-    aws-iac
-    aws-mcp
-    aws-documentation
-    sentry-remote
-)
+# Servers that should be present in all clients after migration (derived dynamically from apm.yml)
+EXPECTED_SERVERS=($(uv run --with pyyaml python3 -c "
+import yaml
+with open('apm.yml') as f:
+    data = yaml.safe_load(f)
+mcp = data.get('dependencies', {}).get('mcp', [])
+for s in mcp:
+    if s.get('enabled', True):
+        print(s['name'])
+"))
 
 # 1. Claude Code
 echo "Claude Code:"

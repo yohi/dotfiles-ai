@@ -12,8 +12,8 @@ Every MCP server is defined in `apm.yml` and executed as a host process
 ## 1. APM (Single Source of Truth)
 
 `apm.yml` defines all MCP servers under `dependencies.mcp`.
-Running `make sync-mcp` generates per-agent configuration files from
-this single source.
+Running `make sync-mcp` generates per-agent configuration files (Claude Code, OpenCode, VSCode, Cursor, Antigravity) from this single source.
+Note that Gemini CLI and Codex CLI targets are defined in `apm.yml` but excluded from automatic synchronization via `make sync-mcp` due to local config structures, requiring manual or dedicated sync commands as configured.
 
 - **Local context tools** (`nexus`, `chronos-graph`, `skillport`) run directly
   on the host to access project files and local databases.

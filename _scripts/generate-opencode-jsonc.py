@@ -340,6 +340,7 @@ def main() -> None:
         if opencode_json.exists():
             try:
                 data = json.loads(opencode_json.read_text(encoding="utf-8"))
+                data["mcp"] = cfg.get("mcp", {})
                 normalised = _normalize_opencode_json_data(data)
                 expected = json.dumps(normalised, indent=2, ensure_ascii=False) + "\n"
                 actual = json.dumps(data, indent=2, ensure_ascii=False) + "\n"

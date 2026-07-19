@@ -155,7 +155,7 @@ Single Source of Truth (SSOT) です。
 - **役割**: AI エージェントが利用する各種ツール（ファイルシステム、データベース、
   GitHub、AWS、Sentry 等）を標準的な MCP 経由で提供します。
 - **設定の同期**: `make sync-mcp` を実行すると、`apm.yml` から
-  各エージェント/IDE 向けの MCP 設定ファイルが自動生成されます。
+  対応するエージェント/IDE 向け（Claude Code, OpenCode, VSCode, Cursor, Antigravity）の MCP 設定ファイルが自動生成されます。Gemini CLI や Codex CLI については自動同期の対象外であるため、個別の設定同期コマンドを実行するか、各ツールの手順に従って手動で設定してください。
 
 そのため、Antigravity CLI では `skillport` / `nexus` / `chronos-graph` を
  direct stdio MCP として使う構成を推奨します。
@@ -186,13 +186,13 @@ Antigravity 設定は `make sync-antigravity` で
 
 | エージェント | 接続方式 | 管理主体 |
 | :--- | :--- | :--- |
-| Claude Code | stdio | `make sync-claude` |
-| Gemini CLI | stdio | `make sync-mcp` 内 `sync-gemini-codex` |
+| Claude Code | stdio / remote | `make sync-mcp` (生成元 `.claude.json` 等) |
+| Gemini CLI | stdio | `make sync-mcp`（非自動同期。手動配置） |
 | Antigravity CLI | Direct stdio MCP | `make sync-antigravity` |
-| Cursor | stdio | `make sync-mcp` + `make setup-cursor` |
+| Cursor | stdio | `make sync-mcp` (生成元 `.cursor/mcp.json`) |
 | OpenCode | stdio / remote | `make sync-opencode` |
-| VSCode | stdio | `make sync-mcp` + `make setup-vscode` |
-| Codex | stdio | `make sync-mcp` 内 `sync-gemini-codex` |
+| VSCode | stdio | `make sync-mcp` (生成元 `ide/vscode/settings.json`) |
+| Codex | stdio | `make sync-mcp`（非自動同期。手動配置） |
 
 `make setup` を実行すると、リポジトリ内の設定ファイルが各エージェントの
 構成ディレクトリへ配備されます。

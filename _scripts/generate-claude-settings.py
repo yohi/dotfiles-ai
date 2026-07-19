@@ -33,6 +33,24 @@ def expand_env_vars(val: Any) -> Any:
     return val
 
 
+def convert_env_placeholders(val: Any) -> Any:
+    if isinstance(val, str):
+
+        def repl(match: re.Match[str]) -> str:
+            var_part = match.group(1)
+            if ":-" in var_part:
+                var_name, default_val = var_part.split(":-", 1)
+                return f"${{{var_name}:-{default_val}}}"
+            return f"${{{var_part}}}"
+
+        return re.sub(r"\$\{env:([^}]+)\}", repl, val)
+    elif isinstance(val, list):
+        return [convert_env_placeholders(x) for x in val]
+    elif isinstance(val, dict):
+        return {k: convert_env_placeholders(v) for k, v in val.items()}
+    return val
+
+
 def build_mcp_servers(apm: dict[str, Any]) -> dict[str, Any]:
     mcp_entries = (apm.get("dependencies") or {}).get("mcp") or []
     mcp_servers: dict[str, Any] = {}
@@ -54,16 +72,16 @@ def build_mcp_servers(apm: dict[str, Any]) -> dict[str, Any]:
                 continue
             remote_cfg: dict[str, Any] = {
                 "type": "http" if transport in ("sse", "http") else transport,
-                "url": expand_env_vars(str(url)),
+                "url": convert_env_placeholders(str(url)),
             }
             headers = entry.get("headers")
             if headers:
                 remote_cfg["headers"] = {
-                    k: expand_env_vars(str(v)) for k, v in headers.items()
+                    k: convert_env_placeholders(str(v)) for k, v in headers.items()
                 }
             if entry.get("env"):
                 remote_cfg["env"] = {
-                    k: expand_env_vars(str(v)) for k, v in entry["env"].items()
+                    k: convert_env_placeholders(str(v)) for k, v in entry["env"].items()
                 }
 
             mcp_servers[name] = remote_cfg

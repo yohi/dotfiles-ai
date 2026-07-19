@@ -18,7 +18,7 @@ make sync-mcp
 | ツール | 設定ファイル |
 | :--- | :--- |
 | Gemini CLI | `~/.gemini/settings.json` |
-| Claude Code | `~/.claude/CLAUDE.md` 配下の MCP 設定 |
+| Claude Code | `~/.claude.json` |
 | Codex CLI | `~/.codex/config.toml` |
 | OpenCode | `~/.config/opencode/opencode.jsonc` |
 | Cursor | `~/.cursor/mcp.json` |
@@ -26,7 +26,7 @@ make sync-mcp
 
 ## サーバー一覧
 
-`make sync-mcp` 後、上記各ツールに以下のサーバーが登録されます。
+`make sync-mcp` 実行時、`apm.yml` の各クライアント設定に基づいて対応するサーバーが登録されます（すべてのサーバーが一律ですべてのツールに登録されるわけではありません。例えば、`sentry-remote` のようなリモートサーバーや、stdio専用の Codex CLI など、クライアントごとの対応差があります）。
 
 - `sqlite` — `uvx mcp-server-sqlite`
 - `filesystem` — `npx @modelcontextprotocol/server-filesystem`
@@ -39,3 +39,4 @@ make sync-mcp
 - `aws-terraform` — `uvx awslabs.terraform-mcp-server`
 - `sentry-remote` — `https://mcp.sentry.dev/mcp`
 - 既存の `nexus`, `chronos-graph`, `skillport` 等
+

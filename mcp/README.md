@@ -81,7 +81,7 @@ Atlassian 製品 (Jira, Confluence) 用の公式 MCP サーバーです。
 | Antigravity | ◎ | `serverUrl` | `~/.gemini/antigravity/...` | JSON |
 | **Gemini CLI** | ◎ | `command` / `url` | `~/.gemini/settings.json` | JSON |
 | **Claude Code** | ◎ | **`command` / `url`** | `.claude.json` | JSON |
-| **Cursor** | 〇 | **`url`** | `.cursor/mcp.json` | JSON |
+| **Cursor** | 〇 | **`command` / `url`** | `.cursor/mcp.json` | JSON |
 | **VSCode** | 〇 | **`url`** | `ide/vscode/settings.json` | JSON |
 | **OpenCode** | 〇 | `command` / `url` | `opencode/opencode.jsonc` | JSONC |
 | **Codex CLI** | 〇 | **`command`** | `~/.codex/config.toml` | TOML |
