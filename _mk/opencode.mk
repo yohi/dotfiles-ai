@@ -229,19 +229,6 @@ setup-opencode: sync-opencode ## OpenCode（opencode）の設定ファイルを�
 	@$(call create_marker,setup-opencode,1)
 	$(Q_ECHO) "✅ OpenCode（opencode）の設定を適用しました"
 	$(Q_ECHO) "💡 使い方を確認するには 'make help-opencode' を実行してください。"
-	@# Load .env from .zshrc for MCP_GATEWAY_TOKEN etc.
-	@if [ -f "$(REPO_ROOT)/.env" ]; then \
-		RC="$$HOME/.zshrc"; \
-		MARKER="# dotfiles-ai .env"; \
-		BLOCK='if [ -f "$(REPO_ROOT)/.env" ]; then set -a; . "$(REPO_ROOT)/.env"; set +a; fi'; \
-		if [ -f "$$RC" ] && ! grep -q "$$MARKER" "$$RC" 2>/dev/null; then \
-			echo "" >> "$$RC"; \
-			echo "$$MARKER" >> "$$RC"; \
-			echo "$$BLOCK" >> "$$RC"; \
-			echo "Added .env to $$RC"; \
-			echo "💡 Run 'source $$RC' to apply changes to the current session."; \
-		fi; \
-	fi
 
 .PHONY: opencode install-packages-opencode install-opencode opencode-update setup-opencode check-opencode uninstall-opencode opencode-personal opencode-work sync-opencode check-sync-opencode help-opencode install-opencode-desktop uninstall-opencode-desktop
 help-opencode: ## OpenCode の使い方を表示

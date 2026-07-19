@@ -1,83 +1,42 @@
-# MCP Client 設定ガイド (Unified SSE Gateway)
+# MCP Client 設定ガイド (APM 直接管理)
 
-このプロジェクトでは、Docker MCP Gateway を使用した **Unified SSE Gateway** (`http://localhost:10888/sse`) を通じて、すべての AI ツールで共通の MCP サーバーを利用します。
+このプロジェクトでは、すべての MCP サーバーを `apm.yml` で定義し、
+`make sync-mcp` によって各クライアントの設定ファイルを生成します。
+各ツールは直接 stdio プロセスまたはリモート SSE エンドポイントに接続します。
 
-各ツールでの設定方法は以下の通りです。
+## 共通設定
 
-## 1. Gemini CLI
-Gemini CLI は `gemini/settings.json` を通じて MCP サーバーを管理します。
+設定ファイルは APM によって自動生成されるため、通常は手動で編集する必要はありません。
+必要に応じて `apm.yml` の `dependencies.mcp` セクションを変更し、以下を実行してください。
 
-- **設定ファイルの場所**: `~/.gemini/settings.json` (プロジェクト内の `gemini/settings.json` から生成されます)
-- **設定方法**:
-  `mcpServers` オブジェクト内にサーバーを追加します。SSE 経由の場合は `url` プロパティを指定します。
-  ```json
-  {
-    "mcpServers": {
-      "my-server": {
-        "url": "http://localhost:10888/sse?server=my-server"
-      }
-    }
-  }
-  ```
+```bash
+make sync-mcp
+```
 
-## 2. Claude Code
-Claude Code は CLI コマンドまたは設定ファイルで SSE サーバーを追加できます。
+## 各ツールでの設定ファイル場所
 
-- **CLIコマンド**:
-  ```bash
-  claude mcp add --transport sse <name> http://localhost:10888/sse?server=<name>
-  ```
-- **設定ファイルの場所**: `.claude.json` (プロジェクトルート)
+| ツール | 設定ファイル |
+| :--- | :--- |
+| Gemini CLI | `~/.gemini/settings.json` |
+| Claude Code | `~/.claude.json` |
+| Codex CLI | `~/.codex/config.toml` |
+| OpenCode | `~/.config/opencode/opencode.jsonc` |
+| Cursor | `~/.cursor/mcp.json` |
+| Antigravity | `~/.gemini/antigravity/mcp_config.json` |
 
-## 3. Codex CLI
-Codex CLI は TOML 形式の設定ファイルを使用します。
+## サーバー一覧
 
-- **設定ファイルの場所**: `~/.codex/config.toml`
-- **設定方法**:
-  `[mcp_servers.<name>]` セクションを追加します。
-  ```toml
-  [mcp_servers.my-server]
-  command = "npx"
-  args = ["-y", "mcp-remote", "http://localhost:10888/sse?server=my-server"]
-  ```
-  *(注: Codex CLI 等の stdio 専用クライアントで SSE サーバーを利用する場合、`mcp-remote` などのブリッジツールが必要です)*
+`make sync-mcp` 実行時、`apm.yml` の各クライアント設定に基づいて対応するサーバーが登録されます（すべてのサーバーが一律ですべてのツールに登録されるわけではありません。例えば、`sentry-remote` のようなリモートサーバーや、stdio専用の Codex CLI など、クライアントごとの対応差があります）。
 
-## 4. OpenCode (oh-my-opencode)
-OpenCode は JSONC 形式の設定ファイルを使用します。
+- `sqlite` — `uvx mcp-server-sqlite`
+- `filesystem` — `npx @modelcontextprotocol/server-filesystem`
+- `sequentialthinking` — `npx @modelcontextprotocol/server-sequential-thinking`
+- `github-official` — `github-mcp-server stdio`
+- `aws-api` — `uvx awslabs.aws-api-mcp-server`
+- `aws-cdk-mcp-server` — `uvx awslabs.cdk-mcp-server`
+- `aws-diagram` — `uvx awslabs.aws-diagram-mcp-server`
+- `aws-documentation` — `uvx awslabs.aws-documentation-mcp-server`
+- `aws-terraform` — `uvx awslabs.terraform-mcp-server`
+- `sentry-remote` — `https://mcp.sentry.dev/mcp`
+- 既存の `nexus`, `chronos-graph`, `skillport` 等
 
-- **設定ファイルの場所**: `~/.config/opencode/opencode.jsonc`
-- **設定方法**:
-  `"mcp"` セクションに設定を追加します。
-  ```jsonc
-  "mcp": {
-    "docker-mcp-gateway": {
-      "type": "remote",
-      "url": "http://127.0.0.1:10888/sse",
-      "enabled": true
-    }
-  }
-  ```
-
-## 5. Cursor IDE
-Cursor は設定 UI または JSON ファイルで設定できます。
-
-- **GUI**: `Settings > Features > MCP Servers > Add New MCP Server`
-  - **Type**: `SSE`
-  - **URL**: `http://localhost:10888/sse?server=<name>`
-- **設定ファイルの場所**: `~/.cursor/mcp.json`
-
-## 6. Antigravity IDE
-Antigravity は `mcp_config.json` を使用します。
-
-- **設定ファイルの場所**: `~/.gemini/antigravity/mcp_config.json`
-- **設定方法**:
-  `serverUrl` プロパティを使用します。
-  ```json
-  {
-    "mcpServers": {
-      "my-server": {
-        "serverUrl": "http://localhost:10888/sse?server=my-server"
-      }
-    }
-  }
-  ```

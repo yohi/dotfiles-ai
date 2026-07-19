@@ -35,9 +35,17 @@ sync-agents: ## Run APM install, compile, generate Antigravity config, and sync 
 	@$(MAKE) sync-agents-run
 
 sync-agents-run:
-	@uv run apm install
+	@if [ -f .env ]; then \
+		set -a && . ./.env && set +a && uv run apm install; \
+	 else \
+		uv run apm install; \
+	 fi
 	@$(MAKE) setup-skill-adapters
-	@uv run apm compile
+	@if [ -f .env ]; then \
+		set -a && . ./.env && set +a && uv run apm compile; \
+	 else \
+		uv run apm compile; \
+	 fi
 	@$(MAKE) setup-antigravity
 	@$(MAKE) sync-claude
 	@$(MAKE) setup-opencode

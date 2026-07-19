@@ -41,7 +41,6 @@ jobs:
         apm install --force
         apm compile
         apm compile --target antigravity
-        make sync-mcp-gateway
 
     - name: Run Integrity Tests
       run: |

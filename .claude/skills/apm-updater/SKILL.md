@@ -14,7 +14,9 @@ description: Checks and updates THIS repository's apm.yml and the OpenCode files
 - **「最新版/モデルの検出」は決定的なスクリプトに任せる**。
 - **「バージョン間で何が変わったか」の説明は人間が判断できる形で必ず提示する**。
 - **apm.yml への書き込みはユーザーの承認後にのみ行う**。
-- **生成物（`opencode.jsonc`, `mcp/config.yaml` など）は直接編集せず、常に `apm.yml` を最小差分で更新した後、決められた `make` コマンドで再同期する**。
+- **生成物は直接編集しない**: `opencode.jsonc` や
+  `gemini/settings.json` などは、`apm.yml` を最小差分で更新した後、
+  決められた `make` コマンドで再同期する。
 
 ## いつ使うか
 
@@ -27,7 +29,10 @@ description: Checks and updates THIS repository's apm.yml and the OpenCode files
 
 ## 前提と安全設計
 
-- **SSOT を壊さない**: `apm.yml` から `opencode.jsonc` や `mcp/config.yaml` などが生成されます。生成物を直接いじらず、常に `apm.yml` を最小差分で書き換えます。YAML 全体を再整形すると巨大な差分になりレビュー不能になるため、対象行だけを置換します。
+- **SSOT を壊さない**: `apm.yml` から `opencode.jsonc` や
+  `gemini/settings.json` などが生成されます。生成物を直接いじらず、
+  常に `apm.yml` を最小差分で書き換えます。YAML 全体を再整形すると
+  巨大な差分になりレビュー不能になるため、対象行だけを置換します。
 - **必ず差分提示 → 承認 → 適用**: 更新テーブルと各依存の変更点を先に出し、承認を得てから書き込みます。
 - **`@latest` / 未固定は既定で据え置き**: `@latest` や版数なしの依存は意図的に最新追従にしている可能性が高いため、現状の解決先を報告するだけに留め、勝手にピン留めしません。
 - **git 操作はしない**: コミット/プッシュはこのスキルでは実行せず、Conventional Commits（日本語）のコミットメッセージ案を提示するに留めます。

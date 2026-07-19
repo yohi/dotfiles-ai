@@ -19,7 +19,7 @@ dependencies:
     - greptileai/skills//check-pr
     - greptileai/skills//greploop
     - anthropics/claude-code//plugins/code-review
-    - yohi/agent-skills//skills/doc-sync-verifier
+    # - yohi/agent-skills//skills/doc-sync-verifier
     - yohi/agent-skills//skills/git-master
     - yohi/agent-skills//skills/github-quality-setup
     - yohi/agent-skills//skills/makefile-organization
@@ -46,6 +46,7 @@ dependencies:
         - "coderabbitai-mcp"
       env:
         GITHUB_PAT: "${env:GITHUB_TOKEN}"
+      timeout: 60000
       enabled: true
 
     - name: codegraph
@@ -68,13 +69,98 @@ dependencies:
         X-GitHub-Token: "${env:GITHUB_TOKEN}"
       enabled: true
 
-    - name: docker-mcp
-      title: "Docker MCP Gateway"
+    - name: filesystem
+      title: "Filesystem MCP"
+      registry: false
+      transport: stdio
+      command: "npx"
+      args:
+        - "-y"
+        - "@modelcontextprotocol/server-filesystem"
+        - "${env:MCP_FILESYSTEM_ROOT:-${env:PWD}}"
+      standalone: true
+      timeout: 60000
+      enabled: true
+
+    - name: sequentialthinking
+      title: "Sequential Thinking MCP"
+      registry: false
+      transport: stdio
+      command: "npx"
+      args:
+        - "-y"
+        - "@modelcontextprotocol/server-sequential-thinking"
+      env:
+        DISABLE_THOUGHT_LOGGING: "${env:DISABLE_THOUGHT_LOGGING:-true}"
+      standalone: true
+      timeout: 60000
+      enabled: true
+
+    - name: github-official
+      title: "GitHub Official MCP"
       registry: false
       transport: sse
-      url: "http://127.0.0.1:10888/sse"
+      url: "https://api.githubcopilot.com/mcp/"
+      standalone: true
+      enabled: true
       headers:
-        Authorization: "Bearer ${env:MCP_GATEWAY_TOKEN}"
+        Authorization: "Bearer ${env:GITHUB_TOKEN}"
+
+    - name: aws-iac
+      title: "AWS IaC MCP"
+      registry: false
+      transport: stdio
+      command: "uvx"
+      args:
+        - "awslabs.aws-iac-mcp-server"
+      env:
+        AWS_PROFILE: "${env:AWS_PROFILE:-default}"
+        AWS_REGION: "${env:AWS_REGION:-us-east-1}"
+        FASTMCP_LOG_LEVEL: "ERROR"
+      standalone: true
+      timeout: 60000
+      enabled: true
+
+
+    - name: aws-documentation
+      title: "AWS Documentation MCP"
+      registry: false
+      transport: stdio
+      command: "uvx"
+      args:
+        - "awslabs.aws-documentation-mcp-server==1.0.0"
+      env:
+        FASTMCP_LOG_LEVEL: "ERROR"
+        AWS_DOCUMENTATION_PARTITION: "${env:AWS_DOCUMENTATION_PARTITION:-aws}"
+      standalone: true
+      enabled: true
+
+    - name: aws-mcp
+      title: "AWS Managed MCP"
+      registry: false
+      transport: stdio
+      command: "uvx"
+      args:
+        - "mcp-proxy-for-aws==1.6.3"
+        - "https://aws-mcp.${env:AWS_REGION:-us-east-1}.api.aws/mcp"
+        - "--service"
+        - "aws-mcp"
+        - "--region"
+        - "${env:AWS_REGION:-us-east-1}"
+        - "--profile"
+        - "${env:AWS_PROFILE:-default}"
+      env:
+        AWS_REGION: "${env:AWS_REGION:-us-east-1}"
+        AWS_PROFILE: "${env:AWS_PROFILE:-default}"
+      standalone: true
+      timeout: 60000
+      enabled: true
+
+    - name: sentry-remote
+      title: "Sentry Remote MCP"
+      registry: false
+      transport: sse
+      url: "https://mcp.sentry.dev/mcp"
       enabled: true
 
     - name: sonarqube
@@ -89,6 +175,7 @@ dependencies:
         SONARQUBE_TOKEN: "${env:SONARQUBE_TOKEN}"
         SONARQUBE_URL: "${env:SONARQUBE_URL}"
         SONARQUBE_ORG: "${env:SONARQUBE_ORG}"
+      timeout: 60000
       enabled: true
 
     - name: semgrep
@@ -105,6 +192,7 @@ dependencies:
       env:
         SEMGREP_APP_TOKEN: "${env:SEMGREP_APP_TOKEN}"
       enabled: true
+      timeout: 60000
 
     - name: skillport
       title: "Skillport"
@@ -116,6 +204,7 @@ dependencies:
       env:
         SKILLPORT_SKILLS_DIR: "${env:SKILLPORT_SKILLS_DIR:-.agents/skills}"
       standalone: true
+      timeout: 60000
       enabled: true
 
     - name: nexus
@@ -125,14 +214,15 @@ dependencies:
       command: "npx"
       args:
         - "-y"
-        - "@yohi/nexus@1.26.3"
+        - "@yohi/nexus@1.28.1"
+        - "http-bridge"
       env:
         LOG_LEVEL: "ERROR"
         NEXUS_WATCHER_IGNORE_PATHS: "node_modules,opencode/node_modules,.opencode/node_modules,oss/apm/node_modules,oss/apm/docs/node_modules,.git,.nexus,dist,gemini,agent-skills,apm_modules,.agents,.opencode,.gemini,.claude,.codex,.vscode,.devcontainer,oss,codex/.tmp,.worktrees,.venv,target,.mypy_cache,.ruff_cache,build,.serena,.cache,__pycache__,*.db,*.sqlite,*.log"
         CHOKIDAR_USEPOLLING: "false"
         CHOKIDAR_INTERVAL: "2000"
         NO_PROXY: "127.0.0.1,localhost"
-      timeout: 30000
+      timeout: 60000
       standalone: true
       enabled: true
 
@@ -172,6 +262,7 @@ dependencies:
         DASHBOARD_HOST: "${env:DASHBOARD_HOST}"
         DASHBOARD_PORT: "${env:DASHBOARD_PORT}"
       standalone: true
+      timeout: 120000
       enabled: true
 
 # --------------------------------------------------------------------------
@@ -713,7 +804,6 @@ experimental:
 # APM Standard Targets
 targets:
   - opencode
-  - cursor
 
 # Exported Artifacts
 exports:
