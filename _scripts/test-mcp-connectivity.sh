@@ -54,7 +54,13 @@ check_client_server() {
 }
 
 # Servers that should be present in all clients after migration (derived dynamically from apm.yml)
-EXPECTED_SERVERS=($(uv run --with pyyaml python3 -c "
+# Ensure uv is installed
+if ! has_cmd "uv"; then
+    echo -e "${RED}[x] 'uv' is required but not installed.${NC}"
+    exit 1
+fi
+
+EXPECTED_SERVERS_RAW=$(uv run --with pyyaml python3 -c "
 import yaml
 with open('apm.yml') as f:
     data = yaml.safe_load(f)
@@ -62,7 +68,15 @@ mcp = data.get('dependencies', {}).get('mcp', [])
 for s in mcp:
     if s.get('enabled', True):
         print(s['name'])
-"))
+")
+
+if [ -z "${EXPECTED_SERVERS_RAW}" ]; then
+    echo -e "${RED}[x] Failed to load expected servers from apm.yml or list is empty.${NC}"
+    exit 1
+fi
+
+EXPECTED_SERVERS=(${EXPECTED_SERVERS_RAW})
+
 
 # 1. Claude Code
 echo "Claude Code:"
