@@ -163,6 +163,7 @@ def validate_apm_models(apm_path: Path) -> int:
     provider_indent = 0
     provider_name = None
     provider_name_indent = None
+    provider_property_indent = None
     list_key = None
     list_key_indent = None
 
@@ -179,15 +180,10 @@ def validate_apm_models(apm_path: Path) -> int:
                     in_provider_section = False
                     provider_name = None
                     provider_name_indent = None
+                    provider_property_indent = None
                     list_key = None
                     list_key_indent = None
                 else:
-                    if (
-                        provider_name_indent is not None
-                        and indent <= provider_name_indent
-                    ):
-                        provider_name = None
-                        provider_name_indent = None
                     if list_key_indent is not None and indent <= list_key_indent:
                         list_key = None
                         list_key_indent = None
@@ -197,27 +193,40 @@ def validate_apm_models(apm_path: Path) -> int:
                 provider_indent = indent
                 provider_name = None
                 provider_name_indent = None
+                provider_property_indent = None
                 list_key = None
                 list_key_indent = None
                 continue
 
             if in_provider_section:
-                if section in ("whitelist", "models") and provider_name is not None:
-                    list_key = section
-                    list_key_indent = indent
-                else:
+                if provider_name_indent is None:
                     provider_name = section
                     provider_name_indent = indent
+                    provider_property_indent = None
+                elif indent == provider_name_indent:
+                    provider_name = section
+                    provider_property_indent = None
+                    list_key = None
+                    list_key_indent = None
+                elif provider_property_indent is None:
+                    provider_property_indent = indent
+                if (
+                    indent == provider_property_indent
+                    and section in ("whitelist", "models")
+                    and provider_name is not None
+                ):
+                    list_key = section
+                    list_key_indent = indent
             continue
 
         if not in_provider_section or not provider_name or not list_key:
             continue
 
-        m = re.match(r'^\s*-\s*"?([^"\s#]+)"?\s*$', line)
+        m = re.match(r"^\s*-\s*(['\"]?)([^\s#'\"]+)\1\s*$", line)
         if not m:
             continue
 
-        model = m.group(1)
+        model = m.group(2)
         if provider_name == "amazon-bedrock":
             full_model = "amazon-bedrock/%s" % model
             if not model.startswith(BEDROCK_ALLOWED_PREFIXES):
@@ -245,6 +254,7 @@ def validate_duplicates(apm_path: Path) -> int:
     provider_indent = 0
     provider_name = None
     provider_name_indent = None
+    provider_property_indent = None
     list_key = None
     list_key_indent = None
     seen = {}
@@ -262,17 +272,11 @@ def validate_duplicates(apm_path: Path) -> int:
                     in_provider_section = False
                     provider_name = None
                     provider_name_indent = None
+                    provider_property_indent = None
                     list_key = None
                     list_key_indent = None
                     seen = {}
                 else:
-                    if (
-                        provider_name_indent is not None
-                        and indent <= provider_name_indent
-                    ):
-                        provider_name = None
-                        provider_name_indent = None
-                        seen = {}
                     if list_key_indent is not None and indent <= list_key_indent:
                         list_key = None
                         list_key_indent = None
@@ -283,30 +287,44 @@ def validate_duplicates(apm_path: Path) -> int:
                 provider_indent = indent
                 provider_name = None
                 provider_name_indent = None
+                provider_property_indent = None
                 list_key = None
                 list_key_indent = None
                 seen = {}
                 continue
 
             if in_provider_section:
-                if section in ("whitelist", "models") and provider_name is not None:
-                    list_key = section
-                    list_key_indent = indent
-                    seen = {}
-                else:
+                if provider_name_indent is None:
                     provider_name = section
                     provider_name_indent = indent
+                    provider_property_indent = None
+                    seen = {}
+                elif indent == provider_name_indent:
+                    provider_name = section
+                    provider_property_indent = None
+                    list_key = None
+                    list_key_indent = None
+                    seen = {}
+                elif provider_property_indent is None:
+                    provider_property_indent = indent
+                if (
+                    indent == provider_property_indent
+                    and section in ("whitelist", "models")
+                    and provider_name is not None
+                ):
+                    list_key = section
+                    list_key_indent = indent
                     seen = {}
             continue
 
         if not in_provider_section or not provider_name or not list_key:
             continue
 
-        m = re.match(r'^\s*-\s*"?([^"\s#]+)"?\s*$', line)
+        m = re.match(r"^\s*-\s*(['\"]?)([^\s#'\"]+)\1\s*$", line)
         if not m:
             continue
 
-        model = m.group(1)
+        model = m.group(2)
         if model in seen:
             issues.append((idx, provider_name, list_key, model, seen[model]))
         else:

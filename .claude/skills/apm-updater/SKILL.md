@@ -144,7 +144,7 @@ python .claude/skills/apm-updater/scripts/check_updates.py --models
 | `qwen3.7-max` | `opencode-go` | `opencode-go` whitelist |
 | カスタム AI Gateway 経由の Kimi | （カスタム） | `cloudflare-ai-gateway-custom` whitelist |
 
-`cloudflare-ai-gateway-custom` は `models.dev` に存在しないカスタム provider です。`--validate-models` では無視されます。
+`cloudflare-ai-gateway-custom` は `models.dev` に存在しないカスタム provider です。`--validate-models` は `whitelist` またはリスト形式の `models` を通常の provider/model として検査するため、カスタムモデルのマッピング形式はこの検査の対象外です。
 
 - 更新後、以下を実行して `opencode/opencode.jsonc` を再生成します:
 
