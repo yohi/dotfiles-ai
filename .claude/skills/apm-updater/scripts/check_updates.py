@@ -48,13 +48,24 @@ SEMVER_RE = re.compile(r"^v?(\d+)\.(\d+)\.(\d+)(?![\d.+\-])")
 FULL_SHA_RE = re.compile(r"^[0-9a-fA-F]{40}$")
 
 
-def run(cmd):
+def run(cmd, include_stderr=False):
     """Run a command, returning stripped stdout or None on any failure."""
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=TIMEOUT)
-    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+    except subprocess.TimeoutExpired:
+        if include_stderr:
+            sys.stderr.write(
+                "timeout after %ds: %s\n" % (TIMEOUT, " ".join(cmd))
+            )
+        return None
+    except (FileNotFoundError, OSError):
+        if include_stderr:
+            sys.stderr.write("command not found: %s\n" % cmd[0])
         return None
     if proc.returncode != 0:
+        if include_stderr:
+            err = (proc.stderr or "").strip()
+            sys.stderr.write("%s failed: %s\n" % (" ".join(cmd), err))
         return None
     return proc.stdout.strip()
 
@@ -281,8 +292,8 @@ def detect(text):
     return records
 
 
-def latest_npm(name):
-    return run(["npm", "view", name, "version"])
+def latest_npm(name, verbose=False):
+    return run(["npm", "view", name, "version"], include_stderr=verbose)
 
 
 def latest_tag(url):
@@ -312,7 +323,7 @@ def latest_head(url):
     return fields[0] if fields else None
 
 
-def resolve(rec):
+def resolve(rec, verbose=False):
     """Populate rec['latest'] and rec['update'] (best-effort)."""
     if rec["spec"] == "latest":
         rec["latest"] = "(tracks latest)"
@@ -320,7 +331,7 @@ def resolve(rec):
         return
     latest = None
     if rec["kind"] in ("plugin", "mcp-npm"):
-        latest = latest_npm(rec["name"])
+        latest = latest_npm(rec["name"], verbose=verbose)
     elif rec["kind"] == "apm-skill":
         latest = latest_tag(rec["git_url"])
     elif rec["kind"] == "mcp-git":
@@ -377,6 +388,9 @@ def main(argv=None):
     parser.add_argument("--apm", default="apm.yml", help="path to apm.yml")
     parser.add_argument("--json", action="store_true", help="emit JSON")
     parser.add_argument(
+        "-v", "--verbose", action="store_true", help="print diagnostic messages"
+    )
+    parser.add_argument(
         "--no-network",
         action="store_true",
         help="inventory only, skip latest resolution",
@@ -420,7 +434,7 @@ def main(argv=None):
 
     if not args.no_network:
         for rec in records:
-            resolve(rec)
+            resolve(rec, verbose=args.verbose)
     else:
         for rec in records:
             rec.setdefault("latest", "(skipped)")
