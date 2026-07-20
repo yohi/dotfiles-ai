@@ -117,3 +117,4 @@ python .claude/skills/apm-updater/scripts/check_updates.py --validate-models
 - `apm.yml` は SSOT。書き換えは対象行のみの最小差分にし、YAML 全体を再整形しない。
 - 版数だけ / ハッシュだけを差し替え、引用符・インデント・`[all]` などの extras・`//subpath` は保持する。
 - 適用後の再解決には `make apm-install`（`apm.lock.yaml` を更新）が必要。MCP 版数変更時は `make sync-mcp`、スキル/プラグイン変更時は `make sync-agents`、OpenCode モデル/環境変更時は `make sync-opencode` を案内する（このスキルでは自動実行しない）。
+- 編集後は `python .claude/skills/apm-updater/scripts/check_updates.py --validate-duplicates` を実行して重複がないか確認する。

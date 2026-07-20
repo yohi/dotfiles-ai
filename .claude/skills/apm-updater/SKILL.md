@@ -84,9 +84,38 @@ python .claude/skills/apm-updater/scripts/check_updates.py --json
 
 「出力フォーマット」の通りに、更新テーブル + 各依存の変更点 + 参照 URL をまとめて提示し、適用してよいか承認を求めます。ユーザーが一部だけ適用したい場合（例: 「nexus 以外」）に対応できるよう、依存ごとに識別しやすく並べます。
 
+##### 破壊的変更を含む場合の承認
+
+いずれかの依存で major version up、`BREAKING CHANGE`、スキルエイリアス削除、設定移行を伴う変更が含まれる場合、単一の「OK」では承認を受け取らず、以下のように提示します。
+
+```text
+⚠️ 以下の依存には破壊的変更の可能性があります:
+  1. oh-my-openagent 4.17.0 -> 4.19.0 (shared/ skill aliases removed)
+```
+
+選択肢:
+
+- (a) 破壊的変更を含む全てを適用
+- (b) 破壊的変更を除く全てを適用
+- (c) 一部のみ適用（番号で指定してください）
+- (d) 今回は見送り
+
+##### 更新対象が複数ある場合の選択
+
+更新候補が 2 件以上ある場合、各依存に番号を割り当て、ユーザーに「`1,3` のみ」などの選択肢を提示して指定された依存だけを適用します。
+
 #### A5. apm.yml への適用（承認後のみ）
 
 承認された依存についてのみ、`apm.yml` の該当行を最小差分で書き換えます。版数だけ / ハッシュだけを置換し、周囲の引用符・インデント・`[all]` などの extras は保持します。
+
+書き換え後、必ず以下を実行して整合性を検証します。
+
+```bash
+python .claude/skills/apm-updater/scripts/check_updates.py --validate-duplicates
+python .claude/skills/apm-updater/scripts/check_updates.py --validate-models
+```
+
+いずれもクリーンであれば、必要な `make` コマンドを案内します。
 
 ### B. OpenCode LLM モデル・環境プロファイル・README の更新
 
@@ -106,6 +135,17 @@ python .claude/skills/apm-updater/scripts/check_updates.py --models
 - `apm.yml` はモデル定義の SSOT です。`opencode.jsonc` を直接編集してはいけません。
 - `provider` セクション配下の各プロバイダー（`openai`, `nvidia`, `cloudflare-workers-ai`, `opencode`, `amazon-bedrock`, `opencode-go` など）の `whitelist` もしくは `models` リストを、最新スキーマで定義されている有効なモデル名と一致するように更新します。
 - **Bedrock モデル（`amazon-bedrock`）の制限**: `amazon-bedrock` の `whitelist` に含めるモデルは、`global.anthropic.claude-*`（グローバルプレフィックス付きの最新 Claude モデル）および `openai.gpt-*`（Bedrock 上で提供される OpenAI モデル）のみとします。その他のリージョン固有モデルや古い世代のモデルは whitelist に含めず、除外してください。
+
+##### provider 選択早見表
+
+| モデル | models.dev 上の provider | `apm.yml` 上の推奨配置 |
+|---|---|---|
+| `kimi-k3` | `opencode-go` | `opencode-go` whitelist |
+| `qwen3.7-max` | `opencode-go` | `opencode-go` whitelist |
+| カスタム AI Gateway 経由の Kimi | （カスタム） | `cloudflare-ai-gateway-custom` whitelist |
+
+`cloudflare-ai-gateway-custom` は `models.dev` に存在しないカスタム provider です。`--validate-models` は `whitelist` またはリスト形式の `models` を通常の provider/model として検査するため、カスタムモデルのマッピング形式はこの検査の対象外です。
+
 - 更新後、以下を実行して `opencode/opencode.jsonc` を再生成します:
 
 ```bash
@@ -136,6 +176,16 @@ make sync-opencode
     - zsh 連携スクリプトやエイリアスの設定解説
     - `apm.yml` からのプラグイン同期手順およびその構造的説明
 
+### C0. 事前クリーンアップ
+
+`make check-sync-opencode` は `.gitignore` 対象の生成済みファイル（例: `opencode.json`）が残っていると失敗することがあります。該当ファイルを確認して削除し、再実行します。
+
+```bash
+git status --ignored | grep opencode\.json || true
+rm -f opencode.json
+make check-sync-opencode
+```
+
 ### C. 整合性の検証とクリーンアップ
 
 更新完了後、静的解析・構文チェック等のチェックを実施します:
@@ -153,20 +203,20 @@ make check-sync-opencode
 ```text
 ## apm.yml 更新サマリ
 
-| 種別 | 依存 | 現在 | 最新 | 更新 |
-|------|------|------|------|------|
-| plugin | @yohi/justice | 2.3.0 | 2.4.1 | あり |
-| mcp-git | yohi/chronos-graph | cb1f33f | a1b2c3d | あり |
-| mcp-npm | @yohi/nexus | 1.22.0 | 1.22.0 | なし |
-| plugin | @nick-vi/opencode-type-inject | latest | (latest 追従) | 据え置き |
+| # | 種別 | 依存 | 現在 | 最新 | 更新 |
+|---|------|------|------|------|------|
+| 1 | plugin | `@yohi/justice` | 2.3.0 | 2.4.1 | あり |
+| 2 | mcp-git | `yohi/chronos-graph` | cb1f33f | a1b2c3d | あり |
+| 3 | mcp-npm | `@yohi/nexus` | 1.22.0 | 1.22.0 | なし |
+| 4 | plugin | `@nick-vi/opencode-type-inject` | `latest` | (latest 追従) | 据え置き |
 
-### @yohi/justice: 2.3.0 -> 2.4.1
+### `@yohi/justice`: 2.3.0 -> 2.4.1
 - 主な変更点:
   - <箇条書きで要約>
   - <BREAKING があれば明示>
 - 参照: https://github.com/<owner/repo>/compare/v2.3.0...v2.4.1
 
-### yohi/chronos-graph: cb1f33f -> a1b2c3d
+### `yohi/chronos-graph`: cb1f33f -> a1b2c3d
 - 主な変更点:
   - <コミット要約>
 - 参照: https://github.com/yohi/chronos-graph/compare/cb1f33f...a1b2c3d

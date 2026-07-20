@@ -48,13 +48,24 @@ SEMVER_RE = re.compile(r"^v?(\d+)\.(\d+)\.(\d+)(?![\d.+\-])")
 FULL_SHA_RE = re.compile(r"^[0-9a-fA-F]{40}$")
 
 
-def run(cmd):
+def run(cmd, include_stderr=False):
     """Run a command, returning stripped stdout or None on any failure."""
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=TIMEOUT)
-    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+    except subprocess.TimeoutExpired:
+        if include_stderr:
+            sys.stderr.write(
+                "timeout after %ds: %s\n" % (TIMEOUT, " ".join(cmd))
+            )
+        return None
+    except (FileNotFoundError, OSError):
+        if include_stderr:
+            sys.stderr.write("command not found: %s\n" % cmd[0])
         return None
     if proc.returncode != 0:
+        if include_stderr:
+            err = (proc.stderr or "").strip()
+            sys.stderr.write("%s failed: %s\n" % (" ".join(cmd), err))
         return None
     return proc.stdout.strip()
 
@@ -104,8 +115,8 @@ def extract_models(schema):
         return []
 
 
-def list_models():
-    """Print the available models from models.dev, grouped by provider."""
+def list_models(json_mode=False):
+    """Print or return the available models from models.dev."""
     schema = fetch_model_schema()
     if schema is None:
         sys.stderr.write(
@@ -116,6 +127,10 @@ def list_models():
     if not models:
         sys.stderr.write("error: no models found in schema\n")
         return 1
+
+    if json_mode:
+        print(json.dumps(sorted(models), indent=2))
+        return 0
 
     groups = {}
     for model in models:
@@ -148,6 +163,7 @@ def validate_apm_models(apm_path: Path) -> int:
     provider_indent = 0
     provider_name = None
     provider_name_indent = None
+    provider_property_indent = None
     list_key = None
     list_key_indent = None
 
@@ -164,15 +180,10 @@ def validate_apm_models(apm_path: Path) -> int:
                     in_provider_section = False
                     provider_name = None
                     provider_name_indent = None
+                    provider_property_indent = None
                     list_key = None
                     list_key_indent = None
                 else:
-                    if (
-                        provider_name_indent is not None
-                        and indent <= provider_name_indent
-                    ):
-                        provider_name = None
-                        provider_name_indent = None
                     if list_key_indent is not None and indent <= list_key_indent:
                         list_key = None
                         list_key_indent = None
@@ -182,27 +193,40 @@ def validate_apm_models(apm_path: Path) -> int:
                 provider_indent = indent
                 provider_name = None
                 provider_name_indent = None
+                provider_property_indent = None
                 list_key = None
                 list_key_indent = None
                 continue
 
             if in_provider_section:
-                if section in ("whitelist", "models") and provider_name is not None:
-                    list_key = section
-                    list_key_indent = indent
-                else:
+                if provider_name_indent is None:
                     provider_name = section
                     provider_name_indent = indent
+                    provider_property_indent = None
+                elif indent == provider_name_indent:
+                    provider_name = section
+                    provider_property_indent = None
+                    list_key = None
+                    list_key_indent = None
+                elif provider_property_indent is None:
+                    provider_property_indent = indent
+                if (
+                    indent == provider_property_indent
+                    and section in ("whitelist", "models")
+                    and provider_name is not None
+                ):
+                    list_key = section
+                    list_key_indent = indent
             continue
 
         if not in_provider_section or not provider_name or not list_key:
             continue
 
-        m = re.match(r'^\s*-\s*"?([^"\s#]+)"?\s*$', line)
+        m = re.match(r"^\s*-\s*(['\"]?)([^\s#'\"]+)\1\s*$", line)
         if not m:
             continue
 
-        model = m.group(1)
+        model = m.group(2)
         if provider_name == "amazon-bedrock":
             full_model = "amazon-bedrock/%s" % model
             if not model.startswith(BEDROCK_ALLOWED_PREFIXES):
@@ -220,6 +244,124 @@ def validate_apm_models(apm_path: Path) -> int:
     else:
         print("MODEL VALIDATION: all whitelist entries match models.dev schema")
     return 0 if not issues else 1
+
+
+def validate_duplicates(apm_path: Path) -> int:
+    """Detect duplicate entries in provider/model whitelists."""
+    text = apm_path.read_text(encoding="utf-8")
+    issues = []
+    in_provider_section = False
+    provider_indent = 0
+    provider_name = None
+    provider_name_indent = None
+    provider_property_indent = None
+    list_key = None
+    list_key_indent = None
+    seen = {}
+
+    for idx, line in enumerate(text.splitlines(), start=1):
+        stripped = line.lstrip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        indent = len(line) - len(stripped)
+        top = re.match(r"^([A-Za-z0-9_-]+):", stripped)
+        if top:
+            section = top.group(1)
+            if in_provider_section:
+                if indent <= provider_indent:
+                    in_provider_section = False
+                    provider_name = None
+                    provider_name_indent = None
+                    provider_property_indent = None
+                    list_key = None
+                    list_key_indent = None
+                    seen = {}
+                else:
+                    if list_key_indent is not None and indent <= list_key_indent:
+                        list_key = None
+                        list_key_indent = None
+                        seen = {}
+
+            if section == "provider" and indent == 0:
+                in_provider_section = True
+                provider_indent = indent
+                provider_name = None
+                provider_name_indent = None
+                provider_property_indent = None
+                list_key = None
+                list_key_indent = None
+                seen = {}
+                continue
+
+            if in_provider_section:
+                if provider_name_indent is None:
+                    provider_name = section
+                    provider_name_indent = indent
+                    provider_property_indent = None
+                    seen = {}
+                elif indent == provider_name_indent:
+                    provider_name = section
+                    provider_property_indent = None
+                    list_key = None
+                    list_key_indent = None
+                    seen = {}
+                elif provider_property_indent is None:
+                    provider_property_indent = indent
+                if (
+                    indent == provider_property_indent
+                    and section in ("whitelist", "models")
+                    and provider_name is not None
+                ):
+                    list_key = section
+                    list_key_indent = indent
+                    seen = {}
+            continue
+
+        if not in_provider_section or not provider_name or not list_key:
+            continue
+
+        m = re.match(r"^\s*-\s*(['\"]?)([^\s#'\"]+)\1\s*$", line)
+        if not m:
+            continue
+
+        model = m.group(2)
+        if model in seen:
+            issues.append((idx, provider_name, list_key, model, seen[model]))
+        else:
+            seen[model] = idx
+
+    if issues:
+        print("DUPLICATE ENTRIES: %d" % len(issues))
+        for line_no, provider, key, model, first_line in issues:
+            print(
+                "  line %d: %s/%s '%s' (first at line %d)"
+                % (line_no, provider, key, model, first_line),
+            )
+    else:
+        print("DUPLICATE ENTRIES: none")
+    return 0 if not issues else 1
+
+
+def check_model(identifier: str) -> int:
+    """Check if a model identifier exists in the models.dev schema."""
+    schema = fetch_model_schema()
+    if schema is None:
+        sys.stderr.write(
+            "error: failed to fetch model schema from %s\n" % MODEL_SCHEMA_URL
+        )
+        return 1
+    valid_models = set(extract_models(schema))
+    if identifier in valid_models:
+        print("VALID: %s" % identifier)
+        return 0
+    suffix = identifier.split("/")[-1] if "/" in identifier else identifier
+    suggestions = [m for m in valid_models if m.endswith("/" + suffix)]
+    print("INVALID: %s" % identifier)
+    if suggestions:
+        print("suggestions:")
+        for s in sorted(suggestions)[:10]:
+            print("  %s" % s)
+    return 1
 
 
 def detect(text):
@@ -281,8 +423,8 @@ def detect(text):
     return records
 
 
-def latest_npm(name):
-    return run(["npm", "view", name, "version"])
+def latest_npm(name, verbose=False):
+    return run(["npm", "view", name, "version"], include_stderr=verbose)
 
 
 def latest_tag(url):
@@ -312,7 +454,7 @@ def latest_head(url):
     return fields[0] if fields else None
 
 
-def resolve(rec):
+def resolve(rec, verbose=False):
     """Populate rec['latest'] and rec['update'] (best-effort)."""
     if rec["spec"] == "latest":
         rec["latest"] = "(tracks latest)"
@@ -320,7 +462,7 @@ def resolve(rec):
         return
     latest = None
     if rec["kind"] in ("plugin", "mcp-npm"):
-        latest = latest_npm(rec["name"])
+        latest = latest_npm(rec["name"], verbose=verbose)
     elif rec["kind"] == "apm-skill":
         latest = latest_tag(rec["git_url"])
     elif rec["kind"] == "mcp-git":
@@ -377,6 +519,9 @@ def main(argv=None):
     parser.add_argument("--apm", default="apm.yml", help="path to apm.yml")
     parser.add_argument("--json", action="store_true", help="emit JSON")
     parser.add_argument(
+        "-v", "--verbose", action="store_true", help="print diagnostic messages"
+    )
+    parser.add_argument(
         "--no-network",
         action="store_true",
         help="inventory only, skip latest resolution",
@@ -391,10 +536,23 @@ def main(argv=None):
         action="store_true",
         help="validate apm.yml model whitelist entries against models.dev schema",
     )
+    parser.add_argument(
+        "--validate-duplicates",
+        action="store_true",
+        help="detect duplicate model entries in provider whitelists",
+    )
+    parser.add_argument(
+        "--check-model",
+        metavar="PROVIDER/MODEL",
+        help="check if a model identifier exists in models.dev schema",
+    )
     args = parser.parse_args(argv)
 
     if args.models:
-        return list_models()
+        return list_models(json_mode=args.json)
+
+    if args.check_model:
+        return check_model(args.check_model)
 
     apm_path = Path(args.apm)
     if not apm_path.is_file():
@@ -413,6 +571,9 @@ def main(argv=None):
             sys.stderr.write("error: apm.yml not found (tried %s)\n" % args.apm)
             return 2
 
+    if args.validate_duplicates:
+        return validate_duplicates(apm_path)
+
     if args.validate_models:
         return validate_apm_models(apm_path)
 
@@ -420,7 +581,7 @@ def main(argv=None):
 
     if not args.no_network:
         for rec in records:
-            resolve(rec)
+            resolve(rec, verbose=args.verbose)
     else:
         for rec in records:
             rec.setdefault("latest", "(skipped)")
