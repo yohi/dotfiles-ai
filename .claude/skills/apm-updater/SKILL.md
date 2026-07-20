@@ -155,18 +155,18 @@ make check-sync-opencode
 
 | 種別 | 依存 | 現在 | 最新 | 更新 |
 |------|------|------|------|------|
-| plugin | @yohi/justice | 2.3.0 | 2.4.1 | あり |
-| mcp-git | yohi/chronos-graph | cb1f33f | a1b2c3d | あり |
-| mcp-npm | @yohi/nexus | 1.22.0 | 1.22.0 | なし |
-| plugin | @nick-vi/opencode-type-inject | latest | (latest 追従) | 据え置き |
+| plugin | `@yohi/justice` | 2.3.0 | 2.4.1 | あり |
+| mcp-git | `yohi/chronos-graph` | cb1f33f | a1b2c3d | あり |
+| mcp-npm | `@yohi/nexus` | 1.22.0 | 1.22.0 | なし |
+| plugin | `@nick-vi/opencode-type-inject` | `latest` | (latest 追従) | 据え置き |
 
-### @yohi/justice: 2.3.0 -> 2.4.1
+### `@yohi/justice`: 2.3.0 -> 2.4.1
 - 主な変更点:
   - <箇条書きで要約>
   - <BREAKING があれば明示>
 - 参照: https://github.com/<owner/repo>/compare/v2.3.0...v2.4.1
 
-### yohi/chronos-graph: cb1f33f -> a1b2c3d
+### `yohi/chronos-graph`: cb1f33f -> a1b2c3d
 - 主な変更点:
   - <コミット要約>
 - 参照: https://github.com/yohi/chronos-graph/compare/cb1f33f...a1b2c3d
