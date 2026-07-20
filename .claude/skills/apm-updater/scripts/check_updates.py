@@ -122,11 +122,11 @@ def list_models(json_mode=False):
         sys.stderr.write(
             "error: failed to fetch model schema from %s\n" % MODEL_SCHEMA_URL
         )
-        return None
+        return 1
     models = extract_models(schema)
     if not models:
         sys.stderr.write("error: no models found in schema\n")
-        return None
+        return 1
 
     if json_mode:
         print(json.dumps(sorted(models), indent=2))
