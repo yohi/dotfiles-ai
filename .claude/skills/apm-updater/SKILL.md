@@ -108,6 +108,15 @@ python .claude/skills/apm-updater/scripts/check_updates.py --json
 
 承認された依存についてのみ、`apm.yml` の該当行を最小差分で書き換えます。版数だけ / ハッシュだけを置換し、周囲の引用符・インデント・`[all]` などの extras は保持します。
 
+書き換え後、必ず以下を実行して整合性を検証します。
+
+```bash
+python .claude/skills/apm-updater/scripts/check_updates.py --validate-duplicates
+python .claude/skills/apm-updater/scripts/check_updates.py --validate-models
+```
+
+いずれもクリーンであれば、必要な `make` コマンドを案内します。
+
 ### B. OpenCode LLM モデル・環境プロファイル・README の更新
 
 #### B1. 最新モデルスキーマ情報の取得と解析
