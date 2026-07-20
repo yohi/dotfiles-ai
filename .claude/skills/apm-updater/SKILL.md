@@ -84,6 +84,26 @@ python .claude/skills/apm-updater/scripts/check_updates.py --json
 
 「出力フォーマット」の通りに、更新テーブル + 各依存の変更点 + 参照 URL をまとめて提示し、適用してよいか承認を求めます。ユーザーが一部だけ適用したい場合（例: 「nexus 以外」）に対応できるよう、依存ごとに識別しやすく並べます。
 
+##### 破壊的変更を含む場合の承認
+
+いずれかの依存で major version up、`BREAKING CHANGE`、スキルエイリアス削除、設定移行を伴う変更が含まれる場合、単一の「OK」では承認を受け取らず、以下のように提示します。
+
+```text
+⚠️ 以下の依存には破壊的変更の可能性があります:
+  1. oh-my-openagent 4.17.0 -> 4.19.0 (shared/ skill aliases removed)
+```
+
+選択肢:
+
+- (a) 破壊的変更を含む全てを適用
+- (b) 破壊的変更を除く全てを適用
+- (c) 一部のみ適用（番号で指定してください）
+- (d) 今回は見送り
+
+##### 更新対象が複数ある場合の選択
+
+更新候補が 2 件以上ある場合、各依存に番号を割り当て、ユーザーに「`1,3` のみ」などの選択肢を提示して指定された依存だけを適用します。
+
 #### A5. apm.yml への適用（承認後のみ）
 
 承認された依存についてのみ、`apm.yml` の該当行を最小差分で書き換えます。版数だけ / ハッシュだけを置換し、周囲の引用符・インデント・`[all]` などの extras は保持します。
@@ -153,12 +173,12 @@ make check-sync-opencode
 ```text
 ## apm.yml 更新サマリ
 
-| 種別 | 依存 | 現在 | 最新 | 更新 |
-|------|------|------|------|------|
-| plugin | `@yohi/justice` | 2.3.0 | 2.4.1 | あり |
-| mcp-git | `yohi/chronos-graph` | cb1f33f | a1b2c3d | あり |
-| mcp-npm | `@yohi/nexus` | 1.22.0 | 1.22.0 | なし |
-| plugin | `@nick-vi/opencode-type-inject` | `latest` | (latest 追従) | 据え置き |
+| # | 種別 | 依存 | 現在 | 最新 | 更新 |
+|---|------|------|------|------|------|
+| 1 | plugin | `@yohi/justice` | 2.3.0 | 2.4.1 | あり |
+| 2 | mcp-git | `yohi/chronos-graph` | cb1f33f | a1b2c3d | あり |
+| 3 | mcp-npm | `@yohi/nexus` | 1.22.0 | 1.22.0 | なし |
+| 4 | plugin | `@nick-vi/opencode-type-inject` | `latest` | (latest 追従) | 据え置き |
 
 ### `@yohi/justice`: 2.3.0 -> 2.4.1
 - 主な変更点:
