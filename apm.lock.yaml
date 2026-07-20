@@ -1,5 +1,5 @@
 lockfile_version: '1'
-generated_at: '2026-07-19T03:14:26.050543+00:00'
+generated_at: '2026-07-20T08:47:06.314953+00:00'
 apm_version: 0.22.0
 dependencies:
 - repo_url: anthropics/claude-code
@@ -1189,24 +1189,10 @@ mcp_configs:
     enabled: true
   aws-mcp:
     name: aws-mcp
-    transport: stdio
-    env:
-      AWS_REGION: ${env:AWS_REGION:-us-east-1}
-      AWS_PROFILE: ${env:AWS_PROFILE:-default}
-    args:
-    - mcp-proxy-for-aws==1.6.3
-    - https://aws-mcp.${env:AWS_REGION:-us-east-1}.api.aws/mcp
-    - --service
-    - aws-mcp
-    - --region
-    - ${env:AWS_REGION:-us-east-1}
-    - --profile
-    - ${env:AWS_PROFILE:-default}
+    transport: sse
     registry: false
-    command: uvx
+    url: https://aws-mcp.us-east-1.api.aws/mcp?oauth=initialize
     title: AWS Managed MCP
-    standalone: true
-    timeout: 60000
     enabled: true
   chronos-graph:
     name: chronos-graph
@@ -1276,7 +1262,7 @@ mcp_configs:
     args:
     - -y
     - '@modelcontextprotocol/server-filesystem'
-    - ${env:MCP_FILESYSTEM_ROOT:-${env:PWD}}
+    - ${env:PWD}
     registry: false
     command: npx
     title: Filesystem MCP
@@ -1314,7 +1300,7 @@ mcp_configs:
       NO_PROXY: 127.0.0.1,localhost
     args:
     - -y
-    - '@yohi/nexus@1.28.1'
+    - '@yohi/nexus@1.28.6'
     - http-bridge
     registry: false
     command: npx

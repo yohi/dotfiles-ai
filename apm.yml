@@ -77,7 +77,7 @@ dependencies:
       args:
         - "-y"
         - "@modelcontextprotocol/server-filesystem"
-        - "${env:MCP_FILESYSTEM_ROOT:-${env:PWD}}"
+        - "${env:PWD}"
       standalone: true
       timeout: 60000
       enabled: true
@@ -138,22 +138,8 @@ dependencies:
     - name: aws-mcp
       title: "AWS Managed MCP"
       registry: false
-      transport: stdio
-      command: "uvx"
-      args:
-        - "mcp-proxy-for-aws==1.6.3"
-        - "https://aws-mcp.${env:AWS_REGION:-us-east-1}.api.aws/mcp"
-        - "--service"
-        - "aws-mcp"
-        - "--region"
-        - "${env:AWS_REGION:-us-east-1}"
-        - "--profile"
-        - "${env:AWS_PROFILE:-default}"
-      env:
-        AWS_REGION: "${env:AWS_REGION:-us-east-1}"
-        AWS_PROFILE: "${env:AWS_PROFILE:-default}"
-      standalone: true
-      timeout: 60000
+      transport: sse
+      url: "https://aws-mcp.us-east-1.api.aws/mcp?oauth=initialize"
       enabled: true
 
     - name: sentry-remote
@@ -562,6 +548,10 @@ provider:
         name: Kimi K3
       dynamic/glm-5.2:
         name: GLM 5.2
+      dynamic/gemini-3.1-pro-preview:
+        name: Gemini 3.1 Pro(Preview)
+      dynamic/gemini-3.5-flash:
+        name: Gemini 3.5 Flash
       # dynamic/test:
       #   name: test
       # custom-nvidia/moonshotai/kimi-k2.6:
@@ -606,10 +596,6 @@ provider:
       - openai.gpt-oss-20b-1:0
       - openai.gpt-oss-safeguard-120b
       - openai.gpt-oss-safeguard-20b
-  ollama-cloud:
-    whitelist: []
-  opencode-go:
-    whitelist: []
 experimental:
   batch_tool: true
   openTelemetry: true
