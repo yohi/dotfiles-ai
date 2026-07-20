@@ -126,6 +126,17 @@ python .claude/skills/apm-updater/scripts/check_updates.py --models
 - `apm.yml` はモデル定義の SSOT です。`opencode.jsonc` を直接編集してはいけません。
 - `provider` セクション配下の各プロバイダー（`openai`, `nvidia`, `cloudflare-workers-ai`, `opencode`, `amazon-bedrock`, `opencode-go` など）の `whitelist` もしくは `models` リストを、最新スキーマで定義されている有効なモデル名と一致するように更新します。
 - **Bedrock モデル（`amazon-bedrock`）の制限**: `amazon-bedrock` の `whitelist` に含めるモデルは、`global.anthropic.claude-*`（グローバルプレフィックス付きの最新 Claude モデル）および `openai.gpt-*`（Bedrock 上で提供される OpenAI モデル）のみとします。その他のリージョン固有モデルや古い世代のモデルは whitelist に含めず、除外してください。
+
+##### provider 選択早見表
+
+| モデル | models.dev 上の provider | `apm.yml` 上の推奨配置 |
+|---|---|---|
+| `kimi-k3` | `opencode-go` | `opencode-go` whitelist |
+| `qwen3.7-max` | `opencode-go` | `opencode-go` whitelist |
+| カスタム AI Gateway 経由の Kimi | （カスタム） | `cloudflare-ai-gateway-custom` whitelist |
+
+`cloudflare-ai-gateway-custom` は `models.dev` に存在しないカスタム provider です。`--validate-models` では無視されます。
+
 - 更新後、以下を実行して `opencode/opencode.jsonc` を再生成します:
 
 ```bash
@@ -155,6 +166,16 @@ make sync-opencode
     - `work.env` / `personal.env` の環境切り替え手順
     - zsh 連携スクリプトやエイリアスの設定解説
     - `apm.yml` からのプラグイン同期手順およびその構造的説明
+
+### C0. 事前クリーンアップ
+
+`make check-sync-opencode` は `.gitignore` 対象の生成済みファイル（例: `opencode.json`）が残っていると失敗することがあります。該当ファイルを確認して削除し、再実行します。
+
+```bash
+git status --ignored | grep opencode\.json || true
+rm -f opencode.json
+make check-sync-opencode
+```
 
 ### C. 整合性の検証とクリーンアップ
 
