@@ -200,7 +200,7 @@ dependencies:
       command: "npx"
       args:
         - "-y"
-        - "@yohi/nexus@1.28.6"
+        - "@yohi/nexus@1.29.0"
         - "http-bridge"
       env:
         LOG_LEVEL: "ERROR"
