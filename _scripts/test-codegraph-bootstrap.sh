@@ -173,6 +173,16 @@ EOF
 chmod +x "$WORKDIR/bin/codegraph"
 reset_codegraph_dir
 reset_bootstrap_state
+# Verify actual timeout path: short timeout, slow init stub.
+CODEGRAPH_INIT_TIMEOUT=1 bash "$WORKDIR/project/_scripts/codegraph-bootstrap.sh" serve --mcp \
+    >"$WORKDIR/stdout" 2>"$WORKDIR/stderr" && fail "expected bootstrap to time out"
+[ -d "$WORKDIR/project/.codegraph/partial" ] && fail "partial .codegraph directory was not removed after timeout"
+grep -q 'timed out' "$WORKDIR/project/.codegraph-bootstrap.log" || fail "timeout was not logged"
+grep -q 'init failed; removing partially-created .codegraph/' "$WORKDIR/project/.codegraph-bootstrap.log" \
+    || fail "cleanup was not logged after timeout"
+
+reset_codegraph_dir
+reset_bootstrap_state
 install_default_codegraph_stub
 
 # ---- macOS fallback: no flock in PATH ----

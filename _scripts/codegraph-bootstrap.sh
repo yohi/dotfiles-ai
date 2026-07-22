@@ -38,22 +38,22 @@ _log() {
     local target
     target="$(_log_level_rank "$level")"
 
-    if [ "$target" -gt "$current" ]; then
+    if [[ "$target" -gt "$current" ]]; then
         return 0
     fi
 
     local timestamp
     timestamp="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
-    local line="[${timestamp}] [${level^^}] ${message}"
+    local line="[${timestamp}] [$(case "$level" in error) echo ERROR ;; warn) echo WARN ;; info) echo INFO ;; debug) echo DEBUG ;; silent) echo SILENT ;; *) echo "$level" ;; esac)] ${message}"
 
     # stderr output is reserved for human-readable diagnostics only when
     # the MCP server has not yet taken over stdout/stdin. After exec, this
     # function is no longer reachable.
-    if [ "$level" = "error" ] || [ "$level" = "warn" ]; then
+    if [[ "$level" == "error" ]] || [[ "$level" == "warn" ]]; then
         printf '%s\n' "$line" >&2
     fi
 
-    if [ "$CODEGRAPH_LOG_LEVEL" != "silent" ]; then
+    if [[ "$CODEGRAPH_LOG_LEVEL" != "silent" ]] || [[ "$level" == "error" ]]; then
         printf '%s\n' "$line" >>"$CODEGRAPH_BOOTSTRAP_LOG"
     fi
 }
@@ -66,15 +66,15 @@ _usage() {
 }
 
 _is_status_mode() {
-    [ "$#" -eq 1 ] && [ "${1:-}" = "--status" ]
+    [[ "$#" -eq 1 ]] && [[ "${1:-}" == "--status" ]]
 }
 
 _is_dry_run_mode() {
-    [ "$#" -eq 3 ] && [ "${1:-}" = "--dry-run" ] && [ "${2:-}" = "serve" ] && [ "${3:-}" = "--mcp" ]
+    [[ "$#" -eq 3 ]] && [[ "${1:-}" == "--dry-run" ]] && [[ "${2:-}" == "serve" ]] && [[ "${3:-}" == "--mcp" ]]
 }
 
 _is_serve_mcp_mode() {
-    [ "$#" -eq 2 ] && [ "${1:-}" = "serve" ] && [ "${2:-}" = "--mcp" ]
+    [[ "$#" -eq 2 ]] && [[ "${1:-}" == "serve" ]] && [[ "${2:-}" == "--mcp" ]]
 }
 
 # --------------------------------------------------------------------------
@@ -89,11 +89,11 @@ _show_status() {
         codegraph_ok="installed"
     fi
 
-    if [ -d "$REPO_ROOT/.codegraph" ]; then
+    if [[ -d "$REPO_ROOT/.codegraph" ]]; then
         codegraph_dir="present"
     fi
 
-    if [ -f "$LOCK_FILE" ]; then
+    if [[ -f "$LOCK_FILE" ]]; then
         lock_file="present"
     fi
 
@@ -101,7 +101,7 @@ _show_status() {
     printf '.codegraph/ dir: %s\n' "$codegraph_dir"
     printf 'bootstrap lock: %s\n' "$lock_file"
 
-    if [ "$codegraph_ok" = "installed" ] && [ "$codegraph_dir" = "present" ]; then
+    if [[ "$codegraph_ok" == "installed" ]] && [[ "$codegraph_dir" == "present" ]]; then
         exit 0
     else
         exit 1
@@ -111,7 +111,7 @@ _show_status() {
 _show_dry_run() {
     shift # consume --dry-run
     _log info "dry-run: would run codegraph init if .codegraph/ is missing, then exec codegraph serve --mcp"
-    if [ ! -d "$REPO_ROOT/.codegraph" ]; then
+    if [[ ! -d "$REPO_ROOT/.codegraph" ]]; then
         printf 'dry-run: codegraph init (because .codegraph/ is missing)\n'
     else
         printf 'dry-run: skip codegraph init (because .codegraph/ exists)\n'
@@ -168,7 +168,7 @@ _run_init_with_timeout() {
         timeout_cmd="gtimeout"
     fi
 
-    if [ -n "$timeout_cmd" ]; then
+    if [[ -n "$timeout_cmd" ]]; then
         "$timeout_cmd" "$CODEGRAPH_INIT_TIMEOUT" codegraph init < /dev/null
         return $?
     fi
@@ -191,26 +191,16 @@ _run_init_with_timeout() {
         sleep "$CODEGRAPH_INIT_TIMEOUT"
         # Signal the whole process group, not just the parent process.
         kill -TERM -"$init_pid" 2>/dev/null || true
+        # Brief grace period after TERM, then forcibly reap at the PGID level.
+        sleep 2
+        kill -KILL -"$init_pid" 2>/dev/null || true
     ) &
     watchdog_pid=$!
-
-    if wait "$init_pid"; then
-        init_rc=0
-    else
-        init_rc=$?
-    fi
-
-    # After init exits, give any spawned children a moment to react to the
-    # group TERM and then forcibly reap any stragglers at the PGID level.
-    sleep 0.5
-    if kill -0 -"$init_pid" 2>/dev/null; then
-        kill -KILL -"$init_pid" 2>/dev/null || true
-    fi
 
     kill "$watchdog_pid" 2>/dev/null || true
     wait "$watchdog_pid" 2>/dev/null || true
 
-    if [ "$init_rc" -eq 143 ] || [ "$init_rc" -eq 129 ]; then
+    if [[ "$init_rc" -eq 143 ]] || [[ "$init_rc" -eq 129 ]]; then
         # TERM/KILL signals normalize to the timeout(1) timeout exit code.
         init_rc=124
     fi
@@ -230,25 +220,26 @@ _initialize_once() {
     fi
 
     _cleanup_partial_init() {
-        if [ "$existed_before" -eq 0 ] && [ -d ".codegraph" ]; then
+        if [[ "$existed_before" -eq 0 ]] && [[ -d ".codegraph" ]]; then
             _log warn "init failed; removing partially-created .codegraph/"
             rm -rf ".codegraph"
         fi
     }
     trap '_cleanup_partial_init' ERR
 
-    if [ ! -d ".codegraph" ]; then
+    if [[ ! -d ".codegraph" ]]; then
         _log info "running codegraph init (timeout: ${CODEGRAPH_INIT_TIMEOUT}s)"
         if _run_init_with_timeout; then
             _log info "codegraph init completed"
         else
             local rc=$?
             _cleanup_partial_init
-            if [ "$rc" -eq 124 ]; then
+            if [[ "$rc" -eq 124 ]]; then
                 _log error "codegraph init timed out after ${CODEGRAPH_INIT_TIMEOUT}s"
             else
                 _log error "codegraph init failed with exit code $rc"
             fi
+            trap - ERR
             return "$rc"
         fi
     fi
@@ -276,7 +267,11 @@ _main() {
 
     _ensure_codegraph_installed
     _acquire_lock
-    _initialize_once
+    _initialize_once || {
+        local rc=$?
+        _release_lock
+        return "$rc"
+    }
     _release_lock
 
     _log info "starting codegraph serve --mcp"

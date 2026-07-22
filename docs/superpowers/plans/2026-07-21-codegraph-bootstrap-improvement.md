@@ -123,15 +123,33 @@ _run_init_with_timeout() {
         timeout_cmd="gtimeout"
     fi
 
-    if [ -n "$timeout_cmd" ]; then
+    if [[ -n "$timeout_cmd" ]]; then
         "$timeout_cmd" "$CODEGRAPH_INIT_TIMEOUT" codegraph init < /dev/null
         return $?
     fi
 
     # Bash watchdog fallback for macOS and other systems without timeout/gtimeout.
+    # Launch codegraph init in a background process group so the watchdog can
+    # terminate the entire group (init + any child processes it forks).
+    local init_pid
+    local watchdog_pid
+    local init_rc=0
+
+    # Enable job control momentarily so the background job receives its own
+    # process group ID (PGID), making init_pid usable as the PGID.
+    set -m
     codegraph init < /dev/null &
     init_pid=$!
-    (sleep "$CODEGRAPH_INIT_TIMEOUT"; kill -TERM "$init_pid" 2>/dev/null || true) &
+    set +m
+
+    (
+        sleep "$CODEGRAPH_INIT_TIMEOUT"
+        # Signal the whole process group, not just the parent process.
+        kill -TERM -"$init_pid" 2>/dev/null || true
+        # Brief grace period after TERM, then forcibly reap at the PGID level.
+        sleep 2
+        kill -KILL -"$init_pid" 2>/dev/null || true
+    ) &
     watchdog_pid=$!
 
     if wait "$init_pid"; then
@@ -143,9 +161,11 @@ _run_init_with_timeout() {
     kill "$watchdog_pid" 2>/dev/null || true
     wait "$watchdog_pid" 2>/dev/null || true
 
-    if [ "$init_rc" -eq 143 ] || [ "$init_rc" -eq 129 ]; then
-        init_rc=124  # normalize to timeout(1) exit code
+    if [[ "$init_rc" -eq 143 ]] || [[ "$init_rc" -eq 129 ]]; then
+        # TERM/KILL signals normalize to the timeout(1) timeout exit code.
+        init_rc=124
     fi
+
     return "$init_rc"
 }
 ```

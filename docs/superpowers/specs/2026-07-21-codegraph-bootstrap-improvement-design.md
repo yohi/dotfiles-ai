@@ -49,7 +49,7 @@ CodeGraph MCP サーバーは、AI エージェントがコードベースを理
 
 ### 3.1 全体構成
 
-```
+```text
 [MCP Client] ──stdio──▶ [_scripts/codegraph-bootstrap.sh]
                                       │
                                       ├── 診断・進捗ログ ──▶ .codegraph/logs/bootstrap.log
@@ -116,8 +116,8 @@ _scripts/codegraph-bootstrap.sh --dry-run serve --mcp
 | 環境変数 | 説明 | デフォルト |
 |---|---|---|
 | `CODEGRAPH_INIT_TIMEOUT` | `codegraph init` のタイムアウト秒数 | `300` |
-| `CODEGRAPH_LOG_LEVEL` | ログの詳細度 (`silent`, `error`, `info`, `debug`) | `info` |
-| `CODEGRAPH_BOOTSTRAP_LOG` | ログファイルのパス | `.codegraph/logs/bootstrap.log` |
+|| `CODEGRAPH_LOG_LEVEL` | ログの詳細度 (`silent`, `error`, `warn`, `info`, `debug`) | `info` |
+|| `CODEGRAPH_BOOTSTRAP_LOG` | ログファイルのパス | `$REPO_ROOT/.codegraph-bootstrap.log` |
 | `CODEGRAPH_NO_DAEMON` | ファイルウォッチャー無効化（CodeGraph 側設定と整合） | — |
 
 ---
