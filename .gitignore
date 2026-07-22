@@ -98,6 +98,7 @@ resolved_config.json
 
 # CodeGraph runtime files
 .codegraph/
+.codegraph-bootstrap.log
 .codegraph-bootstrap.lock
 
 # Generated agent commands & skills (derived from agent-commands/)
