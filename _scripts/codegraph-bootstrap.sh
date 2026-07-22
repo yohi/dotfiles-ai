@@ -174,18 +174,23 @@ _run_init_with_timeout() {
     fi
 
     # Bash watchdog fallback for macOS and other systems without timeout/gtimeout.
-    # Launch codegraph init in the background, then wait for it with a sleep-based
-    # watchdog. If the watchdog fires, kill init and normalize the exit code to 124.
+    # Launch codegraph init in a background process group so the watchdog can
+    # terminate the entire group (init + any child processes it forks).
     local init_pid
     local watchdog_pid
     local init_rc=0
 
+    # Enable job control momentarily so the background job receives its own
+    # process group ID (PGID), making init_pid usable as the PGID.
+    set -m
     codegraph init < /dev/null &
     init_pid=$!
+    set +m
 
     (
         sleep "$CODEGRAPH_INIT_TIMEOUT"
-        kill -TERM "$init_pid" 2>/dev/null || true
+        # Signal the whole process group, not just the parent process.
+        kill -TERM -"$init_pid" 2>/dev/null || true
     ) &
     watchdog_pid=$!
 
@@ -193,6 +198,13 @@ _run_init_with_timeout() {
         init_rc=0
     else
         init_rc=$?
+    fi
+
+    # After init exits, give any spawned children a moment to react to the
+    # group TERM and then forcibly reap any stragglers at the PGID level.
+    sleep 0.5
+    if kill -0 -"$init_pid" 2>/dev/null; then
+        kill -KILL -"$init_pid" 2>/dev/null || true
     fi
 
     kill "$watchdog_pid" 2>/dev/null || true
@@ -205,6 +217,7 @@ _run_init_with_timeout() {
 
     return "$init_rc"
 }
+
 
 # Initialize CodeGraph once, cleaning up a partially-created .codegraph/
 # directory if init fails.  stdin is redirected to /dev/null so that init
