@@ -8,7 +8,7 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WORKDIR="$(mktemp -d)"
-trap 'rm -rf "$WORKDIR"' EXIT INT TERM
+trap 'chmod -R u+rwx "$WORKDIR" 2>/dev/null; rm -rf "$WORKDIR"' EXIT INT TERM
 
 fail() {
     printf 'FAIL: %s\n' "$1" >&2
@@ -150,6 +150,14 @@ for bad_args in '' 'serve' 'serve --foo' 'serve --mcp extra' '--status extra' '-
         >"$WORKDIR/stdout" 2>"$WORKDIR/stderr" && fail "expected failure for args: '$bad_args'"
     [[ -d "$WORKDIR/project/.codegraph" ]] && fail "argument error must not create .codegraph for: '$bad_args'"
 done
+
+# ---- Invalid arguments exit with code 1 (per design doc) ----
+reset_codegraph_dir
+reset_bootstrap_state
+rc=0
+bash "$WORKDIR/project/_scripts/codegraph-bootstrap.sh" serve \
+    >"$WORKDIR/stdout" 2>"$WORKDIR/stderr" || rc=$?
+[[ "$rc" -eq 1 ]] || fail "invalid arguments should exit 1, got $rc"
 
 # ---- GNU timeout path ----
 cat >"$WORKDIR/bin/codegraph" <<'EOF'
@@ -293,5 +301,104 @@ RC2=$?
 
 INIT_COUNT="$(cat "$INIT_COUNT_FILE")"
 [[ "$INIT_COUNT" -eq 1 ]] || fail "codegraph init ran $INIT_COUNT times, expected 1"
+
+# ---- codegraph missing in serve --mcp mode: error message + exit code 1 ----
+reset_codegraph_dir
+reset_bootstrap_state
+rc=0
+PATH="/bin:/usr/bin" bash "$WORKDIR/project/_scripts/codegraph-bootstrap.sh" serve --mcp \
+    >"$WORKDIR/stdout" 2>"$WORKDIR/stderr" || rc=$?
+[[ "$rc" -eq 1 ]] || fail "missing codegraph in serve mode should exit 1, got $rc"
+grep -q 'codegraph command not found' "$WORKDIR/stderr" || fail "missing codegraph error message was not reported"
+[[ -d "$WORKDIR/project/.codegraph" ]] && fail "missing codegraph must not create .codegraph"
+
+# ---- Lock file cannot be created: warn and continue instead of crashing ----
+install_default_codegraph_stub
+reset_codegraph_dir
+reset_bootstrap_state
+LOCK_FAIL_LOG="$WORKDIR/lock-fail.log"
+rm -f "$LOCK_FAIL_LOG"
+chmod 555 "$WORKDIR/project"
+if CODEGRAPH_BOOTSTRAP_LOG="$LOCK_FAIL_LOG" bash "$WORKDIR/project/_scripts/codegraph-bootstrap.sh" serve --mcp \
+    >"$WORKDIR/stdout" 2>"$WORKDIR/stderr"; then
+    LOCK_FAIL_RC=0
+else
+    LOCK_FAIL_RC=$?
+fi
+chmod 755 "$WORKDIR/project"
+grep -q 'codegraph-bootstrap\.sh:.*lock' "$WORKDIR/stderr" \
+    && fail "raw bash permission error from the wrapper leaked to stderr instead of a warn log: $(cat "$WORKDIR/stderr")"
+grep -q 'could not create lock file' "$LOCK_FAIL_LOG" || fail "lock creation failure was not logged as a warning"
+grep -q 'running codegraph init' "$LOCK_FAIL_LOG" \
+    || fail "processing did not continue past lock acquisition failure (rc=$LOCK_FAIL_RC)"
+
+# ---- flock acquisition times out: warn and fall back to no-lock ----
+install_default_codegraph_stub
+reset_codegraph_dir
+reset_bootstrap_state
+LOCK_PATH="$WORKDIR/project/.codegraph-bootstrap.lock"
+: >"$LOCK_PATH"
+# Hold an exclusive flock on the lock file in a background subshell for
+# longer than the wrapper's configured lock-acquisition timeout.
+(
+    exec 201>"$LOCK_PATH"
+    flock 201
+    sleep 5
+) &
+HOLDER_PID=$!
+# Give the holder a moment to actually acquire the lock before racing it.
+sleep 0.5
+if CODEGRAPH_LOCK_TIMEOUT=1 bash "$WORKDIR/project/_scripts/codegraph-bootstrap.sh" serve --mcp \
+    >"$WORKDIR/stdout" 2>"$WORKDIR/stderr"; then
+    FLOCK_TIMEOUT_RC=0
+else
+    FLOCK_TIMEOUT_RC=$?
+fi
+kill "$HOLDER_PID" 2>/dev/null || true
+wait "$HOLDER_PID" 2>/dev/null || true
+[[ "$FLOCK_TIMEOUT_RC" -eq 0 ]] || fail "wrapper should still succeed by falling back to no-lock, got rc=$FLOCK_TIMEOUT_RC"
+grep -q 'flock acquisition timed out' "$WORKDIR/project/.codegraph-bootstrap.log" \
+    || fail "flock timeout fallback was not logged"
+[[ -d "$WORKDIR/project/.codegraph" ]] || fail ".codegraph was not created after flock timeout fallback"
+
+# ---- SIGTERM forwarding: in-flight codegraph init must not survive as an orphan ----
+cat >"$WORKDIR/bin/codegraph" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+case "${1:-}" in
+  init)
+    mkdir -p .codegraph/partial
+    sleep 47.131
+    ;;
+  serve)
+    printf 'codegraph %s\n' "$*" >&2
+    ;;
+  *)
+    exit 1
+    ;;
+esac
+EOF
+chmod +x "$WORKDIR/bin/codegraph"
+reset_codegraph_dir
+reset_bootstrap_state
+
+bash "$WORKDIR/project/_scripts/codegraph-bootstrap.sh" serve --mcp \
+    >"$WORKDIR/stdout" 2>"$WORKDIR/stderr" &
+WRAPPER_PID=$!
+sleep 1
+kill -TERM "$WRAPPER_PID"
+if wait "$WRAPPER_PID"; then
+    WRAPPER_RC=0
+else
+    WRAPPER_RC=$?
+fi
+[[ "$WRAPPER_RC" -eq 143 ]] || fail "wrapper should exit 143 after SIGTERM, got $WRAPPER_RC"
+grep -q 'received SIGTERM' "$WORKDIR/project/.codegraph-bootstrap.log" \
+    || fail "SIGTERM receipt was not logged"
+
+sleep 1
+if pgrep -f 'sleep 47\.131' >/dev/null 2>&1; then
+    fail "codegraph init child (sleep 47.131) survived as an orphan after SIGTERM"
+fi
 
 printf 'PASS\n'
