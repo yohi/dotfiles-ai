@@ -177,9 +177,17 @@ _release_lock() {
 # an orphan.
 _terminate_process_group() {
     local pgid="$1"
-    kill -TERM -"$pgid" 2>/dev/null || true
+    if ! kill -TERM -"$pgid" 2>/dev/null; then
+        # Target already gone; nothing to wait for or escalate to KILL.
+        return 0
+    fi
     sleep 2
-    kill -KILL -"$pgid" 2>/dev/null || true
+    # Re-check the group is still present before escalating to KILL, since
+    # the PGID could have been recycled by an unrelated process during the
+    # sleep window.
+    if kill -0 -"$pgid" 2>/dev/null; then
+        kill -KILL -"$pgid" 2>/dev/null || true
+    fi
 }
 
 # Handle SIGINT/SIGTERM delivered to the wrapper itself: stop any
@@ -220,6 +228,10 @@ _run_init_with_timeout() {
     local init_rc=0
 
     set -m
+    # Block INT/TERM for the brief window between launching the background
+    # job and recording its PID, so a termination signal can never arrive
+    # while codegraph init is running but untracked by _CURRENT_INIT_PID.
+    trap '' INT TERM
     if [[ -n "$timeout_cmd" ]]; then
         "$timeout_cmd" "$CODEGRAPH_INIT_TIMEOUT" codegraph init < /dev/null &
     else
@@ -228,6 +240,8 @@ _run_init_with_timeout() {
     init_pid=$!
     set +m
     _CURRENT_INIT_PID="$init_pid"
+    trap '_on_termination_signal INT' INT
+    trap '_on_termination_signal TERM' TERM
 
     if [[ -z "$timeout_cmd" ]]; then
         # Bash watchdog fallback for macOS and other systems without
