@@ -52,7 +52,7 @@ CodeGraph MCP サーバーは、AI エージェントがコードベースを理
 ```text
 [MCP Client] ──stdio──▶ [_scripts/codegraph-bootstrap.sh]
                                       │
-                                      ├── 診断・進捗ログ ──▶ .codegraph/logs/bootstrap.log
+                                      ├── 診断・進捗ログ ──▶ $REPO_ROOT/.codegraph-bootstrap.log
                                       │
                                       ├── ロック制御 (.codegraph-bootstrap.lock)
                                       │
@@ -69,7 +69,7 @@ CodeGraph MCP サーバーは、AI エージェントがコードベースを理
 |---|---|
 | `_scripts/codegraph-bootstrap.sh` | リポジトリルート解決、`.codegraph/` 存在確認、初回 init、MCP サーバー起動、診断ログ書き出し |
 | `.codegraph-bootstrap.lock` | `flock` による並行起動排他 |
-| `.codegraph/logs/bootstrap.log` | 構造化された診断ログ（タイムスタンプ、フェーズ、メッセージ） |
+| `$REPO_ROOT/.codegraph-bootstrap.log` | 構造化された診断ログ（タイムスタンプ、フェーズ、メッセージ） |
 | `codegraph` CLI | 実際のインデックス生成と MCP サーバー処理（変更なし） |
 
 ### 3.3 データフロー
@@ -162,7 +162,7 @@ _scripts/codegraph-bootstrap.sh --dry-run serve --mcp
 |---|---|
 | `_scripts/codegraph-bootstrap.sh` | ラッパー本体を改善（ログ、タイムアウト、モード追加） |
 | `_scripts/test-codegraph-bootstrap.sh` | 新規テストケース追加 |
-| `.gitignore` | `.codegraph/logs/` を追加（既存 `.codegraph-bootstrap.lock` は維持） |
+| `.gitignore` | `.codegraph-bootstrap.log` と `.codegraph-bootstrap.lock` を追加（既存は維持） |
 | `.github/workflows/*.yml` | CI にテスト実行を追加 |
 | `docs/superpowers/specs/2026-07-21-codegraph-bootstrap-improvement-design.md` | 本設計書 |
 

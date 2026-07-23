@@ -66,7 +66,7 @@ reset_codegraph_dir
 reset_bootstrap_state
 bash "$WORKDIR/project/_scripts/codegraph-bootstrap.sh" serve --mcp \
     >"$WORKDIR/stdout" 2>"$WORKDIR/stderr"
-[ -d "$WORKDIR/project/.codegraph" ] || fail ".codegraph was not created"
+[[ -d "$WORKDIR/project/.codegraph" ]] || fail ".codegraph was not created"
 grep -q 'codegraph init' "$WORKDIR/stderr" || fail "init was not attempted"
 grep -q 'codegraph serve --mcp' "$WORKDIR/stderr" || fail "server was not started"
 grep -q '^codegraph init$' "$WORKDIR/codegraph.log" || fail "init was not logged"
@@ -93,8 +93,8 @@ reset_codegraph_dir
 reset_bootstrap_state
 ! bash "$WORKDIR/project/_scripts/codegraph-bootstrap.sh" serve --mcp \
     >"$WORKDIR/stdout" 2>"$WORKDIR/stderr" || fail "expected bootstrap to fail"
-[ -d "$WORKDIR/project/.codegraph" ] && fail "partial .codegraph directory was not removed"
-[ -f "$WORKDIR/project/.codegraph-bootstrap.log" ] || fail "bootstrap log should survive cleanup"
+[[ -d "$WORKDIR/project/.codegraph" ]] && fail "partial .codegraph directory was not removed"
+[[ -f "$WORKDIR/project/.codegraph-bootstrap.log" ]] || fail "bootstrap log should survive cleanup"
 grep -q 'init failed; removing partially-created .codegraph/' "$WORKDIR/project/.codegraph-bootstrap.log" \
     || fail "cleanup was not logged"
 
@@ -104,8 +104,8 @@ reset_codegraph_dir
 reset_bootstrap_state
 PATH="/bin:/usr/bin" bash "$WORKDIR/project/_scripts/codegraph-bootstrap.sh" --dry-run serve --mcp \
     >"$WORKDIR/stdout" 2>"$WORKDIR/stderr" || fail "expected --dry-run to succeed"
-[ -d "$WORKDIR/project/.codegraph" ] && fail "logging/dry-run must not create .codegraph"
-[ -f "$WORKDIR/project/.codegraph-bootstrap.log" ] || fail "bootstrap log should be created"
+[[ -d "$WORKDIR/project/.codegraph" ]] && fail "logging/dry-run must not create .codegraph"
+[[ -f "$WORKDIR/project/.codegraph-bootstrap.log" ]] || fail "bootstrap log should be created"
 
 # ---- --status when codegraph is missing ----
 reset_codegraph_dir
@@ -148,7 +148,7 @@ for bad_args in '' 'serve' 'serve --foo' 'serve --mcp extra' '--status extra' '-
     # shellcheck disable=SC2086
     bash "$WORKDIR/project/_scripts/codegraph-bootstrap.sh" $bad_args \
         >"$WORKDIR/stdout" 2>"$WORKDIR/stderr" && fail "expected failure for args: '$bad_args'"
-    [ -d "$WORKDIR/project/.codegraph" ] && fail "argument error must not create .codegraph for: '$bad_args'"
+    [[ -d "$WORKDIR/project/.codegraph" ]] && fail "argument error must not create .codegraph for: '$bad_args'"
 done
 
 # ---- GNU timeout path ----
@@ -176,7 +176,7 @@ reset_bootstrap_state
 # Verify actual timeout path: short timeout, slow init stub.
 CODEGRAPH_INIT_TIMEOUT=1 bash "$WORKDIR/project/_scripts/codegraph-bootstrap.sh" serve --mcp \
     >"$WORKDIR/stdout" 2>"$WORKDIR/stderr" && fail "expected bootstrap to time out"
-[ -d "$WORKDIR/project/.codegraph/partial" ] && fail "partial .codegraph directory was not removed after timeout"
+[[ -d "$WORKDIR/project/.codegraph/partial" ]] && fail "partial .codegraph directory was not removed after timeout"
 grep -q 'timed out' "$WORKDIR/project/.codegraph-bootstrap.log" || fail "timeout was not logged"
 grep -q 'init failed; removing partially-created .codegraph/' "$WORKDIR/project/.codegraph-bootstrap.log" \
     || fail "cleanup was not logged after timeout"
@@ -288,10 +288,10 @@ wait "$PID1"
 RC1=$?
 wait "$PID2"
 RC2=$?
-[ "$RC1" -eq 0 ] || fail "first concurrent bootstrap exited with $RC1"
-[ "$RC2" -eq 0 ] || fail "second concurrent bootstrap exited with $RC2"
+[[ "$RC1" -eq 0 ]] || fail "first concurrent bootstrap exited with $RC1"
+[[ "$RC2" -eq 0 ]] || fail "second concurrent bootstrap exited with $RC2"
 
 INIT_COUNT="$(cat "$INIT_COUNT_FILE")"
-[ "$INIT_COUNT" -eq 1 ] || fail "codegraph init ran $INIT_COUNT times, expected 1"
+[[ "$INIT_COUNT" -eq 1 ]] || fail "codegraph init ran $INIT_COUNT times, expected 1"
 
 printf 'PASS\n'

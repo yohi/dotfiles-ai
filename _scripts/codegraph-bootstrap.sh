@@ -38,8 +38,10 @@ _log() {
     local target
     target="$(_log_level_rank "$level")"
 
-    if [[ "$target" -gt "$current" ]]; then
-        return 0
+    if [[ "$level" != "error" ]]; then
+        if [[ "$target" -gt "$current" ]]; then
+            return 0
+        fi
     fi
 
     local timestamp
@@ -197,6 +199,14 @@ _run_init_with_timeout() {
     ) &
     watchdog_pid=$!
 
+    # Wait for init to finish (naturally or via watchdog).
+    if wait "$init_pid"; then
+        init_rc=0
+    else
+        init_rc=$?
+    fi
+
+    # Cancel the watchdog now that init has exited.
     kill "$watchdog_pid" 2>/dev/null || true
     wait "$watchdog_pid" 2>/dev/null || true
 
@@ -214,7 +224,7 @@ _run_init_with_timeout() {
 # cannot consume MCP protocol bytes from the wrapper's stdio transport.
 _initialize_once() {
     local existed_before=0
-    if [ -d ".codegraph" ]; then
+    if [[ -d ".codegraph" ]]; then
         existed_before=1
         _log info ".codegraph/ already exists; skipping codegraph init"
     fi
