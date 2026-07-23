@@ -1,5 +1,5 @@
 lockfile_version: '1'
-generated_at: '2026-07-21T13:56:36.873934+00:00'
+generated_at: '2026-07-23T08:30:38.989845+00:00'
 apm_version: 0.22.0
 dependencies:
 - repo_url: anthropics/claude-code
@@ -1154,9 +1154,7 @@ mcp_configs:
     name: atlassian
     transport: sse
     registry: false
-    headers:
-      Authorization: ${env:ATLASSIAN_AUTH_HEADER}
-    url: https://mcp.atlassian.com/v1/mcp
+    url: https://mcp.atlassian.com/v1/mcp/authv2
     title: Atlassian MCP
     enabled: true
   aws-documentation:
