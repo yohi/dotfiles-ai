@@ -101,14 +101,13 @@ install-requirements:
 			[ "$$actual" = "$$expected" ]; then \
 			sh "$$installer"; \
 			rm -f "$$installer" "$$checksums"; \
-		export PATH="$(HOME)/.local/bin:$(PATH)"; \
-		uv sync; \
+			export PATH="$(HOME)/.local/bin:$(PATH)"; \
+			uv sync; \
 		else \
 			rm -f "$$installer" "$$checksums"; \
-			if [ ! -d ".venv" ]; then \
-				python3 -m venv .venv; \
-			fi; \
-			.venv/bin/pip install -r requirements.txt; \
+			echo "❌ エラー: uv のインストールに失敗しました(ハッシュ検証エラーまたはダウンロード失敗)。"; \
+			echo "   手動で 'curl -LsSf https://astral.sh/uv/install.sh | sh' を実行してから再度お試しください。"; \
+			exit 1; \
 		fi; \
 	fi
 
