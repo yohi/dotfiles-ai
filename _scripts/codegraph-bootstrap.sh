@@ -10,6 +10,7 @@ cd "$REPO_ROOT"
 LOCK_FILE="$REPO_ROOT/.codegraph-bootstrap.lock"
 
 CODEGRAPH_INIT_TIMEOUT="${CODEGRAPH_INIT_TIMEOUT:-300}"
+CODEGRAPH_LOCK_TIMEOUT="${CODEGRAPH_LOCK_TIMEOUT:-30}"
 CODEGRAPH_LOG_LEVEL="${CODEGRAPH_LOG_LEVEL:-info}"
 # Place the bootstrap log outside .codegraph/ so that logging does not alter
 # the initialization state and so diagnostics survive partial-init cleanup.
@@ -136,14 +137,26 @@ _ensure_codegraph_installed() {
 # Locking
 # --------------------------------------------------------------------------
 _LOCK_TYPE=""
+_CURRENT_INIT_PID=""
 
 _acquire_lock() {
-    if command -v flock >/dev/null 2>&1; then
-        exec 200>"$LOCK_FILE"
-        flock 200
+    if ! command -v flock >/dev/null 2>&1; then
+        _log warn "flock not found; running without lock (macOS fallback)"
+        _LOCK_TYPE=none
+        return 0
+    fi
+
+    if ! { exec 200>"$LOCK_FILE"; } 2>/dev/null; then
+        _log warn "could not create lock file ${LOCK_FILE}; running without lock"
+        _LOCK_TYPE=none
+        return 0
+    fi
+
+    if flock -w "$CODEGRAPH_LOCK_TIMEOUT" 200; then
         _LOCK_TYPE=flock
     else
-        _log warn "flock not found; running without lock (macOS fallback)"
+        _log warn "flock acquisition timed out after ${CODEGRAPH_LOCK_TIMEOUT}s; proceeding without lock"
+        exec 200>&-
         _LOCK_TYPE=none
     fi
 }
@@ -155,6 +168,41 @@ _release_lock() {
             exec 200>&-
             ;;
         *) ;;
+    esac
+}
+
+# Send SIGTERM (then SIGKILL after a grace period) to an entire process
+# group. Used both by the init timeout watchdog and by the termination-
+# signal handler so that an in-flight codegraph init never survives as
+# an orphan.
+_terminate_process_group() {
+    local pgid="$1"
+    if ! kill -TERM -"$pgid" 2>/dev/null; then
+        # Target already gone; nothing to wait for or escalate to KILL.
+        return 0
+    fi
+    sleep 2
+    # Re-check the group is still present before escalating to KILL, since
+    # the PGID could have been recycled by an unrelated process during the
+    # sleep window.
+    if kill -0 -"$pgid" 2>/dev/null; then
+        kill -KILL -"$pgid" 2>/dev/null || true
+    fi
+}
+
+# Handle SIGINT/SIGTERM delivered to the wrapper itself: stop any
+# in-flight codegraph init, release the lock, and exit with the
+# conventional 128+signal exit code.
+_on_termination_signal() {
+    local sig="$1"
+    _log warn "received SIG${sig}; terminating and cleaning up"
+    if [[ -n "$_CURRENT_INIT_PID" ]]; then
+        _terminate_process_group "$_CURRENT_INIT_PID"
+    fi
+    _release_lock
+    case "$sig" in
+        INT)  exit 130 ;;
+        *)    exit 143 ;;
     esac
 }
 
@@ -170,45 +218,54 @@ _run_init_with_timeout() {
         timeout_cmd="gtimeout"
     fi
 
-    if [[ -n "$timeout_cmd" ]]; then
-        "$timeout_cmd" "$CODEGRAPH_INIT_TIMEOUT" codegraph init < /dev/null
-        return $?
-    fi
-
-    # Bash watchdog fallback for macOS and other systems without timeout/gtimeout.
-    # Launch codegraph init in a background process group so the watchdog can
-    # terminate the entire group (init + any child processes it forks).
+    # Always launch codegraph init as a background job in its own process
+    # group (via `set -m`) and `wait` on it, whether or not timeout/gtimeout
+    # is available. This keeps a single code path for both cases and,
+    # critically, lets a pending INT/TERM trap interrupt `wait` immediately
+    # instead of being deferred until a synchronous foreground command exits.
     local init_pid
-    local watchdog_pid
+    local watchdog_pid=""
     local init_rc=0
 
-    # Enable job control momentarily so the background job receives its own
-    # process group ID (PGID), making init_pid usable as the PGID.
     set -m
-    codegraph init < /dev/null &
+    # Block INT/TERM for the brief window between launching the background
+    # job and recording its PID, so a termination signal can never arrive
+    # while codegraph init is running but untracked by _CURRENT_INIT_PID.
+    trap '' INT TERM
+    if [[ -n "$timeout_cmd" ]]; then
+        "$timeout_cmd" "$CODEGRAPH_INIT_TIMEOUT" codegraph init < /dev/null &
+    else
+        codegraph init < /dev/null &
+    fi
     init_pid=$!
     set +m
+    _CURRENT_INIT_PID="$init_pid"
+    trap '_on_termination_signal INT' INT
+    trap '_on_termination_signal TERM' TERM
 
-    (
-        sleep "$CODEGRAPH_INIT_TIMEOUT"
-        # Signal the whole process group, not just the parent process.
-        kill -TERM -"$init_pid" 2>/dev/null || true
-        # Brief grace period after TERM, then forcibly reap at the PGID level.
-        sleep 2
-        kill -KILL -"$init_pid" 2>/dev/null || true
-    ) &
-    watchdog_pid=$!
+    if [[ -z "$timeout_cmd" ]]; then
+        # Bash watchdog fallback for macOS and other systems without
+        # timeout/gtimeout: terminate the whole process group ourselves.
+        (
+            sleep "$CODEGRAPH_INIT_TIMEOUT"
+            _terminate_process_group "$init_pid"
+        ) &
+        watchdog_pid=$!
+    fi
 
-    # Wait for init to finish (naturally or via watchdog).
+    # Wait for init to finish (naturally, via the watchdog, or via a
+    # termination signal delivered to the wrapper itself).
     if wait "$init_pid"; then
         init_rc=0
     else
         init_rc=$?
     fi
+    _CURRENT_INIT_PID=""
 
-    # Cancel the watchdog now that init has exited.
-    kill "$watchdog_pid" 2>/dev/null || true
-    wait "$watchdog_pid" 2>/dev/null || true
+    if [[ -n "$watchdog_pid" ]]; then
+        kill "$watchdog_pid" 2>/dev/null || true
+        wait "$watchdog_pid" 2>/dev/null || true
+    fi
 
     if [[ "$init_rc" -eq 143 ]] || [[ "$init_rc" -eq 129 ]]; then
         # TERM/KILL signals normalize to the timeout(1) timeout exit code.
@@ -261,6 +318,9 @@ _initialize_once() {
 # Entry point
 # --------------------------------------------------------------------------
 _main() {
+    trap '_on_termination_signal INT' INT
+    trap '_on_termination_signal TERM' TERM
+
     if _is_status_mode "$@"; then
         _show_status
     fi
@@ -272,7 +332,7 @@ _main() {
     if ! _is_serve_mcp_mode "$@"; then
         _log error "invalid arguments: $*. Expected '--status', '--dry-run serve --mcp', or 'serve --mcp'"
         _usage
-        exit 2
+        exit 1
     fi
 
     _ensure_codegraph_installed
