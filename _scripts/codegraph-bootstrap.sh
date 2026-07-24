@@ -159,6 +159,7 @@ _INIT_LAUNCHING=0
 # was set; replayed synchronously by _run_init_with_timeout once
 # _CURRENT_INIT_PID is known. Empty means no signal is pending.
 _PENDING_TERM_SIG=""
+_CURRENT_FALLBACK_TIMER_PID=""
 
 _acquire_lock() {
     if ! command -v flock >/dev/null 2>&1; then
@@ -253,6 +254,18 @@ _terminate_process_group() {
     return "$rc"
 }
 
+_stop_fallback_timer() {
+    local timer_pid="$_CURRENT_FALLBACK_TIMER_PID"
+    _CURRENT_FALLBACK_TIMER_PID=""
+    if [[ -z "$timer_pid" ]]; then
+        return 0
+    fi
+    if _job_still_tracked "$timer_pid"; then
+        kill "$timer_pid" 2>/dev/null || true
+    fi
+    wait "$timer_pid" 2>/dev/null || true
+}
+
 # Handle SIGINT/SIGTERM delivered to the wrapper itself: stop any
 # in-flight codegraph init, release the lock, and exit with the
 # conventional 128+signal exit code.
@@ -264,16 +277,18 @@ _terminate_process_group() {
 # arriving in that narrow window is never lost.
 _on_termination_signal() {
     local sig="$1"
+    if [[ -z "$_CURRENT_INIT_PID" ]] && [[ "$_INIT_LAUNCHING" -eq 1 ]]; then
+        _PENDING_TERM_SIG="$sig"
+        return 0
+    fi
     _log warn "received SIG${sig}; terminating and cleaning up"
+    _stop_fallback_timer
     if [[ -n "$_CURRENT_INIT_PID" ]]; then
         # The return value is only used by the watchdog escalation branch
         # in _run_init_with_timeout; here we always fall through to
         # _release_lock/exit regardless, so discard it explicitly rather
         # than letting a non-zero exit-by-signal status trip `set -e`.
         _terminate_process_group "$_CURRENT_INIT_PID" || true
-    elif [[ "$_INIT_LAUNCHING" -eq 1 ]]; then
-        _PENDING_TERM_SIG="$sig"
-        return 0
     fi
     _release_lock
     case "$sig" in
@@ -336,6 +351,7 @@ _run_init_with_timeout() {
         # mechanism, immune to that PID/PGID reuse window.
         sleep "$CODEGRAPH_INIT_TIMEOUT" &
         sleep_pid=$!
+        _CURRENT_FALLBACK_TIMER_PID="$sleep_pid"
     fi
     set +m
     _CURRENT_INIT_PID="$init_pid"
@@ -362,10 +378,10 @@ _run_init_with_timeout() {
         if _job_still_tracked "$sleep_pid"; then
             # Timer still tracked: wait -n reaped init_pid itself, so its exit
             # status is already in wait_n_rc. Cancel the now-unneeded timer.
-            kill "$sleep_pid" 2>/dev/null || true
-            wait "$sleep_pid" 2>/dev/null || true
+            _stop_fallback_timer
             init_rc="$wait_n_rc"
         else
+            _CURRENT_FALLBACK_TIMER_PID=""
             # Timer already reaped by wait -n: CODEGRAPH_INIT_TIMEOUT
             # elapsed before init_pid finished. Hand off to
             # _terminate_process_group, which owns the TERM->KILL
@@ -384,6 +400,7 @@ _run_init_with_timeout() {
         fi
     fi
     _CURRENT_INIT_PID=""
+    _CURRENT_FALLBACK_TIMER_PID=""
 
     if [[ "$init_rc" -eq 143 ]] || [[ "$init_rc" -eq 129 ]] || [[ "$init_rc" -eq 137 ]]; then
         # TERM/KILL signals normalize to the timeout(1) timeout exit code.

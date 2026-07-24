@@ -9,7 +9,28 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WORKDIR="$(mktemp -d)"
 MINIMAL_PATH="/bin:/usr/bin"
-trap 'chmod -R u+rwx "$WORKDIR" 2>/dev/null; rm -rf "$WORKDIR"' EXIT INT TERM
+ACTIVE_HELPER_PID=""
+ACTIVE_WRAPPER_PID_FILE=""
+ACTIVE_INIT_PID_FILE=""
+ACTIVE_TIMER_PID_FILE=""
+
+cleanup() {
+    trap - EXIT INT TERM
+    local pid_file pid
+    if [[ -n "$ACTIVE_HELPER_PID" ]]; then
+        kill "$ACTIVE_HELPER_PID" 2>/dev/null || true
+        wait "$ACTIVE_HELPER_PID" 2>/dev/null || true
+    fi
+    for pid_file in "$ACTIVE_WRAPPER_PID_FILE" "$ACTIVE_INIT_PID_FILE" "$ACTIVE_TIMER_PID_FILE"; do
+        if [[ -n "$pid_file" ]] && [[ -s "$pid_file" ]]; then
+            pid="$(cat "$pid_file")"
+            kill "$pid" 2>/dev/null || true
+        fi
+    done
+    chmod -R u+rwx "$WORKDIR" 2>/dev/null
+    rm -rf "$WORKDIR"
+}
+trap cleanup EXIT INT TERM
 
 fail() {
     printf 'FAIL: %s\n' "$1" >&2
@@ -401,6 +422,204 @@ sleep 1
 if pgrep -f 'sleep 47\.131' >/dev/null 2>&1; then
     fail "codegraph init child (sleep 47.131) survived as an orphan after SIGTERM"
 fi
+
+# ---- Deferred SIGTERM replay logs receipt exactly once ----
+# A DEBUG hook injected through BASH_ENV stops immediately before init_pid=$!,
+# after the child has forked but before _CURRENT_INIT_PID can be published.
+cat >"$WORKDIR/deferred-signal.bashenv" <<'EOF'
+if [[ "$0" == */_scripts/codegraph-bootstrap.sh ]] \
+    && [[ -n "${DEFER_SIGNAL_MARKER:-}" ]] \
+    && [[ -n "${INIT_LAUNCH_MARKER:-}" ]]; then
+    set -T
+    _deliver_deferred_term_once() {
+        local next_command="$1"
+        if [[ "${_INIT_LAUNCHING:-0}" -eq 1 ]] \
+            && [[ -z "${_CURRENT_INIT_PID:-}" ]] \
+            && [[ ! -e "$DEFER_SIGNAL_MARKER" ]] \
+            && [[ "$next_command" == 'init_pid=$!' ]]; then
+            trap - DEBUG
+            local marker_ready=0
+            for _ in {1..500}; do
+                if [[ -s "$INIT_LAUNCH_MARKER" ]]; then
+                    marker_ready=1
+                    break
+                fi
+                sleep 0.01
+            done
+            if [[ "$marker_ready" -ne 1 ]]; then
+                printf 'timed out waiting for codegraph init launch marker: %s\n' \
+                    "$INIT_LAUNCH_MARKER" >&2
+                exit 1
+            fi
+            : >"$DEFER_SIGNAL_MARKER"
+            kill -TERM "$$"
+        fi
+    }
+    trap '_deliver_deferred_term_once "$BASH_COMMAND"' DEBUG
+fi
+EOF
+cat >"$WORKDIR/bin/codegraph" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+case "${1:-}" in
+  init)
+    mkdir -p .codegraph/partial
+    printf '%s\n' "$$" >"$INIT_LAUNCH_MARKER"
+    exec /bin/sleep 47.132
+    ;;
+  serve)
+    exit 1
+    ;;
+  *)
+    exit 1
+    ;;
+esac
+EOF
+chmod +x "$WORKDIR/bin/codegraph"
+reset_codegraph_dir
+reset_bootstrap_state
+DEFER_SIGNAL_MARKER="$WORKDIR/deferred-term.marker"
+INIT_LAUNCH_MARKER="$WORKDIR/deferred-init.pid"
+rm -f "$DEFER_SIGNAL_MARKER" "$INIT_LAUNCH_MARKER"
+ACTIVE_INIT_PID_FILE="$INIT_LAUNCH_MARKER"
+rc=0
+BASH_ENV="$WORKDIR/deferred-signal.bashenv" \
+    DEFER_SIGNAL_MARKER="$DEFER_SIGNAL_MARKER" \
+    INIT_LAUNCH_MARKER="$INIT_LAUNCH_MARKER" \
+    bash "$WORKDIR/project/_scripts/codegraph-bootstrap.sh" serve --mcp \
+    >"$WORKDIR/stdout" 2>"$WORKDIR/stderr" || rc=$?
+[[ "$rc" -eq 143 ]] || fail "deferred SIGTERM replay should exit 143, got $rc"
+[[ -f "$DEFER_SIGNAL_MARKER" ]] || fail "SIGTERM was not delivered in the init launch window"
+[[ -s "$INIT_LAUNCH_MARKER" ]] || fail "codegraph init did not launch before deferred SIGTERM"
+DEFERRED_INIT_PID="$(cat "$INIT_LAUNCH_MARKER")"
+if kill -0 "$DEFERRED_INIT_PID" 2>/dev/null; then
+    kill "$DEFERRED_INIT_PID" 2>/dev/null || true
+    fail "codegraph init child survived deferred SIGTERM"
+fi
+ACTIVE_INIT_PID_FILE=""
+TERM_LOG_COUNT="$(grep -c 'received SIGTERM; terminating and cleaning up' \
+    "$WORKDIR/project/.codegraph-bootstrap.log" || true)"
+[[ "$TERM_LOG_COUNT" -eq 1 ]] \
+    || fail "deferred SIGTERM receipt should be logged once, got $TERM_LOG_COUNT events"
+
+# ---- No-timeout signal handling terminates and reaps the fallback timer ----
+mkdir -p "$WORKDIR/notimeout-signal/bin"
+ln -sf "$(command -v bash)" "$WORKDIR/notimeout-signal/bin/bash"
+ln -sf "$(command -v rm)" "$WORKDIR/notimeout-signal/bin/rm"
+ln -sf "$(command -v mkdir)" "$WORKDIR/notimeout-signal/bin/mkdir"
+ln -sf "$(command -v dirname)" "$WORKDIR/notimeout-signal/bin/dirname" 2>/dev/null || true
+ln -sf "$(command -v pwd)" "$WORKDIR/notimeout-signal/bin/pwd" 2>/dev/null || true
+ln -sf "$(command -v date)" "$WORKDIR/notimeout-signal/bin/date"
+cat >"$WORKDIR/notimeout-signal/bin/sleep" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+if [[ "${1:-}" == "${FALLBACK_TIMER_DELAY:-}" ]]; then
+    printf '%s\n' "$$" >"$FALLBACK_TIMER_PID_FILE"
+fi
+exec /bin/sleep "$@"
+EOF
+cat >"$WORKDIR/notimeout-signal/bin/codegraph" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+case "${1:-}" in
+  init)
+    mkdir -p .codegraph/partial
+    printf '%s\n' "$$" >"$INIT_PID_FILE"
+    exec /bin/sleep "$INIT_SLEEP_DELAY"
+    ;;
+  serve)
+    exit 1
+    ;;
+  *)
+    exit 1
+    ;;
+esac
+EOF
+chmod +x "$WORKDIR/notimeout-signal/bin/sleep" "$WORKDIR/notimeout-signal/bin/codegraph"
+cat >"$WORKDIR/wrapper-pid.bashenv" <<'EOF'
+if [[ "$0" == */_scripts/codegraph-bootstrap.sh ]] && [[ -n "${WRAPPER_PID_FILE:-}" ]]; then
+    printf '%s\n' "$$" >"$WRAPPER_PID_FILE"
+fi
+EOF
+
+FALLBACK_TIMER_FAILURES=""
+run_fallback_signal_test() {
+    local sig="$1"
+    local expected_rc="$2"
+    local wrapper_pid_file="$WORKDIR/wrapper-${sig}.pid"
+    local init_pid_file="$WORKDIR/init-${sig}.pid"
+    local timer_pid_file="$WORKDIR/timer-${sig}.pid"
+    local signal_sent_file="$WORKDIR/signal-${sig}.sent"
+    local init_sleep_delay timer_pid init_pid rc=0
+    init_sleep_delay="47.13${expected_rc}"
+    rm -f "$wrapper_pid_file" "$init_pid_file" "$timer_pid_file" "$signal_sent_file"
+    reset_codegraph_dir
+    reset_bootstrap_state
+
+    ACTIVE_WRAPPER_PID_FILE="$wrapper_pid_file"
+    ACTIVE_INIT_PID_FILE="$init_pid_file"
+    ACTIVE_TIMER_PID_FILE="$timer_pid_file"
+    (
+        for _ in {1..200}; do
+            if [[ -s "$wrapper_pid_file" ]] && [[ -s "$init_pid_file" ]] \
+                && [[ -s "$timer_pid_file" ]]; then
+                break
+            fi
+            sleep 0.05
+        done
+        [[ -s "$wrapper_pid_file" ]] && [[ -s "$init_pid_file" ]] \
+            && [[ -s "$timer_pid_file" ]] || exit 1
+        sleep 0.2
+        kill "-$sig" "$(cat "$wrapper_pid_file")"
+        : >"$signal_sent_file"
+    ) &
+    ACTIVE_HELPER_PID=$!
+
+    if BASH_ENV="$WORKDIR/wrapper-pid.bashenv" \
+        WRAPPER_PID_FILE="$wrapper_pid_file" \
+        INIT_PID_FILE="$init_pid_file" \
+        INIT_SLEEP_DELAY="$init_sleep_delay" \
+        FALLBACK_TIMER_DELAY=37 \
+        FALLBACK_TIMER_PID_FILE="$timer_pid_file" \
+        CODEGRAPH_INIT_TIMEOUT=37 \
+        PATH="$WORKDIR/notimeout-signal/bin" \
+        bash "$WORKDIR/project/_scripts/codegraph-bootstrap.sh" serve --mcp \
+        >"$WORKDIR/stdout" 2>"$WORKDIR/stderr"; then
+        rc=0
+    else
+        rc=$?
+    fi
+    wait "$ACTIVE_HELPER_PID" || fail "$sig signal helper did not observe all lifecycle PIDs"
+    ACTIVE_HELPER_PID=""
+
+    [[ -f "$signal_sent_file" ]] || fail "$sig was not sent to the wrapper"
+    [[ "$rc" -eq "$expected_rc" ]] \
+        || fail "wrapper should exit $expected_rc after SIG$sig, got $rc"
+    timer_pid="$(cat "$timer_pid_file")"
+    init_pid="$(cat "$init_pid_file")"
+    if kill -0 "$init_pid" 2>/dev/null; then
+        kill "$init_pid" 2>/dev/null || true
+        fail "codegraph init child survived after SIG$sig"
+    fi
+    if kill -0 "$timer_pid" 2>/dev/null; then
+        kill "$timer_pid" 2>/dev/null || true
+        for _ in {1..100}; do
+            kill -0 "$timer_pid" 2>/dev/null || break
+            sleep 0.01
+        done
+        kill -KILL "$timer_pid" 2>/dev/null || true
+        FALLBACK_TIMER_FAILURES="${FALLBACK_TIMER_FAILURES} SIG${sig}"
+    fi
+
+    ACTIVE_WRAPPER_PID_FILE=""
+    ACTIVE_INIT_PID_FILE=""
+    ACTIVE_TIMER_PID_FILE=""
+}
+
+run_fallback_signal_test TERM 143
+run_fallback_signal_test INT 130
+[[ -z "$FALLBACK_TIMER_FAILURES" ]] \
+    || fail "fallback timer survived wrapper termination for:${FALLBACK_TIMER_FAILURES}"
 
 # ---- KILL escalation normalizes to exit 124 (no timeout/gtimeout in PATH) ----
 # Exercises the bash watchdog fallback's TERM->KILL escalation inside
