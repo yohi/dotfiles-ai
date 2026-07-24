@@ -8,6 +8,7 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WORKDIR="$(mktemp -d)"
+MINIMAL_PATH="/bin:/usr/bin"
 trap 'chmod -R u+rwx "$WORKDIR" 2>/dev/null; rm -rf "$WORKDIR"' EXIT INT TERM
 
 fail() {
@@ -102,7 +103,7 @@ grep -q 'init failed; removing partially-created .codegraph/' "$WORKDIR/project/
 install_default_codegraph_stub
 reset_codegraph_dir
 reset_bootstrap_state
-PATH="/bin:/usr/bin" bash "$WORKDIR/project/_scripts/codegraph-bootstrap.sh" --dry-run serve --mcp \
+PATH="$MINIMAL_PATH" bash "$WORKDIR/project/_scripts/codegraph-bootstrap.sh" --dry-run serve --mcp \
     >"$WORKDIR/stdout" 2>"$WORKDIR/stderr" || fail "expected --dry-run to succeed"
 [[ -d "$WORKDIR/project/.codegraph" ]] && fail "logging/dry-run must not create .codegraph"
 [[ -f "$WORKDIR/project/.codegraph-bootstrap.log" ]] || fail "bootstrap log should be created"
@@ -110,7 +111,7 @@ PATH="/bin:/usr/bin" bash "$WORKDIR/project/_scripts/codegraph-bootstrap.sh" --d
 # ---- --status when codegraph is missing ----
 reset_codegraph_dir
 reset_bootstrap_state
-PATH="/bin:/usr/bin" bash "$WORKDIR/project/_scripts/codegraph-bootstrap.sh" --status \
+PATH="$MINIMAL_PATH" bash "$WORKDIR/project/_scripts/codegraph-bootstrap.sh" --status \
     >"$WORKDIR/stdout" 2>"$WORKDIR/stderr" && fail "status must report missing when codegraph is not installed"
 grep -q 'CodeGraph CLI: missing' "$WORKDIR/stdout" || fail "missing CLI was not reported"
 grep -q '.codegraph/ dir: missing' "$WORKDIR/stdout" || fail "missing dir was not reported"
@@ -120,7 +121,7 @@ grep -q 'bootstrap lock: missing' "$WORKDIR/stdout" || fail "missing lock was no
 reset_codegraph_dir
 reset_bootstrap_state
 mkdir -p "$WORKDIR/project/.codegraph"
-PATH="$WORKDIR/bin:/bin:/usr/bin" bash "$WORKDIR/project/_scripts/codegraph-bootstrap.sh" --status \
+PATH="$WORKDIR/bin:$MINIMAL_PATH" bash "$WORKDIR/project/_scripts/codegraph-bootstrap.sh" --status \
     >"$WORKDIR/stdout" 2>"$WORKDIR/stderr" || fail "status must report installed when codegraph is present"
 grep -q 'CodeGraph CLI: installed' "$WORKDIR/stdout" || fail "installed CLI was not reported"
 grep -q '.codegraph/ dir: present' "$WORKDIR/stdout" || fail "present dir was not reported"
@@ -128,7 +129,7 @@ grep -q '.codegraph/ dir: present' "$WORKDIR/stdout" || fail "present dir was no
 reset_codegraph_dir
 reset_bootstrap_state
 mkdir -p "$WORKDIR/project/.codegraph"
-PATH="/bin:/usr/bin" bash "$WORKDIR/project/_scripts/codegraph-bootstrap.sh" --dry-run serve --mcp \
+PATH="$MINIMAL_PATH" bash "$WORKDIR/project/_scripts/codegraph-bootstrap.sh" --dry-run serve --mcp \
     >"$WORKDIR/stdout" 2>"$WORKDIR/stderr" || fail "expected --dry-run to succeed with existing .codegraph"
 grep -q 'dry-run: skip codegraph init' "$WORKDIR/stdout" || fail "dry-run did not skip init"
 grep -q 'dry-run: exec codegraph serve --mcp' "$WORKDIR/stdout" || fail "dry-run did not report exec"
@@ -136,7 +137,7 @@ grep -q 'dry-run: exec codegraph serve --mcp' "$WORKDIR/stdout" || fail "dry-run
 # ---- --dry-run when .codegraph is missing ----
 reset_codegraph_dir
 reset_bootstrap_state
-PATH="/bin:/usr/bin" bash "$WORKDIR/project/_scripts/codegraph-bootstrap.sh" --dry-run serve --mcp \
+PATH="$MINIMAL_PATH" bash "$WORKDIR/project/_scripts/codegraph-bootstrap.sh" --dry-run serve --mcp \
     >"$WORKDIR/stdout" 2>"$WORKDIR/stderr" || fail "expected --dry-run to succeed with missing .codegraph"
 grep -q 'dry-run: codegraph init' "$WORKDIR/stdout" || fail "dry-run did not report init"
 grep -q 'dry-run: exec codegraph serve --mcp' "$WORKDIR/stdout" || fail "dry-run did not report exec"
@@ -306,7 +307,7 @@ INIT_COUNT="$(cat "$INIT_COUNT_FILE")"
 reset_codegraph_dir
 reset_bootstrap_state
 rc=0
-PATH="/bin:/usr/bin" bash "$WORKDIR/project/_scripts/codegraph-bootstrap.sh" serve --mcp \
+PATH="$MINIMAL_PATH" bash "$WORKDIR/project/_scripts/codegraph-bootstrap.sh" serve --mcp \
     >"$WORKDIR/stdout" 2>"$WORKDIR/stderr" || rc=$?
 [[ "$rc" -eq 1 ]] || fail "missing codegraph in serve mode should exit 1, got $rc"
 grep -q 'codegraph command not found' "$WORKDIR/stderr" || fail "missing codegraph error message was not reported"
@@ -399,6 +400,53 @@ grep -q 'received SIGTERM' "$WORKDIR/project/.codegraph-bootstrap.log" \
 sleep 1
 if pgrep -f 'sleep 47\.131' >/dev/null 2>&1; then
     fail "codegraph init child (sleep 47.131) survived as an orphan after SIGTERM"
+fi
+
+# ---- KILL escalation normalizes to exit 124 (no timeout/gtimeout in PATH) ----
+# Exercises the bash watchdog fallback's TERM->KILL escalation inside
+# _terminate_process_group: codegraph init ignores SIGTERM, so after the
+# 2-second grace period the wrapper must escalate to SIGKILL, and the
+# resulting wait() status (137 = 128+SIGKILL) must be normalized to 124,
+# the same "timed out" exit code produced by the external timeout(1) path.
+mkdir -p "$WORKDIR/notimeout/bin"
+ln -sf "$(command -v bash)" "$WORKDIR/notimeout/bin/bash"
+ln -sf "$(command -v rm)" "$WORKDIR/notimeout/bin/rm"
+ln -sf "$(command -v mkdir)" "$WORKDIR/notimeout/bin/mkdir"
+ln -sf "$(command -v dirname)" "$WORKDIR/notimeout/bin/dirname" 2>/dev/null || true
+ln -sf "$(command -v pwd)" "$WORKDIR/notimeout/bin/pwd" 2>/dev/null || true
+ln -sf "$(command -v date)" "$WORKDIR/notimeout/bin/date"
+ln -sf "$(command -v sleep)" "$WORKDIR/notimeout/bin/sleep"
+cat >"$WORKDIR/notimeout/bin/codegraph" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+case "${1:-}" in
+  init)
+    trap '' TERM
+    mkdir -p .codegraph/partial
+    sleep 41.271
+    ;;
+  serve)
+    printf 'codegraph %s\n' "$*" >&2
+    ;;
+  *)
+    exit 1
+    ;;
+esac
+EOF
+chmod +x "$WORKDIR/notimeout/bin/codegraph"
+reset_codegraph_dir
+reset_bootstrap_state
+rc=0
+CODEGRAPH_INIT_TIMEOUT=1 PATH="$WORKDIR/notimeout/bin" \
+    bash "$WORKDIR/project/_scripts/codegraph-bootstrap.sh" serve --mcp \
+    >"$WORKDIR/stdout" 2>"$WORKDIR/stderr" || rc=$?
+[[ "$rc" -eq 124 ]] || fail "KILL-escalated timeout should normalize to exit 124, got $rc"
+[[ -d "$WORKDIR/project/.codegraph/partial" ]] && fail "partial .codegraph directory was not removed after KILL escalation"
+grep -q 'timed out' "$WORKDIR/project/.codegraph-bootstrap.log" \
+    || fail "KILL-escalated timeout was not logged as a timeout"
+sleep 1
+if pgrep -f 'sleep 41\.271' >/dev/null 2>&1; then
+    fail "codegraph init child (sleep 41.271) survived as an orphan after KILL escalation"
 fi
 
 printf 'PASS\n'
