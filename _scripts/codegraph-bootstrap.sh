@@ -133,11 +133,33 @@ _ensure_codegraph_installed() {
     fi
 }
 
+_ensure_bash_version_supports_wait_n() {
+    local major="${BASH_VERSINFO[0]}"
+    local minor="${BASH_VERSINFO[1]}"
+
+    if (( major < 4 || (major == 4 && minor < 3) )); then
+        _log error "Bash ${BASH_VERSION} detected; Bash 4.3 or newer is required for 'wait -n'. Install a newer Bash (on macOS: brew install bash), then re-run explicitly, for example: \"\$(brew --prefix)/bin/bash\" _scripts/codegraph-bootstrap.sh serve --mcp"
+        exit 1
+    fi
+}
+
 # --------------------------------------------------------------------------
 # Locking
 # --------------------------------------------------------------------------
 _LOCK_TYPE=""
 _CURRENT_INIT_PID=""
+# Set to 1 for the brief window between forking the codegraph-init
+# background job and recording its PID in _CURRENT_INIT_PID. Lets
+# _on_termination_signal distinguish "no init running at all" (exit
+# immediately) from "init just launched but not yet tracked" (defer via
+# _PENDING_TERM_SIG instead of losing the signal or acting on an unknown
+# PID).
+_INIT_LAUNCHING=0
+# Holds a deferred signal name (INT/TERM) received while _INIT_LAUNCHING
+# was set; replayed synchronously by _run_init_with_timeout once
+# _CURRENT_INIT_PID is known. Empty means no signal is pending.
+_PENDING_TERM_SIG=""
+_CURRENT_FALLBACK_TIMER_PID=""
 
 _acquire_lock() {
     if ! command -v flock >/dev/null 2>&1; then
@@ -175,29 +197,98 @@ _release_lock() {
 # group. Used both by the init timeout watchdog and by the termination-
 # signal handler so that an in-flight codegraph init never survives as
 # an orphan.
+#
+# Detecting whether the group is still alive after the grace period used
+# to be a blind `sleep 2` followed by `kill -0 -"$pgid"`. That re-check is
+# racy: if some other process reaped `pgid` and the OS recycled the PGID
+# number for an unrelated process group during the sleep, `kill -0` (and
+# worse, the KILL escalation) could target that unrelated group instead.
+# Both current callers (_on_termination_signal and the no-timeout watchdog
+# in _run_init_with_timeout) invoke this from the shell that is the direct
+# parent of `pgid`'s job, so we race a `wait -n` against a grace-period
+# timer job instead: `wait -n` reports real process completion via the
+# kernel's actual wait() mechanism, which cannot be fooled by PID/PGID
+# reuse the way a `kill -0` poll can. (Requires bash 4.3+ for `wait -n`;
+# normal mode checks this requirement before initialization.)
+_job_still_tracked() {
+    # Query Bash's own child-job bookkeeping instead of the kernel PID
+    # namespace. A reaped child's PID can be recycled for an unrelated process,
+    # but only an explicitly waited job disappears from this table.
+    local tracked_jobs
+    tracked_jobs="$(jobs -p 2>/dev/null)"
+    [[ $'\n'"$tracked_jobs"$'\n' == *$'\n'"$1"$'\n'* ]]
+}
+
 _terminate_process_group() {
     local pgid="$1"
     if ! kill -TERM -"$pgid" 2>/dev/null; then
         # Target already gone; nothing to wait for or escalate to KILL.
         return 0
     fi
-    sleep 2
-    # Re-check the group is still present before escalating to KILL, since
-    # the PGID could have been recycled by an unrelated process during the
-    # sleep window.
-    if kill -0 -"$pgid" 2>/dev/null; then
-        kill -KILL -"$pgid" 2>/dev/null || true
+
+    sleep 2 &
+    local grace_pid=$!
+    local rc=0
+    if wait -n "$pgid" "$grace_pid"; then
+        rc=0
+    else
+        rc=$?
     fi
+
+    if _job_still_tracked "$grace_pid"; then
+        # The grace timer is still tracked, so `wait -n` must have reaped
+        # `pgid` itself: SIGTERM was enough. Cancel the now-unneeded timer.
+        kill "$grace_pid" 2>/dev/null || true
+        wait "$grace_pid" 2>/dev/null || true
+        return "$rc"
+    fi
+
+    # The grace timer is the one `wait -n` reaped (it fired before `pgid`
+    # exited): escalate to KILL.
+    kill -KILL -"$pgid" 2>/dev/null || true
+    if wait "$pgid" 2>/dev/null; then
+        rc=0
+    else
+        rc=$?
+    fi
+    return "$rc"
+}
+
+_stop_fallback_timer() {
+    local timer_pid="$_CURRENT_FALLBACK_TIMER_PID"
+    _CURRENT_FALLBACK_TIMER_PID=""
+    if [[ -z "$timer_pid" ]]; then
+        return 0
+    fi
+    if _job_still_tracked "$timer_pid"; then
+        kill "$timer_pid" 2>/dev/null || true
+    fi
+    wait "$timer_pid" 2>/dev/null || true
 }
 
 # Handle SIGINT/SIGTERM delivered to the wrapper itself: stop any
 # in-flight codegraph init, release the lock, and exit with the
 # conventional 128+signal exit code.
+#
+# If codegraph init has been forked but _CURRENT_INIT_PID has not been
+# recorded yet (see _INIT_LAUNCHING in _run_init_with_timeout), defer
+# instead of exiting or silently dropping the signal: it is remembered in
+# _PENDING_TERM_SIG and replayed once the PID is known, so a signal
+# arriving in that narrow window is never lost.
 _on_termination_signal() {
     local sig="$1"
+    if [[ -z "$_CURRENT_INIT_PID" ]] && [[ "$_INIT_LAUNCHING" -eq 1 ]]; then
+        _PENDING_TERM_SIG="$sig"
+        return 0
+    fi
     _log warn "received SIG${sig}; terminating and cleaning up"
+    _stop_fallback_timer
     if [[ -n "$_CURRENT_INIT_PID" ]]; then
-        _terminate_process_group "$_CURRENT_INIT_PID"
+        # The return value is only used by the watchdog escalation branch
+        # in _run_init_with_timeout; here we always fall through to
+        # _release_lock/exit regardless, so discard it explicitly rather
+        # than letting a non-zero exit-by-signal status trip `set -e`.
+        _terminate_process_group "$_CURRENT_INIT_PID" || true
     fi
     _release_lock
     case "$sig" in
@@ -224,51 +315,99 @@ _run_init_with_timeout() {
     # critically, lets a pending INT/TERM trap interrupt `wait` immediately
     # instead of being deferred until a synchronous foreground command exits.
     local init_pid
-    local watchdog_pid=""
     local init_rc=0
 
+    # The INT/TERM traps installed by _main stay active continuously through
+    # the fork below -- they are deliberately never disabled with
+    # `trap '' INT TERM`. Ignoring a signal (SIG_IGN) discards deliveries
+    # instead of queuing them, so a signal arriving in the fork window would
+    # be lost outright; worse, SIG_IGN is inherited across fork+exec, so the
+    # codegraph/timeout child launched below would itself start with
+    # INT/TERM ignored and could shrug off a later graceful `kill -TERM`
+    # from _terminate_process_group. Instead, _INIT_LAUNCHING marks this
+    # narrow pre-registration window so _on_termination_signal can defer
+    # (see _PENDING_TERM_SIG) rather than dropping the signal or acting on
+    # a PID it doesn't know yet.
+    _INIT_LAUNCHING=1
     set -m
-    # Block INT/TERM for the brief window between launching the background
-    # job and recording its PID, so a termination signal can never arrive
-    # while codegraph init is running but untracked by _CURRENT_INIT_PID.
-    trap '' INT TERM
     if [[ -n "$timeout_cmd" ]]; then
         "$timeout_cmd" "$CODEGRAPH_INIT_TIMEOUT" codegraph init < /dev/null &
     else
         codegraph init < /dev/null &
     fi
     init_pid=$!
-    set +m
-    _CURRENT_INIT_PID="$init_pid"
-    trap '_on_termination_signal INT' INT
-    trap '_on_termination_signal TERM' TERM
 
+    local sleep_pid=""
     if [[ -z "$timeout_cmd" ]]; then
         # Bash watchdog fallback for macOS and other systems without
-        # timeout/gtimeout: terminate the whole process group ourselves.
-        (
-            sleep "$CODEGRAPH_INIT_TIMEOUT"
-            _terminate_process_group "$init_pid"
-        ) &
-        watchdog_pid=$!
+        # timeout/gtimeout: start the grace timer as a job of THIS shell
+        # (the real parent of init_pid) instead of in a detached sibling
+        # subshell. A sibling subshell cannot `wait` on init_pid, so it can
+        # only poll with `kill -0 -"$pgid"` after its own sleep -- which is
+        # racy if this shell's own `wait` below has already reaped init_pid
+        # and the OS has recycled its PGID for an unrelated process group
+        # in the meantime. Racing a same-shell `wait -n` against this timer
+        # instead detects real completion via the kernel's wait()
+        # mechanism, immune to that PID/PGID reuse window.
+        sleep "$CODEGRAPH_INIT_TIMEOUT" &
+        sleep_pid=$!
+        _CURRENT_FALLBACK_TIMER_PID="$sleep_pid"
+    fi
+    set +m
+    _CURRENT_INIT_PID="$init_pid"
+    _INIT_LAUNCHING=0
+    if [[ -n "$_PENDING_TERM_SIG" ]]; then
+        # A termination signal arrived while the job was still launching
+        # and was deferred by _on_termination_signal. Handle it now,
+        # synchronously, with the PID known, so it is not lost.
+        local pending_sig="$_PENDING_TERM_SIG"
+        _PENDING_TERM_SIG=""
+        _on_termination_signal "$pending_sig"
     fi
 
-    # Wait for init to finish (naturally, via the watchdog, or via a
-    # termination signal delivered to the wrapper itself).
-    if wait "$init_pid"; then
-        init_rc=0
+    if [[ -n "$sleep_pid" ]]; then
+        # No external timeout command: race init_pid against the grace
+        # timer in this shell so we can tell them apart via `wait -n`
+        # instead of a blind sleep-then-kill-0 re-check.
+        local wait_n_rc=0
+        if wait -n "$init_pid" "$sleep_pid"; then
+            wait_n_rc=0
+        else
+            wait_n_rc=$?
+        fi
+        if _job_still_tracked "$sleep_pid"; then
+            # Timer still tracked: wait -n reaped init_pid itself, so its exit
+            # status is already in wait_n_rc. Cancel the now-unneeded timer.
+            _stop_fallback_timer
+            init_rc="$wait_n_rc"
+        else
+            _CURRENT_FALLBACK_TIMER_PID=""
+            # Timer already reaped by wait -n: CODEGRAPH_INIT_TIMEOUT
+            # elapsed before init_pid finished. Hand off to
+            # _terminate_process_group, which owns the TERM->KILL
+            # escalation and reaps init_pid itself.
+            if _terminate_process_group "$init_pid"; then
+                init_rc=0
+            else
+                init_rc=$?
+            fi
+        fi
     else
-        init_rc=$?
+        if wait "$init_pid"; then
+            init_rc=0
+        else
+            init_rc=$?
+        fi
     fi
     _CURRENT_INIT_PID=""
+    _CURRENT_FALLBACK_TIMER_PID=""
 
-    if [[ -n "$watchdog_pid" ]]; then
-        kill "$watchdog_pid" 2>/dev/null || true
-        wait "$watchdog_pid" 2>/dev/null || true
-    fi
-
-    if [[ "$init_rc" -eq 143 ]] || [[ "$init_rc" -eq 129 ]]; then
+    if [[ "$init_rc" -eq 143 ]] || [[ "$init_rc" -eq 129 ]] || [[ "$init_rc" -eq 137 ]]; then
         # TERM/KILL signals normalize to the timeout(1) timeout exit code.
+        # 137 = 128+SIGKILL, produced when _terminate_process_group had to
+        # escalate past SIGTERM; without normalizing it here, a
+        # KILL-escalated timeout would be mis-reported by _initialize_once
+        # as a generic failure instead of a timeout.
         init_rc=124
     fi
 
@@ -336,6 +475,7 @@ _main() {
     fi
 
     _ensure_codegraph_installed
+    _ensure_bash_version_supports_wait_n
     _acquire_lock
     _initialize_once || {
         local rc=$?
