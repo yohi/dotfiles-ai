@@ -9,7 +9,7 @@ OpenCode プラットフォーム自体のコア設定ファイルです。
 
 ### `oh-my-openagent.jsonc`
 メインの設定ファイルであり、各専門エージェントに割り当てる LLM モデルや知能カテゴリーなどを管理します。
-*Target Version: v4.19.0*
+*Target Version: v4.19.2*
 
 ## 2. 使い方
 
