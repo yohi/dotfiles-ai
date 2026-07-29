@@ -34,8 +34,9 @@ APM によって直接管理されるローカル知識ベース・長期記憶�
 
 Atlassian 製品 (Jira, Confluence) 用の公式 MCP サーバーです。
 
-- **ステータス**: 有効 (Gemini CLI / Claude Code から直接接続。
-  OAuth 認証をネイティブに処理)
+- **ステータス**: 有効 (API Token 認証。`ATLASSIAN_EMAIL` / `ATLASSIAN_API_TOKEN`
+  から `make sync-agents` が `ATLASSIAN_AUTH_HEADER`
+  (`Basic base64(email:token)`) を自動生成し、Authorization ヘッダーとして送信)
 - **エンドポイント**: `https://mcp.atlassian.com/v1/mcp`
 
 ---

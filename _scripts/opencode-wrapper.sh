@@ -34,6 +34,7 @@ if [[ "$1" == "work" || "$1" == "personal" ]]; then
 fi
 
 ENV_FILE="$BASE_PATH/${PROFILE}.env"
+REPO_ENV_FILE="$REPO_ROOT/.env"
 
 if [ ! -f "$TEMPLATE" ]; then
     echo "❌ Error: Template not found at $TEMPLATE"
@@ -42,6 +43,17 @@ fi
 
 if [ ! -f "$ENV_FILE" ]; then
     echo "⚠️  Warning: Profile env file not found at $ENV_FILE, using default environment"
+fi
+
+# Load repository-wide secrets/config (e.g. ATLASSIAN_AUTH_HEADER, GITHUB_TOKEN)
+# generated into $REPO_ROOT/.env by `make sync-agents`, so MCP servers that
+# reference ${env:VAR} in apm.yml resolve correctly even when the shell
+# startup config (zshrc etc.) hasn't exported them.
+if [ -f "$REPO_ENV_FILE" ]; then
+    set -a
+    # shellcheck source=/dev/null
+    source "$REPO_ENV_FILE"
+    set +a
 fi
 
 if [ -f "$ENV_FILE" ]; then

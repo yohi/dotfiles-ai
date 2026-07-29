@@ -55,6 +55,13 @@ def _convert_mcp_entry(entry: dict[str, Any]) -> tuple[str, dict[str, Any]]:
             result["headers"] = {
                 k: _normalize_env_syntax(v) for k, v in entry["headers"].items()
             }
+        if "oauth" in entry:
+            # OpenCode remote MCP servers attempt OAuth discovery/PKCE/dynamic
+            # client registration by default. Set oauth: false in apm.yml for
+            # servers authenticating purely via `headers` (API token / Basic
+            # auth); otherwise OpenCode may hang awaiting an interactive OAuth
+            # flow instead of using the provided header.
+            result["oauth"] = entry["oauth"]
     else:
         # stdio
         cmd_str = entry.get("command", "")

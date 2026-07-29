@@ -31,7 +31,15 @@ dependencies:
       title: "Atlassian MCP"
       registry: false
       transport: sse
-      url: "https://mcp.atlassian.com/v1/mcp/authv2"
+      url: "https://mcp.atlassian.com/v1/mcp"
+      headers:
+        Authorization: "${env:ATLASSIAN_AUTH_HEADER}"
+      # OpenCode attempts OAuth discovery/PKCE by default on remote MCP
+      # servers. mcp.atlassian.com supports OAuth 2.1 natively, so without
+      # this flag OpenCode tries an interactive OAuth flow instead of using
+      # the Authorization header above, and hangs until timeout in headless
+      # use. Force header-based (API token) auth only.
+      oauth: false
       enabled: true
 
     - name: coderabbit
@@ -583,6 +591,7 @@ provider:
       - global.anthropic.claude-opus-4-6-v1
       - global.anthropic.claude-opus-4-7
       - global.anthropic.claude-opus-4-8
+      - global.anthropic.claude-opus-5
       - global.anthropic.claude-sonnet-4-5-20250929-v1:0
       - global.anthropic.claude-sonnet-4-6
       - global.anthropic.claude-sonnet-5
