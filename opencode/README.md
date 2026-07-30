@@ -9,7 +9,7 @@ OpenCode プラットフォーム自体のコア設定ファイルです。
 
 ### `oh-my-openagent.jsonc`
 メインの設定ファイルであり、各専門エージェントに割り当てる LLM モデルや知能カテゴリーなどを管理します。
-*Target Version: v4.19.0*
+*Target Version: v4.19.3*
 
 ## 2. 使い方
 
@@ -32,11 +32,11 @@ Sisyphus（監督）は、タスクの性質に応じて最適な「知能カテ
 | **ultrabrain** | `xhigh` / 最強推論 | 複雑な計画立案、コード監査、アーキテクチャ設計、リスク分析。 | GPT-5.6 Sol (xhigh) |
 | **deep** | `xhigh` / 自律解決 | 難解なバグ修正、機能実装、リファクタリングなど職人的作業。 | gpt-5.6-terra (xhigh) |
 | **quick** | `low` / 高速応答 | ドキュメント検索、コード探索、些細な修正、プロトタイピング。 | gpt-5.6-luna (low) |
-| **visual-engineering** | UI/UX 特化 | UIデザイン解析、CSSアニメーション、フロントエンド最適化。 | Qwen 3.6 Plus (high) |
+| **visual-engineering** | UI/UX 特化 | UIデザイン解析、CSSアニメーション、フロントエンド最適化。 | Claude Opus 5 (max) |
 | **unspecified-high** | 高負荷汎用 | 特定の役割に当てはまらないが、高い知能を要する汎用作業。 | GPT-5.6 Sol (high) |
 | **unspecified-low** | `xhigh` / 低負荷汎用 | 定形的な作業、単純なデータ変換などの低コストな汎用作業。 | gpt-5.6-luna (xhigh) |
 | **writing** | 文書作成 特化 | 技術解説、ドキュメンテーション、リリースノートの作成。 | Kimi (k2.7-code) |
-| **artistry** | 創造性 特化 | ジェネラティブアート、クリエイティブな発想、芸術的表現。 | Gemini 3.1 Pro (high) / Kimi K3 |
+| **artistry** | 創造性 特化 | ジェネラティブアート、クリエイティブな発想、芸術的表現。 | Claude Fable 5 (xhigh) |
 
 ### エージェント一覧とカテゴリー・マッピング
 
@@ -61,7 +61,7 @@ Sisyphus（監督）は、タスクの性質に応じて最適な「知能カテ
 エージェントの能力を最大限に引き出すためには、エージェントの思考スタイルに合った「脳（モデルファミリー）」を割り当てることが重要です。
 
 ### 推奨スタック: OpenCode Go + OpenAI + Kimi K3 (Best Value)
-最も効率的でバランスの良い組み合わせです。v4.19.0 では **Kimi K3** がファーストクラス対応となり、Sisyphus 系エージェントの司令塔・Todo 管理に最適です。
+最も効率的でバランスの良い組み合わせです。v4.19.3 では **Kimi K3** がファーストクラス対応となり、Sisyphus 系エージェントの司令塔・Todo 管理に最適です。
 
 - **OpenCode Go ($10/mo)**: Kimi (Claude系代替, **K3 対応**), Qwen (Gemini系代替), MiniMax を提供。
 - **OpenAI Plus/Pro ($20/mo)**: GPT-5.6/5.4/5.5 (実装・監査系) を提供。
@@ -74,21 +74,21 @@ Sisyphus（監督）は、タスクの性質に応じて最適な「知能カテ
 | **原則駆動** | **自律探索型。** 最小限の指示で自律的に解決策を見出す。深い実装に強い。 | GPT Family, DeepSeek, Qwen, Kimi K3 | Hephaestus, Oracle, Momus |
 | **視覚推論型** | **UI・構造理解。** デザイン解析、CSS、レイアウトの理解に特化。 | Gemini Family, Qwen | Looker |
 
-### カテゴリー別・推奨モデルと代替ルール (v4.19.0)
+### カテゴリー別・推奨モデルと代替ルール (v4.19.3)
 
 | カテゴリー | デフォルトモデル | フォールバックチェーン (優先順) |
 | :--- | :--- | :--- |
-| **ultrabrain** | `gpt-5.6-sol` (xhigh) | `gpt-5.6-sol` (xhigh) → `qwen3.6-plus` (high) → `claude-opus-4-8` (max) → `glm-5.2` |
-| **deep** | `gpt-5.6-terra` (xhigh) | `gpt-5.6-terra` (xhigh) → `gpt-5.6-sol` (medium) → `claude-opus-4-8` (max) → `qwen3.6-plus` (high) |
+| **ultrabrain** | `gpt-5.6-sol` (xhigh) | `gpt-5.6-sol` (xhigh) → `qwen3.6-plus` (high) → `claude-opus-5` (max) → `glm-5.2` |
+| **deep** | `gpt-5.6-terra` (xhigh) | `gpt-5.6-terra` (xhigh) → `gpt-5.6-sol` (medium) → `claude-opus-5` (max) → `qwen3.6-plus` (high) |
 | **quick** | `gpt-5.6-luna` (low) | `gpt-5.6-luna` (low) → `gpt-5.6-terra` (medium) → `claude-haiku-4-5` → `qwen3.5-plus` → `minimax-m3` → `minimax-m2.7` |
-| **visual-engineering** | `qwen3.6-plus` (high) | `qwen3.6-plus` (high) → `glm-5.2` → `claude-opus-4-8` (max) → `kimi-k2.7-code` |
-| **artistry** | `qwen3.6-plus` (high) | `qwen3.6-plus` (high) → `claude-opus-4-8` (max) → `gpt-5.6-sol` |
-| **unspecified-high** | `gpt-5.6-sol` (high) | `gpt-5.6-sol` (high) → `claude-opus-4-8` (max) → `glm-5.2` → `kimi-k2.7-code` → `qwen3.6-plus` → `kimi-k2.5` |
+| **visual-engineering** | `qwen3.6-plus` (high) | `qwen3.6-plus` (high) → `glm-5.2` → `claude-opus-5` (max) → `kimi-k2.7-code` |
+| **artistry** | `qwen3.6-plus` (high) | `qwen3.6-plus` (high) → `claude-opus-5` (max) → `gpt-5.6-sol` |
+| **unspecified-high** | `gpt-5.6-sol` (high) | `gpt-5.6-sol` (high) → `claude-opus-5` (max) → `glm-5.2` → `kimi-k2.7-code` → `qwen3.6-plus` → `kimi-k2.5` |
 | **unspecified-low** | `gpt-5.6-luna` (xhigh) | `gpt-5.6-luna` (xhigh) → `kimi-k3` → `kimi-k2.7-code` → `kimi-k2.6` → `gpt-5.4-mini` → `qwen3.5-plus` → `minimax-m3` |
 | **writing** | `kimi-k3` | `kimi-k3` → `kimi-k2.7-code` → `qwen3.5-plus` → `kimi-k2.6` → `claude-sonnet-5` → `minimax-m3` → `minimax-m2.7` |
 
 ---
-*Updated: 2026-07-20*
+*Updated: 2026-07-30*
 
 
 ## 5. 環境の切り替え (Switching Environments)
@@ -165,9 +165,9 @@ OpenCode の機能を拡張するため、現在以下のプラグインが [apm
    make setup-opencode
    ```
 
-### v4.19.0 主要新機能
+### v4.19.3 主要新機能
 
-最新の v4.19.0 にて強化・導入された主要機能です。
+最新の v4.19.3 にて強化・導入された主要機能です。
 
 #### Kimi K3 is a first-class citizen
 Sisyphus、Sisyphus-Junior、Atlas に Kimi K3 プロンプトバリアントが追加され、モデルファミリー検出とフォールバックルーティングが自動化されました。OpenRouter 経由でも Moonshot API 直接でも、omo は K3 を認識して適切なプロンプトを選択します。
