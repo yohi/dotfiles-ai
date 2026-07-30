@@ -257,7 +257,7 @@ shell: bash
 snapshot: true
 
 plugin:
-  - "@yohi/justice@2.4.0"
+  - "@yohi/justice@2.7.0"
   - "@yohi/akane@1.6.2"
   - "oh-my-openagent@4.19.0"
   - "@yohi/chronos-gate@1.1.0"
