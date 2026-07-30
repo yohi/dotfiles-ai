@@ -127,11 +127,27 @@ if "$WRAPPER" personal >/dev/null 2>&1; then
     fi
 
     # Check if --port parameter was added when port detected
-    if grep -q "CALL: opencode.*--port" "$MOCK_LOG" 2>/dev/null; then
-        pass "Detected port was forwarded to opencode"
+    if command -v ss >/dev/null 2>&1; then
+        EXPECTED_PORT=""
+        for p in {4090..4100}; do
+            if ! ss -tln | grep -q ":$p " >/dev/null 2>&1; then
+                EXPECTED_PORT=$p
+                break
+            fi
+        done
+
+        if [ -n "$EXPECTED_PORT" ]; then
+            if grep -q "CALL: opencode --port $EXPECTED_PORT" "$MOCK_LOG" 2>/dev/null; then
+                pass "Detected port ($EXPECTED_PORT) was correctly forwarded to opencode"
+            else
+                fail "Port $EXPECTED_PORT was available but --port was not forwarded to opencode"
+                cat "$MOCK_LOG" 2>/dev/null || true
+            fi
+        else
+            skip "No available port found in 4090..4100 range"
+        fi
     else
-        # If no port available or ss tool absent, pass conditionally/skip assertion
-        pass "No port forwarded (or ss not available/no open port found)"
+        skip "ss command not available for port detection test"
     fi
 else
     fail "Wrapper invocation failed for no-arg invocation"
