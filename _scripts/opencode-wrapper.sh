@@ -27,10 +27,13 @@ fi
 
 # --- Profile Selection ---
 
-PROFILE="personal"
+PROFILE="${PROFILE:-personal}"
 if [[ "$1" == "work" || "$1" == "personal" ]]; then
     PROFILE="$1"
     shift
+    # Kill any existing running server to force fresh config loading with the requested profile
+    pkill -f "opencode --port" 2>/dev/null || true
+    sleep 0.5
 fi
 
 ENV_FILE="$BASE_PATH/${PROFILE}.env"
@@ -45,6 +48,11 @@ if [ ! -f "$ENV_FILE" ]; then
 fi
 
 if [ -f "$ENV_FILE" ]; then
+    # Clear all model profile env vars across work.env and personal.env so switching profiles doesn't keep old values
+    ALL_PROFILE_VARS=$(grep -oP '^[A-Z0-9_]+=' "$BASE_PATH"/*.env 2>/dev/null | cut -d: -f2 | cut -d= -f1 | sort -u)
+    if [ -n "$ALL_PROFILE_VARS" ]; then
+        unset $ALL_PROFILE_VARS 2>/dev/null || true
+    fi
     set -a
     # shellcheck source=/dev/null
     source "$ENV_FILE"
@@ -52,6 +60,9 @@ if [ -f "$ENV_FILE" ]; then
 fi
 
 export SKILLPORT_SKILLS_DIR="${SKILLPORT_SKILLS_DIR:-$REPO_ROOT/.agents/skills}"
+
+# Ensure plugin's static config unification file doesn't override dynamic profile switching
+rm -f "$HOME/.omo/omo.jsonc" 2>/dev/null || true
 
 # --- Execution ---
 TMP_DIR=$(mktemp -d)
@@ -63,7 +74,7 @@ if [ -d "$REAL_CONFIG_DIR" ]; then
     # Create symlinks to all files in the real config dir except the one we are generating
     for f in "$REAL_CONFIG_DIR"/*; do
         filename=$(basename "$f")
-        if [[ "$filename" != "oh-my-openagent.jsonc" && "$filename" != "oh-my-opencode.jsonc" ]]; then
+        if [[ "$filename" != "oh-my-openagent.jsonc" && "$filename" != "oh-my-opencode.jsonc" && "$filename" != "opencode.jsonc" && "$filename" != *.bak.* ]]; then
             ln -s "$f" "$TMP_DIR/$filename" 2>/dev/null || true
         fi
     done
@@ -93,13 +104,28 @@ fi
 # Note: We use OPENCODE_CONFIG_DIR to point to our temporary directory
 export OPENCODE_CONFIG_DIR="$TMP_DIR"
 
+# If user didn't pass an explicit --model flag, default to SISYPHUS_MODEL from current profile
+MODEL_ARGS=()
+if [[ -n "$SISYPHUS_MODEL" ]]; then
+    has_model=false
+    for arg in "$@"; do
+        if [[ "$arg" == "-m" || "$arg" == "--model" || "$arg" == --model=* ]]; then
+            has_model=true
+            break
+        fi
+    done
+    if [ "$has_model" = false ]; then
+        MODEL_ARGS=(--model "$SISYPHUS_MODEL")
+    fi
+fi
+
 # Only use automatic port for the main agent loop (no arguments or starting with -)
 # Subcommands like auth, mcp, doctor, etc. don't accept --port
 if [[ -n "$PORT" && ( -z "$1" || "$1" == -* ) ]]; then
     echo "✅ Profile [${PROFILE}] | Port [${PORT}]"
-    opencode --port "$PORT" "$@"
+    opencode "${MODEL_ARGS[@]}" --port "$PORT" "$@"
 else
     echo "✅ Profile [${PROFILE}]"
-    opencode "$@"
+    opencode "${MODEL_ARGS[@]}" "$@"
 fi
 
