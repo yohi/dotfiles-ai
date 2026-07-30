@@ -1,6 +1,6 @@
 ---
 name: apm-updater
-description: Checks and updates THIS repository's apm.yml and the OpenCode files derived from it. Handles (1) pinned dependency versions and commit hashes in apm.yml -- APM skill git refs (owner/repo#tag), npm plugins under `plugin:`, and MCP server packages under `dependencies.mcp` -- and (2) LLM model whitelists in apm.yml plus the OpenCode environment profiles (opencode/personal.env, opencode/work.env) and opencode/README.md using the latest model-schema from models.dev. Use whenever the user wants to bump apm.yml dependencies, refresh MCP/plugin/skill pins, check if apm.yml is outdated, update OpenCode LLM model settings, or sync opencode/README.md with the latest oh-my-openagent release. Do NOT use for package.json / uv / other lockfile bumps, GitHub Actions version updates, or adding brand-new MCP/skill/plugin entries to apm.yml.
+description: Checks and updates THIS repository's apm.yml and the OpenCode files derived from it. Handles (1) pinned dependency versions and commit hashes in apm.yml -- APM skill git refs (owner/repo#tag), npm plugins under `plugin:`, and MCP server packages under `dependencies.mcp` -- and (2) LLM model whitelists in apm.yml plus the OMO native profile configuration (opencode/omo.jsonc profiles.personal / profiles.work) and opencode/README.md using the latest model-schema from models.dev. Use whenever the user wants to bump apm.yml dependencies, refresh MCP/plugin/skill pins, check if apm.yml is outdated, update OpenCode LLM model settings, or sync opencode/README.md with the latest oh-my-openagent release. Do NOT use for package.json / uv / other lockfile bumps, GitHub Actions version updates, or adding brand-new MCP/skill/plugin entries to apm.yml.
 ---
 
 # apm.yml / OpenCode 一括最新化スキル
@@ -14,25 +14,25 @@ description: Checks and updates THIS repository's apm.yml and the OpenCode files
 - **「最新版/モデルの検出」は決定的なスクリプトに任せる**。
 - **「バージョン間で何が変わったか」の説明は人間が判断できる形で必ず提示する**。
 - **apm.yml への書き込みはユーザーの承認後にのみ行う**。
-- **生成物は直接編集しない**: `opencode.jsonc` や
-  `gemini/settings.json` などは、`apm.yml` を最小差分で更新した後、
-  決められた `make` コマンドで再同期する。
+- **生成物は直接編集しない**: `opencode/opencode.jsonc` (`make sync-opencode` による生成物、`.gitignore` 対象) や `gemini/settings.json` などは、`apm.yml` を最小差分で更新した後、決められた `make` コマンドで再同期する。ただし `opencode/omo.jsonc` は OMO ネイティブプロファイルの SSOT として手動で編集する対象ファイルであるため、直接編集する。
 
 ## いつ使うか
 
 - 「apm.yml のバージョンを最新にして」「依存を更新して」「古くなってない?」
 - 「chronos-graph のハッシュを最新コミットに」「nexus を上げて」「プラグインを bump して」
 - 更新に伴って「何が変わったか教えて」「変更点を出して」と言われたとき
-- 「OpenCode のモデル設定を最新化して」「models.dev のモデルスキーマに合わせて」「personal.env / work.env のモデルを更新して」
+- 「OpenCode のモデル設定を最新化して」「models.dev のモデルスキーマに合わせて」「omo.jsonc の profiles.personal / profiles.work のモデルを更新して」
 - 「opencode/README.md を oh-my-openagent の最新リリースに合わせて更新して」
 - 「make sync-opencode」「make check-sync-opencode」を実行して検証して
 
 ## 前提と安全設計
 
-- **SSOT を壊さない**: `apm.yml` から `opencode.jsonc` や
+- **SSOT を壊さない**: `apm.yml` から `opencode/opencode.jsonc` や
   `gemini/settings.json` などが生成されます。生成物を直接いじらず、
-  常に `apm.yml` を最小差分で書き換えます。YAML 全体を再整形すると
-  巨大な差分になりレビュー不能になるため、対象行だけを置換します。
+  常に `apm.yml` を最小差分で書き換えます。ただし `opencode/omo.jsonc` は
+  プロファイル別モデル設定の SSOT です。モデル設定の更新は `opencode/omo.jsonc` 内の
+  `profiles.personal` / `profiles.work` を直接編集します。
+  YAML 全体を再整形すると巨大な差分になりレビュー不能になるため、対象行だけを置換します。
 - **必ず差分提示 → 承認 → 適用**: 更新テーブルと各依存の変更点を先に出し、承認を得てから書き込みます。
 - **`@latest` / 未固定は既定で据え置き**: `@latest` や版数なしの依存は意図的に最新追従にしている可能性が高いため、現状の解決先を報告するだけに留め、勝手にピン留めしません。
 - **git 操作はしない**: コミット/プッシュはこのスキルでは実行せず、Conventional Commits（日本語）のコミットメッセージ案を提示するに留めます。
@@ -132,7 +132,7 @@ python .claude/skills/apm-updater/scripts/check_updates.py --models
 
 #### B2. apm.yml の provider/model セクション更新 (SSOT)
 
-- `apm.yml` はモデル定義の SSOT です。`opencode.jsonc` を直接編集してはいけません。
+- `apm.yml` はモデル定義の SSOT です。`opencode/opencode.jsonc` を直接編集してはいけません。
 - `provider` セクション配下の各プロバイダー（`openai`, `nvidia`, `cloudflare-workers-ai`, `opencode`, `amazon-bedrock`, `opencode-go` など）の `whitelist` もしくは `models` リストを、最新スキーマで定義されている有効なモデル名と一致するように更新します。
 - **Bedrock モデル（`amazon-bedrock`）の制限**: `amazon-bedrock` の `whitelist` に含めるモデルは、`global.anthropic.claude-*`（グローバルプレフィックス付きの最新 Claude モデル）および `openai.gpt-*`（Bedrock 上で提供される OpenAI モデル）のみとします。その他のリージョン固有モデルや古い世代のモデルは whitelist に含めず、除外してください。
 
@@ -146,42 +146,47 @@ python .claude/skills/apm-updater/scripts/check_updates.py --models
 
 `cloudflare-ai-gateway-custom` は `models.dev` に存在しないカスタム provider です。`--validate-models` は `whitelist` またはリスト形式の `models` を通常の provider/model として検査するため、カスタムモデルのマッピング形式はこの検査の対象外です。
 
-- 更新後、以下を実行して `opencode/opencode.jsonc` を再生成します:
+- 更新後、以下を実行して `opencode/opencode.jsonc` （生成物）を再生成し、OMO ネイティブプロファイルを反映します:
 
 ```bash
 make sync-opencode
+make check-sync-opencode
 ```
 
-#### B3. 環境プロファイル (personal.env & work.env) の更新
+#### B3. 環境プロファイル（OMO ネイティブプロファイル）の更新
 
-`opencode/personal.env` および `opencode/work.env` に定義されている各エージェントおよびカテゴリのモデル・フォールバックモデルを更新します。
+OpenCode のプロファイル切り替えは OMO ネイティブプロファイル方式に移行しました。モデル設定は `opencode/personal.env` および `opencode/work.env` ではなく、`opencode/omo.jsonc` 内の `profiles.personal` / `profiles.work` で管理されます。
 
-- **`personal.env` の更新ルール**:
+`.opencode` ではなく `~/.omo/omo.jsonc` を使うため、ランチャー（`_scripts/opencode-wrapper.sh`）が `OMO_PROFILE=personal|work` を設定して起動します。
+
+- **`profiles.personal` の更新ルール**:
   - AWS Bedrock モデル（`amazon-bedrock/*`）を**含めない**ように構成します。
   - 最新の OpenAI モデル（`openai/gpt-*`）や、その他利用可能な最新モデル（Kimi, Gemini, GLM, Qwen, Minimax など）を割り当てます。
-- **`work.env` の更新ルール**:
-  - Bedrock モデル（`amazon-bedrock/*`）**のみ**を使用するように構成します（他のプロバイダーは含めません。ただし `HEPHAESTUS_DISABLED=true` などの例外設定は維持します）。
+  - 対象は `profiles.personal["[opencode]"].agents.<name>.model` / `fallback_models`、および同 `categories.<name>.model` / `fallback_models` です。
+- **`profiles.work` の更新ルール**:
+  - Bedrock モデル（`amazon-bedrock/*`）**のみ**を使用するように構成します（`hephaestus.disabled: true` などの既存設定は維持します）。
   - 最新の Bedrock Claude モデル（`global.anthropic.claude-*`）を割り当てます。
+  - 対象は `profiles.work["[opencode]"].agents.<name>.model` / `fallback_models`、および同 `categories.<name>.model` / `fallback_models` です。
 
 #### B4. opencode/README.md の更新
 
 - GitHub の `https://github.com/code-yeongyu/oh-my-openagent` から最新のリリース（Release Tag）および変更内容を確認します。
 - 公式の変更内容に基づいて、`opencode/README.md` に記載されている `Target Version` や、知能カテゴリー・エージェント構成のデフォルト推奨モデルなどの差分のみを部分的にアップデートします。
-- **注意**: 当プロジェクト固有の説明（`work.env`/`personal.env` の切り替え方法、zsh 連携、`apm.yml` からのプラグイン同期など）を消去してしまわないよう、丸ごとの置き換えは絶対に避けてください。
+- **注意**: 当プロジェクト固有の説明（OMO ネイティブプロファイル `profiles.personal` / `profiles.work` の切り替え方法、zsh 連携、`apm.yml` からのプラグイン同期など）を消去してしまわないよう、丸ごとの置き換えは絶対に避けてください。
   - **更新すべき対象範囲**:
     - `Target Version` セクション
     - 知能カテゴリー・エージェント構成のデフォルト推奨モデル一覧
   - **維持（保護）すべき対象範囲**:
-    - `work.env` / `personal.env` の環境切り替え手順
+    - `profiles.personal` / `profiles.work` の環境切り替え手順
     - zsh 連携スクリプトやエイリアスの設定解説
     - `apm.yml` からのプラグイン同期手順およびその構造的説明
 
 ### C0. 事前クリーンアップ
 
-`make check-sync-opencode` は `.gitignore` 対象の生成済みファイル（例: `opencode.json`）が残っていると失敗することがあります。該当ファイルを確認して削除し、再実行します。
+`make check-sync-opencode` は `.gitignore` 対象の生成済みファイル（例: `opencode/opencode.jsonc`, `opencode.json`）が残っていると失敗することがあります。該当ファイルを確認して削除し、再実行します。
 
 ```bash
-git status --ignored | grep opencode\.json || true
+git status --ignored | grep -E 'opencode\.jsonc|opencode\.json' || true
 rm -f opencode.json
 make check-sync-opencode
 ```
