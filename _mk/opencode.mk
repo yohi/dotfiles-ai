@@ -23,6 +23,9 @@ OPENCODE_DOTFILES_SKILLS ?= $(RUNTIME_SKILLS_DIR)
 OPENCODE_DOCS_PATH ?= $(OPENCODE_CONFIG_DIR)/docs
 OPENCODE_DOTFILES_DOCS ?= $(REPO_ROOT)/opencode/docs
 OPENCODE_INSTALLER_HASH ?= fc3c1b2123f49b6df545a7622e5127d21cd794b15134fc3b66e1ca49f7fb297e
+OMO_CONFIG_DIR ?= $(HOME_DIR)/.omo
+OMO_CONFIG_PATH ?= $(OMO_CONFIG_DIR)/omo.jsonc
+OMO_DOTFILES_CONFIG ?= $(REPO_ROOT)/opencode/omo.jsonc
 
 OPENCODE_API_URL := https://opencode.ai/api/version
 OPENCODE_INSTALL_URL := https://opencode.ai/install
@@ -226,6 +229,9 @@ setup-opencode: sync-opencode ## OpenCode（opencode）の設定ファイルを�
 	@$(call link_config,$(OPENCODE_DOTFILES_DOCS),$(OPENCODE_DOCS_PATH),docs)
 	@# tui.jsonc の設定
 	@$(call link_config,$(OPENCODE_TUI_DOTFILES_CONFIG),$(OPENCODE_TUI_CONFIG_PATH),tui)
+	@# omo.jsonc の設定 (~/.omo/omo.jsonc)
+	@mkdir -p "$(OMO_CONFIG_DIR)"
+	@$(call link_config,$(OMO_DOTFILES_CONFIG),$(OMO_CONFIG_PATH),omo)
 	@$(call create_marker,setup-opencode,1)
 	$(Q_ECHO) "✅ OpenCode（opencode）の設定を適用しました"
 	$(Q_ECHO) "💡 使い方を確認するには 'make help-opencode' を実行してください。"

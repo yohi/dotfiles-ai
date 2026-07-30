@@ -1,0 +1,468 @@
+// OMO configuration
+// Migrated to omo native profiles (v4.19.3+)
+// Profile activation: OMO_PROFILE=personal|work (set by opencode-wrapper.sh)
+{
+  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/omo.schema.json",
+
+  // ===========================================================================
+  // Shared base [opencode] settings (profile-independent)
+  // ===========================================================================
+  "[opencode]": {
+    // Team Mode: チーム開発・マルチエージェント連携
+    "team_mode": {
+      "enabled": true,
+      "base_dir": ".sisyphus/team",
+      "auto_sync": true
+    },
+    // Sisyphus Agent: オーケストレーションの中核
+    "sisyphus_agent": {
+      "disabled": false,
+      "planner_enabled": true,
+      "replace_plan": true,
+      "default_builder_enabled": true
+    },
+    // Experimental: 最新・実験的機能の最適化
+    "experimental": {
+      "task_system": true,
+      "hashline_diff_enhancer": true,
+      "aggressive_truncation": true,
+      "auto_resume": true,
+      "preemptive_compaction_threshold": 0.85
+    },
+    // TMUX統合
+    "tmux": {
+      "enabled": true,
+      "layout": "main-vertical",
+      "main_pane_size": 65
+    },
+    // ブラウザ自動化エンジン
+    "browser_automation_engine": {
+      "provider": "playwright-cli"
+    },
+    // バックグラウンドタスクの並列実行制御
+    "background_task": {
+      "defaultConcurrency": 10,
+      "providerConcurrency": {
+        "openai": 5,
+        "nvidia": 10,
+        "minimax": 5,
+        "google": 20,
+        "opencode": 5,
+        "sakura": 5
+      }
+    },
+    // Ralph Loop
+    "ralph_loop": {
+      "enabled": true,
+      "default_max_iterations": 20
+    },
+    // Boulder State
+    "boulder_state": {
+      "enabled": true,
+      "storage_path": ".sisyphus/boulder_state.json"
+    },
+    // Session Recovery
+    "session_recovery": {
+      "enabled": true,
+      "max_age_minutes": 1440
+    },
+    // Interactive Bash
+    "interactive_bash": {
+      "enabled": true,
+      "timeout_ms": 300000
+    },
+    // Git Master
+    "git_master": {
+      "commit_footer": false,
+      "include_co_authored_by": false
+    },
+    // Comment Checker
+    "comment_checker": {
+      "enabled": true
+    },
+    "disabled_hooks": [
+      "auto-update-checker"
+    ],
+    // Rules Injector
+    "rules_injector": {
+      "enabled": true
+    },
+    // Auto Slash Command
+    "auto_slash_command": {
+      "enabled": true
+    },
+    "commands": {
+      "git-pr-flow": {
+        "description": "Git PR Flow with full-skill access",
+        "prompt": "./commands/git-pr-flow.md",
+        "skills": {
+          "git-master": {
+            "enabled": true
+          }
+        }
+      },
+      "build-skill": {
+        "description": "Agent Skill Builder",
+        "prompt": "./commands/build-skill.md",
+        "skills": {
+          "agent-skill-architect": {
+            "enabled": true
+          }
+        }
+      }
+    },
+    "hashline_edit": true,
+    // 環境変数パススルー (CHRONOS系のみ。モデル変数はプロファイルで管理)
+    "env": [
+      "HOME",
+      "CHRONOS_POSTGRES_HOST",
+      "CHRONOS_POSTGRES_PASSWORD",
+      "CHRONOS_NEO4J_URI",
+      "CHRONOS_NEO4J_PASSWORD",
+      "CHRONOS_REDIS_URL",
+      "CHRONOS_POSTGRES_PORT",
+      "CHRONOS_POSTGRES_DB",
+      "CHRONOS_POSTGRES_USER",
+      "CHRONOS_POSTGRES_SSL",
+      "CHRONOS_GRAPH_ENABLED",
+      "CHRONOS_NEO4J_USER",
+      "CHRONOS_CACHE_BACKEND",
+      "CHRONOS_REDIS_SSL",
+      "CHRONOS_DECAY_HALF_LIFE_DAYS",
+      "CHRONOS_SIMILARITY_THRESHOLD",
+      "CHRONOS_DEDUP_THRESHOLD",
+      "CHRONOS_EMBEDDING_PROVIDER",
+      "CHRONOS_LOCAL_MODEL_NAME",
+      "CHRONOS_EMBEDDING_DIMENSION"
+    ]
+  },
+
+  // ===========================================================================
+  // Profiles: personal / work
+  // Activated via: OMO_PROFILE=personal|work (set by opencode-wrapper.sh)
+  // ===========================================================================
+  "profiles": {
+
+    // =========================================================================
+    // personal: Kimi / GPT / Gemini 系 (Cloudflare AI Gateway / OpenAI)
+    // =========================================================================
+    "personal": {
+      "[opencode]": {
+        "agents": {
+          "sisyphus": {
+            // 【司令塔】 Kimi-K2.7 Code: 命令追従・長文脈・Todo管理に強い
+            "model": "cloudflare-ai-gateway-custom/dynamic/kimi-k2.7-code",
+            "variant": "default",
+            "fallback_models": [
+              "cloudflare-ai-gateway-custom/dynamic/kimi-k2.6"
+            ],
+            "ultrawork": {
+              "model": "openai/gpt-5.6-sol",
+              "variant": "max",
+              "reasoning": "high"
+            }
+          },
+          "hephaestus": {
+            // 【製造担当】 GPT-5.6 Terra: 自律実装に特化したプリンシプル駆動
+            "disable": false,
+            "model": "openai/gpt-5.6-terra",
+            "variant": "xhigh",
+            "fallback_models": [
+              "openai/gpt-5.5"
+            ]
+          },
+          "oracle": {
+            // 【大規模解析・監査】 GPT-5.6 Sol: 深い論理推論・アーキテクチャレビュー
+            "model": "openai/gpt-5.6-sol",
+            "variant": "high",
+            "fallback_models": [
+              "cloudflare-ai-gateway-custom/dynamic/gemini-3.1-pro-preview"
+            ]
+          },
+          "librarian": {
+            // 【超高速補助】 GPT-5.6 Luna: 高速・低コスト調査
+            "model": "openai/gpt-5.6-luna",
+            "variant": "default",
+            "fallback_models": [
+              "cloudflare-ai-gateway-custom/dynamic/kimi-k2.6"
+            ],
+            "description": "Ultra-fast background research with minimal token cost."
+          },
+          "explore": {
+            // 【高速探索】 GPT-5.6 Luna
+            "model": "openai/gpt-5.6-luna",
+            "variant": "default",
+            "fallback_models": [
+              "cloudflare-ai-gateway-custom/dynamic/kimi-k2.6"
+            ],
+            "description": "Rapid scaffolding using autonomous web search for latest technical specs."
+          },
+          "multimodal-looker": {
+            // 【視覚アナリスト】 GPT-5.6 Sol: ビジョン能力
+            "model": "openai/gpt-5.6-sol",
+            "variant": "default",
+            "fallback_models": [
+              "cloudflare-ai-gateway-custom/dynamic/kimi-k2.7-code"
+            ],
+            "description": "Visual Intelligence. Analyzes UI designs for API generation and debugs browser test failures."
+          },
+          "prometheus": {
+            // 【戦略家】 GPT-5.6 Sol: 多角的推論・Agent Swarm計画
+            "model": "openai/gpt-5.6-sol",
+            "variant": "max",
+            "fallback_models": [
+              "openai/gpt-5.5"
+            ]
+          },
+          "metis": {
+            // 【計画コンサル】 Kimi-K2.7 Code: 曖昧さの事前排除
+            "model": "cloudflare-ai-gateway-custom/dynamic/kimi-k2.7-code",
+            "variant": "default",
+            "fallback_models": [
+              "cloudflare-ai-gateway-custom/dynamic/kimi-k2.6"
+            ]
+          },
+          "momus": {
+            // 【計画レビュアー】 GPT-5.6 Sol: 厳格なレビュー
+            "model": "openai/gpt-5.6-sol",
+            "variant": "xhigh",
+            "fallback_models": [
+              "cloudflare-ai-gateway-custom/dynamic/glm-5.2"
+            ]
+          },
+          "atlas": {
+            // 【現場監督】 Kimi-K2.7 Code: 命令追従・Todo管理
+            "model": "cloudflare-ai-gateway-custom/dynamic/kimi-k2.7-code",
+            "variant": "default",
+            "fallback_models": [
+              "cloudflare-ai-gateway-custom/dynamic/kimi-k2.6"
+            ],
+            "description": "Orchestrates Tmux, Playwright, and server states. Ensures environment consistency."
+          }
+        },
+        "categories": {
+          "ultrabrain": {
+            "model": "openai/gpt-5.6-sol",
+            "variant": "xhigh",
+            "fallback_models": [
+              "cloudflare-ai-gateway-custom/dynamic/gemini-3.1-pro-preview"
+            ]
+          },
+          "deep": {
+            "model": "openai/gpt-5.6-terra",
+            "variant": "xhigh",
+            "fallback_models": [
+              "cloudflare-ai-gateway-custom/dynamic/gemini-3.1-pro-preview"
+            ]
+          },
+          "quick": {
+            "model": "openai/gpt-5.6-luna",
+            "variant": "default",
+            "fallback_models": [
+              "cloudflare-ai-gateway-custom/dynamic/kimi-k2.6"
+            ]
+          },
+          "writing": {
+            "model": "cloudflare-ai-gateway-custom/dynamic/kimi-k2.7-code",
+            "variant": "default",
+            "fallback_models": [
+              "cloudflare-ai-gateway-custom/dynamic/kimi-k2.7-code"
+            ]
+          },
+          "unspecified-low": {
+            "model": "openai/gpt-5.6-luna",
+            "variant": "xhigh",
+            "fallback_models": [
+              "cloudflare-ai-gateway-custom/dynamic/kimi-k2.6"
+            ]
+          },
+          "unspecified-high": {
+            "model": "openai/gpt-5.6-sol",
+            "variant": "high",
+            "fallback_models": [
+              "cloudflare-ai-gateway-custom/dynamic/kimi-k2.7-code"
+            ]
+          },
+          "visual-engineering": {
+            "model": "cloudflare-ai-gateway-custom/dynamic/gemini-3.1-pro-preview",
+            "variant": "high",
+            "fallback_models": [
+              "cloudflare-ai-gateway-custom/dynamic/glm-5.2"
+            ]
+          },
+          "artistry": {
+            "model": "cloudflare-ai-gateway-custom/dynamic/gemini-3.1-pro-preview",
+            "variant": "high",
+            "fallback_models": [
+              "openai/gpt-5.6-sol"
+            ]
+          }
+        }
+      }
+    },
+
+    // =========================================================================
+    // work: Amazon Bedrock - Claude 系 (Opus 5 / Sonnet 5 / Haiku)
+    // Claude ベストプラクティス: Opus=司令塔・設計、Sonnet=実装、Haiku=高速探索
+    // =========================================================================
+    "work": {
+      "[opencode]": {
+        "agents": {
+          "sisyphus": {
+            // 【司令塔】 Sonnet: 大きなプロンプトを正確に理解し指示を出す
+            "model": "amazon-bedrock/global.anthropic.claude-sonnet-5",
+            "variant": "max",
+            "fallback_models": [
+              "amazon-bedrock/global.anthropic.claude-opus-5"
+            ],
+            "ultrawork": {
+              "model": "amazon-bedrock/global.anthropic.claude-opus-5",
+              "variant": "max",
+              "reasoning": "high"
+            }
+          },
+          "hephaestus": {
+            // 【製造担当】 GPT-5.5専用プロンプトのため、Claude環境では非推奨
+            "disable": true,
+            "model": "amazon-bedrock/global.anthropic.claude-sonnet-5",
+            "variant": "default",
+            "fallback_models": [
+              "amazon-bedrock/global.anthropic.claude-haiku-4-5-20251001-v1:0"
+            ]
+          },
+          "oracle": {
+            // 【大規模解析・監査】 Opus: 設計・深い洞察
+            "model": "amazon-bedrock/global.anthropic.claude-opus-5",
+            "variant": "max",
+            "fallback_models": [
+              "amazon-bedrock/global.anthropic.claude-sonnet-5"
+            ]
+          },
+          "librarian": {
+            // 【超高速補助】 Haiku: 速度重視
+            "model": "amazon-bedrock/global.anthropic.claude-haiku-4-5-20251001-v1:0",
+            "variant": "default",
+            "fallback_models": [
+              "amazon-bedrock/global.anthropic.claude-sonnet-5"
+            ],
+            "description": "Ultra-fast background research with minimal token cost."
+          },
+          "explore": {
+            // 【高速探索】 Haiku: 知能よりも速度とコストを優先
+            "model": "amazon-bedrock/global.anthropic.claude-haiku-4-5-20251001-v1:0",
+            "variant": "default",
+            "fallback_models": [
+              "amazon-bedrock/global.anthropic.claude-sonnet-5"
+            ],
+            "description": "Rapid scaffolding using autonomous web search for latest technical specs."
+          },
+          "multimodal-looker": {
+            // 【視覚アナリスト】 Opus: 画像認識能力
+            "model": "amazon-bedrock/global.anthropic.claude-opus-5",
+            "variant": "max",
+            "fallback_models": [
+              "amazon-bedrock/global.anthropic.claude-sonnet-5"
+            ],
+            "description": "Visual Intelligence. Analyzes UI designs for API generation and debugs browser test failures."
+          },
+          "prometheus": {
+            // 【戦略家】 Opus: 多角的推論が最も活きる
+            "model": "amazon-bedrock/global.anthropic.claude-opus-5",
+            "variant": "max",
+            "fallback_models": [
+              "amazon-bedrock/global.anthropic.claude-sonnet-5"
+            ]
+          },
+          "metis": {
+            // 【計画コンサル】 Opus: 深い洞察で計画精度を向上
+            "model": "amazon-bedrock/global.anthropic.claude-opus-5",
+            "variant": "max",
+            "fallback_models": [
+              "amazon-bedrock/global.anthropic.claude-sonnet-5"
+            ]
+          },
+          "momus": {
+            // 【計画レビュアー】 Opus: 厳格なレビュー
+            "model": "amazon-bedrock/global.anthropic.claude-opus-5",
+            "variant": "max",
+            "fallback_models": [
+              "amazon-bedrock/global.anthropic.claude-sonnet-5"
+            ]
+          },
+          "atlas": {
+            // 【現場監督】 Sonnet: 高速なSonnetで快適に動作
+            "model": "amazon-bedrock/global.anthropic.claude-sonnet-5",
+            "variant": "default",
+            "fallback_models": [
+              "amazon-bedrock/global.anthropic.claude-haiku-4-5-20251001-v1:0"
+            ],
+            "description": "Orchestrates Tmux, Playwright, and server states. Ensures environment consistency."
+          }
+        },
+        "categories": {
+          "ultrabrain": {
+            "model": "amazon-bedrock/global.anthropic.claude-opus-5",
+            "variant": "max",
+            "fallback_models": [
+              "amazon-bedrock/global.anthropic.claude-sonnet-5"
+            ]
+          },
+          "deep": {
+            "model": "amazon-bedrock/global.anthropic.claude-opus-5",
+            "variant": "max",
+            "fallback_models": [
+              "amazon-bedrock/global.anthropic.claude-sonnet-5"
+            ]
+          },
+          "quick": {
+            "model": "amazon-bedrock/global.anthropic.claude-haiku-4-5-20251001-v1:0",
+            "variant": "default",
+            "fallback_models": [
+              "amazon-bedrock/global.anthropic.claude-sonnet-5"
+            ]
+          },
+          "writing": {
+            "model": "amazon-bedrock/global.anthropic.claude-sonnet-5",
+            "variant": "default",
+            "fallback_models": [
+              "amazon-bedrock/global.anthropic.claude-haiku-4-5-20251001-v1:0"
+            ]
+          },
+          "unspecified-low": {
+            "model": "amazon-bedrock/global.anthropic.claude-sonnet-5",
+            "variant": "default",
+            "fallback_models": [
+              "amazon-bedrock/global.anthropic.claude-haiku-4-5-20251001-v1:0"
+            ]
+          },
+          "unspecified-high": {
+            "model": "amazon-bedrock/global.anthropic.claude-opus-5",
+            "variant": "max",
+            "fallback_models": [
+              "amazon-bedrock/global.anthropic.claude-sonnet-5"
+            ]
+          },
+          "visual-engineering": {
+            "model": "amazon-bedrock/global.anthropic.claude-opus-5",
+            "variant": "max",
+            "fallback_models": [
+              "amazon-bedrock/global.anthropic.claude-sonnet-5"
+            ]
+          },
+          "artistry": {
+            "model": "amazon-bedrock/global.anthropic.claude-sonnet-5",
+            "variant": "default",
+            "fallback_models": [
+              "amazon-bedrock/global.anthropic.claude-haiku-4-5-20251001-v1:0"
+            ]
+          }
+        }
+      }
+    }
+  },
+
+  // Legacy migration metadata (do not remove)
+  "_migrations": [
+    "2026-07-opencode-config-unification"
+  ]
+}

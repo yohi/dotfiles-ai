@@ -98,18 +98,20 @@ python .claude/skills/apm-updater/scripts/check_updates.py --validate-models
 
 - `provider` セクション配下の各プロバイダーの `whitelist` または `models` リストを、最新スキーマで定義されている有効なモデル名と一致させます。
 - **Bedrock 制限**: `amazon-bedrock` の whitelist は `global.anthropic.claude-*` と `openai.gpt-*` のみにします。リージョン固有モデルや古い世代は含めません。
-- `opencode.jsonc` を直接編集してはいけません。`apm.yml` 更新後に `make sync-opencode` で再生成します。
+- `opencode.jsonc` を直接編集してはいけません。`opencode/omo.jsonc` はプロファイル別モデル設定の SSOT です。`apm.yml` 更新後は `make setup-opencode` で `~/.omo/omo.jsonc` を作成・配置し、`opencode/omo.jsonc` をリンクした上で `make sync-opencode` で `opencode/opencode.jsonc` を再生成します。
 
-### 4. personal.env / work.env の更新ルール
+### 4. omo.jsonc プロファイル（profiles.personal / profiles.work）の更新ルール
 
-- `personal.env`: Bedrock モデル（`amazon-bedrock/*`）を含めず、OpenAI・Kimi・Gemini・GLM・Qwen・Minimax 等の最新モデルを割り当てます。
-- `work.env`: Bedrock モデルのみを使用します（`HEPHAESTUS_DISABLED=true` 等の例外設定は維持）。最新の Bedrock Claude モデル（`global.anthropic.claude-*`）を割り当てます。
+OMO ネイティブプロファイル方式では、モデル設定は `opencode/omo.jsonc` 内の `profiles.personal` / `profiles.work` で管理されます。これらはランチャー（`_scripts/opencode-wrapper.sh`）が `OMO_PROFILE=personal|work` 環境変数を設定し、`~/.omo/omo.jsonc` を読み込むことで有効化されます。
+
+- `profiles.personal`: Bedrock モデル（`amazon-bedrock/*`）を含めず、OpenAI / Kimi / Gemini / GLM / Qwen / Minimax 等の最新モデルを `agents.<name>.model` / `fallback_models`、および `categories.<name>.model` / `fallback_models` に割り当てます。
+- `profiles.work`: Bedrock モデルのみを使用します（`hephaestus.disable: true` 等の既存設定は維持）。最新の Bedrock Claude モデル（`global.anthropic.claude-*`）を同じく `agents` / `categories` 各モデル・フォールバックに割り当てます。
 
 ### 5. opencode/README.md の更新ルール
 
 - `https://github.com/code-yeongyu/oh-my-openagent` の最新リリースを確認します。
 - 更新対象: `Target Version` セクション、知能カテゴリー・エージェント構成のデフォルト推奨モデル一覧。
-- **保護対象**: `work.env`/`personal.env` の切り替え手順、zsh 連携スクリプトやエイリアスの設定解説、`apm.yml` からのプラグイン同期手順および構造的説明。
+- **保護対象**: `profiles.personal` / `profiles.work` の切り替え手順、zsh 連携スクリプトやエイリアスの設定解説、`apm.yml` からのプラグイン同期手順および構造的説明。
 - 丸ごとの置き換えは絶対に避け、差分のみを部分的にアップデートします。
 
 ## 注意点
