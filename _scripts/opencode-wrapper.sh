@@ -3,8 +3,23 @@
 
 set -e
 
-# --- Configuration ---
-export PATH="$HOME/.opencode/bin:$PATH"
+TMP_DIR=""
+OMO_BACKUP=""
+OMO_USER_CONFIG="$HOME/.omo/omo.jsonc"
+
+cleanup() {
+    if [ -n "$TMP_DIR" ] && [ -d "$TMP_DIR" ]; then
+        rm -rf "$TMP_DIR" 2>/dev/null || true
+    fi
+    if [ -n "$OMO_BACKUP" ] && [ -f "$OMO_BACKUP" ]; then
+        mkdir -p "$HOME/.omo" 2>/dev/null || true
+        if ! mv -f "$OMO_BACKUP" "$OMO_USER_CONFIG" 2>/dev/null; then
+            echo "⚠️ Warning: Failed to restore $OMO_USER_CONFIG from backup $OMO_BACKUP" >&2
+        fi
+    fi
+}
+trap cleanup EXIT INT TERM
+
 # Ensure auth data is loaded from the correct XDG data directory
 export XDG_DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -27,10 +42,20 @@ fi
 
 # --- Profile Selection ---
 
-PROFILE="personal"
+PROFILE_EXPLICIT=false
+PROFILE="${PROFILE:-personal}"
 if [[ "$1" == "work" || "$1" == "personal" ]]; then
     PROFILE="$1"
+    PROFILE_EXPLICIT=true
     shift
+elif [[ -n "${PROFILE:-}" && "${PROFILE}" != "personal" ]]; then
+    PROFILE_EXPLICIT=true
+fi
+
+if [ "$PROFILE_EXPLICIT" = true ]; then
+    # Terminate any existing opencode server when a profile is explicitly requested
+    pkill -f "opencode.*--port" 2>/dev/null || true
+    sleep 0.5
 fi
 
 ENV_FILE="$BASE_PATH/${PROFILE}.env"
@@ -45,6 +70,11 @@ if [ ! -f "$ENV_FILE" ]; then
 fi
 
 if [ -f "$ENV_FILE" ]; then
+    # Clear all model profile env vars across work.env and personal.env so switching profiles doesn't keep old values
+    ALL_PROFILE_VARS=$(grep -oP '^[A-Z0-9_]+=' "$BASE_PATH"/*.env 2>/dev/null | cut -d: -f2 | cut -d= -f1 | sort -u)
+    if [ -n "$ALL_PROFILE_VARS" ]; then
+        unset $ALL_PROFILE_VARS 2>/dev/null || true
+    fi
     set -a
     # shellcheck source=/dev/null
     source "$ENV_FILE"
@@ -53,17 +83,22 @@ fi
 
 export SKILLPORT_SKILLS_DIR="${SKILLPORT_SKILLS_DIR:-$REPO_ROOT/.agents/skills}"
 
+# Protect user's persistent ~/.omo/omo.jsonc by backing up during startup and restoring on exit
+if [ -f "$OMO_USER_CONFIG" ]; then
+    OMO_BACKUP=$(mktemp)
+    cp "$OMO_USER_CONFIG" "$OMO_BACKUP"
+    rm -f "$OMO_USER_CONFIG"
+fi
+
 # --- Execution ---
 TMP_DIR=$(mktemp -d)
-# Ensure cleanup on any exit
-trap 'rm -rf "$TMP_DIR"' EXIT INT TERM
 
 # 1. Inherit other configurations (antigravity.json, AGENTS.md, etc.)
 if [ -d "$REAL_CONFIG_DIR" ]; then
     # Create symlinks to all files in the real config dir except the one we are generating
     for f in "$REAL_CONFIG_DIR"/*; do
         filename=$(basename "$f")
-        if [[ "$filename" != "oh-my-openagent.jsonc" && "$filename" != "oh-my-opencode.jsonc" ]]; then
+        if [[ "$filename" != "oh-my-openagent.jsonc" && "$filename" != "oh-my-opencode.jsonc" && "$filename" != "opencode.jsonc" && "$filename" != *.bak.* ]]; then
             ln -s "$f" "$TMP_DIR/$filename" 2>/dev/null || true
         fi
     done
@@ -93,13 +128,28 @@ fi
 # Note: We use OPENCODE_CONFIG_DIR to point to our temporary directory
 export OPENCODE_CONFIG_DIR="$TMP_DIR"
 
+# If user didn't pass an explicit --model flag, default to SISYPHUS_MODEL from current profile
+MODEL_ARGS=()
+if [[ -n "$SISYPHUS_MODEL" ]]; then
+    has_model=false
+    for arg in "$@"; do
+        if [[ "$arg" == "-m" || "$arg" == "--model" || "$arg" == --model=* ]]; then
+            has_model=true
+            break
+        fi
+    done
+    if [ "$has_model" = false ]; then
+        MODEL_ARGS=(--model "$SISYPHUS_MODEL")
+    fi
+fi
+
 # Only use automatic port for the main agent loop (no arguments or starting with -)
 # Subcommands like auth, mcp, doctor, etc. don't accept --port
 if [[ -n "$PORT" && ( -z "$1" || "$1" == -* ) ]]; then
     echo "✅ Profile [${PROFILE}] | Port [${PORT}]"
-    opencode --port "$PORT" "$@"
+    opencode "${MODEL_ARGS[@]}" --port "$PORT" "$@"
 else
     echo "✅ Profile [${PROFILE}]"
-    opencode "$@"
+    opencode "${MODEL_ARGS[@]}" "$@"
 fi
 
