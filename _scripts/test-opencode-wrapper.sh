@@ -15,9 +15,11 @@ WRAPPER="$SCRIPT_DIR/opencode-wrapper.sh"
 
 PASS=0
 FAIL=0
+SKIP=0
 
 pass() { echo "  ✅ $1"; PASS=$((PASS+1)); }
 fail() { echo "  ❌ $1"; FAIL=$((FAIL+1)); }
+skip() { echo "  ⏭️  $1 (skipped)"; SKIP=$((SKIP+1)); }
 
 echo "🧪 Running opencode-wrapper.sh tests (omo native profiles)..."
 echo ""
@@ -120,32 +122,49 @@ fi
 echo "  [7] ~/.omo/omo.jsonc has profiles.personal and profiles.work"
 OOM_JSONC="$HOME/.omo/omo.jsonc"
 if [ -f "$OOM_JSONC" ]; then
-    if node -e "
-const {parse} = require('/home/y_ohi/.cache/opencode/packages/oh-my-openagent@4.19.3/node_modules/jsonc-parser/lib/umd/main.js');
-const fs = require('fs');
-const cfg = parse(fs.readFileSync('$OOM_JSONC', 'utf-8'), [], {allowTrailingComma:true, disallowComments:false});
-const profiles = Object.keys(cfg.profiles || {});
-if (!profiles.includes('personal') || !profiles.includes('work')) {
-  process.exit(1);
-}
-const personalModel = cfg.profiles.personal?.['[opencode]']?.agents?.sisyphus?.model;
-const workModel = cfg.profiles.work?.['[opencode]']?.agents?.sisyphus?.model;
-if (!personalModel || !workModel) process.exit(1);
-if (workModel.includes('bedrock') && !personalModel.includes('bedrock')) process.exit(0);
-process.exit(1);
+    if python3 -c "
+import json
+import re
+import sys
+
+def strip_jsonc(text):
+    strings = []
+    def protect(m):
+        strings.append(m.group(0))
+        return f'__STR{len(strings) - 1}__'
+    text = re.sub(r'\"(?:\\\\.|[^\"\\\\])*\"', protect, text)
+    text = re.sub(r'/\\*.*?\\*/', '', text, flags=re.S)
+    text = re.sub(r'//.*$', '', text, flags=re.M)
+    text = re.sub(r',(\\s*[}\\]])', r'\\1', text)
+    for i, s in enumerate(strings):
+        text = text.replace(f'__STR{i}__', s)
+    return text
+
+raw = open('$OOM_JSONC', encoding='utf-8').read()
+cfg = json.loads(strip_jsonc(raw))
+profiles = list(cfg.get('profiles', {}).keys())
+if 'personal' not in profiles or 'work' not in profiles:
+    sys.exit(1)
+personal_model = cfg['profiles']['personal'].get('[opencode]', {}).get('agents', {}).get('sisyphus', {}).get('model', '')
+work_model = cfg['profiles']['work'].get('[opencode]', {}).get('agents', {}).get('sisyphus', {}).get('model', '')
+if not personal_model or not work_model:
+    sys.exit(1)
+if 'bedrock' in work_model and 'bedrock' not in personal_model:
+    sys.exit(0)
+sys.exit(1)
 " 2>/dev/null; then
         pass "omo.jsonc has valid profiles.personal (non-bedrock) and profiles.work (bedrock)"
     else
         fail "omo.jsonc profiles structure invalid"
     fi
 else
-    fail "~/.omo/omo.jsonc not found"
+    skip "~/.omo/omo.jsonc not found"
 fi
 
 # --- Summary ---
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "  Results: $PASS passed, $FAIL failed"
+echo "  Results: $PASS passed, $FAIL failed, $SKIP skipped"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
 if [ "$FAIL" -gt 0 ]; then
