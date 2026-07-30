@@ -78,10 +78,12 @@ rm -f "$MOCK_LOG" "$MOCK_LOG.generated_config" "$PKILL_LOG"
 
 if grep -q "CALL: opencode --model $EXPECTED_WORK_MODEL" "$MOCK_LOG" && \
    grep -q "ENV_KIMI_K2_6=unset" "$MOCK_LOG" && \
+   grep -q "CONFIG_GENERATED=true" "$MOCK_LOG" && \
+   grep -q "$EXPECTED_WORK_MODEL" "$MOCK_LOG.generated_config" && \
    grep -q "PKILL_CALL: pkill -f opencode.*--port" "$PKILL_LOG"; then
-    echo "  ✅ Work profile wrapper invocation & old env var unsetting (KIMI_K2_6) verified"
+    echo "  ✅ Work profile wrapper invocation, generated config & old env var unsetting (KIMI_K2_6) verified"
 else
-    echo "  ❌ Failed: Work profile wrapper invocation did not clear old profile env vars or pass expected args"
+    echo "  ❌ Failed: Work profile wrapper invocation did not clear old profile env vars, generate config, or pass expected args"
     cat "$MOCK_LOG" "$PKILL_LOG" 2>/dev/null || true
     exit 1
 fi
