@@ -3,6 +3,21 @@
 
 set -e
 
+TMP_DIR=""
+OMO_BACKUP=""
+OMO_USER_CONFIG="$HOME/.omo/omo.jsonc"
+
+cleanup() {
+    if [ -n "$TMP_DIR" ] && [ -d "$TMP_DIR" ]; then
+        rm -rf "$TMP_DIR" 2>/dev/null || true
+    fi
+    if [ -n "$OMO_BACKUP" ] && [ -f "$OMO_BACKUP" ]; then
+        mkdir -p "$HOME/.omo" 2>/dev/null || true
+        mv -f "$OMO_BACKUP" "$OMO_USER_CONFIG" 2>/dev/null || true
+    fi
+}
+trap cleanup EXIT INT TERM
+
 # Ensure auth data is loaded from the correct XDG data directory
 export XDG_DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -67,8 +82,6 @@ fi
 export SKILLPORT_SKILLS_DIR="${SKILLPORT_SKILLS_DIR:-$REPO_ROOT/.agents/skills}"
 
 # Protect user's persistent ~/.omo/omo.jsonc by backing up during startup and restoring on exit
-OMO_USER_CONFIG="$HOME/.omo/omo.jsonc"
-OMO_BACKUP=""
 if [ -f "$OMO_USER_CONFIG" ]; then
     OMO_BACKUP=$(mktemp)
     cp "$OMO_USER_CONFIG" "$OMO_BACKUP"
@@ -77,14 +90,6 @@ fi
 
 # --- Execution ---
 TMP_DIR=$(mktemp -d)
-cleanup() {
-    rm -rf "$TMP_DIR" 2>/dev/null || true
-    if [ -n "$OMO_BACKUP" ] && [ -f "$OMO_BACKUP" ]; then
-        mkdir -p "$HOME/.omo"
-        mv "$OMO_BACKUP" "$OMO_USER_CONFIG" 2>/dev/null || true
-    fi
-}
-trap cleanup EXIT INT TERM
 
 # 1. Inherit other configurations (antigravity.json, AGENTS.md, etc.)
 if [ -d "$REAL_CONFIG_DIR" ]; then
