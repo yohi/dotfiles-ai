@@ -3,8 +3,6 @@
 
 set -e
 
-# --- Configuration ---
-export PATH="$HOME/.opencode/bin:$PATH"
 # Ensure auth data is loaded from the correct XDG data directory
 export XDG_DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -27,12 +25,19 @@ fi
 
 # --- Profile Selection ---
 
+PROFILE_EXPLICIT=false
 PROFILE="${PROFILE:-personal}"
 if [[ "$1" == "work" || "$1" == "personal" ]]; then
     PROFILE="$1"
+    PROFILE_EXPLICIT=true
     shift
-    # Kill any existing running server to force fresh config loading with the requested profile
-    pkill -f "opencode --port" 2>/dev/null || true
+elif [[ -n "${PROFILE:-}" && "${PROFILE}" != "personal" ]]; then
+    PROFILE_EXPLICIT=true
+fi
+
+if [ "$PROFILE_EXPLICIT" = true ]; then
+    # Terminate any existing opencode server when a profile is explicitly requested
+    pkill -f "opencode.*--port" 2>/dev/null || true
     sleep 0.5
 fi
 
@@ -61,13 +66,25 @@ fi
 
 export SKILLPORT_SKILLS_DIR="${SKILLPORT_SKILLS_DIR:-$REPO_ROOT/.agents/skills}"
 
-# Ensure plugin's static config unification file doesn't override dynamic profile switching
-rm -f "$HOME/.omo/omo.jsonc" 2>/dev/null || true
+# Protect user's persistent ~/.omo/omo.jsonc by backing up during startup and restoring on exit
+OMO_USER_CONFIG="$HOME/.omo/omo.jsonc"
+OMO_BACKUP=""
+if [ -f "$OMO_USER_CONFIG" ]; then
+    OMO_BACKUP=$(mktemp)
+    cp "$OMO_USER_CONFIG" "$OMO_BACKUP"
+    rm -f "$OMO_USER_CONFIG"
+fi
 
 # --- Execution ---
 TMP_DIR=$(mktemp -d)
-# Ensure cleanup on any exit
-trap 'rm -rf "$TMP_DIR"' EXIT INT TERM
+cleanup() {
+    rm -rf "$TMP_DIR" 2>/dev/null || true
+    if [ -n "$OMO_BACKUP" ] && [ -f "$OMO_BACKUP" ]; then
+        mkdir -p "$HOME/.omo"
+        mv "$OMO_BACKUP" "$OMO_USER_CONFIG" 2>/dev/null || true
+    fi
+}
+trap cleanup EXIT INT TERM
 
 # 1. Inherit other configurations (antigravity.json, AGENTS.md, etc.)
 if [ -d "$REAL_CONFIG_DIR" ]; then
