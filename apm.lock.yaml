@@ -1,6 +1,6 @@
 lockfile_version: '1'
-generated_at: '2026-07-23T08:30:38.989845+00:00'
-apm_version: 0.22.0
+generated_at: '2026-07-30T06:40:43.791614+00:00'
+apm_version: 0.26.0
 dependencies:
 - repo_url: anthropics/claude-code
   name: code-review
@@ -11,12 +11,8 @@ dependencies:
   is_virtual: true
   package_type: marketplace_plugin
   deployed_files:
-  - .cursor/commands/code-review.md
-  - .gemini/commands/code-review.toml
   - .opencode/commands/code-review.md
   deployed_file_hashes:
-    .cursor/commands/code-review.md: sha256:ecab79f22b6e2bef07a524d2015aaa9e0b7abce82445f38b31a231b19c7bd43a
-    .gemini/commands/code-review.toml: sha256:ea451002aca3c98e27b6c5e8a3cf77e9c6e6cd93c72944b496adcf0c78f5f966
     .opencode/commands/code-review.md: sha256:ecab79f22b6e2bef07a524d2015aaa9e0b7abce82445f38b31a231b19c7bd43a
   content_hash: sha256:d25f797947bbd724551746c24ed4ac40788aaf370a7857eb120180fbb00ac2be
 - repo_url: anthropics/skills
@@ -875,24 +871,18 @@ dependencies:
   - .agents/skills/autofix/github.md
   - .agents/skills/code-review
   - .agents/skills/code-review/SKILL.md
-  - .cursor/agents/code-reviewer.md
-  - .cursor/commands/coderabbit-review.md
-  - .gemini/commands/coderabbit-review.toml
   - .opencode/agents/code-reviewer.md
   - .opencode/commands/coderabbit-review.md
   deployed_file_hashes:
     .agents/skills/autofix/SKILL.md: sha256:09430a914debe143f646dd369b56c9bca27704c159aebf28c07e41f411046acf
     .agents/skills/autofix/github.md: sha256:466780fcf8c883a5f30532956b5b08645691a79d6755c8a02cc879de14649aff
     .agents/skills/code-review/SKILL.md: sha256:18c9c3c69a6a58ae0b7baa5b19637eaa9aaf02c21b1242f0bb073dc24942fe0a
-    .cursor/agents/code-reviewer.md: sha256:5677b371344cdc444390fbb366041eee7ad204fdbc85b6a37f92671afa8bce7f
-    .cursor/commands/coderabbit-review.md: sha256:cba1e6915ee98d24f288e3fb2dfb4b9b5bdc9e3164abf66b885aa9b66d8ce17d
-    .gemini/commands/coderabbit-review.toml: sha256:9848b7ccce2a249a06b72523877fa5ea280f6fc491ca5f066bc5c7b956b478c0
     .opencode/agents/code-reviewer.md: sha256:5677b371344cdc444390fbb366041eee7ad204fdbc85b6a37f92671afa8bce7f
     .opencode/commands/coderabbit-review.md: sha256:cba1e6915ee98d24f288e3fb2dfb4b9b5bdc9e3164abf66b885aa9b66d8ce17d
   content_hash: sha256:6c4d9f9fa574b8546857ce3ce5f08d02c0c236dc3071023d6d0b45d62127bdbd
   declared_license: MIT
 - repo_url: greptileai/skills
-  name: skills
+  name: check-pr
   host: github.com
   resolved_commit: 7a34572951f296d7f2a05e69e8494136cb00c85e
   version: unknown
@@ -910,7 +900,7 @@ dependencies:
     .agents/skills/check-pr/references/graphql-queries.md: sha256:f850841783ef3df4f28f4f45731f08591c8994fbe3e742eef5a370454d575d02
   content_hash: sha256:54dc158641c3857ad6cd147860017c1494d3dbfdfae16a16c30819e7b36900a5
 - repo_url: greptileai/skills
-  name: skills
+  name: greploop
   host: github.com
   resolved_commit: 7a34572951f296d7f2a05e69e8494136cb00c85e
   version: unknown
@@ -930,9 +920,9 @@ dependencies:
 - repo_url: obra/superpowers
   name: superpowers
   host: github.com
-  resolved_commit: d884ae04edebef577e82ff7c4e143debd0bbec99
-  resolved_ref: v6.1.1
-  version: 6.1.1
+  resolved_commit: 3dcbd5c4b48e02263fbf4a3c01e3fe4f81d584d9
+  resolved_ref: v6.2.0
+  version: 6.2.0
   package_type: marketplace_plugin
   deployed_files:
   - .agents/skills/brainstorming
@@ -958,6 +948,7 @@ dependencies:
   - .agents/skills/subagent-driven-development
   - .agents/skills/subagent-driven-development/SKILL.md
   - .agents/skills/subagent-driven-development/implementer-prompt.md
+  - .agents/skills/subagent-driven-development/re-review-prompt.md
   - .agents/skills/subagent-driven-development/scripts/review-package
   - .agents/skills/subagent-driven-development/scripts/sdd-workspace
   - .agents/skills/subagent-driven-development/scripts/task-brief
@@ -976,13 +967,14 @@ dependencies:
   - .agents/skills/systematic-debugging/test-pressure-3.md
   - .agents/skills/test-driven-development
   - .agents/skills/test-driven-development/SKILL.md
-  - .agents/skills/test-driven-development/testing-anti-patterns.md
+  - .agents/skills/test-driven-development/writing-good-tests.md
   - .agents/skills/using-git-worktrees
   - .agents/skills/using-git-worktrees/SKILL.md
   - .agents/skills/using-superpowers
   - .agents/skills/using-superpowers/SKILL.md
   - .agents/skills/using-superpowers/references/antigravity-tools.md
   - .agents/skills/using-superpowers/references/codex-tools.md
+  - .agents/skills/using-superpowers/references/gemini-tools.md
   - .agents/skills/using-superpowers/references/pi-tools.md
   - .agents/skills/verification-before-completion
   - .agents/skills/verification-before-completion/SKILL.md
@@ -997,63 +989,61 @@ dependencies:
   - .agents/skills/writing-skills/persuasion-principles.md
   - .agents/skills/writing-skills/render-graphs.js
   - .agents/skills/writing-skills/testing-skills-with-subagents.md
-  - .cursor/hooks/superpowers/hooks/run-hook.cmd
-  - .gemini/hooks/superpowers/hooks/run-hook.cmd
   deployed_file_hashes:
-    .agents/skills/brainstorming/SKILL.md: sha256:e14914605f640e0841758e45d0ab2a53243b59b921f929e47921c99668f2e61d
+    .agents/skills/brainstorming/SKILL.md: sha256:4a54a4858b99807f3155ed1614b2f116e35ea5c1b788e793f565dd837fd3891f
     .agents/skills/brainstorming/scripts/frame-template.html: sha256:6a8a4e58bd6a44b904e2e3c57de774481d909204597e1498de53f1b2fecc4c4e
     .agents/skills/brainstorming/scripts/helper.js: sha256:43c6d69954a46ec34a2a262bcc62a9a7e83e839c739f199cb72646d397c686e3
     .agents/skills/brainstorming/scripts/server.cjs: sha256:2d2961ea8d11f56c5f4c3a1a68d22709efa5d7601a2246d8c880774e7e9e8412
     .agents/skills/brainstorming/scripts/start-server.sh: sha256:a4e5ae84275bcaacd2f84345afeabe59cf7b00ba080e123da7cc1fb226f12847
     .agents/skills/brainstorming/scripts/stop-server.sh: sha256:0b5ccbbd57f62d3ed88993f7940b5ee0e5c0fc9b21c550c623da4f6292e47daf
     .agents/skills/brainstorming/spec-document-reviewer-prompt.md: sha256:95a0a195de9d984be2fffa95bab16fc8c563bc296a9cfc5e9c29cb3ece0d7457
-    .agents/skills/brainstorming/visual-companion.md: sha256:3321a044c777d03d7177df41c77bb83155ff2a6d0c16b8a3d752426d29f14ea8
-    .agents/skills/dispatching-parallel-agents/SKILL.md: sha256:f0df13f584049059cc5619f90061405b89dcc6e28ab3f2a8517d27d99c7a46a6
-    .agents/skills/executing-plans/SKILL.md: sha256:bbd8d28bb655a52817cc129ce49f9e46fa7c6303f72ed5de95bfe914ef8e0ce8
-    .agents/skills/finishing-a-development-branch/SKILL.md: sha256:e6d4a812de900d33c6eacfb40747f99427f25c304a7b7099120f9373b115a47f
-    .agents/skills/receiving-code-review/SKILL.md: sha256:647036bbdab7bf2317e14e079595e984c9030f64295e2b4c0fb57dbeb48f25dd
-    .agents/skills/requesting-code-review/SKILL.md: sha256:1017ccdd5bc61fab67c654cf118cbdb520464b313073a0a6b9a6b9aa647a3ad6
+    .agents/skills/brainstorming/visual-companion.md: sha256:60cbad29b9dd7eaf08da020e301c498a72230b2e13c1813fa967a135ffcc1d71
+    .agents/skills/dispatching-parallel-agents/SKILL.md: sha256:1968923066f3b707eb01d1992cdf4c42284c3855f70253b9cd5000ff45fca13c
+    .agents/skills/executing-plans/SKILL.md: sha256:c4c3d8b628c51114cd165fb8246fe02744cd8be180032328391252e653028d9b
+    .agents/skills/finishing-a-development-branch/SKILL.md: sha256:d0ac8360ed9d59121776ef95c84bcb38e9747de0d7ae7e227dca81e437593b9b
+    .agents/skills/receiving-code-review/SKILL.md: sha256:091df1629510af1b92fc4abd6f96732ebedb4cb2c0f3457e8f2740b0504a2438
+    .agents/skills/requesting-code-review/SKILL.md: sha256:d71cc01ba56d2325cf8af5f7c11837819b63ecd57de0bfdb812f7f3ff7751df8
     .agents/skills/requesting-code-review/code-reviewer.md: sha256:b2f2ec7596925fe52dac158fdfbca19b3a7d779d619c481e6706a6c0001662d3
-    .agents/skills/subagent-driven-development/SKILL.md: sha256:5e9e846ae67d153ddf7c5f4fd5102af78454c8f3cdaa0720331cec063fc8861a
-    .agents/skills/subagent-driven-development/implementer-prompt.md: sha256:49018b28dc11bc9f3d13a28959bb10ae1a96eabc5d8f19f4079d901f9ff2bf64
-    .agents/skills/subagent-driven-development/scripts/review-package: sha256:0c0629f6e2c46fc8bf68dcfb8a247ab24eb548b7004fe494035e6fcba9b5cdfb
-    .agents/skills/subagent-driven-development/scripts/sdd-workspace: sha256:9430befaff459ed862415b700c1a9efe45fd34838a684802a1d8320de0c3a007
-    .agents/skills/subagent-driven-development/scripts/task-brief: sha256:5380283f00bffa99ab82ae78482b7d248abe10655129c72ca7050bdc0b6a85e1
-    .agents/skills/subagent-driven-development/task-reviewer-prompt.md: sha256:2eb9d54373420de25bc0bd00635d3a3123a6c0eb30c881168e6f3348e2387331
+    .agents/skills/subagent-driven-development/SKILL.md: sha256:ca49b5d6acd6259e47b71b8f04345902a3b43fab8a63eac33532edfcec861376
+    .agents/skills/subagent-driven-development/implementer-prompt.md: sha256:946601616a6f76ab3f165ef98377390968f1ec124ecef87422bc3553404e0332
+    .agents/skills/subagent-driven-development/re-review-prompt.md: sha256:e1d8e0e65e58ccde6dc920843da9148d23e65aeb0f8932bcc30be1341a703c4c
+    .agents/skills/subagent-driven-development/scripts/review-package: sha256:fac3d4bd7f94369e8037b9ead2a8a502dca6ab333902b560b9455dbb3c450ebe
+    .agents/skills/subagent-driven-development/scripts/sdd-workspace: sha256:95a09d9d3983ad1aafd093ca72b4587946dea885c6e302caa02a779a2f911c31
+    .agents/skills/subagent-driven-development/scripts/task-brief: sha256:d6954ef7841c7da3d77373e6ff5118b3f2f2e998606fd95d33e6527851bce044
+    .agents/skills/subagent-driven-development/task-reviewer-prompt.md: sha256:e3b4a1bfe7cd55ed0459e5ca9cdddb6ff086c345b99e9097036db6a18545729e
     .agents/skills/systematic-debugging/CREATION-LOG.md: sha256:c24733a5b1821bd6bed1fc950261f0b9f4e90097e0bbb96459d8179713730789
-    .agents/skills/systematic-debugging/SKILL.md: sha256:3b20719eca4f0461cb51a195221320d775dcf03b6859271066a03a5132a6ce7a
+    .agents/skills/systematic-debugging/SKILL.md: sha256:808fc5717aa88ad65efff312b11c186294d3e6ee301afb584e2f86599b137787
     .agents/skills/systematic-debugging/condition-based-waiting-example.ts: sha256:40ae5ebe497fdf310200e43fe986552546d0a22837c0d39e855db1cfd33eb88e
     .agents/skills/systematic-debugging/condition-based-waiting.md: sha256:e89fec8400d6cd50f43407cec9fab50976ba4d55d0ec2eb51c0bd68036b54c26
     .agents/skills/systematic-debugging/defense-in-depth.md: sha256:1e175fb86fc357e58c6aebf5441e481e1b7868b4380c0456b63a17eefbd18ba7
-    .agents/skills/systematic-debugging/find-polluter.sh: sha256:6462747eae9b175ac145b78bcfaeab755654a75e32637f08eb633f065a9e1d7c
+    .agents/skills/systematic-debugging/find-polluter.sh: sha256:dd7b8f13c4cc2a24b33ff87b18da9248f3e1c80a085c3316224f69ff0fa5c43c
     .agents/skills/systematic-debugging/root-cause-tracing.md: sha256:6b0622269e098ca1399e123e553fd385f0b6412d88ef0e9c4f5a8ea9cf1cec7b
     .agents/skills/systematic-debugging/test-academic.md: sha256:fe2ba480d78ac0d686dc025f41c2a32a43d642bf533f91b0c6053a04d35d6486
     .agents/skills/systematic-debugging/test-pressure-1.md: sha256:0b6a915db0054577819834c79be9eb614e97bddba10d73768e1fbe91cfed048a
     .agents/skills/systematic-debugging/test-pressure-2.md: sha256:b2030aeffba07050e8ad573ddf87486457c4a016a786bb326235bebd856f2016
     .agents/skills/systematic-debugging/test-pressure-3.md: sha256:96b50a52e2c7989c9cf20fb752c47c1e9a3a70dc362f8f7989f8f5b64dac7708
-    .agents/skills/test-driven-development/SKILL.md: sha256:b5b4717b8b761cce15a6cfe9022e33fd959e0894c0c39d72c9cb49c23486c10e
-    .agents/skills/test-driven-development/testing-anti-patterns.md: sha256:bde453bc258f06543987477c837939afaa774ea2acbd9f308d702fc452bc4283
-    .agents/skills/using-git-worktrees/SKILL.md: sha256:e2c3ec142e52868a51af246c620cd76ab648dcf27d6900d47e6ffd07159a9794
+    .agents/skills/test-driven-development/SKILL.md: sha256:bf1b8216e523851a411e91d429a7c1c2a173e79d88957bc78e348218d50edd54
+    .agents/skills/test-driven-development/writing-good-tests.md: sha256:51471c853306ff92ca8bb41dcaea05f31c0e46b03651f8f3c99754b7172f4ae1
+    .agents/skills/using-git-worktrees/SKILL.md: sha256:8cfb86f121269e8f7f12361e6795c4f6738828340e28964c9229d365666c9edd
     .agents/skills/using-superpowers/SKILL.md: sha256:55379fe7c1c473a02c61961c822996bff30e1320d6921d9062509bc508482c05
-    .agents/skills/using-superpowers/references/antigravity-tools.md: sha256:d0bcfa94dd0fa399fb9606a0f7c9562b43040cad02be167a2b999c3913a1d5e9
-    .agents/skills/using-superpowers/references/codex-tools.md: sha256:9310bb2315eed2c1cebea02cd1c9e8fe121cb788fc6b41e8b8f8b5ff46f85f37
+    .agents/skills/using-superpowers/references/antigravity-tools.md: sha256:4880f6de3da4e32f9659ebe7a72b9e0ebfff04e028c2ed96173f86d0387a04c0
+    .agents/skills/using-superpowers/references/codex-tools.md: sha256:d3f113a8ebbd748e8ba847b09b57b7685442775ca4ee194d693ce3663f8fac68
+    .agents/skills/using-superpowers/references/gemini-tools.md: sha256:62b9157bcb0ee3c6784e3d0da0798ddfa5872f9e0c34bea48f3079dabea71965
     .agents/skills/using-superpowers/references/pi-tools.md: sha256:703dbc83d23ecab9c6f388460c38abc482e9dee2fe6772a8c7a255152ad3a4d5
-    .agents/skills/verification-before-completion/SKILL.md: sha256:ea52d15aabaf72bc6b558efe2c126f161b53961090ddcd712000273bfe8c7b6c
-    .agents/skills/writing-plans/SKILL.md: sha256:272e1af349f5062c28dc282b3e21b220d58d683a7314a10c455b7432ec91d845
+    .agents/skills/verification-before-completion/SKILL.md: sha256:2befe7fc55bcadaa3d97dd9e8efeb633d2561c0ebe74c5a8b17c4d9e7e4520b3
+    .agents/skills/writing-plans/SKILL.md: sha256:72190c88b2b5a67a96b91d66aa72b9161913e10e8769da3f28a226f4cc7b99d0
     .agents/skills/writing-plans/plan-document-reviewer-prompt.md: sha256:aa728b96aad603c8be28875a4305637f6c984aa81ffcadcb13e743202fa2a0c7
-    .agents/skills/writing-skills/SKILL.md: sha256:6b8d08fe863318be8480ae8428e169640309fa9208df84bb0510012764454146
+    .agents/skills/writing-skills/SKILL.md: sha256:16148d03c58f718abe2a9cfbb3edd06159b4a454391c5c2b933dfa1c25f9601e
     .agents/skills/writing-skills/anthropic-best-practices.md: sha256:217629b356c09c9bd11017c9788e8fc654ca1b32c92d4a51cd490e16dd65e59a
     .agents/skills/writing-skills/examples/CLAUDE_MD_TESTING.md: sha256:0b379a3415e185d3c434b3ad283d8aa132f3022c2a4f210f168865b5986bcef0
     .agents/skills/writing-skills/graphviz-conventions.dot: sha256:e2890a593c91370e384b42f2f67b1a6232c9e69dddea7891a0c1c46d7b20b694
     .agents/skills/writing-skills/persuasion-principles.md: sha256:a51bc9bf75189ea73a27b3fb504a2fdfdb966fb1f7f1cdf03203230a216ccc03
     .agents/skills/writing-skills/render-graphs.js: sha256:ccda971a87bb185f8febf81c56b556a20d026fa980c17b35fa3e8824fbb37852
     .agents/skills/writing-skills/testing-skills-with-subagents.md: sha256:c711346852c911b24a84aa161e0cff06a4cd7f4e2fa9e9c0a266cead5afcbade
-    .cursor/hooks/superpowers/hooks/run-hook.cmd: sha256:d3d9c6199678dab2858e60509dde5e7414f13c2a2b5e48a38b1d368b6e1d6abb
-    .gemini/hooks/superpowers/hooks/run-hook.cmd: sha256:d3d9c6199678dab2858e60509dde5e7414f13c2a2b5e48a38b1d368b6e1d6abb
-  content_hash: sha256:fcec2b6832dc4a4ce8fd0b7883fc72531fb402dd76537b62e495ab5c09742cf4
+  content_hash: sha256:f4ba2a0b0275955535927e8635806758416f20b7dd7ff598c051cf5cdd08051d
   declared_license: MIT
 - repo_url: yohi/agent-skills
-  name: agent-skills
+  name: git-master
   host: github.com
   resolved_commit: 6dd072e0e6298286d5e9486b4e4df66b514b5a06
   version: unknown
@@ -1067,7 +1057,7 @@ dependencies:
     .agents/skills/git-master/SKILL.md: sha256:9ff44ee28ce077e90c80f791af06c53f67b1b8028cb60819430be02b1510a485
   content_hash: sha256:2168dbeeaedea51ef70208201c9cddbe93e8e1e3f2916c953d2e36b13a55fb08
 - repo_url: yohi/agent-skills
-  name: agent-skills
+  name: github-quality-setup
   host: github.com
   resolved_commit: 6dd072e0e6298286d5e9486b4e4df66b514b5a06
   version: unknown
@@ -1085,7 +1075,7 @@ dependencies:
     .agents/skills/github-quality-setup/references/tool-configs.md: sha256:2cd02c5aaea923fd7a5aed449d04596d3b8f8cfcaec8c8de5374e5cbd5c9a02a
   content_hash: sha256:fa03d324626cabd515f07f265c8416e3a419d18c31542d4305c59e2035a1d88a
 - repo_url: yohi/agent-skills
-  name: agent-skills
+  name: github-release-packages
   host: github.com
   resolved_commit: 6dd072e0e6298286d5e9486b4e4df66b514b5a06
   version: unknown
@@ -1117,7 +1107,7 @@ dependencies:
     .agents/skills/github-release-packages/scripts/grade.sh: sha256:621def19270a49b5ea0e51df007f0ab6973af33660e57cc10cdec7bf9e849250
   content_hash: sha256:2cd3a8e07844ce20d789c92dfa4d069cb5a4faabad8da57dcedf8f52d63e5b23
 - repo_url: yohi/agent-skills
-  name: agent-skills
+  name: makefile-organization
   host: github.com
   resolved_commit: 6dd072e0e6298286d5e9486b4e4df66b514b5a06
   version: unknown
@@ -1132,6 +1122,4885 @@ dependencies:
     .agents/skills/makefile-organization/REFERENCE.md: sha256:e2e8babe76bccef0b2bc032d5edda06eec748b1e2b79630b4078df13d3107057
     .agents/skills/makefile-organization/SKILL.md: sha256:d88ed176c1a5a3f7399468366993fc60220bb7d1a879ea41fd8b4bd1f85de6a9
   content_hash: sha256:1082322d10ecdcf2f10e7abec37710b4c928c5793138537bb8ca8ca30c374ef5
+deployments:
+- kind: uri
+  target: mcp
+  value: atlassian
+  runtime: opencode
+  scope: project
+  owners:
+  - .
+  active_owner: .
+  content_hash: null
+- kind: uri
+  target: mcp
+  value: aws-documentation
+  runtime: opencode
+  scope: project
+  owners:
+  - .
+  active_owner: .
+  content_hash: null
+- kind: uri
+  target: mcp
+  value: aws-iac
+  runtime: opencode
+  scope: project
+  owners:
+  - .
+  active_owner: .
+  content_hash: null
+- kind: uri
+  target: mcp
+  value: aws-mcp
+  runtime: opencode
+  scope: project
+  owners:
+  - .
+  active_owner: .
+  content_hash: null
+- kind: uri
+  target: mcp
+  value: chronos-graph
+  runtime: opencode
+  scope: project
+  owners:
+  - .
+  active_owner: .
+  content_hash: null
+- kind: uri
+  target: mcp
+  value: codegraph
+  runtime: opencode
+  scope: project
+  owners:
+  - .
+  active_owner: .
+  content_hash: null
+- kind: uri
+  target: mcp
+  value: coderabbit
+  runtime: opencode
+  scope: project
+  owners:
+  - .
+  active_owner: .
+  content_hash: null
+- kind: uri
+  target: mcp
+  value: filesystem
+  runtime: opencode
+  scope: project
+  owners:
+  - .
+  active_owner: .
+  content_hash: null
+- kind: uri
+  target: mcp
+  value: github-official
+  runtime: opencode
+  scope: project
+  owners:
+  - .
+  active_owner: .
+  content_hash: null
+- kind: uri
+  target: mcp
+  value: greptile
+  runtime: opencode
+  scope: project
+  owners:
+  - .
+  active_owner: .
+  content_hash: null
+- kind: uri
+  target: mcp
+  value: nexus
+  runtime: opencode
+  scope: project
+  owners:
+  - .
+  active_owner: .
+  content_hash: null
+- kind: uri
+  target: mcp
+  value: semgrep
+  runtime: opencode
+  scope: project
+  owners:
+  - .
+  active_owner: .
+  content_hash: null
+- kind: uri
+  target: mcp
+  value: sentry-remote
+  runtime: opencode
+  scope: project
+  owners:
+  - .
+  active_owner: .
+  content_hash: null
+- kind: uri
+  target: mcp
+  value: sequentialthinking
+  runtime: opencode
+  scope: project
+  owners:
+  - .
+  active_owner: .
+  content_hash: null
+- kind: uri
+  target: mcp
+  value: skillport
+  runtime: opencode
+  scope: project
+  owners:
+  - .
+  active_owner: .
+  content_hash: null
+- kind: uri
+  target: mcp
+  value: sonarqube
+  runtime: opencode
+  scope: project
+  owners:
+  - .
+  active_owner: .
+  content_hash: null
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/algorithmic-art
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: null
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/algorithmic-art/LICENSE.txt
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:bc6b3af2f331cbc7fb0da1344efb2cbe5877a31498b4d70dbc7000f3405a1362
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/algorithmic-art/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:3bc4092c09804853186524c826bc0621b940bb6122c05b84496dff95388e6eef
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/algorithmic-art/templates/generator_template.js
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:9ee0f1da52ef8f7bbfde1917123654880890d43f2d388642d71eab6dd78f94c4
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/algorithmic-art/templates/viewer.html
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:86c79d7ce97d2599ebe4bd9b97fdeb7295c9d3ed61ceeb513cbe1b2bb5d1ce29
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/autofix
+  runtime: null
+  scope: project
+  owners:
+  - coderabbitai/skills
+  active_owner: coderabbitai/skills
+  content_hash: null
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/autofix/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - coderabbitai/skills
+  active_owner: coderabbitai/skills
+  content_hash: sha256:09430a914debe143f646dd369b56c9bca27704c159aebf28c07e41f411046acf
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/autofix/github.md
+  runtime: null
+  scope: project
+  owners:
+  - coderabbitai/skills
+  active_owner: coderabbitai/skills
+  content_hash: sha256:466780fcf8c883a5f30532956b5b08645691a79d6755c8a02cc879de14649aff
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/brainstorming
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: null
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/brainstorming/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: sha256:4a54a4858b99807f3155ed1614b2f116e35ea5c1b788e793f565dd837fd3891f
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/brainstorming/scripts/frame-template.html
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: sha256:6a8a4e58bd6a44b904e2e3c57de774481d909204597e1498de53f1b2fecc4c4e
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/brainstorming/scripts/helper.js
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: sha256:43c6d69954a46ec34a2a262bcc62a9a7e83e839c739f199cb72646d397c686e3
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/brainstorming/scripts/server.cjs
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: sha256:2d2961ea8d11f56c5f4c3a1a68d22709efa5d7601a2246d8c880774e7e9e8412
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/brainstorming/scripts/start-server.sh
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: sha256:a4e5ae84275bcaacd2f84345afeabe59cf7b00ba080e123da7cc1fb226f12847
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/brainstorming/scripts/stop-server.sh
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: sha256:0b5ccbbd57f62d3ed88993f7940b5ee0e5c0fc9b21c550c623da4f6292e47daf
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/brainstorming/spec-document-reviewer-prompt.md
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: sha256:95a0a195de9d984be2fffa95bab16fc8c563bc296a9cfc5e9c29cb3ece0d7457
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/brainstorming/visual-companion.md
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: sha256:60cbad29b9dd7eaf08da020e301c498a72230b2e13c1813fa967a135ffcc1d71
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/brand-guidelines
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: null
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/brand-guidelines/LICENSE.txt
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:bc6b3af2f331cbc7fb0da1344efb2cbe5877a31498b4d70dbc7000f3405a1362
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/brand-guidelines/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:1120b3769e2985cefb3d25be981b1f914abeba57ae079b83c20c666c164fa9fe
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: null
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/LICENSE.txt
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:bc6b3af2f331cbc7fb0da1344efb2cbe5877a31498b4d70dbc7000f3405a1362
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:a1f288079624402f30682753c1d43920b6664785698d21d3e7aa197450a6448b
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/ArsenalSC-OFL.txt
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:8ddd61b18ba2c0d0dbe4a691cf5f1a0673f473d02fa0546e67ee88c006aeff6e
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/ArsenalSC-Regular.ttf
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:65e6f89df58f68fd905b3add34a79dd6106aa3b3044df0dad9676fff53d504b9
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/BigShoulders-Bold.ttf
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:b43bcd198b9fdf717dd42aa61a34dba32e01aceaeae659d689afd0ca52c37ea2
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/BigShoulders-OFL.txt
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:fbc746aabf0eb1847dfd92e2efc4596d79fa897d60b8e64062a22f585508fb3f
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/BigShoulders-Regular.ttf
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:18a879fc71978a4447150705caf880a9da3860083c259fd29e6dc03057b6842a
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/Boldonse-OFL.txt
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:45cc82ab4032273c0924025ffcf8f0665a68e1a5955e3f7247e5daf1deeb1326
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/Boldonse-Regular.ttf
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:cc2e540604565c0f90a7d8d46194a2f42fc9c45512cd2e39bf03b50eb68c35a4
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/BricolageGrotesque-Bold.ttf
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:a737b146fe0d77ffe8a86e3cd16700dd431d3b1e420d4fd80e142cd68a1cb50d
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/BricolageGrotesque-OFL.txt
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:0e4f4eb8534bc66a76aca13dd19c1f9731b2008866b29ccff182b764649df9b4
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/BricolageGrotesque-Regular.ttf
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:972a6d098c9867ae131d0ea99e221e63976b11a19d4b931c2c7ace525674e4f6
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/CrimsonPro-Bold.ttf
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:48f191e38355c8db100eb3ce157c20f9302a3b9a37b44a660f77ecfce3986609
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/CrimsonPro-Italic.ttf
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:52318db3526b644e6efa60be0b3ca5a50e40fbe8bd026c261e0aa206f0772267
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/CrimsonPro-OFL.txt
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:35680d14547b6748b6f362a052a46d22764ce5eccf96e18b74f567bb2ee58114
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/CrimsonPro-Regular.ttf
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:48fad08cb1917a7b2f2c6fe5135d6c07743a6663cf7631ec4481108aaf081422
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/DMMono-OFL.txt
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:bfe7842fcb88323e2981e24710c25202677385a8c75fb6a87217b275a0247ae3
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/DMMono-Regular.ttf
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:f98ada968dc3b6b2c08d3f5caaf266977df0bfe0929372b93df5a06cf2ace450
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/EricaOne-OFL.txt
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:e0de629968b52255548d5fafcf30b24ff9edae0eda362380755a75816404d0fa
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/EricaOne-Regular.ttf
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:db1d89e80e33a8a01beaaac7a85df582857d24a43f1e181461aa7ff5d701476a
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/GeistMono-Bold.ttf
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:75c0828d5c1ee44b9ef9f4df577bf41595ec362e2ea3f1e558590c9e92c7949d
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/GeistMono-OFL.txt
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:6a873c900f584109b13ae0aaf81d6e3cf0a68751a216b03f7b6c68d547057bb4
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/GeistMono-Regular.ttf
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:a55c1b51cda4afeab9e471e7947b85a20f7c8831d7e6b1470c1b7fbdc0f0f15e
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/Gloock-OFL.txt
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:c0a3f3125ac491ef3d1f09f401be4834c646562f647e44f2bcbc49f0466c656d
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/Gloock-Regular.ttf
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:e86b4ce66dbd3f1f83eee8db99ec96e0da1128c3f53df0e9b3b7472025dfe960
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/IBMPlexMono-Bold.ttf
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:dbd2a2fb024579438d6400a84e57579bfd2dbe67c306c8fd9fde92a61e4f2eea
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/IBMPlexMono-OFL.txt
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:5294ce778857e1eb02e830b6ab06435537d38f43055327e73d03a2d4d57d5123
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/IBMPlexMono-Regular.ttf
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:ab08018ccd276b79fb2c636bb95b9c543598f9d50505fe92506fcb4dae7810cd
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/IBMPlexSerif-Bold.ttf
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:b8d294e9b5c5a0940f167c3ced0f7ef2e3f57082ca3ff096ef30e86e26c1c159
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/IBMPlexSerif-BoldItalic.ttf
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:da64b75f4284f53e7b5c71fa190a35b8bf3494fe19f1804c81c3a53340bca570
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/IBMPlexSerif-Italic.ttf
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:b11f1048745e715a55c9d837b3f10226ca3d78867b7db7251ddad8f98dcf0f38
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/IBMPlexSerif-Regular.ttf
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:77cd233a2af8dc6b1022faea3bb3b01f3c75af68bcf530cb6aeb15982ff3dbb7
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/InstrumentSans-Bold.ttf
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:444f85bf1c4b0e1ce1ca624f6be54bcd832207714ccaf4ea99ee531341683bdf
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/InstrumentSans-BoldItalic.ttf
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:3762f6cef95d6039489ad5ba5787d4c30f17a1ad01e9ac3c816ed69692722a68
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/InstrumentSans-Italic.ttf
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:78e85858e371b2cb4e18f617c10f0f937c0e12a0887ffee98555b24ed305b3a7
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/InstrumentSans-OFL.txt
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:bf4dc6d13a8cccd4807133c77a1ee9619a16b92cb23322258725ab6731c2f6e5
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/InstrumentSans-Regular.ttf
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:a22cb26e48fd79bcb01bf2fc92d36785474dce36d9c544ab0a8868c2657c4a87
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/InstrumentSerif-Italic.ttf
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:9c86e4d5a47b50224a2463a9eca8535835257c8e85c470c2c6b454b1af6f046e
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/InstrumentSerif-Regular.ttf
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:56ac3be03ac3ba283196b3e77850ab2ffcf56cfb6fd3212c5620109a972f8c99
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/Italiana-OFL.txt
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:8373b11312ace78c4cec2e8f9f6aa9f2330601107dac7bcf899c6f2dbd40c5a5
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/Italiana-Regular.ttf
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:15c4dd6ab8cf4a29ba8826f65edcbe2f6c266c557d34d081f25072dfd5605fd2
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/JetBrainsMono-Bold.ttf
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:a2349098b9e45419e7bf0e2958d6c4937a049dded37387b08be725be4c7615f3
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/JetBrainsMono-OFL.txt
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:a76abf002c49097d146e86740a3105a5d00450b1592e820a1109a8c5680cd697
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/JetBrainsMono-Regular.ttf
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:b6b1ff4ddefe36d7f2a6174e1d001cab374e594519ee9049af028d577b64c5f5
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/Jura-Light.ttf
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:c891a381df056b2c4dfe85841e911bf45da0890fa21a7b2692cbe5ea1f505e1e
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/Jura-Medium.ttf
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:c72965cb732a92872643819fd1734128238583cc36b116313859137a51d3368a
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/Jura-OFL.txt
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:eaf9bdb675f6d87e5feb88199ab3ea581d3bd2082f426e384fa9c394576d7260
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/LibreBaskerville-OFL.txt
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:55959eef5b0c3b2e3c1c7631b8ff0f9447d75de20f29cfa7db5bcfb026763343
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/LibreBaskerville-Regular.ttf
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:2101302538d9e88adb679031c04623e4578b5745e89566284fd2c508d79acae0
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/Lora-Bold.ttf
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:7d74015e950c2fb66519c7295b8155621d22200ae2ca2a4c6b43ce3c490cac87
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/Lora-BoldItalic.ttf
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:152f87e71f5ddb60d5c57ecd9132807c947e65c42977193c9164e7c5a6690081
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/Lora-Italic.ttf
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:be627e595184e8afe521f08da0607eee613f1997d423bc8dadc5798995581377
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/Lora-OFL.txt
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:62e37a82d3f1ef2a70712885fa8b3144b65fd144d8e748d6196b690a354d792c
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/Lora-Regular.ttf
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:7ed00e7c9cdf16ab7e2fd2361fe45d4f0b61263cd60aae398b27b7ee08108827
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/NationalPark-Bold.ttf
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:69ac4c301c4a7233c6e602d12a92c54d7967b575f4449951c45ce773f7acff53
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/NationalPark-OFL.txt
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:81c6c71d83b5b45d7344f96df12bb4a2477a5b092a9144757ee1d0f50f855175
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/NationalPark-Regular.ttf
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:a477338b7e18308d476650dfe31235ef86a883572665e56ffb5fb80f82009b58
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/NothingYouCouldDo-OFL.txt
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:7c2a6970584ddad04919816163746f83b378078015899b18468b40f05e9ce128
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/NothingYouCouldDo-Regular.ttf
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:d866f985896d3280f4fce72db7e17302c24a0c1fdb0699b6b5ed3af14f944d57
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/Outfit-Bold.ttf
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:6654b93d21301ec61887d3cedd6c11d9df1b1dfb63f9cf45ac7995f6e2235ab1
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/Outfit-OFL.txt
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:1945b62cd76da9a3051a1660dde72afaa64ffc2666d30e7a78356d651653ba2f
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/Outfit-Regular.ttf
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:f24945365147c9e783e91d8649959b59be6b00c9ee4ecd2f6b33afbb2dd871fe
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/PixelifySans-Medium.ttf
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:38397504f71c122b03d234ea6f55118e3d5bdbddffd82bedddbd7755d3b3be82
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/PixelifySans-OFL.txt
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:7f54d1d9f1ae1ba9f2722f978145f90324fea34ca3c2304b3a29cfa96ac6037e
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/PoiretOne-OFL.txt
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:2eaf541f7eb8b512e4c757a5212060abf5b6edfef230e9d7640bf736b315c33a
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/PoiretOne-Regular.ttf
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:9cf265b139648b36b6c0afdfeb0bf27f7e66db9a16094bc40f644d8da05bc318
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/RedHatMono-Bold.ttf
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:7ef48353f4be5ddb90f000f6fad48f2b62b3e8c27d9818d8d45ff46c201065e0
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/RedHatMono-OFL.txt
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:435fbfb7e66988b2a06686a4cb966faec733f35d8fe100a1601573c27f3e0bb8
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/RedHatMono-Regular.ttf
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:452fe826871b37539f5212b20c87cf30f82f58dd2741f1c96edd1dcbdc0db6b4
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/Silkscreen-OFL.txt
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:6b849745119bbe85ec01fd080c9cd50234da9f52ac6e48b55d1a424a0c4d7ca9
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/Silkscreen-Regular.ttf
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:49567408600809e25147e9225ac4f37f410e2df45a750696c45027531fb65f1b
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/SmoochSans-Medium.ttf
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:dd76e6e77cce82f827a8654cd906e9ce58f3aaf78adda63c4a7f655b8ecb41f0
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/SmoochSans-OFL.txt
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:74c9c4eb88e891483e1b7bc54780b452cbf4f4df66d4e71881d7569aa2130749
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/Tektur-Medium.ttf
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:52bbe8c9b057b3d2da4eeace31a524b1ea26a1375ae34319cf6900ccc57a4c82
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/Tektur-OFL.txt
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:3f1466cb5438f31782eeb6e895f3a655bc4d090e24263e331f555357d1cb734e
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/Tektur-Regular.ttf
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:162e1b36c4718c5b051b36c971ad7e50d341944f35618f480422ebbe72988f98
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/WorkSans-Bold.ttf
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:240d125fc9f8561363dc1ea3f513501253bd70942f41468f48f0b0cafb0c82e2
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/WorkSans-BoldItalic.ttf
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:a5b2cad813df0aaa7d16621f2e93b5117c25e9bc788bc9a3ad218e9d6348ce34
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/WorkSans-Italic.ttf
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:6b7f7002e0b0c8b261fe878658ef5551e3e59d9f6b609b04efb90dde1e2c1ada
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/WorkSans-OFL.txt
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:ace8c22a3326318b54e67c3691857929634205533f454a70ef5a3473ddb2e2ba
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/WorkSans-Regular.ttf
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:e67985a843df0d3cdee51a3d0f329eb1774a344ad9ff0c9ab923751f1577e2a4
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/YoungSerif-OFL.txt
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:cdcb8039606b40a027a6d24586ec62d5fe29c701343d82a048c829cb28a3dd28
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/canvas-design/canvas-fonts/YoungSerif-Regular.ttf
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:f8dc08f77abad753a00670af70756a8ace938e5c3f0b770f4f4c2071c4bd8fc6
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/check-pr
+  runtime: null
+  scope: project
+  owners:
+  - greptileai/skills/check-pr
+  active_owner: greptileai/skills/check-pr
+  content_hash: null
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/check-pr/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - greptileai/skills/check-pr
+  active_owner: greptileai/skills/check-pr
+  content_hash: sha256:34eb01152ce5c99a162a14aa9a43ee227e4c5bf3e767e87a15ba3e43ba2737ee
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/check-pr/references/gitlab-api.md
+  runtime: null
+  scope: project
+  owners:
+  - greptileai/skills/check-pr
+  active_owner: greptileai/skills/check-pr
+  content_hash: sha256:7a92fcf46e0152c693012fbdc02d61a04c940599f5a60b7ab28bcbdf18952968
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/check-pr/references/graphql-queries.md
+  runtime: null
+  scope: project
+  owners:
+  - greptileai/skills/check-pr
+  active_owner: greptileai/skills/check-pr
+  content_hash: sha256:f850841783ef3df4f28f4f45731f08591c8994fbe3e742eef5a370454d575d02
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/claude-api
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: null
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/claude-api/LICENSE.txt
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:bc6b3af2f331cbc7fb0da1344efb2cbe5877a31498b4d70dbc7000f3405a1362
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/claude-api/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:1d08b3be1c02b6bd2d8c966b1645e234fbb36454d2dd4cbd39802d2f321bd0f4
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/claude-api/csharp/claude-api/README.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:16481a361eda1fb0a58ac4581553e3dafab80b6c90ba9be7dcbe426905a8df0f
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/claude-api/csharp/claude-api/batches.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:19d17c89efe01f13a2a173a05169dee9b6bbdd5274ec2716395c4faa6ee7029a
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/claude-api/csharp/claude-api/files-api.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:413d08653a31766fdc3196f25af6ce386b085c41372dcbf33e9205cd35253731
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/claude-api/csharp/claude-api/streaming.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:8cd323dceb3d28963fcde3ecd18f2fecde0c7d87b441f7361dab5e8795f5fee2
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/claude-api/csharp/claude-api/tool-use.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:80013059920daaea42a32ccb1786071c36068871c84115fc3dffca334bdd90f6
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/claude-api/curl/examples.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:9ddc35cfa47d47e307a9346c569c15c83b0d6185ec2e3cae26d353150c04bbcf
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/claude-api/curl/managed-agents.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:ded9c1d2f012a0c0cf29050f9c95180d4b549a0697e4424fecab55a65980dee1
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/claude-api/go/claude-api/README.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:24816178eaa12ffd7464326dbbcaedb911e2695bd6aa17fa6184cd346c54631c
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/claude-api/go/claude-api/files-api.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:144c12678497f872436aed71944e0e9ba73fea08f4a771e0bec5c1c40d620866
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/claude-api/go/claude-api/streaming.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:066a5195398a1c66835d306f5d725708788046e34bf70a0f3a2df53e397537ca
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/claude-api/go/claude-api/tool-use.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:8a447360fc87b439aff89ef57730f206e76e3ca3f483602f4148638da13b70ec
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/claude-api/go/managed-agents/README.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:bc9eb191b42bb217b7b821427c602f1f0770f0984cd23834e8751b3471d2ef6e
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/claude-api/java/claude-api/README.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:f69567754943deebaaedb848c5b19193ca8890e2f5c863a0e9108a2f3d00a3f6
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/claude-api/java/claude-api/files-api.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:81550cec88f2de0c9af8d6826a4e624668a18ffa25ff7217595e403045a88800
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/claude-api/java/claude-api/streaming.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:de8d63789e440eb00610908007f6a1593d5fdbdca5708fcafb8e6a50a4f58f3d
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/claude-api/java/claude-api/tool-use.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:d61ec94bc6d57db1ac6c1eeb6ca8cd852c8bf00124874ef4fe75b2d87155814f
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/claude-api/java/managed-agents/README.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:6b56c9fd4585525368062955d125800f948123f4014d45cea4be7f5691590a65
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/claude-api/php/claude-api/README.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:80caa60268f2d27472cef4470312eadde0bae9d765cb80e87f2d22507a290a59
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/claude-api/php/claude-api/batches.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:45cc12df38c2452d28cfb46ef85300b620f7efce0d2c3117f4a1af6916b62b76
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/claude-api/php/claude-api/files-api.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:a1f2467c6674696b4036ca13026c1f19c0e661bbf94b6e1da0deeb1492958871
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/claude-api/php/claude-api/streaming.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:f4b6b685ff1b0c54631e9a456d9933d1b2f31f50825e0959a74384014808da4c
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/claude-api/php/claude-api/tool-use.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:d4474a01bea5fa4bb6d5c27270333dc76bf5be8e71587e1c440fbd217df5345a
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/claude-api/php/managed-agents/README.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:df276cf31a3708df4b08171e70b396f16cc8f67410f14374454effb43a7b4cd6
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/claude-api/python/claude-api/README.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:671ad1ce74fcc88c3e21cdf92edec2ad70de120fefac0ad264ef74d4cd71f244
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/claude-api/python/claude-api/batches.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:6849033ccaaf140ac52a0cf4c923fd6ae545754f67d7a72d20c36036cdacbe68
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/claude-api/python/claude-api/files-api.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:68d034200244045b7f8b8ba31e2860ca633d0b7141a151317a5d8aeba013a603
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/claude-api/python/claude-api/streaming.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:a3c980a9256bee23bfd4fbfe044637d58f7ba66464ed6a192f61ee622bd96f5a
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/claude-api/python/claude-api/tool-use.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:490dc14dbaa0cf471bff456aea5eba95101b7c69f767cc9d7032d93feb0f6f43
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/claude-api/python/managed-agents/README.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:8f797c6e84c89bc63c0d899f1e2ea9c7457778372d6e35906ac7426e50cc47ac
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/claude-api/ruby/claude-api/README.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:036021fee02420d8d9fe9c7283eba932b4ebe9f2ebbcc1be4bf8e3e89d6a8d30
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/claude-api/ruby/claude-api/streaming.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:e1edcb452ceeadeead3f58732c33cf58f45af9907f9b30230e88fe2db839c51c
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/claude-api/ruby/claude-api/tool-use.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:ea7e1cd0a20c9b40e0bfae0b0390ab0f00d6c67d11df87c8abec76121a962551
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/claude-api/ruby/managed-agents/README.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:5f3aec036d8b8866a2297d3330e14f8dfc614bbac7a7cff8e894812df453dd3b
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/claude-api/shared/agent-design.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:8660a1965bc280ce9264e96ab8960c57f385a03de9f2d8bda6a504482d33b0ff
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/claude-api/shared/anthropic-cli.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:7ffa53b02d92e3227d055b80ea3506c066bf7409c59878f722e2088f26f18894
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/claude-api/shared/claude-platform-on-aws.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:4213d75b3eace63fa7142389160565a54fc482a949aedad87ca16f02f856e9ef
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/claude-api/shared/error-codes.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:30f469fdf1ef7ac423e01d8b66e150bee6017bb3f4238841ac744d0ce206c871
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/claude-api/shared/live-sources.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:46ca91c1bb757b97b10a78d8b29152ad11c52213aa328397267535a86de1c949
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/claude-api/shared/managed-agents-api-reference.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:489651518999b9401b38cda8561e726ef9e2ffb5aa1bc0f548c9d65ef738dac7
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/claude-api/shared/managed-agents-client-patterns.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:de288a933ed7702edba6e6ec54afdb3addcc861245a09255da3496fce2d0f3a8
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/claude-api/shared/managed-agents-core.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:5a5b3bd53adb8cfb9be60e4dc41fdd8a5b2b397874ddd4f5c4e186caafcf5a45
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/claude-api/shared/managed-agents-environments.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:c26934889eaccb936b2eb900ec2c5a648881784280c1beba0e249864078b90b0
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/claude-api/shared/managed-agents-events.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:8e8ce1b6eb7bf52333092674be9d89ea1bb88c474e0e37f02cdff66410efa1b6
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/claude-api/shared/managed-agents-memory.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:1c2825364115ccf9d0a779447336764ebbaaf875f79c2a064075ca9235d16c16
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/claude-api/shared/managed-agents-multiagent.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:bd1034335c0424df96c91d9e61c519a5e0e05a5031e8fc8a33f954665c1eabd2
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/claude-api/shared/managed-agents-onboarding.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:fa44c171a0c12104836f75f9abd51d3ea07c1e3b488f650755ebd12899a24732
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/claude-api/shared/managed-agents-outcomes.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:bf195965dca27a07a996c66df16ccb62c745dd000039f1f364b8a4e75dd73b96
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/claude-api/shared/managed-agents-overview.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:aa4d4659c5249122ca102d849cd175c1093de38010f878301e89c9a6824feaac
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/claude-api/shared/managed-agents-scheduled-deployments.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:63b7b4ca743cfe9a4b3d453dc104820e7ea2410fc18d8d52e6973c3196003ca2
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/claude-api/shared/managed-agents-self-hosted-sandboxes.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:225865291eb1eda677451a416849523b9be1bf81661c6c0306408501b089e8bc
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/claude-api/shared/managed-agents-tools.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:faaec13061bbd9657653a8731fb727168dfe5fbcc3b53a7a964c49560ac94908
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/claude-api/shared/managed-agents-webhooks.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:b2f80f0155b1fe037abaa0ae22d8fd909dbe30a30131e82b18834667b61d0174
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/claude-api/shared/model-migration.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:a9d829fef3ad4e0a5afebd4b3caf0e9c584db9579ffdcd811621d37a22560bec
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/claude-api/shared/models.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:21d00e97640bafb3c5f2935c1c802792bcc4a7598a95b658fc8cdbae6a87baa1
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/claude-api/shared/platform-availability.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:54895cf5e812706cd4c6379b41c0781b3292237236a2e71cfbdc3d02f434348c
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/claude-api/shared/prompt-caching.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:7c242024cfdfb0b3c9a5a884248df73d1377ab497e7097a4bed1c4444542a7a2
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/claude-api/shared/token-counting.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:231c4d669618915958adb2db2d73470f3e2a376aaf5472e39b651d3e5efa044d
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/claude-api/shared/tool-use-concepts.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:dc2fe5f4e36a8ccfe6567f0c3349e991e58e65c5bf141263dda6395b648bce92
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/claude-api/typescript/claude-api/README.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:4668edb425e307708040a87ae20cb5c2d2ca3e5fca8c9c0c3bcd39778df14940
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/claude-api/typescript/claude-api/batches.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:07e75f7e6864aa79fad1f4135a06f1907dc0149ce3234f0851c950b93e0a9e8f
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/claude-api/typescript/claude-api/files-api.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:0e70fae5742e78d93314744777dc9359d71d6e3511ca67abe3d51aaf1e107331
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/claude-api/typescript/claude-api/streaming.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:7af1abfc92f45b8fff0bab3bcbb3d99a011cc19f93f0a8cf0e0cf73e0a1a3276
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/claude-api/typescript/claude-api/tool-use.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:1f7108408432767cf277090ef9e5b7b75b1fa04a8bcf62f8d48e9dc3dac28039
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/claude-api/typescript/managed-agents/README.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:ab1fe28ad2e1c2fe9938807d6e634ee3a1b0f35ecb32c0c755120a1908c543fc
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/code-review
+  runtime: null
+  scope: project
+  owners:
+  - coderabbitai/skills
+  active_owner: coderabbitai/skills
+  content_hash: null
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/code-review/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - coderabbitai/skills
+  active_owner: coderabbitai/skills
+  content_hash: sha256:18c9c3c69a6a58ae0b7baa5b19637eaa9aaf02c21b1242f0bb073dc24942fe0a
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/dispatching-parallel-agents
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: null
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/dispatching-parallel-agents/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: sha256:1968923066f3b707eb01d1992cdf4c42284c3855f70253b9cd5000ff45fca13c
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/doc-coauthoring
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: null
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/doc-coauthoring/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:2e47d78846faeea4a56e9809c52700087a15a2155a3f293a3efbaded81398ef4
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/docx
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: null
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/docx/LICENSE.txt
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:79f6d8f5b427252fa3b1c11ecdbdb6bf610b944f7530b4de78f770f38741cfaa
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/docx/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:cfbabd72b1aec7dfaad988fb6e5e16b27dc744b9a00cae15db9045e95f53903e
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/docx/scripts/__init__.py
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/docx/scripts/accept_changes.py
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:0c991d2bc7304a1248e9f3bf9b1498f0b6e76641fc457e7cbd73c99b4eef3a74
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/docx/scripts/comment.py
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:e86e4e17ec5805780325206d20d3ed5a8f7024f1e4641ac8f46ef5df0b564f63
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/docx/scripts/office/helpers/__init__.py
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/docx/scripts/office/helpers/merge_runs.py
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:7c40ed838b88639c51f9ffdcfd564b568f26832b78fe44008c0e01b742669ca7
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/docx/scripts/office/helpers/simplify_redlines.py
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:560cb55978a834c505406eb18e2c61f62f998fc7a2d8e9721b9c563b42597896
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/docx/scripts/office/pack.py
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:b1800987e568261a31f462df8e1303d386e9e6ccc11a75ef46e60cc528c20683
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/docx/scripts/office/schemas/ISO-IEC29500-4_2016/dml-chart.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:41b93bd8857cc68b1e43be2806a872d736a9bdd6566900062d8fdb57d7bbb354
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/docx/scripts/office/schemas/ISO-IEC29500-4_2016/dml-chartDrawing.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:3fd0586f2637b98bb9886f0e0b67d89e1cc987c2d158cc7deb5f5b9890ced412
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/docx/scripts/office/schemas/ISO-IEC29500-4_2016/dml-diagram.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:29b254ee0d10414a8504b5a08149c7baec35a60d5ff607d6b3f492aa36815f40
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/docx/scripts/office/schemas/ISO-IEC29500-4_2016/dml-lockedCanvas.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:5cb76dabd8b97d1e9308a1700b90c20139be4d50792d21a7f09789f5cccd6026
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/docx/scripts/office/schemas/ISO-IEC29500-4_2016/dml-main.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:5375417f0f5394b8dd1a7035b9679151f19a6b65df309dec10cfb4a420cb00e9
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/docx/scripts/office/schemas/ISO-IEC29500-4_2016/dml-picture.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:5d389d42befbebd91945d620242347caecd3367f9a3a7cf8d97949507ae1f53c
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/docx/scripts/office/schemas/ISO-IEC29500-4_2016/dml-spreadsheetDrawing.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:b4532b6d258832953fbb3ee4c711f4fe25d3faf46a10644b2505f17010d01e88
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/docx/scripts/office/schemas/ISO-IEC29500-4_2016/dml-wordprocessingDrawing.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:bdad416b096b61d37b71603b2c949484f9070c830bdaeba93bf35e15c8900614
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/docx/scripts/office/schemas/ISO-IEC29500-4_2016/pml.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:d173c3e5d61e42e2e3a97226c632fd2ab7cc481fc4e492365b87024ab546daff
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/docx/scripts/office/schemas/ISO-IEC29500-4_2016/shared-additionalCharacteristics.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:3c6709101c6aaa82888df5d8795c33f9e857196790eb320d9194e64be2b6bdd8
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/docx/scripts/office/schemas/ISO-IEC29500-4_2016/shared-bibliography.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:0b364451dc36a48dd6dae0f3b6ada05fd9b71e5208211f8ee5537d7e51a587e2
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/docx/scripts/office/schemas/ISO-IEC29500-4_2016/shared-commonSimpleTypes.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:e2abacbb9a55ce1365f8961bc1b1395bbc811e512b111000d8c333f98458dece
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/docx/scripts/office/schemas/ISO-IEC29500-4_2016/shared-customXmlDataProperties.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:0ef4bb354ff44b923564c4ddbdda5987919d220225129ec94614a618ceafc281
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/docx/scripts/office/schemas/ISO-IEC29500-4_2016/shared-customXmlSchemaProperties.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:0d103b99a4a8652f8871552a69d42d2a3760ac6a5e3ef02d979c4273257ff6a4
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/docx/scripts/office/schemas/ISO-IEC29500-4_2016/shared-documentPropertiesCustom.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:9c085407751b9061c1f996f6c39ce58451be22a8d334f09175f0e89e42736285
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/docx/scripts/office/schemas/ISO-IEC29500-4_2016/shared-documentPropertiesExtended.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:bc92e36ccd233722d4c5869bec71ddc7b12e2df56059942cce5a39065cc9c368
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/docx/scripts/office/schemas/ISO-IEC29500-4_2016/shared-documentPropertiesVariantTypes.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:7b5b7413e2c895b1e148e82e292a117d53c7ec65b0696c992edca57b61b4a74b
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/docx/scripts/office/schemas/ISO-IEC29500-4_2016/shared-math.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:3213ef1631606250f5010b42cad7ef716f7c59426367798e33c374c0ec391d3a
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/docx/scripts/office/schemas/ISO-IEC29500-4_2016/shared-relationshipReference.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:12264f3c03d738311cd9237d212f1c07479e70f0cbe1ae725d29b36539aef637
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/docx/scripts/office/schemas/ISO-IEC29500-4_2016/sml.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:beffeed56945c22a77440122c8bdc426f3fcbe7f3b12ea0976c770d1f8d54578
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/docx/scripts/office/schemas/ISO-IEC29500-4_2016/vml-main.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:f5ee623b08b6a66935e5aced2f5d8ad0fc71bf9e8e833cd490150c0fa94b8763
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/docx/scripts/office/schemas/ISO-IEC29500-4_2016/vml-officeDrawing.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:585bedc1313b40888dcc544cb74cd939a105ee674f3b1d3aa1cc6d34f70ff155
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/docx/scripts/office/schemas/ISO-IEC29500-4_2016/vml-presentationDrawing.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:133c9f64a5c5d573b78d0a474122b22506d8eadb5e063f67cdbbb8fa2f161d0e
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/docx/scripts/office/schemas/ISO-IEC29500-4_2016/vml-spreadsheetDrawing.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:6bdeb169c3717eb01108853bd9fc5a3750fb1fa5b82abbdd854d49855a40f519
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/docx/scripts/office/schemas/ISO-IEC29500-4_2016/vml-wordprocessingDrawing.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:475dcae1e7d1ea46232db6f8481040c15e53a52a3c256831d3df204212b0e831
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/docx/scripts/office/schemas/ISO-IEC29500-4_2016/wml.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:c2dd9f61f892deae6acd8d20771ea79b12018af25f3bf8d06639c8542d218cfd
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/docx/scripts/office/schemas/ISO-IEC29500-4_2016/xml.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:a539aa2fb154fa50e0f5cc97e6ad7cbc66f8ec3e3746f61ec6a8b0d5d15ecdf2
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/docx/scripts/office/schemas/ecma/fouth-edition/opc-contentTypes.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:9e0b7209fc69ab11987900404540969976000c5ebe4d4f58c43dc3842886bf3a
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/docx/scripts/office/schemas/ecma/fouth-edition/opc-coreProperties.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:451958454e8588dfc7cd945981ada142ca06ff3307937f5700df059c2b307fa8
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/docx/scripts/office/schemas/ecma/fouth-edition/opc-digSig.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:6de111e11403f7cd49027400755bae0ea1cabef2815f09bd40a24f0017613b24
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/docx/scripts/office/schemas/ecma/fouth-edition/opc-relationships.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:f565adfef5a502044abc3a9153e157edc25af78304d335994afb958874b15e26
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/docx/scripts/office/schemas/mce/mc.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:3a37e461ecf5a8670fdec34029703401f8728ab9c96ec1739a6ae58d55212413
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/docx/scripts/office/schemas/microsoft/wml-2010.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:568b26ee156cb9549aa439ca2158965f77b7c1602b7e0316f40ac6cf586e35f2
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/docx/scripts/office/schemas/microsoft/wml-2012.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:0fa75578a000439a7988ba0c59fdc69f774bbd416cbacc14d07125b3f686cb74
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/docx/scripts/office/schemas/microsoft/wml-2018.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:be0ff793a22dd31384650c3a4da14c2fa8062751c2e97b0e5ee852bda13c60ad
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/docx/scripts/office/schemas/microsoft/wml-cex-2018.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:fddc2b880cabb9005aebbc7e783e53c19fec1c03df7d0e2f2076a33a0fdfd081
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/docx/scripts/office/schemas/microsoft/wml-cid-2016.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:127ca209fa73d7cb708449cb355c871867948a96e4a74f7bf5811ef62d17991d
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/docx/scripts/office/schemas/microsoft/wml-sdtdatahash-2020.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:842e7163409c8d74f4d7088a8bc99500d80bc75332681a0980055b08f374a604
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/docx/scripts/office/schemas/microsoft/wml-symex-2015.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:16f6f8072249f431370723c2cd8974672e0d9c897e00e97dd918079df934871b
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/docx/scripts/office/soffice.py
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:a3e21840e29e32f947d5286028931b96eaf2dee63f75d883b8eb19c943c80aa0
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/docx/scripts/office/unpack.py
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:83f69cecc87910183654c06345837244402e8a99edbf3bdddc1cf72f11304b62
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/docx/scripts/office/validate.py
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:1aef24f8e316965a0584c30859776bd2c82a9fb69f72d79cfed041119cf95514
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/docx/scripts/office/validators/__init__.py
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:83e0f035c5abea238d3f2c3968afbd511ed022b527b7c9cb60a9434cc34ff987
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/docx/scripts/office/validators/base.py
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:d6358b67252df4dbfe4fa6647423a765960c949346ef6a8c4eb8722bb1108d25
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/docx/scripts/office/validators/docx.py
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:0ef04ce86b2e6b6a1cb088c0276fd0bd5b770d96fdfe7a6cc73d005feb3f0345
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/docx/scripts/office/validators/pptx.py
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:f937961e62a5fa0d002b8dc51a4c4e2cd8fcd59fe65853fa54edaca3fe99eccc
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/docx/scripts/office/validators/redlining.py
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:f4c33fdb9da0651d1d9aa76f0d5294cc9955869339ae131b2f75f3b2e366cb40
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/docx/scripts/templates/comments.xml
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:a08ba83ee8790ac9e3dc61921f4988f19edd7e06ac09d6f1897a877c1581818d
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/docx/scripts/templates/commentsExtended.xml
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:544eeecfeceed4b468fff163cd9c366d33641c8b8ab691ce002576197846afe8
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/docx/scripts/templates/commentsExtensible.xml
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:bad10b3283e6ad6e7ef6d1ca5169683721ed690ee331282c65df04017e080631
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/docx/scripts/templates/commentsIds.xml
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:db20f9616e004ec42ef736e80c2384e45db0f8d1194d31dc8b37c7d6ecdd6420
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/docx/scripts/templates/people.xml
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:056f63aa1197fd8c9dda980c9f1b9ff016fd5fa4a462df8aec5f384f39d23e37
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/executing-plans
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: null
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/executing-plans/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: sha256:c4c3d8b628c51114cd165fb8246fe02744cd8be180032328391252e653028d9b
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/finishing-a-development-branch
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: null
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/finishing-a-development-branch/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: sha256:d0ac8360ed9d59121776ef95c84bcb38e9747de0d7ae7e227dca81e437593b9b
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/frontend-design
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: null
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/frontend-design/LICENSE.txt
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/frontend-design/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:1608ea77fbb6fc30d13a97d12cfa8ebf31358d40f0dd97beed24829d6b3f45dd
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/git-master
+  runtime: null
+  scope: project
+  owners:
+  - yohi/agent-skills/skills/git-master
+  active_owner: yohi/agent-skills/skills/git-master
+  content_hash: null
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/git-master/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - yohi/agent-skills/skills/git-master
+  active_owner: yohi/agent-skills/skills/git-master
+  content_hash: sha256:9ff44ee28ce077e90c80f791af06c53f67b1b8028cb60819430be02b1510a485
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/github-quality-setup
+  runtime: null
+  scope: project
+  owners:
+  - yohi/agent-skills/skills/github-quality-setup
+  active_owner: yohi/agent-skills/skills/github-quality-setup
+  content_hash: null
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/github-quality-setup/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - yohi/agent-skills/skills/github-quality-setup
+  active_owner: yohi/agent-skills/skills/github-quality-setup
+  content_hash: sha256:9bba8ef74c82ed37c0372a7c6e61e12c45e0f92bc97abd79040fb0f431dba587
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/github-quality-setup/evals/evals.json
+  runtime: null
+  scope: project
+  owners:
+  - yohi/agent-skills/skills/github-quality-setup
+  active_owner: yohi/agent-skills/skills/github-quality-setup
+  content_hash: sha256:64b35ea043c1c42abc5c2ad3b385f14909e2c498ccf73a839adff908a421dd86
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/github-quality-setup/references/tool-configs.md
+  runtime: null
+  scope: project
+  owners:
+  - yohi/agent-skills/skills/github-quality-setup
+  active_owner: yohi/agent-skills/skills/github-quality-setup
+  content_hash: sha256:2cd02c5aaea923fd7a5aed449d04596d3b8f8cfcaec8c8de5374e5cbd5c9a02a
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/github-release-packages
+  runtime: null
+  scope: project
+  owners:
+  - yohi/agent-skills/skills/github-release-packages
+  active_owner: yohi/agent-skills/skills/github-release-packages
+  content_hash: null
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/github-release-packages/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - yohi/agent-skills/skills/github-release-packages
+  active_owner: yohi/agent-skills/skills/github-release-packages
+  content_hash: sha256:e99c4b99bdd1d3c85cc78c801f25b3831847c6578f99dd3c3b4c88501015ad7d
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/github-release-packages/evals/evals.json
+  runtime: null
+  scope: project
+  owners:
+  - yohi/agent-skills/skills/github-release-packages
+  active_owner: yohi/agent-skills/skills/github-release-packages
+  content_hash: sha256:3084b69017007b0537d92f1f6b4c3d70621c38227bba5b558cfd2e5825aa5d3d
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/github-release-packages/references/docker.md
+  runtime: null
+  scope: project
+  owners:
+  - yohi/agent-skills/skills/github-release-packages
+  active_owner: yohi/agent-skills/skills/github-release-packages
+  content_hash: sha256:178a60b53862b7cb939ffa8119e61c8489142111340cebbab9cf35a24aa90c57
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/github-release-packages/references/go.md
+  runtime: null
+  scope: project
+  owners:
+  - yohi/agent-skills/skills/github-release-packages
+  active_owner: yohi/agent-skills/skills/github-release-packages
+  content_hash: sha256:a788582cff8aca478f855be646d9ac365cd5763aadf15fef082e01bd2c2c3903
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/github-release-packages/references/manifest-mode.md
+  runtime: null
+  scope: project
+  owners:
+  - yohi/agent-skills/skills/github-release-packages
+  active_owner: yohi/agent-skills/skills/github-release-packages
+  content_hash: sha256:df55884df5ff298b51cfc99d7b7c52ce6cc75139e3b4837789987763171b5ea0
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/github-release-packages/references/nodejs.md
+  runtime: null
+  scope: project
+  owners:
+  - yohi/agent-skills/skills/github-release-packages
+  active_owner: yohi/agent-skills/skills/github-release-packages
+  content_hash: sha256:3c268721971648d452d43bd399a5d911740bc56479647ea81094bd0db152870f
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/github-release-packages/references/python.md
+  runtime: null
+  scope: project
+  owners:
+  - yohi/agent-skills/skills/github-release-packages
+  active_owner: yohi/agent-skills/skills/github-release-packages
+  content_hash: sha256:36ab86e47687bdfa7f505acb2f6eb03adcddf08357544a4c8cdcfd9b2e5dadb5
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/github-release-packages/references/rust.md
+  runtime: null
+  scope: project
+  owners:
+  - yohi/agent-skills/skills/github-release-packages
+  active_owner: yohi/agent-skills/skills/github-release-packages
+  content_hash: sha256:f44d5c9d14c49409a2532c434aa2dc6e88132e004c6b21836eb3607a6bfe0921
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/github-release-packages/scripts/generate-workflow.sh
+  runtime: null
+  scope: project
+  owners:
+  - yohi/agent-skills/skills/github-release-packages
+  active_owner: yohi/agent-skills/skills/github-release-packages
+  content_hash: sha256:9ee87655c95279ee57acf3642b944014f9cca7cb6dc6436146a73110824f4b9b
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/github-release-packages/scripts/grade.sh
+  runtime: null
+  scope: project
+  owners:
+  - yohi/agent-skills/skills/github-release-packages
+  active_owner: yohi/agent-skills/skills/github-release-packages
+  content_hash: sha256:621def19270a49b5ea0e51df007f0ab6973af33660e57cc10cdec7bf9e849250
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/greploop
+  runtime: null
+  scope: project
+  owners:
+  - greptileai/skills/greploop
+  active_owner: greptileai/skills/greploop
+  content_hash: null
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/greploop/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - greptileai/skills/greploop
+  active_owner: greptileai/skills/greploop
+  content_hash: sha256:b515e64c91eaeca900682cd9bfc319e665d8fa9a5759d3e8157b16d6de338caa
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/greploop/references/gitlab-api.md
+  runtime: null
+  scope: project
+  owners:
+  - greptileai/skills/greploop
+  active_owner: greptileai/skills/greploop
+  content_hash: sha256:56ed1f30b4a5fe8c3286503505de1d4f9704f361ed158c162a0027c6bbbd2c80
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/greploop/references/graphql-queries.md
+  runtime: null
+  scope: project
+  owners:
+  - greptileai/skills/greploop
+  active_owner: greptileai/skills/greploop
+  content_hash: sha256:99a689cf5318332316353a3fe2e68d5f6096f9c48b6428ca5ddf434ee5c75a42
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/internal-comms
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: null
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/internal-comms/LICENSE.txt
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:bc6b3af2f331cbc7fb0da1344efb2cbe5877a31498b4d70dbc7000f3405a1362
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/internal-comms/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:067b7587a344a928fc6534ef66b1bcd591fc7c26d207ea7ca3334aeb678d6475
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/internal-comms/examples/3p-updates.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:087e4363c0f3513728a7e695eeb9ead5c3ecd12a4681b59340691180e65b68fc
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/internal-comms/examples/company-newsletter.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:30f81cfbdb03858a006169c72169024089c7c5d3d32611d337782da4f38c86b5
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/internal-comms/examples/faq-answers.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:5ecd3356cd6666937f2ebefa753253edfdbdca15e368d07baf398bfcced72484
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/internal-comms/examples/general-comms.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:4d3a4bb198a77626bcf018e96b2b45a2dbabed172d4ade0fcd70d23ae8a47a47
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/makefile-organization
+  runtime: null
+  scope: project
+  owners:
+  - yohi/agent-skills/skills/makefile-organization
+  active_owner: yohi/agent-skills/skills/makefile-organization
+  content_hash: null
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/makefile-organization/REFERENCE.md
+  runtime: null
+  scope: project
+  owners:
+  - yohi/agent-skills/skills/makefile-organization
+  active_owner: yohi/agent-skills/skills/makefile-organization
+  content_hash: sha256:e2e8babe76bccef0b2bc032d5edda06eec748b1e2b79630b4078df13d3107057
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/makefile-organization/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - yohi/agent-skills/skills/makefile-organization
+  active_owner: yohi/agent-skills/skills/makefile-organization
+  content_hash: sha256:d88ed176c1a5a3f7399468366993fc60220bb7d1a879ea41fd8b4bd1f85de6a9
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/mcp-builder
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: null
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/mcp-builder/LICENSE.txt
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:bc6b3af2f331cbc7fb0da1344efb2cbe5877a31498b4d70dbc7000f3405a1362
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/mcp-builder/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:0f4592dcb53cf2b5d6b7febee6b4152018b565551a1c29e3c612f57b218ab295
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/mcp-builder/reference/evaluation.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:8c99479f8a2d22a636c38e274537aac3610879e26f34e0709825077c4576f427
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/mcp-builder/reference/mcp_best_practices.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:80fb4369a349447cf18ecdd7494fe7938b6065377e9f08c077cec411093a3007
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/mcp-builder/reference/node_mcp_server.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:c3ba35a4f599dd53be9c6555ae72c19a7bf412cd5426576c2c08d42755482c66
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/mcp-builder/reference/python_mcp_server.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:2da52f77e675191014ca2e146a4b95aa04d0ca7dd7e2b100322df15ade685e80
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/mcp-builder/scripts/connections.py
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:9403668a2041568772082a8b334122c1f88daf0541fb393af4522d0094a47a6e
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/mcp-builder/scripts/evaluation.py
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:49ed1d17cdce5da101b210197740713f49b935c29d4f339542a14b132658e6f7
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/mcp-builder/scripts/example_evaluation.xml
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:9272b348ddcc4b06ba562367ccd0770e018158c0068ac5116d5e34aaeff8777a
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/mcp-builder/scripts/requirements.txt
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:d5d7558b2368ecea9dfeed7d1fbc71ee9e0750bebd1282faa527d528a344c3c7
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/pdf
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: null
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/pdf/LICENSE.txt
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:79f6d8f5b427252fa3b1c11ecdbdb6bf610b944f7530b4de78f770f38741cfaa
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/pdf/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:9f78b8359fbd4943ad260a7a1e436e5a96503406d6c34e99f69223d647d85b9c
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/pdf/forms.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:9530b3f57034792e0242a3abfe8b3c296466329551916f2ff6c5a70db78f7e44
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/pdf/reference.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:03a5f964f8abecbbe156f363356e927e864d7ee964f1012c84ee1bfc8acbeb95
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/pdf/scripts/check_bounding_boxes.py
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:0ced522402dd7b3c82a0be9518cf4e485fa9cc0467d7beab6ddb04cb36fcc3e1
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/pdf/scripts/check_fillable_fields.py
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:1fe10b9980a5493c9bbec8c20630c603eaa475b45403751c08f26738736647b8
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/pdf/scripts/convert_pdf_to_images.py
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:7f58e292a67e18a8ff000d30bad2469389546731f7e8a698cc1d0aed001ea15d
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/pdf/scripts/create_validation_image.py
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:8fa9fd7962c9f940045b81cf6b991e7c1057c1838e3f9cc6d305007a222ffebf
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/pdf/scripts/extract_form_field_info.py
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:bb235b36f497bbb1c7c6821cecf527bbba7213520de11219da99f7b13a38c109
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/pdf/scripts/extract_form_structure.py
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:6814e3fe8f78c2b16d766c132b5a727ff7a31b71d76a7d46bd6e40fe50bc97c5
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/pdf/scripts/fill_fillable_fields.py
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:d140872c2e92e41b1e05370ae8d270c5b7f5ebdf55d9905f03bc974a9c708ff5
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/pdf/scripts/fill_pdf_form_with_annotations.py
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:8a56e063a49ed53c0b0e1d312ecf8023af76816ed139486ec3b539873de202fd
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/pptx
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: null
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/pptx/LICENSE.txt
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:79f6d8f5b427252fa3b1c11ecdbdb6bf610b944f7530b4de78f770f38741cfaa
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/pptx/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:e5b0df918cbe9d62508b3cf808d73899633f82fc19f6258a25ef9f0de7e62125
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/pptx/editing.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:6cb47c3ab17e60b7de37e83131c409ef5a90a01bfb54e999905a9c9f7dd88e68
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/pptx/pptxgenjs.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:9539534d92b7170813b735a448750df3580390da2da6c52a02b687ed53ecba86
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/pptx/scripts/__init__.py
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/pptx/scripts/add_slide.py
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:04233ba3932c6b8611677347891616456e243cc09b7f9769408b8c83d9acfe64
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/pptx/scripts/clean.py
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:3e3966a17f488a1ddc7145f0b7ec9f25595afa1f3a427ab05e610f1a328feea9
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/pptx/scripts/office/helpers/__init__.py
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/pptx/scripts/office/helpers/merge_runs.py
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:7c40ed838b88639c51f9ffdcfd564b568f26832b78fe44008c0e01b742669ca7
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/pptx/scripts/office/helpers/simplify_redlines.py
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:560cb55978a834c505406eb18e2c61f62f998fc7a2d8e9721b9c563b42597896
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/pptx/scripts/office/pack.py
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:b1800987e568261a31f462df8e1303d386e9e6ccc11a75ef46e60cc528c20683
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/pptx/scripts/office/schemas/ISO-IEC29500-4_2016/dml-chart.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:41b93bd8857cc68b1e43be2806a872d736a9bdd6566900062d8fdb57d7bbb354
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/pptx/scripts/office/schemas/ISO-IEC29500-4_2016/dml-chartDrawing.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:3fd0586f2637b98bb9886f0e0b67d89e1cc987c2d158cc7deb5f5b9890ced412
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/pptx/scripts/office/schemas/ISO-IEC29500-4_2016/dml-diagram.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:29b254ee0d10414a8504b5a08149c7baec35a60d5ff607d6b3f492aa36815f40
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/pptx/scripts/office/schemas/ISO-IEC29500-4_2016/dml-lockedCanvas.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:5cb76dabd8b97d1e9308a1700b90c20139be4d50792d21a7f09789f5cccd6026
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/pptx/scripts/office/schemas/ISO-IEC29500-4_2016/dml-main.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:5375417f0f5394b8dd1a7035b9679151f19a6b65df309dec10cfb4a420cb00e9
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/pptx/scripts/office/schemas/ISO-IEC29500-4_2016/dml-picture.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:5d389d42befbebd91945d620242347caecd3367f9a3a7cf8d97949507ae1f53c
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/pptx/scripts/office/schemas/ISO-IEC29500-4_2016/dml-spreadsheetDrawing.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:b4532b6d258832953fbb3ee4c711f4fe25d3faf46a10644b2505f17010d01e88
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/pptx/scripts/office/schemas/ISO-IEC29500-4_2016/dml-wordprocessingDrawing.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:bdad416b096b61d37b71603b2c949484f9070c830bdaeba93bf35e15c8900614
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/pptx/scripts/office/schemas/ISO-IEC29500-4_2016/pml.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:d173c3e5d61e42e2e3a97226c632fd2ab7cc481fc4e492365b87024ab546daff
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/pptx/scripts/office/schemas/ISO-IEC29500-4_2016/shared-additionalCharacteristics.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:3c6709101c6aaa82888df5d8795c33f9e857196790eb320d9194e64be2b6bdd8
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/pptx/scripts/office/schemas/ISO-IEC29500-4_2016/shared-bibliography.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:0b364451dc36a48dd6dae0f3b6ada05fd9b71e5208211f8ee5537d7e51a587e2
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/pptx/scripts/office/schemas/ISO-IEC29500-4_2016/shared-commonSimpleTypes.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:e2abacbb9a55ce1365f8961bc1b1395bbc811e512b111000d8c333f98458dece
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/pptx/scripts/office/schemas/ISO-IEC29500-4_2016/shared-customXmlDataProperties.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:0ef4bb354ff44b923564c4ddbdda5987919d220225129ec94614a618ceafc281
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/pptx/scripts/office/schemas/ISO-IEC29500-4_2016/shared-customXmlSchemaProperties.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:0d103b99a4a8652f8871552a69d42d2a3760ac6a5e3ef02d979c4273257ff6a4
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/pptx/scripts/office/schemas/ISO-IEC29500-4_2016/shared-documentPropertiesCustom.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:9c085407751b9061c1f996f6c39ce58451be22a8d334f09175f0e89e42736285
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/pptx/scripts/office/schemas/ISO-IEC29500-4_2016/shared-documentPropertiesExtended.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:bc92e36ccd233722d4c5869bec71ddc7b12e2df56059942cce5a39065cc9c368
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/pptx/scripts/office/schemas/ISO-IEC29500-4_2016/shared-documentPropertiesVariantTypes.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:7b5b7413e2c895b1e148e82e292a117d53c7ec65b0696c992edca57b61b4a74b
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/pptx/scripts/office/schemas/ISO-IEC29500-4_2016/shared-math.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:3213ef1631606250f5010b42cad7ef716f7c59426367798e33c374c0ec391d3a
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/pptx/scripts/office/schemas/ISO-IEC29500-4_2016/shared-relationshipReference.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:12264f3c03d738311cd9237d212f1c07479e70f0cbe1ae725d29b36539aef637
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/pptx/scripts/office/schemas/ISO-IEC29500-4_2016/sml.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:beffeed56945c22a77440122c8bdc426f3fcbe7f3b12ea0976c770d1f8d54578
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/pptx/scripts/office/schemas/ISO-IEC29500-4_2016/vml-main.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:f5ee623b08b6a66935e5aced2f5d8ad0fc71bf9e8e833cd490150c0fa94b8763
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/pptx/scripts/office/schemas/ISO-IEC29500-4_2016/vml-officeDrawing.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:585bedc1313b40888dcc544cb74cd939a105ee674f3b1d3aa1cc6d34f70ff155
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/pptx/scripts/office/schemas/ISO-IEC29500-4_2016/vml-presentationDrawing.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:133c9f64a5c5d573b78d0a474122b22506d8eadb5e063f67cdbbb8fa2f161d0e
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/pptx/scripts/office/schemas/ISO-IEC29500-4_2016/vml-spreadsheetDrawing.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:6bdeb169c3717eb01108853bd9fc5a3750fb1fa5b82abbdd854d49855a40f519
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/pptx/scripts/office/schemas/ISO-IEC29500-4_2016/vml-wordprocessingDrawing.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:475dcae1e7d1ea46232db6f8481040c15e53a52a3c256831d3df204212b0e831
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/pptx/scripts/office/schemas/ISO-IEC29500-4_2016/wml.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:c2dd9f61f892deae6acd8d20771ea79b12018af25f3bf8d06639c8542d218cfd
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/pptx/scripts/office/schemas/ISO-IEC29500-4_2016/xml.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:a539aa2fb154fa50e0f5cc97e6ad7cbc66f8ec3e3746f61ec6a8b0d5d15ecdf2
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/pptx/scripts/office/schemas/ecma/fouth-edition/opc-contentTypes.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:9e0b7209fc69ab11987900404540969976000c5ebe4d4f58c43dc3842886bf3a
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/pptx/scripts/office/schemas/ecma/fouth-edition/opc-coreProperties.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:451958454e8588dfc7cd945981ada142ca06ff3307937f5700df059c2b307fa8
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/pptx/scripts/office/schemas/ecma/fouth-edition/opc-digSig.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:6de111e11403f7cd49027400755bae0ea1cabef2815f09bd40a24f0017613b24
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/pptx/scripts/office/schemas/ecma/fouth-edition/opc-relationships.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:f565adfef5a502044abc3a9153e157edc25af78304d335994afb958874b15e26
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/pptx/scripts/office/schemas/mce/mc.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:3a37e461ecf5a8670fdec34029703401f8728ab9c96ec1739a6ae58d55212413
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/pptx/scripts/office/schemas/microsoft/wml-2010.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:568b26ee156cb9549aa439ca2158965f77b7c1602b7e0316f40ac6cf586e35f2
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/pptx/scripts/office/schemas/microsoft/wml-2012.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:0fa75578a000439a7988ba0c59fdc69f774bbd416cbacc14d07125b3f686cb74
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/pptx/scripts/office/schemas/microsoft/wml-2018.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:be0ff793a22dd31384650c3a4da14c2fa8062751c2e97b0e5ee852bda13c60ad
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/pptx/scripts/office/schemas/microsoft/wml-cex-2018.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:fddc2b880cabb9005aebbc7e783e53c19fec1c03df7d0e2f2076a33a0fdfd081
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/pptx/scripts/office/schemas/microsoft/wml-cid-2016.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:127ca209fa73d7cb708449cb355c871867948a96e4a74f7bf5811ef62d17991d
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/pptx/scripts/office/schemas/microsoft/wml-sdtdatahash-2020.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:842e7163409c8d74f4d7088a8bc99500d80bc75332681a0980055b08f374a604
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/pptx/scripts/office/schemas/microsoft/wml-symex-2015.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:16f6f8072249f431370723c2cd8974672e0d9c897e00e97dd918079df934871b
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/pptx/scripts/office/soffice.py
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:a3e21840e29e32f947d5286028931b96eaf2dee63f75d883b8eb19c943c80aa0
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/pptx/scripts/office/unpack.py
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:83f69cecc87910183654c06345837244402e8a99edbf3bdddc1cf72f11304b62
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/pptx/scripts/office/validate.py
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:1aef24f8e316965a0584c30859776bd2c82a9fb69f72d79cfed041119cf95514
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/pptx/scripts/office/validators/__init__.py
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:83e0f035c5abea238d3f2c3968afbd511ed022b527b7c9cb60a9434cc34ff987
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/pptx/scripts/office/validators/base.py
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:d6358b67252df4dbfe4fa6647423a765960c949346ef6a8c4eb8722bb1108d25
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/pptx/scripts/office/validators/docx.py
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:0ef04ce86b2e6b6a1cb088c0276fd0bd5b770d96fdfe7a6cc73d005feb3f0345
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/pptx/scripts/office/validators/pptx.py
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:f937961e62a5fa0d002b8dc51a4c4e2cd8fcd59fe65853fa54edaca3fe99eccc
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/pptx/scripts/office/validators/redlining.py
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:f4c33fdb9da0651d1d9aa76f0d5294cc9955869339ae131b2f75f3b2e366cb40
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/pptx/scripts/thumbnail.py
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:e959ecd4f19735161218bc44d0648a46da17874323fb3e19c2e9cb50cefe6ce7
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/receiving-code-review
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: null
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/receiving-code-review/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: sha256:091df1629510af1b92fc4abd6f96732ebedb4cb2c0f3457e8f2740b0504a2438
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/requesting-code-review
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: null
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/requesting-code-review/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: sha256:d71cc01ba56d2325cf8af5f7c11837819b63ecd57de0bfdb812f7f3ff7751df8
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/requesting-code-review/code-reviewer.md
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: sha256:b2f2ec7596925fe52dac158fdfbca19b3a7d779d619c481e6706a6c0001662d3
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/skill-creator
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: null
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/skill-creator/LICENSE.txt
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:bc6b3af2f331cbc7fb0da1344efb2cbe5877a31498b4d70dbc7000f3405a1362
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/skill-creator/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:dcd4803e61e913e6fc27294184cd3a71f09f5e924ff20c8a9a20173e7b3c2bcf
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/skill-creator/agents/analyzer.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:bf68f4cac5a56c673a928c2e6d619586c5b93ea364026ab37547772cb45a663a
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/skill-creator/agents/comparator.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:fe1fc9787c495d864c5d6eada47396478572325fde1b33a96d78bf4b849b7a3e
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/skill-creator/agents/grader.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:57134da0c1a4eea33fbd74a1c9c44aa814f07d6bc64de303edb586f941e5d21a
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/skill-creator/assets/eval_review.html
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:ce477dcc74dc1c0d1d3352646a79167b5a63634e936b1019160025065974e452
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/skill-creator/eval-viewer/generate_review.py
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:fc9d1b9243fe5ab6012ebd579bd76d0035de1b79fd3b969de114defab26478fb
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/skill-creator/eval-viewer/viewer.html
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:a53213426ee1100441d701a3a0d49cda7a842f992d2c36463f4d3cc0258575fa
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/skill-creator/references/schemas.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:8e8876180a8989b406a4d3edddf875b04cdfd5805cc8616686d552b11ce4455f
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/skill-creator/scripts/__init__.py
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/skill-creator/scripts/aggregate_benchmark.py
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:123ef128ea5ccc01a4b1ac212ef5567f21e9c13d3d240609780beeb3200c49aa
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/skill-creator/scripts/generate_report.py
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:13df7118a3c50c83c4c3250a606d5f2b20b25a3d44cbc392b3d669ec75281453
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/skill-creator/scripts/improve_description.py
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:87d864570220b699fac52da309d2d6efdb060647bfebc74f768128e646accf80
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/skill-creator/scripts/package_skill.py
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:1a33059b0db1ef73375d46d513e5ea81369d2e8838c970597b0d52ddef8d1c0f
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/skill-creator/scripts/quick_validate.py
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:67cf5703402013936c8fb75ad6a1afecd8841d45cc5e606b634eb05825fde365
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/skill-creator/scripts/run_eval.py
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:43e3b8f80dbf69c343967ba77e268fae991d9fa3ed68b32a0ff02532cd48657f
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/skill-creator/scripts/run_loop.py
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:7bd6f674203168520517eec94c55f493c0d154339b061b4d7c0f0dad187d0f21
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/skill-creator/scripts/utils.py
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:3af8ae62c40c73ab712207436a0d9a981e845f25c5a7040229eb189cc8e45bb1
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/slack-gif-creator
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: null
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/slack-gif-creator/LICENSE.txt
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:bc6b3af2f331cbc7fb0da1344efb2cbe5877a31498b4d70dbc7000f3405a1362
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/slack-gif-creator/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:2efca615ce55a3edd8fc05c779068a8085816617991987e446606403cd3abb22
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/slack-gif-creator/core/easing.py
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:60bc943449802541f0f0881a874faa7ef408aaaf0b758fde756664ada7740452
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/slack-gif-creator/core/frame_composer.py
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:a127ea8f2a58893ea10a5c7b5cab4e2010af6515adc538676eb0cc14f5a03985
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/slack-gif-creator/core/gif_builder.py
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:b6f50d738c491ee0438a2e86e897f71cdab9792494ba4605f140befb0bddbf89
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/slack-gif-creator/core/validators.py
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:56bd19e3aae05f8387d78ec8185d6098b3dc909d1fa041211753da37212528a3
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/slack-gif-creator/requirements.txt
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:edc7108a0c6b56183566c71ee96830f6dc791e3b41952112d9cb56b33a6bd757
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/subagent-driven-development
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: null
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/subagent-driven-development/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: sha256:ca49b5d6acd6259e47b71b8f04345902a3b43fab8a63eac33532edfcec861376
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/subagent-driven-development/implementer-prompt.md
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: sha256:946601616a6f76ab3f165ef98377390968f1ec124ecef87422bc3553404e0332
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/subagent-driven-development/re-review-prompt.md
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: sha256:e1d8e0e65e58ccde6dc920843da9148d23e65aeb0f8932bcc30be1341a703c4c
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/subagent-driven-development/scripts/review-package
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: sha256:fac3d4bd7f94369e8037b9ead2a8a502dca6ab333902b560b9455dbb3c450ebe
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/subagent-driven-development/scripts/sdd-workspace
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: sha256:95a09d9d3983ad1aafd093ca72b4587946dea885c6e302caa02a779a2f911c31
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/subagent-driven-development/scripts/task-brief
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: sha256:d6954ef7841c7da3d77373e6ff5118b3f2f2e998606fd95d33e6527851bce044
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/subagent-driven-development/task-reviewer-prompt.md
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: sha256:e3b4a1bfe7cd55ed0459e5ca9cdddb6ff086c345b99e9097036db6a18545729e
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/systematic-debugging
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: null
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/systematic-debugging/CREATION-LOG.md
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: sha256:c24733a5b1821bd6bed1fc950261f0b9f4e90097e0bbb96459d8179713730789
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/systematic-debugging/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: sha256:808fc5717aa88ad65efff312b11c186294d3e6ee301afb584e2f86599b137787
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/systematic-debugging/condition-based-waiting-example.ts
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: sha256:40ae5ebe497fdf310200e43fe986552546d0a22837c0d39e855db1cfd33eb88e
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/systematic-debugging/condition-based-waiting.md
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: sha256:e89fec8400d6cd50f43407cec9fab50976ba4d55d0ec2eb51c0bd68036b54c26
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/systematic-debugging/defense-in-depth.md
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: sha256:1e175fb86fc357e58c6aebf5441e481e1b7868b4380c0456b63a17eefbd18ba7
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/systematic-debugging/find-polluter.sh
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: sha256:dd7b8f13c4cc2a24b33ff87b18da9248f3e1c80a085c3316224f69ff0fa5c43c
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/systematic-debugging/root-cause-tracing.md
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: sha256:6b0622269e098ca1399e123e553fd385f0b6412d88ef0e9c4f5a8ea9cf1cec7b
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/systematic-debugging/test-academic.md
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: sha256:fe2ba480d78ac0d686dc025f41c2a32a43d642bf533f91b0c6053a04d35d6486
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/systematic-debugging/test-pressure-1.md
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: sha256:0b6a915db0054577819834c79be9eb614e97bddba10d73768e1fbe91cfed048a
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/systematic-debugging/test-pressure-2.md
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: sha256:b2030aeffba07050e8ad573ddf87486457c4a016a786bb326235bebd856f2016
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/systematic-debugging/test-pressure-3.md
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: sha256:96b50a52e2c7989c9cf20fb752c47c1e9a3a70dc362f8f7989f8f5b64dac7708
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/test-driven-development
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: null
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/test-driven-development/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: sha256:bf1b8216e523851a411e91d429a7c1c2a173e79d88957bc78e348218d50edd54
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/test-driven-development/writing-good-tests.md
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: sha256:51471c853306ff92ca8bb41dcaea05f31c0e46b03651f8f3c99754b7172f4ae1
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/theme-factory
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: null
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/theme-factory/LICENSE.txt
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:bc6b3af2f331cbc7fb0da1344efb2cbe5877a31498b4d70dbc7000f3405a1362
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/theme-factory/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:c35893e221e28895c52143cc11bf30e41a44817796b39d4b15727dadc9796552
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/theme-factory/theme-showcase.pdf
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:3e126eca9fe99088051f7cb984c97cedb31c7d9e09ce0ba5d61bd01e70a0d253
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/theme-factory/themes/arctic-frost.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:868a75a8fb5b2a61d0f0ab87c437fe632d3cbab6371c418f06aa2816ac109ae0
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/theme-factory/themes/botanical-garden.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:222cb8e7496abc9b75b29453c809fb9839e7e4b01fa45deecdd896b38d087765
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/theme-factory/themes/desert-rose.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:bd065b8629be3b64655183927e248e3d892a27b8d184b009cfba89c96102744f
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/theme-factory/themes/forest-canopy.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:ecb722efa24688e808b5bf323c334ca2349e989cfddd72ce8400ce5d4c4bd3e7
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/theme-factory/themes/golden-hour.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:3444a00df971d3c2f06b665e21a2e9eb5d7d7d6f6281f2758773b8345776a139
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/theme-factory/themes/midnight-galaxy.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:0e134c4c0324df41e34ac314269aa6829cd378cf3c304b31858d0cd158d2f944
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/theme-factory/themes/modern-minimalist.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:b8bc572b75948d4df69c401af703b9262ed6820a3ceb270da30a529e92763614
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/theme-factory/themes/ocean-depths.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:a7ad8eec85341dbfcb2665da827a4b6a4baee08ab3335ac02421f18e6b46b2e2
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/theme-factory/themes/sunset-boulevard.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:658af11ab04be4923692571081ffb42a428141ae537703117b9236d9f8ee22a3
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/theme-factory/themes/tech-innovation.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:183648163026dd5eeba3df5effa335b55ba333c3ee1fe215278605e55f40a52a
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/using-git-worktrees
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: null
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/using-git-worktrees/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: sha256:8cfb86f121269e8f7f12361e6795c4f6738828340e28964c9229d365666c9edd
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/using-superpowers
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: null
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/using-superpowers/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: sha256:55379fe7c1c473a02c61961c822996bff30e1320d6921d9062509bc508482c05
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/using-superpowers/references/antigravity-tools.md
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: sha256:4880f6de3da4e32f9659ebe7a72b9e0ebfff04e028c2ed96173f86d0387a04c0
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/using-superpowers/references/codex-tools.md
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: sha256:d3f113a8ebbd748e8ba847b09b57b7685442775ca4ee194d693ce3663f8fac68
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/using-superpowers/references/gemini-tools.md
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: sha256:62b9157bcb0ee3c6784e3d0da0798ddfa5872f9e0c34bea48f3079dabea71965
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/using-superpowers/references/pi-tools.md
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: sha256:703dbc83d23ecab9c6f388460c38abc482e9dee2fe6772a8c7a255152ad3a4d5
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/verification-before-completion
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: null
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/verification-before-completion/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: sha256:2befe7fc55bcadaa3d97dd9e8efeb633d2561c0ebe74c5a8b17c4d9e7e4520b3
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/web-artifacts-builder
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: null
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/web-artifacts-builder/LICENSE.txt
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:bc6b3af2f331cbc7fb0da1344efb2cbe5877a31498b4d70dbc7000f3405a1362
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/web-artifacts-builder/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:81c5002c6643b0de7b8710b00e7a9038daa6fb9b68d59870ee6adb12da8d10f8
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/web-artifacts-builder/scripts/bundle-artifact.sh
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:abf0e480bf6585b56fab8526a407dfb7dc740812bddd70c636e1e8f3df5f9618
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/web-artifacts-builder/scripts/init-artifact.sh
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:355e5dd4382aaaee91f01f1627eaeab30b2676ffa8d9b3ec328a1ae450ebccaa
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/web-artifacts-builder/scripts/shadcn-components.tar.gz
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:1296f069e825de7933de7e8ac63672495cacce3f88f2dc45554dbcddbcbca60f
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/webapp-testing
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: null
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/webapp-testing/LICENSE.txt
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:bc6b3af2f331cbc7fb0da1344efb2cbe5877a31498b4d70dbc7000f3405a1362
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/webapp-testing/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:51b7349e77ec63b7744a6f63647e7566a0b4d2e301121cc10e8c2113af6556a2
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/webapp-testing/examples/console_logging.py
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:ea46877289acb82da7e7ce59d0bc37c8977cd57e2a006d0c88d7a1c625bf95da
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/webapp-testing/examples/element_discovery.py
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:d63c89604a22f8845d724e95dda45db49b1bf57c25ce0a83afbb7b8da3d402f0
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/webapp-testing/examples/static_html_automation.py
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:9d533aafb875ee3ab8b8ebf8f5b9003ac8d999da3d09b285cce252e623140064
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/webapp-testing/scripts/with_server.py
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:b0dcf4918935b795f4eda9821579b9902119235ff4447f687a30286e7d0925fd
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/writing-plans
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: null
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/writing-plans/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: sha256:72190c88b2b5a67a96b91d66aa72b9161913e10e8769da3f28a226f4cc7b99d0
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/writing-plans/plan-document-reviewer-prompt.md
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: sha256:aa728b96aad603c8be28875a4305637f6c984aa81ffcadcb13e743202fa2a0c7
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/writing-skills
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: null
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/writing-skills/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: sha256:16148d03c58f718abe2a9cfbb3edd06159b4a454391c5c2b933dfa1c25f9601e
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/writing-skills/anthropic-best-practices.md
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: sha256:217629b356c09c9bd11017c9788e8fc654ca1b32c92d4a51cd490e16dd65e59a
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/writing-skills/examples/CLAUDE_MD_TESTING.md
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: sha256:0b379a3415e185d3c434b3ad283d8aa132f3022c2a4f210f168865b5986bcef0
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/writing-skills/graphviz-conventions.dot
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: sha256:e2890a593c91370e384b42f2f67b1a6232c9e69dddea7891a0c1c46d7b20b694
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/writing-skills/persuasion-principles.md
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: sha256:a51bc9bf75189ea73a27b3fb504a2fdfdb966fb1f7f1cdf03203230a216ccc03
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/writing-skills/render-graphs.js
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: sha256:ccda971a87bb185f8febf81c56b556a20d026fa980c17b35fa3e8824fbb37852
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/writing-skills/testing-skills-with-subagents.md
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: sha256:c711346852c911b24a84aa161e0cff06a4cd7f4e2fa9e9c0a266cead5afcbade
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/xlsx
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: null
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/xlsx/LICENSE.txt
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:79f6d8f5b427252fa3b1c11ecdbdb6bf610b944f7530b4de78f770f38741cfaa
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/xlsx/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:dd316db7785a6be12966c2a2d848931fbf5f518b3cdb0a66fa62ee835ead1cfc
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/xlsx/scripts/office/helpers/__init__.py
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/xlsx/scripts/office/helpers/merge_runs.py
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:7c40ed838b88639c51f9ffdcfd564b568f26832b78fe44008c0e01b742669ca7
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/xlsx/scripts/office/helpers/simplify_redlines.py
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:560cb55978a834c505406eb18e2c61f62f998fc7a2d8e9721b9c563b42597896
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/xlsx/scripts/office/pack.py
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:b1800987e568261a31f462df8e1303d386e9e6ccc11a75ef46e60cc528c20683
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/dml-chart.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:41b93bd8857cc68b1e43be2806a872d736a9bdd6566900062d8fdb57d7bbb354
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/dml-chartDrawing.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:3fd0586f2637b98bb9886f0e0b67d89e1cc987c2d158cc7deb5f5b9890ced412
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/dml-diagram.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:29b254ee0d10414a8504b5a08149c7baec35a60d5ff607d6b3f492aa36815f40
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/dml-lockedCanvas.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:5cb76dabd8b97d1e9308a1700b90c20139be4d50792d21a7f09789f5cccd6026
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/dml-main.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:5375417f0f5394b8dd1a7035b9679151f19a6b65df309dec10cfb4a420cb00e9
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/dml-picture.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:5d389d42befbebd91945d620242347caecd3367f9a3a7cf8d97949507ae1f53c
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/dml-spreadsheetDrawing.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:b4532b6d258832953fbb3ee4c711f4fe25d3faf46a10644b2505f17010d01e88
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/dml-wordprocessingDrawing.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:bdad416b096b61d37b71603b2c949484f9070c830bdaeba93bf35e15c8900614
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/pml.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:d173c3e5d61e42e2e3a97226c632fd2ab7cc481fc4e492365b87024ab546daff
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/shared-additionalCharacteristics.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:3c6709101c6aaa82888df5d8795c33f9e857196790eb320d9194e64be2b6bdd8
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/shared-bibliography.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:0b364451dc36a48dd6dae0f3b6ada05fd9b71e5208211f8ee5537d7e51a587e2
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/shared-commonSimpleTypes.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:e2abacbb9a55ce1365f8961bc1b1395bbc811e512b111000d8c333f98458dece
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/shared-customXmlDataProperties.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:0ef4bb354ff44b923564c4ddbdda5987919d220225129ec94614a618ceafc281
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/shared-customXmlSchemaProperties.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:0d103b99a4a8652f8871552a69d42d2a3760ac6a5e3ef02d979c4273257ff6a4
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/shared-documentPropertiesCustom.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:9c085407751b9061c1f996f6c39ce58451be22a8d334f09175f0e89e42736285
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/shared-documentPropertiesExtended.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:bc92e36ccd233722d4c5869bec71ddc7b12e2df56059942cce5a39065cc9c368
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/shared-documentPropertiesVariantTypes.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:7b5b7413e2c895b1e148e82e292a117d53c7ec65b0696c992edca57b61b4a74b
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/shared-math.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:3213ef1631606250f5010b42cad7ef716f7c59426367798e33c374c0ec391d3a
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/shared-relationshipReference.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:12264f3c03d738311cd9237d212f1c07479e70f0cbe1ae725d29b36539aef637
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/sml.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:beffeed56945c22a77440122c8bdc426f3fcbe7f3b12ea0976c770d1f8d54578
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/vml-main.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:f5ee623b08b6a66935e5aced2f5d8ad0fc71bf9e8e833cd490150c0fa94b8763
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/vml-officeDrawing.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:585bedc1313b40888dcc544cb74cd939a105ee674f3b1d3aa1cc6d34f70ff155
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/vml-presentationDrawing.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:133c9f64a5c5d573b78d0a474122b22506d8eadb5e063f67cdbbb8fa2f161d0e
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/vml-spreadsheetDrawing.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:6bdeb169c3717eb01108853bd9fc5a3750fb1fa5b82abbdd854d49855a40f519
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/vml-wordprocessingDrawing.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:475dcae1e7d1ea46232db6f8481040c15e53a52a3c256831d3df204212b0e831
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/wml.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:c2dd9f61f892deae6acd8d20771ea79b12018af25f3bf8d06639c8542d218cfd
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/xml.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:a539aa2fb154fa50e0f5cc97e6ad7cbc66f8ec3e3746f61ec6a8b0d5d15ecdf2
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/xlsx/scripts/office/schemas/ecma/fouth-edition/opc-contentTypes.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:9e0b7209fc69ab11987900404540969976000c5ebe4d4f58c43dc3842886bf3a
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/xlsx/scripts/office/schemas/ecma/fouth-edition/opc-coreProperties.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:451958454e8588dfc7cd945981ada142ca06ff3307937f5700df059c2b307fa8
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/xlsx/scripts/office/schemas/ecma/fouth-edition/opc-digSig.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:6de111e11403f7cd49027400755bae0ea1cabef2815f09bd40a24f0017613b24
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/xlsx/scripts/office/schemas/ecma/fouth-edition/opc-relationships.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:f565adfef5a502044abc3a9153e157edc25af78304d335994afb958874b15e26
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/xlsx/scripts/office/schemas/mce/mc.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:3a37e461ecf5a8670fdec34029703401f8728ab9c96ec1739a6ae58d55212413
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/xlsx/scripts/office/schemas/microsoft/wml-2010.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:568b26ee156cb9549aa439ca2158965f77b7c1602b7e0316f40ac6cf586e35f2
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/xlsx/scripts/office/schemas/microsoft/wml-2012.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:0fa75578a000439a7988ba0c59fdc69f774bbd416cbacc14d07125b3f686cb74
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/xlsx/scripts/office/schemas/microsoft/wml-2018.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:be0ff793a22dd31384650c3a4da14c2fa8062751c2e97b0e5ee852bda13c60ad
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/xlsx/scripts/office/schemas/microsoft/wml-cex-2018.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:fddc2b880cabb9005aebbc7e783e53c19fec1c03df7d0e2f2076a33a0fdfd081
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/xlsx/scripts/office/schemas/microsoft/wml-cid-2016.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:127ca209fa73d7cb708449cb355c871867948a96e4a74f7bf5811ef62d17991d
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/xlsx/scripts/office/schemas/microsoft/wml-sdtdatahash-2020.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:842e7163409c8d74f4d7088a8bc99500d80bc75332681a0980055b08f374a604
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/xlsx/scripts/office/schemas/microsoft/wml-symex-2015.xsd
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:16f6f8072249f431370723c2cd8974672e0d9c897e00e97dd918079df934871b
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/xlsx/scripts/office/soffice.py
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:a3e21840e29e32f947d5286028931b96eaf2dee63f75d883b8eb19c943c80aa0
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/xlsx/scripts/office/unpack.py
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:83f69cecc87910183654c06345837244402e8a99edbf3bdddc1cf72f11304b62
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/xlsx/scripts/office/validate.py
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:1aef24f8e316965a0584c30859776bd2c82a9fb69f72d79cfed041119cf95514
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/xlsx/scripts/office/validators/__init__.py
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:83e0f035c5abea238d3f2c3968afbd511ed022b527b7c9cb60a9434cc34ff987
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/xlsx/scripts/office/validators/base.py
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:d6358b67252df4dbfe4fa6647423a765960c949346ef6a8c4eb8722bb1108d25
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/xlsx/scripts/office/validators/docx.py
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:0ef04ce86b2e6b6a1cb088c0276fd0bd5b770d96fdfe7a6cc73d005feb3f0345
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/xlsx/scripts/office/validators/pptx.py
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:f937961e62a5fa0d002b8dc51a4c4e2cd8fcd59fe65853fa54edaca3fe99eccc
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/xlsx/scripts/office/validators/redlining.py
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:f4c33fdb9da0651d1d9aa76f0d5294cc9955869339ae131b2f75f3b2e366cb40
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/xlsx/scripts/recalc.py
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:cf419d15e02965aeaec17773c05b61303f7f520f67fa2696547e7da07502eac7
+- kind: project-relative
+  target: opencode
+  value: .opencode/agents/code-reviewer.md
+  runtime: null
+  scope: project
+  owners:
+  - coderabbitai/skills
+  active_owner: coderabbitai/skills
+  content_hash: sha256:5677b371344cdc444390fbb366041eee7ad204fdbc85b6a37f92671afa8bce7f
+- kind: project-relative
+  target: opencode
+  value: .opencode/commands/code-review.md
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/claude-code/plugins/code-review
+  active_owner: anthropics/claude-code/plugins/code-review
+  content_hash: sha256:ecab79f22b6e2bef07a524d2015aaa9e0b7abce82445f38b31a231b19c7bd43a
+- kind: project-relative
+  target: opencode
+  value: .opencode/commands/coderabbit-review.md
+  runtime: null
+  scope: project
+  owners:
+  - coderabbitai/skills
+  active_owner: coderabbitai/skills
+  content_hash: sha256:cba1e6915ee98d24f288e3fb2dfb4b9b5bdc9e3164abf66b885aa9b66d8ce17d
 mcp_servers:
 - atlassian
 - aws-documentation
@@ -1223,7 +6092,7 @@ mcp_configs:
       DASHBOARD_PORT: ${env:DASHBOARD_PORT}
     args:
     - --from
-    - context-store-mcp[all] @ https://github.com/yohi/chronos-graph/archive/refs/tags/v3.0.0.tar.gz
+    - context-store-mcp[all] @ https://github.com/yohi/chronos-graph/archive/refs/tags/v3.0.1.tar.gz
     - context-store
     registry: false
     command: uvx
@@ -1298,7 +6167,7 @@ mcp_configs:
       NO_PROXY: 127.0.0.1,localhost
     args:
     - -y
-    - '@yohi/nexus@1.29.0'
+    - '@yohi/nexus@1.29.1'
     - http-bridge
     registry: false
     command: npx
@@ -1371,9 +6240,21 @@ mcp_configs:
     title: SonarQube MCP
     timeout: 60000
     enabled: true
-local_deployed_files:
-- .cursor/rules/agent-commands.mdc
-- .cursor/rules/architecture.mdc
-local_deployed_file_hashes:
-  .cursor/rules/agent-commands.mdc: sha256:de037ca92ad5bb65be804d929789aa4ffe0027c7d94b6917d5146c7e91ebf7f7
-  .cursor/rules/architecture.mdc: sha256:7d7892b6042e79abf1fab5e526cfeacd898731e8118fd0ef93b3475804346f40
+mcp_target_servers:
+  opencode:
+  - atlassian
+  - aws-documentation
+  - aws-iac
+  - aws-mcp
+  - chronos-graph
+  - codegraph
+  - coderabbit
+  - filesystem
+  - github-official
+  - greptile
+  - nexus
+  - semgrep
+  - sentry-remote
+  - sequentialthinking
+  - skillport
+  - sonarqube
