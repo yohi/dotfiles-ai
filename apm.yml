@@ -13,7 +13,7 @@ skills:
 dependencies:
   # Skills
   apm:
-    - obra/superpowers#v6.1.1
+    - obra/superpowers#v6.2.0
     - anthropics/skills
     - coderabbitai/skills
     - greptileai/skills//check-pr
@@ -198,7 +198,7 @@ dependencies:
       command: "npx"
       args:
         - "-y"
-        - "@yohi/nexus@1.29.0"
+        - "@yohi/nexus@1.30.0"
         - "http-bridge"
       env:
         LOG_LEVEL: "ERROR"
@@ -217,7 +217,7 @@ dependencies:
       command: "uvx"
       args:
         - "--from"
-        - "context-store-mcp[all] @ https://github.com/yohi/chronos-graph/archive/refs/tags/v3.0.0.tar.gz"
+        - "context-store-mcp[all] @ https://github.com/yohi/chronos-graph/archive/refs/tags/v3.0.1.tar.gz"
         - "context-store"
       env:
         STORAGE_BACKEND: "${env:STORAGE_BACKEND}"
@@ -257,9 +257,9 @@ shell: bash
 snapshot: true
 
 plugin:
-  - "@yohi/justice@2.4.0"
+  - "@yohi/justice@2.6.0"
   - "@yohi/akane@1.6.2"
-  - "oh-my-openagent@4.19.0"
+  - "oh-my-openagent@4.19.3"
   - "@yohi/chronos-gate@1.1.0"
   - "@nick-vi/opencode-type-inject@latest"
   - "opencode-vibeguard@latest"
