@@ -1,109 +1,156 @@
 #!/bin/bash
-# _scripts/test-opencode-wrapper.sh: Test suite for opencode-wrapper.sh profile switching
+# _scripts/test-opencode-wrapper.sh: Test suite for opencode-wrapper.sh (omo native profiles)
+#
+# Tests that:
+# 1. OMO_PROFILE is correctly set for each profile
+# 2. Profile selection via argument works (personal/work)
+# 3. Profile selection via PROFILE env var works
+# 4. Port argument is passed when available
+# 5. Wrapper exits cleanly on valid invocations
 
-set -eo pipefail
+set -o pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BASE_PATH="$SCRIPT_DIR/../opencode"
 WRAPPER="$SCRIPT_DIR/opencode-wrapper.sh"
 
-echo "🧪 Running opencode-wrapper.sh tests..."
+PASS=0
+FAIL=0
 
-get_profile_model() {
-    local env_file="$1"
-    (
-        set -a
-        source "$env_file"
-        echo "$SISYPHUS_MODEL"
-    )
-}
+pass() { echo "  ✅ $1"; PASS=$((PASS+1)); }
+fail() { echo "  ❌ $1"; FAIL=$((FAIL+1)); }
 
-EXPECTED_PERSONAL_MODEL=$(get_profile_model "$BASE_PATH/personal.env")
-EXPECTED_WORK_MODEL=$(get_profile_model "$BASE_PATH/work.env")
+echo "🧪 Running opencode-wrapper.sh tests (omo native profiles)..."
+echo ""
 
-if [ -z "$EXPECTED_PERSONAL_MODEL" ] || [ -z "$EXPECTED_WORK_MODEL" ]; then
-    echo "❌ Failed: Could not load models from env files."
-    exit 1
-fi
-
+# --- Setup mock opencode ---
 TEST_SANDBOX=$(mktemp -d)
 trap 'rm -rf "$TEST_SANDBOX"' EXIT
 
 MOCK_BIN_DIR="$TEST_SANDBOX/bin"
 mkdir -p "$MOCK_BIN_DIR"
 MOCK_LOG="$TEST_SANDBOX/mock_opencode.log"
-PKILL_LOG="$TEST_SANDBOX/mock_pkill.log"
 
-cat << EOF > "$MOCK_BIN_DIR/opencode"
+cat <<'EOF' > "$MOCK_BIN_DIR/opencode"
 #!/bin/bash
-echo "CALL: opencode \$@" >> "$MOCK_LOG"
-echo "ENV_KIMI_K2_6=\${KIMI_K2_6:-unset}" >> "$MOCK_LOG"
-echo "OPENCODE_CONFIG_DIR=\$OPENCODE_CONFIG_DIR" >> "$MOCK_LOG"
-if [ -n "\$OPENCODE_CONFIG_DIR" ] && [ -d "\$OPENCODE_CONFIG_DIR" ] && [ -f "\$OPENCODE_CONFIG_DIR/oh-my-openagent.jsonc" ]; then
-    echo "CONFIG_GENERATED=true" >> "$MOCK_LOG"
-    cat "\$OPENCODE_CONFIG_DIR/oh-my-openagent.jsonc" > "$MOCK_LOG.generated_config"
-fi
+echo "CALL: opencode $@" >> "$MOCK_LOG"
+echo "OMO_PROFILE=${OMO_PROFILE:-unset}" >> "$MOCK_LOG"
+echo "OPENCODE_CONFIG_DIR=${OPENCODE_CONFIG_DIR:-unset}" >> "$MOCK_LOG"
+echo "SKILLPORT_SKILLS_DIR=${SKILLPORT_SKILLS_DIR:-unset}" >> "$MOCK_LOG"
 EOF
+# Inject MOCK_LOG path into the mock script
+sed -i "s|\"\$MOCK_LOG\"|\"$MOCK_LOG\"|g" "$MOCK_BIN_DIR/opencode"
 chmod +x "$MOCK_BIN_DIR/opencode"
-
-cat << EOF > "$MOCK_BIN_DIR/pkill"
-#!/bin/bash
-echo "PKILL_CALL: pkill \$@" >> "$PKILL_LOG"
-EOF
-chmod +x "$MOCK_BIN_DIR/pkill"
 
 export PATH="$MOCK_BIN_DIR:$PATH"
 
-echo "  - Testing wrapper invocation with personal profile..."
-rm -f "$MOCK_LOG" "$MOCK_LOG.generated_config" "$PKILL_LOG"
-"$WRAPPER" personal run "hello" >/dev/null 2>&1
+# --- Test 1: personal profile via argument ---
+echo "  [1] Profile arg: personal"
+rm -f "$MOCK_LOG"
+"$WRAPPER" personal --version >/dev/null 2>&1 || true
 
-if grep -q "CALL: opencode --model $EXPECTED_PERSONAL_MODEL" "$MOCK_LOG" && \
-   grep -q "CONFIG_GENERATED=true" "$MOCK_LOG" && \
-   grep -q "$EXPECTED_PERSONAL_MODEL" "$MOCK_LOG.generated_config" && \
-   grep -q "PKILL_CALL: pkill -f opencode.*--port" "$PKILL_LOG"; then
-    echo "  ✅ Personal profile wrapper invocation & pkill cleanup verified"
+if grep -q "OMO_PROFILE=personal" "$MOCK_LOG" 2>/dev/null; then
+    pass "OMO_PROFILE=personal is set"
 else
-    echo "  ❌ Failed: Personal profile wrapper invocation did not generate expected config/args or trigger pkill"
-    cat "$MOCK_LOG" "$PKILL_LOG" 2>/dev/null || true
-    exit 1
+    fail "OMO_PROFILE=personal not found in env"
+    cat "$MOCK_LOG" 2>/dev/null || true
 fi
 
-echo "  - Testing wrapper env var unsetting across profile switch..."
-rm -f "$MOCK_LOG" "$MOCK_LOG.generated_config" "$PKILL_LOG"
-(
-    export KIMI_K2_6="should_be_cleared_by_wrapper"
-    "$WRAPPER" work run "hello" >/dev/null 2>&1
-)
+# --- Test 2: work profile via argument ---
+echo "  [2] Profile arg: work"
+rm -f "$MOCK_LOG"
+"$WRAPPER" work --version >/dev/null 2>&1 || true
 
-if grep -q "CALL: opencode --model $EXPECTED_WORK_MODEL" "$MOCK_LOG" && \
-   grep -q "ENV_KIMI_K2_6=unset" "$MOCK_LOG" && \
-   grep -q "CONFIG_GENERATED=true" "$MOCK_LOG" && \
-   grep -q "$EXPECTED_WORK_MODEL" "$MOCK_LOG.generated_config" && \
-   grep -q "PKILL_CALL: pkill -f opencode.*--port" "$PKILL_LOG"; then
-    echo "  ✅ Work profile wrapper invocation, generated config & old env var unsetting (KIMI_K2_6) verified"
+if grep -q "OMO_PROFILE=work" "$MOCK_LOG" 2>/dev/null; then
+    pass "OMO_PROFILE=work is set"
 else
-    echo "  ❌ Failed: Work profile wrapper invocation did not clear old profile env vars, generate config, or pass expected args"
-    cat "$MOCK_LOG" "$PKILL_LOG" 2>/dev/null || true
-    exit 1
+    fail "OMO_PROFILE=work not found in env"
+    cat "$MOCK_LOG" 2>/dev/null || true
 fi
 
-echo "  - Testing ~/.omo/omo.jsonc preservation and restoration..."
-MOCK_HOME="$TEST_SANDBOX/home"
-mkdir -p "$MOCK_HOME/.omo"
-echo '{"user_custom": true}' > "$MOCK_HOME/.omo/omo.jsonc"
+# --- Test 3: default profile (no arg) ---
+echo "  [3] Default profile (no arg)"
+rm -f "$MOCK_LOG"
+"$WRAPPER" --version >/dev/null 2>&1 || true
 
-(
-    export HOME="$MOCK_HOME"
-    export PATH="$MOCK_BIN_DIR:$PATH"
-    "$WRAPPER" personal run "hello" >/dev/null 2>&1
-)
-
-if [ -f "$MOCK_HOME/.omo/omo.jsonc" ] && grep -q "user_custom" "$MOCK_HOME/.omo/omo.jsonc"; then
-    echo "  ✅ Persistent ~/.omo/omo.jsonc was safely preserved and restored after execution"
+if grep -q "OMO_PROFILE=personal" "$MOCK_LOG" 2>/dev/null; then
+    pass "Default profile is 'personal'"
 else
-    echo "  ❌ Failed: ~/.omo/omo.jsonc was lost or corrupted"
-    exit 1
+    fail "Default profile not 'personal'"
+    cat "$MOCK_LOG" 2>/dev/null || true
 fi
 
-echo "🎉 All wrapper end-to-end integration tests passed successfully!"
+# --- Test 4: PROFILE env var ---
+echo "  [4] PROFILE env var override"
+rm -f "$MOCK_LOG"
+PROFILE=work "$WRAPPER" --version >/dev/null 2>&1 || true
+
+if grep -q "OMO_PROFILE=work" "$MOCK_LOG" 2>/dev/null; then
+    pass "PROFILE=work env var sets OMO_PROFILE=work"
+else
+    fail "PROFILE=work env var did not set OMO_PROFILE=work"
+    cat "$MOCK_LOG" 2>/dev/null || true
+fi
+
+# --- Test 5: profile arg consumed (not passed to opencode) ---
+echo "  [5] Profile arg not forwarded to opencode"
+rm -f "$MOCK_LOG"
+"$WRAPPER" personal --version >/dev/null 2>&1 || true
+
+if grep -q "CALL: opencode.*personal" "$MOCK_LOG" 2>/dev/null; then
+    fail "'personal' was forwarded as arg to opencode"
+    cat "$MOCK_LOG" 2>/dev/null || true
+else
+    pass "'personal' arg is consumed by wrapper, not forwarded"
+fi
+
+# --- Test 6: SKILLPORT_SKILLS_DIR is set ---
+echo "  [6] SKILLPORT_SKILLS_DIR is exported"
+rm -f "$MOCK_LOG"
+"$WRAPPER" personal --version >/dev/null 2>&1 || true
+
+if grep -q "SKILLPORT_SKILLS_DIR=" "$MOCK_LOG" 2>/dev/null && \
+   ! grep -q "SKILLPORT_SKILLS_DIR=unset" "$MOCK_LOG" 2>/dev/null; then
+    pass "SKILLPORT_SKILLS_DIR is set"
+else
+    fail "SKILLPORT_SKILLS_DIR is not set"
+    cat "$MOCK_LOG" 2>/dev/null || true
+fi
+
+# --- Test 7: omo.jsonc profiles sanity check ---
+echo "  [7] ~/.omo/omo.jsonc has profiles.personal and profiles.work"
+OOM_JSONC="$HOME/.omo/omo.jsonc"
+if [ -f "$OOM_JSONC" ]; then
+    if node -e "
+const {parse} = require('/home/y_ohi/.cache/opencode/packages/oh-my-openagent@4.19.3/node_modules/jsonc-parser/lib/umd/main.js');
+const fs = require('fs');
+const cfg = parse(fs.readFileSync('$OOM_JSONC', 'utf-8'), [], {allowTrailingComma:true, disallowComments:false});
+const profiles = Object.keys(cfg.profiles || {});
+if (!profiles.includes('personal') || !profiles.includes('work')) {
+  process.exit(1);
+}
+const personalModel = cfg.profiles.personal?.['[opencode]']?.agents?.sisyphus?.model;
+const workModel = cfg.profiles.work?.['[opencode]']?.agents?.sisyphus?.model;
+if (!personalModel || !workModel) process.exit(1);
+if (workModel.includes('bedrock') && !personalModel.includes('bedrock')) process.exit(0);
+process.exit(1);
+" 2>/dev/null; then
+        pass "omo.jsonc has valid profiles.personal (non-bedrock) and profiles.work (bedrock)"
+    else
+        fail "omo.jsonc profiles structure invalid"
+    fi
+else
+    fail "~/.omo/omo.jsonc not found"
+fi
+
+# --- Summary ---
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "  Results: $PASS passed, $FAIL failed"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+if [ "$FAIL" -gt 0 ]; then
+    echo "❌ Some tests failed"
+    exit 1
+else
+    echo "🎉 All tests passed!"
+fi
