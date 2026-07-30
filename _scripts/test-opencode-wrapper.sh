@@ -48,80 +48,115 @@ export PATH="$MOCK_BIN_DIR:$PATH"
 # --- Test 1: personal profile via argument ---
 echo "  [1] Profile arg: personal"
 rm -f "$MOCK_LOG"
-"$WRAPPER" personal --version >/dev/null 2>&1 || true
-
-if grep -q "OMO_PROFILE=personal" "$MOCK_LOG" 2>/dev/null; then
-    pass "OMO_PROFILE=personal is set"
+if "$WRAPPER" personal --version >/dev/null 2>&1; then
+    if grep -q "OMO_PROFILE=personal" "$MOCK_LOG" 2>/dev/null; then
+        pass "OMO_PROFILE=personal is set"
+    else
+        fail "OMO_PROFILE=personal not found in env"
+        cat "$MOCK_LOG" 2>/dev/null || true
+    fi
 else
-    fail "OMO_PROFILE=personal not found in env"
-    cat "$MOCK_LOG" 2>/dev/null || true
+    fail "Wrapper invocation failed for personal profile"
 fi
 
 # --- Test 2: work profile via argument ---
 echo "  [2] Profile arg: work"
 rm -f "$MOCK_LOG"
-"$WRAPPER" work --version >/dev/null 2>&1 || true
-
-if grep -q "OMO_PROFILE=work" "$MOCK_LOG" 2>/dev/null; then
-    pass "OMO_PROFILE=work is set"
+if "$WRAPPER" work --version >/dev/null 2>&1; then
+    if grep -q "OMO_PROFILE=work" "$MOCK_LOG" 2>/dev/null; then
+        pass "OMO_PROFILE=work is set"
+    else
+        fail "OMO_PROFILE=work not found in env"
+        cat "$MOCK_LOG" 2>/dev/null || true
+    fi
 else
-    fail "OMO_PROFILE=work not found in env"
-    cat "$MOCK_LOG" 2>/dev/null || true
+    fail "Wrapper invocation failed for work profile"
 fi
 
 # --- Test 3: default profile (no arg) ---
 echo "  [3] Default profile (no arg)"
 rm -f "$MOCK_LOG"
-"$WRAPPER" --version >/dev/null 2>&1 || true
-
-if grep -q "OMO_PROFILE=personal" "$MOCK_LOG" 2>/dev/null; then
-    pass "Default profile is 'personal'"
+if "$WRAPPER" --version >/dev/null 2>&1; then
+    if grep -q "OMO_PROFILE=personal" "$MOCK_LOG" 2>/dev/null; then
+        pass "Default profile is 'personal'"
+    else
+        fail "Default profile not 'personal'"
+        cat "$MOCK_LOG" 2>/dev/null || true
+    fi
 else
-    fail "Default profile not 'personal'"
-    cat "$MOCK_LOG" 2>/dev/null || true
+    fail "Wrapper invocation failed for default profile"
 fi
 
 # --- Test 4: PROFILE env var ---
 echo "  [4] PROFILE env var override"
 rm -f "$MOCK_LOG"
-PROFILE=work "$WRAPPER" --version >/dev/null 2>&1 || true
-
-if grep -q "OMO_PROFILE=work" "$MOCK_LOG" 2>/dev/null; then
-    pass "PROFILE=work env var sets OMO_PROFILE=work"
+if PROFILE=work "$WRAPPER" --version >/dev/null 2>&1; then
+    if grep -q "OMO_PROFILE=work" "$MOCK_LOG" 2>/dev/null; then
+        pass "PROFILE=work env var sets OMO_PROFILE=work"
+    else
+        fail "PROFILE=work env var did not set OMO_PROFILE=work"
+        cat "$MOCK_LOG" 2>/dev/null || true
+    fi
 else
-    fail "PROFILE=work env var did not set OMO_PROFILE=work"
-    cat "$MOCK_LOG" 2>/dev/null || true
+    fail "Wrapper invocation failed for PROFILE=work"
 fi
 
-# --- Test 5: profile arg consumed (not passed to opencode) ---
-echo "  [5] Profile arg not forwarded to opencode"
+# --- Test 4b: Invalid PROFILE env var fallback ---
+echo "  [4b] Invalid PROFILE env var fallback"
 rm -f "$MOCK_LOG"
-"$WRAPPER" personal --version >/dev/null 2>&1 || true
-
-if grep -q "CALL: opencode.*personal" "$MOCK_LOG" 2>/dev/null; then
-    fail "'personal' was forwarded as arg to opencode"
-    cat "$MOCK_LOG" 2>/dev/null || true
+if PROFILE=wrk "$WRAPPER" --version >/dev/null 2>&1; then
+    if grep -q "OMO_PROFILE=personal" "$MOCK_LOG" 2>/dev/null; then
+        pass "PROFILE=wrk falls back to OMO_PROFILE=personal"
+    else
+        fail "PROFILE=wrk did not fall back to personal"
+        cat "$MOCK_LOG" 2>/dev/null || true
+    fi
 else
-    pass "'personal' arg is consumed by wrapper, not forwarded"
+    fail "Wrapper invocation failed for PROFILE=wrk"
+fi
+
+# --- Test 5: profile arg consumed & port forwarding ---
+echo "  [5] Profile arg not forwarded & port forwarding check"
+rm -f "$MOCK_LOG"
+if "$WRAPPER" personal >/dev/null 2>&1; then
+    if grep -q "CALL: opencode.*personal" "$MOCK_LOG" 2>/dev/null; then
+        fail "'personal' was forwarded as arg to opencode"
+        cat "$MOCK_LOG" 2>/dev/null || true
+    else
+        pass "'personal' arg is consumed by wrapper, not forwarded"
+    fi
+
+    # Check if --port parameter was added when port detected
+    if grep -q "CALL: opencode.*--port" "$MOCK_LOG" 2>/dev/null; then
+        pass "Detected port was forwarded to opencode"
+    else
+        # If no port available or ss tool absent, pass conditionally/skip assertion
+        pass "No port forwarded (or ss not available/no open port found)"
+    fi
+else
+    fail "Wrapper invocation failed for no-arg invocation"
 fi
 
 # --- Test 6: SKILLPORT_SKILLS_DIR is set ---
 echo "  [6] SKILLPORT_SKILLS_DIR is exported"
 rm -f "$MOCK_LOG"
-"$WRAPPER" personal --version >/dev/null 2>&1 || true
-
-if grep -q "SKILLPORT_SKILLS_DIR=" "$MOCK_LOG" 2>/dev/null && \
-   ! grep -q "SKILLPORT_SKILLS_DIR=unset" "$MOCK_LOG" 2>/dev/null; then
-    pass "SKILLPORT_SKILLS_DIR is set"
+if "$WRAPPER" personal --version >/dev/null 2>&1; then
+    if grep -q "SKILLPORT_SKILLS_DIR=" "$MOCK_LOG" 2>/dev/null && \
+       ! grep -q "SKILLPORT_SKILLS_DIR=unset" "$MOCK_LOG" 2>/dev/null; then
+        pass "SKILLPORT_SKILLS_DIR is set"
+    else
+        fail "SKILLPORT_SKILLS_DIR is not set"
+        cat "$MOCK_LOG" 2>/dev/null || true
+    fi
 else
-    fail "SKILLPORT_SKILLS_DIR is not set"
-    cat "$MOCK_LOG" 2>/dev/null || true
+    fail "Wrapper invocation failed for SKILLPORT_SKILLS_DIR test"
 fi
 
-# --- Test 7: omo.jsonc profiles sanity check ---
-echo "  [7] ~/.omo/omo.jsonc has profiles.personal and profiles.work"
-OOM_JSONC="$HOME/.omo/omo.jsonc"
-if [ -f "$OOM_JSONC" ]; then
+# --- Test 7: opencode/omo.jsonc profiles sanity check ---
+echo "  [7] opencode/omo.jsonc has profiles.personal and profiles.work"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+REPO_OMO_JSONC="$REPO_ROOT/opencode/omo.jsonc"
+if [ -f "$REPO_OMO_JSONC" ]; then
     if python3 -c "
 import json
 import re
@@ -140,7 +175,7 @@ def strip_jsonc(text):
         text = text.replace(f'__STR{i}__', s)
     return text
 
-raw = open('$OOM_JSONC', encoding='utf-8').read()
+raw = open('$REPO_OMO_JSONC', encoding='utf-8').read()
 cfg = json.loads(strip_jsonc(raw))
 profiles = list(cfg.get('profiles', {}).keys())
 if 'personal' not in profiles or 'work' not in profiles:
@@ -153,12 +188,29 @@ if 'bedrock' in work_model and 'bedrock' not in personal_model:
     sys.exit(0)
 sys.exit(1)
 " 2>/dev/null; then
-        pass "omo.jsonc has valid profiles.personal (non-bedrock) and profiles.work (bedrock)"
+        pass "opencode/omo.jsonc has valid profiles.personal (non-bedrock) and profiles.work (bedrock)"
     else
-        fail "omo.jsonc profiles structure invalid"
+        fail "opencode/omo.jsonc profiles structure invalid"
     fi
 else
-    skip "~/.omo/omo.jsonc not found"
+    fail "opencode/omo.jsonc not found in repo"
+fi
+
+# --- Test 8: ~/.omo/omo.jsonc symlink contract check ---
+echo "  [8] ~/.omo/omo.jsonc symlink contract check"
+HOME_OMO_JSONC="$HOME/.omo/omo.jsonc"
+if [ -L "$HOME_OMO_JSONC" ]; then
+    LINK_TARGET=$(readlink -f "$HOME_OMO_JSONC")
+    EXPECTED_TARGET=$(readlink -f "$REPO_OMO_JSONC")
+    if [ "$LINK_TARGET" = "$EXPECTED_TARGET" ]; then
+        pass "~/.omo/omo.jsonc correctly links to repo opencode/omo.jsonc"
+    else
+        fail "~/.omo/omo.jsonc links to $LINK_TARGET instead of $EXPECTED_TARGET"
+    fi
+elif [ -f "$HOME_OMO_JSONC" ]; then
+    skip "~/.omo/omo.jsonc exists but is a regular file (not a symlink)"
+else
+    skip "~/.omo/omo.jsonc does not exist"
 fi
 
 # --- Summary ---

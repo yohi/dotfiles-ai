@@ -158,16 +158,13 @@
             ],
             "ultrawork": {
               "model": "openai/gpt-5.6-sol",
-              "fallback_models": [
-                "cloudflare-ai-gateway-custom/dynamic/kimi-k2.7-code"
-              ],
               "variant": "max",
-              "effort": "high"
+              "reasoning": "high"
             }
           },
           "hephaestus": {
             // 【製造担当】 GPT-5.6 Terra: 自律実装に特化したプリンシプル駆動
-            "disabled": false,
+            "disable": false,
             "model": "openai/gpt-5.6-terra",
             "variant": "xhigh",
             "fallback_models": [
@@ -320,16 +317,13 @@
             ],
             "ultrawork": {
               "model": "amazon-bedrock/global.anthropic.claude-opus-5",
-              "fallback_models": [
-                "amazon-bedrock/global.anthropic.claude-sonnet-5"
-              ],
               "variant": "max",
-              "effort": "high"
+              "reasoning": "high"
             }
           },
           "hephaestus": {
             // 【製造担当】 GPT-5.5専用プロンプトのため、Claude環境では非推奨
-            "disabled": true,
+            "disable": true,
             "model": "amazon-bedrock/global.anthropic.claude-sonnet-5",
             "variant": "default",
             "fallback_models": [

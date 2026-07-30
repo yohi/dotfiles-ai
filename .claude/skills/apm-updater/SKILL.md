@@ -146,9 +146,10 @@ python .claude/skills/apm-updater/scripts/check_updates.py --models
 
 `cloudflare-ai-gateway-custom` は `models.dev` に存在しないカスタム provider です。`--validate-models` は `whitelist` またはリスト形式の `models` を通常の provider/model として検査するため、カスタムモデルのマッピング形式はこの検査の対象外です。
 
-- 更新後、以下を実行して `opencode/opencode.jsonc` （生成物）を再生成し、OMO ネイティブプロファイルを反映します:
+- 更新後、以下を実行して `make setup-opencode` で `~/.omo/omo.jsonc` の配置・シンボリックリンク生成を行った後、`opencode/opencode.jsonc` （生成物）を再生成し、OMO ネイティブプロファイルを反映します:
 
 ```bash
+make setup-opencode
 make sync-opencode
 make check-sync-opencode
 ```
@@ -164,7 +165,7 @@ OpenCode のプロファイル切り替えは OMO ネイティブプロファイ
   - 最新の OpenAI モデル（`openai/gpt-*`）や、その他利用可能な最新モデル（Kimi, Gemini, GLM, Qwen, Minimax など）を割り当てます。
   - 対象は `profiles.personal["[opencode]"].agents.<name>.model` / `fallback_models`、および同 `categories.<name>.model` / `fallback_models` です。
 - **`profiles.work` の更新ルール**:
-  - Bedrock モデル（`amazon-bedrock/*`）**のみ**を使用するように構成します（`hephaestus.disabled: true` などの既存設定は維持します）。
+  - Bedrock モデル（`amazon-bedrock/*`）**のみ**を使用するように構成します（`hephaestus.disable: true` などの既存設定は維持します）。
   - 最新の Bedrock Claude モデル（`global.anthropic.claude-*`）を割り当てます。
   - 対象は `profiles.work["[opencode]"].agents.<name>.model` / `fallback_models`、および同 `categories.<name>.model` / `fallback_models` です。
 
@@ -187,7 +188,7 @@ OpenCode のプロファイル切り替えは OMO ネイティブプロファイ
 
 ```bash
 git status --ignored | grep -E 'opencode\.jsonc|opencode\.json' || true
-rm -f opencode.json
+rm -f opencode/opencode.jsonc opencode.json
 make check-sync-opencode
 ```
 

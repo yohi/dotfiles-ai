@@ -21,6 +21,10 @@ if [[ "$1" == "work" || "$1" == "personal" ]]; then
     shift
 fi
 
+if [[ "$PROFILE" != "work" && "$PROFILE" != "personal" ]]; then
+    PROFILE="personal"
+fi
+
 # Activate omo native profile
 export OMO_PROFILE="$PROFILE"
 
