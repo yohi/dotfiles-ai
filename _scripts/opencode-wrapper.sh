@@ -13,7 +13,9 @@ cleanup() {
     fi
     if [ -n "$OMO_BACKUP" ] && [ -f "$OMO_BACKUP" ]; then
         mkdir -p "$HOME/.omo" 2>/dev/null || true
-        mv -f "$OMO_BACKUP" "$OMO_USER_CONFIG" 2>/dev/null || true
+        if ! mv -f "$OMO_BACKUP" "$OMO_USER_CONFIG" 2>/dev/null; then
+            echo "⚠️ Warning: Failed to restore $OMO_USER_CONFIG from backup $OMO_BACKUP" >&2
+        fi
     fi
 }
 trap cleanup EXIT INT TERM

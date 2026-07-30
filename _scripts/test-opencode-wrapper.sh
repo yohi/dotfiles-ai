@@ -37,7 +37,7 @@ PKILL_LOG="$TEST_SANDBOX/mock_pkill.log"
 cat << EOF > "$MOCK_BIN_DIR/opencode"
 #!/bin/bash
 echo "CALL: opencode \$@" >> "$MOCK_LOG"
-echo "ENV_OLD_PROFILE_VAR=\${OLD_PROFILE_TEST_VAR:-unset}" >> "$MOCK_LOG"
+echo "ENV_KIMI_K2_6=\${KIMI_K2_6:-unset}" >> "$MOCK_LOG"
 echo "OPENCODE_CONFIG_DIR=\$OPENCODE_CONFIG_DIR" >> "$MOCK_LOG"
 if [ -n "\$OPENCODE_CONFIG_DIR" ] && [ -d "\$OPENCODE_CONFIG_DIR" ] && [ -f "\$OPENCODE_CONFIG_DIR/oh-my-openagent.jsonc" ]; then
     echo "CONFIG_GENERATED=true" >> "$MOCK_LOG"
@@ -72,15 +72,16 @@ fi
 echo "  - Testing wrapper env var unsetting across profile switch..."
 rm -f "$MOCK_LOG" "$MOCK_LOG.generated_config" "$PKILL_LOG"
 (
-    export OLD_PROFILE_TEST_VAR="should_be_unset"
+    export KIMI_K2_6="should_be_cleared_by_wrapper"
     "$WRAPPER" work run "hello" >/dev/null 2>&1
 )
 
 if grep -q "CALL: opencode --model $EXPECTED_WORK_MODEL" "$MOCK_LOG" && \
+   grep -q "ENV_KIMI_K2_6=unset" "$MOCK_LOG" && \
    grep -q "PKILL_CALL: pkill -f opencode.*--port" "$PKILL_LOG"; then
-    echo "  ✅ Work profile wrapper invocation & server termination verified"
+    echo "  ✅ Work profile wrapper invocation & old env var unsetting (KIMI_K2_6) verified"
 else
-    echo "  ❌ Failed: Work profile wrapper invocation did not pass expected args or trigger pkill"
+    echo "  ❌ Failed: Work profile wrapper invocation did not clear old profile env vars or pass expected args"
     cat "$MOCK_LOG" "$PKILL_LOG" 2>/dev/null || true
     exit 1
 fi
