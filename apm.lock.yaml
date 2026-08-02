@@ -1,5 +1,5 @@
 lockfile_version: '1'
-generated_at: '2026-07-30T07:24:18.436122+00:00'
+generated_at: '2026-08-02T12:24:10.009371+00:00'
 apm_version: 0.26.0
 dependencies:
 - repo_url: anthropics/claude-code
@@ -6167,7 +6167,7 @@ mcp_configs:
       NO_PROXY: 127.0.0.1,localhost
     args:
     - -y
-    - '@yohi/nexus@1.30.0'
+    - '@yohi/nexus@1.31.4'
     - http-bridge
     registry: false
     command: npx

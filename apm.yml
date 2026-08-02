@@ -198,7 +198,7 @@ dependencies:
       command: "npx"
       args:
         - "-y"
-        - "@yohi/nexus@1.30.0"
+        - "@yohi/nexus@1.31.4"
         - "http-bridge"
       env:
         LOG_LEVEL: "ERROR"
@@ -264,9 +264,7 @@ plugin:
   - "@nick-vi/opencode-type-inject@latest"
   - "opencode-vibeguard@latest"
 
-disabled_providers:
-  - google
-  - cursor
+disabled_providers: []
 
 permission:
   "*": ask
@@ -528,6 +526,7 @@ enabled_providers:
   - opencode-go
   - ollama-cloud
   - amazon-bedrock
+  - google
 
 provider:
   cloudflare-ai-gateway-custom:
@@ -598,6 +597,14 @@ provider:
       - openai.gpt-oss-20b-1:0
       - openai.gpt-oss-safeguard-120b
       - openai.gpt-oss-safeguard-20b
+  google:
+    whitelist:
+      - gemini-3.1-pro-preview
+      - gemini-3.6-flash
+      - gemini-3.5-flash-lite
+  opencode-go:
+    whitelist:
+      - kimi-k3
 experimental:
   batch_tool: true
   openTelemetry: true

@@ -439,7 +439,7 @@ Each skill contains step-by-step instructions, templates, and scripts.
 </skill>
 <skill>
   <name>local/apm-updater</name>
-  <description>Checks and updates THIS repository's apm.yml and the OpenCode files derived from it. Handles (1) pinned dependency versions and commit hashes in apm.yml -- APM skill git refs (owner/repo#tag), npm plugins under `plugin:`, and MCP server packages under `dependencies.mcp` -- and (2) LLM model whitelists in apm.yml plus the OpenCode environment profiles (opencode/personal.env, opencode/work.env) and opencode/README.md using the latest model-schema from models.dev. Use whenever the user wants to bump apm.yml dependencies, refresh MCP/plugin/skill pins, check if apm.yml is outdated, update OpenCode LLM model settings, or sync opencode/README.md with the latest oh-my-openagent release. Do NOT use for package.json / uv / other lockfile bumps, GitHub Actions version updates, or adding brand-new MCP/skill/plugin entries to apm.yml.</description>
+  <description>Checks and updates THIS repository's apm.yml and the OpenCode files derived from it. Handles (1) pinned dependency versions and commit hashes in apm.yml -- APM skill git refs (owner/repo#tag), npm plugins under `plugin:`, and MCP server packages under `dependencies.mcp` -- and (2) LLM model whitelists in apm.yml plus the OMO native profile configuration (opencode/omo.jsonc profiles.personal / profiles.work) and opencode/README.md using the latest model-schema from models.dev. Use whenever the user wants to bump apm.yml dependencies, refresh MCP/plugin/skill pins, check if apm.yml is outdated, update OpenCode LLM model settings, or sync opencode/README.md with the latest oh-my-openagent release. Do NOT use for package.json / uv / other lockfile bumps, GitHub Actions version updates, or adding brand-new MCP/skill/plugin entries to apm.yml.</description>
   <location>.claude/skills/apm-updater/SKILL.md</location>
 </skill>
 <skill>
@@ -845,14 +845,27 @@ When using **Nexus MCP** tools for codebase exploration and semantic search, adh
 ### 9.1 WHAT & WHY (Project Overview)
 - **Purpose**: Nexus is a local-first code indexing and search platform for AI agents, providing hybrid semantic search, ripgrep, and AST-based context parsing.
 
-### 9.2 Tool Usage Rules (Playbook)
-- **Index Status**: Run `index_status` before searching. If `isIndexing` is `true`, search results may be incomplete.
+### 9.2 Tool Selection Triggers
+- **Load the code-search skill first**: For any code investigation or design exploration, load the project-local `.agents/skills/code-search.md` before searching. It defines the standard pipeline and One-Call / Deferred Loading patterns.
+- **Structural / call-tree tracing**: If the repository has a `.codegraph/` directory, prefer `codegraph_explore` for dependency and call-tree questions; otherwise use Nexus search tools.
+- **Vague or conceptual search**: Use `hybrid_search` (combines vector & ripgrep via RRF).
+- **Exact symbol or error-string search**: Use `grep_search`.
+- **Minimal file context retrieval**: Use `get_context` with explicit `startLine` and `endLine`.
+
+### 9.3 One-Call & Deferred Loading Patterns
+- **One-Call pattern**: After `hybrid_search` or `grep_search` returns candidates, call `get_context` for the top 1-3 candidates before answering. The first response should contain an actionable, evidence-based summary with file paths and line ranges, not just a list of hits.
+- **Deferred Loading**: Return a summary plus file/line references first. Expand the explanation or fetch additional ranges only when the user asks for details or the initial snippets are insufficient. Never load an entire file through `get_context` merely for background.
+
+### 9.4 Tool Usage Rules (Playbook)
+- **Index Status**: Run `index_status` before any Nexus search (`hybrid_search`, `grep_search`, `semantic_search`). CodeGraph exploration does not depend on the Nexus index, so `index_status` is not required before `codegraph_explore`.
 - **Search Strategy**:
   - Use `hybrid_search` for semantic queries, vague feature exploration, or architectural questions (combines vector & ripgrep via RRF).
   - Use `grep_search` to pinpoint exact symbols, class/function names, or error strings.
+  - If the repository has a `.codegraph/` directory, use `codegraph_explore` for structural or call-tree tracing.
 - **Context Budgeting**:
-  - When calling `get_context`, **DO NOT** read the entire file. Always specify `startLine` and `endLine` parameters to retrieve the minimal relevant snippet to conserve context tokens.
+  - When calling `get_context`, **prefer** partial reads: specify `startLine` and `endLine` to retrieve the minimal relevant snippet whenever you know the range. If you need a complete analysis of a file, omitting the range to read the entire file is acceptable.
   - If you switch branches or make massive code changes, manually call `reindex` to refresh the local LanceDB store.
 
-### 9.3 Project-Specific Context
-- **Local Documentation**: In repositories where Nexus is active, refer to the project-local `SPEC.md` for architecture details and `AGENTS.md` for Agent Commands & Plugins guidelines, if they exist.
+### 9.5 Project-Specific Context
+- **Local Documentation**: In repositories where Nexus is active, refer to the project-local `SPEC.md` for architecture details and `AGENTS.md` for specific development constraints, if they exist.
+- **Skill Layer**: For code-search tasks, the canonical skill file is `.agents/skills/code-search.md`. It contains the standard pipeline (task classification → choose index → get context → act), One-Call pattern, and Deferred Loading guidance.
