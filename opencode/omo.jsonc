@@ -1,5 +1,5 @@
 // OMO configuration
-// Migrated to omo native profiles (v4.19.3+)
+// Migrated to omo native profiles (v4.19.4+)
 // Profile activation: OMO_PROFILE=personal|work (set by opencode-wrapper.sh)
 {
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/omo.schema.json",
@@ -10,7 +10,7 @@
   "[opencode]": {
     // Team Mode: チーム開発・マルチエージェント連携
     "team_mode": {
-      "enabled": true,
+      "enabled": false,
       "base_dir": ".sisyphus/team",
       "auto_sync": true
     },
@@ -155,10 +155,12 @@
         "agents": {
           "sisyphus": {
             // 【司令塔】 Kimi K3: 推論・戦略・Todo管理を統括
-            "model": "cloudflare-ai-gateway-custom/dynamic/kimi-k3",
+            // "model": "cloudflare-ai-gateway/dynamic/kimi-k3",
+            "model": "cloudflare-ai-gateway/dynamic/kimi-k2.7-code",
             "variant": "default",
             "fallback_models": [
-              "cloudflare-ai-gateway-custom/dynamic/kimi-k2.7-code"
+              "openai/gpt-5.6-sol",
+              "cloudflare-ai-gateway/custom-octg/gpt-5.6-sol",
             ],
             "ultrawork": {
               "model": "openai/gpt-5.6-sol",
@@ -169,138 +171,149 @@
           "hephaestus": {
             // 【製造担当】 GPT-5.6 Terra: 自律実装に特化したプリンシプル駆動
             "disable": false,
-            "model": "openai/gpt-5.6-terra",
-            "variant": "xhigh",
+            "model": "cloudflare-ai-gateway/custom-octg/gpt-5.6-luna",
+            "variant": "medium",
             "fallback_models": [
-              "openai/gpt-5.5"
+              "openai/gpt-5.6-luna",
+              "cloudflare-ai-gateway/custom-octg/gpt-5.6-terra",
+              "openai/gpt-5.6-terra"
             ]
           },
           "oracle": {
             // 【大規模解析・監査】 GPT-5.6 Sol: 深い論理推論・アーキテクチャレビュー
-            "model": "openai/gpt-5.6-sol",
+            "model": "cloudflare-ai-gateway/custom-octg/gpt-5.6-sol",
             "variant": "high",
             "fallback_models": [
-              "cloudflare-ai-gateway-custom/dynamic/kimi-k3"
+              "openai/gpt-5.6-sol"
             ]
           },
           "librarian": {
             // 【超高速補助】 GPT-5.6 Luna: 高速・低コスト調査
-            "model": "openai/gpt-5.6-luna",
-            "variant": "default",
+            "model": "cloudflare-ai-gateway/custom-octg/gpt-5.6-luna",
+            "variant": "low",
             "fallback_models": [
-              "cloudflare-ai-gateway-custom/dynamic/kimi-k2.6"
+              "openai/gpt-5.6-luna"
             ],
             "description": "Ultra-fast background research with minimal token cost."
           },
           "explore": {
             // 【高速探索】 GPT-5.6 Luna
-            "model": "openai/gpt-5.6-luna",
-            "variant": "default",
+            "model": "cloudflare-ai-gateway/custom-octg/gpt-5.6-luna",
+            "variant": "medium",
             "fallback_models": [
-              "cloudflare-ai-gateway-custom/dynamic/kimi-k2.6"
+              "openai/gpt-5.6-luna"
+
             ],
             "description": "Rapid scaffolding using autonomous web search for latest technical specs."
           },
           "multimodal-looker": {
             // 【視覚アナリスト】 Kimi K3: 視覚推論・UI/図解解析
-            "model": "cloudflare-ai-gateway-custom/dynamic/kimi-k3",
+            // "model": "cloudflare-ai-gateway/dynamic/kimi-k3",
+            "model": "cloudflare-ai-gateway/google/gemini-3.1-pro",
             "variant": "default",
             "fallback_models": [
-              "cloudflare-ai-gateway-custom/dynamic/kimi-k2.7-code"
+              "cloudflare-ai-gateway/dynamic/kimi-k2.7-code"
             ],
             "description": "Visual Intelligence. Analyzes UI designs for API generation and debugs browser test failures."
           },
           "prometheus": {
             // 【戦略家】 GPT-5.6 Sol: 多角的推論・Agent Swarm計画
-            "model": "openai/gpt-5.6-sol",
+            "model": "cloudflare-ai-gateway/custom-octg/gpt-5.6-sol",
             "variant": "max",
             "fallback_models": [
-              "cloudflare-ai-gateway-custom/dynamic/kimi-k3"
+              "openai/gpt-5.6-sol",
+              "cloudflare-ai-gateway/dynamic/kimi-k2.7-code"
             ]
           },
           "metis": {
-            // 【計画コンサル】 Kimi K2.7 Code: 命令追従・曖昧さの事前排除
-            "model": "cloudflare-ai-gateway-custom/dynamic/kimi-k2.7-code",
+            // 【計画コンサル】 Kimi K3: 命令追従・曖昧さの事前排除
+            "model": "cloudflare-ai-gateway/dynamic/kimi-k2.7-code",
             "variant": "default",
             "fallback_models": [
-              "cloudflare-ai-gateway-custom/dynamic/kimi-k2.6"
+              "cloudflare-ai-gateway/dynamic/kimi-k2.6"
             ]
           },
           "momus": {
             // 【計画レビュアー】 GPT-5.6 Sol: 厳格なレビュー
-            "model": "openai/gpt-5.6-sol",
+            "model": "cloudflare-ai-gateway/custom-octg/gpt-5.6-sol",
             "variant": "xhigh",
             "fallback_models": [
-              "cloudflare-ai-gateway-custom/dynamic/kimi-k3"
+              // "cloudflare-ai-gateway/dynamic/kimi-k3",
+              "openai/gpt-5.6-sol",
+              "cloudflare-ai-gateway/dynamic/kimi-k2.7-code"
             ]
           },
           "atlas": {
             // 【現場監督】 Kimi K3: 環境管理・Todo調整・実行監視
-            "model": "cloudflare-ai-gateway-custom/dynamic/kimi-k3",
+            // "model": "cloudflare-ai-gateway/dynamic/kimi-k3",
+            "model": "cloudflare-ai-gateway/dynamic/kimi-k2.7-code",
             "variant": "default",
             "fallback_models": [
-              "cloudflare-ai-gateway-custom/dynamic/kimi-k2.7-code"
+              "cloudflare-ai-gateway/custom-octg/gpt-5.6-sol"
             ],
             "description": "Orchestrates Tmux, Playwright, and server states. Ensures environment consistency."
           }
         },
         "categories": {
           "ultrabrain": {
-            "model": "cloudflare-ai-gateway-custom/dynamic/kimi-k3",
+            // "model": "cloudflare-ai-gateway/dynamic/kimi-k3",
+            "model": "cloudflare-ai-gateway/dynamic/kimi-k2.7-code",
             "variant": "default",
             "fallback_models": [
+              "cloudflare-ai-gateway/custom-octg/gpt-5.6-sol",
               "openai/gpt-5.6-sol"
             ]
           },
           "deep": {
-            "model": "openai/gpt-5.6-terra",
+            "model": "cloudflare-ai-gateway/custom-octg/gpt-5.6-terra",
             "variant": "xhigh",
             "fallback_models": [
-              "cloudflare-ai-gateway-custom/dynamic/kimi-k3"
+              "openai/gpt-5.6-terra",
+              "cloudflare-ai-gateway/dynamic/kimi-k2.7-code"
             ]
           },
           "quick": {
-            "model": "cloudflare-ai-gateway-custom/dynamic/kimi-k2.7-code",
-            "variant": "default",
+            "model": "cloudflare-ai-gateway/custom-octg/gpt-5.6-luna",
+            "variant": "low",
             "fallback_models": [
-              "cloudflare-ai-gateway-custom/dynamic/kimi-k2.6"
+              "openai/gpt-5.6-luna"
             ]
           },
           "writing": {
-            "model": "cloudflare-ai-gateway-custom/dynamic/kimi-k3",
+            // "model": "cloudflare-ai-gateway/dynamic/kimi-k3",
+            "model": "cloudflare-ai-gateway/dynamic/kimi-k2.7-code",
             "variant": "default",
             "fallback_models": [
-              "cloudflare-ai-gateway-custom/dynamic/kimi-k2.7-code"
+              // "cloudflare-ai-gateway/dynamic/kimi-k2.7-code"
             ]
           },
           "unspecified-low": {
-            "model": "openai/gpt-5.6-luna",
+            "model": "cloudflare-ai-gateway/custom-octg/gpt-5.6-luna",
             "variant": "xhigh",
             "fallback_models": [
-              "cloudflare-ai-gateway-custom/dynamic/kimi-k3",
-              "cloudflare-ai-gateway-custom/dynamic/kimi-k2.7-code"
+              "openai/gpt-5.6-luna"
             ]
           },
           "unspecified-high": {
-            "model": "openai/gpt-5.6-sol",
+            "model": "cloudflare-ai-gateway/custom-octg/gpt-5.6-sol",
             "variant": "high",
             "fallback_models": [
-              "cloudflare-ai-gateway-custom/dynamic/kimi-k3"
+              "openai/gpt-5.6-sol",
+              "cloudflare-ai-gateway/dynamic/kimi-k2.7-code"
             ]
           },
           "visual-engineering": {
-            "model": "cloudflare-ai-gateway-custom/dynamic/gemini-3.1-pro-preview",
+            "model": "cloudflare-ai-gateway/google/gemini-3.1-pro",
             "variant": "high",
             "fallback_models": [
-              "cloudflare-ai-gateway-custom/dynamic/glm-5.2",
-              "cloudflare-ai-gateway-custom/dynamic/kimi-k2.7-code"
+              "cloudflare-ai-gateway/dynamic/kimi-k2.7-code"
             ]
           },
           "artistry": {
-            "model": "cloudflare-ai-gateway-custom/dynamic/gemini-3.1-pro-preview",
+            "model": "cloudflare-ai-gateway/google/gemini-3.1-pro",
             "variant": "high",
             "fallback_models": [
-              "cloudflare-ai-gateway-custom/dynamic/kimi-k3"
+              "cloudflare-ai-gateway/dynamic/kimi-k2.7-code"
             ]
           }
         }

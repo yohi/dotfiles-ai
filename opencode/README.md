@@ -7,9 +7,10 @@
 ### `opencode.jsonc`
 OpenCode プラットフォーム自体のコア設定ファイルです。
 
-### `oh-my-openagent.jsonc`
+### `omo.jsonc`
 メインの設定ファイルであり、各専門エージェントに割り当てる LLM モデルや知能カテゴリーなどを管理します。
-*Target Version: v4.19.3*
+`profiles.personal` と `profiles.work` で環境別のモデル構成を管理します。
+*Target Version: v4.19.4*
 
 ## 2. 使い方
 
@@ -17,7 +18,7 @@ OpenCode プラットフォーム自体のコア設定ファイルです。
 設定を変更する場合は、各ファイルに応じて以下の通り対応してください。
 
 - **`opencode.jsonc`**: `apm.yml` (SSOT) から自動生成されるため、直接編集せず `apm.yml` を編集して `make sync-opencode` を実行してください。このファイルは Git の追跡対象外です。
-- **`oh-my-openagent.jsonc`**: このファイルを直接編集してください。このファイルは Git で追跡されているため、変更履歴を管理できます。
+- **`omo.jsonc`**: このファイルを直接編集してください。このファイルは OMO ネイティブプロファイルの SSOT として Git で追跡されています。
 
 ## 3. 知能カテゴリーとエージェント (11 Specialists)
 
@@ -29,14 +30,14 @@ Sisyphus（監督）は、タスクの性質に応じて最適な「知能カテ
 
 | カテゴリー | 特徴・バリアント | 想定される用途 | 推奨モデル (Brain) |
 | :--- | :--- | :--- | :--- |
-| **ultrabrain** | `xhigh` / 最強推論 | 複雑な計画立案、コード監査、アーキテクチャ設計、リスク分析。 | GPT-5.6 Sol (xhigh) |
+| **ultrabrain** | `xhigh` / 最強推論 | 複雑な計画立案、コード監査、アーキテクチャ設計、リスク分析。 | Kimi K3 → GPT-5.6 Sol |
 | **deep** | `xhigh` / 自律解決 | 難解なバグ修正、機能実装、リファクタリングなど職人的作業。 | gpt-5.6-terra (xhigh) |
 | **quick** | `low` / 高速応答 | ドキュメント検索、コード探索、些細な修正、プロトタイピング。 | gpt-5.6-luna (low) |
-| **visual-engineering** | UI/UX 特化 | UIデザイン解析、CSSアニメーション、フロントエンド最適化。 | Claude Opus 5 (max) |
+| **visual-engineering** | UI/UX 特化 | UIデザイン解析、CSSアニメーション、フロントエンド最適化。 | Gemini 3.1 Pro |
 | **unspecified-high** | 高負荷汎用 | 特定の役割に当てはまらないが、高い知能を要する汎用作業。 | GPT-5.6 Sol (high) |
 | **unspecified-low** | `xhigh` / 低負荷汎用 | 定形的な作業、単純なデータ変換などの低コストな汎用作業。 | gpt-5.6-luna (xhigh) |
 | **writing** | 文書作成 特化 | 技術解説、ドキュメンテーション、リリースノートの作成。 | Kimi (k2.7-code) |
-| **artistry** | 創造性 特化 | ジェネラティブアート、クリエイティブな発想、芸術的表現。 | Claude Fable 5 (xhigh) |
+| **artistry** | 創造性 特化 | ジェネラティブアート、クリエイティブな発想、芸術的表現。 | Gemini 3.1 Pro |
 
 ### エージェント一覧とカテゴリー・マッピング
 
@@ -61,7 +62,7 @@ Sisyphus（監督）は、タスクの性質に応じて最適な「知能カテ
 エージェントの能力を最大限に引き出すためには、エージェントの思考スタイルに合った「脳（モデルファミリー）」を割り当てることが重要です。
 
 ### 推奨スタック: OpenCode Go + OpenAI + Kimi K3 (Best Value)
-最も効率的でバランスの良い組み合わせです。v4.19.3 では **Kimi K3** がファーストクラス対応となり、Sisyphus 系エージェントの司令塔・Todo 管理に最適です。
+最も効率的でバランスの良い組み合わせです。v4.19.4 では **Kimi K3** がファーストクラス対応となり、Sisyphus 系エージェントの司令塔・Todo 管理に最適です。
 
 - **OpenCode Go ($10/mo)**: Kimi (Claude系代替, **K3 対応**), Qwen (Gemini系代替), MiniMax を提供。
 - **OpenAI Plus/Pro ($20/mo)**: GPT-5.6/5.4/5.5 (実装・監査系) を提供。
@@ -74,13 +75,13 @@ Sisyphus（監督）は、タスクの性質に応じて最適な「知能カテ
 | **原則駆動** | **自律探索型。** 最小限の指示で自律的に解決策を見出す。深い実装に強い。 | GPT Family, DeepSeek, Qwen, Kimi K3 | Hephaestus, Oracle, Momus |
 | **視覚推論型** | **UI・構造理解。** デザイン解析、CSS、レイアウトの理解に特化。 | Gemini Family, Qwen | Looker |
 
-### カテゴリー別・推奨モデルと代替ルール (v4.19.3)
+### カテゴリー別・推奨モデルと代替ルール (v4.19.4)
 
 | カテゴリー | デフォルトモデル | フォールバックチェーン (優先順) |
 | :--- | :--- | :--- |
 | **ultrabrain** | `gpt-5.6-sol` (xhigh) | `gpt-5.6-sol` (xhigh) → `qwen3.6-plus` (high) → `claude-opus-5` (max) → `glm-5.2` |
 | **deep** | `gpt-5.6-terra` (xhigh) | `gpt-5.6-terra` (xhigh) → `gpt-5.6-sol` (medium) → `claude-opus-5` (max) → `qwen3.6-plus` (high) |
-| **quick** | `gpt-5.6-luna` (low) | `gpt-5.6-luna` (low) → `gpt-5.6-terra` (medium) → `claude-haiku-4-5` → `qwen3.5-plus` → `minimax-m3` → `minimax-m2.7` |
+| **quick** | `gpt-5.6-luna` (low) | `gpt-5.6-luna` (low) → `deepseek-v4-flash-free` → `kimi-k3` → `kimi-k2.7-code` |
 | **visual-engineering** | `qwen3.6-plus` (high) | `qwen3.6-plus` (high) → `glm-5.2` → `claude-opus-5` (max) → `kimi-k2.7-code` |
 | **artistry** | `qwen3.6-plus` (high) | `qwen3.6-plus` (high) → `claude-opus-5` (max) → `gpt-5.6-sol` |
 | **unspecified-high** | `gpt-5.6-sol` (high) | `gpt-5.6-sol` (high) → `claude-opus-5` (max) → `glm-5.2` → `kimi-k2.7-code` → `qwen3.6-plus` → `kimi-k2.5` |
@@ -93,28 +94,28 @@ Sisyphus（監督）は、タスクの性質に応じて最適な「知能カテ
 
 ## 5. 環境の切り替え (Switching Environments)
 
-モデル構成をシーン（仕事用・個人用など）に合わせて切り替えるには、`opencode/` 配下の `.env` ファイルを利用します。
+モデル構成をシーン（仕事用・個人用など）に合わせて切り替えるには、OMO ネイティブプロファイルを利用します。
 
 ### 用意されているファイル
-- **`work.env`**: Amazon Bedrock (Claude 3.5 Sonnet/Opus等) を中心とした業務向け構成。
-- **`personal.env`**: OpenAI (GPT-5.5等) を中心とした個人・検証向け構成。
+- **`profiles.work`**: Amazon Bedrock の Claude を中心とした業務向け構成。
+- **`profiles.personal`**: OpenAI、Kimi、Gemini を組み合わせた個人・検証向け構成。
 
 ### 適用方法
-シェルで以下のコマンドを実行して環境変数をロードした後にエージェントを起動してください。
+`opencode-wrapper.sh` が設定する `OMO_PROFILE` を使って起動してください。
 
 ```bash
 # 業務用構成（Bedrock）に切り替える場合
-export $(cat opencode/work.env | xargs)
+PROFILE=work opencode
 
 # 個人用構成（OpenAI）に切り替える場合
-export $(cat opencode/personal.env | xargs)
+PROFILE=personal opencode
 ```
 
-この方法により、`oh-my-openagent.jsonc` を書き換えることなく、瞬時に推論エンジンのスタックを切り替えることが可能です。
+この方法により、`omo.jsonc` を書き換えることなく、瞬時に推論エンジンのスタックを切り替えることが可能です。
 
 ## 6. 高度な使い方：PROFILEによる自動切り替え
 
-本プロジェクトでは、`dotfiles-zsh` と連携し、`PROFILE=work opencode` と打つだけで「環境変数のロード」と「空きポートの自動割り当て」を同時に行うシェル関数が用意されています。
+本プロジェクトでは、`dotfiles-zsh` と連携し、`PROFILE=work opencode` と打つだけでモデルプロファイルの切替と「空きポートの自動割り当て」を同時に行うシェル関数が用意されています。ランチャー内部で `OMO_PROFILE` に変換されます。
 
 ### 統合場所
 - `~/dotfiles/components/dotfiles-zsh/functions/opencode.zsh`
@@ -165,9 +166,9 @@ OpenCode の機能を拡張するため、現在以下のプラグインが [apm
    make setup-opencode
    ```
 
-### v4.19.3 主要新機能
+### v4.19.4 主要新機能
 
-最新の v4.19.3 にて強化・導入された主要機能です。
+最新の v4.19.4 にて強化・導入された主要機能です。
 
 #### Kimi K3 is a first-class citizen
 Sisyphus、Sisyphus-Junior、Atlas に Kimi K3 プロンプトバリアントが追加され、モデルファミリー検出とフォールバックルーティングが自動化されました。OpenRouter 経由でも Moonshot API 直接でも、omo は K3 を認識して適切なプロンプトを選択します。
