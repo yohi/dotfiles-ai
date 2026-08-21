@@ -38,12 +38,41 @@ echo "CALL: opencode $@" >> "$MOCK_LOG"
 echo "OMO_PROFILE=${OMO_PROFILE:-unset}" >> "$MOCK_LOG"
 echo "OPENCODE_CONFIG_DIR=${OPENCODE_CONFIG_DIR:-unset}" >> "$MOCK_LOG"
 echo "SKILLPORT_SKILLS_DIR=${SKILLPORT_SKILLS_DIR:-unset}" >> "$MOCK_LOG"
+echo "OCTG_CF_ACCOUNT_ID=${OCTG_CF_ACCOUNT_ID:-unset}" >> "$MOCK_LOG"
+echo "OCTG_CF_GATEWAY_ID=${OCTG_CF_GATEWAY_ID:-unset}" >> "$MOCK_LOG"
+echo "OCTG_CF_API_TOKEN=${OCTG_CF_API_TOKEN:-unset}" >> "$MOCK_LOG"
 EOF
 # Inject MOCK_LOG path into the mock script
 sed -i "s|\"\$MOCK_LOG\"|\"$MOCK_LOG\"|g" "$MOCK_BIN_DIR/opencode"
 chmod +x "$MOCK_BIN_DIR/opencode"
 
 export PATH="$MOCK_BIN_DIR:$PATH"
+
+echo "  [0] Repository-local .env is loaded"
+ENV_FIXTURE_ROOT="$TEST_SANDBOX/repo"
+mkdir -p "$ENV_FIXTURE_ROOT/_scripts"
+cp "$WRAPPER" "$ENV_FIXTURE_ROOT/_scripts/opencode-wrapper.sh"
+chmod +x "$ENV_FIXTURE_ROOT/_scripts/opencode-wrapper.sh"
+cat <<'EOF' > "$ENV_FIXTURE_ROOT/.env"
+OCTG_CF_ACCOUNT_ID=test-account
+OCTG_CF_GATEWAY_ID=test-gateway
+OCTG_CF_API_TOKEN=test-token
+EOF
+rm -f "$MOCK_LOG"
+if env -u OCTG_CF_ACCOUNT_ID -u OCTG_CF_GATEWAY_ID -u OCTG_CF_API_TOKEN \
+    "$ENV_FIXTURE_ROOT/_scripts/opencode-wrapper.sh" personal --version >/dev/null 2>&1; then
+    if grep -q "OCTG_CF_ACCOUNT_ID=test-account" "$MOCK_LOG" && \
+       grep -q "OCTG_CF_GATEWAY_ID=test-gateway" "$MOCK_LOG" && \
+       grep -q "OCTG_CF_API_TOKEN=test-token" "$MOCK_LOG"; then
+        pass "repository-local .env values are exported to opencode"
+    else
+        fail "repository-local .env values were not exported to opencode"
+        cat "$MOCK_LOG" 2>/dev/null || true
+    fi
+else
+    fail "Wrapper invocation failed while loading repository-local .env"
+    cat "$MOCK_LOG" 2>/dev/null || true
+fi
 
 # --- Test 1: personal profile via argument ---
 echo "  [1] Profile arg: personal"

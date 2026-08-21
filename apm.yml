@@ -524,6 +524,7 @@ watcher:
 enabled_providers:
   - openai
   - cloudflare-ai-gateway-custom
+  - cloudflare-ai-gateway-octg
   - opencode
   - opencode-go
   - ollama-cloud
@@ -534,9 +535,9 @@ provider:
     npm: "@ai-sdk/openai-compatible"
     name: "Cloudflare AI Gateway(Custom)"
     options:
-      baseURL: "https://gateway.ai.cloudflare.com/v1/${env:CLOUDFLARE_ACCOUNT_ID}/${env:CLOUDFLARE_GATEWAY_ID}/compat"
+      baseURL: "https://gateway.ai.cloudflare.com/v1/${env:OCTG_CF_ACCOUNT_ID}/${env:OCTG_CF_GATEWAY_ID}/compat"
       headers:
-        cf-aig-authorization: "Bearer ${env:CLOUDFLARE_API_TOKEN}"
+        cf-aig-authorization: "Bearer ${env:OCTG_CF_API_TOKEN}"
     models:
       dynamic/kimi-k2.6:
         name: Kimi K2.6
@@ -554,6 +555,67 @@ provider:
       #   name: test
       # custom-nvidia/moonshotai/kimi-k2.6:
       #   name: Kimi K2.6(Nvidia)
+  cloudflare-ai-gateway-octg:
+    # The native OpenAI SDK uses the Responses API, whose tool limit is higher
+    # than the Chat Completions API used by openai-compatible.
+    npm: "@ai-sdk/openai"
+    options:
+      # @ai-sdk/openai requires a non-empty key, but the empty Authorization
+      # header makes Cloudflare AI Gateway use the Custom Provider's stored key.
+      apiKey: "cloudflare-custom-provider"
+      baseURL: "https://gateway.ai.cloudflare.com/v1/${env:OCTG_CF_ACCOUNT_ID}/${env:OCTG_CF_GATEWAY_ID}/custom-octg/v1"
+      headers:
+        Authorization: ""
+        cf-aig-authorization: "Bearer ${env:OCTG_CF_API_TOKEN}"
+        cf-aig-collect-log-payload: "false"
+        cf-aig-max-attempts: "1"
+        cf-aig-skip-cache: "true"
+    models:
+      gpt-5.6-luna:
+        name: GPT-5.6 Luna (OCTG)
+        variants:
+          none:
+            reasoningEffort: none
+          low:
+            reasoningEffort: low
+          medium:
+            reasoningEffort: medium
+          high:
+            reasoningEffort: high
+          xhigh:
+            reasoningEffort: xhigh
+          max:
+            reasoningEffort: max
+      gpt-5.6-terra:
+        name: GPT-5.6 Terra (OCTG)
+        variants:
+          none:
+            reasoningEffort: none
+          low:
+            reasoningEffort: low
+          medium:
+            reasoningEffort: medium
+          high:
+            reasoningEffort: high
+          xhigh:
+            reasoningEffort: xhigh
+          max:
+            reasoningEffort: max
+      gpt-5.6-sol:
+        name: GPT-5.6 Sol (OCTG)
+        variants:
+          none:
+            reasoningEffort: none
+          low:
+            reasoningEffort: low
+          medium:
+            reasoningEffort: medium
+          high:
+            reasoningEffort: high
+          xhigh:
+            reasoningEffort: xhigh
+          max:
+            reasoningEffort: max
   openai:
     whitelist:
       - gpt-5.3-codex
