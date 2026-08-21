@@ -188,6 +188,10 @@ def build_config(apm: dict[str, Any]) -> dict[str, Any]:
     cfg["shell"] = apm.get("shell", "bash")
     cfg["snapshot"] = apm.get("snapshot", True)
 
+    # --- Agent ---
+    if "agent" in apm:
+        cfg["agent"] = apm["agent"]
+
     # --- Plugin ([Plugin] anchor) ---
     cfg["plugin"] = apm.get("plugin", [])
 
@@ -254,6 +258,7 @@ def build_config(apm: dict[str, Any]) -> dict[str, Any]:
 # Serialise to JSONC with section headers
 # ---------------------------------------------------------------------------
 _SECTION_COMMENTS: dict[str, str] = {
+    "agent": "// Agent - エージェント設定",
     "plugin": "// [Plugin] - エコシステム設定\n  // [Plugin]",
     "permission": "// Permission - 権限とガードレール",
     "compaction": "// Compaction & Lifecycle",
@@ -362,6 +367,12 @@ def main() -> None:
         try:
             data = json.loads(opencode_json.read_text(encoding="utf-8"))
             data["mcp"] = cfg.get("mcp", {})
+            if "agent" in cfg:
+                data["agent"] = cfg["agent"]
+            if "provider" in cfg:
+                data["provider"] = cfg["provider"]
+            if "enabled_providers" in cfg:
+                data["enabled_providers"] = cfg["enabled_providers"]
             normalized = _normalize_opencode_json_data(data)
             opencode_json.write_text(
                 json.dumps(normalized, indent=2, ensure_ascii=False) + "\n",
