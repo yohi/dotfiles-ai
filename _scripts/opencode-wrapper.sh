@@ -14,6 +14,13 @@ set -e
 export XDG_DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
+if [[ -f "$REPO_ROOT/.env" ]]; then
+    set -a
+    # shellcheck disable=SC1091
+    . "$REPO_ROOT/.env"
+    set +a
+fi
+
 # --- Profile Selection ---
 PROFILE="${PROFILE:-personal}"
 if [[ "$1" == "work" || "$1" == "personal" ]]; then
