@@ -1,45 +1,48 @@
 // OMO configuration
 // Migrated to omo native profiles (v4.19.4+)
-// Profile activation: OMO_PROFILE=personal|work (set by opencode-wrapper.sh)
+// Native profiles: personal / work
+// Activation: OMO_PROFILE=personal|work
 {
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/omo.schema.json",
 
   // ===========================================================================
-  // Shared base [opencode] settings (profile-independent)
+  // OpenCode shared configuration
   // ===========================================================================
   "[opencode]": {
-    // Team Mode: チーム開発・マルチエージェント連携
     "team_mode": {
       "enabled": false,
       "base_dir": ".sisyphus/team",
       "auto_sync": true
     },
-    // Sisyphus Agent: オーケストレーションの中核
+
     "sisyphus_agent": {
       "disabled": false,
       "planner_enabled": true,
       "replace_plan": true,
       "default_builder_enabled": true
     },
-    // Experimental: 最新・実験的機能の最適化
+
     "experimental": {
       "task_system": true,
-      "hashline_diff_enhancer": true,
       "aggressive_truncation": true,
-      "auto_resume": true,
-      "preemptive_compaction_threshold": 0.85
+
+      // Replaces the old unsupported
+      // preemptive_compaction_threshold setting.
+      "preemptive_compaction": true
     },
-    // TMUX統合
+
     "tmux": {
       "enabled": true,
       "layout": "main-vertical",
       "main_pane_size": 65
     },
-    // ブラウザ自動化エンジン
+
     "browser_automation_engine": {
       "provider": "playwright-cli"
     },
-    // バックグラウンドタスクの並列実行制御
+
+    // Keep existing limits for Step 1.
+    // Model/provider-specific optimization comes later.
     "background_task": {
       "defaultConcurrency": 10,
       "providerConcurrency": {
@@ -51,73 +54,53 @@
         "sakura": 5
       }
     },
-    // Ralph Loop
-    "ralph_loop": {
+
+    // Runtime model fallback.
+    // Important for quota exhaustion / 429 handling.
+    "runtime_fallback": {
       "enabled": true,
+      "retry_on_errors": [
+        429,
+        500,
+        502,
+        503,
+        504
+      ],
+      "max_fallback_attempts": 3,
+      "cooldown_seconds": 60,
+      "timeout_seconds": 30,
+      "notify_on_fallback": true,
+      "restore_primary_after_cooldown": true
+    },
+
+    // Ralph Loop -> Goal
+    "goal": {
+      "enabled": true,
+      "auto_start": false,
       "default_max_iterations": 20
     },
-    // Boulder State
-    "boulder_state": {
-      "enabled": true,
-      "storage_path": ".sisyphus/boulder_state.json"
+
+    "default_mode": {
+      "goal": false
     },
-    // Session Recovery
-    "session_recovery": {
-      "enabled": true,
-      "max_age_minutes": 1440
-    },
-    // Interactive Bash
-    "interactive_bash": {
-      "enabled": true,
-      "timeout_ms": 300000
-    },
-    // Git Master
+
     "git_master": {
       "commit_footer": false,
       "include_co_authored_by": false
     },
-    // Comment Checker
+
     "comment_checker": {
       "enabled": true
     },
-    "default_mode": {
-      "goal": false
-    },
+
     "disabled_hooks": [
-      "auto-update-checker",
-      "goal"
+      "auto-update-checker"
     ],
-    // Rules Injector
-    "rules_injector": {
-      "enabled": true
-    },
-    // Auto Slash Command
-    "auto_slash_command": {
-      "enabled": true
-    },
-    "commands": {
-      "git-pr-flow": {
-        "description": "Git PR Flow with full-skill access",
-        "prompt": "./commands/git-pr-flow.md",
-        "skills": {
-          "git-master": {
-            "enabled": true
-          }
-        }
-      },
-      "build-skill": {
-        "description": "Agent Skill Builder",
-        "prompt": "./commands/build-skill.md",
-        "skills": {
-          "agent-skill-architect": {
-            "enabled": true
-          }
-        }
-      }
-    },
+
     "hashline_edit": true,
-    // 環境変数パススルー (CHRONOS系のみ。モデル変数はプロファイルで管理)
-    "env": [
+
+    // Environment variables exposed to MCPs.
+    "mcp_env_allowlist": [
       "HOME",
       "CHRONOS_POSTGRES_HOST",
       "CHRONOS_POSTGRES_PASSWORD",
@@ -142,179 +125,296 @@
   },
 
   // ===========================================================================
-  // Profiles: personal / work
-  // Activated via: OMO_PROFILE=personal|work (set by opencode-wrapper.sh)
+  // Profiles
   // ===========================================================================
   "profiles": {
-
     // =========================================================================
-    // personal: Kimi / GPT / Gemini 系 (Cloudflare AI Gateway / OpenAI)
+    // PERSONAL
     // =========================================================================
     "personal": {
+      // -----------------------------------------------------------------------
+      // Logical model catalog
+      //
+      // Keep provider routing in one place.
+      // Agent/category definitions below refer to these aliases.
+      // -----------------------------------------------------------------------
+      "models": {
+        "kimi-k27": {
+          "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.7-code"
+        },
+        "kimi-k26": {
+          "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.6"
+        },
+
+        "sol-octg": {
+          "model": "cloudflare-ai-gateway-octg/gpt-5.6-sol"
+        },
+        "sol-plus": {
+          "model": "openai/gpt-5.6-sol"
+        },
+
+        "terra-octg": {
+          "model": "cloudflare-ai-gateway-octg/gpt-5.6-terra"
+        },
+        "terra-plus": {
+          "model": "openai/gpt-5.6-terra"
+        },
+
+        "luna-octg": {
+          "model": "cloudflare-ai-gateway-octg/gpt-5.6-luna"
+        },
+        "luna-plus": {
+          "model": "openai/gpt-5.6-luna"
+        },
+
+        "gemini-pro": {
+          "model": "cloudflare-ai-gateway/google/gemini-3.1-pro"
+        },
+        "gemini-pro-ai-studio": {
+          "model": "cloudflare-ai-gateway/google-ai-studio/gemini-3.1-pro"
+        }
+      },
+
       "[opencode]": {
         "agents": {
+          // -------------------------------------------------------------------
+          // Primary agents
+          // -------------------------------------------------------------------
+
           "sisyphus": {
-            // 【司令塔】 Kimi K3: 推論・戦略・Todo管理を統括
-            // "model": "cloudflare-ai-gateway/dynamic/kimi-k3",
-            "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.7-code",
-            "variant": "default",
-            "fallback_models": [
-              "openai/gpt-5.6-sol",
-              "cloudflare-ai-gateway-octg/gpt-5.6-sol",
+            "models": [
+              "kimi-k27",
+              {
+                "model": "sol-plus",
+                "reasoning": "default"
+              },
+              {
+                "model": "sol-octg",
+                "reasoning": "default"
+              }
             ],
+
+            // NOTE:
+            // Previous config had variant=max AND reasoning=high.
+            // `reasoning` is canonical, so Step 1 preserves "high".
             "ultrawork": {
-              "model": "openai/gpt-5.6-sol",
-              "variant": "max",
+              "model": "sol-plus",
               "reasoning": "high"
             }
           },
-          "hephaestus": {
-            // 【製造担当】 GPT-5.6 Terra: 自律実装に特化したプリンシプル駆動
-            "disable": false,
-            "model": "cloudflare-ai-gateway-octg/gpt-5.6-terra",
-            "variant": "medium",
-            "fallback_models": [
-              "openai/gpt-5.6-terra",
-              "cloudflare-ai-gateway-octg/gpt-5.6-luna",
-              "openai/gpt-5.6-luna"
-            ]
-          },
-          "oracle": {
-            // 【大規模解析・監査】 GPT-5.6 Sol: 深い論理推論・アーキテクチャレビュー
-            "model": "cloudflare-ai-gateway-octg/gpt-5.6-sol",
-            "variant": "high",
-            "fallback_models": [
-              "openai/gpt-5.6-sol"
-            ]
-          },
-          "librarian": {
-            // 【超高速補助】 GPT-5.6 Luna: 高速・低コスト調査
-            "model": "cloudflare-ai-gateway-octg/gpt-5.6-luna",
-            "variant": "low",
-            "fallback_models": [
-              "openai/gpt-5.6-luna"
-            ],
-            "description": "Ultra-fast background research with minimal token cost."
-          },
-          "explore": {
-            // 【高速探索】 GPT-5.6 Luna
-            "model": "cloudflare-ai-gateway-octg/gpt-5.6-luna",
-            "variant": "medium",
-            "fallback_models": [
-              "openai/gpt-5.6-luna"
 
-            ],
-            "description": "Rapid scaffolding using autonomous web search for latest technical specs."
+          "hephaestus": {
+            "disable": false,
+            "models": [
+              {
+                "model": "terra-octg",
+                "reasoning": "medium"
+              },
+              {
+                "model": "terra-plus",
+                "reasoning": "medium"
+              },
+              {
+                "model": "luna-octg",
+                "reasoning": "medium"
+              },
+              {
+                "model": "luna-plus",
+                "reasoning": "medium"
+              }
+            ]
           },
+
+          // -------------------------------------------------------------------
+          // Specialist subagents
+          // -------------------------------------------------------------------
+
+          "oracle": {
+            "models": [
+              {
+                "model": "sol-octg",
+                "reasoning": "high"
+              },
+              {
+                "model": "sol-plus",
+                "reasoning": "high"
+              }
+            ]
+          },
+
+          "librarian": {
+            "models": [
+              {
+                "model": "luna-octg",
+                "reasoning": "low"
+              },
+              {
+                "model": "luna-plus",
+                "reasoning": "low"
+              }
+            ]
+          },
+
+          "explore": {
+            "models": [
+              {
+                "model": "luna-octg",
+                "reasoning": "medium"
+              },
+              {
+                "model": "luna-plus",
+                "reasoning": "medium"
+              }
+            ]
+          },
+
           "multimodal-looker": {
-            // 【視覚アナリスト】 Kimi K3: 視覚推論・UI/図解解析
-            // "model": "cloudflare-ai-gateway/dynamic/kimi-k3",
-            "model": "cloudflare-ai-gateway/google/gemini-3.1-pro",
-            "variant": "default",
-            "fallback_models": [
-              "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.7-code"
-            ],
-            "description": "Visual Intelligence. Analyzes UI designs for API generation and debugs browser test failures."
+            "models": [
+              "gemini-pro",
+              "kimi-k27"
+            ]
           },
+
+          // -------------------------------------------------------------------
+          // Planning / orchestration
+          // -------------------------------------------------------------------
+
           "prometheus": {
-            // 【戦略家】 GPT-5.6 Sol: 多角的推論・Agent Swarm計画
-            "model": "cloudflare-ai-gateway-octg/gpt-5.6-sol",
-            "variant": "max",
-            "fallback_models": [
-              "openai/gpt-5.6-sol",
-              "cloudflare-ai-gateway/dynamic/kimi-k2.7-code"
+            "models": [
+              {
+                "model": "sol-octg",
+                "reasoning": "max"
+              },
+              {
+                "model": "sol-plus",
+                "reasoning": "max"
+              },
+              "kimi-k27"
             ]
           },
+
           "metis": {
-            // 【計画コンサル】 Kimi K3: 命令追従・曖昧さの事前排除
-            "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.7-code",
-            "variant": "default",
-            "fallback_models": [
-              "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.6"
+            "models": [
+              "kimi-k27",
+              "kimi-k26"
             ]
           },
+
           "momus": {
-            // 【計画レビュアー】 GPT-5.6 Sol: 厳格なレビュー
-            "model": "cloudflare-ai-gateway-octg/gpt-5.6-sol",
-            "variant": "xhigh",
-            "fallback_models": [
-              // "cloudflare-ai-gateway/dynamic/kimi-k3",
-              "openai/gpt-5.6-sol",
-              "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.7-code"
+            "models": [
+              {
+                "model": "sol-octg",
+                "reasoning": "xhigh"
+              },
+              {
+                "model": "sol-plus",
+                "reasoning": "xhigh"
+              },
+              "kimi-k27"
             ]
           },
+
           "atlas": {
-            // 【現場監督】 Kimi K3: 環境管理・Todo調整・実行監視
-            // "model": "cloudflare-ai-gateway/dynamic/kimi-k3",
-            "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.7-code",
-            "variant": "default",
-            "fallback_models": [
-              "cloudflare-ai-gateway-octg/gpt-5.6-sol",
-              "openai/gpt-5.6-sol"
-            ],
-            "description": "Orchestrates Tmux, Playwright, and server states. Ensures environment consistency."
+            "models": [
+              "kimi-k27",
+              {
+                "model": "sol-octg",
+                "reasoning": "default"
+              },
+              {
+                "model": "sol-plus",
+                "reasoning": "default"
+              }
+            ]
           }
         },
+
         "categories": {
           "ultrabrain": {
-            // "model": "cloudflare-ai-gateway/dynamic/kimi-k3",
-            "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.7-code",
-            "variant": "default",
-            "fallback_models": [
-              "cloudflare-ai-gateway-octg/gpt-5.6-sol",
-              "openai/gpt-5.6-sol"
+            "models": [
+              "kimi-k27",
+              "sol-octg",
+              "sol-plus"
             ]
           },
+
           "deep": {
-            "model": "cloudflare-ai-gateway-octg/gpt-5.6-terra",
-            "variant": "xhigh",
-            "fallback_models": [
-              "openai/gpt-5.6-terra",
-              "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.7-code"
+            "models": [
+              {
+                "model": "terra-octg",
+                "reasoning": "xhigh"
+              },
+              {
+                "model": "terra-plus",
+                "reasoning": "xhigh"
+              },
+              "kimi-k27"
             ]
           },
+
           "quick": {
-            "model": "cloudflare-ai-gateway-octg/gpt-5.6-luna",
-            "variant": "low",
-            "fallback_models": [
-              "openai/gpt-5.6-luna"
+            "models": [
+              {
+                "model": "luna-octg",
+                "reasoning": "low"
+              },
+              {
+                "model": "luna-plus",
+                "reasoning": "low"
+              }
             ]
           },
+
           "writing": {
-            // "model": "cloudflare-ai-gateway/dynamic/kimi-k3",
-            "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.7-code",
-            "variant": "default",
-            "fallback_models": [
-              // "cloudflare-ai-gateway/dynamic/kimi-k2.7-code"
+            "models": [
+              "kimi-k27"
             ]
           },
+
           "unspecified-low": {
-            "model": "cloudflare-ai-gateway-octg/gpt-5.6-luna",
-            "variant": "xhigh",
-            "fallback_models": [
-              "openai/gpt-5.6-luna"
+            "models": [
+              {
+                "model": "luna-octg",
+                "reasoning": "xhigh"
+              },
+              {
+                "model": "luna-plus",
+                "reasoning": "xhigh"
+              }
             ]
           },
+
           "unspecified-high": {
-            "model": "cloudflare-ai-gateway-octg/gpt-5.6-sol",
-            "variant": "high",
-            "fallback_models": [
-              "openai/gpt-5.6-sol",
-              "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.7-code"
+            "models": [
+              {
+                "model": "sol-octg",
+                "reasoning": "high"
+              },
+              {
+                "model": "sol-plus",
+                "reasoning": "high"
+              },
+              "kimi-k27"
             ]
           },
+
           "visual-engineering": {
-            "model": "cloudflare-ai-gateway/google/gemini-3.1-pro",
-            "variant": "high",
-            "fallback_models": [
-              "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.7-code"
+            "models": [
+              {
+                "model": "gemini-pro",
+                "reasoning": "high"
+              },
+              "kimi-k27"
             ]
           },
+
           "artistry": {
-            "model": "cloudflare-ai-gateway/google-ai-studio/gemini-3.1-pro",
-            "variant": "high",
-            "fallback_models": [
-              "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.7-code"
+            "models": [
+              {
+                "model": "gemini-pro-ai-studio",
+                "reasoning": "high"
+              },
+              "kimi-k27"
             ]
           }
         }
@@ -322,158 +422,182 @@
     },
 
     // =========================================================================
-    // work: Amazon Bedrock - Claude 系 (Opus 5 / Sonnet 5 / Haiku)
-    // Claude ベストプラクティス: Opus=司令塔・設計、Sonnet=実装、Haiku=高速探索
+    // WORK
     // =========================================================================
     "work": {
+      "models": {
+        "opus": {
+          "model": "amazon-bedrock/global.anthropic.claude-opus-5"
+        },
+        "sonnet": {
+          "model": "amazon-bedrock/global.anthropic.claude-sonnet-5"
+        },
+        "haiku": {
+          "model": "amazon-bedrock/global.anthropic.claude-haiku-4-5-20251001-v1:0"
+        }
+      },
+
       "[opencode]": {
         "agents": {
           "sisyphus": {
-            // 【司令塔】 Sonnet: 大きなプロンプトを正確に理解し指示を出す
-            "model": "amazon-bedrock/global.anthropic.claude-sonnet-5",
-            "variant": "max",
-            "fallback_models": [
-              "amazon-bedrock/global.anthropic.claude-opus-5"
+            "models": [
+              {
+                "model": "sonnet",
+                "reasoning": "max"
+              },
+              {
+                "model": "opus",
+                "reasoning": "max"
+              }
             ],
             "ultrawork": {
-              "model": "amazon-bedrock/global.anthropic.claude-opus-5",
-              "variant": "max",
+              "model": "opus",
               "reasoning": "high"
             }
           },
+
           "hephaestus": {
-            // 【製造担当】 GPT-5.5専用プロンプトのため、Claude環境では非推奨
-            "disable": true,
-            "model": "amazon-bedrock/global.anthropic.claude-sonnet-5",
-            "variant": "default",
-            "fallback_models": [
-              "amazon-bedrock/global.anthropic.claude-haiku-4-5-20251001-v1:0"
-            ]
+            "disable": true
           },
+
           "oracle": {
-            // 【大規模解析・監査】 Opus: 設計・深い洞察
-            "model": "amazon-bedrock/global.anthropic.claude-opus-5",
-            "variant": "max",
-            "fallback_models": [
-              "amazon-bedrock/global.anthropic.claude-sonnet-5"
+            "models": [
+              {
+                "model": "opus",
+                "reasoning": "max"
+              },
+              "sonnet"
             ]
           },
+
           "librarian": {
-            // 【超高速補助】 Haiku: 速度重視
-            "model": "amazon-bedrock/global.anthropic.claude-haiku-4-5-20251001-v1:0",
-            "variant": "default",
-            "fallback_models": [
-              "amazon-bedrock/global.anthropic.claude-sonnet-5"
-            ],
-            "description": "Ultra-fast background research with minimal token cost."
+            "models": [
+              "haiku",
+              "sonnet"
+            ]
           },
+
           "explore": {
-            // 【高速探索】 Haiku: 知能よりも速度とコストを優先
-            "model": "amazon-bedrock/global.anthropic.claude-haiku-4-5-20251001-v1:0",
-            "variant": "default",
-            "fallback_models": [
-              "amazon-bedrock/global.anthropic.claude-sonnet-5"
-            ],
-            "description": "Rapid scaffolding using autonomous web search for latest technical specs."
+            "models": [
+              "haiku",
+              "sonnet"
+            ]
           },
+
           "multimodal-looker": {
-            // 【視覚アナリスト】 Opus: 画像認識能力
-            "model": "amazon-bedrock/global.anthropic.claude-opus-5",
-            "variant": "max",
-            "fallback_models": [
-              "amazon-bedrock/global.anthropic.claude-sonnet-5"
-            ],
-            "description": "Visual Intelligence. Analyzes UI designs for API generation and debugs browser test failures."
+            "models": [
+              {
+                "model": "opus",
+                "reasoning": "max"
+              },
+              "sonnet"
+            ]
           },
+
           "prometheus": {
-            // 【戦略家】 Opus: 多角的推論が最も活きる
-            "model": "amazon-bedrock/global.anthropic.claude-opus-5",
-            "variant": "max",
-            "fallback_models": [
-              "amazon-bedrock/global.anthropic.claude-sonnet-5"
+            "models": [
+              {
+                "model": "opus",
+                "reasoning": "max"
+              },
+              "sonnet"
             ]
           },
+
           "metis": {
-            // 【計画コンサル】 Opus: 深い洞察で計画精度を向上
-            "model": "amazon-bedrock/global.anthropic.claude-opus-5",
-            "variant": "max",
-            "fallback_models": [
-              "amazon-bedrock/global.anthropic.claude-sonnet-5"
+            "models": [
+              {
+                "model": "opus",
+                "reasoning": "max"
+              },
+              "sonnet"
             ]
           },
+
           "momus": {
-            // 【計画レビュアー】 Opus: 厳格なレビュー
-            "model": "amazon-bedrock/global.anthropic.claude-opus-5",
-            "variant": "max",
-            "fallback_models": [
-              "amazon-bedrock/global.anthropic.claude-sonnet-5"
+            "models": [
+              {
+                "model": "opus",
+                "reasoning": "max"
+              },
+              "sonnet"
             ]
           },
+
           "atlas": {
-            // 【現場監督】 Sonnet: 高速なSonnetで快適に動作
-            "model": "amazon-bedrock/global.anthropic.claude-sonnet-5",
-            "variant": "default",
-            "fallback_models": [
-              "amazon-bedrock/global.anthropic.claude-haiku-4-5-20251001-v1:0"
-            ],
-            "description": "Orchestrates Tmux, Playwright, and server states. Ensures environment consistency."
+            "models": [
+              "sonnet",
+              "haiku"
+            ]
           }
         },
+
         "categories": {
           "ultrabrain": {
-            "model": "amazon-bedrock/global.anthropic.claude-opus-5",
-            "variant": "max",
-            "fallback_models": [
-              "amazon-bedrock/global.anthropic.claude-sonnet-5"
+            "models": [
+              {
+                "model": "opus",
+                "reasoning": "max"
+              },
+              "sonnet"
             ]
           },
+
           "deep": {
-            "model": "amazon-bedrock/global.anthropic.claude-opus-5",
-            "variant": "max",
-            "fallback_models": [
-              "amazon-bedrock/global.anthropic.claude-sonnet-5"
+            "models": [
+              {
+                "model": "opus",
+                "reasoning": "max"
+              },
+              "sonnet"
             ]
           },
+
           "quick": {
-            "model": "amazon-bedrock/global.anthropic.claude-haiku-4-5-20251001-v1:0",
-            "variant": "default",
-            "fallback_models": [
-              "amazon-bedrock/global.anthropic.claude-sonnet-5"
+            "models": [
+              "haiku",
+              "sonnet"
             ]
           },
+
           "writing": {
-            "model": "amazon-bedrock/global.anthropic.claude-sonnet-5",
-            "variant": "default",
-            "fallback_models": [
-              "amazon-bedrock/global.anthropic.claude-haiku-4-5-20251001-v1:0"
+            "models": [
+              "sonnet",
+              "haiku"
             ]
           },
+
           "unspecified-low": {
-            "model": "amazon-bedrock/global.anthropic.claude-sonnet-5",
-            "variant": "default",
-            "fallback_models": [
-              "amazon-bedrock/global.anthropic.claude-haiku-4-5-20251001-v1:0"
+            "models": [
+              "sonnet",
+              "haiku"
             ]
           },
+
           "unspecified-high": {
-            "model": "amazon-bedrock/global.anthropic.claude-opus-5",
-            "variant": "max",
-            "fallback_models": [
-              "amazon-bedrock/global.anthropic.claude-sonnet-5"
+            "models": [
+              {
+                "model": "opus",
+                "reasoning": "max"
+              },
+              "sonnet"
             ]
           },
+
           "visual-engineering": {
-            "model": "amazon-bedrock/global.anthropic.claude-opus-5",
-            "variant": "max",
-            "fallback_models": [
-              "amazon-bedrock/global.anthropic.claude-sonnet-5"
+            "models": [
+              {
+                "model": "opus",
+                "reasoning": "max"
+              },
+              "sonnet"
             ]
           },
+
           "artistry": {
-            "model": "amazon-bedrock/global.anthropic.claude-sonnet-5",
-            "variant": "default",
-            "fallback_models": [
-              "amazon-bedrock/global.anthropic.claude-haiku-4-5-20251001-v1:0"
+            "models": [
+              "sonnet",
+              "haiku"
             ]
           }
         }
@@ -481,7 +605,6 @@
     }
   },
 
-  // Legacy migration metadata (do not remove)
   "_migrations": [
     "2026-07-opencode-config-unification"
   ]
