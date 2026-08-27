@@ -1,6 +1,6 @@
 lockfile_version: '1'
-generated_at: '2026-08-02T12:24:10.009371+00:00'
-apm_version: 0.26.0
+generated_at: '2026-08-27T10:28:43.918451+00:00'
+apm_version: 0.28.0
 dependencies:
 - repo_url: anthropics/claude-code
   name: code-review
@@ -350,6 +350,8 @@ dependencies:
   - .agents/skills/skill-creator/eval-viewer/viewer.html
   - .agents/skills/skill-creator/references/schemas.md
   - .agents/skills/skill-creator/scripts/__init__.py
+  - .agents/skills/skill-creator/scripts/__pycache__/__init__.cpython-314.pyc
+  - .agents/skills/skill-creator/scripts/__pycache__/aggregate_benchmark.cpython-314.pyc
   - .agents/skills/skill-creator/scripts/aggregate_benchmark.py
   - .agents/skills/skill-creator/scripts/generate_report.py
   - .agents/skills/skill-creator/scripts/improve_description.py
@@ -765,6 +767,8 @@ dependencies:
     .agents/skills/skill-creator/eval-viewer/viewer.html: sha256:a53213426ee1100441d701a3a0d49cda7a842f992d2c36463f4d3cc0258575fa
     .agents/skills/skill-creator/references/schemas.md: sha256:8e8876180a8989b406a4d3edddf875b04cdfd5805cc8616686d552b11ce4455f
     .agents/skills/skill-creator/scripts/__init__.py: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+    .agents/skills/skill-creator/scripts/__pycache__/__init__.cpython-314.pyc: sha256:850ab763583a9d4ea5589f7a616b5d0ac089cda3ba61d8e23b8ed44a51eefcac
+    .agents/skills/skill-creator/scripts/__pycache__/aggregate_benchmark.cpython-314.pyc: sha256:23a5d21e1c51455358e0c2ef74aa1abe87f0996f46efcf4eae25ca6b51e2fd66
     .agents/skills/skill-creator/scripts/aggregate_benchmark.py: sha256:123ef128ea5ccc01a4b1ac212ef5567f21e9c13d3d240609780beeb3200c49aa
     .agents/skills/skill-creator/scripts/generate_report.py: sha256:13df7118a3c50c83c4c3250a606d5f2b20b25a3d44cbc392b3d669ec75281453
     .agents/skills/skill-creator/scripts/improve_description.py: sha256:87d864570220b699fac52da309d2d6efdb060647bfebc74f768128e646accf80
@@ -881,6 +885,24 @@ dependencies:
     .opencode/commands/coderabbit-review.md: sha256:cba1e6915ee98d24f288e3fb2dfb4b9b5bdc9e3164abf66b885aa9b66d8ce17d
   content_hash: sha256:6c4d9f9fa574b8546857ce3ce5f08d02c0c236dc3071023d6d0b45d62127bdbd
   declared_license: MIT
+- repo_url: github/gh-stack
+  name: gh-stack
+  host: github.com
+  resolved_commit: 14fc42ed9b6c376a53b2f999f138d3bd26dac546
+  version: unknown
+  package_type: skill_bundle
+  deployed_files:
+  - .agents/skills/gh-stack
+  - .agents/skills/gh-stack/SKILL.md
+  - .agents/skills/gh-stack/references/commands.md
+  - .agents/skills/gh-stack/references/stack-design.md
+  - .agents/skills/gh-stack/references/troubleshooting.md
+  deployed_file_hashes:
+    .agents/skills/gh-stack/SKILL.md: sha256:1ff5a23a7f66a3f5853ef411e48ae66ebe0b47d98d248a3a41ee0de8e237a796
+    .agents/skills/gh-stack/references/commands.md: sha256:362bca643fa84aae90627c4d1797c2343aaf5427713e6aa8572e04454c555fa9
+    .agents/skills/gh-stack/references/stack-design.md: sha256:4a61e3065ce61a5d129a30f5dcbebe73bfde250e34c382277facdc31d2c4e5ce
+    .agents/skills/gh-stack/references/troubleshooting.md: sha256:fe1958036e663c7471a0d3efdf1fefe47ee65e06713b13a96e3db95becccdc47
+  content_hash: sha256:a665723d62643caac4d397bb69c6c2d9b163be53c8803e641e4c7edaf04876c6
 - repo_url: greptileai/skills
   name: check-pr
   host: github.com
@@ -1107,31 +1129,28 @@ dependencies:
     .agents/skills/github-release-packages/scripts/grade.sh: sha256:621def19270a49b5ea0e51df007f0ab6973af33660e57cc10cdec7bf9e849250
   content_hash: sha256:2cd3a8e07844ce20d789c92dfa4d069cb5a4faabad8da57dcedf8f52d63e5b23
 - repo_url: yohi/agent-skills
-  name: makefile-organization
+  name: temporary-credential-agent
   host: github.com
-  resolved_commit: 6dd072e0e6298286d5e9486b4e4df66b514b5a06
+  resolved_commit: 2062ea4c08efcaff4fee0b2ca243195af6bed836
   version: unknown
-  virtual_path: skills/makefile-organization
+  virtual_path: skills/temporary-credential-agent
   is_virtual: true
   package_type: claude_skill
   deployed_files:
-  - .agents/skills/makefile-organization
-  - .agents/skills/makefile-organization/REFERENCE.md
-  - .agents/skills/makefile-organization/SKILL.md
+  - .agents/skills/temporary-credential-agent
+  - .agents/skills/temporary-credential-agent/SKILL.md
+  - .agents/skills/temporary-credential-agent/evals/evals.json
+  - .agents/skills/temporary-credential-agent/references/audit-schema.md
+  - .agents/skills/temporary-credential-agent/references/evaluation-matrix.md
+  - .agents/skills/temporary-credential-agent/references/service-profiles.md
   deployed_file_hashes:
-    .agents/skills/makefile-organization/REFERENCE.md: sha256:e2e8babe76bccef0b2bc032d5edda06eec748b1e2b79630b4078df13d3107057
-    .agents/skills/makefile-organization/SKILL.md: sha256:d88ed176c1a5a3f7399468366993fc60220bb7d1a879ea41fd8b4bd1f85de6a9
-  content_hash: sha256:1082322d10ecdcf2f10e7abec37710b4c928c5793138537bb8ca8ca30c374ef5
+    .agents/skills/temporary-credential-agent/SKILL.md: sha256:4e73cdaf46337a822ae310ec5a71deb2f7287640b6383c2c99222192c5cddb47
+    .agents/skills/temporary-credential-agent/evals/evals.json: sha256:270b45a6855d17e593666bb55cfbe01d02503084d804df5539d8fdadbdb5524b
+    .agents/skills/temporary-credential-agent/references/audit-schema.md: sha256:31ff2f1701f1c7c754fdb58d256ae0e6cbaed60144646a3814efef1fe305c857
+    .agents/skills/temporary-credential-agent/references/evaluation-matrix.md: sha256:b8a573cf632b8c2b65c9c17733dee8fea2873a0851ee6f9dcdbbdc73507e0a6b
+    .agents/skills/temporary-credential-agent/references/service-profiles.md: sha256:16297622e056e7497fdf824e03c01bc662585a0533293b182b37c373033a4007
+  content_hash: sha256:7bcaef97a452cee80b97d478d88ff30ee0c118edaf3d6da6f0759ff956c15bd8
 deployments:
-- kind: uri
-  target: mcp
-  value: atlassian
-  runtime: opencode
-  scope: project
-  owners:
-  - .
-  active_owner: .
-  content_hash: null
 - kind: uri
   target: mcp
   value: aws-documentation
@@ -1153,6 +1172,15 @@ deployments:
 - kind: uri
   target: mcp
   value: aws-mcp
+  runtime: opencode
+  scope: project
+  owners:
+  - .
+  active_owner: .
+  content_hash: null
+- kind: uri
+  target: mcp
+  value: cf-mcp-portal-personal
   runtime: opencode
   scope: project
   owners:
@@ -3519,6 +3547,51 @@ deployments:
   content_hash: sha256:1608ea77fbb6fc30d13a97d12cfa8ebf31358d40f0dd97beed24829d6b3f45dd
 - kind: project-relative
   target: opencode
+  value: .agents/skills/gh-stack
+  runtime: null
+  scope: project
+  owners:
+  - github/gh-stack
+  active_owner: github/gh-stack
+  content_hash: null
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/gh-stack/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - github/gh-stack
+  active_owner: github/gh-stack
+  content_hash: sha256:1ff5a23a7f66a3f5853ef411e48ae66ebe0b47d98d248a3a41ee0de8e237a796
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/gh-stack/references/commands.md
+  runtime: null
+  scope: project
+  owners:
+  - github/gh-stack
+  active_owner: github/gh-stack
+  content_hash: sha256:362bca643fa84aae90627c4d1797c2343aaf5427713e6aa8572e04454c555fa9
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/gh-stack/references/stack-design.md
+  runtime: null
+  scope: project
+  owners:
+  - github/gh-stack
+  active_owner: github/gh-stack
+  content_hash: sha256:4a61e3065ce61a5d129a30f5dcbebe73bfde250e34c382277facdc31d2c4e5ce
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/gh-stack/references/troubleshooting.md
+  runtime: null
+  scope: project
+  owners:
+  - github/gh-stack
+  active_owner: github/gh-stack
+  content_hash: sha256:fe1958036e663c7471a0d3efdf1fefe47ee65e06713b13a96e3db95becccdc47
+- kind: project-relative
+  target: opencode
   value: .agents/skills/git-master
   runtime: null
   scope: project
@@ -3769,33 +3842,6 @@ deployments:
   - anthropics/skills
   active_owner: anthropics/skills
   content_hash: sha256:4d3a4bb198a77626bcf018e96b2b45a2dbabed172d4ade0fcd70d23ae8a47a47
-- kind: project-relative
-  target: opencode
-  value: .agents/skills/makefile-organization
-  runtime: null
-  scope: project
-  owners:
-  - yohi/agent-skills/skills/makefile-organization
-  active_owner: yohi/agent-skills/skills/makefile-organization
-  content_hash: null
-- kind: project-relative
-  target: opencode
-  value: .agents/skills/makefile-organization/REFERENCE.md
-  runtime: null
-  scope: project
-  owners:
-  - yohi/agent-skills/skills/makefile-organization
-  active_owner: yohi/agent-skills/skills/makefile-organization
-  content_hash: sha256:e2e8babe76bccef0b2bc032d5edda06eec748b1e2b79630b4078df13d3107057
-- kind: project-relative
-  target: opencode
-  value: .agents/skills/makefile-organization/SKILL.md
-  runtime: null
-  scope: project
-  owners:
-  - yohi/agent-skills/skills/makefile-organization
-  active_owner: yohi/agent-skills/skills/makefile-organization
-  content_hash: sha256:d88ed176c1a5a3f7399468366993fc60220bb7d1a879ea41fd8b4bd1f85de6a9
 - kind: project-relative
   target: opencode
   value: .agents/skills/mcp-builder
@@ -4698,6 +4744,24 @@ deployments:
   content_hash: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
 - kind: project-relative
   target: opencode
+  value: .agents/skills/skill-creator/scripts/__pycache__/__init__.cpython-314.pyc
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:850ab763583a9d4ea5589f7a616b5d0ac089cda3ba61d8e23b8ed44a51eefcac
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/skill-creator/scripts/__pycache__/aggregate_benchmark.cpython-314.pyc
+  runtime: null
+  scope: project
+  owners:
+  - anthropics/skills
+  active_owner: anthropics/skills
+  content_hash: sha256:23a5d21e1c51455358e0c2ef74aa1abe87f0996f46efcf4eae25ca6b51e2fd66
+- kind: project-relative
+  target: opencode
   value: .agents/skills/skill-creator/scripts/aggregate_benchmark.py
   runtime: null
   scope: project
@@ -5020,6 +5084,60 @@ deployments:
   - obra/superpowers
   active_owner: obra/superpowers
   content_hash: sha256:96b50a52e2c7989c9cf20fb752c47c1e9a3a70dc362f8f7989f8f5b64dac7708
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/temporary-credential-agent
+  runtime: null
+  scope: project
+  owners:
+  - yohi/agent-skills/skills/temporary-credential-agent
+  active_owner: yohi/agent-skills/skills/temporary-credential-agent
+  content_hash: null
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/temporary-credential-agent/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - yohi/agent-skills/skills/temporary-credential-agent
+  active_owner: yohi/agent-skills/skills/temporary-credential-agent
+  content_hash: sha256:4e73cdaf46337a822ae310ec5a71deb2f7287640b6383c2c99222192c5cddb47
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/temporary-credential-agent/evals/evals.json
+  runtime: null
+  scope: project
+  owners:
+  - yohi/agent-skills/skills/temporary-credential-agent
+  active_owner: yohi/agent-skills/skills/temporary-credential-agent
+  content_hash: sha256:270b45a6855d17e593666bb55cfbe01d02503084d804df5539d8fdadbdb5524b
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/temporary-credential-agent/references/audit-schema.md
+  runtime: null
+  scope: project
+  owners:
+  - yohi/agent-skills/skills/temporary-credential-agent
+  active_owner: yohi/agent-skills/skills/temporary-credential-agent
+  content_hash: sha256:31ff2f1701f1c7c754fdb58d256ae0e6cbaed60144646a3814efef1fe305c857
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/temporary-credential-agent/references/evaluation-matrix.md
+  runtime: null
+  scope: project
+  owners:
+  - yohi/agent-skills/skills/temporary-credential-agent
+  active_owner: yohi/agent-skills/skills/temporary-credential-agent
+  content_hash: sha256:b8a573cf632b8c2b65c9c17733dee8fea2873a0851ee6f9dcdbbdc73507e0a6b
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/temporary-credential-agent/references/service-profiles.md
+  runtime: null
+  scope: project
+  owners:
+  - yohi/agent-skills/skills/temporary-credential-agent
+  active_owner: yohi/agent-skills/skills/temporary-credential-agent
+  content_hash: sha256:16297622e056e7497fdf824e03c01bc662585a0533293b182b37c373033a4007
 - kind: project-relative
   target: opencode
   value: .agents/skills/test-driven-development
@@ -6002,10 +6120,10 @@ deployments:
   active_owner: coderabbitai/skills
   content_hash: sha256:cba1e6915ee98d24f288e3fb2dfb4b9b5bdc9e3164abf66b885aa9b66d8ce17d
 mcp_servers:
-- atlassian
 - aws-documentation
 - aws-iac
 - aws-mcp
+- cf-mcp-portal-personal
 - chronos-graph
 - codegraph
 - coderabbit
@@ -6019,13 +6137,6 @@ mcp_servers:
 - skillport
 - sonarqube
 mcp_configs:
-  atlassian:
-    name: atlassian
-    transport: sse
-    registry: false
-    url: https://mcp.atlassian.com/v1/mcp/authv2
-    title: Atlassian MCP
-    enabled: true
   aws-documentation:
     name: aws-documentation
     transport: stdio
@@ -6061,6 +6172,13 @@ mcp_configs:
     url: https://aws-mcp.us-east-1.api.aws/mcp?oauth=initialize
     title: AWS Managed MCP
     enabled: true
+  cf-mcp-portal-personal:
+    name: cf-mcp-portal-personal
+    transport: streamable-http
+    registry: false
+    url: https://personal.mcp.y-ohi.com/mcp
+    title: Cloudflare MCP Portal (Personal)
+    enabled: true
   chronos-graph:
     name: chronos-graph
     transport: stdio
@@ -6092,7 +6210,7 @@ mcp_configs:
       DASHBOARD_PORT: ${env:DASHBOARD_PORT}
     args:
     - --from
-    - context-store-mcp[all] @ https://github.com/yohi/chronos-graph/archive/refs/tags/v3.0.1.tar.gz
+    - context-store-mcp[all] @ https://github.com/yohi/chronos-graph/archive/refs/tags/v3.1.0.tar.gz
     - context-store
     registry: false
     command: uvx
@@ -6167,7 +6285,7 @@ mcp_configs:
       NO_PROXY: 127.0.0.1,localhost
     args:
     - -y
-    - '@yohi/nexus@1.31.4'
+    - '@yohi/nexus@2.1.0'
     - http-bridge
     registry: false
     command: npx
@@ -6242,10 +6360,10 @@ mcp_configs:
     enabled: true
 mcp_target_servers:
   opencode:
-  - atlassian
   - aws-documentation
   - aws-iac
   - aws-mcp
+  - cf-mcp-portal-personal
   - chronos-graph
   - codegraph
   - coderabbit
