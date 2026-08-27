@@ -25,9 +25,6 @@
     "experimental": {
       "task_system": true,
       "aggressive_truncation": true,
-
-      // Replaces the old unsupported
-      // preemptive_compaction_threshold setting.
       "preemptive_compaction": true
     },
 
@@ -41,8 +38,6 @@
       "provider": "playwright-cli"
     },
 
-    // Keep existing limits for Step 1.
-    // Model/provider-specific optimization comes later.
     "background_task": {
       "defaultConcurrency": 10,
       "providerConcurrency": {
@@ -55,8 +50,7 @@
       }
     },
 
-    // Runtime model fallback.
-    // Important for quota exhaustion / 429 handling.
+    // 429 / provider error時にordered model chainへ切り替える
     "runtime_fallback": {
       "enabled": true,
       "retry_on_errors": [
@@ -73,7 +67,6 @@
       "restore_primary_after_cooldown": true
     },
 
-    // Ralph Loop -> Goal
     "goal": {
       "enabled": true,
       "auto_start": false,
@@ -99,7 +92,6 @@
 
     "hashline_edit": true,
 
-    // Environment variables exposed to MCPs.
     "mcp_env_allowlist": [
       "HOME",
       "CHRONOS_POSTGRES_HOST",
@@ -128,20 +120,30 @@
   // Profiles
   // ===========================================================================
   "profiles": {
+
     // =========================================================================
     // PERSONAL
+    //
+    // Routing policy:
+    //
+    // Kimi K2.7   = orchestration / instruction-following / planning
+    // Luna         = high-frequency worker / search / TDD implementation
+    // Terra        = senior reasoning / review / architecture consultation
+    // Sol          = explicit deep specialist only
+    // Gemini       = visual / creative
+    //
+    // Provider paths are intentionally unchanged in Step 2.
     // =========================================================================
     "personal": {
+
       // -----------------------------------------------------------------------
       // Logical model catalog
-      //
-      // Keep provider routing in one place.
-      // Agent/category definitions below refer to these aliases.
       // -----------------------------------------------------------------------
       "models": {
         "kimi-k27": {
           "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.7-code"
         },
+
         "kimi-k26": {
           "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.6"
         },
@@ -149,6 +151,7 @@
         "sol-octg": {
           "model": "cloudflare-ai-gateway-octg/gpt-5.6-sol"
         },
+
         "sol-plus": {
           "model": "openai/gpt-5.6-sol"
         },
@@ -156,6 +159,7 @@
         "terra-octg": {
           "model": "cloudflare-ai-gateway-octg/gpt-5.6-terra"
         },
+
         "terra-plus": {
           "model": "openai/gpt-5.6-terra"
         },
@@ -163,6 +167,7 @@
         "luna-octg": {
           "model": "cloudflare-ai-gateway-octg/gpt-5.6-luna"
         },
+
         "luna-plus": {
           "model": "openai/gpt-5.6-luna"
         },
@@ -170,84 +175,124 @@
         "gemini-pro": {
           "model": "cloudflare-ai-gateway/google/gemini-3.1-pro"
         },
+
         "gemini-pro-ai-studio": {
           "model": "cloudflare-ai-gateway/google-ai-studio/gemini-3.1-pro"
         }
       },
 
       "[opencode]": {
-        "agents": {
-          // -------------------------------------------------------------------
-          // Primary agents
-          // -------------------------------------------------------------------
 
+        // =====================================================================
+        // Agents
+        // =====================================================================
+        "agents": {
+
+          // -------------------------------------------------------------------
+          // Sisyphus
+          //
+          // High-frequency orchestration.
+          // K2.7 is maintainer-verified for Sisyphus and substantially cheaper
+          // to keep running than Sol/K3-class models.
+          // -------------------------------------------------------------------
           "sisyphus": {
             "models": [
               "kimi-k27",
-              {
-                "model": "sol-plus",
-                "reasoning": "default"
-              },
+
               {
                 "model": "sol-octg",
-                "reasoning": "default"
+                "reasoning": "medium"
+              },
+
+              {
+                "model": "sol-plus",
+                "reasoning": "medium"
               }
             ],
 
-            // NOTE:
-            // Previous config had variant=max AND reasoning=high.
-            // `reasoning` is canonical, so Step 1 preserves "high".
+            // Premium autonomous mode.
+            //
+            // Current provider set has no active K3 route, so keep the existing
+            // OpenAI path rather than introducing a new provider in Step 2.
             "ultrawork": {
               "model": "sol-plus",
               "reasoning": "high"
             }
           },
 
+          // -------------------------------------------------------------------
+          // Hephaestus
+          //
+          // Explicit deep implementation specialist.
+          // Restore upstream-native GPT-5.6 Sol / medium behavior.
+          // -------------------------------------------------------------------
           "hephaestus": {
             "disable": false,
-            "models": [
-              {
-                "model": "terra-octg",
-                "reasoning": "medium"
-              },
-              {
-                "model": "terra-plus",
-                "reasoning": "medium"
-              },
-              {
-                "model": "luna-octg",
-                "reasoning": "medium"
-              },
-              {
-                "model": "luna-plus",
-                "reasoning": "medium"
-              }
-            ]
-          },
 
-          // -------------------------------------------------------------------
-          // Specialist subagents
-          // -------------------------------------------------------------------
-
-          "oracle": {
             "models": [
               {
                 "model": "sol-octg",
-                "reasoning": "high"
+                "reasoning": "medium"
               },
+
               {
                 "model": "sol-plus",
-                "reasoning": "high"
+                "reasoning": "medium"
               }
             ]
           },
 
+          // -------------------------------------------------------------------
+          // Oracle
+          //
+          // Oracle is invoked frequently in real workflows.
+          // Do NOT spend Sol quota on every architecture/debug consultation.
+          //
+          // Normal:
+          //   Terra/high
+          //
+          // Availability fallback:
+          //   Luna/max -> alternate Terra -> alternate Luna
+          //
+          // Sol escalation should happen explicitly through
+          // Hephaestus / deep / ultrabrain instead.
+          // -------------------------------------------------------------------
+          "oracle": {
+            "models": [
+              {
+                "model": "terra-octg",
+                "reasoning": "high"
+              },
+
+              {
+                "model": "luna-octg",
+                "reasoning": "max"
+              },
+
+              {
+                "model": "terra-plus",
+                "reasoning": "high"
+              },
+
+              {
+                "model": "luna-plus",
+                "reasoning": "max"
+              }
+            ]
+          },
+
+          // -------------------------------------------------------------------
+          // Librarian
+          //
+          // High-frequency external documentation / OSS research.
+          // -------------------------------------------------------------------
           "librarian": {
             "models": [
               {
                 "model": "luna-octg",
                 "reasoning": "low"
               },
+
               {
                 "model": "luna-plus",
                 "reasoning": "low"
@@ -255,44 +300,71 @@
             ]
           },
 
+          // -------------------------------------------------------------------
+          // Explore
+          //
+          // High-frequency codebase search.
+          // Upstream also places Luna/low first for this role.
+          // -------------------------------------------------------------------
           "explore": {
             "models": [
               {
                 "model": "luna-octg",
-                "reasoning": "medium"
+                "reasoning": "low"
               },
+
               {
                 "model": "luna-plus",
-                "reasoning": "medium"
+                "reasoning": "low"
               }
             ]
           },
 
+          // -------------------------------------------------------------------
+          // Multimodal Looker
+          // -------------------------------------------------------------------
           "multimodal-looker": {
             "models": [
-              "gemini-pro",
+              {
+                "model": "gemini-pro",
+                "reasoning": "high"
+              },
+
               "kimi-k27"
             ]
           },
 
           // -------------------------------------------------------------------
-          // Planning / orchestration
+          // Prometheus
+          //
+          // Superpowersを主planning workflowとして使うため、
+          // 高頻度Sol plannerにはしない。
+          //
+          // K2.7 = normal planning
+          // Sol/high = provider/model fallback
           // -------------------------------------------------------------------
-
           "prometheus": {
             "models": [
+              "kimi-k27",
+
               {
                 "model": "sol-octg",
-                "reasoning": "max"
+                "reasoning": "high"
               },
+
               {
                 "model": "sol-plus",
-                "reasoning": "max"
-              },
-              "kimi-k27"
+                "reasoning": "high"
+              }
             ]
           },
 
+          // -------------------------------------------------------------------
+          // Metis
+          //
+          // Mechanics-driven planning/gap analysis.
+          // Keep within Kimi family.
+          // -------------------------------------------------------------------
           "metis": {
             "models": [
               "kimi-k27",
@@ -300,64 +372,157 @@
             ]
           },
 
+          // -------------------------------------------------------------------
+          // Momus
+          //
+          // Upstream-native primary is Terra/high.
+          // Frequent planning review must not consume Sol on every round.
+          // -------------------------------------------------------------------
           "momus": {
             "models": [
               {
-                "model": "sol-octg",
-                "reasoning": "xhigh"
+                "model": "terra-octg",
+                "reasoning": "high"
               },
+
               {
-                "model": "sol-plus",
-                "reasoning": "xhigh"
+                "model": "luna-octg",
+                "reasoning": "max"
               },
-              "kimi-k27"
+
+              {
+                "model": "terra-plus",
+                "reasoning": "high"
+              },
+
+              {
+                "model": "luna-plus",
+                "reasoning": "max"
+              }
             ]
           },
 
+          // -------------------------------------------------------------------
+          // Atlas
+          //
+          // Execution controller / conductor.
+          // Avoid expensive Sol as the normal orchestration model.
+          // -------------------------------------------------------------------
           "atlas": {
             "models": [
               "kimi-k27",
+
               {
                 "model": "sol-octg",
-                "reasoning": "default"
+                "reasoning": "medium"
               },
+
               {
                 "model": "sol-plus",
-                "reasoning": "default"
+                "reasoning": "medium"
+              }
+            ]
+          },
+
+          // -------------------------------------------------------------------
+          // Sisyphus Junior
+          //
+          // High-frequency implementation worker.
+          //
+          // This is the main Step 2 change for Superpowers compatibility:
+          // normal detailed TDD tasks should run on Luna/max rather than Sol.
+          // -------------------------------------------------------------------
+          "sisyphus-junior": {
+            "models": [
+              {
+                "model": "luna-octg",
+                "reasoning": "max"
+              },
+
+              "kimi-k27",
+
+              {
+                "model": "terra-octg",
+                "reasoning": "high"
+              },
+
+              {
+                "model": "luna-plus",
+                "reasoning": "max"
               }
             ]
           }
         },
 
+        // =====================================================================
+        // Categories
+        // =====================================================================
         "categories": {
+
+          // -------------------------------------------------------------------
+          // ultrabrain
+          //
+          // Semantic meaning:
+          // "I explicitly want the strongest reasoning."
+          //
+          // Keep Sol/max instead of silently degrading this category.
+          // -------------------------------------------------------------------
           "ultrabrain": {
             "models": [
-              "kimi-k27",
-              "sol-octg",
-              "sol-plus"
+              {
+                "model": "sol-octg",
+                "reasoning": "max"
+              },
+
+              {
+                "model": "sol-plus",
+                "reasoning": "max"
+              },
+
+              {
+                "model": "terra-octg",
+                "reasoning": "high"
+              }
             ]
           },
 
+          // -------------------------------------------------------------------
+          // deep
+          //
+          // Explicit deep autonomous implementation.
+          // Keep upstream-native Sol/medium semantics.
+          // -------------------------------------------------------------------
           "deep": {
             "models": [
               {
-                "model": "terra-octg",
-                "reasoning": "xhigh"
+                "model": "sol-octg",
+                "reasoning": "medium"
               },
+
               {
-                "model": "terra-plus",
-                "reasoning": "xhigh"
+                "model": "sol-plus",
+                "reasoning": "medium"
               },
-              "kimi-k27"
+
+              {
+                "model": "terra-octg",
+                "reasoning": "high"
+              }
             ]
           },
 
+          // -------------------------------------------------------------------
+          // quick
+          //
+          // Search, trivial modifications, small mechanical work.
+          // -------------------------------------------------------------------
           "quick": {
             "models": [
               {
                 "model": "luna-octg",
                 "reasoning": "low"
               },
+
               {
                 "model": "luna-plus",
                 "reasoning": "low"
@@ -365,55 +530,86 @@
             ]
           },
 
+          // -------------------------------------------------------------------
+          // writing
+          //
+          // Kimi instruction-following remains a better fit than GPT-native
+          // deep reasoning for normal technical writing.
+          // -------------------------------------------------------------------
           "writing": {
             "models": [
               "kimi-k27"
             ]
           },
 
+          // -------------------------------------------------------------------
+          // unspecified-low
+          //
+          // Generic work where quick/low is too weak but deep is excessive.
+          // Luna/high becomes the default general-purpose tier.
+          // -------------------------------------------------------------------
           "unspecified-low": {
             "models": [
               {
                 "model": "luna-octg",
-                "reasoning": "xhigh"
+                "reasoning": "high"
               },
+
               {
                 "model": "luna-plus",
-                "reasoning": "xhigh"
-              }
-            ]
-          },
+                "reasoning": "high"
+              },
 
-          "unspecified-high": {
-            "models": [
-              {
-                "model": "sol-octg",
-                "reasoning": "high"
-              },
-              {
-                "model": "sol-plus",
-                "reasoning": "high"
-              },
               "kimi-k27"
             ]
           },
 
+          // -------------------------------------------------------------------
+          // unspecified-high
+          //
+          // Senior general-purpose reasoning.
+          // Terra/high replaces Sol/high to protect Sol capacity.
+          // -------------------------------------------------------------------
+          "unspecified-high": {
+            "models": [
+              {
+                "model": "terra-octg",
+                "reasoning": "high"
+              },
+
+              {
+                "model": "terra-plus",
+                "reasoning": "high"
+              },
+
+              "kimi-k27"
+            ]
+          },
+
+          // -------------------------------------------------------------------
+          // visual-engineering
+          // -------------------------------------------------------------------
           "visual-engineering": {
             "models": [
               {
                 "model": "gemini-pro",
                 "reasoning": "high"
               },
+
               "kimi-k27"
             ]
           },
 
+          // -------------------------------------------------------------------
+          // artistry
+          // -------------------------------------------------------------------
           "artistry": {
             "models": [
               {
                 "model": "gemini-pro-ai-studio",
                 "reasoning": "high"
               },
+
               "kimi-k27"
             ]
           }
@@ -423,15 +619,19 @@
 
     // =========================================================================
     // WORK
+    //
+    // Step 2では変更しない。
     // =========================================================================
     "work": {
       "models": {
         "opus": {
           "model": "amazon-bedrock/global.anthropic.claude-opus-5"
         },
+
         "sonnet": {
           "model": "amazon-bedrock/global.anthropic.claude-sonnet-5"
         },
+
         "haiku": {
           "model": "amazon-bedrock/global.anthropic.claude-haiku-4-5-20251001-v1:0"
         }
@@ -445,11 +645,13 @@
                 "model": "sonnet",
                 "reasoning": "max"
               },
+
               {
                 "model": "opus",
                 "reasoning": "max"
               }
             ],
+
             "ultrawork": {
               "model": "opus",
               "reasoning": "high"
@@ -466,6 +668,7 @@
                 "model": "opus",
                 "reasoning": "max"
               },
+
               "sonnet"
             ]
           },
@@ -490,6 +693,7 @@
                 "model": "opus",
                 "reasoning": "max"
               },
+
               "sonnet"
             ]
           },
@@ -500,6 +704,7 @@
                 "model": "opus",
                 "reasoning": "max"
               },
+
               "sonnet"
             ]
           },
@@ -510,6 +715,7 @@
                 "model": "opus",
                 "reasoning": "max"
               },
+
               "sonnet"
             ]
           },
@@ -520,6 +726,7 @@
                 "model": "opus",
                 "reasoning": "max"
               },
+
               "sonnet"
             ]
           },
@@ -539,6 +746,7 @@
                 "model": "opus",
                 "reasoning": "max"
               },
+
               "sonnet"
             ]
           },
@@ -549,6 +757,7 @@
                 "model": "opus",
                 "reasoning": "max"
               },
+
               "sonnet"
             ]
           },
@@ -580,6 +789,7 @@
                 "model": "opus",
                 "reasoning": "max"
               },
+
               "sonnet"
             ]
           },
@@ -590,6 +800,7 @@
                 "model": "opus",
                 "reasoning": "max"
               },
+
               "sonnet"
             ]
           },
