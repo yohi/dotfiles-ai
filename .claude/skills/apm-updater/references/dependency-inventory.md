@@ -54,7 +54,7 @@
 | 種別 | 依存 | 現在値（作成時点） |
 |------|------|--------------------|
 | `apm-skill` | `obra/superpowers` | `#v6.0.2` |
-| `mcp-npm` | `@yohi/nexus` | `1.22.0` |
+| `mcp-npm` | `@yohi/nexus` | `2.0.0` |
 | `mcp-git` | `yohi/chronos-graph` | `cb1f33f...222c`（40桁 commit hash） |
 | `plugin` | `@yohi/justice` | `2.3.0` |
 | `plugin` | `@yohi/akane` | `1.5.1` |

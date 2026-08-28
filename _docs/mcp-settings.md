@@ -35,8 +35,7 @@ make sync-mcp
 - `aws-api` — `uvx awslabs.aws-api-mcp-server`
 - `aws-cdk-mcp-server` — `uvx awslabs.cdk-mcp-server`
 - `aws-diagram` — `uvx awslabs.aws-diagram-mcp-server`
-- `aws-documentation` — `uvx awslabs.aws-documentation-mcp-server`
-- `aws-terraform` — `uvx awslabs.terraform-mcp-server`
+- `cf-mcp-portal-personal` — `https://personal.mcp.y-ohi.com/mcp`
 - `sentry-remote` — `https://mcp.sentry.dev/mcp`
 - 既存の `nexus`, `chronos-graph`, `skillport` 等
 
