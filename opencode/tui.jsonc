@@ -22,7 +22,7 @@
   "plugin": [
     "oh-my-openagent/tui",
     "@yohi/akane@1.6.2",
-    "file:///home/y_ohi/program/private/sibyl/dist/tui.js"
+    // "file:///home/y_ohi/program/private/sibyl/dist/tui.js"
   ]
 }
 

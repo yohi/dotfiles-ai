@@ -10,8 +10,6 @@ OPENCODE_CONFIG_PATH ?= $(OPENCODE_CONFIG_DIR)/opencode.jsonc
 OPENCODE_TUI_CONFIG_PATH ?= $(OPENCODE_CONFIG_DIR)/tui.json
 OPENCODE_TUI_DOTFILES_CONFIG ?= $(REPO_ROOT)/opencode/tui.jsonc
 OPENCODE_DOTFILES_CONFIG ?= $(REPO_ROOT)/opencode/opencode.jsonc
-OH_MY_OPENAGENT_CONFIG_PATH ?= $(OPENCODE_CONFIG_DIR)/oh-my-openagent.jsonc
-OH_MY_OPENAGENT_DOTFILES_CONFIG ?= $(REPO_ROOT)/opencode/oh-my-openagent.jsonc.template
 OPENCODE_ANTIGRAVITY_PATH ?= $(OPENCODE_CONFIG_DIR)/antigravity.json
 OPENCODE_DOTFILES_ANTIGRAVITY ?= $(REPO_ROOT)/opencode/antigravity.json
 OPENCODE_AGENTS_PATH ?= $(OPENCODE_CONFIG_DIR)/AGENTS.md
@@ -265,10 +263,20 @@ check-opencode: ## OpenCode（opencode）の状態を確認
 	else \
 		echo "⚠️  config: $(OPENCODE_CONFIG_PATH) is not configured"; \
 	fi
-	@if [ -f "$(OH_MY_OPENAGENT_DOTFILES_CONFIG)" ]; then \
-		echo "✅ template: $(OH_MY_OPENAGENT_DOTFILES_CONFIG) exists"; \
-	else \
-		echo "⚠️  template: $(OH_MY_OPENAGENT_DOTFILES_CONFIG) not found"; \
+	@if [ -f "$(OMO_DOTFILES_CONFIG)" ]; then \
+		if [ -L "$(OMO_CONFIG_PATH)" ]; then \
+			actual=$$(readlink -f "$(OMO_CONFIG_PATH)" 2>/dev/null || readlink "$(OMO_CONFIG_PATH)" 2>/dev/null || true); \
+			expected=$$(readlink -f "$(OMO_DOTFILES_CONFIG)" 2>/dev/null || readlink "$(OMO_DOTFILES_CONFIG)" 2>/dev/null || true); \
+			if [ -n "$$actual" ] && [ "$$actual" = "$$expected" ]; then \
+				echo "✅ omo: $(OMO_CONFIG_PATH) -> $(OMO_DOTFILES_CONFIG)"; \
+			else \
+				echo "⚠️  omo: $(OMO_CONFIG_PATH) points to $$actual (expected $$expected)"; \
+			fi; \
+		elif [ -e "$(OMO_CONFIG_PATH)" ]; then \
+			echo "⚠️  omo: $(OMO_CONFIG_PATH) exists but is not a symlink"; \
+		else \
+			echo "⚠️  omo: $(OMO_CONFIG_PATH) is not configured"; \
+		fi; \
 	fi
 	@if [ -f "$(REPO_ROOT)/_scripts/opencode-wrapper.sh" ]; then \
 		echo "✅ wrapper: $(REPO_ROOT)/_scripts/opencode-wrapper.sh exists"; \

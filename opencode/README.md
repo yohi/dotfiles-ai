@@ -28,65 +28,58 @@ Sisyphus（監督）は、タスクの性質に応じて最適な「知能カテ
 
 タスクの難易度や種類に応じてモデルとパラメータを最適化する定義です。
 
-| カテゴリー | 特徴・バリアント | 想定される用途 | 推奨モデル (Brain) |
+| カテゴリー | 特徴・バリアント | 想定される用途 | デフォルトモデル (personal) |
 | :--- | :--- | :--- | :--- |
-| **ultrabrain** | `xhigh` / 最強推論 | 複雑な計画立案、コード監査、アーキテクチャ設計、リスク分析。 | Kimi K3 → GPT-5.6 Sol |
-| **deep** | `xhigh` / 自律解決 | 難解なバグ修正、機能実装、リファクタリングなど職人的作業。 | gpt-5.6-terra (xhigh) |
-| **quick** | `low` / 高速応答 | ドキュメント検索、コード探索、些細な修正、プロトタイピング。 | gpt-5.6-luna (low) |
+| **ultrabrain** | `max` / 最強推論 | 複雑な計画立案、コード監査、アーキテクチャ設計、リスク分析。 | GPT-5.6 Sol (OCTG / OpenAI) |
+| **deep** | `high` / 自律解決 | 難解なバグ修正、機能実装、リファクタリングなど職人的作業。 | GPT-5.6 Terra (OCTG / OpenAI) |
+| **quick** | `low` / 高速応答 | ドキュメント検索、コード探索、些細な修正、プロトタイピング。 | GPT-5.6 Luna |
 | **visual-engineering** | UI/UX 特化 | UIデザイン解析、CSSアニメーション、フロントエンド最適化。 | Gemini 3.1 Pro |
-| **unspecified-high** | 高負荷汎用 | 特定の役割に当てはまらないが、高い知能を要する汎用作業。 | GPT-5.6 Sol (high) |
-| **unspecified-low** | `xhigh` / 低負荷汎用 | 定形的な作業、単純なデータ変換などの低コストな汎用作業。 | gpt-5.6-luna (xhigh) |
-| **writing** | 文書作成 特化 | 技術解説、ドキュメンテーション、リリースノートの作成。 | Kimi (k2.7-code) |
+| **unspecified-high** | 高負荷汎用 | 特定の役割に当てはまらないが、高い知能を要する汎用作業。 | GPT-5.6 Luna (max) → Kimi K2.7 |
+| **unspecified-low** | 低負荷汎用 | 定形的な作業、単純なデータ変換などの低コストな汎用作業。 | GPT-5.6 Luna (high) → Kimi K2.7 |
+| **writing** | 文書作成 特化 | 技術解説、ドキュメンテーション、リリースノートの作成。 | Kimi K2.7 Code |
 | **artistry** | 創造性 特化 | ジェネラティブアート、クリエイティブな発想、芸術的表現。 | Gemini 3.1 Pro |
 
 ### エージェント一覧とカテゴリー・マッピング
 
-各エージェントは役割を持ち、デフォルトで以下のカテゴリーが割り当てられています。
+各エージェントは役割を持ち、デフォルトで以下のモデル・フォールバックチェーンが割り当てられています（`personal` 構成）。
 
-| エージェント | カテゴリー | 推奨/フォールバックチェーン (優先順) | 役割・専門領域 |
+| エージェント | カテゴリー | personal モデルチェーン (優先順) | 役割・専門領域 |
 | :--- | :--- | :--- | :--- |
-| **Sisyphus** | `ultrabrain` | `kimi-k3` → `claude-fable-5` → `claude-opus-4-8` → `claude-opus-4-7` (max) → `kimi-k2.7-code` → `kimi-k2.6` → `gpt-5.6-sol` (medium) → `glm-5.2` | 司令塔。全体の品質管理、タスクの分解と委譲。 |
-| **Hephaestus** | `deep` | `gpt-5.6-terra` (xhigh) → `gpt-5.6-sol` (medium) | 実装職人。自律的なコードの書き込み、複雑なロジック実装。 |
-| **Oracle** | `ultrabrain` | `gpt-5.6-sol` (high) → `qwen3.6-plus` (high) → `claude-opus-4-8` (max) → `glm-5.2` | 賢者。アーキテクチャ設計の相談、難解なバグのデバッグ。 |
-| **Librarian** | `quick` | `gpt-5.6-luna` (low) → `gpt-5.6-terra` (medium) → `qwen3.5-plus` → `minimax-m3` → `minimax-m2.7` → `claude-haiku-4-5` | 司書。外部ドキュメントやOSSの実装例の高速検索。 |
-| **Explore** | `quick` | `gpt-5.6-luna` (low) → `gpt-5.6-terra` (medium) → `qwen3.5-plus` → `minimax-m3` → `minimax-m2.7` → `claude-haiku-4-5` | 探検家。コードベースの高速探索、grep検索、スキャフォールディング 。 |
-| **Prometheus** | `ultrabrain` | `claude-opus-4-8` (max) → `gpt-5.6-sol` (high) → `glm-5.2` → `qwen3.6-plus` | 流れ者。タスクの分解と並列実行計画（Agent Swarm）の作成。 |
-| **Metis** | `ultrabrain` | `claude-sonnet-5` → `claude-sonnet-4-6` → `claude-opus-4-8` (max) → `gpt-5.6-sol` (high) → `glm-5.2` → `kimi-k2.5` | 計画コンサル。計画前のリスク特定と曖昧さの排除。 |
-| **Momus** | `ultrabrain` | `gpt-5.6-sol` (xhigh) → `claude-opus-4-8` (max) → `qwen3.6-plus` (high) → `glm-5.2` | 計画レビュアー。Prometheusが作成した計画の厳格な検証。 |
-| **Atlas** | `ultrabrain` | `kimi-k3` → `claude-sonnet-5` → `claude-sonnet-4-6` → `kimi-k2.7-code` → `kimi-k2.6` → `gpt-5.6-sol` (medium) → `glm-5.2` | 現場監督。環境管理、Todo項目の体系的な管理と調整。 |
-| **Multimodal-Looker** | `ultrabrain` | `kimi-k3` → `gpt-5.6-sol` (medium) → `kimi-k2.7-code` → `kimi-k2.6` → `glm-5.2` | 視覚アナリスト。UIデザイン、画像、図解、PDFの解析。 |
-| **Sisyphus-Junior** | (動的) | `kimi-k3` → `claude-sonnet-5` → `claude-sonnet-4-6` → `kimi-k2.7-code` → `kimi-k2.6` → `gpt-5.6-sol` (medium) → `minimax-m3` | 作業員. 特定のカテゴリーに特化して生成される実行用エージェント. |
+| **Sisyphus** | `ultrabrain` | `kimi-k27` → `sol-octg` (medium) → `sol` (medium) | 司令塔。全体の品質管理、タスクの分解と委譲。 |
+| **Hephaestus** | `deep` | `sol-octg` (medium) → `sol` (medium) | 実装職人。自律的なコードの書き込み、複雑なロジック実装。 |
+| **Oracle** | `ultrabrain` | `terra-octg` (high) → `terra` (high) → `luna` (max) | 賢者。アーキテクチャ設計の相談、難解なバグのデバッグ。 |
+| **Librarian** | `quick` | `luna` (low) | 司書。外部ドキュメントやOSSの実装例の高速検索。 |
+| **Explore** | `quick` | `luna` (low) | 探検家。コードベースの高速探索、grep検索、スキャフォールディング。 |
+| **Prometheus** | `ultrabrain` | `kimi-k27` → `sol-octg` (high) → `sol` (high) | 流れ者。タスクの分解と並列実行計画の作成。 |
+| **Metis** | `ultrabrain` | `kimi-k27` → `kimi-k26` | 計画コンサル。計画前のリスク特定と曖昧さの排除。 |
+| **Momus** | `ultrabrain` | `terra-octg` (high) → `terra` (high) → `luna` (max) | 計画レビュアー。Prometheusが作成した計画の厳格な検証。 |
+| **Atlas** | `ultrabrain` | `kimi-k27` → `sol-octg` (medium) → `sol` (medium) | 現場監督。環境管理、Todo項目の体系的な管理と調整。 |
+| **Multimodal-Looker** | `ultrabrain` | `gemini-pro` (high) → `kimi-k27` | 視覚アナリスト。UIデザイン、画像、図解、PDFの解析。 |
 
 ## 4. LLMモデル選択のベストプラクティス
 
 エージェントの能力を最大限に引き出すためには、エージェントの思考スタイルに合った「脳（モデルファミリー）」を割り当てることが重要です。
 
-### 推奨スタック: OpenCode Go + OpenAI + Kimi K3 (Best Value)
-最も効率的でバランスの良い組み合わせです。v4.19.4 では **Kimi K3** がファーストクラス対応となり、Sisyphus 系エージェントの司令塔・Todo 管理に最適です。
-
-- **OpenCode Go ($10/mo)**: Kimi (Claude系代替, **K3 対応**), Qwen (Gemini系代替), MiniMax を提供。
-- **OpenAI Plus/Pro ($20/mo)**: GPT-5.6/5.4/5.5 (実装・監査系) を提供。
-
 ### 思考スタイルとモデルの相性
 
 | スタイル | 特徴 | 適合モデル | 最適なエージェント |
 | :--- | :--- | :--- | :--- |
-| **メカニクス駆動** | **指示追従型。** 長大で複雑な手順、多段のTodo管理に極めて強い。 | Claude Family, Kimi, GLM | Sisyphus, Atlas, Metis |
-| **原則駆動** | **自律探索型。** 最小限の指示で自律的に解決策を見出す。深い実装に強い。 | GPT Family, DeepSeek, Qwen, Kimi K3 | Hephaestus, Oracle, Momus |
-| **視覚推論型** | **UI・構造理解。** デザイン解析、CSS、レイアウトの理解に特化。 | Gemini Family, Qwen | Looker |
+| **メカニクス駆動** | **指示追従型。** 長大で複雑な手順、多段のTodo管理に極めて強い。 | Kimi Family, Claude Family | Sisyphus, Atlas, Metis |
+| **原則駆動** | **自律探索型。** 最小限の指示で自律的に解決策を見出す。深い実装に強い。 | GPT Family (Sol, Terra, Luna) | Hephaestus, Oracle, Momus |
+| **視覚推論型** | **UI・構造理解。** デザイン解析、CSS、レイアウトの理解に特化。 | Gemini Family | Looker |
 
-### カテゴリー別・推奨モデルと代替ルール (v4.19.4)
+### カテゴリー別・モデルルーティング一覧
 
-| カテゴリー | デフォルトモデル | フォールバックチェーン (優先順) |
-| :--- | :--- | :--- |
-| **ultrabrain** | `gpt-5.6-sol` (xhigh) | `gpt-5.6-sol` (xhigh) → `qwen3.6-plus` (high) → `claude-opus-5` (max) → `glm-5.2` |
-| **deep** | `gpt-5.6-terra` (xhigh) | `gpt-5.6-terra` (xhigh) → `gpt-5.6-sol` (medium) → `claude-opus-5` (max) → `qwen3.6-plus` (high) |
-| **quick** | `gpt-5.6-luna` (low) | `gpt-5.6-luna` (low) → `deepseek-v4-flash-free` → `kimi-k3` → `kimi-k2.7-code` |
-| **visual-engineering** | `qwen3.6-plus` (high) | `qwen3.6-plus` (high) → `glm-5.2` → `claude-opus-5` (max) → `kimi-k2.7-code` |
-| **artistry** | `qwen3.6-plus` (high) | `qwen3.6-plus` (high) → `claude-opus-5` (max) → `gpt-5.6-sol` |
-| **unspecified-high** | `gpt-5.6-sol` (high) | `gpt-5.6-sol` (high) → `claude-opus-5` (max) → `glm-5.2` → `kimi-k2.7-code` → `qwen3.6-plus` → `kimi-k2.5` |
-| **unspecified-low** | `gpt-5.6-luna` (xhigh) | `gpt-5.6-luna` (xhigh) → `kimi-k3` → `kimi-k2.7-code` → `kimi-k2.6` → `gpt-5.4-mini` → `qwen3.5-plus` → `minimax-m3` |
-| **writing** | `kimi-k3` | `kimi-k3` → `kimi-k2.7-code` → `qwen3.5-plus` → `kimi-k2.6` → `claude-sonnet-5` → `minimax-m3` → `minimax-m2.7` |
+| カテゴリー | personal デフォルト | personal フォールバックチェーン | work (Bedrock) |
+| :--- | :--- | :--- | :--- |
+| **ultrabrain** | `sol-octg` (max) | `sol-octg` (max) → `sol` (max) → `terra-octg` (high) → `terra` (high) | `opus` (max) → `sonnet` |
+| **deep** | `terra-octg` (high) | `terra-octg` (high) → `terra` (high) → `sol-octg` (medium) → `sol` (medium) | `opus` (max) → `sonnet` |
+| **quick** | `luna` (low) | `luna` (low) | `haiku` → `sonnet` |
+| **visual-engineering** | `gemini-pro` (high) | `gemini-pro` (high) → `kimi-k27` | `opus` (max) → `sonnet` |
+| **artistry** | `gemini-pro` (high) | `gemini-pro` (high) → `kimi-k27` | `sonnet` → `haiku` |
+| **unspecified-high** | `luna` (max) | `luna` (max) → `kimi-k27` | `opus` (max) → `sonnet` |
+| **unspecified-low** | `luna` (high) | `luna` (high) → `kimi-k27` | `sonnet` → `haiku` |
+| **writing** | `kimi-k27` | `kimi-k27` | `sonnet` → `haiku` |
 
 ---
 *Updated: 2026-07-30*

@@ -1,20 +1,37 @@
-// OMO configuration
-// Migrated to omo native profiles (v4.19.4+)
-// Native profiles: personal / work
-// Activation: OMO_PROFILE=personal|work
+// =============================================================================
+// OMO (Oh-My-OpenAgent) Configuration
+// =============================================================================
+// - omo native profiles (v4.19.4+) 対応設定ファイル
+// - プロファイル構成: personal (個人開発 / コスト最適化) / work (業務 / AWS Bedrock)
+// - プロファイル切り替え: OMO_PROFILE=personal|work (またはラッパー引数 "opencode personal")
+// =============================================================================
 {
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/omo.schema.json",
 
   // ===========================================================================
-  // OpenCode shared configuration
+  // OpenCode 共通設定 (全プロファイルで共有されるコア機能・環境設定)
   // ===========================================================================
   "[opencode]": {
+    // -------------------------------------------------------------------------
+    // Team Mode (マルチエージェント協調・自律チーム実行)
+    // -------------------------------------------------------------------------
     "team_mode": {
       "enabled": false,
       "base_dir": ".sisyphus/team",
-      "auto_sync": true
+      "tmux_visualization": false,
+      "max_parallel_members": 4,
+      "max_members": 8,
+      "max_messages_per_run": 10000,
+      "max_wall_clock_minutes": 120,
+      "max_member_turns": 500,
+      "message_payload_max_bytes": 32768,
+      "recipient_unread_max_bytes": 262144,
+      "mailbox_poll_interval_ms": 3000
     },
 
+    // -------------------------------------------------------------------------
+    // Sisyphus Agent コア設定
+    // -------------------------------------------------------------------------
     "sisyphus_agent": {
       "disabled": false,
       "planner_enabled": true,
@@ -22,22 +39,37 @@
       "default_builder_enabled": true
     },
 
+    // -------------------------------------------------------------------------
+    // 実験的機能 (コンテキスト圧縮・タスクシステム)
+    // -------------------------------------------------------------------------
     "experimental": {
       "task_system": true,
       "aggressive_truncation": true,
       "preemptive_compaction": true
     },
 
+    // -------------------------------------------------------------------------
+    // Tmux ターミナル分割・ペイン制御
+    // -------------------------------------------------------------------------
     "tmux": {
       "enabled": true,
       "layout": "main-vertical",
-      "main_pane_size": 65
+      "main_pane_size": 65,
+      "main_pane_min_width": 120,
+      "agent_pane_min_width": 40,
+      "isolation": "inline"
     },
 
+    // -------------------------------------------------------------------------
+    // ブラウザ自動化エンジン
+    // -------------------------------------------------------------------------
     "browser_automation_engine": {
       "provider": "playwright-cli"
     },
 
+    // -------------------------------------------------------------------------
+    // バックグラウンドタスクのプロバイダ別並行制御
+    // -------------------------------------------------------------------------
     "background_task": {
       "defaultConcurrency": 10,
       "providerConcurrency": {
@@ -50,7 +82,9 @@
       }
     },
 
-    // 429 / provider error時にordered model chainへ切り替える
+    // -------------------------------------------------------------------------
+    // ランタイム自動フォールバック (429 / 5xx エラー時に ordered model chain へ切り替え)
+    // -------------------------------------------------------------------------
     "runtime_fallback": {
       "enabled": true,
       "retry_on_errors": [
@@ -67,31 +101,47 @@
       "restore_primary_after_cooldown": true
     },
 
+    // -------------------------------------------------------------------------
+    // Goal モード (自律ゴール達成ループ)
+    // -------------------------------------------------------------------------
     "goal": {
-      "enabled": true,
+      "enabled": false,
       "auto_start": false,
       "default_max_iterations": 20
     },
 
+    // -------------------------------------------------------------------------
+    // デフォルト実行モード
+    // -------------------------------------------------------------------------
     "default_mode": {
+      "ultrawork": false,
       "goal": false
     },
 
+    // -------------------------------------------------------------------------
+    // Git Master (Conventional Commits 自動生成ポリシー)
+    // -------------------------------------------------------------------------
     "git_master": {
       "commit_footer": false,
-      "include_co_authored_by": false
+      "include_co_authored_by": false,
+      "git_env_prefix": "GIT_MASTER=1"
     },
 
-    "comment_checker": {
-      "enabled": true
-    },
-
+    // -------------------------------------------------------------------------
+    // 無効化フック
+    // -------------------------------------------------------------------------
     "disabled_hooks": [
       "auto-update-checker"
     ],
 
+    // -------------------------------------------------------------------------
+    // 高速行番号編集 (Hashline Edit)
+    // -------------------------------------------------------------------------
     "hashline_edit": true,
 
+    // -------------------------------------------------------------------------
+    // MCP サーバーへ転送を許可する環境変数ホワイトリスト
+    // -------------------------------------------------------------------------
     "mcp_env_allowlist": [
       "HOME",
       "CHRONOS_POSTGRES_HOST",
@@ -113,702 +163,593 @@
       "CHRONOS_EMBEDDING_PROVIDER",
       "CHRONOS_LOCAL_MODEL_NAME",
       "CHRONOS_EMBEDDING_DIMENSION"
-    ]
-  },
-
-  // ===========================================================================
-  // Profiles
-  // ===========================================================================
-  "profiles": {
+    ],
 
     // =========================================================================
-    // PERSONAL
-    //
-    // Routing policy:
-    //
-    // Kimi K2.7   = orchestration / instruction-following / planning
-    // Luna         = high-frequency worker / search / TDD implementation
-    // Terra        = senior reasoning / review / architecture consultation
-    // Sol          = explicit deep specialist only
-    // Gemini       = visual / creative
-    //
-    // Provider paths are intentionally unchanged in Step 2.
+    // Base Agents (デフォルト: personal 構成)
     // =========================================================================
-    "personal": {
-
-      // -----------------------------------------------------------------------
-      // Logical model catalog
-      // -----------------------------------------------------------------------
-      "models": {
-        "kimi-k27": {
-          "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.7-code"
-        },
-
-        "kimi-k26": {
-          "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.6"
-        },
-
-        "sol-octg": {
-          "model": "cloudflare-ai-gateway-octg/gpt-5.6-sol"
-        },
-
-        "sol-plus": {
-          "model": "openai/gpt-5.6-sol"
-        },
-
-        "terra-octg": {
-          "model": "cloudflare-ai-gateway-octg/gpt-5.6-terra"
-        },
-
-        "terra-plus": {
-          "model": "openai/gpt-5.6-terra"
-        },
-
-        "luna-octg": {
-          "model": "cloudflare-ai-gateway-octg/gpt-5.6-luna"
-        },
-
-        "luna-plus": {
-          "model": "openai/gpt-5.6-luna"
-        },
-
-        "gemini-pro": {
-          "model": "cloudflare-ai-gateway/google/gemini-3.1-pro"
-        },
-
-        "gemini-pro-ai-studio": {
-          "model": "cloudflare-ai-gateway/google-ai-studio/gemini-3.1-pro"
+    "agents": {
+      "sisyphus": {
+        "model": "kimi-k27",
+        "models": [
+          {
+            "model": "kimi-k27"
+          },
+          {
+            "model": "sol-octg",
+            "reasoning": "medium"
+          },
+          {
+            "model": "sol",
+            "reasoning": "medium"
+          }
+        ],
+        "ultrawork": {
+          "model": "sol",
+          "reasoning": "high"
         }
       },
-
-      "[opencode]": {
-
-        // =====================================================================
-        // Agents
-        // =====================================================================
-        "agents": {
-
-          // -------------------------------------------------------------------
-          // Sisyphus
-          //
-          // High-frequency orchestration.
-          // K2.7 is maintainer-verified for Sisyphus and substantially cheaper
-          // to keep running than Sol/K3-class models.
-          // -------------------------------------------------------------------
-          "sisyphus": {
-            "models": [
-              "kimi-k27",
-
-              {
-                "model": "sol-octg",
-                "reasoning": "medium"
-              },
-
-              {
-                "model": "sol-plus",
-                "reasoning": "medium"
-              }
-            ],
-
-            // Premium autonomous mode.
-            //
-            // Current provider set has no active K3 route, so keep the existing
-            // OpenAI path rather than introducing a new provider in Step 2.
-            "ultrawork": {
-              "model": "sol-plus",
-              "reasoning": "high"
-            }
+      "hephaestus": {
+        "disable": false,
+        "model": "sol-octg",
+        "models": [
+          {
+            "model": "sol-octg",
+            "reasoning": "medium"
           },
-
-          // -------------------------------------------------------------------
-          // Hephaestus
-          //
-          // Explicit deep implementation specialist.
-          // Restore upstream-native GPT-5.6 Sol / medium behavior.
-          // -------------------------------------------------------------------
-          "hephaestus": {
-            "disable": false,
-
-            "models": [
-              {
-                "model": "sol-octg",
-                "reasoning": "medium"
-              },
-
-              {
-                "model": "sol-plus",
-                "reasoning": "medium"
-              }
-            ]
-          },
-
-          // -------------------------------------------------------------------
-          // Oracle
-          //
-          // Oracle is invoked frequently in real workflows.
-          // Do NOT spend Sol quota on every architecture/debug consultation.
-          //
-          // Normal:
-          //   Terra/high
-          //
-          // Availability fallback:
-          //   Luna/max -> alternate Terra -> alternate Luna
-          //
-          // Sol escalation should happen explicitly through
-          // Hephaestus / deep / ultrabrain instead.
-          // -------------------------------------------------------------------
-          "oracle": {
-            "models": [
-              {
-                "model": "terra-octg",
-                "reasoning": "high"
-              },
-
-              {
-                "model": "luna-octg",
-                "reasoning": "max"
-              },
-
-              {
-                "model": "terra-plus",
-                "reasoning": "high"
-              },
-
-              {
-                "model": "luna-plus",
-                "reasoning": "max"
-              }
-            ]
-          },
-
-          // -------------------------------------------------------------------
-          // Librarian
-          //
-          // High-frequency external documentation / OSS research.
-          // -------------------------------------------------------------------
-          "librarian": {
-            "models": [
-              {
-                "model": "luna-octg",
-                "reasoning": "low"
-              },
-
-              {
-                "model": "luna-plus",
-                "reasoning": "low"
-              }
-            ]
-          },
-
-          // -------------------------------------------------------------------
-          // Explore
-          //
-          // High-frequency codebase search.
-          // Upstream also places Luna/low first for this role.
-          // -------------------------------------------------------------------
-          "explore": {
-            "models": [
-              {
-                "model": "luna-octg",
-                "reasoning": "low"
-              },
-
-              {
-                "model": "luna-plus",
-                "reasoning": "low"
-              }
-            ]
-          },
-
-          // -------------------------------------------------------------------
-          // Multimodal Looker
-          // -------------------------------------------------------------------
-          "multimodal-looker": {
-            "models": [
-              {
-                "model": "gemini-pro",
-                "reasoning": "high"
-              },
-
-              "kimi-k27"
-            ]
-          },
-
-          // -------------------------------------------------------------------
-          // Prometheus
-          //
-          // Superpowersを主planning workflowとして使うため、
-          // 高頻度Sol plannerにはしない。
-          //
-          // K2.7 = normal planning
-          // Sol/high = provider/model fallback
-          // -------------------------------------------------------------------
-          "prometheus": {
-            "models": [
-              "kimi-k27",
-
-              {
-                "model": "sol-octg",
-                "reasoning": "high"
-              },
-
-              {
-                "model": "sol-plus",
-                "reasoning": "high"
-              }
-            ]
-          },
-
-          // -------------------------------------------------------------------
-          // Metis
-          //
-          // Mechanics-driven planning/gap analysis.
-          // Keep within Kimi family.
-          // -------------------------------------------------------------------
-          "metis": {
-            "models": [
-              "kimi-k27",
-              "kimi-k26"
-            ]
-          },
-
-          // -------------------------------------------------------------------
-          // Momus
-          //
-          // Upstream-native primary is Terra/high.
-          // Frequent planning review must not consume Sol on every round.
-          // -------------------------------------------------------------------
-          "momus": {
-            "models": [
-              {
-                "model": "terra-octg",
-                "reasoning": "high"
-              },
-
-              {
-                "model": "luna-octg",
-                "reasoning": "max"
-              },
-
-              {
-                "model": "terra-plus",
-                "reasoning": "high"
-              },
-
-              {
-                "model": "luna-plus",
-                "reasoning": "max"
-              }
-            ]
-          },
-
-          // -------------------------------------------------------------------
-          // Atlas
-          //
-          // Execution controller / conductor.
-          // Avoid expensive Sol as the normal orchestration model.
-          // -------------------------------------------------------------------
-          "atlas": {
-            "models": [
-              "kimi-k27",
-
-              {
-                "model": "sol-octg",
-                "reasoning": "medium"
-              },
-
-              {
-                "model": "sol-plus",
-                "reasoning": "medium"
-              }
-            ]
-          },
-
-          // -------------------------------------------------------------------
-          // Sisyphus Junior
-          //
-          // High-frequency implementation worker.
-          //
-          // This is the main Step 2 change for Superpowers compatibility:
-          // normal detailed TDD tasks should run on Luna/max rather than Sol.
-          // -------------------------------------------------------------------
-          "sisyphus-junior": {
-            "models": [
-              {
-                "model": "luna-octg",
-                "reasoning": "max"
-              },
-
-              "kimi-k27",
-
-              {
-                "model": "terra-octg",
-                "reasoning": "high"
-              },
-
-              {
-                "model": "luna-plus",
-                "reasoning": "max"
-              }
-            ]
+          {
+            "model": "sol",
+            "reasoning": "medium"
           }
-        },
-
-        // =====================================================================
-        // Categories
-        // =====================================================================
-        "categories": {
-
-          // -------------------------------------------------------------------
-          // ultrabrain
-          //
-          // Semantic meaning:
-          // "I explicitly want the strongest reasoning."
-          //
-          // Keep Sol/max instead of silently degrading this category.
-          // -------------------------------------------------------------------
-          "ultrabrain": {
-            "models": [
-              {
-                "model": "sol-octg",
-                "reasoning": "max"
-              },
-
-              {
-                "model": "sol-plus",
-                "reasoning": "max"
-              },
-
-              {
-                "model": "terra-octg",
-                "reasoning": "high"
-              }
-            ]
+        ]
+      },
+      "oracle": {
+        "model": "terra-octg",
+        "models": [
+          {
+            "model": "terra-octg",
+            "reasoning": "high"
           },
-
-          // -------------------------------------------------------------------
-          // deep
-          //
-          // Explicit deep autonomous implementation.
-          // Keep upstream-native Sol/medium semantics.
-          // -------------------------------------------------------------------
-          "deep": {
-            "models": [
-              {
-                "model": "sol-octg",
-                "reasoning": "medium"
-              },
-
-              {
-                "model": "sol-plus",
-                "reasoning": "medium"
-              },
-
-              {
-                "model": "terra-octg",
-                "reasoning": "high"
-              }
-            ]
+          {
+            "model": "terra",
+            "reasoning": "high"
           },
-
-          // -------------------------------------------------------------------
-          // quick
-          //
-          // Search, trivial modifications, small mechanical work.
-          // -------------------------------------------------------------------
-          "quick": {
-            "models": [
-              {
-                "model": "luna-octg",
-                "reasoning": "low"
-              },
-
-              {
-                "model": "luna-plus",
-                "reasoning": "low"
-              }
-            ]
-          },
-
-          // -------------------------------------------------------------------
-          // writing
-          //
-          // Kimi instruction-following remains a better fit than GPT-native
-          // deep reasoning for normal technical writing.
-          // -------------------------------------------------------------------
-          "writing": {
-            "models": [
-              "kimi-k27"
-            ]
-          },
-
-          // -------------------------------------------------------------------
-          // unspecified-low
-          //
-          // Generic work where quick/low is too weak but deep is excessive.
-          // Luna/high becomes the default general-purpose tier.
-          // -------------------------------------------------------------------
-          "unspecified-low": {
-            "models": [
-              {
-                "model": "luna-octg",
-                "reasoning": "high"
-              },
-
-              {
-                "model": "luna-plus",
-                "reasoning": "high"
-              },
-
-              "kimi-k27"
-            ]
-          },
-
-          // -------------------------------------------------------------------
-          // unspecified-high
-          //
-          // Senior general-purpose reasoning.
-          // Terra/high replaces Sol/high to protect Sol capacity.
-          // -------------------------------------------------------------------
-          "unspecified-high": {
-            "models": [
-              {
-                "model": "terra-octg",
-                "reasoning": "high"
-              },
-
-              {
-                "model": "terra-plus",
-                "reasoning": "high"
-              },
-
-              "kimi-k27"
-            ]
-          },
-
-          // -------------------------------------------------------------------
-          // visual-engineering
-          // -------------------------------------------------------------------
-          "visual-engineering": {
-            "models": [
-              {
-                "model": "gemini-pro",
-                "reasoning": "high"
-              },
-
-              "kimi-k27"
-            ]
-          },
-
-          // -------------------------------------------------------------------
-          // artistry
-          // -------------------------------------------------------------------
-          "artistry": {
-            "models": [
-              {
-                "model": "gemini-pro-ai-studio",
-                "reasoning": "high"
-              },
-
-              "kimi-k27"
-            ]
+          {
+            "model": "luna",
+            "reasoning": "max"
           }
-        }
+        ]
+      },
+      "librarian": {
+        "model": "luna",
+        "models": [
+          {
+            "model": "luna",
+            "reasoning": "low"
+          }
+        ]
+      },
+      "explore": {
+        "model": "luna",
+        "models": [
+          {
+            "model": "luna",
+            "reasoning": "low"
+          }
+        ]
+      },
+      "multimodal-looker": {
+        "model": "gemini-pro",
+        "models": [
+          {
+            "model": "gemini-pro",
+            "reasoning": "high"
+          },
+          {
+            "model": "kimi-k27"
+          }
+        ]
+      },
+      "prometheus": {
+        "model": "kimi-k27",
+        "models": [
+          {
+            "model": "kimi-k27"
+          },
+          {
+            "model": "sol-octg",
+            "reasoning": "high"
+          },
+          {
+            "model": "sol",
+            "reasoning": "high"
+          }
+        ]
+      },
+      "metis": {
+        "model": "kimi-k27",
+        "models": [
+          {
+            "model": "kimi-k27"
+          },
+          {
+            "model": "kimi-k26"
+          }
+        ]
+      },
+      "momus": {
+        "model": "terra-octg",
+        "models": [
+          {
+            "model": "terra-octg",
+            "reasoning": "high"
+          },
+          {
+            "model": "terra",
+            "reasoning": "high"
+          },
+          {
+            "model": "luna",
+            "reasoning": "max"
+          }
+        ]
+      },
+      "atlas": {
+        "model": "kimi-k27",
+        "models": [
+          {
+            "model": "kimi-k27"
+          },
+          {
+            "model": "sol-octg",
+            "reasoning": "medium"
+          },
+          {
+            "model": "sol",
+            "reasoning": "medium"
+          }
+        ]
       }
     },
 
     // =========================================================================
-    // WORK
+    // Base Categories (デフォルト: personal 構成)
+    // =========================================================================
+    "categories": {
+      "ultrabrain": {
+        "model": "sol-octg",
+        "models": [
+          {
+            "model": "sol-octg",
+            "reasoning": "max"
+          },
+          {
+            "model": "sol",
+            "reasoning": "max"
+          },
+          {
+            "model": "terra-octg",
+            "reasoning": "high"
+          },
+          {
+            "model": "terra",
+            "reasoning": "high"
+          }
+        ]
+      },
+      "deep": {
+        "model": "terra-octg",
+        "models": [
+          {
+            "model": "terra-octg",
+            "reasoning": "high"
+          },
+          {
+            "model": "terra",
+            "reasoning": "high"
+          },
+          {
+            "model": "sol-octg",
+            "reasoning": "medium"
+          },
+          {
+            "model": "sol",
+            "reasoning": "medium"
+          }
+        ]
+      },
+      "quick": {
+        "model": "luna",
+        "models": [
+          {
+            "model": "luna",
+            "reasoning": "low"
+          }
+        ]
+      },
+      "writing": {
+        "model": "kimi-k27",
+        "models": [
+          {
+            "model": "kimi-k27"
+          }
+        ]
+      },
+      "unspecified-low": {
+        "model": "luna",
+        "models": [
+          {
+            "model": "luna",
+            "reasoning": "high"
+          },
+          {
+            "model": "kimi-k27"
+          }
+        ]
+      },
+      "unspecified-high": {
+        "model": "luna",
+        "models": [
+          {
+            "model": "luna",
+            "reasoning": "max"
+          },
+          {
+            "model": "kimi-k27"
+          }
+        ]
+      },
+      "visual-engineering": {
+        "model": "gemini-pro",
+        "models": [
+          {
+            "model": "gemini-pro",
+            "reasoning": "high"
+          },
+          {
+            "model": "kimi-k27"
+          }
+        ]
+      },
+      "artistry": {
+        "model": "gemini-pro",
+        "models": [
+          {
+            "model": "gemini-pro",
+            "reasoning": "high"
+          },
+          {
+            "model": "kimi-k27"
+          }
+        ]
+      }
+    }
+  },
+
+  // ===========================================================================
+  // Base Models (デフォルト: personal カタログ)
+  // ===========================================================================
+  "models": {
+    "kimi-k27": {
+      "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.7-code"
+    },
+    "kimi-k26": {
+      "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.6"
+    },
+    "sol-octg": {
+      "model": "cloudflare-ai-gateway-octg/gpt-5.6-sol"
+    },
+    "sol": {
+      "model": "openai/gpt-5.6-sol"
+    },
+    "terra-octg": {
+      "model": "cloudflare-ai-gateway-octg/gpt-5.6-terra"
+    },
+    "terra": {
+      "model": "openai/gpt-5.6-terra"
+    },
+    "luna": {
+      "model": "openai/gpt-5.6-luna"
+    },
+    "gemini-pro": {
+      "model": "cloudflare-ai-gateway/google-ai-studio/gemini-3.1-pro"
+    }
+  },
+
+  // ===========================================================================
+  // Profiles (実行環境別プロファイル定義)
+  // ===========================================================================
+  "profiles": {
+
+    // =========================================================================
+    // PERSONAL プロファイル (個人開発用 / ベース設定をそのまま使用)
+    // =========================================================================
+    "personal": {},
+
+    // =========================================================================
+    // WORK プロファイル (業務環境用 / Amazon Bedrock Claude 統一ポリシー)
     //
-    // Step 2では変更しない。
+    // 【モデルルーティング方針】
+    // - Claude Opus 5   : 司令塔・最上位推論・高度レビュー
+    // - Claude Sonnet 5 : 主力実装・プランニング・汎用オーケストレーション
+    // - Claude Haiku 4.5: 高速検索・スクリーニング・軽量作業
     // =========================================================================
     "work": {
+      // -----------------------------------------------------------------------
+      // 論理モデルカタログ (Amazon Bedrock)
+      // -----------------------------------------------------------------------
       "models": {
+        // Claude Opus 5 (最上位推論)
         "opus": {
           "model": "amazon-bedrock/global.anthropic.claude-opus-5"
         },
 
+        // Claude Sonnet 5 (高性能・高速主力)
         "sonnet": {
           "model": "amazon-bedrock/global.anthropic.claude-sonnet-5"
         },
 
+        // Claude Haiku 4.5 (超高速・軽量)
         "haiku": {
           "model": "amazon-bedrock/global.anthropic.claude-haiku-4-5-20251001-v1:0"
         }
       },
 
       "[opencode]": {
+        // Git コミット設定
+        "git_master": {
+          "commit_footer": false,
+          "include_co_authored_by": false,
+          "git_env_prefix": "GIT_MASTER=1"
+        },
+
+        // =====================================================================
+        // Agents (業務プロファイル用エージェント定義)
+        // =====================================================================
         "agents": {
+          // Sisyphus (メイン司令塔: Sonnet/max -> Opus/max)
           "sisyphus": {
+            "model": "sonnet",
             "models": [
               {
                 "model": "sonnet",
                 "reasoning": "max"
               },
-
               {
                 "model": "opus",
                 "reasoning": "max"
               }
             ],
-
             "ultrawork": {
               "model": "opus",
               "reasoning": "high"
             }
           },
 
+          // Hephaestus は業務プロファイルでは無効化
           "hephaestus": {
             "disable": true
           },
 
+          // Oracle (設計相談: Opus/max -> Sonnet)
           "oracle": {
+            "model": "opus",
             "models": [
               {
                 "model": "opus",
                 "reasoning": "max"
               },
-
-              "sonnet"
+              {
+                "model": "sonnet"
+              }
             ]
           },
 
+          // Librarian (外部調査: Haiku -> Sonnet)
           "librarian": {
+            "model": "haiku",
             "models": [
-              "haiku",
-              "sonnet"
+              {
+                "model": "haiku"
+              },
+              {
+                "model": "sonnet"
+              }
             ]
           },
 
+          // Explore (コード探索: Haiku -> Sonnet)
           "explore": {
+            "model": "haiku",
             "models": [
-              "haiku",
-              "sonnet"
+              {
+                "model": "haiku"
+              },
+              {
+                "model": "sonnet"
+              }
             ]
           },
 
+          // Multimodal Looker (視覚解析: Opus/max -> Sonnet)
           "multimodal-looker": {
+            "model": "opus",
             "models": [
               {
                 "model": "opus",
                 "reasoning": "max"
               },
-
-              "sonnet"
+              {
+                "model": "sonnet"
+              }
             ]
           },
 
+          // Prometheus (計画立案: Opus/max -> Sonnet)
           "prometheus": {
+            "model": "opus",
             "models": [
               {
                 "model": "opus",
                 "reasoning": "max"
               },
-
-              "sonnet"
+              {
+                "model": "sonnet"
+              }
             ]
           },
 
+          // Metis (メカニクス分析: Opus/max -> Sonnet)
           "metis": {
+            "model": "opus",
             "models": [
               {
                 "model": "opus",
                 "reasoning": "max"
               },
-
-              "sonnet"
+              {
+                "model": "sonnet"
+              }
             ]
           },
 
+          // Momus (レビュー: Opus/max -> Sonnet)
           "momus": {
+            "model": "opus",
             "models": [
               {
                 "model": "opus",
                 "reasoning": "max"
               },
-
-              "sonnet"
+              {
+                "model": "sonnet"
+              }
             ]
           },
 
+          // Atlas (環境管理・進行監視: Sonnet -> Haiku)
           "atlas": {
+            "model": "sonnet",
             "models": [
-              "sonnet",
-              "haiku"
+              {
+                "model": "sonnet"
+              },
+              {
+                "model": "haiku"
+              }
             ]
           }
         },
 
+        // =====================================================================
+        // Categories (業務プロファイル用カテゴリ定義)
+        // =====================================================================
         "categories": {
+          // 最上位推論 (Opus/max -> Sonnet)
           "ultrabrain": {
+            "model": "opus",
             "models": [
               {
                 "model": "opus",
                 "reasoning": "max"
               },
-
-              "sonnet"
+              {
+                "model": "sonnet"
+              }
             ]
           },
 
+          // ディープ実装 (Opus/max -> Sonnet)
           "deep": {
+            "model": "opus",
             "models": [
               {
                 "model": "opus",
                 "reasoning": "max"
               },
-
-              "sonnet"
+              {
+                "model": "sonnet"
+              }
             ]
           },
 
+          // クイック作業 (Haiku -> Sonnet)
           "quick": {
+            "model": "haiku",
             "models": [
-              "haiku",
-              "sonnet"
+              {
+                "model": "haiku"
+              },
+              {
+                "model": "sonnet"
+              }
             ]
           },
 
+          // ドキュメント執筆 (Sonnet -> Haiku)
           "writing": {
+            "model": "sonnet",
             "models": [
-              "sonnet",
-              "haiku"
+              {
+                "model": "sonnet"
+              },
+              {
+                "model": "haiku"
+              }
             ]
           },
 
+          // 汎用軽量タスク (Sonnet -> Haiku)
           "unspecified-low": {
+            "model": "sonnet",
             "models": [
-              "sonnet",
-              "haiku"
+              {
+                "model": "sonnet"
+              },
+              {
+                "model": "haiku"
+              }
             ]
           },
 
+          // 汎用高度推論 (Opus/max -> Sonnet)
           "unspecified-high": {
+            "model": "opus",
             "models": [
               {
                 "model": "opus",
                 "reasoning": "max"
               },
-
-              "sonnet"
+              {
+                "model": "sonnet"
+              }
             ]
           },
 
+          // ビジュアル・UI設計 (Opus/max -> Sonnet)
           "visual-engineering": {
+            "model": "opus",
             "models": [
               {
                 "model": "opus",
                 "reasoning": "max"
               },
-
-              "sonnet"
+              {
+                "model": "sonnet"
+              }
             ]
           },
 
+          // クリエイティブ生成 (Sonnet -> Haiku)
           "artistry": {
+            "model": "sonnet",
             "models": [
-              "sonnet",
-              "haiku"
+              {
+                "model": "sonnet"
+              },
+              {
+                "model": "haiku"
+              }
             ]
           }
         }
@@ -816,6 +757,9 @@
     }
   },
 
+  // ===========================================================================
+  // マイグレーション履歴
+  // ===========================================================================
   "_migrations": [
     "2026-07-opencode-config-unification"
   ]
