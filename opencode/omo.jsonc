@@ -173,42 +173,53 @@
     // OMO v4.19.4 時点の実装ではサブエージェント (task) 起動時等の特定パスでカタログ解決前の
     // 生文字列が渡り、下流の parseModelString() (provider/model 形式必須検査) で
     // `Invalid model format "<alias>"` エラーが発生する不整合があります。
-    // そのため、agents / categories には常に完全修飾名 (provider/model) を指定しています。
+    // そのため、各行に短縮名形式 (コメントアウト) を併記しつつ、実設定値には完全修飾名 (provider/model) を指定しています。
     // =========================================================================
     "agents": {
       "sisyphus": {
+        // "model": "kimi-k27",
         "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.7-code",
         "ultrawork": {
+          // "model": "sol",
           "model": "openai/gpt-5.6-sol",
           "reasoning": "high"
         }
       },
       "hephaestus": {
         "disable": false,
+        // "model": "sol-octg",
         "model": "cloudflare-ai-gateway-octg/gpt-5.6-sol"
       },
       "oracle": {
+        // "model": "terra-octg",
         "model": "cloudflare-ai-gateway-octg/gpt-5.6-terra"
       },
       "librarian": {
+        // "model": "luna",
         "model": "openai/gpt-5.6-luna"
       },
       "explore": {
+        // "model": "luna",
         "model": "openai/gpt-5.6-luna"
       },
       "multimodal-looker": {
+        // "model": "gemini-pro",
         "model": "cloudflare-ai-gateway/google-ai-studio/gemini-3.1-pro"
       },
       "prometheus": {
+        // "model": "kimi-k27",
         "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.7-code"
       },
       "metis": {
+        // "model": "kimi-k27",
         "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.7-code"
       },
       "momus": {
+        // "model": "terra-octg",
         "model": "cloudflare-ai-gateway-octg/gpt-5.6-terra"
       },
       "atlas": {
+        // "model": "kimi-k27",
         "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.7-code"
       }
     },
@@ -218,108 +229,134 @@
     // =========================================================================
     "categories": {
       "ultrabrain": {
+        // "model": "sol-octg",
         "model": "cloudflare-ai-gateway-octg/gpt-5.6-sol",
         "models": [
           {
+            // "model": "sol-octg",
             "model": "cloudflare-ai-gateway-octg/gpt-5.6-sol",
             "reasoning": "max"
           },
           {
+            // "model": "sol",
             "model": "openai/gpt-5.6-sol",
             "reasoning": "max"
           },
           {
+            // "model": "terra-octg",
             "model": "cloudflare-ai-gateway-octg/gpt-5.6-terra",
             "reasoning": "high"
           },
           {
+            // "model": "terra",
             "model": "openai/gpt-5.6-terra",
             "reasoning": "high"
           }
         ]
       },
       "deep": {
+        // "model": "terra-octg",
         "model": "cloudflare-ai-gateway-octg/gpt-5.6-terra",
         "models": [
           {
+            // "model": "terra-octg",
             "model": "cloudflare-ai-gateway-octg/gpt-5.6-terra",
             "reasoning": "high"
           },
           {
+            // "model": "terra",
             "model": "openai/gpt-5.6-terra",
             "reasoning": "high"
           },
           {
+            // "model": "sol-octg",
             "model": "cloudflare-ai-gateway-octg/gpt-5.6-sol",
             "reasoning": "medium"
           },
           {
+            // "model": "sol",
             "model": "openai/gpt-5.6-sol",
             "reasoning": "medium"
           }
         ]
       },
       "quick": {
+        // "model": "luna",
         "model": "openai/gpt-5.6-luna",
         "models": [
           {
+            // "model": "luna",
             "model": "openai/gpt-5.6-luna",
             "reasoning": "low"
           }
         ]
       },
       "writing": {
+        // "model": "kimi-k27",
         "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.7-code",
         "models": [
           {
+            // "model": "kimi-k27",
             "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.7-code"
           }
         ]
       },
       "unspecified-low": {
+        // "model": "luna",
         "model": "openai/gpt-5.6-luna",
         "models": [
           {
+            // "model": "luna",
             "model": "openai/gpt-5.6-luna",
             "reasoning": "high"
           },
           {
+            // "model": "kimi-k27",
             "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.7-code"
           }
         ]
       },
       "unspecified-high": {
+        // "model": "luna",
         "model": "openai/gpt-5.6-luna",
         "models": [
           {
+            // "model": "luna",
             "model": "openai/gpt-5.6-luna",
             "reasoning": "max"
           },
           {
+            // "model": "kimi-k27",
             "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.7-code"
           }
         ]
       },
       "visual-engineering": {
+        // "model": "gemini-pro",
         "model": "cloudflare-ai-gateway/google-ai-studio/gemini-3.1-pro",
         "models": [
           {
+            // "model": "gemini-pro",
             "model": "cloudflare-ai-gateway/google-ai-studio/gemini-3.1-pro",
             "reasoning": "high"
           },
           {
+            // "model": "kimi-k27",
             "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.7-code"
           }
         ]
       },
       "artistry": {
+        // "model": "gemini-pro",
         "model": "cloudflare-ai-gateway/google-ai-studio/gemini-3.1-pro",
         "models": [
           {
+            // "model": "gemini-pro",
             "model": "cloudflare-ai-gateway/google-ai-studio/gemini-3.1-pro",
             "reasoning": "high"
           },
           {
+            // "model": "kimi-k27",
             "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.7-code"
           }
         ]
@@ -416,8 +453,10 @@
         "agents": {
           // Sisyphus (メイン司令塔: Sonnet -> Opus)
           "sisyphus": {
+            // "model": "sonnet",
             "model": "amazon-bedrock/global.anthropic.claude-sonnet-5",
             "ultrawork": {
+              // "model": "opus",
               "model": "amazon-bedrock/global.anthropic.claude-opus-5",
               "reasoning": "high"
             }
@@ -430,41 +469,49 @@
 
           // Oracle (設計相談)
           "oracle": {
+            // "model": "opus",
             "model": "amazon-bedrock/global.anthropic.claude-opus-5"
           },
 
           // Librarian (外部調査)
           "librarian": {
+            // "model": "haiku",
             "model": "amazon-bedrock/global.anthropic.claude-haiku-4-5-20251001-v1:0"
           },
 
           // Explore (コード探索)
           "explore": {
+            // "model": "haiku",
             "model": "amazon-bedrock/global.anthropic.claude-haiku-4-5-20251001-v1:0"
           },
 
           // Multimodal Looker (視覚解析)
           "multimodal-looker": {
+            // "model": "opus",
             "model": "amazon-bedrock/global.anthropic.claude-opus-5"
           },
 
           // Prometheus (計画立案)
           "prometheus": {
+            // "model": "opus",
             "model": "amazon-bedrock/global.anthropic.claude-opus-5"
           },
 
           // Metis (メカニクス分析)
           "metis": {
+            // "model": "opus",
             "model": "amazon-bedrock/global.anthropic.claude-opus-5"
           },
 
           // Momus (レビュー)
           "momus": {
+            // "model": "opus",
             "model": "amazon-bedrock/global.anthropic.claude-opus-5"
           },
 
           // Atlas (環境管理・進行監視)
           "atlas": {
+            // "model": "sonnet",
             "model": "amazon-bedrock/global.anthropic.claude-sonnet-5"
           }
         },
@@ -475,13 +522,16 @@
         "categories": {
           // 最上位推論 (Opus/max -> Sonnet)
           "ultrabrain": {
+            // "model": "opus",
             "model": "amazon-bedrock/global.anthropic.claude-opus-5",
             "models": [
               {
+                // "model": "opus",
                 "model": "amazon-bedrock/global.anthropic.claude-opus-5",
                 "reasoning": "max"
               },
               {
+                // "model": "sonnet",
                 "model": "amazon-bedrock/global.anthropic.claude-sonnet-5"
               }
             ]
@@ -489,13 +539,16 @@
 
           // ディープ実装 (Opus/max -> Sonnet)
           "deep": {
+            // "model": "opus",
             "model": "amazon-bedrock/global.anthropic.claude-opus-5",
             "models": [
               {
+                // "model": "opus",
                 "model": "amazon-bedrock/global.anthropic.claude-opus-5",
                 "reasoning": "max"
               },
               {
+                // "model": "sonnet",
                 "model": "amazon-bedrock/global.anthropic.claude-sonnet-5"
               }
             ]
@@ -503,12 +556,15 @@
 
           // クイック作業 (Haiku -> Sonnet)
           "quick": {
+            // "model": "haiku",
             "model": "amazon-bedrock/global.anthropic.claude-haiku-4-5-20251001-v1:0",
             "models": [
               {
+                // "model": "haiku",
                 "model": "amazon-bedrock/global.anthropic.claude-haiku-4-5-20251001-v1:0"
               },
               {
+                // "model": "sonnet",
                 "model": "amazon-bedrock/global.anthropic.claude-sonnet-5"
               }
             ]
@@ -516,12 +572,15 @@
 
           // ドキュメント執筆 (Sonnet -> Haiku)
           "writing": {
+            // "model": "sonnet",
             "model": "amazon-bedrock/global.anthropic.claude-sonnet-5",
             "models": [
               {
+                // "model": "sonnet",
                 "model": "amazon-bedrock/global.anthropic.claude-sonnet-5"
               },
               {
+                // "model": "haiku",
                 "model": "amazon-bedrock/global.anthropic.claude-haiku-4-5-20251001-v1:0"
               }
             ]
@@ -529,12 +588,15 @@
 
           // 汎用軽量タスク (Sonnet -> Haiku)
           "unspecified-low": {
+            // "model": "sonnet",
             "model": "amazon-bedrock/global.anthropic.claude-sonnet-5",
             "models": [
               {
+                // "model": "sonnet",
                 "model": "amazon-bedrock/global.anthropic.claude-sonnet-5"
               },
               {
+                // "model": "haiku",
                 "model": "amazon-bedrock/global.anthropic.claude-haiku-4-5-20251001-v1:0"
               }
             ]
@@ -542,13 +604,16 @@
 
           // 汎用高度推論 (Opus/max -> Sonnet)
           "unspecified-high": {
+            // "model": "opus",
             "model": "amazon-bedrock/global.anthropic.claude-opus-5",
             "models": [
               {
+                // "model": "opus",
                 "model": "amazon-bedrock/global.anthropic.claude-opus-5",
                 "reasoning": "max"
               },
               {
+                // "model": "sonnet",
                 "model": "amazon-bedrock/global.anthropic.claude-sonnet-5"
               }
             ]
@@ -556,13 +621,16 @@
 
           // ビジュアル・UI設計 (Opus/max -> Sonnet)
           "visual-engineering": {
+            // "model": "opus",
             "model": "amazon-bedrock/global.anthropic.claude-opus-5",
             "models": [
               {
+                // "model": "opus",
                 "model": "amazon-bedrock/global.anthropic.claude-opus-5",
                 "reasoning": "max"
               },
               {
+                // "model": "sonnet",
                 "model": "amazon-bedrock/global.anthropic.claude-sonnet-5"
               }
             ]
@@ -570,12 +638,15 @@
 
           // クリエイティブ生成 (Sonnet -> Haiku)
           "artistry": {
+            // "model": "sonnet",
             "model": "amazon-bedrock/global.anthropic.claude-sonnet-5",
             "models": [
               {
+                // "model": "sonnet",
                 "model": "amazon-bedrock/global.anthropic.claude-sonnet-5"
               },
               {
+                // "model": "haiku",
                 "model": "amazon-bedrock/global.anthropic.claude-haiku-4-5-20251001-v1:0"
               }
             ]
