@@ -50,3 +50,4 @@ sync-agents-run:
 	@$(MAKE) sync-claude
 	@$(MAKE) setup-opencode
 	@$(MAKE) sync-agents-core
+	@$(MAKE) index-skillport
