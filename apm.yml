@@ -530,6 +530,7 @@ enabled_providers:
   - openai
   - cloudflare-ai-gateway
   - cloudflare-ai-gateway-custom
+  - cloudflare-ai-gateway-dynamic
   - cloudflare-ai-gateway-octg
   - opencode
   - ollama-cloud
@@ -538,6 +539,9 @@ enabled_providers:
   - google
 
 provider:
+  # 1. Cloudflare AI Gateway built-in providers.
+  # Provider credentials are resolved by AI Gateway (BYOK / Unified Billing);
+  # OpenCode only carries the AI Gateway token.
   cloudflare-ai-gateway:
     npm: "ai-gateway-provider"
     options:
@@ -617,41 +621,13 @@ provider:
           max:
             reasoningEffort: max
 
-      # Dynamic
-      dynamic/kimi-k2.6:
-        name: Kimi K2.6 (Dynamic)
-      dynamic/kimi-k2.7-code:
-        name: Kimi K2.7 Code (Dynamic)
-      dynamic/kimi-k3:
-        name: Kimi K3 (Dynamic)
-      dynamic/glm-5.2:
-        name: GLM 5.2 (Dynamic)
-        variants:
-          low:
-            reasoningEffort: low
-          high:
-            reasoningEffort: high
-          max:
-            reasoningEffort: max
-      dynamic/gemini-3.1-pro-preview:
-        name: Gemini 3.1 Pro Preview (Dynamic)
-      dynamic/gemini-3.5-flash:
-        name: Gemini 3.5 Flash (Dynamic)
-      dynamic/k2.6-code-preview-free:
-        name: Kimi 2.6 (Free)
-      dynamic/ox-alpha:free:
-        name: Ox Aplha Free (Dynamic)
-        # variants:
-        #   low:
-        #     reasoningEffort: low
-        #   high:
-        #     reasoningEffort: high
-        #   max:
-        #     reasoningEffort: max
-
+  # 2. Cloudflare Custom Providers using the generic OpenAI-compatible
+  # /compat endpoint. Keeping the custom-{slug}/{model} model ID lets a single
+  # OpenCode provider address multiple Custom Providers without storing their
+  # upstream API keys locally.
   cloudflare-ai-gateway-custom:
     npm: "@ai-sdk/openai-compatible"
-    name: "Cloudflare AI Gateway (Custom)"
+    name: "Cloudflare AI Gateway (Custom Providers)"
     options:
       baseURL: "https://gateway.ai.cloudflare.com/v1/${env:OC_CF_ACCOUNT_ID}/${env:OC_CF_GATEWAY_ID}/compat"
       apiKey: ""
@@ -724,6 +700,49 @@ provider:
           max:
             reasoningEffort: max
 
+  # 3. Cloudflare Dynamic Routes. Dynamic Routing currently requires the
+  # OpenAI-compatible /compat/chat/completions endpoint and cannot use the
+  # REST API path selected by the native Cloudflare provider.
+  cloudflare-ai-gateway-dynamic:
+    npm: "@ai-sdk/openai-compatible"
+    name: "Cloudflare AI Gateway (Dynamic Routes)"
+    options:
+      baseURL: "https://gateway.ai.cloudflare.com/v1/${env:OC_CF_ACCOUNT_ID}/${env:OC_CF_GATEWAY_ID}/compat"
+      apiKey: ""
+      headers:
+        Authorization: ""
+        cf-aig-authorization: "Bearer ${env:OC_CF_API_TOKEN}"
+        cf-aig-collect-log-payload: "true"
+        cf-aig-max-attempts: "1"
+        cf-aig-skip-cache: "true"
+    models:
+      dynamic/kimi-k2.6:
+        name: Kimi K2.6 (Dynamic)
+      dynamic/kimi-k2.7-code:
+        name: Kimi K2.7 Code (Dynamic)
+      dynamic/kimi-k3:
+        name: Kimi K3 (Dynamic)
+      dynamic/glm-5.2:
+        name: GLM 5.2 (Dynamic)
+        variants:
+          low:
+            reasoningEffort: low
+          high:
+            reasoningEffort: high
+          max:
+            reasoningEffort: max
+      dynamic/gemini-3.1-pro-preview:
+        name: Gemini 3.1 Pro Preview (Dynamic)
+      dynamic/gemini-3.5-flash:
+        name: Gemini 3.5 Flash (Dynamic)
+      dynamic/k2.6-code-preview-free:
+        name: Kimi 2.6 (Free)
+      dynamic/ox-alpha:free:
+        name: Ox Alpha Free (Dynamic)
+
+  # Custom Provider with its provider-specific endpoint and the native OpenAI
+  # Responses API. Kept separate because this path intentionally needs
+  # @ai-sdk/openai rather than the generic Chat Completions-compatible client.
   cloudflare-ai-gateway-octg:
     # The native OpenAI SDK uses the Responses API, whose tool limit is higher
     # than the Chat Completions API used by openai-compatible.
