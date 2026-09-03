@@ -559,16 +559,6 @@ x-variants:
     max:
       reasoningEffort: max
 
-  gpt_variants_max: &gpt_variants_max
-    <<: *gpt_variants
-    default:
-      reasoningEffort: max
-
-  gpt_variants_high: &gpt_variants_high
-    <<: *gpt_variants
-    default:
-      reasoningEffort: high
-
   glm_variants: &glm_variants
     default:
       reasoningEffort: high
@@ -643,13 +633,22 @@ provider:
       # OpenAI
       openai/gpt-5.6-luna:
         name: GPT-5.6 Luna (OpenAI)
-        variants: *gpt_variants_max
+        variants:
+          <<: *gpt_variants
+          default:
+            reasoningEffort: max
       openai/gpt-5.6-terra:
         name: GPT-5.6 Terra (OpenAI)
-        variants: *gpt_variants_high
+        variants:
+          <<: *gpt_variants
+          default:
+            reasoningEffort: high
       openai/gpt-5.6-sol:
         name: GPT-5.6 Sol (OpenAI)
-        variants: *gpt_variants_high
+        variants:
+          <<: *gpt_variants
+          default:
+            reasoningEffort: high
 
       # Google AI Studio
       google-ai-studio/gemini-3.5-flash-lite:
@@ -821,13 +820,22 @@ provider:
     models:
       gpt-5.6-luna:
         name: GPT-5.6 Luna (OCTG)
-        variants: *gpt_variants_max
+        variants:
+          <<: *gpt_variants
+          default:
+            reasoningEffort: max
       gpt-5.6-terra:
         name: GPT-5.6 Terra (OCTG)
-        variants: *gpt_variants_high
+        variants:
+          <<: *gpt_variants
+          default:
+            reasoningEffort: high
       gpt-5.6-sol:
         name: GPT-5.6 Sol (OCTG)
-        variants: *gpt_variants_high
+        variants:
+          <<: *gpt_variants
+          default:
+            reasoningEffort: high
 
   openai:
     whitelist:
