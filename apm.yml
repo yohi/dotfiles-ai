@@ -552,7 +552,7 @@ provider:
       # OpenAI
       openai/gpt-5.6-luna:
         name: GPT-5.6 Luna (OpenAI)
-        variants:
+        variants: &gpt_variants_max
           default:
             reasoningEffort: max
           none:
@@ -569,7 +569,7 @@ provider:
             reasoningEffort: max
       openai/gpt-5.6-terra:
         name: GPT-5.6 Terra (OpenAI)
-        variants:
+        variants: &gpt_variants_high
           default:
             reasoningEffort: high
           none:
@@ -586,34 +586,22 @@ provider:
             reasoningEffort: max
       openai/gpt-5.6-sol:
         name: GPT-5.6 Sol (OpenAI)
-        variants:
-          default:
-            reasoningEffort: high
-          none:
-            reasoningEffort: none
-          low:
-            reasoningEffort: low
-          medium:
-            reasoningEffort: medium
-          high:
-            reasoningEffort: high
-          xhigh:
-            reasoningEffort: xhigh
-          max:
-            reasoningEffort: max
+        variants: *gpt_variants_high
 
       # Google AI Studio
       google-ai-studio/gemini-3.5-flash-lite:
         name: Gemini 3.5 Flash-Lite
-      google-ai-studio/gemini-3.7-flash:
-        name: Gemini 3.7 Flash
+      google-ai-studio/gemini-3.8-flash:
+        name: Gemini 3.8 Flash
       google-ai-studio/gemini-3.1-pro:
         name: Gemini 3.1 Pro
 
       # OpenRouter
       openrouter/z-ai/glm-5.2:Free:
         name: GLM 5.2 Free (OpenRouter)
-        variants:
+        variants: &glm_variants
+          default:
+            reasoningEffort: high
           low:
             reasoningEffort: low
           high:
@@ -641,13 +629,24 @@ provider:
       # Ollama Cloud
       custom-ollama-cloud/kimi-k2.6:
         name: Kimi K2.6 (Ollama Cloud)
+        variants: &kimi_k2_6_variants
+          default:
+            body:
+              thinking:
+                type: enabled
+          thinking:
+            body:
+              thinking:
+                type: enabled
+          none:
+            body:
+              thinking:
+                type: disabled
       custom-ollama-cloud/kimi-k2.7-code:
         name: Kimi K2.7 Code (Ollama Cloud)
       custom-ollama-cloud/kimi-k3:
         name: Kimi K3 (Ollama Cloud)
-      custom-ollama-cloud/glm-5.2:
-        name: GLM 5.2 (Ollama Cloud)
-        variants:
+        variants: &kimi_k3_variants
           default:
             reasoningEffort: high
           low:
@@ -656,12 +655,42 @@ provider:
             reasoningEffort: high
           max:
             reasoningEffort: max
+      custom-ollama-cloud/glm-5.2:
+        name: GLM 5.2 (Ollama Cloud)
+        variants: *glm_variants
+      custom-ollama-cloud/glm-5.3-flash:
+        name: GLM 5.3 Flash (Ollama Cloud)
+        variants: *glm_variants
+      custom-ollama-cloud/glm-5.3:
+        name: GLM 5.3 (Ollama Cloud)
+        variants: *glm_variants
+
+      # OpenCode Go
+      custom-opencode-go/kimi-k2.6:
+        name: Kimi K2.6 (OpenCode Go)
+        variants: *kimi_k2_6_variants
+      custom-opencode-go/kimi-k2.7-code:
+        name: Kimi K2.7 Code (OpenCode Go)
+      custom-opencode-go/kimi-k3:
+        name: Kimi K3 (OpenCode Go)
+        variants: *kimi_k3_variants
+      custom-opencode-go/glm-5.2:
+        name: GLM 5.2 (OpenCode Go)
+        variants: *glm_variants
+      custom-opencode-go/glm-5.3-flash:
+        name: GLM 5.3 Flash (OpenCode Go)
+        variants: *glm_variants
+      custom-opencode-go/glm-5.3:
+        name: GLM 5.3 (OpenCode Go)
+        variants: *glm_variants
 
       # AIHubMix
       custom-aihubmix/coding-kimi-k3-free:
         name: Coding Kimi K3 Free (AIHubMix)
+        variants: *kimi_k3_variants
       custom-aihubmix/k2.6-code-preview-free:
         name: Coding Kimi K2.6 Free (AIHubMix)
+        variants: *kimi_k2_6_variants
       custom-aihubmix/gemini-3.5-flash-lite-free:
         name: Gemini 3.5 Flash-Lite Free (AIHubMix)
       custom-aihubmix/gemini-3.6-flash-lite-free:
@@ -670,35 +699,27 @@ provider:
         name: Coding GLM 5.2 Free (AIHubMix)
       custom-aihubmix/glm-5.2-free:
         name: GLM 5.2 Free (AIHubMix)
-        variants:
-          low:
-            reasoningEffort: low
-          high:
-            reasoningEffort: high
-          max:
-            reasoningEffort: max
+        variants: *glm_variants
 
       # ZenMax
       custom-zenmax/z-ai/glm-5.3-free:
         name: GLM 5.3 Free (ZenMax)
-        variants:
-          low:
-            reasoningEffort: low
-          high:
-            reasoningEffort: high
-          max:
-            reasoningEffort: max
+        variants: *glm_variants
 
       # Bluesminds
       custom-bluesminds/z-ai/glm-5.2:
         name: GLM 5.2 (Bluesminds)
-        variants:
-          low:
-            reasoningEffort: low
-          high:
-            reasoningEffort: high
-          max:
-            reasoningEffort: max
+        variants: *glm_variants
+
+      # TokenRouter
+      custom-token-router/z-ai/glm-5.3-free:
+        name: GLM 5.3 Free (TokenRouter)
+        variants: *glm_variants
+
+      # Nvidia
+      custom-nvidia/moonshotai/kimi-k3:
+        name: Kimi K3 Free (Nvidia)
+        variants: *kimi_k3_variants
 
   # 3. Cloudflare Dynamic Routes. Dynamic Routing currently requires the
   # OpenAI-compatible /compat/chat/completions endpoint and cannot use the
@@ -718,27 +739,30 @@ provider:
     models:
       dynamic/kimi-k2.6:
         name: Kimi K2.6 (Dynamic)
+        variants: *kimi_k2_6_variants
       dynamic/kimi-k2.7-code:
         name: Kimi K2.7 Code (Dynamic)
       dynamic/kimi-k3:
         name: Kimi K3 (Dynamic)
+        variants: *kimi_k3_variants
+      dynamic/kimi-k3:free:
+        name: Kimi K3 Free (Dynamic)
+        variants: *kimi_k3_variants
       dynamic/glm-5.2:
         name: GLM 5.2 (Dynamic)
-        variants:
-          low:
-            reasoningEffort: low
-          high:
-            reasoningEffort: high
-          max:
-            reasoningEffort: max
+        variants: *glm_variants
       dynamic/gemini-3.1-pro-preview:
         name: Gemini 3.1 Pro Preview (Dynamic)
       dynamic/gemini-3.5-flash:
         name: Gemini 3.5 Flash (Dynamic)
       dynamic/k2.6-code-preview-free:
         name: Kimi 2.6 (Free)
+        variants: *kimi_k2_6_variants
       dynamic/ox-alpha:free:
         name: Ox Alpha Free (Dynamic)
+      dynamic/glm5.3:free:
+        name: GLM 5.3 Free (Dynamic)
+        variants: *glm_variants
 
   # Custom Provider with its provider-specific endpoint and the native OpenAI
   # Responses API. Kept separate because this path intentionally needs
@@ -762,49 +786,13 @@ provider:
     models:
       gpt-5.6-luna:
         name: GPT-5.6 Luna (OCTG)
-        variants:
-          none:
-            reasoningEffort: none
-          low:
-            reasoningEffort: low
-          medium:
-            reasoningEffort: medium
-          high:
-            reasoningEffort: high
-          xhigh:
-            reasoningEffort: xhigh
-          max:
-            reasoningEffort: max
+        variants: *gpt_variants_max
       gpt-5.6-terra:
         name: GPT-5.6 Terra (OCTG)
-        variants:
-          none:
-            reasoningEffort: none
-          low:
-            reasoningEffort: low
-          medium:
-            reasoningEffort: medium
-          high:
-            reasoningEffort: high
-          xhigh:
-            reasoningEffort: xhigh
-          max:
-            reasoningEffort: max
+        variants: *gpt_variants_high
       gpt-5.6-sol:
         name: GPT-5.6 Sol (OCTG)
-        variants:
-          none:
-            reasoningEffort: none
-          low:
-            reasoningEffort: low
-          medium:
-            reasoningEffort: medium
-          high:
-            reasoningEffort: high
-          xhigh:
-            reasoningEffort: xhigh
-          max:
-            reasoningEffort: max
+        variants: *gpt_variants_high
 
   openai:
     whitelist:
@@ -819,6 +807,34 @@ provider:
       - north-mini-code-free
       - nemotron-3-ultra-free
       - x-preview-f-free
+    models:
+      deepseek-v4-flash-free:
+        name: DeepSeek V4 Flash Free
+        variants: &deepseek_v4_variants
+          default:
+            reasoningEffort: high
+            body:
+              thinking:
+                type: enabled
+          low:
+            reasoningEffort: low
+            body:
+              thinking:
+                type: enabled
+          high:
+            reasoningEffort: high
+            body:
+              thinking:
+                type: enabled
+          max:
+            reasoningEffort: max
+            body:
+              thinking:
+                type: enabled
+          none:
+            body:
+              thinking:
+                type: disabled
   amazon-bedrock:
     whitelist:
       - global.anthropic.claude-fable-5
