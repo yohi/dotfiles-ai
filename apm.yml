@@ -538,6 +538,102 @@ enabled_providers:
   - amazon-bedrock
   - google
 
+# --------------------------------------------------------------------------
+# Model Variant Templates (YAML Anchors)
+# --------------------------------------------------------------------------
+x-variants:
+  gpt_variants_max: &gpt_variants_max
+    default:
+      reasoningEffort: max
+    none:
+      reasoningEffort: none
+    low:
+      reasoningEffort: low
+    medium:
+      reasoningEffort: medium
+    high:
+      reasoningEffort: high
+    xhigh:
+      reasoningEffort: xhigh
+    max:
+      reasoningEffort: max
+
+  gpt_variants_high: &gpt_variants_high
+    default:
+      reasoningEffort: high
+    none:
+      reasoningEffort: none
+    low:
+      reasoningEffort: low
+    medium:
+      reasoningEffort: medium
+    high:
+      reasoningEffort: high
+    xhigh:
+      reasoningEffort: xhigh
+    max:
+      reasoningEffort: max
+
+  glm_variants: &glm_variants
+    default:
+      reasoningEffort: high
+    low:
+      reasoningEffort: low
+    high:
+      reasoningEffort: high
+    max:
+      reasoningEffort: max
+
+  kimi_k3_variants: &kimi_k3_variants
+    default:
+      reasoningEffort: high
+    low:
+      reasoningEffort: low
+    high:
+      reasoningEffort: high
+    max:
+      reasoningEffort: max
+
+  kimi_k2_6_variants: &kimi_k2_6_variants
+    default:
+      body:
+        thinking:
+          type: enabled
+    thinking:
+      body:
+        thinking:
+          type: enabled
+    none:
+      body:
+        thinking:
+          type: disabled
+
+  deepseek_v4_variants: &deepseek_v4_variants
+    default:
+      reasoningEffort: high
+      body:
+        thinking:
+          type: enabled
+    low:
+      reasoningEffort: low
+      body:
+        thinking:
+          type: enabled
+    high:
+      reasoningEffort: high
+      body:
+        thinking:
+          type: enabled
+    max:
+      reasoningEffort: max
+      body:
+        thinking:
+          type: enabled
+    none:
+      body:
+        thinking:
+          type: disabled
+
 provider:
   # 1. Cloudflare AI Gateway built-in providers.
   # Provider credentials are resolved by AI Gateway (BYOK / Unified Billing);
@@ -552,38 +648,10 @@ provider:
       # OpenAI
       openai/gpt-5.6-luna:
         name: GPT-5.6 Luna (OpenAI)
-        variants: &gpt_variants_max
-          default:
-            reasoningEffort: max
-          none:
-            reasoningEffort: none
-          low:
-            reasoningEffort: low
-          medium:
-            reasoningEffort: medium
-          high:
-            reasoningEffort: high
-          xhigh:
-            reasoningEffort: xhigh
-          max:
-            reasoningEffort: max
+        variants: *gpt_variants_max
       openai/gpt-5.6-terra:
         name: GPT-5.6 Terra (OpenAI)
-        variants: &gpt_variants_high
-          default:
-            reasoningEffort: high
-          none:
-            reasoningEffort: none
-          low:
-            reasoningEffort: low
-          medium:
-            reasoningEffort: medium
-          high:
-            reasoningEffort: high
-          xhigh:
-            reasoningEffort: xhigh
-          max:
-            reasoningEffort: max
+        variants: *gpt_variants_high
       openai/gpt-5.6-sol:
         name: GPT-5.6 Sol (OpenAI)
         variants: *gpt_variants_high
@@ -599,15 +667,7 @@ provider:
       # OpenRouter
       openrouter/z-ai/glm-5.2:Free:
         name: GLM 5.2 Free (OpenRouter)
-        variants: &glm_variants
-          default:
-            reasoningEffort: high
-          low:
-            reasoningEffort: low
-          high:
-            reasoningEffort: high
-          max:
-            reasoningEffort: max
+        variants: *glm_variants
 
   # 2. Cloudflare Custom Providers using the generic OpenAI-compatible
   # /compat endpoint. Keeping the custom-{slug}/{model} model ID lets a single
@@ -629,32 +689,12 @@ provider:
       # Ollama Cloud
       custom-ollama-cloud/kimi-k2.6:
         name: Kimi K2.6 (Ollama Cloud)
-        variants: &kimi_k2_6_variants
-          default:
-            body:
-              thinking:
-                type: enabled
-          thinking:
-            body:
-              thinking:
-                type: enabled
-          none:
-            body:
-              thinking:
-                type: disabled
+        variants: *kimi_k2_6_variants
       custom-ollama-cloud/kimi-k2.7-code:
         name: Kimi K2.7 Code (Ollama Cloud)
       custom-ollama-cloud/kimi-k3:
         name: Kimi K3 (Ollama Cloud)
-        variants: &kimi_k3_variants
-          default:
-            reasoningEffort: high
-          low:
-            reasoningEffort: low
-          high:
-            reasoningEffort: high
-          max:
-            reasoningEffort: max
+        variants: *kimi_k3_variants
       custom-ollama-cloud/glm-5.2:
         name: GLM 5.2 (Ollama Cloud)
         variants: *glm_variants
@@ -810,31 +850,7 @@ provider:
     models:
       deepseek-v4-flash-free:
         name: DeepSeek V4 Flash Free
-        variants: &deepseek_v4_variants
-          default:
-            reasoningEffort: high
-            body:
-              thinking:
-                type: enabled
-          low:
-            reasoningEffort: low
-            body:
-              thinking:
-                type: enabled
-          high:
-            reasoningEffort: high
-            body:
-              thinking:
-                type: enabled
-          max:
-            reasoningEffort: max
-            body:
-              thinking:
-                type: enabled
-          none:
-            body:
-              thinking:
-                type: disabled
+        variants: *deepseek_v4_variants
   amazon-bedrock:
     whitelist:
       - global.anthropic.claude-fable-5
