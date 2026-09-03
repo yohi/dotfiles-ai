@@ -542,9 +542,10 @@ enabled_providers:
 # Model Variant Templates (YAML Anchors)
 # --------------------------------------------------------------------------
 x-variants:
-  gpt_variants_max: &gpt_variants_max
+  # Base GPT variants (default: medium)
+  gpt_variants: &gpt_variants
     default:
-      reasoningEffort: max
+      reasoningEffort: medium
     none:
       reasoningEffort: none
     low:
@@ -558,21 +559,15 @@ x-variants:
     max:
       reasoningEffort: max
 
+  gpt_variants_max: &gpt_variants_max
+    <<: *gpt_variants
+    default:
+      reasoningEffort: max
+
   gpt_variants_high: &gpt_variants_high
+    <<: *gpt_variants
     default:
       reasoningEffort: high
-    none:
-      reasoningEffort: none
-    low:
-      reasoningEffort: low
-    medium:
-      reasoningEffort: medium
-    high:
-      reasoningEffort: high
-    xhigh:
-      reasoningEffort: xhigh
-    max:
-      reasoningEffort: max
 
   glm_variants: &glm_variants
     default:
