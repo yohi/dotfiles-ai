@@ -669,7 +669,7 @@ provider:
   # upstream API keys locally.
   cloudflare-ai-gateway-custom:
     npm: "@ai-sdk/openai-compatible"
-    name: "Cloudflare AI Gateway (Custom Providers)"
+    name: "Cloudflare AI Gateway (Custom)"
     options:
       baseURL: "https://gateway.ai.cloudflare.com/v1/${env:OC_CF_ACCOUNT_ID}/${env:OC_CF_GATEWAY_ID}/compat"
       apiKey: ""
@@ -718,6 +718,32 @@ provider:
         name: GLM 5.3 (OpenCode Go)
         variants: *glm_variants
 
+      # CommandCode
+      custom-command-code/moonshotai/kimi-k2.6:
+        name: Kimi K2.6 (CommandCode)
+        variants: *kimi_k2_6_variants
+      custom-command-code/moonshotai/kimi-k2.7-code:
+        name: Kimi K2.7 Code (CommandCode)
+      custom-command-code/moonshotai/kimi-k3:
+        name: Kimi K3 (CommandCode)
+        variants: *kimi_k3_variants
+      custom-command-code/zai-org/glm-5.2:
+        name: GLM 5.2 (CommandCode)
+        variants: *glm_variants
+      custom-command-code/z-ai/glm-5.3-flash:
+        name: GLM 5.3 Flash (CommandCode)
+        variants: *glm_variants
+      custom-command-code/zai-org/glm-5.3:
+        name: GLM 5.3 (CommandCode)
+        variants: *glm_variants
+
+      # Sakura AI Engine
+      custom-sakura-ai/preview/Kimi-K2.6:
+        name: Kimi K2.6 (Sakura AI Engine)
+        variants: *kimi_k2_6_variants
+      custom-sakura-ai/preview/Kimi-K2.7-Code:
+        name: Kimi K2.7 Code (Sakura AI Engine)
+
       # AIHubMix
       custom-aihubmix/coding-kimi-k3-free:
         name: Coding Kimi K3 Free (AIHubMix)
@@ -727,22 +753,20 @@ provider:
         variants: *kimi_k2_6_variants
       custom-aihubmix/gemini-3.5-flash-lite-free:
         name: Gemini 3.5 Flash-Lite Free (AIHubMix)
-      custom-aihubmix/gemini-3.6-flash-lite-free:
-        name: Gemini 3.6 Flash Free (AIHubMix)
+      custom-aihubmix/gemini-3.7-flash-free:
+        name: Gemini 3.7 Flash Free (AIHubMix)
       custom-aihubmix/coding-glm-5.2-free:
         name: Coding GLM 5.2 Free (AIHubMix)
       custom-aihubmix/glm-5.2-free:
         name: GLM 5.2 Free (AIHubMix)
         variants: *glm_variants
+      custom-aihubmix/ox-alpha:
+        name: GLM 5.3 Flash Free (AIHubMix)
+        variants: *glm_variants
 
       # ZenMax
       custom-zenmax/z-ai/glm-5.3-free:
         name: GLM 5.3 Free (ZenMax)
-        variants: *glm_variants
-
-      # Bluesminds
-      custom-bluesminds/z-ai/glm-5.2:
-        name: GLM 5.2 (Bluesminds)
         variants: *glm_variants
 
       # TokenRouter
@@ -760,7 +784,7 @@ provider:
   # REST API path selected by the native Cloudflare provider.
   cloudflare-ai-gateway-dynamic:
     npm: "@ai-sdk/openai-compatible"
-    name: "Cloudflare AI Gateway (Dynamic Routes)"
+    name: "Cloudflare AI Gateway (Dynamic)"
     options:
       baseURL: "https://gateway.ai.cloudflare.com/v1/${env:OC_CF_ACCOUNT_ID}/${env:OC_CF_GATEWAY_ID}/compat"
       apiKey: ""
@@ -772,30 +796,30 @@ provider:
         cf-aig-skip-cache: "true"
     models:
       dynamic/kimi-k2.6:
-        name: Kimi K2.6 (Dynamic)
+        name: Kimi K2.6
         variants: *kimi_k2_6_variants
       dynamic/kimi-k2.7-code:
-        name: Kimi K2.7 Code (Dynamic)
+        name: Kimi K2.7 Code
       dynamic/kimi-k3:
-        name: Kimi K3 (Dynamic)
+        name: Kimi K3
         variants: *kimi_k3_variants
       dynamic/kimi-k3:free:
-        name: Kimi K3 Free (Dynamic)
+        name: Kimi K3 Free
         variants: *kimi_k3_variants
       dynamic/glm-5.2:
-        name: GLM 5.2 (Dynamic)
+        name: GLM 5.2
         variants: *glm_variants
       dynamic/gemini-3.1-pro-preview:
-        name: Gemini 3.1 Pro Preview (Dynamic)
+        name: Gemini 3.1 Pro Preview
       dynamic/gemini-3.5-flash:
-        name: Gemini 3.5 Flash (Dynamic)
+        name: Gemini 3.5 Flash
       dynamic/k2.6-code-preview-free:
         name: Kimi 2.6 (Free)
         variants: *kimi_k2_6_variants
       dynamic/ox-alpha:free:
-        name: Ox Alpha Free (Dynamic)
+        name: Ox Alpha Free
       dynamic/glm5.3:free:
-        name: GLM 5.3 Free (Dynamic)
+        name: GLM 5.3 Free
         variants: *glm_variants
 
   # Custom Provider with its provider-specific endpoint and the native OpenAI
@@ -819,19 +843,19 @@ provider:
         cf-aig-skip-cache: "true"
     models:
       gpt-5.6-luna:
-        name: GPT-5.6 Luna (OCTG)
+        name: GPT-5.6 Luna
         variants:
           <<: *gpt_variants
           default:
             reasoningEffort: max
       gpt-5.6-terra:
-        name: GPT-5.6 Terra (OCTG)
+        name: GPT-5.6 Terra
         variants:
           <<: *gpt_variants
           default:
             reasoningEffort: high
       gpt-5.6-sol:
-        name: GPT-5.6 Sol (OCTG)
+        name: GPT-5.6 Sol
         variants:
           <<: *gpt_variants
           default:
