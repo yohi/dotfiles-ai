@@ -43,9 +43,79 @@
     // 実験的機能 (コンテキスト圧縮・タスクシステム)
     // -------------------------------------------------------------------------
     "experimental": {
+      // 期待効果: TodoWrite/TodoReadを永続タスクシステムへ切り替え、
+      // 長時間作業でタスク状態を安定して引き継ぐ。直接のtoken削減設定ではない。
       "task_system": true,
+
+      // 期待効果: context limit超過時に大きなtool outputを追加削減し、
+      // 復旧成功率を上げる。通常時には発火せず、日常的なtoken削減の主役ではない。
+      // 注意: 超過時の救済策のため、必要な出力まで失う可能性がある。
       "aggressive_truncation": true,
-      "preemptive_compaction": true
+
+      // 期待効果: context使用量が内部閾値(約78%)に達した際に先回りでcompactionし、
+      // providerのcontext limit到達による停止を防ぐ。閾値はここでは変更しない。
+      // 注意: compaction用の追加requestと要約による情報損失が発生し得る。
+      "preemptive_compaction": true,
+
+      // 期待効果: whitelist対象外を含む全tool outputを個別に上限制御し、
+      // 巨大なtest log/bash/read結果が後続requestへ累積するのを抑える。
+      // v4.19.4の目安は通常50k tokens、webfetchは10k tokensで、先頭側を優先して残す。
+      "truncate_all_tool_outputs": true,
+
+      // 期待効果: context limit復旧時に不要なtool履歴を選択的に削り、
+      // 会話全体のcompactionより低損失で再試行できるようにする。
+      // 注意: v4.19.4では常時pruningではなく、context limit復旧時のdeduplicationが主な実装。
+      "dynamic_context_pruning": {
+        // 同一tool・同一引数の古いcall/resultを削除する機能を有効化する。
+        // 通常turnごとには動かず、context limit復旧時のtoken削減に効く。
+        "enabled": true,
+
+        // 期待効果: pruning通知を最小限にして、通知文自体と画面上のノイズを抑える。
+        // 削除対象や削減量は変えない。
+        "notification": "minimal",
+
+        // 期待効果: 対応実装では直近3turnのtool outputを保護し、
+        // 現在進行中のdebug情報を残す。v4.19.4の復旧deduplicationでは直接参照されない。
+        "turn_protection": {
+          "enabled": true,
+          "turns": 3
+        },
+
+        // 期待効果: タスク状態、rename操作、session履歴などの再開に必要なtoolを
+        // pruning対象から除外し、context削減による制御情報の欠落を防ぐ。
+        "protected_tools": [
+          "task",
+          "todowrite",
+          "todoread",
+          "lsp_rename",
+          "session_read",
+          "session_write",
+          "session_search"
+        ],
+        "strategies": {
+          // 期待効果: 同一tool・同一引数の重複callは最新結果を残して古い結果を削り、
+          // 繰り返しread/検索によるtool履歴の膨張を抑える。
+          "deduplication": {
+            "enabled": true
+          },
+
+          // 期待効果: 対応実装では後続Readが確認できた古いWrite入力を削る。
+          // aggressive=falseにより、任意のReadだけを根拠にした過剰削除を避ける。
+          // 注意: v4.19.4の復旧deduplication実装ではこの設定は直接適用されない。
+          "supersede_writes": {
+            "enabled": true,
+            "aggressive": false
+          },
+
+          // 期待効果: 対応実装では古いtool errorの入力を削り、失敗の再試行履歴を圧縮する。
+          // 5turn以内は保持するため、直後のdebug情報への影響を抑える。
+          // 注意: v4.19.4の復旧deduplication実装ではこの設定は直接適用されない。
+          "purge_errors": {
+            "enabled": true,
+            "turns": 5
+          }
+        }
+      }
     },
 
     // -------------------------------------------------------------------------
