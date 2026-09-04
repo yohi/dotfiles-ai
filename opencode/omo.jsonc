@@ -6,7 +6,7 @@
 // - プロファイル切り替え: OMO_PROFILE=personal|work (またはラッパー引数 "opencode personal")
 // =============================================================================
 {
-  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/omo.schema.json",
+  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/v4.19.4/assets/omo.schema.json",
 
   // ===========================================================================
   // OpenCode 共通設定 (全プロファイルで共有されるコア機能・環境設定)
@@ -57,32 +57,18 @@
       // 注意: compaction用の追加requestと要約による情報損失が発生し得る。
       "preemptive_compaction": true,
 
-      // 期待効果: whitelist対象外を含む全tool outputを個別に上限制御し、
-      // 巨大なtest log/bash/read結果が後続requestへ累積するのを抑える。
-      // v4.19.4の目安は通常50k tokens、webfetchは10k tokensで、先頭側を優先して残す。
-      "truncate_all_tool_outputs": true,
+      // OpenCode側のtool_output制限でfull outputをdiskへ退避するため、
+      // OmOでは全toolへの無差別truncationを行わない。OmO標準whitelistの
+      // tool-output-truncatorは引き続き有効で、巨大outputの安全弁として機能する。
+      "truncate_all_tool_outputs": false,
 
-      // 期待効果: context limit復旧時に不要なtool履歴を選択的に削り、
-      // 会話全体のcompactionより低損失で再試行できるようにする。
-      // 注意: v4.19.4では常時pruningではなく、context limit復旧時のdeduplicationが主な実装。
+      // context limit復旧時に重複tool履歴を低損失で削除する。
+      // v4.19.4ではprompt-too-long時のdeduplication recoveryが実動作の中心。
       "dynamic_context_pruning": {
-        // 同一tool・同一引数の古いcall/resultを削除する機能を有効化する。
-        // 通常turnごとには動かず、context limit復旧時のtoken削減に効く。
         "enabled": true,
-
-        // 期待効果: pruning通知を最小限にして、通知文自体と画面上のノイズを抑える。
-        // 削除対象や削減量は変えない。
         "notification": "minimal",
 
-        // 期待効果: 対応実装では直近3turnのtool outputを保護し、
-        // 現在進行中のdebug情報を残す。v4.19.4の復旧deduplicationでは直接参照されない。
-        "turn_protection": {
-          "enabled": true,
-          "turns": 3
-        },
-
-        // 期待効果: タスク状態、rename操作、session履歴などの再開に必要なtoolを
-        // pruning対象から除外し、context削減による制御情報の欠落を防ぐ。
+        // task/session系の制御情報はdeduplication recoveryから保護する。
         "protected_tools": [
           "task",
           "todowrite",
@@ -93,26 +79,9 @@
           "session_search"
         ],
         "strategies": {
-          // 期待効果: 同一tool・同一引数の重複callは最新結果を残して古い結果を削り、
-          // 繰り返しread/検索によるtool履歴の膨張を抑える。
+          // 同一tool・同一引数の古いcall/resultを削除し、最新結果だけを残す。
           "deduplication": {
             "enabled": true
-          },
-
-          // 期待効果: 対応実装では後続Readが確認できた古いWrite入力を削る。
-          // aggressive=falseにより、任意のReadだけを根拠にした過剰削除を避ける。
-          // 注意: v4.19.4の復旧deduplication実装ではこの設定は直接適用されない。
-          "supersede_writes": {
-            "enabled": true,
-            "aggressive": false
-          },
-
-          // 期待効果: 対応実装では古いtool errorの入力を削り、失敗の再試行履歴を圧縮する。
-          // 5turn以内は保持するため、直後のdebug情報への影響を抑える。
-          // 注意: v4.19.4の復旧deduplication実装ではこの設定は直接適用されない。
-          "purge_errors": {
-            "enabled": true,
-            "turns": 5
           }
         }
       }
@@ -141,14 +110,17 @@
     // バックグラウンドタスクのプロバイダ別並行制御
     // -------------------------------------------------------------------------
     "background_task": {
-      "defaultConcurrency": 10,
+      // 100k+ token級requestの同時多発でquota windowが瞬間的に枯れるのを抑える。
+      // providerConcurrencyのkeyはmodel文字列の先頭provider IDと完全一致させる。
+      "defaultConcurrency": 6,
       "providerConcurrency": {
-        "openai": 5,
-        "nvidia": 10,
-        "minimax": 5,
-        "google": 20,
+        "openai": 6,
         "opencode": 5,
-        "sakura": 5
+        "cloudflare-ai-gateway": 3,
+        "cloudflare-ai-gateway-custom": 5,
+        "cloudflare-ai-gateway-dynamic": 5,
+        "cloudflare-ai-gateway-octg": 4,
+        "amazon-bedrock": 5
       }
     },
 
