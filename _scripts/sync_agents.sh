@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 #
 # _scripts/sync_agents.sh
-# description: Generate agent-skills/AVAILABLE_SKILLS.md and global-rules/AGENTS.global.md
-# from the runtime .agents/skills tree, local custom skills under agent-skills/custom,
-# and project-local skills tracked under .claude/skills/.
+# description: Generate agent-skills/AVAILABLE_SKILLS.md from the runtime .agents/skills tree,
+# local custom skills under agent-skills/custom, and project-local skills tracked under .claude/skills/.
+# global-rules/AGENTS.global.md intentionally remains a lightweight shared prompt and only references
+# the generated catalog for progressive disclosure.
 #
 
 set -euo pipefail
@@ -13,7 +14,6 @@ cd "$(dirname "$0")/.." || exit 1
 
 readonly OUTPUT_FILES=(
     "agent-skills/AVAILABLE_SKILLS.md"
-    "global-rules/AGENTS.global.md"
 )
 
 run_skillport_doc() {

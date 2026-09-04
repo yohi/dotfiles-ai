@@ -207,6 +207,10 @@ def build_config(apm: dict[str, Any]) -> dict[str, Any]:
     if "compaction" in apm:
         cfg["compaction"] = apm["compaction"]
 
+    # --- Tool output truncation ---
+    if "tool_output" in apm:
+        cfg["tool_output"] = apm["tool_output"]
+
     # --- Share ---
     if "share" in apm:
         cfg["share"] = apm["share"]
@@ -262,6 +266,7 @@ _SECTION_COMMENTS: dict[str, str] = {
     "plugin": "// [Plugin] - エコシステム設定\n  // [Plugin]",
     "permission": "// Permission - 権限とガードレール",
     "compaction": "// Compaction & Lifecycle",
+    "tool_output": "// Tool Output - コンテキスト肥大化防止",
     "lsp": "// LSP - 言語サーバー設定",
     "instructions": "// Instructions",
     "watcher": "// Watcher",

@@ -93,20 +93,21 @@ uvx skillport validate agent-skills/custom/my-new-skill
 
 ## プロジェクト固有の同期フロー
 
-スキルの追加・修正後は、以下のコマンドでプロジェクト全体のドキュメントや各エージェント（OpenCode, Gemini 等）へ同期します。
+スキルの追加・修正後は、以下のコマンドでスキルカタログを更新します。
 
 ```bash
-# スキル一覧 (AGENTS.md) の更新と各エージェントへの配備
 make sync-agents
 ```
 
-※ `make sync-agents` は内部で `skillport doc` を実行し、以下の 3 つの skill tree を元に `agent-skills/AVAILABLE_SKILLS.md` と `global-rules/AGENTS.global.md` を更新します：
+`make sync-agents` は内部で `skillport doc` を実行し、以下の 3 つの skill tree を元に `agent-skills/AVAILABLE_SKILLS.md` を更新します。
 
 - `.agents/skills/` の runtime tree（外部 skill）
 - `agent-skills/custom/` の custom tree（グローバル自作 skill）
 - `.claude/skills/` のうち Git 追跡対象となっているプロジェクト固有 skill
 
-※ `make sync-agents` は内部で `skillport doc` を実行し、`.agents/skills/` の runtime tree と `agent-skills/custom/` の custom tree を元に `agent-skills/AVAILABLE_SKILLS.md` の `<!-- SKILLPORT_START -->` マーカー内にスキルリストを直接反映します。各 `AGENTS.md` はコンテキストの肥大化を避けるため、このファイルへのリンクのみを保持します。自作スキルは `custom/<name>`、配布スキルは `anthropics/<name>` や `superpowers/<name>` といったネームスペース付きで識別されます。
+`global-rules/AGENTS.global.md` は APM から複数 AI エージェントへ共通配布する軽量なグローバル指示として扱い、SkillPort の全カタログは埋め込みません。グローバル指示から `agent-skills/AVAILABLE_SKILLS.md` を参照し、必要な skill だけを SkillPort の `search_skills` / `load_skill` で段階的に読み込む構成です。
+
+自作スキルは `custom/<name>`、配布スキルは `anthropics/<name>` や `superpowers/<name>` といったネームスペース付きで識別されます。
 
 ## スキル設計の原則
 
