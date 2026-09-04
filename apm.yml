@@ -859,19 +859,19 @@ provider:
         variants: *kimi_k2_6_variants
       dynamic/ox-alpha:free:
         name: Ox Alpha Free
-      dynamic/glm5.3:free:
+      dynamic/glm-5.3:free:
         name: GLM 5.3 Free
         variants: *glm_variants
       dynamic/deepseek-v4-flash:
         name: DeepSeek V4 Flash
         variants: *deepseek_v4_variants
-      dynamic/gemini-3.1-pro:
+      dynamic/gemini-3.1-pro:free:
         name: Gemini 3.1 Pro
-      dynamic/gemini-3.5-flash-lite:
+      dynamic/gemini-3.5-flash-lite:free:
         name: Gemini 3.5 Flash-Lite
-      dynamic/gemini-3.7-flash:
+      dynamic/gemini-3.7-flash:free:
         name: Gemini 3.7 Flash
-      dynamic/gemini-3.8-flash:
+      dynamic/gemini-3.8-flash:free:
         name: Gemini 3.8 Flash
 
   # Custom Provider with its provider-specific endpoint and the native OpenAI
