@@ -18,6 +18,7 @@ agent-skills/external/*
 .agents/
 .sisyphus/
 .omo/
+.justice/
 oss/
 
 # Codex runtime files

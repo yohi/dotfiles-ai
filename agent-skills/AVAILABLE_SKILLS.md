@@ -318,6 +318,11 @@ Each skill contains step-by-step instructions, templates, and scripts.
   <location>.agents/skills/frontend-design/SKILL.md</location>
 </skill>
 <skill>
+  <name>gh-stack</name>
+  <description>Manages stacked PRs and splits multi-part work into reviewable branches with gh-stack. Use for stack creation, viewing, edits, push, submit, sync, rebase, merge, or checkout; when asked to split or isolate work for review; whenever a user mentions a stack, branch layers, dependent PRs, or gh stack; or when a stack is checked out.</description>
+  <location>.agents/skills/gh-stack/SKILL.md</location>
+</skill>
+<skill>
   <name>git-master</name>
   <description>A specialized skill for performing Git operations safely and appropriately. Particularly focuses on splitting changes correctly and creating Japanese commit messages following Conventional Commits.</description>
   <location>.agents/skills/git-master/SKILL.md</location>
@@ -344,18 +349,13 @@ Each skill contains step-by-step instructions, templates, and scripts.
 </skill>
 <skill>
   <name>local/apm-updater</name>
-  <description>Checks and updates THIS repository's apm.yml and the OpenCode files derived from it. Handles (1) pinned dependency versions and commit hashes in apm.yml -- APM skill git refs (owner/repo#tag), npm plugins under `plugin:`, and MCP server packages under `dependencies.mcp` -- and (2) LLM model whitelists in apm.yml plus the OpenCode environment profiles (opencode/personal.env, opencode/work.env) and opencode/README.md using the latest model-schema from models.dev. Use whenever the user wants to bump apm.yml dependencies, refresh MCP/plugin/skill pins, check if apm.yml is outdated, update OpenCode LLM model settings, or sync opencode/README.md with the latest oh-my-openagent release. Do NOT use for package.json / uv / other lockfile bumps, GitHub Actions version updates, or adding brand-new MCP/skill/plugin entries to apm.yml.</description>
+  <description>Checks and updates THIS repository's apm.yml and the OpenCode files derived from it. Handles (1) pinned dependency versions and commit hashes in apm.yml -- APM skill git refs (owner/repo#tag), npm plugins under `plugin:`, and MCP server packages under `dependencies.mcp` -- and (2) LLM model whitelists in apm.yml plus the OMO native profile configuration (opencode/omo.jsonc profiles.personal / profiles.work) and opencode/README.md using the latest model-schema from models.dev. Use whenever the user wants to bump apm.yml dependencies, refresh MCP/plugin/skill pins, check if apm.yml is outdated, update OpenCode LLM model settings, or sync opencode/README.md with the latest oh-my-openagent release. Do NOT use for package.json / uv / other lockfile bumps, GitHub Actions version updates, or adding brand-new MCP/skill/plugin entries to apm.yml.</description>
   <location>.claude/skills/apm-updater/SKILL.md</location>
 </skill>
 <skill>
   <name>local/dotfiles-guidelines</name>
   <description>Core principles, persona definitions, and command workflows for the dotfiles project. Use when seeking development guidance, selecting an appropriate expert persona (Architect, Developer, Tester, DevOps, Analyst), or following standard project commands (analyze, implement, design, etc.). Ensures consistency, quality, and adherence to project-wide best practices.</description>
   <location>.claude/skills/dotfiles-guidelines/SKILL.md</location>
-</skill>
-<skill>
-  <name>makefile-organization</name>
-  <description>Guidelines for organizing and maintaining modular Makefiles. Use when refactoring, creating new .mk files, or ensuring consistency across the project's Makefile structure. Covers naming conventions, inclusion order, idempotency management, and error handling for a robust development environment.</description>
-  <location>.agents/skills/makefile-organization/SKILL.md</location>
 </skill>
 <skill>
   <name>mcp-builder</name>
@@ -401,6 +401,11 @@ Each skill contains step-by-step instructions, templates, and scripts.
   <name>systematic-debugging</name>
   <description>Use when encountering any bug, test failure, or unexpected behavior, before proposing fixes</description>
   <location>.agents/skills/systematic-debugging/SKILL.md</location>
+</skill>
+<skill>
+  <name>temporary-credential-agent</name>
+  <description>Use when an AI agent must investigate or change registered AWS, Cloudflare, Grafana, or HCP Terraform resources using temporary credentials without exposing parent credentials, Bitwarden Secrets Manager access tokens, or temporary secret values.</description>
+  <location>.agents/skills/temporary-credential-agent/SKILL.md</location>
 </skill>
 <skill>
   <name>test-driven-development</name>

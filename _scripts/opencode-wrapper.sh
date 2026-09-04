@@ -14,6 +14,13 @@ set -e
 export XDG_DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
+if [[ -f "$REPO_ROOT/.env" ]]; then
+    set -a
+    # shellcheck disable=SC1091
+    . "$REPO_ROOT/.env"
+    set +a
+fi
+
 # --- Profile Selection ---
 PROFILE="${PROFILE:-personal}"
 if [[ "$1" == "work" || "$1" == "personal" ]]; then
@@ -45,6 +52,10 @@ fi
 # Subcommands like auth, mcp, doctor, etc. don't accept --port
 if [[ -n "$PORT" && ( -z "$1" || "$1" == -* ) ]]; then
     echo "✅ Profile [${PROFILE}] | Port [${PORT}]"
+    # --- Sibyl Subagent Display (dynamic, port-aware) ---
+    export OPENCODE_SERVER_URL="${OPENCODE_SERVER_URL:-http://127.0.0.1:${PORT}}"
+    export OPENCODE_PROJECT_DIR="${OPENCODE_PROJECT_DIR:-$PWD}"
+    export SIBYL_SUBAGENT_ENABLED="${SIBYL_SUBAGENT_ENABLED:-true}"
     opencode --port "$PORT" "$@"
 else
     echo "✅ Profile [${PROFILE}]"

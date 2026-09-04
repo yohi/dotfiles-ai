@@ -98,6 +98,14 @@ def _normalize_opencode_json_data(data: dict[str, Any]) -> dict[str, Any]:
     return normalized
 
 
+def _apply_generated_fields(data: dict[str, Any], cfg: dict[str, Any]) -> None:
+    """Apply the fields generated from apm.yml to an existing config."""
+    data["mcp"] = cfg.get("mcp", {})
+    for key in ("agent", "provider", "enabled_providers"):
+        if key in cfg:
+            data[key] = cfg[key]
+
+
 def _build_mcp_section(mcp_entries: list[dict[str, Any]]) -> dict[str, Any]:
     mcp: dict[str, Any] = {}
     for entry in mcp_entries:
@@ -188,6 +196,10 @@ def build_config(apm: dict[str, Any]) -> dict[str, Any]:
     cfg["shell"] = apm.get("shell", "bash")
     cfg["snapshot"] = apm.get("snapshot", True)
 
+    # --- Agent ---
+    if "agent" in apm:
+        cfg["agent"] = apm["agent"]
+
     # --- Plugin ([Plugin] anchor) ---
     cfg["plugin"] = apm.get("plugin", [])
 
@@ -202,6 +214,10 @@ def build_config(apm: dict[str, Any]) -> dict[str, Any]:
     # --- Compaction ---
     if "compaction" in apm:
         cfg["compaction"] = apm["compaction"]
+
+    # --- Tool output ---
+    if "tool_output" in apm:
+        cfg["tool_output"] = apm["tool_output"]
 
     # --- Share ---
     if "share" in apm:
@@ -254,9 +270,11 @@ def build_config(apm: dict[str, Any]) -> dict[str, Any]:
 # Serialise to JSONC with section headers
 # ---------------------------------------------------------------------------
 _SECTION_COMMENTS: dict[str, str] = {
+    "agent": "// Agent - エージェント設定",
     "plugin": "// [Plugin] - エコシステム設定\n  // [Plugin]",
     "permission": "// Permission - 権限とガードレール",
     "compaction": "// Compaction & Lifecycle",
+    "tool_output": "// Tool Output - コンテキスト肥大化抑制",
     "lsp": "// LSP - 言語サーバー設定",
     "instructions": "// Instructions",
     "watcher": "// Watcher",
@@ -340,7 +358,7 @@ def main() -> None:
         if opencode_json.exists():
             try:
                 data = json.loads(opencode_json.read_text(encoding="utf-8"))
-                data["mcp"] = cfg.get("mcp", {})
+                _apply_generated_fields(data, cfg)
                 normalised = _normalize_opencode_json_data(data)
                 expected = json.dumps(normalised, indent=2, ensure_ascii=False) + "\n"
                 actual = json.dumps(data, indent=2, ensure_ascii=False) + "\n"
@@ -361,7 +379,7 @@ def main() -> None:
     if opencode_json.exists():
         try:
             data = json.loads(opencode_json.read_text(encoding="utf-8"))
-            data["mcp"] = cfg.get("mcp", {})
+            _apply_generated_fields(data, cfg)
             normalized = _normalize_opencode_json_data(data)
             opencode_json.write_text(
                 json.dumps(normalized, indent=2, ensure_ascii=False) + "\n",

@@ -15,6 +15,7 @@ description: Checks and updates THIS repository's apm.yml and the OpenCode files
 - **「バージョン間で何が変わったか」の説明は人間が判断できる形で必ず提示する**。
 - **apm.yml への書き込みはユーザーの承認後にのみ行う**。
 - **生成物は直接編集しない**: `opencode/opencode.jsonc` (`make sync-opencode` による生成物、`.gitignore` 対象) や `gemini/settings.json` などは、`apm.yml` を最小差分で更新した後、決められた `make` コマンドで再同期する。ただし `opencode/omo.jsonc` は OMO ネイティブプロファイルの SSOT として手動で編集する対象ファイルであるため、直接編集する。
+- **A と B を別タスクとして放置しない**: 依存更新の承認を得た場合も、それだけで完了扱いにせず、モデル whitelist、`profiles.personal` / `profiles.work`、README の更新確認まで同じ実行で完走する。ユーザーが明示的に「依存のみ」と指定した場合だけ B を省略し、その旨を報告する。
 
 ## いつ使うか
 
@@ -82,7 +83,7 @@ python .claude/skills/apm-updater/scripts/check_updates.py --json
 
 #### A4. 更新サマリの提示とユーザー承認
 
-「出力フォーマット」の通りに、更新テーブル + 各依存の変更点 + 参照 URL をまとめて提示し、適用してよいか承認を求めます。ユーザーが一部だけ適用したい場合（例: 「nexus 以外」）に対応できるよう、依存ごとに識別しやすく並べます。
+「出力フォーマット」の通りに、更新テーブル + 各依存の変更点 + 参照 URL をまとめて提示し、適用してよいか承認を求めます。ユーザーが一部だけ適用したい場合（例: 「nexus 以外」）に対応できるよう、依存ごとに識別しやすく並べます。承認選択肢（`a` / `b` / `c`）は依存の適用範囲を意味し、スキル全体の完了を意味しません。承認後は A5 を実行してから、必ず B1〜B4 に進みます。
 
 ##### 破壊的変更を含む場合の承認
 
@@ -104,6 +105,13 @@ python .claude/skills/apm-updater/scripts/check_updates.py --json
 
 更新候補が 2 件以上ある場合、各依存に番号を割り当て、ユーザーに「`1,3` のみ」などの選択肢を提示して指定された依存だけを適用します。
 
+##### 承認後の継続条件
+
+- `a`（全て適用）、`b`（破壊的変更を除く）、`c`（一部適用）のいずれを選んでも、選択された依存を A5 で適用した後に B1〜B4 を実行します。
+- B 側で変更候補がない場合も、モデル検証とプロファイルの現状確認を行い、「変更なし」と明示してから完了します。
+- `personal.env` / `work.env` は旧方式の補助ファイルであり、モデル設定の更新対象にしません。正式な編集対象は `opencode/omo.jsonc` の `profiles.personal` / `profiles.work` です。
+- B を実行しないのは、ユーザーが「依存のみ」「apm.yml のみ」など範囲を明示した場合に限ります。
+
 #### A5. apm.yml への適用（承認後のみ）
 
 承認された依存についてのみ、`apm.yml` の該当行を最小差分で書き換えます。版数だけ / ハッシュだけを置換し、周囲の引用符・インデント・`[all]` などの extras は保持します。
@@ -115,9 +123,19 @@ python .claude/skills/apm-updater/scripts/check_updates.py --validate-duplicates
 python .claude/skills/apm-updater/scripts/check_updates.py --validate-models
 ```
 
-いずれもクリーンであれば、必要な `make` コマンドを案内します。
+いずれもクリーンであれば、必要な `make` コマンドを案内します。ただし、ここで処理を終了せず、B1〜B4 に進みます。
 
 ### B. OpenCode LLM モデル・環境プロファイル・README の更新
+
+#### B0. 必須実行ゲート
+
+依存更新を適用した実行では、B セクションを必ず通過します。次の全項目を確認するまで完了報告を出してはいけません。
+
+1. `check_updates.py --validate-models` で `apm.yml` の whitelist を検証する。
+2. `opencode/omo.jsonc` の `profiles.personal` と `profiles.work` を読み、モデルと fallback の更新要否を判定する。
+3. `opencode/README.md` の Target Version とモデル一覧を最新リリースと照合する。
+4. 変更があれば SSOT を編集し、変更がなければ「変更なし」と理由を報告する。
+5. `personal.env` / `work.env` だけを更新して完了にしてはならない。
 
 #### B1. 最新モデルスキーマ情報の取得と解析
 
@@ -141,10 +159,9 @@ python .claude/skills/apm-updater/scripts/check_updates.py --models
 | モデル | models.dev 上の provider | `apm.yml` 上の推奨配置 |
 |---|---|---|
 | `kimi-k3` | `opencode-go` | `opencode-go` whitelist |
-| `qwen3.7-max` | `opencode-go` | `opencode-go` whitelist |
-| カスタム AI Gateway 経由の Kimi | （カスタム） | `cloudflare-ai-gateway-custom` whitelist |
+| カスタム AI Gateway 経由の Kimi | （カスタム） | `cloudflare-ai-gateway` models (`dynamic/kimi-*`) |
 
-`cloudflare-ai-gateway-custom` は `models.dev` に存在しないカスタム provider です。`--validate-models` は `whitelist` またはリスト形式の `models` を通常の provider/model として検査するため、カスタムモデルのマッピング形式はこの検査の対象外です。
+`cloudflare-ai-gateway` は Cloudflare AI Gateway 経由で各プロバイダやカスタム/Dynamic モデルを配信するプロバイダです。`--validate-models` は `whitelist` またはリスト形式の `models` を通常の provider/model として検査するため、カスタムモデルのマッピング形式はこの検査の対象外です。
 
 - 更新後、以下を実行して `make setup-opencode` で `~/.omo/omo.jsonc` の配置・シンボリックリンク生成を行った後、`opencode/opencode.jsonc` （生成物）を再生成し、OMO ネイティブプロファイルを反映します:
 
@@ -232,6 +249,13 @@ make check-sync-opencode
 ```
 
 適用後は、変更した行と「次アクション」（`make apm-install` / `make sync-mcp` / `make sync-agents` / `make sync-opencode`）+ コミットメッセージ案を短く報告します。
+
+依存更新を含む実行では、上記に加えて必ず次を報告します。
+
+- `apm.yml` のモデル whitelist 検証結果
+- `opencode/omo.jsonc` の `profiles.personal` / `profiles.work` の更新結果（変更なしの場合は理由）
+- `opencode/README.md` の Target Version・モデル一覧の更新結果
+- `personal.env` / `work.env` を編集対象にしなかったこと（旧方式の場合）
 
 ## 参照
 

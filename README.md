@@ -67,7 +67,7 @@ AIエージェント（Claude Code, Gemini CLI, OpenCode, Codex）の設定・�
 ## 主要機能
 
 - **SkillPort**: 全エージェントで再利用可能なスキルの SSOT 管理。
-- **APM 直接管理 MCP**: stdio / リモート SSE による各エージェント向け
+- **APM 直接管理 MCP**: stdio / リモート SSE / Streamable HTTP による各エージェント向け
   MCP サーバーの一元管理。
 - **SSOT ルール管理**: 規約やユーザー指示の一元化と自動同期。
 - **マルチエージェント対応**: Claude Code, Gemini CLI, OpenCode, Codex,
@@ -132,7 +132,7 @@ Single Source of Truth (SSOT) です。
   すべての MCP サーバーを `apm.yml` で定義し、
   `make sync-mcp` で各エージェントへ反映します。
 - **安全な実行**: ホストに直接アクセスするツールも、
-  APM による標準的な stdio またはリモート SSE 接続で管理します。
+    APM による標準的な stdio、リモート SSE、または Streamable HTTP 接続で管理します。
 - **スキル配置**: `.agents/skills/` に集約（全エージェントが参照）
 - **自動生成ファイルと Git**:
   これらは `.gitignore` で除外されており、Git 管理の対象外です。
@@ -236,6 +236,6 @@ Antigravity 設定は `make sync-antigravity` で
 | カテゴリ | テクノロジー |
 | :--- | :--- |
 | スキル管理 | [skillport](https://github.com/gotalab/skillport) CLI |
-| ツール管理 | APM (`apm.yml`) による stdio / remote SSE |
+| ツール管理 | APM (`apm.yml`) による stdio / remote SSE / Streamable HTTP |
 | ビルド自動化 | GNU Make (`_mk/*.mk`) |
 | 構成管理 | Bash, jq, systemd |

@@ -19,20 +19,22 @@ dependencies:
     - greptileai/skills//check-pr
     - greptileai/skills//greploop
     - anthropics/claude-code//plugins/code-review
+    - github/gh-stack
     # - yohi/agent-skills//skills/doc-sync-verifier
     - yohi/agent-skills//skills/git-master
     - yohi/agent-skills//skills/github-quality-setup
-    - yohi/agent-skills//skills/makefile-organization
     - yohi/agent-skills//skills/github-release-packages
+    - yohi/agent-skills//skills/temporary-credential-agent
 
   # MCP Servers
   mcp:
-    - name: atlassian
-      title: "Atlassian MCP"
+    - name: cf-mcp-portal-personal
+      title: "Cloudflare MCP Portal (Personal)"
       registry: false
-      transport: sse
-      url: "https://mcp.atlassian.com/v1/mcp/authv2"
+      transport: streamable-http
+      url: https://personal.mcp.y-ohi.com/mcp
       enabled: true
+
 
     - name: coderabbit
       title: "CodeRabbit MCP"
@@ -198,7 +200,7 @@ dependencies:
       command: "npx"
       args:
         - "-y"
-        - "@yohi/nexus@1.30.0"
+        - "@yohi/nexus@2.1.0"
         - "http-bridge"
       env:
         LOG_LEVEL: "ERROR"
@@ -217,7 +219,7 @@ dependencies:
       command: "uvx"
       args:
         - "--from"
-        - "context-store-mcp[all] @ https://github.com/yohi/chronos-graph/archive/refs/tags/v3.0.1.tar.gz"
+        - "context-store-mcp[all] @ https://github.com/yohi/chronos-graph/archive/refs/tags/v3.1.0.tar.gz"
         - "context-store"
       env:
         STORAGE_BACKEND: "${env:STORAGE_BACKEND}"
@@ -253,20 +255,23 @@ dependencies:
 # Global Agent Settings (Inherited by all targets)
 # --------------------------------------------------------------------------
 default_agent: sisyphus
+agent:
+  title:
+    disable: true
 shell: bash
 snapshot: true
 
 plugin:
-  - "@yohi/justice@2.7.0"
+  - "@yohi/justice@3.0.0"
   - "@yohi/akane@1.6.2"
-  - "oh-my-openagent@4.19.3"
+  # - "@yohi/sibyl/server@1.0.0"
+  - "file:///home/y_ohi/program/private/sibyl/dist/server.js"
+  - "oh-my-openagent@4.19.4"
   - "@yohi/chronos-gate@1.1.0"
   - "@nick-vi/opencode-type-inject@latest"
   - "opencode-vibeguard@latest"
 
-disabled_providers:
-  - google
-  - cursor
+disabled_providers: []
 
 permission:
   "*": ask
@@ -470,6 +475,12 @@ compaction:
   tail_turns: 3
   prune: true
 
+# Keep large tool results out of the model context while preserving the
+# complete output on disk for targeted re-reads / Explore delegation.
+tool_output:
+  max_lines: 800
+  max_bytes: 24576
+
 share: manual
 
 lsp:
@@ -520,51 +531,390 @@ watcher:
     - "**/coverage/**"
     - "**/*.lock"
     - "**/.git/**"
+    - "**/.superpowers/**"
+    - "**/.sisyphus/**"
+    - "**/.work/**"
+    - "**/.worktrees/**"
+    - "**/worktrees/**"
 
 enabled_providers:
   - openai
+  - cloudflare-ai-gateway
   - cloudflare-ai-gateway-custom
+  - cloudflare-ai-gateway-dynamic
+  - cloudflare-ai-gateway-octg
   - opencode
-  - opencode-go
   - ollama-cloud
+  - opencode-go
   - amazon-bedrock
+  - google
+
+# --------------------------------------------------------------------------
+# Model Variant Templates (YAML Anchors)
+# --------------------------------------------------------------------------
+x-variants:
+  # Base GPT variants (default: medium)
+  gpt_variants: &gpt_variants
+    default:
+      reasoningEffort: medium
+    none:
+      reasoningEffort: none
+    low:
+      reasoningEffort: low
+    medium:
+      reasoningEffort: medium
+    high:
+      reasoningEffort: high
+    xhigh:
+      reasoningEffort: xhigh
+    max:
+      reasoningEffort: max
+
+  glm_variants: &glm_variants
+    default:
+      reasoningEffort: high
+    low:
+      reasoningEffort: low
+    high:
+      reasoningEffort: high
+    max:
+      reasoningEffort: max
+
+  kimi_k3_variants: &kimi_k3_variants
+    default:
+      reasoningEffort: high
+    low:
+      reasoningEffort: low
+    high:
+      reasoningEffort: high
+    max:
+      reasoningEffort: max
+
+  kimi_k2_6_variants: &kimi_k2_6_variants
+    default:
+      body:
+        thinking:
+          type: enabled
+    thinking:
+      body:
+        thinking:
+          type: enabled
+    none:
+      body:
+        thinking:
+          type: disabled
+
+  deepseek_v4_variants: &deepseek_v4_variants
+    default:
+      reasoningEffort: high
+      body:
+        thinking:
+          type: enabled
+    low:
+      reasoningEffort: low
+      body:
+        thinking:
+          type: enabled
+    high:
+      reasoningEffort: high
+      body:
+        thinking:
+          type: enabled
+    max:
+      reasoningEffort: max
+      body:
+        thinking:
+          type: enabled
+    none:
+      body:
+        thinking:
+          type: disabled
+
+  gemini_variants: &gemini_variants
+    default:
+      reasoningEffort: low
+    low:
+      reasoningEffort: low
+    medium:
+      reasoningEffort: medium
+    high:
+      reasoningEffort: high
+    none:
+      reasoningEffort: none
 
 provider:
+  # 1. Cloudflare AI Gateway built-in providers.
+  # Provider credentials are resolved by AI Gateway (BYOK / Unified Billing);
+  # OpenCode only carries the AI Gateway token.
+  cloudflare-ai-gateway:
+    npm: "ai-gateway-provider"
+    options:
+      accountId: "${env:OC_CF_ACCOUNT_ID}"
+      gatewayId: "${env:OC_CF_GATEWAY_ID}"
+      apiKey: "${env:OC_CF_API_TOKEN}"
+    models:
+      # OpenAI
+      openai/gpt-5.6-luna:
+        name: GPT-5.6 Luna (OpenAI)
+        variants:
+          <<: *gpt_variants
+          default:
+            reasoningEffort: max
+      openai/gpt-5.6-terra:
+        name: GPT-5.6 Terra (OpenAI)
+        variants:
+          <<: *gpt_variants
+          default:
+            reasoningEffort: high
+      openai/gpt-5.6-sol:
+        name: GPT-5.6 Sol (OpenAI)
+        variants:
+          <<: *gpt_variants
+          default:
+            reasoningEffort: high
+
+      # Google AI Studio
+      google-ai-studio/gemini-3.5-flash-lite:
+        name: Gemini 3.5 Flash-Lite
+        variants: *gemini_variants
+      google-ai-studio/gemini-3.8-flash:
+        name: Gemini 3.8 Flash
+        variants: *gemini_variants
+      google-ai-studio/gemini-3.1-pro:
+        name: Gemini 3.1 Pro
+        variants: *gemini_variants
+
+      # OpenRouter
+      openrouter/z-ai/glm-5.2:Free:
+        name: GLM 5.2 Free (OpenRouter)
+        variants: *glm_variants
+
+  # 2. Cloudflare Custom Providers using the generic OpenAI-compatible
+  # /compat endpoint. Keeping the custom-{slug}/{model} model ID lets a single
+  # OpenCode provider address multiple Custom Providers without storing their
+  # upstream API keys locally.
   cloudflare-ai-gateway-custom:
     npm: "@ai-sdk/openai-compatible"
-    name: "Cloudflare AI Gateway(Custom)"
+    name: "Cloudflare AI Gateway (Custom)"
     options:
-      baseURL: "https://gateway.ai.cloudflare.com/v1/${env:CLOUDFLARE_ACCOUNT_ID}/${env:CLOUDFLARE_GATEWAY_ID}/compat"
+      baseURL: "https://gateway.ai.cloudflare.com/v1/${env:OC_CF_ACCOUNT_ID}/${env:OC_CF_GATEWAY_ID}/compat"
+      apiKey: ""
       headers:
-        cf-aig-authorization: "Bearer ${env:CLOUDFLARE_API_TOKEN}"
+        Authorization: ""
+        cf-aig-authorization: "Bearer ${env:OC_CF_API_TOKEN}"
+        cf-aig-collect-log-payload: "true"
+        cf-aig-max-attempts: "1"
+        cf-aig-skip-cache: "true"
     models:
-      dynamic/kimi-k2.6:
-        name: Kimi K2.6
+      # Ollama Cloud
+      custom-ollama-cloud/kimi-k2.6:
+        name: Kimi K2.6 (Ollama Cloud)
+        variants: *kimi_k2_6_variants
+      custom-ollama-cloud/kimi-k2.7-code:
+        name: Kimi K2.7 Code (Ollama Cloud)
+      custom-ollama-cloud/kimi-k3:
+        name: Kimi K3 (Ollama Cloud)
+        variants: *kimi_k3_variants
+      custom-ollama-cloud/glm-5.2:
+        name: GLM 5.2 (Ollama Cloud)
+        variants: *glm_variants
+      custom-ollama-cloud/glm-5.3-flash:
+        name: GLM 5.3 Flash (Ollama Cloud)
+        variants: *glm_variants
+      custom-ollama-cloud/glm-5.3:
+        name: GLM 5.3 (Ollama Cloud)
+        variants: *glm_variants
+
+      # OpenCode Go
+      custom-opencode-go/kimi-k2.6:
+        name: Kimi K2.6 (OpenCode Go)
+        variants: *kimi_k2_6_variants
+      custom-opencode-go/kimi-k2.7-code:
+        name: Kimi K2.7 Code (OpenCode Go)
+      custom-opencode-go/kimi-k3:
+        name: Kimi K3 (OpenCode Go)
+        variants: *kimi_k3_variants
+      custom-opencode-go/glm-5.2:
+        name: GLM 5.2 (OpenCode Go)
+        variants: *glm_variants
+      custom-opencode-go/glm-5.3-flash:
+        name: GLM 5.3 Flash (OpenCode Go)
+        variants: *glm_variants
+      custom-opencode-go/glm-5.3:
+        name: GLM 5.3 (OpenCode Go)
+        variants: *glm_variants
+
+      # CommandCode
+      custom-command-code/moonshotai/kimi-k2.6:
+        name: Kimi K2.6 (CommandCode)
+        variants: *kimi_k2_6_variants
+      custom-command-code/moonshotai/kimi-k2.7-code:
+        name: Kimi K2.7 Code (CommandCode)
+      custom-command-code/moonshotai/kimi-k3:
+        name: Kimi K3 (CommandCode)
+        variants: *kimi_k3_variants
+      custom-command-code/zai-org/glm-5.2:
+        name: GLM 5.2 (CommandCode)
+        variants: *glm_variants
+      custom-command-code/z-ai/glm-5.3-flash:
+        name: GLM 5.3 Flash (CommandCode)
+        variants: *glm_variants
+      custom-command-code/zai-org/glm-5.3:
+        name: GLM 5.3 (CommandCode)
+        variants: *glm_variants
+
+      # Sakura AI Engine
+      custom-sakura-ai/preview/Kimi-K2.6:
+        name: Kimi K2.6 (Sakura AI Engine)
+        variants: *kimi_k2_6_variants
+      custom-sakura-ai/preview/Kimi-K2.7-Code:
+        name: Kimi K2.7 Code (Sakura AI Engine)
+
+      # AIHubMix
+      custom-aihubmix/coding-kimi-k3-free:
+        name: Coding Kimi K3 Free (AIHubMix)
+        variants: *kimi_k3_variants
+      custom-aihubmix/k2.6-code-preview-free:
+        name: Coding Kimi K2.6 Free (AIHubMix)
+        variants: *kimi_k2_6_variants
+      custom-aihubmix/gemini-3.5-flash-lite-free:
+        name: Gemini 3.5 Flash-Lite Free (AIHubMix)
+      custom-aihubmix/gemini-3.7-flash-free:
+        name: Gemini 3.7 Flash Free (AIHubMix)
+      custom-aihubmix/coding-glm-5.2-free:
+        name: Coding GLM 5.2 Free (AIHubMix)
+      custom-aihubmix/glm-5.2-free:
+        name: GLM 5.2 Free (AIHubMix)
+        variants: *glm_variants
+      custom-aihubmix/ox-alpha:
+        name: GLM 5.3 Flash Free (AIHubMix)
+        variants: *glm_variants
+
+      # ZenMax
+      custom-zenmax/z-ai/glm-5.3-free:
+        name: GLM 5.3 Free (ZenMax)
+        variants: *glm_variants
+
+      # TokenRouter
+      custom-token-router/z-ai/glm-5.3-free:
+        name: GLM 5.3 Free (TokenRouter)
+        variants: *glm_variants
+
+      # Nvidia
+      custom-nvidia/moonshotai/kimi-k3:
+        name: Kimi K3 Free (Nvidia)
+        variants: *kimi_k3_variants
+
+  # 3. Cloudflare Dynamic Routes. Dynamic Routing currently requires the
+  # OpenAI-compatible /compat/chat/completions endpoint and cannot use the
+  # REST API path selected by the native Cloudflare provider.
+  cloudflare-ai-gateway-dynamic:
+    npm: "@ai-sdk/openai-compatible"
+    name: "Cloudflare AI Gateway (Dynamic)"
+    options:
+      baseURL: "https://gateway.ai.cloudflare.com/v1/${env:OC_CF_ACCOUNT_ID}/${env:OC_CF_GATEWAY_ID}/compat"
+      apiKey: ""
+      headers:
+        Authorization: ""
+        cf-aig-authorization: "Bearer ${env:OC_CF_API_TOKEN}"
+        cf-aig-collect-log-payload: "true"
+        cf-aig-max-attempts: "1"
+        cf-aig-skip-cache: "true"
+    models:
+      # Keep this catalog in sync with cf-ai-gw-dynamic-routing/routes.
       dynamic/kimi-k2.7-code:
         name: Kimi K2.7 Code
       dynamic/kimi-k3:
         name: Kimi K3
+        variants: *kimi_k3_variants
       dynamic/glm-5.2:
         name: GLM 5.2
-      dynamic/gemini-3.1-pro-preview:
-        name: Gemini 3.1 Pro(Preview)
-      dynamic/gemini-3.5-flash:
-        name: Gemini 3.5 Flash
-      # dynamic/test:
-      #   name: test
-      # custom-nvidia/moonshotai/kimi-k2.6:
-      #   name: Kimi K2.6(Nvidia)
+        variants: *glm_variants
+      dynamic/glm-5.3:
+        name: GLM 5.3
+        variants: *glm_variants
+      dynamic/glm-5.3-flash:
+        name: GLM 5.3 Flash
+        variants: *glm_variants
+      dynamic/gemini-3.1-pro:
+        name: Gemini 3.1 Pro
+        variants: *gemini_variants
+      dynamic/gemini-3.5-flash-lite:
+        name: Gemini 3.5 Flash Lite
+        variants: *gemini_variants
+      dynamic/gemini-3.7-flash:
+        name: Gemini 3.7 Flash
+        variants: *gemini_variants
+      dynamic/gemini-3.8-flash:
+        name: Gemini 3.8 Flash
+        variants: *gemini_variants
+
+
+      # Free Endpoint
+      dynamic/kimi-k3:free:
+        name: Kimi K3 Free
+        variants: *kimi_k3_variants
+      dynamic/k2.6-code-preview-free:
+        name: Kimi 2.6 (Free)
+        variants: *kimi_k2_6_variants
+      dynamic/ox-alpha:free:
+        name: Ox Alpha Free
+      dynamic/glm-5.3:free:
+        name: GLM 5.3 Free
+        variants: *glm_variants
+      dynamic/deepseek-v4-flash:
+        name: DeepSeek V4 Flash
+        variants: *deepseek_v4_variants
+      dynamic/gemini-3.1-pro:free:
+        name: Gemini 3.1 Pro
+      dynamic/gemini-3.5-flash-lite:free:
+        name: Gemini 3.5 Flash-Lite
+      dynamic/gemini-3.7-flash:free:
+        name: Gemini 3.7 Flash
+      dynamic/gemini-3.8-flash:free:
+        name: Gemini 3.8 Flash
+
+  # Custom Provider with its provider-specific endpoint and the native OpenAI
+  # Responses API. Kept separate because this path intentionally needs
+  # @ai-sdk/openai rather than the generic Chat Completions-compatible client.
+  cloudflare-ai-gateway-octg:
+    # The native OpenAI SDK uses the Responses API, whose tool limit is higher
+    # than the Chat Completions API used by openai-compatible.
+    npm: "@ai-sdk/openai"
+    name: "Cloudflare AI Gateway (OCTG)"
+    options:
+      # @ai-sdk/openai requires a non-empty key, but the empty Authorization
+      # header makes Cloudflare AI Gateway use the Custom Provider's stored key.
+      apiKey: "cloudflare-custom-provider"
+      baseURL: "https://gateway.ai.cloudflare.com/v1/${env:OCTG_CF_ACCOUNT_ID}/${env:OCTG_CF_GATEWAY_ID}/custom-octg/v1"
+      headers:
+        Authorization: ""
+        cf-aig-authorization: "Bearer ${env:OCTG_CF_API_TOKEN}"
+        cf-aig-collect-log-payload: "true"
+        cf-aig-max-attempts: "1"
+        cf-aig-skip-cache: "true"
+    models:
+      gpt-5.6-luna:
+        name: GPT-5.6 Luna
+        variants:
+          <<: *gpt_variants
+          default:
+            reasoningEffort: max
+      gpt-5.6-terra:
+        name: GPT-5.6 Terra
+        variants:
+          <<: *gpt_variants
+          default:
+            reasoningEffort: high
+      gpt-5.6-sol:
+        name: GPT-5.6 Sol
+        variants:
+          <<: *gpt_variants
+          default:
+            reasoningEffort: high
+
   openai:
     whitelist:
-      - gpt-5.3-codex
-      - gpt-5.3-codex-spark
-      - gpt-5.4
-      - gpt-5.4-mini
-      - gpt-5.4-nano
-      - gpt-5.4-pro
-      - gpt-5.5
-      - gpt-5.5-pro
-      - gpt-5.6
       - gpt-5.6-luna
       - gpt-5.6-sol
       - gpt-5.6-terra
@@ -575,6 +925,11 @@ provider:
       - mimo-v2.5-free
       - north-mini-code-free
       - nemotron-3-ultra-free
+      - x-preview-f-free
+    models:
+      deepseek-v4-flash-free:
+        name: DeepSeek V4 Flash Free
+        variants: *deepseek_v4_variants
   amazon-bedrock:
     whitelist:
       - global.anthropic.claude-fable-5
@@ -598,6 +953,16 @@ provider:
       - openai.gpt-oss-20b-1:0
       - openai.gpt-oss-safeguard-120b
       - openai.gpt-oss-safeguard-20b
+  google:
+    whitelist:
+      - gemini-3.1-pro-preview
+      - gemini-3.6-flash
+      - gemini-3.5-flash-lite
+  opencode-go:
+    whitelist:
+      - kimi-k2.7-code
+      - kimi-k3
+      - ox-alpha-free
 experimental:
   batch_tool: true
   openTelemetry: true

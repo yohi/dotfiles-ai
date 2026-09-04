@@ -175,3 +175,29 @@ status-skillport: stats-skillport ## stats-skillport のエイリアス
 check-skillport-version: ## SkillPort のコンテナと PyPI のバージョンを比較
 	@echo "🔍 SkillPort のバージョン比較を確認中..."
 	@bash _scripts/check-skillport-version.sh
+
+# SkillPort MCP のスキルインデックスを冪等にビルド（スキル変更時のみ再構築）
+# skillport-mcp の should_reindex/build_index を再利用し、ハッシュ比較で変更検出する。
+index-skillport: ## SkillPort MCP のスキルインデックスをビルド（変更時のみ）
+	@echo "🚀 SkillPort スキルインデックスを確認・ビルド中..."
+	@cd "$(REPO_ROOT)" && \
+		SKILLPORT_INSTALLED=$$(uvx --from skillport-mcp==$(SKILLPORT_MCP_VERSION) python -c \
+			'from skillport.modules.indexing.public.index import build_index; \
+			 from skillport.shared.config import Config; \
+			 import json; \
+			 cfg = Config(skills_dir=".agents/skills"); \
+			 res = build_index(config=cfg); \
+			 print(json.dumps({"success": res.success, "skill_count": res.skill_count, "message": res.message}))' 2>/dev/null || echo '{"success": false, "skill_count": 0, "message": "unavailable"}'); \
+		SKILL_COUNT=$$(echo "$$SKILLPORT_INSTALLED" | python3 -c 'import sys,json; print(json.load(sys.stdin).get("skill_count", 0))'); \
+		MESSAGE=$$(echo "$$SKILLPORT_INSTALLED" | python3 -c 'import sys,json; print(json.load(sys.stdin).get("message", ""))'); \
+		SUCCESS=$$(echo "$$SKILLPORT_INSTALLED" | python3 -c 'import sys,json; print(str(json.load(sys.stdin).get("success", False)).lower())'); \
+		if [ "$$MESSAGE" = "unavailable" ]; then \
+			echo "⚠️  skillport-mcp が利用できないためインデックスを確認できません"; \
+		elif [ "$$SUCCESS" != "true" ]; then \
+			echo "❌ スキルインデックスのビルドに失敗しました: $$MESSAGE"; \
+			exit 1; \
+		elif [ "$$MESSAGE" = "unchanged" ] || [ "$$MESSAGE" = "no_state" ]; then \
+			echo "✅ スキルインデックスは最新です ($$SKILL_COUNT スキル)"; \
+		else \
+			echo "🔄 スキルインデックスを再ビルドしました ($$SKILL_COUNT スキル)"; \
+		fi

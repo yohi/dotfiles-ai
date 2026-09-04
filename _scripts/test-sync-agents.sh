@@ -3,59 +3,65 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+CATALOG="$REPO_ROOT/agent-skills/AVAILABLE_SKILLS.md"
+GLOBAL_RULES="$REPO_ROOT/global-rules/AGENTS.global.md"
+
 echo "Running Sync Agents Verification Tests..."
 
-# Backup current files
-cp "$REPO_ROOT/agent-skills/AVAILABLE_SKILLS.md" "$REPO_ROOT/agent-skills/AVAILABLE_SKILLS.md.bak"
-cp "$REPO_ROOT/global-rules/AGENTS.global.md" "$REPO_ROOT/global-rules/AGENTS.global.md.bak"
+cp "$CATALOG" "$CATALOG.bak"
+cp "$GLOBAL_RULES" "$GLOBAL_RULES.bak"
 
-# Ensure cleanup on exit
 cleanup() {
-    mv "$REPO_ROOT/agent-skills/AVAILABLE_SKILLS.md.bak" "$REPO_ROOT/agent-skills/AVAILABLE_SKILLS.md" || true
-    mv "$REPO_ROOT/global-rules/AGENTS.global.md.bak" "$REPO_ROOT/global-rules/AGENTS.global.md" || true
+    mv "$CATALOG.bak" "$CATALOG" || true
+    mv "$GLOBAL_RULES.bak" "$GLOBAL_RULES" || true
 }
 trap cleanup EXIT
 
-# Clear out the skills section to test if the script adds it back
-sed -i.tmp '/<available_skills>/,/<[/]available_skills>/d' "$REPO_ROOT/agent-skills/AVAILABLE_SKILLS.md"
-sed -i.tmp '/<available_skills>/,/<[/]available_skills>/d' "$REPO_ROOT/global-rules/AGENTS.global.md"
-rm -f "$REPO_ROOT/agent-skills/AVAILABLE_SKILLS.md.tmp" "$REPO_ROOT/global-rules/AGENTS.global.md.tmp"
+# Remove the generated section only from the dedicated catalog. The global
+# instruction file must stay compact and must never receive the full catalog.
+sed -i.tmp '/<!-- SKILLPORT_START -->/,/<!-- SKILLPORT_END -->/d' "$CATALOG"
+rm -f "$CATALOG.tmp"
 
-# Run sync_agents.sh
 bash "$REPO_ROOT/_scripts/sync_agents.sh" >/dev/null
 
-# Verify files
-readonly OUTPUT_FILES=(
-    "agent-skills/AVAILABLE_SKILLS.md"
-    "global-rules/AGENTS.global.md"
-)
+if ! grep -qF "<!-- SKILLPORT_START -->" "$CATALOG"; then
+    echo "FAIL: <!-- SKILLPORT_START --> marker not found in agent-skills/AVAILABLE_SKILLS.md"
+    exit 1
+fi
+if ! grep -qF "<!-- SKILLPORT_END -->" "$CATALOG"; then
+    echo "FAIL: <!-- SKILLPORT_END --> marker not found in agent-skills/AVAILABLE_SKILLS.md"
+    exit 1
+fi
+if ! grep -qF "<available_skills>" "$CATALOG"; then
+    echo "FAIL: <available_skills> not found in agent-skills/AVAILABLE_SKILLS.md"
+    exit 1
+fi
+if ! awk '/<available_skills>/, /<\/available_skills>/ { if ($0 ~ /<skill>/) { found=1; exit } } END { if (!found) exit 1 }' "$CATALOG"; then
+    echo "FAIL: <available_skills> section is empty or missing <skill> elements"
+    exit 1
+fi
+if ! grep -qF "External skills (anthropics/*, superpowers/*)" "$CATALOG"; then
+    echo "FAIL: External skills note not found in agent-skills/AVAILABLE_SKILLS.md"
+    exit 1
+fi
+if ! grep -qF "<name>pdf</name>" "$CATALOG"; then
+    echo "FAIL: pdf skill entry not found in agent-skills/AVAILABLE_SKILLS.md"
+    exit 1
+fi
 
-for f in "${OUTPUT_FILES[@]}"; do
-    if ! grep -qF "<!-- SKILLPORT_START -->" "$REPO_ROOT/$f"; then
-        echo "FAIL: <!-- SKILLPORT_START --> marker not found in $f"
-        exit 1
-    fi
-    if ! grep -qF "<!-- SKILLPORT_END -->" "$REPO_ROOT/$f"; then
-        echo "FAIL: <!-- SKILLPORT_END --> marker not found in $f"
-        exit 1
-    fi
-    if ! grep -qF "<available_skills>" "$REPO_ROOT/$f"; then
-        echo "FAIL: <available_skills> not found in $f"
-        exit 1
-    fi
-    # Check if <available_skills> section contains at least one <skill> element
-    if ! awk '/<available_skills>/, /<\/available_skills>/ { if ($0 ~ /<skill>/) { found=1; exit } } END { if (!found) exit 1 }' "$REPO_ROOT/$f"; then
-        echo "FAIL: <available_skills> section is empty or missing <skill> elements in $f"
-        exit 1
-    fi
-    if ! grep -qF "External skills (anthropics/*, superpowers/*)" "$REPO_ROOT/$f"; then
-        echo "FAIL: External skills note not found in $f"
-        exit 1
-    fi
-    if ! grep -qF "<name>pdf</name>" "$REPO_ROOT/$f"; then
-        echo "FAIL: pdf skill entry not found in $f"
-    fi
-    echo "PASS: $f verified."
-done
+# Context-footprint regression guard: the full catalog must not be embedded in
+# the always-on global instructions. The global file should only point to the
+# catalog / on-demand loader.
+if grep -qF "<!-- SKILLPORT_START -->" "$GLOBAL_RULES" || \
+   grep -qF "<available_skills>" "$GLOBAL_RULES"; then
+    echo "FAIL: global-rules/AGENTS.global.md contains an embedded skill catalog"
+    exit 1
+fi
+if ! grep -qF "agent-skills/AVAILABLE_SKILLS.md" "$GLOBAL_RULES"; then
+    echo "FAIL: global-rules/AGENTS.global.md no longer references the skill catalog"
+    exit 1
+fi
 
+echo "PASS: agent-skills/AVAILABLE_SKILLS.md verified."
+echo "PASS: global-rules/AGENTS.global.md remains compact."
 echo "🎉 All sync agents tests passed successfully!"

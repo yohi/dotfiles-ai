@@ -30,13 +30,13 @@ APM によって直接管理されるローカル知識ベース・長期記憶�
   - **Nexus**: プロジェクトコードの高速なセマンティック検索・インデックス管理。
 - **実装**: `apm.yml` で一括管理されます。
 
-### Atlassian MCP (Direct / Streamable HTTP)
+### Cloudflare MCP Portal (Direct / Streamable HTTP)
 
-Atlassian 製品 (Jira, Confluence) 用の公式 MCP サーバーです。
+Cloudflare One で管理されるリモート MCP ポータルです。
 
-- **ステータス**: 有効 (Gemini CLI / Claude Code から直接接続。
-  OAuth 認証をネイティブに処理)
-- **エンドポイント**: `https://mcp.atlassian.com/v1/mcp`
+- **ステータス**: 有効 (`apm.yml` で定義、各エージェントから利用可能)
+- **エンドポイント**: `https://personal.mcp.y-ohi.com/mcp`
+- **トランスポート**: `streamable-http`
 
 ---
 
@@ -71,7 +71,8 @@ Atlassian 製品 (Jira, Confluence) 用の公式 MCP サーバーです。
 ## 3. 各ツールの接続仕様リファレンス
 
 本プロジェクトでは **APM 直接管理** パターンを採用しており、
-各ツールは `apm.yml` で定義された stdio コマンドまたはリモート SSE URL を直接使用します。
+各ツールは `apm.yml` で定義された stdio コマンド、リモート SSE URL、または
+リモート Streamable HTTP URL を直接使用します。
 設定は `make sync-mcp` によって各エージェントの設定ファイルに自動反映されます。
 
 ### 接続設定キー・対応一覧
@@ -158,14 +159,14 @@ APM によって直接管理されます。
 | :--- | :--- | :--- |
 | **Greptile** | (非公開) | https://www.greptile.com/docs/mcp/setup |
 | **CodeGraph** | https://github.com/colbymchenry/codegraph | https://colbymchenry.github.io/codegraph/ |
-| **Nexus** | https://github.com/yohi/nexus | https://github.com/yohi/nexus/tree/v1.26.3 |
+| **Nexus** | https://github.com/yohi/nexus | https://github.com/yohi/nexus/tree/v2.0.0 |
 
 ### クラウド・API 統合系
 
 | サーバー | GitHub | ドキュメント |
 | :--- | :--- | :--- |
+| **Cloudflare MCP Portal** | (Cloudflare One) | https://developers.cloudflare.com/cloudflare-one/access-controls/ai-controls/mcp-portals/ |
 | **GitHub Official** | https://github.com/github/github-mcp-server | https://github.com/github/github-mcp-server/tree/main/docs |
-| **Atlassian Rovo** | https://github.com/atlassian/atlassian-mcp-server | https://support.atlassian.com/atlassian-rovo-mcp-server/ |
 | **Sentry** | https://github.com/getsentry/sentry-mcp | https://docs.sentry.io/product/sentry-mcp/ |
 
 ### AWS 統合系
