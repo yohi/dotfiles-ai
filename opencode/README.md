@@ -20,7 +20,7 @@ OpenCode プラットフォーム自体のコア設定ファイルです。
 - **`opencode.jsonc`**: `apm.yml` (SSOT) から自動生成されるため、直接編集せず `apm.yml` を編集して `make sync-opencode` を実行してください。このファイルは Git の追跡対象外です。
 - **`omo.jsonc`**: このファイルを直接編集してください。このファイルは OMO ネイティブプロファイルの SSOT として Git で追跡されています。
 
-## 3. 知能カテゴリーとエージェント (11 Specialists)
+## 3. 知能カテゴリーとエージェント (10 Specialists)
 
 Sisyphus（監督）は、タスクの性質に応じて最適な「知能カテゴリー」を選択し、専門エージェントを指揮します。
 
@@ -28,33 +28,34 @@ Sisyphus（監督）は、タスクの性質に応じて最適な「知能カテ
 
 タスクの難易度や種類に応じてモデルとパラメータを最適化する定義です。
 
-| カテゴリー | 特徴・バリアント | 想定される用途 | デフォルトモデル (personal) |
+| カテゴリー | 特徴・バリアント | 想定される用途 | デフォルトモデル (personal カタログ) |
 | :--- | :--- | :--- | :--- |
-| **ultrabrain** | `max` / 最強推論 | 複雑な計画立案、コード監査、アーキテクチャ設計、リスク分析。 | GPT-5.6 Sol (OCTG / OpenAI) |
-| **deep** | `high` / 自律解決 | 難解なバグ修正、機能実装、リファクタリングなど職人的作業。 | GPT-5.6 Terra (OCTG / OpenAI) |
-| **quick** | `low` / 高速応答 | ドキュメント検索、コード探索、些細な修正、プロトタイピング。 | GPT-5.6 Luna |
-| **visual-engineering** | UI/UX 特化 | UIデザイン解析、CSSアニメーション、フロントエンド最適化。 | Gemini 3.1 Pro |
-| **unspecified-high** | 高負荷汎用 | 特定の役割に当てはまらないが、高い知能を要する汎用作業。 | GPT-5.6 Luna (max) → Kimi K2.7 |
-| **unspecified-low** | 低負荷汎用 | 定形的な作業、単純なデータ変換などの低コストな汎用作業。 | GPT-5.6 Luna (high) → Kimi K2.7 |
-| **writing** | 文書作成 特化 | 技術解説、ドキュメンテーション、リリースノートの作成。 | Kimi K2.7 Code |
-| **artistry** | 創造性 特化 | ジェネラティブアート、クリエイティブな発想、芸術的表現。 | Gemini 3.1 Pro |
+| **ultrabrain** | `max` / 最強推論 | 複雑な計画立案、コード監査、アーキテクチャ設計、リスク分析。 | `sol-octg` |
+| **deep** | `high` / 自律解決 | 難解なバグ修正、機能実装、リファクタリングなど職人的作業。 | `terra-octg` |
+| **quick** | `low` / 高速応答 | ドキュメント検索、コード探索、些細な修正、プロトタイピング。 | `luna` |
+| **visual-engineering** | UI/UX 特化 | UIデザイン解析、CSSアニメーション、フロントエンド最適化。 | `gemini-pro` |
+| **unspecified-high** | 高負荷汎用 | 特定の役割に当てはまらないが、高い知能を要する汎用作業。 | `luna` |
+| **unspecified-low** | 低負荷汎用 | 定形的な作業、単純なデータ変換などの低コストな汎用作業。 | `luna` |
+| **writing** | 文書作成 特化 | 技術解説、ドキュメンテーション、リリースノートの作成。 | `kimi-k27` |
+| **artistry** | 創造性 特化 | ジェネレーティブアート、クリエイティブな発想、芸術的表現。 | `gemini-pro` |
 
 ### エージェント一覧とカテゴリー・マッピング
 
-各エージェントは役割を持ち、デフォルトで以下のモデル・フォールバックチェーンが割り当てられています（`personal` 構成）。
+各エージェントは役割を持ち、`personal` 構成では以下の実モデルが割り当てられています。
+フォールバックはエージェント単位ではなく、下記カテゴリーの `models` 配列で定義されます。
 
-| エージェント | カテゴリー | personal モデルチェーン (優先順) | 役割・専門領域 |
+| エージェント | カテゴリー | personal 実モデル (provider/model) | 役割・専門領域 |
 | :--- | :--- | :--- | :--- |
-| **Sisyphus** | `ultrabrain` | `kimi-k27` → `sol-octg` (medium) → `sol` (medium) | 司令塔。全体の品質管理、タスクの分解と委譲。 |
-| **Hephaestus** | `deep` | `sol-octg` (medium) → `sol` (medium) | 実装職人。自律的なコードの書き込み、複雑なロジック実装。 |
-| **Oracle** | `ultrabrain` | `terra-octg` (high) → `terra` (high) → `luna` (max) | 賢者。アーキテクチャ設計の相談、難解なバグのデバッグ。 |
-| **Librarian** | `quick` | `luna` (low) | 司書。外部ドキュメントやOSSの実装例の高速検索。 |
-| **Explore** | `quick` | `luna` (low) | 探検家。コードベースの高速探索、grep検索、スキャフォールディング。 |
-| **Prometheus** | `ultrabrain` | `kimi-k27` → `sol-octg` (high) → `sol` (high) | 流れ者。タスクの分解と並列実行計画の作成。 |
-| **Metis** | `ultrabrain` | `kimi-k27` → `kimi-k26` | 計画コンサル。計画前のリスク特定と曖昧さの排除。 |
-| **Momus** | `ultrabrain` | `terra-octg` (high) → `terra` (high) → `luna` (max) | 計画レビュアー。Prometheusが作成した計画の厳格な検証。 |
-| **Atlas** | `ultrabrain` | `kimi-k27` → `sol-octg` (medium) → `sol` (medium) | 現場監督。環境管理、Todo項目の体系的な管理と調整。 |
-| **Multimodal-Looker** | `ultrabrain` | `gemini-pro` (high) → `kimi-k27` | 視覚アナリスト。UIデザイン、画像、図解、PDFの解析。 |
+| **Sisyphus** | `ultrabrain` | `cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.7-code`; ultrawork: `openai/gpt-5.6-sol` (high) | 司令塔。全体の品質管理、タスクの分解と委譲。 |
+| **Hephaestus** | `deep` | `cloudflare-ai-gateway-octg/gpt-5.6-sol` | 実装職人。自律的なコードの書き込み、複雑なロジック実装。 |
+| **Oracle** | `ultrabrain` | `cloudflare-ai-gateway-octg/gpt-5.6-terra` | 賢者。アーキテクチャ設計の相談、難解なバグのデバッグ。 |
+| **Librarian** | `quick` | `openai/gpt-5.6-luna` | 司書。外部ドキュメントやOSSの実装例の高速検索。 |
+| **Explore** | `quick` | `openai/gpt-5.6-luna` | 探検家。コードベースの高速探索、grep検索、スキャフォールディング。 |
+| **Multimodal-Looker** | `ultrabrain` | `cloudflare-ai-gateway/google-ai-studio/gemini-3.1-pro` | 視覚アナリスト。UIデザイン、画像、図解、PDFの解析。 |
+| **Prometheus** | `ultrabrain` | `cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.7-code` | 流れ者。タスクの分解と並列実行計画の作成。 |
+| **Metis** | `ultrabrain` | `cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.7-code` | 計画コンサル。計画前のリスク特定と曖昧さの排除。 |
+| **Momus** | `ultrabrain` | `cloudflare-ai-gateway-octg/gpt-5.6-terra` | 計画レビュアー。Prometheusが作成した計画の厳格な検証。 |
+| **Atlas** | `ultrabrain` | `cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.7-code` | 現場監督。環境管理、Todo項目の体系的な管理と調整。 |
 
 ## 4. LLMモデル選択のベストプラクティス
 
@@ -69,6 +70,9 @@ Sisyphus（監督）は、タスクの性質に応じて最適な「知能カテ
 | **視覚推論型** | **UI・構造理解。** デザイン解析、CSS、レイアウトの理解に特化。 | Gemini Family | Looker |
 
 ### カテゴリー別・モデルルーティング一覧
+
+表中の短縮名は `omo.jsonc` の `models` カタログのキーであり、実行時には対応する
+`provider/model` 完全修飾名へ解決されます。
 
 | カテゴリー | personal デフォルト | personal フォールバックチェーン | work (Bedrock) |
 | :--- | :--- | :--- | :--- |
@@ -117,7 +121,7 @@ PROFILE=personal opencode
 
 ### 実装されている機能
 - **空きポートの自動検出**: `ss` または `lsof` を使用し、4090-4100 の範囲で未使用のポートを自動的に探し、`--port` 引数として付与します。
-- **プロファイルの自動ロード**: `PROFILE` 環境変数が指定されている場合、`opencode/{PROFILE}.env` を自動的に `export` します（未指定時はデフォルトで `personal` プロファイルをロードします）。
+- **プロファイルの自動ロード**: `PROFILE` 環境変数またはランチャー引数を `OMO_PROFILE` に変換して OMO ネイティブプロファイルを選択します（未指定時はデフォルトで `personal` プロファイルをロードします）。プロファイル用envファイルは読み込みません。
 
 ### 使用例
 ```bash

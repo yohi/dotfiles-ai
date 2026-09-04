@@ -98,6 +98,14 @@ def _normalize_opencode_json_data(data: dict[str, Any]) -> dict[str, Any]:
     return normalized
 
 
+def _apply_generated_fields(data: dict[str, Any], cfg: dict[str, Any]) -> None:
+    """Apply the fields generated from apm.yml to an existing config."""
+    data["mcp"] = cfg.get("mcp", {})
+    for key in ("agent", "provider", "enabled_providers"):
+        if key in cfg:
+            data[key] = cfg[key]
+
+
 def _build_mcp_section(mcp_entries: list[dict[str, Any]]) -> dict[str, Any]:
     mcp: dict[str, Any] = {}
     for entry in mcp_entries:
@@ -350,7 +358,7 @@ def main() -> None:
         if opencode_json.exists():
             try:
                 data = json.loads(opencode_json.read_text(encoding="utf-8"))
-                data["mcp"] = cfg.get("mcp", {})
+                _apply_generated_fields(data, cfg)
                 normalised = _normalize_opencode_json_data(data)
                 expected = json.dumps(normalised, indent=2, ensure_ascii=False) + "\n"
                 actual = json.dumps(data, indent=2, ensure_ascii=False) + "\n"
@@ -371,13 +379,7 @@ def main() -> None:
     if opencode_json.exists():
         try:
             data = json.loads(opencode_json.read_text(encoding="utf-8"))
-            data["mcp"] = cfg.get("mcp", {})
-            if "agent" in cfg:
-                data["agent"] = cfg["agent"]
-            if "provider" in cfg:
-                data["provider"] = cfg["provider"]
-            if "enabled_providers" in cfg:
-                data["enabled_providers"] = cfg["enabled_providers"]
+            _apply_generated_fields(data, cfg)
             normalized = _normalize_opencode_json_data(data)
             opencode_json.write_text(
                 json.dumps(normalized, indent=2, ensure_ascii=False) + "\n",

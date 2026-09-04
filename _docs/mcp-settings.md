@@ -2,7 +2,8 @@
 
 このプロジェクトでは、すべての MCP サーバーを `apm.yml` で定義し、
 `make sync-mcp` によって各クライアントの設定ファイルを生成します。
-各ツールは直接 stdio プロセスまたはリモート SSE エンドポイントに接続します。
+各ツールは直接 stdio プロセス、リモート SSE、またはリモート Streamable HTTP
+エンドポイントに接続します。
 
 ## 共通設定
 
@@ -35,7 +36,6 @@ make sync-mcp
 - `aws-api` — `uvx awslabs.aws-api-mcp-server`
 - `aws-cdk-mcp-server` — `uvx awslabs.cdk-mcp-server`
 - `aws-diagram` — `uvx awslabs.aws-diagram-mcp-server`
-- `cf-mcp-portal-personal` — `https://personal.mcp.y-ohi.com/mcp`
-- `sentry-remote` — `https://mcp.sentry.dev/mcp`
+- `cf-mcp-portal-personal` — Streamable HTTP: `https://personal.mcp.y-ohi.com/mcp`
+- `sentry-remote` — SSE: `https://mcp.sentry.dev/mcp`
 - 既存の `nexus`, `chronos-graph`, `skillport` 等
-
