@@ -630,6 +630,18 @@ x-variants:
         thinking:
           type: disabled
 
+  gemini_variants: &gemini_variants
+    default:
+      reasoningEffort: low
+    low:
+      reasoningEffort: low
+    medium:
+      reasoningEffort: medium
+    high:
+      reasoningEffort: high
+    none:
+      reasoningEffort: none
+
 provider:
   # 1. Cloudflare AI Gateway built-in providers.
   # Provider credentials are resolved by AI Gateway (BYOK / Unified Billing);
@@ -664,10 +676,13 @@ provider:
       # Google AI Studio
       google-ai-studio/gemini-3.5-flash-lite:
         name: Gemini 3.5 Flash-Lite
+        variants: *gemini_variants
       google-ai-studio/gemini-3.8-flash:
         name: Gemini 3.8 Flash
+        variants: *gemini_variants
       google-ai-studio/gemini-3.1-pro:
         name: Gemini 3.1 Pro
+        variants: *gemini_variants
 
       # OpenRouter
       openrouter/z-ai/glm-5.2:Free:
@@ -815,8 +830,37 @@ provider:
       dynamic/glm-5.2:
         name: GLM 5.2
         variants: *glm_variants
+      dynamic/glm-5.3:
+        name: GLM 5.3
+        variants: *glm_variants
       dynamic/glm-5.3-flash:
         name: GLM 5.3 Flash
+        variants: *glm_variants
+      dynamic/gemini-3.1-pro:
+        name: Gemini 3.1 Pro
+        variants: *gemini_variants
+      dynamic/gemini-3.5-flash-lite:
+        name: Gemini 3.5 Flash Lite
+        variants: *gemini_variants
+      dynamic/gemini-3.7-flash:
+        name: Gemini 3.7 Flash
+        variants: *gemini_variants
+      dynamic/gemini-3.8-flash:
+        name: Gemini 3.8 Flash
+        variants: *gemini_variants
+
+
+      # Free Endpoint
+      dynamic/kimi-k3:free:
+        name: Kimi K3 Free
+        variants: *kimi_k3_variants
+      dynamic/k2.6-code-preview-free:
+        name: Kimi 2.6 (Free)
+        variants: *kimi_k2_6_variants
+      dynamic/ox-alpha:free:
+        name: Ox Alpha Free
+      dynamic/glm5.3:free:
+        name: GLM 5.3 Free
         variants: *glm_variants
       dynamic/deepseek-v4-flash:
         name: DeepSeek V4 Flash
