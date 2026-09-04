@@ -475,6 +475,12 @@ compaction:
   tail_turns: 3
   prune: true
 
+# Keep large tool results out of the rolling conversation while preserving the
+# full payload on disk for targeted Grep/Read or Explore delegation.
+tool_output:
+  max_lines: 800
+  max_bytes: 24576
+
 share: manual
 
 lsp:
@@ -514,6 +520,9 @@ lsp:
     command: ["eslint", "--format", "stylish", "--max-warnings", "0"]
     extensions: [".ts", ".tsx", ".js", ".jsx"]
 
+# Keep the shared global rules in the APM SSOT so every supported AI agent can
+# receive the same instructions. The rules file itself stays lightweight and
+# points to the skill catalog instead of embedding it.
 instructions:
   - global-rules/AGENTS.global.md
   - .agents/skills/superpowers/using-superpowers/SKILL.md
@@ -525,6 +534,10 @@ watcher:
     - "**/coverage/**"
     - "**/*.lock"
     - "**/.git/**"
+    - "**/.superpowers/**"
+    - "**/.sisyphus/**"
+    - "**/.work/**"
+    - "**/.worktrees/**"
 
 enabled_providers:
   - openai
@@ -779,9 +792,9 @@ provider:
         name: Kimi K3 Free (Nvidia)
         variants: *kimi_k3_variants
 
-  # 3. Cloudflare Dynamic Routes. Dynamic Routing currently requires the
-  # OpenAI-compatible /compat/chat/completions endpoint and cannot use the
-  # REST API path selected by the native Cloudflare provider.
+  # 3. Cloudflare Dynamic Routes. Keep this catalog synchronized with the
+  # deployed route IDs in yohi/cf-ai-gw-dynamic-routing. Active OmO K2.7
+  # traffic remains pinned to Ollama until the Sakura A/B validation completes.
   cloudflare-ai-gateway-dynamic:
     npm: "@ai-sdk/openai-compatible"
     name: "Cloudflare AI Gateway (Dynamic)"
@@ -795,32 +808,28 @@ provider:
         cf-aig-max-attempts: "1"
         cf-aig-skip-cache: "true"
     models:
-      dynamic/kimi-k2.6:
-        name: Kimi K2.6
-        variants: *kimi_k2_6_variants
       dynamic/kimi-k2.7-code:
         name: Kimi K2.7 Code
       dynamic/kimi-k3:
         name: Kimi K3
         variants: *kimi_k3_variants
-      dynamic/kimi-k3:free:
-        name: Kimi K3 Free
-        variants: *kimi_k3_variants
       dynamic/glm-5.2:
         name: GLM 5.2
         variants: *glm_variants
-      dynamic/gemini-3.1-pro-preview:
-        name: Gemini 3.1 Pro Preview
-      dynamic/gemini-3.5-flash:
-        name: Gemini 3.5 Flash
-      dynamic/k2.6-code-preview-free:
-        name: Kimi 2.6 (Free)
-        variants: *kimi_k2_6_variants
-      dynamic/ox-alpha:free:
-        name: Ox Alpha Free
-      dynamic/glm5.3:free:
-        name: GLM 5.3 Free
+      dynamic/glm-5.3-flash:
+        name: GLM 5.3 Flash
         variants: *glm_variants
+      dynamic/deepseek-v4-flash:
+        name: DeepSeek V4 Flash
+        variants: *deepseek_v4_variants
+      dynamic/gemini-3.1-pro:
+        name: Gemini 3.1 Pro
+      dynamic/gemini-3.5-flash-lite:
+        name: Gemini 3.5 Flash-Lite
+      dynamic/gemini-3.7-flash:
+        name: Gemini 3.7 Flash
+      dynamic/gemini-3.8-flash:
+        name: Gemini 3.8 Flash
 
   # Custom Provider with its provider-specific endpoint and the native OpenAI
   # Responses API. Kept separate because this path intentionally needs
