@@ -51,7 +51,7 @@ Portal側には、次のリモート上流MCPを登録して集約します。
 | AWS Managed | `https://aws-mcp.us-east-1.api.aws/mcp?oauth=initialize` | AWS連携 |
 | Sentry Remote | `https://mcp.sentry.dev/mcp` | Sentry連携 |
 
-上流の登録、認証、`Ready` 状態の確認はCloudflare Dashboardで行います。ExaはPortalのCustom Headersに `x-api-key` を設定し、Tavilyは公式仕様に従う認証方式をPortal側で設定します。APIキーやOAuthシークレットはこのリポジトリへ記載しません。
+上流の登録、認証、`Ready` 状態の確認はCloudflare Dashboardで行います。ExaはPortalのCustom Headersに `x-api-key` を設定します。APIキーやOAuthシークレットはこのリポジトリへ記載しません。
 Portalの仕様は [MCP server portals](https://developers.cloudflare.com/cloudflare-one/access-controls/ai-controls/mcp-portals/)、保護設定は [Secure MCP servers](https://developers.cloudflare.com/cloudflare-one/access-controls/ai-controls/secure-mcp-servers/)、内部アプリ連携は [Linked Apps](https://developers.cloudflare.com/cloudflare-one/access-controls/ai-controls/linked-apps/) を参照します。
 `optimize_context=search_and_execute` は別機能のContext optimizationであり、Code Modeの指定には使用しません。
 GitHub Official、Greptile、AWS Managed、Sentry RemoteのAPM直接接続は無効化し、Portal経由に統一します。
@@ -134,10 +134,17 @@ APM によって直接管理されます。
 
 1. Cloudflare Dashboardの **Zero Trust > Access controls > AI controls >
    MCP servers** で、上流サーバーが `Ready` であることを確認する。
-2. 個人用Portalへ必要な上流サーバーとツールだけを追加する。
-3. `portal_list_servers` でPortalから上流一覧を確認する。
-4. 代表ツールを呼び出してから、クライアント側の直接リモートMCPを有効化しない。
-5. ローカルstdio MCPは従来どおり `make sync-mcp` で同期する。
+2. `cf-mcp-portal` へ必要な上流サーバーとツールだけを追加する。
+3. `apm.yml` 内の直接リモートMCP（`greptile`、`github-official`、`aws-mcp`、`sentry-remote`）が
+   `enabled: false` になっていることを確認する。
+4. クライアント側の生成済み設定ファイル（`.claude.json`、`.cursor/mcp.json`、
+   `ide/vscode/settings.json` 等）から、これらの直接リモートMCPエントリを
+   削除または無効化する。
+5. `make sync-mcp` を実行し、直接リモートMCPの無効化とローカルstdio MCPの同期を
+   再反映する。
+6. `portal_list_servers` でPortalから上流一覧を確認し、直接接続とPortal接続が
+   重複していないことを確認する。
+7. Portal経由で代表ツールを呼び出し、応答を確認する。
 
 ---
 
