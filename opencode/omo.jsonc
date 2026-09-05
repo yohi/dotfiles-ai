@@ -207,6 +207,13 @@
       "CHRONOS_EMBEDDING_DIMENSION"
     ],
 
+    // Cloudflare MCP Portalへ集約するリモートMCPをOmOから無効化
+    "disabled_mcps": [
+      "websearch",
+      "context7",
+      "grep_app"
+    ],
+
     // =========================================================================
     // Base Agents (デフォルト: personal 構成)
     //

@@ -5,19 +5,19 @@ MCP サーバーの設定、管理スクリプト、および接続仕様のリ�
 
 ## 1. 設定済み MCP サーバー
 
-### APM 直接管理 MCP サーバー
+### APM 直接管理 MCP サーバー（ローカル stdio）
 
 すべての MCP サーバーは `apm.yml` の `dependencies.mcp` で定義され、
 `make sync-mcp` によって各エージェントの設定ファイルに反映されます。
-主なサーバーは以下の通りです。
+主なローカルサーバーは以下の通りです。
 
 - **Filesystem**: プロジェクトルート以下のファイルアクセス。
 - **SQLite**: ローカル DB 操作 (`${HOME}/.mcp/sqlite/sqlite.db`)。
 - **Sequential Thinking**: 複雑な思考プロセスの補助。
-- **GitHub Official**: GitHub 連携。
-- **AWS API / CDK / Diagram / Documentation / Terraform**: AWS 関連支援。
-- **Sentry Remote**: Sentry リモート連携。
 - **Skillport**: エージェントスキルの検索・ロード。
+- **AWS IaC / AWS Documentation**: ローカル `uvx` 実行。
+- **SonarQube / Semgrep**: ローカル CLI と連携した品質・セキュリティ分析。
+- **LSP / CodeGraph**: ローカルコード解析。
 
 ### Chronos Graph & Nexus (Direct APM)
 
@@ -35,8 +35,26 @@ APM によって直接管理されるローカル知識ベース・長期記憶�
 Cloudflare One で管理されるリモート MCP ポータルです。
 
 - **ステータス**: 有効 (`apm.yml` で定義、各エージェントから利用可能)
-- **エンドポイント**: `https://personal.mcp.y-ohi.com/mcp`
+- **エンドポイント**: `https://mcp.y-ohi.com/mcp?codemode=search_and_execute`
 - **トランスポート**: `streamable-http`
+- **Code Mode**: `codemode=search_and_execute` をPortal URLに指定し、上流ツールをCode Mode経由で利用します。
+
+Portal側には、次のリモート上流MCPを登録して集約します。
+
+| 上流MCP | URL | 用途 |
+| :--- | :--- | :--- |
+| Exa | `https://mcp.exa.ai/mcp?tools=web_search_exa` | Web検索 |
+| Context7 | `https://mcp.context7.com/mcp` | ライブラリドキュメント検索 |
+| grep.app | `https://mcp.grep.app` | GitHubコード検索 |
+| Greptile | `https://api.greptile.com/mcp` | コードレビュー・解析 |
+| GitHub Official | `https://api.githubcopilot.com/mcp/` | GitHub連携 |
+| AWS Managed | `https://aws-mcp.us-east-1.api.aws/mcp?oauth=initialize` | AWS連携 |
+| Sentry Remote | `https://mcp.sentry.dev/mcp` | Sentry連携 |
+
+上流の登録、認証、`Ready` 状態の確認はCloudflare Dashboardで行います。ExaはPortalのCustom Headersに `x-api-key` を設定し、Tavilyは公式仕様に従う認証方式をPortal側で設定します。APIキーやOAuthシークレットはこのリポジトリへ記載しません。
+Portalの仕様は [MCP server portals](https://developers.cloudflare.com/cloudflare-one/access-controls/ai-controls/mcp-portals/)、保護設定は [Secure MCP servers](https://developers.cloudflare.com/cloudflare-one/access-controls/ai-controls/secure-mcp-servers/)、内部アプリ連携は [Linked Apps](https://developers.cloudflare.com/cloudflare-one/access-controls/ai-controls/linked-apps/) を参照します。
+`optimize_context=search_and_execute` は別機能のContext optimizationであり、Code Modeの指定には使用しません。
+GitHub Official、Greptile、AWS Managed、Sentry RemoteのAPM直接接続は無効化し、Portal経由に統一します。
 
 ---
 
@@ -70,9 +88,9 @@ Cloudflare One で管理されるリモート MCP ポータルです。
 
 ## 3. 各ツールの接続仕様リファレンス
 
-本プロジェクトでは **APM 直接管理** パターンを採用しており、
-各ツールは `apm.yml` で定義された stdio コマンド、リモート SSE URL、または
-リモート Streamable HTTP URL を直接使用します。
+本プロジェクトでは **APM + Cloudflare MCP Portal** パターンを採用しています。
+ローカルMCPは `apm.yml` で定義された stdio コマンドを直接使用し、リモートMCPは
+Cloudflare MCP PortalのStreamable HTTP URLへ集約します。
 設定は `make sync-mcp` によって各エージェントの設定ファイルに自動反映されます。
 
 ### 接続設定キー・対応一覧
@@ -111,6 +129,15 @@ APM によって直接管理されます。
 
 - **`make sync-mcp`**: `apm install` を実行し、`apm.yml` の定義に基づいて
   各エージェントの MCP 設定ファイルを同期。
+
+### Portal移行後の確認手順
+
+1. Cloudflare Dashboardの **Zero Trust > Access controls > AI controls >
+   MCP servers** で、上流サーバーが `Ready` であることを確認する。
+2. 個人用Portalへ必要な上流サーバーとツールだけを追加する。
+3. `portal_list_servers` でPortalから上流一覧を確認する。
+4. 代表ツールを呼び出してから、クライアント側の直接リモートMCPを有効化しない。
+5. ローカルstdio MCPは従来どおり `make sync-mcp` で同期する。
 
 ---
 
