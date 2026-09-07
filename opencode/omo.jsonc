@@ -128,7 +128,8 @@
         "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k3": 1,
         "cloudflare-ai-gateway-custom/custom-ollama-cloud/glm-5.2": 2,
         "cloudflare-ai-gateway-custom/custom-ollama-cloud/glm-5.3-flash": 4,
-        "cloudflare-ai-gateway-custom/custom-aihubmix/gemini-3.7-flash-free": 2,
+        "cloudflare-ai-gateway-custom/custom-command-code/deepseek/deepseek-v4-flash": 5,
+        "cloudflare-ai-gateway-custom/custom-aihubmix/gemini-3.1-pro-preview": 2,
         "cloudflare-ai-gateway-octg/gpt-5.6-sol": 1,
         "cloudflare-ai-gateway-octg/gpt-5.6-terra": 2
       }
@@ -283,8 +284,8 @@
         "model": "openai/gpt-5.6-luna"
       },
       "multimodal-looker": {
-        // "model": "gemini-flash",
-        "model": "cloudflare-ai-gateway-custom/custom-aihubmix/gemini-3.7-flash-free"
+        // "model": "gemini-pro",
+        "model": "cloudflare-ai-gateway-custom/custom-aihubmix/gemini-3.1-pro-preview"
       },
       "prometheus": {
         // "model": "kimi-k27",
@@ -311,6 +312,7 @@
     // - OCTG Sol STANDARD (1M tokens/day) は高価値・低頻度のultrabrain中心に温存する。
     // - Plus Luna/maxは高スループットなTDD / 汎用作業に積極的に使う。
     // - OpenAI以外のpersonal modelはcloudflare-ai-gateway-custom経由に統一する。
+    // - Dynamic Routes停止中もモデルの役割は維持し、同一モデルをCustom Provider直結で使う。
     // - Full GLM-5.3はGLM-5.2との役割重複が大きいため現状ルーティング対象外。
     //   GLM-5.2を substantial coding、GLM-5.3 Flashをagentic-fast用途に分離する。
     // =========================================================================
@@ -376,10 +378,9 @@
             "reasoning": "low"
           },
           {
-            // Dynamic Routes停止中はdirect OpenCode providerを使わず、
-            // Custom Provider経由のGLM-5.3 Flashを軽量fallbackにする。
-            // "model": "glm-53-flash",
-            "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/glm-5.3-flash"
+            // Dynamic Routes停止中も高速・大容量utility枠はDeepSeek V4 Flashを維持する。
+            // "model": "deepseek-v4-flash",
+            "model": "cloudflare-ai-gateway-custom/custom-command-code/deepseek/deepseek-v4-flash"
           }
         ]
       },
@@ -428,13 +429,14 @@
         ]
       },
       "visual-engineering": {
-        // "model": "gemini-flash",
-        "model": "cloudflare-ai-gateway-custom/custom-aihubmix/gemini-3.7-flash-free",
+        // "model": "gemini-pro",
+        "model": "cloudflare-ai-gateway-custom/custom-aihubmix/gemini-3.1-pro-preview",
         "models": [
           {
-            // Geminiもbuilt-in providerを使わずCustom Providerへ統一する。
-            // "model": "gemini-flash",
-            "model": "cloudflare-ai-gateway-custom/custom-aihubmix/gemini-3.7-flash-free"
+            // Gemini 3.1 Proの視覚・UI設計役割を維持しつつCustom Providerを通す。
+            // "model": "gemini-pro",
+            "model": "cloudflare-ai-gateway-custom/custom-aihubmix/gemini-3.1-pro-preview",
+            "reasoning": "high"
           },
           {
             // "model": "kimi-k27",
@@ -443,13 +445,14 @@
         ]
       },
       "artistry": {
-        // "model": "gemini-flash",
-        "model": "cloudflare-ai-gateway-custom/custom-aihubmix/gemini-3.7-flash-free",
+        // "model": "gemini-pro",
+        "model": "cloudflare-ai-gateway-custom/custom-aihubmix/gemini-3.1-pro-preview",
         "models": [
           {
-            // Geminiもbuilt-in providerを使わずCustom Providerへ統一する。
-            // "model": "gemini-flash",
-            "model": "cloudflare-ai-gateway-custom/custom-aihubmix/gemini-3.7-flash-free"
+            // Gemini 3.1 Proの高品質生成役割を維持しつつCustom Providerを通す。
+            // "model": "gemini-pro",
+            "model": "cloudflare-ai-gateway-custom/custom-aihubmix/gemini-3.1-pro-preview",
+            "reasoning": "high"
           },
           {
             // "model": "kimi-k27",
@@ -466,7 +469,7 @@
   // ※ OMO の論理カタログ定義。上述の通りサブエージェント実行時の不整合回避のため、
   //   agents / categories 側には provider/model 完全修飾名を直接記述しています。
   // ※ Dynamic Routes停止中は、OpenAI以外のpersonal model aliasを
-  //   cloudflare-ai-gateway-custom配下の直結先へ向ける。
+  //   cloudflare-ai-gateway-custom配下の同一モデル直結先へ向ける。
   // ===========================================================================
   "models": {
     "kimi-k27": {
@@ -480,6 +483,9 @@
     },
     "glm-53-flash": {
       "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/glm-5.3-flash"
+    },
+    "deepseek-v4-flash": {
+      "model": "cloudflare-ai-gateway-custom/custom-command-code/deepseek/deepseek-v4-flash"
     },
     "kimi-k26": {
       "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.6"
@@ -499,8 +505,8 @@
     "luna": {
       "model": "openai/gpt-5.6-luna"
     },
-    "gemini-flash": {
-      "model": "cloudflare-ai-gateway-custom/custom-aihubmix/gemini-3.7-flash-free"
+    "gemini-pro": {
+      "model": "cloudflare-ai-gateway-custom/custom-aihubmix/gemini-3.1-pro-preview"
     }
   },
 
