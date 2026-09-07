@@ -129,14 +129,16 @@ OCTG の STANDARD pool は 1M tokens / UTC day と小さいため、すべての
 - **`profiles.personal`**: OpenAI、Kimi、GLM、DeepSeek、Gemini を組み合わせた個人・検証向け構成。
 
 ### 適用方法
-`opencode-wrapper.sh` が設定する `OMO_PROFILE` を使って起動してください。
+OpenCode を直接起動する場合は `OMO_PROFILE` を指定します。リポジトリの wrapper を利用する場合は `PROFILE` を渡すと、wrapper が内部で `OMO_PROFILE` に変換します。
 
 ```bash
-# 業務用構成（Bedrock）に切り替える場合
-PROFILE=work opencode
+# OpenCode を直接起動する場合
+OMO_PROFILE=work opencode
+OMO_PROFILE=personal opencode
 
-# 個人用構成で起動
-PROFILE=personal opencode
+# リポジトリの wrapper を利用する場合
+PROFILE=work _scripts/opencode-wrapper.sh
+PROFILE=personal _scripts/opencode-wrapper.sh
 ```
 
 この方法により、`omo.jsonc` を書き換えることなく、推論エンジンのスタックを切り替えられます。
