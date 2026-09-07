@@ -20,6 +20,22 @@ OpenCode プラットフォーム自体のコア設定ファイルです。
 - **`opencode.jsonc`**: `apm.yml` (SSOT) から自動生成されるため、直接編集せず `apm.yml` を編集して `make sync-opencode` を実行してください。このファイルは Git の追跡対象外です。
 - **`omo.jsonc`**: このファイルを直接編集してください。このファイルは OMO ネイティブプロファイルの SSOT として Git で追跡されています。
 
+### personal のモデル選択とプロバイダー選択の責務分離
+
+`personal` では、OmO と Cloudflare AI Gateway Dynamic Routing の責務を分離します。
+
+```text
+OmO
+  task / category から LLM モデルを選択
+       ↓
+Cloudflare AI Gateway Dynamic Route
+  同じ LLM モデルを維持したまま provider を選択 / failover
+```
+
+Kimi K2.7 / K3、GLM-5.2 / GLM-5.3 Flash、DeepSeek V4 Flash は `cloudflare-ai-gateway-dynamic/dynamic/*` を利用します。Sakura / Ollama / OpenCode Go / Command Code GOAT の選択は OmO では行わず、`cf-ai-gw-dynamic-routing` 側の同一モデル Route に委譲します。
+
+Sisyphus-Junior は意図的に固定モデルを設定しません。category-routed task では、選択された category のモデルを引き継がせます。
+
 ## 3. 知能カテゴリーとエージェント (10 Specialists)
 
 Sisyphus（監督）は、タスクの性質に応じて最適な「知能カテゴリー」を選択し、専門エージェントを指揮します。
@@ -34,7 +50,7 @@ Sisyphus（監督）は、タスクの性質に応じて最適な「知能カテ
 | **deep** | `high` / 自律解決 | 難解なバグ修正、機能実装、リファクタリングなど職人的作業。 | `terra-octg` |
 | **quick** | `low` / 高速応答 | ドキュメント検索、コード探索、些細な修正、プロトタイピング。 | `luna` |
 | **visual-engineering** | UI/UX 特化 | UIデザイン解析、CSSアニメーション、フロントエンド最適化。 | `gemini-pro` |
-| **unspecified-high** | 高負荷汎用 | 特定の役割に当てはまらないが、高い知能を要する汎用作業。 | `luna` |
+| **unspecified-high** | 高負荷汎用 | 特定の役割に当てはまらないが、高い知能を要する汎用作業。 | `glm-52` |
 | **unspecified-low** | 低負荷汎用 | 定形的な作業、単純なデータ変換などの低コストな汎用作業。 | `luna` |
 | **writing** | 文書作成 特化 | 技術解説、ドキュメンテーション、リリースノートの作成。 | `kimi-k27` |
 | **artistry** | 創造性 特化 | ジェネレーティブアート、クリエイティブな発想、芸術的表現。 | `gemini-pro` |
@@ -42,20 +58,19 @@ Sisyphus（監督）は、タスクの性質に応じて最適な「知能カテ
 ### エージェント一覧とカテゴリー・マッピング
 
 各エージェントは役割を持ち、`personal` 構成では以下の実モデルが割り当てられています。
-フォールバックはエージェント単位ではなく、下記カテゴリーの `models` 配列で定義されます。
 
 | エージェント | カテゴリー | personal 実モデル (provider/model) | 役割・専門領域 |
 | :--- | :--- | :--- | :--- |
-| **Sisyphus** | `ultrabrain` | `cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.7-code`; ultrawork: `openai/gpt-5.6-sol` (high) | 司令塔。全体の品質管理、タスクの分解と委譲。 |
-| **Hephaestus** | `deep` | `cloudflare-ai-gateway-octg/gpt-5.6-sol` | 実装職人。自律的なコードの書き込み、複雑なロジック実装。 |
+| **Sisyphus** | `ultrabrain` | `cloudflare-ai-gateway-dynamic/dynamic/kimi-k2.7-code`; ultrawork: `openai/gpt-5.6-sol` (high) | 司令塔。全体の品質管理、タスクの分解と委譲。 |
+| **Hephaestus** | `deep` | `openai/gpt-5.6-sol` → OCTG Sol | 実装職人。反復量が多いため Plus Sol を主系とし、OCTG STANDARD を枯渇させにくくする。 |
 | **Oracle** | `ultrabrain` | `cloudflare-ai-gateway-octg/gpt-5.6-terra` | 賢者。アーキテクチャ設計の相談、難解なバグのデバッグ。 |
 | **Librarian** | `quick` | `openai/gpt-5.6-luna` | 司書。外部ドキュメントやOSSの実装例の高速検索。 |
 | **Explore** | `quick` | `openai/gpt-5.6-luna` | 探検家。コードベースの高速探索、grep検索、スキャフォールディング。 |
 | **Multimodal-Looker** | `ultrabrain` | `cloudflare-ai-gateway/google-ai-studio/gemini-3.1-pro` | 視覚アナリスト。UIデザイン、画像、図解、PDFの解析。 |
-| **Prometheus** | `ultrabrain` | `cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.7-code` | 流れ者。タスクの分解と並列実行計画の作成。 |
-| **Metis** | `ultrabrain` | `cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.7-code` | 計画コンサル。計画前のリスク特定と曖昧さの排除。 |
+| **Prometheus** | `ultrabrain` | `cloudflare-ai-gateway-dynamic/dynamic/kimi-k2.7-code` | 流れ者。タスクの分解と並列実行計画の作成。 |
+| **Metis** | `ultrabrain` | `cloudflare-ai-gateway-dynamic/dynamic/kimi-k2.7-code` | 計画コンサル。計画前のリスク特定と曖昧さの排除。 |
 | **Momus** | `ultrabrain` | `cloudflare-ai-gateway-octg/gpt-5.6-terra` | 計画レビュアー。Prometheusが作成した計画の厳格な検証。 |
-| **Atlas** | `ultrabrain` | `cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.7-code` | 現場監督。環境管理、Todo項目の体系的な管理と調整。 |
+| **Atlas** | `ultrabrain` | `cloudflare-ai-gateway-dynamic/dynamic/kimi-k2.7-code` | 現場監督。環境管理、Todo項目の体系的な管理と調整。 |
 
 ## 4. LLMモデル選択のベストプラクティス
 
@@ -66,28 +81,44 @@ Sisyphus（監督）は、タスクの性質に応じて最適な「知能カテ
 | スタイル | 特徴 | 適合モデル | 最適なエージェント |
 | :--- | :--- | :--- | :--- |
 | **メカニクス駆動** | **指示追従型。** 長大で複雑な手順、多段のTodo管理に極めて強い。 | Kimi Family, Claude Family | Sisyphus, Atlas, Metis |
-| **原則駆動** | **自律探索型。** 最小限の指示で自律的に解決策を見出す。深い実装に強い。 | GPT Family (Sol, Terra, Luna) | Hephaestus, Oracle, Momus |
+| **原則駆動** | **自律探索型。** 最小限の指示で自律的に解決策を見出す。深い実装に強い。 | GPT Family (Sol, Terra, Luna), GLM Family | Hephaestus, Oracle, Momus |
 | **視覚推論型** | **UI・構造理解。** デザイン解析、CSS、レイアウトの理解に特化。 | Gemini Family | Looker |
 
 ### カテゴリー別・モデルルーティング一覧
 
-表中の短縮名は `omo.jsonc` の `models` カタログのキーであり、実行時には対応する
-`provider/model` 完全修飾名へ解決されます。
+表中の短縮名は `omo.jsonc` の `models` カタログのキーです。v4.19.4 の一部 task path には alias 解決の不整合があるため、実設定では完全修飾 `provider/model` を記述します。
 
 | カテゴリー | personal デフォルト | personal フォールバックチェーン | work (Bedrock) |
 | :--- | :--- | :--- | :--- |
 | **ultrabrain** | `sol-octg` (max) | `sol-octg` (max) → `sol` (max) → `terra-octg` (high) → `terra` (high) | `opus` (max) → `sonnet` |
-| **deep** | `terra-octg` (high) | `terra-octg` (high) → `terra` (high) → `sol-octg` (medium) → `sol` (medium) | `opus` (max) → `sonnet` |
-| **quick** | `luna` (low) | `luna` (low) | `haiku` → `sonnet` |
+| **deep** | `terra-octg` (high) | `terra-octg` (high) → `glm-52` → `terra` (high) → `sol` (medium) | `opus` (max) → `sonnet` |
+| **quick** | `luna` (low) | `luna` (low) → `deepseek-v4-flash` | `haiku` → `sonnet` |
 | **visual-engineering** | `gemini-pro` (high) | `gemini-pro` (high) → `kimi-k27` | `opus` (max) → `sonnet` |
 | **artistry** | `gemini-pro` (high) | `gemini-pro` (high) → `kimi-k27` | `sonnet` → `haiku` |
-| **unspecified-high** | `luna` (max) | `luna` (max) → `kimi-k27` | `opus` (max) → `sonnet` |
-| **unspecified-low** | `luna` (high) | `luna` (high) → `kimi-k27` | `sonnet` → `haiku` |
+| **unspecified-high** | `glm-52` | `glm-52` → `luna` (max) → `kimi-k3` | `opus` (max) → `sonnet` |
+| **unspecified-low** | `luna` (medium) | `luna` (medium) → `glm-53-flash` | `sonnet` → `haiku` |
 | **writing** | `kimi-k27` | `kimi-k27` | `sonnet` → `haiku` |
 
----
-*Updated: 2026-07-30*
+### OCTG Sol (STANDARD) の利用方針
 
+OCTG の STANDARD pool は 1M tokens / UTC day と小さいため、すべての Sol workload の primary にはしません。一方で全経路を secondary にすると未使用のまま日次枠が失効しやすいため、**高価値・比較的低頻度の `ultrabrain` では OCTG Sol を primary のまま維持**します。
+
+高頻度で実装・テスト・修正を反復する Hephaestus は Plus Sol を primary とし、OCTG Sol は fallback にします。また `modelConcurrency` で OCTG Sol を 1 並列に制限し、巨大コンテキスト要求の同時 reservation を抑制します。
+
+### Dynamic open model の役割
+
+| モデル | 主な役割 |
+| :--- | :--- |
+| **Kimi K2.7 Code** | Sisyphus / Prometheus / Metis / Atlas / writing の主力オーケストレーション |
+| **Kimi K3** | 高負荷汎用タスクの premium orchestration reserve |
+| **GLM-5.2** | substantial coding / deep fallback / unspecified-high primary |
+| **GLM-5.3 Flash** | 軽〜中程度の agentic work、unspecified-low fallback |
+| **DeepSeek V4 Flash** | 高ボリューム探索・調査、quick fallback |
+
+**GLM-5.3 full は意図的に採用していません。** GLM-5.2 が substantial coding を担当し、GLM-5.3 Flash が agentic-fast という独立した役割を持つためです。Go / GOAT の共有 quota をさらに消費する full 5.3 を追加するより、現時点ではこの2モデルの役割分離を優先します。
+
+---
+*Updated: 2026-09-07*
 
 ## 5. 環境の切り替え (Switching Environments)
 
@@ -95,7 +126,7 @@ Sisyphus（監督）は、タスクの性質に応じて最適な「知能カテ
 
 ### 用意されているファイル
 - **`profiles.work`**: Amazon Bedrock の Claude を中心とした業務向け構成。
-- **`profiles.personal`**: OpenAI、Kimi、Gemini を組み合わせた個人・検証向け構成。
+- **`profiles.personal`**: OpenAI、Kimi、GLM、DeepSeek、Gemini を組み合わせた個人・検証向け構成。
 
 ### 適用方法
 `opencode-wrapper.sh` が設定する `OMO_PROFILE` を使って起動してください。
@@ -104,11 +135,11 @@ Sisyphus（監督）は、タスクの性質に応じて最適な「知能カテ
 # 業務用構成（Bedrock）に切り替える場合
 PROFILE=work opencode
 
-# 個人用構成（OpenAI）に切り替える場合
+# 個人用構成で起動
 PROFILE=personal opencode
 ```
 
-この方法により、`omo.jsonc` を書き換えることなく、瞬時に推論エンジンのスタックを切り替えることが可能です。
+この方法により、`omo.jsonc` を書き換えることなく、推論エンジンのスタックを切り替えられます。
 
 ## 6. 高度な使い方：PROFILEによる自動切り替え
 
@@ -182,8 +213,6 @@ Senpi タスクシステムの信頼性が向上: タスクロスト時の resid
 ---
 
 ### v4.17.0 主要機能（継続）
-
-最新の v4.17.0 にて強化・導入された主要機能です。
 
 ### Codex Work That Scales to the Task
 LazyCodex は、すべての実装を1つの汎用実行エージェントにルーティングする代わりに、実際の変更サイズとリスクから低・中・高難易度のワーカーを選択するようになりました。新規インストール時のデフォルトは372Kコンテキストウィンドウを持つ GPT-5.6 Sol となり、探索（exploration）およびディープアナリティクス（deep-analysis）カテゴリーは新しい Luna および Terra ルート（`gpt-5.6-luna`, `gpt-5.6-terra`）を使用します。これにより、軽微な作業は低コストで、真に推論能力が必要な変更はより強力に対応できるようになります。
