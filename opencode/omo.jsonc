@@ -129,7 +129,7 @@
         "cloudflare-ai-gateway-custom/custom-ollama-cloud/glm-5.2": 2,
         "cloudflare-ai-gateway-custom/custom-ollama-cloud/glm-5.3-flash": 4,
         "cloudflare-ai-gateway-custom/custom-command-code/deepseek/deepseek-v4-flash": 5,
-        "cloudflare-ai-gateway-custom/custom-aihubmix/gemini-3.1-pro-preview": 2,
+        "cloudflare-ai-gateway/google-ai-studio/gemini-3.1-pro": 2,
         "cloudflare-ai-gateway-octg/gpt-5.6-sol": 1,
         "cloudflare-ai-gateway-octg/gpt-5.6-terra": 2
       }
@@ -138,8 +138,9 @@
     // TEMPORARY: Cloudflare Dynamic Routing is disabled because newly created
     // or recreated routes can fail with Error 2005 before provider invocation
     // (cloudflare/ai#611), and Custom Providers are not supported by Dynamic
-    // Routing yet (cloudflare/cloudflare-docs#29840). Personal non-OpenAI models
-    // are pinned to cloudflare-ai-gateway-custom until Cloudflare resolves them.
+    // Routing yet (cloudflare/cloudflare-docs#29840). Personal open models use
+    // cloudflare-ai-gateway-custom direct paths, while Gemini 3.1 Pro remains on
+    // the Google AI Studio provider used by the Dynamic Route definition.
     // -------------------------------------------------------------------------
     // ランタイム自動フォールバック (429 / 5xx エラー時に ordered model chain へ切り替え)
     // -------------------------------------------------------------------------
@@ -242,10 +243,11 @@
     // `Invalid model format "<alias>"` エラーが発生する不整合があります。
     // そのため、各行に短縮名形式 (コメントアウト) を併記しつつ、実設定値には完全修飾名 (provider/model) を指定しています。
     //
-    // TEMPORARY: Dynamic Routes are bypassed. Personal non-OpenAI models use
-    // cloudflare-ai-gateway-custom direct paths until Cloudflare resolves the
-    // known Error 2005 / Custom Provider issues. Sisyphus-Junior is intentionally
-    // not configured: category-routed tasks inherit the selected category model.
+    // TEMPORARY: Dynamic Routes are bypassed. Personal open models use
+    // cloudflare-ai-gateway-custom direct paths, while Gemini 3.1 Pro keeps the
+    // Google AI Studio provider selected by cf-ai-gw-dynamic-routing. Sisyphus-Junior
+    // is intentionally not configured: category-routed tasks inherit the selected
+    // category model.
     // =========================================================================
     "agents": {
       "sisyphus": {
@@ -285,7 +287,7 @@
       },
       "multimodal-looker": {
         // "model": "gemini-pro",
-        "model": "cloudflare-ai-gateway-custom/custom-aihubmix/gemini-3.1-pro-preview"
+        "model": "cloudflare-ai-gateway/google-ai-studio/gemini-3.1-pro"
       },
       "prometheus": {
         // "model": "kimi-k27",
@@ -311,8 +313,9 @@
     // 【リソース割り当て方針】
     // - OCTG Sol STANDARD (1M tokens/day) は高価値・低頻度のultrabrain中心に温存する。
     // - Plus Luna/maxは高スループットなTDD / 汎用作業に積極的に使う。
-    // - OpenAI以外のpersonal modelはcloudflare-ai-gateway-custom経由に統一する。
-    // - Dynamic Routes停止中もモデルの役割は維持し、同一モデルをCustom Provider直結で使う。
+    // - Kimi / GLM / DeepSeek等のopen modelはcloudflare-ai-gateway-custom経由に統一する。
+    // - Gemini 3.1 Proはcf-ai-gw-dynamic-routingと同じGoogle AI Studio providerを使う。
+    // - Dynamic Routes停止中もモデルの役割は維持し、同一モデルの直結経路を使う。
     // - Full GLM-5.3はGLM-5.2との役割重複が大きいため現状ルーティング対象外。
     //   GLM-5.2を substantial coding、GLM-5.3 Flashをagentic-fast用途に分離する。
     // =========================================================================
@@ -430,12 +433,12 @@
       },
       "visual-engineering": {
         // "model": "gemini-pro",
-        "model": "cloudflare-ai-gateway-custom/custom-aihubmix/gemini-3.1-pro-preview",
+        "model": "cloudflare-ai-gateway/google-ai-studio/gemini-3.1-pro",
         "models": [
           {
-            // Gemini 3.1 Proの視覚・UI設計役割を維持しつつCustom Providerを通す。
+            // Gemini 3.1 Proの視覚・UI設計役割を維持し、Google AI Studioを使う。
             // "model": "gemini-pro",
-            "model": "cloudflare-ai-gateway-custom/custom-aihubmix/gemini-3.1-pro-preview",
+            "model": "cloudflare-ai-gateway/google-ai-studio/gemini-3.1-pro",
             "reasoning": "high"
           },
           {
@@ -446,12 +449,12 @@
       },
       "artistry": {
         // "model": "gemini-pro",
-        "model": "cloudflare-ai-gateway-custom/custom-aihubmix/gemini-3.1-pro-preview",
+        "model": "cloudflare-ai-gateway/google-ai-studio/gemini-3.1-pro",
         "models": [
           {
-            // Gemini 3.1 Proの高品質生成役割を維持しつつCustom Providerを通す。
+            // Gemini 3.1 Proの高品質生成役割を維持し、Google AI Studioを使う。
             // "model": "gemini-pro",
-            "model": "cloudflare-ai-gateway-custom/custom-aihubmix/gemini-3.1-pro-preview",
+            "model": "cloudflare-ai-gateway/google-ai-studio/gemini-3.1-pro",
             "reasoning": "high"
           },
           {
@@ -468,8 +471,8 @@
   //
   // ※ OMO の論理カタログ定義。上述の通りサブエージェント実行時の不整合回避のため、
   //   agents / categories 側には provider/model 完全修飾名を直接記述しています。
-  // ※ Dynamic Routes停止中は、OpenAI以外のpersonal model aliasを
-  //   cloudflare-ai-gateway-custom配下の同一モデル直結先へ向ける。
+  // ※ Dynamic Routes停止中は、open model aliasをcloudflare-ai-gateway-custom配下の
+  //   同一モデル直結先へ向け、Gemini 3.1 ProだけGoogle AI Studioへ向ける。
   // ===========================================================================
   "models": {
     "kimi-k27": {
@@ -506,7 +509,7 @@
       "model": "openai/gpt-5.6-luna"
     },
     "gemini-pro": {
-      "model": "cloudflare-ai-gateway-custom/custom-aihubmix/gemini-3.1-pro-preview"
+      "model": "cloudflare-ai-gateway/google-ai-studio/gemini-3.1-pro"
     }
   },
 
@@ -768,6 +771,7 @@
   "_migrations": [
     "2026-07-opencode-config-unification",
     "2026-09-cloudflare-dynamic-routing-temporary-bypass",
-    "2026-09-personal-non-openai-custom-provider"
+    "2026-09-personal-open-model-custom-provider",
+    "2026-09-gemini-google-ai-studio-direct"
   ]
 }
