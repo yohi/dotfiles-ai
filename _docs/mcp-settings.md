@@ -36,6 +36,6 @@ make sync-mcp
 - `aws-api` — `uvx awslabs.aws-api-mcp-server`
 - `aws-cdk-mcp-server` — `uvx awslabs.cdk-mcp-server`
 - `aws-diagram` — `uvx awslabs.aws-diagram-mcp-server`
-- `cf-mcp-portal-personal` — Streamable HTTP: `https://personal.mcp.y-ohi.com/mcp`
+- `cf-mcp-portal` — Streamable HTTP / Code Mode: `https://mcp.y-ohi.com/mcp?codemode=search_and_execute`
 - `sentry-remote` — SSE: `https://mcp.sentry.dev/mcp`
 - 既存の `nexus`, `chronos-graph`, `skillport` 等

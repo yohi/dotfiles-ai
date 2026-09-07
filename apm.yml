@@ -28,11 +28,11 @@ dependencies:
 
   # MCP Servers
   mcp:
-    - name: cf-mcp-portal-personal
+    - name: cf-mcp-portal
       title: "Cloudflare MCP Portal (Personal)"
       registry: false
       transport: streamable-http
-      url: https://personal.mcp.y-ohi.com/mcp
+      url: https://mcp.y-ohi.com/mcp?codemode=search_and_execute
       enabled: true
 
 
@@ -67,7 +67,7 @@ dependencies:
       headers:
         Authorization: "Bearer ${env:GREPTILE_API_KEY}"
         X-GitHub-Token: "${env:GITHUB_TOKEN}"
-      enabled: true
+      enabled: false
 
     - name: filesystem
       title: "Filesystem MCP"
@@ -102,7 +102,7 @@ dependencies:
       transport: sse
       url: "https://api.githubcopilot.com/mcp/"
       standalone: true
-      enabled: true
+      enabled: false
       headers:
         Authorization: "Bearer ${env:GITHUB_TOKEN}"
 
@@ -140,14 +140,14 @@ dependencies:
       registry: false
       transport: sse
       url: "https://aws-mcp.us-east-1.api.aws/mcp?oauth=initialize"
-      enabled: true
+      enabled: false
 
     - name: sentry-remote
       title: "Sentry Remote MCP"
       registry: false
       transport: sse
       url: "https://mcp.sentry.dev/mcp"
-      enabled: true
+      enabled: false
 
     - name: sonarqube
       title: "SonarQube MCP"

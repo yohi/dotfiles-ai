@@ -1,5 +1,5 @@
 lockfile_version: '1'
-generated_at: '2026-08-27T10:28:43.918451+00:00'
+generated_at: '2026-09-05T02:33:13.291504+00:00'
 apm_version: 0.28.0
 dependencies:
 - repo_url: anthropics/claude-code
@@ -1180,7 +1180,7 @@ deployments:
   content_hash: null
 - kind: uri
   target: mcp
-  value: cf-mcp-portal-personal
+  value: cf-mcp-portal
   runtime: opencode
   scope: project
   owners:
@@ -6123,7 +6123,7 @@ mcp_servers:
 - aws-documentation
 - aws-iac
 - aws-mcp
-- cf-mcp-portal-personal
+- cf-mcp-portal
 - chronos-graph
 - codegraph
 - coderabbit
@@ -6171,12 +6171,12 @@ mcp_configs:
     registry: false
     url: https://aws-mcp.us-east-1.api.aws/mcp?oauth=initialize
     title: AWS Managed MCP
-    enabled: true
-  cf-mcp-portal-personal:
-    name: cf-mcp-portal-personal
+    enabled: false
+  cf-mcp-portal:
+    name: cf-mcp-portal
     transport: streamable-http
     registry: false
-    url: https://personal.mcp.y-ohi.com/mcp
+    url: https://mcp.y-ohi.com/mcp?codemode=search_and_execute
     title: Cloudflare MCP Portal (Personal)
     enabled: true
   chronos-graph:
@@ -6263,7 +6263,7 @@ mcp_configs:
     url: https://api.githubcopilot.com/mcp/
     title: GitHub Official MCP
     standalone: true
-    enabled: true
+    enabled: false
   greptile:
     name: greptile
     transport: sse
@@ -6273,7 +6273,7 @@ mcp_configs:
       X-GitHub-Token: ${env:GITHUB_TOKEN}
     url: https://api.greptile.com/mcp
     title: Greptile MCP
-    enabled: true
+    enabled: false
   nexus:
     name: nexus
     transport: stdio
@@ -6315,7 +6315,7 @@ mcp_configs:
     registry: false
     url: https://mcp.sentry.dev/mcp
     title: Sentry Remote MCP
-    enabled: true
+    enabled: false
   sequentialthinking:
     name: sequentialthinking
     transport: stdio
@@ -6363,7 +6363,7 @@ mcp_target_servers:
   - aws-documentation
   - aws-iac
   - aws-mcp
-  - cf-mcp-portal-personal
+  - cf-mcp-portal
   - chronos-graph
   - codegraph
   - coderabbit
