@@ -35,7 +35,6 @@ dependencies:
       url: https://mcp.y-ohi.com/mcp?codemode=search_and_execute
       enabled: true
 
-
     - name: coderabbit
       title: "CodeRabbit MCP"
       registry: false
@@ -47,7 +46,7 @@ dependencies:
       env:
         GITHUB_PAT: "${env:GITHUB_TOKEN}"
       timeout: 60000
-      enabled: true
+      enabled: false
 
     - name: codegraph
       title: "CodeGraph MCP"
@@ -119,7 +118,7 @@ dependencies:
         FASTMCP_LOG_LEVEL: "ERROR"
       standalone: true
       timeout: 60000
-      enabled: true
+      enabled: false
 
 
     - name: aws-documentation
@@ -133,7 +132,7 @@ dependencies:
         FASTMCP_LOG_LEVEL: "ERROR"
         AWS_DOCUMENTATION_PARTITION: "${env:AWS_DOCUMENTATION_PARTITION:-aws}"
       standalone: true
-      enabled: true
+      enabled: false
 
     - name: aws-mcp
       title: "AWS Managed MCP"
@@ -200,7 +199,7 @@ dependencies:
       command: "npx"
       args:
         - "-y"
-        - "@yohi/nexus@2.1.0"
+        - "@yohi/nexus@2.2.2"
         - "http-bridge"
       env:
         LOG_LEVEL: "ERROR"
@@ -219,7 +218,7 @@ dependencies:
       command: "uvx"
       args:
         - "--from"
-        - "context-store-mcp[all] @ https://github.com/yohi/chronos-graph/archive/refs/tags/v3.1.0.tar.gz"
+        - "context-store-mcp[all] @ https://github.com/yohi/chronos-graph/archive/refs/tags/v3.2.0.tar.gz"
         - "context-store"
       env:
         STORAGE_BACKEND: "${env:STORAGE_BACKEND}"
@@ -541,7 +540,12 @@ enabled_providers:
   - openai
   - cloudflare-ai-gateway
   - cloudflare-ai-gateway-custom
-  - cloudflare-ai-gateway-dynamic
+  # TEMPORARY: Cloudflare AI Gateway Dynamic Routes are disabled because newly
+  # created/recreated routes can fail before provider invocation (cloudflare/ai#611),
+  # and Custom Providers are not supported by Dynamic Routing yet
+  # (cloudflare/cloudflare-docs#29840). Keep the provider definition below so it
+  # can be re-enabled quickly once Cloudflare confirms a fix/support.
+  # - cloudflare-ai-gateway-dynamic
   - cloudflare-ai-gateway-octg
   - opencode
   - ollama-cloud
@@ -762,6 +766,9 @@ provider:
       custom-command-code/zai-org/glm-5.3:
         name: GLM 5.3 (CommandCode)
         variants: *glm_variants
+      custom-command-code/deepseek/deepseek-v4-flash:
+        name: DeepSeek V4 Flash (CommandCode)
+        variants: *deepseek_v4_variants
 
       # Sakura AI Engine
       custom-sakura-ai/preview/Kimi-K2.6:
@@ -805,9 +812,12 @@ provider:
         name: Kimi K3 Free (Nvidia)
         variants: *kimi_k3_variants
 
-  # 3. Cloudflare Dynamic Routes. Dynamic Routing currently requires the
-  # OpenAI-compatible /compat/chat/completions endpoint and cannot use the
-  # REST API path selected by the native Cloudflare provider.
+  # 3. Cloudflare Dynamic Routes — TEMPORARILY DISABLED.
+  # Known Cloudflare issue: newly created/recreated routes may return Error 2005
+  # before invoking an otherwise healthy provider (cloudflare/ai#611). Dynamic
+  # Routing also does not support Custom Providers yet
+  # (cloudflare/cloudflare-docs#29840). Keep the catalog/configuration dormant so
+  # re-enabling only requires restoring cloudflare-ai-gateway-dynamic above.
   cloudflare-ai-gateway-dynamic:
     npm: "@ai-sdk/openai-compatible"
     name: "Cloudflare AI Gateway (Dynamic)"

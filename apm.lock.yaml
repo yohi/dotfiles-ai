@@ -1,5 +1,5 @@
 lockfile_version: '1'
-generated_at: '2026-09-05T02:33:13.291504+00:00'
+generated_at: '2026-09-07T15:37:47.988569+00:00'
 apm_version: 0.28.0
 dependencies:
 - repo_url: anthropics/claude-code
@@ -6149,7 +6149,7 @@ mcp_configs:
     command: uvx
     title: AWS Documentation MCP
     standalone: true
-    enabled: true
+    enabled: false
   aws-iac:
     name: aws-iac
     transport: stdio
@@ -6164,7 +6164,7 @@ mcp_configs:
     title: AWS IaC MCP
     standalone: true
     timeout: 60000
-    enabled: true
+    enabled: false
   aws-mcp:
     name: aws-mcp
     transport: sse
@@ -6210,7 +6210,7 @@ mcp_configs:
       DASHBOARD_PORT: ${env:DASHBOARD_PORT}
     args:
     - --from
-    - context-store-mcp[all] @ https://github.com/yohi/chronos-graph/archive/refs/tags/v3.1.0.tar.gz
+    - context-store-mcp[all] @ https://github.com/yohi/chronos-graph/archive/refs/tags/v3.2.0.tar.gz
     - context-store
     registry: false
     command: uvx
@@ -6240,7 +6240,7 @@ mcp_configs:
     command: npx
     title: CodeRabbit MCP
     timeout: 60000
-    enabled: true
+    enabled: false
   filesystem:
     name: filesystem
     transport: stdio
@@ -6285,7 +6285,7 @@ mcp_configs:
       NO_PROXY: 127.0.0.1,localhost
     args:
     - -y
-    - '@yohi/nexus@2.1.0'
+    - '@yohi/nexus@2.2.2'
     - http-bridge
     registry: false
     command: npx
