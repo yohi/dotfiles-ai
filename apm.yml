@@ -35,7 +35,6 @@ dependencies:
       url: https://mcp.y-ohi.com/mcp?codemode=search_and_execute
       enabled: true
 
-
     - name: coderabbit
       title: "CodeRabbit MCP"
       registry: false
@@ -47,7 +46,7 @@ dependencies:
       env:
         GITHUB_PAT: "${env:GITHUB_TOKEN}"
       timeout: 60000
-      enabled: true
+      enabled: false
 
     - name: codegraph
       title: "CodeGraph MCP"
@@ -119,7 +118,7 @@ dependencies:
         FASTMCP_LOG_LEVEL: "ERROR"
       standalone: true
       timeout: 60000
-      enabled: true
+      enabled: false
 
 
     - name: aws-documentation
@@ -133,7 +132,7 @@ dependencies:
         FASTMCP_LOG_LEVEL: "ERROR"
         AWS_DOCUMENTATION_PARTITION: "${env:AWS_DOCUMENTATION_PARTITION:-aws}"
       standalone: true
-      enabled: true
+      enabled: false
 
     - name: aws-mcp
       title: "AWS Managed MCP"
@@ -200,7 +199,7 @@ dependencies:
       command: "npx"
       args:
         - "-y"
-        - "@yohi/nexus@2.1.0"
+        - "@yohi/nexus@2.2.2"
         - "http-bridge"
       env:
         LOG_LEVEL: "ERROR"
@@ -219,7 +218,7 @@ dependencies:
       command: "uvx"
       args:
         - "--from"
-        - "context-store-mcp[all] @ https://github.com/yohi/chronos-graph/archive/refs/tags/v3.1.0.tar.gz"
+        - "context-store-mcp[all] @ https://github.com/yohi/chronos-graph/archive/refs/tags/v3.2.0.tar.gz"
         - "context-store"
       env:
         STORAGE_BACKEND: "${env:STORAGE_BACKEND}"
