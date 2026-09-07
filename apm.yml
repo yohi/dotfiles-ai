@@ -767,6 +767,9 @@ provider:
       custom-command-code/zai-org/glm-5.3:
         name: GLM 5.3 (CommandCode)
         variants: *glm_variants
+      custom-command-code/deepseek/deepseek-v4-flash:
+        name: DeepSeek V4 Flash (CommandCode)
+        variants: *deepseek_v4_variants
 
       # Sakura AI Engine
       custom-sakura-ai/preview/Kimi-K2.6:
@@ -776,6 +779,9 @@ provider:
         name: Kimi K2.7 Code (Sakura AI Engine)
 
       # AIHubMix
+      custom-aihubmix/gemini-3.1-pro-preview:
+        name: Gemini 3.1 Pro Preview (AIHubMix)
+        variants: *gemini_variants
       custom-aihubmix/coding-kimi-k3-free:
         name: Coding Kimi K3 Free (AIHubMix)
         variants: *kimi_k3_variants
