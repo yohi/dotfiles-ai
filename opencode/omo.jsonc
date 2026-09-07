@@ -9,12 +9,9 @@
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/v4.19.4/assets/omo.schema.json",
 
   // ===========================================================================
-  // OpenCode 共通設定 (全プロファイルで共有されるコア機能・環境設定)
+  // OpenCode 共通設定
   // ===========================================================================
   "[opencode]": {
-    // -------------------------------------------------------------------------
-    // Team Mode (マルチエージェント協調・自律チーム実行)
-    // -------------------------------------------------------------------------
     "team_mode": {
       "enabled": false,
       "base_dir": ".sisyphus/team",
@@ -29,9 +26,6 @@
       "mailbox_poll_interval_ms": 3000
     },
 
-    // -------------------------------------------------------------------------
-    // Sisyphus Agent コア設定
-    // -------------------------------------------------------------------------
     "sisyphus_agent": {
       "disabled": false,
       "planner_enabled": true,
@@ -39,36 +33,14 @@
       "default_builder_enabled": true
     },
 
-    // -------------------------------------------------------------------------
-    // 実験的機能 (コンテキスト圧縮・タスクシステム)
-    // -------------------------------------------------------------------------
     "experimental": {
-      // 期待効果: TodoWrite/TodoReadを永続タスクシステムへ切り替え、
-      // 長時間作業でタスク状態を安定して引き継ぐ。直接のtoken削減設定ではない。
       "task_system": true,
-
-      // 期待効果: context limit超過時に大きなtool outputを追加削減し、
-      // 復旧成功率を上げる。通常時には発火せず、日常的なtoken削減の主役ではない。
-      // 注意: 超過時の救済策のため、必要な出力まで失う可能性がある。
       "aggressive_truncation": true,
-
-      // 期待効果: context使用量が内部閾値(約78%)に達した際に先回りでcompactionし、
-      // providerのcontext limit到達による停止を防ぐ。閾値はここでは変更しない。
-      // 注意: compaction用の追加requestと要約による情報損失が発生し得る。
       "preemptive_compaction": true,
-
-      // OpenCode側のtool_output制限でfull outputをdiskへ退避するため、
-      // OmOでは全toolへの無差別truncationを行わない。OmO標準whitelistの
-      // tool-output-truncatorは引き続き有効で、巨大outputの安全弁として機能する。
       "truncate_all_tool_outputs": false,
-
-      // context limit復旧時に重複tool履歴を低損失で削除する。
-      // v4.19.4ではprompt-too-long時のdeduplication recoveryが実動作の中心。
       "dynamic_context_pruning": {
         "enabled": true,
         "notification": "minimal",
-
-        // task/session系の制御情報はdeduplication recoveryから保護する。
         "protected_tools": [
           "task",
           "todowrite",
@@ -79,7 +51,6 @@
           "session_search"
         ],
         "strategies": {
-          // 同一tool・同一引数の古いcall/resultを削除し、最新結果だけを残す。
           "deduplication": {
             "enabled": true
           }
@@ -87,9 +58,6 @@
       }
     },
 
-    // -------------------------------------------------------------------------
-    // Tmux ターミナル分割・ペイン制御
-    // -------------------------------------------------------------------------
     "tmux": {
       "enabled": true,
       "layout": "main-vertical",
@@ -99,34 +67,39 @@
       "isolation": "inline"
     },
 
-    // -------------------------------------------------------------------------
-    // ブラウザ自動化エンジン
-    // -------------------------------------------------------------------------
     "browser_automation_engine": {
       "provider": "playwright-cli"
     },
 
-    // -------------------------------------------------------------------------
-    // バックグラウンドタスクのプロバイダ別並行制御
-    // -------------------------------------------------------------------------
+    // Provider-wide limits are the coarse guardrail. Expensive personal models
+    // additionally use modelConcurrency so one large-context workload cannot
+    // drain a shared quota window through parallel reservations.
     "background_task": {
-      // 100k+ token級requestの同時多発でquota windowが瞬間的に枯れるのを抑える。
-      // providerConcurrencyのkeyはmodel文字列の先頭provider IDと完全一致させる。
       "defaultConcurrency": 6,
       "providerConcurrency": {
         "openai": 6,
         "opencode": 5,
         "cloudflare-ai-gateway": 3,
         "cloudflare-ai-gateway-custom": 5,
-        "cloudflare-ai-gateway-dynamic": 5,
         "cloudflare-ai-gateway-octg": 4,
         "amazon-bedrock": 5
+      },
+      "modelConcurrency": {
+        "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.7-code": 2,
+        "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k3": 1,
+        "cloudflare-ai-gateway-custom/custom-ollama-cloud/glm-5.2": 2,
+        "cloudflare-ai-gateway-custom/custom-ollama-cloud/glm-5.3-flash": 4,
+        "opencode/deepseek-v4-flash-free": 5,
+        "cloudflare-ai-gateway-octg/gpt-5.6-sol": 1,
+        "cloudflare-ai-gateway-octg/gpt-5.6-terra": 2
       }
     },
 
-    // -------------------------------------------------------------------------
-    // ランタイム自動フォールバック (429 / 5xx エラー時に ordered model chain へ切り替え)
-    // -------------------------------------------------------------------------
+    // TEMPORARY: Cloudflare Dynamic Routing is bypassed because newly created
+    // or recreated routes can fail with Error 2005 before provider invocation,
+    // and Custom Providers are not yet supported by Dynamic Routing. Personal
+    // open models are pinned to direct provider paths until Cloudflare resolves
+    // cloudflare/ai#611 and cloudflare/cloudflare-docs#29840.
     "runtime_fallback": {
       "enabled": true,
       "retry_on_errors": [
@@ -138,52 +111,34 @@
       ],
       "max_fallback_attempts": 3,
       "cooldown_seconds": 60,
-      "timeout_seconds": 30,
+      "timeout_seconds": 600,
       "notify_on_fallback": true,
-      "restore_primary_after_cooldown": true
+      "restore_primary_after_cooldown": false
     },
 
-    // -------------------------------------------------------------------------
-    // Goal モード (自律ゴール達成ループ)
-    // -------------------------------------------------------------------------
     "goal": {
       "enabled": false,
       "auto_start": false,
       "default_max_iterations": 20
     },
 
-    // -------------------------------------------------------------------------
-    // デフォルト実行モード
-    // -------------------------------------------------------------------------
     "default_mode": {
       "ultrawork": false,
       "goal": false
     },
 
-    // -------------------------------------------------------------------------
-    // Git Master (Conventional Commits 自動生成ポリシー)
-    // -------------------------------------------------------------------------
     "git_master": {
       "commit_footer": false,
       "include_co_authored_by": false,
       "git_env_prefix": "GIT_MASTER=1"
     },
 
-    // -------------------------------------------------------------------------
-    // 無効化フック
-    // -------------------------------------------------------------------------
     "disabled_hooks": [
       "auto-update-checker"
     ],
 
-    // -------------------------------------------------------------------------
-    // 高速行番号編集 (Hashline Edit)
-    // -------------------------------------------------------------------------
     "hashline_edit": true,
 
-    // -------------------------------------------------------------------------
-    // MCP サーバーへ転送を許可する環境変数ホワイトリスト
-    // -------------------------------------------------------------------------
     "mcp_env_allowlist": [
       "HOME",
       "CHRONOS_POSTGRES_HOST",
@@ -207,198 +162,190 @@
       "CHRONOS_EMBEDDING_DIMENSION"
     ],
 
+    "disabled_mcps": [
+      "websearch",
+      "context7",
+      "grep_app"
+    ],
+
     // =========================================================================
-    // Base Agents (デフォルト: personal 構成)
+    // Base Agents (personal)
     //
-    // 【重要: モデル指定形式について】
-    // OMO 設計上は下記 models カタログの短縮名 (例: "luna", "sol") の解決機構がありますが、
-    // OMO v4.19.4 時点の実装ではサブエージェント (task) 起動時等の特定パスでカタログ解決前の
-    // 生文字列が渡り、下流の parseModelString() (provider/model 形式必須検査) で
-    // `Invalid model format "<alias>"` エラーが発生する不整合があります。
-    // そのため、各行に短縮名形式 (コメントアウト) を併記しつつ、実設定値には完全修飾名 (provider/model) を指定しています。
+    // v4.19.4 has an alias-resolution inconsistency on some task paths, so
+    // executable agent/category settings intentionally use fully-qualified
+    // provider/model strings. The logical models catalog below remains useful
+    // for documentation and future migration.
+    //
+    // TEMPORARY: Dynamic Routes are bypassed. Open-model agents use direct
+    // provider paths (primarily Ollama Cloud) until the Cloudflare issues are
+    // resolved. Sisyphus-Junior is intentionally not configured: category-routed
+    // tasks inherit the model from the selected category.
     // =========================================================================
     "agents": {
       "sisyphus": {
-        // "model": "kimi-k27",
         "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.7-code",
         "ultrawork": {
-          // "model": "sol",
           "model": "openai/gpt-5.6-sol",
           "reasoning": "high"
         }
       },
       "hephaestus": {
         "disable": false,
-        // "model": "sol-octg",
-        "model": "cloudflare-ai-gateway-octg/gpt-5.6-sol"
+        "model": "openai/gpt-5.6-sol",
+        "fallback_models": [
+          {
+            "model": "cloudflare-ai-gateway-octg/gpt-5.6-sol",
+            "reasoning": "high"
+          }
+        ]
       },
       "oracle": {
-        // "model": "terra-octg",
         "model": "cloudflare-ai-gateway-octg/gpt-5.6-terra"
       },
       "librarian": {
-        // "model": "luna",
         "model": "openai/gpt-5.6-luna"
       },
       "explore": {
-        // "model": "luna",
         "model": "openai/gpt-5.6-luna"
       },
       "multimodal-looker": {
-        // "model": "gemini-pro",
         "model": "cloudflare-ai-gateway/google-ai-studio/gemini-3.1-pro"
       },
       "prometheus": {
-        // "model": "kimi-k27",
         "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.7-code"
       },
       "metis": {
-        // "model": "kimi-k27",
         "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.7-code"
       },
       "momus": {
-        // "model": "terra-octg",
         "model": "cloudflare-ai-gateway-octg/gpt-5.6-terra"
       },
       "atlas": {
-        // "model": "kimi-k27",
         "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.7-code"
       }
     },
 
     // =========================================================================
-    // Base Categories (デフォルト: personal 構成)
+    // Base Categories (personal)
+    //
+    // Resource policy:
+    // - OCTG Sol STANDARD (1M tokens/day) stays primary only for ultrabrain,
+    //   where each call is high-value and comparatively low-frequency.
+    // - Hephaestus is high-frequency/iterative, so Plus Sol is primary there.
+    // - TEMPORARY: open models use direct provider paths while Dynamic Routing
+    //   is affected by Cloudflare's known Error 2005 / Custom Provider issues.
+    // - Full GLM-5.3 is intentionally omitted; GLM-5.2 covers substantial
+    //   coding while GLM-5.3 Flash has a distinct agentic-fast role.
     // =========================================================================
     "categories": {
       "ultrabrain": {
-        // "model": "sol-octg",
         "model": "cloudflare-ai-gateway-octg/gpt-5.6-sol",
         "models": [
           {
-            // "model": "sol-octg",
             "model": "cloudflare-ai-gateway-octg/gpt-5.6-sol",
             "reasoning": "max"
           },
           {
-            // "model": "sol",
             "model": "openai/gpt-5.6-sol",
             "reasoning": "max"
           },
           {
-            // "model": "terra-octg",
             "model": "cloudflare-ai-gateway-octg/gpt-5.6-terra",
             "reasoning": "high"
           },
           {
-            // "model": "terra",
             "model": "openai/gpt-5.6-terra",
             "reasoning": "high"
           }
         ]
       },
       "deep": {
-        // "model": "terra-octg",
         "model": "cloudflare-ai-gateway-octg/gpt-5.6-terra",
         "models": [
           {
-            // "model": "terra-octg",
             "model": "cloudflare-ai-gateway-octg/gpt-5.6-terra",
             "reasoning": "high"
           },
           {
-            // "model": "terra",
+            "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/glm-5.2"
+          },
+          {
             "model": "openai/gpt-5.6-terra",
             "reasoning": "high"
           },
           {
-            // "model": "sol-octg",
-            "model": "cloudflare-ai-gateway-octg/gpt-5.6-sol",
-            "reasoning": "medium"
-          },
-          {
-            // "model": "sol",
             "model": "openai/gpt-5.6-sol",
             "reasoning": "medium"
           }
         ]
       },
       "quick": {
-        // "model": "luna",
         "model": "openai/gpt-5.6-luna",
         "models": [
           {
-            // "model": "luna",
             "model": "openai/gpt-5.6-luna",
             "reasoning": "low"
+          },
+          {
+            "model": "opencode/deepseek-v4-flash-free"
           }
         ]
       },
       "writing": {
-        // "model": "kimi-k27",
         "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.7-code",
         "models": [
           {
-            // "model": "kimi-k27",
             "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.7-code"
           }
         ]
       },
       "unspecified-low": {
-        // "model": "luna",
         "model": "openai/gpt-5.6-luna",
         "models": [
           {
-            // "model": "luna",
             "model": "openai/gpt-5.6-luna",
-            "reasoning": "high"
+            "reasoning": "medium"
           },
           {
-            // "model": "kimi-k27",
-            "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.7-code"
+            "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/glm-5.3-flash"
           }
         ]
       },
       "unspecified-high": {
-        // "model": "luna",
-        "model": "openai/gpt-5.6-luna",
+        "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/glm-5.2",
         "models": [
           {
-            // "model": "luna",
+            "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/glm-5.2"
+          },
+          {
             "model": "openai/gpt-5.6-luna",
             "reasoning": "max"
           },
           {
-            // "model": "kimi-k27",
-            "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.7-code"
+            "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k3"
           }
         ]
       },
       "visual-engineering": {
-        // "model": "gemini-pro",
         "model": "cloudflare-ai-gateway/google-ai-studio/gemini-3.1-pro",
         "models": [
           {
-            // "model": "gemini-pro",
             "model": "cloudflare-ai-gateway/google-ai-studio/gemini-3.1-pro",
             "reasoning": "high"
           },
           {
-            // "model": "kimi-k27",
             "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.7-code"
           }
         ]
       },
       "artistry": {
-        // "model": "gemini-pro",
         "model": "cloudflare-ai-gateway/google-ai-studio/gemini-3.1-pro",
         "models": [
           {
-            // "model": "gemini-pro",
             "model": "cloudflare-ai-gateway/google-ai-studio/gemini-3.1-pro",
             "reasoning": "high"
           },
           {
-            // "model": "kimi-k27",
             "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.7-code"
           }
         ]
@@ -407,14 +354,23 @@
   },
 
   // ===========================================================================
-  // Base Models (デフォルト: personal カタログ)
-  //
-  // ※ OMO の論理カタログ定義。上述の通りサブエージェント実行時の不整合回避のため、
-  //   agents / categories 側には provider/model 完全修飾名を直接記述しています。
+  // Base Models (personal logical catalog)
   // ===========================================================================
   "models": {
     "kimi-k27": {
       "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.7-code"
+    },
+    "kimi-k3": {
+      "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k3"
+    },
+    "glm-52": {
+      "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/glm-5.2"
+    },
+    "glm-53-flash": {
+      "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/glm-5.3-flash"
+    },
+    "deepseek-v4-flash": {
+      "model": "opencode/deepseek-v4-flash-free"
     },
     "kimi-k26": {
       "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.6"
@@ -440,248 +396,152 @@
   },
 
   // ===========================================================================
-  // Profiles (実行環境別プロファイル定義)
+  // Profiles
   // ===========================================================================
   "profiles": {
-
-    // =========================================================================
-    // PERSONAL プロファイル (個人開発用 / ベース設定をそのまま使用)
-    // =========================================================================
     "personal": {},
 
-    // =========================================================================
-    // WORK プロファイル (業務環境用 / Amazon Bedrock Claude 統一ポリシー)
-    //
-    // 【モデルルーティング方針】
-    // - Claude Opus 5   : 司令塔・最上位推論・高度レビュー
-    // - Claude Sonnet 5 : 主力実装・プランニング・汎用オーケストレーション
-    // - Claude Haiku 4.5: 高速検索・スクリーニング・軽量作業
-    // =========================================================================
+    // WORK profile remains unchanged in routing policy: Amazon Bedrock Claude.
     "work": {
-      // -----------------------------------------------------------------------
-      // 論理モデルカタログ (Amazon Bedrock)
-      //
-      // ※ OMO の論理カタログ定義。サブエージェント実行時の不整合回避のため、
-      //   agents / categories 側には provider/model 完全修飾名を直接記述しています。
-      // -----------------------------------------------------------------------
       "models": {
-        // Claude Opus 5 (最上位推論)
         "opus": {
           "model": "amazon-bedrock/global.anthropic.claude-opus-5"
         },
-
-        // Claude Sonnet 5 (高性能・高速主力)
         "sonnet": {
           "model": "amazon-bedrock/global.anthropic.claude-sonnet-5"
         },
-
-        // Claude Haiku 4.5 (超高速・軽量)
         "haiku": {
           "model": "amazon-bedrock/global.anthropic.claude-haiku-4-5-20251001-v1:0"
         }
       },
 
       "[opencode]": {
-        // =====================================================================
-        // Agents (業務プロファイル用エージェント定義)
-        // =====================================================================
         "agents": {
-          // Sisyphus (メイン司令塔: Sonnet -> Opus)
           "sisyphus": {
-            // "model": "sonnet",
             "model": "amazon-bedrock/global.anthropic.claude-sonnet-5",
             "ultrawork": {
-              // "model": "opus",
               "model": "amazon-bedrock/global.anthropic.claude-opus-5",
               "reasoning": "high"
             }
           },
-
-          // Hephaestus は業務プロファイルでは無効化
           "hephaestus": {
             "disable": true
           },
-
-          // Oracle (設計相談)
           "oracle": {
-            // "model": "opus",
             "model": "amazon-bedrock/global.anthropic.claude-opus-5"
           },
-
-          // Librarian (外部調査)
           "librarian": {
-            // "model": "haiku",
             "model": "amazon-bedrock/global.anthropic.claude-haiku-4-5-20251001-v1:0"
           },
-
-          // Explore (コード探索)
           "explore": {
-            // "model": "haiku",
             "model": "amazon-bedrock/global.anthropic.claude-haiku-4-5-20251001-v1:0"
           },
-
-          // Multimodal Looker (視覚解析)
           "multimodal-looker": {
-            // "model": "opus",
             "model": "amazon-bedrock/global.anthropic.claude-opus-5"
           },
-
-          // Prometheus (計画立案)
           "prometheus": {
-            // "model": "opus",
             "model": "amazon-bedrock/global.anthropic.claude-opus-5"
           },
-
-          // Metis (メカニクス分析)
           "metis": {
-            // "model": "opus",
             "model": "amazon-bedrock/global.anthropic.claude-opus-5"
           },
-
-          // Momus (レビュー)
           "momus": {
-            // "model": "opus",
             "model": "amazon-bedrock/global.anthropic.claude-opus-5"
           },
-
-          // Atlas (環境管理・進行監視)
           "atlas": {
-            // "model": "sonnet",
             "model": "amazon-bedrock/global.anthropic.claude-sonnet-5"
           }
         },
 
-        // =====================================================================
-        // Categories (業務プロファイル用カテゴリ定義)
-        // =====================================================================
         "categories": {
-          // 最上位推論 (Opus/max -> Sonnet)
           "ultrabrain": {
-            // "model": "opus",
             "model": "amazon-bedrock/global.anthropic.claude-opus-5",
             "models": [
               {
-                // "model": "opus",
                 "model": "amazon-bedrock/global.anthropic.claude-opus-5",
                 "reasoning": "max"
               },
               {
-                // "model": "sonnet",
                 "model": "amazon-bedrock/global.anthropic.claude-sonnet-5"
               }
             ]
           },
-
-          // ディープ実装 (Opus/max -> Sonnet)
           "deep": {
-            // "model": "opus",
             "model": "amazon-bedrock/global.anthropic.claude-opus-5",
             "models": [
               {
-                // "model": "opus",
                 "model": "amazon-bedrock/global.anthropic.claude-opus-5",
                 "reasoning": "max"
               },
               {
-                // "model": "sonnet",
                 "model": "amazon-bedrock/global.anthropic.claude-sonnet-5"
               }
             ]
           },
-
-          // クイック作業 (Haiku -> Sonnet)
           "quick": {
-            // "model": "haiku",
             "model": "amazon-bedrock/global.anthropic.claude-haiku-4-5-20251001-v1:0",
             "models": [
               {
-                // "model": "haiku",
                 "model": "amazon-bedrock/global.anthropic.claude-haiku-4-5-20251001-v1:0"
               },
               {
-                // "model": "sonnet",
                 "model": "amazon-bedrock/global.anthropic.claude-sonnet-5"
               }
             ]
           },
-
-          // ドキュメント執筆 (Sonnet -> Haiku)
           "writing": {
-            // "model": "sonnet",
             "model": "amazon-bedrock/global.anthropic.claude-sonnet-5",
             "models": [
               {
-                // "model": "sonnet",
                 "model": "amazon-bedrock/global.anthropic.claude-sonnet-5"
               },
               {
-                // "model": "haiku",
                 "model": "amazon-bedrock/global.anthropic.claude-haiku-4-5-20251001-v1:0"
               }
             ]
           },
-
-          // 汎用軽量タスク (Sonnet -> Haiku)
           "unspecified-low": {
-            // "model": "sonnet",
             "model": "amazon-bedrock/global.anthropic.claude-sonnet-5",
             "models": [
               {
-                // "model": "sonnet",
                 "model": "amazon-bedrock/global.anthropic.claude-sonnet-5"
               },
               {
-                // "model": "haiku",
                 "model": "amazon-bedrock/global.anthropic.claude-haiku-4-5-20251001-v1:0"
               }
             ]
           },
-
-          // 汎用高度推論 (Opus/max -> Sonnet)
           "unspecified-high": {
-            // "model": "opus",
             "model": "amazon-bedrock/global.anthropic.claude-opus-5",
             "models": [
               {
-                // "model": "opus",
                 "model": "amazon-bedrock/global.anthropic.claude-opus-5",
                 "reasoning": "max"
               },
               {
-                // "model": "sonnet",
                 "model": "amazon-bedrock/global.anthropic.claude-sonnet-5"
               }
             ]
           },
-
-          // ビジュアル・UI設計 (Opus/max -> Sonnet)
           "visual-engineering": {
-            // "model": "opus",
             "model": "amazon-bedrock/global.anthropic.claude-opus-5",
             "models": [
               {
-                // "model": "opus",
                 "model": "amazon-bedrock/global.anthropic.claude-opus-5",
                 "reasoning": "max"
               },
               {
-                // "model": "sonnet",
                 "model": "amazon-bedrock/global.anthropic.claude-sonnet-5"
               }
             ]
           },
-
-          // クリエイティブ生成 (Sonnet -> Haiku)
           "artistry": {
-            // "model": "sonnet",
             "model": "amazon-bedrock/global.anthropic.claude-sonnet-5",
             "models": [
               {
-                // "model": "sonnet",
                 "model": "amazon-bedrock/global.anthropic.claude-sonnet-5"
               },
               {
-                // "model": "haiku",
                 "model": "amazon-bedrock/global.anthropic.claude-haiku-4-5-20251001-v1:0"
               }
             ]
@@ -691,10 +551,8 @@
     }
   },
 
-  // ===========================================================================
-  // マイグレーション履歴
-  // ===========================================================================
   "_migrations": [
-    "2026-07-opencode-config-unification"
+    "2026-07-opencode-config-unification",
+    "2026-09-cloudflare-dynamic-routing-temporary-bypass"
   ]
 }
