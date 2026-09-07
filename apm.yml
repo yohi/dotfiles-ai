@@ -541,7 +541,12 @@ enabled_providers:
   - openai
   - cloudflare-ai-gateway
   - cloudflare-ai-gateway-custom
-  - cloudflare-ai-gateway-dynamic
+  # TEMPORARY: Cloudflare AI Gateway Dynamic Routes are disabled because newly
+  # created/recreated routes can fail before provider invocation (cloudflare/ai#611),
+  # and Custom Providers are not supported by Dynamic Routing yet
+  # (cloudflare/cloudflare-docs#29840). Keep the provider definition below so it
+  # can be re-enabled quickly once Cloudflare confirms a fix/support.
+  # - cloudflare-ai-gateway-dynamic
   - cloudflare-ai-gateway-octg
   - opencode
   - ollama-cloud
@@ -805,9 +810,12 @@ provider:
         name: Kimi K3 Free (Nvidia)
         variants: *kimi_k3_variants
 
-  # 3. Cloudflare Dynamic Routes. Dynamic Routing currently requires the
-  # OpenAI-compatible /compat/chat/completions endpoint and cannot use the
-  # REST API path selected by the native Cloudflare provider.
+  # 3. Cloudflare Dynamic Routes — TEMPORARILY DISABLED.
+  # Known Cloudflare issue: newly created/recreated routes may return Error 2005
+  # before invoking an otherwise healthy provider (cloudflare/ai#611). Dynamic
+  # Routing also does not support Custom Providers yet
+  # (cloudflare/cloudflare-docs#29840). Keep the catalog/configuration dormant so
+  # re-enabling only requires restoring cloudflare-ai-gateway-dynamic above.
   cloudflare-ai-gateway-dynamic:
     npm: "@ai-sdk/openai-compatible"
     name: "Cloudflare AI Gateway (Dynamic)"
