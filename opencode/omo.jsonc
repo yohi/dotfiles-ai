@@ -81,25 +81,25 @@
         "opencode": 5,
         "cloudflare-ai-gateway": 3,
         "cloudflare-ai-gateway-custom": 5,
-        "cloudflare-ai-gateway-dynamic": 5,
         "cloudflare-ai-gateway-octg": 4,
         "amazon-bedrock": 5
       },
       "modelConcurrency": {
-        "cloudflare-ai-gateway-dynamic/dynamic/kimi-k2.7-code": 2,
-        "cloudflare-ai-gateway-dynamic/dynamic/kimi-k3": 1,
-        "cloudflare-ai-gateway-dynamic/dynamic/glm-5.2": 2,
-        "cloudflare-ai-gateway-dynamic/dynamic/glm-5.3-flash": 4,
-        "cloudflare-ai-gateway-dynamic/dynamic/deepseek-v4-flash": 5,
+        "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.7-code": 2,
+        "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k3": 1,
+        "cloudflare-ai-gateway-custom/custom-ollama-cloud/glm-5.2": 2,
+        "cloudflare-ai-gateway-custom/custom-ollama-cloud/glm-5.3-flash": 4,
+        "opencode/deepseek-v4-flash-free": 5,
         "cloudflare-ai-gateway-octg/gpt-5.6-sol": 1,
         "cloudflare-ai-gateway-octg/gpt-5.6-terra": 2
       }
     },
 
-    // Cloudflare Dynamic Routing owns provider failover for the same model.
-    // OmO runtime fallback therefore advances only after the route/model itself
-    // fails. The long timeout avoids racing Cloudflare's 120-180s per-provider
-    // timeout chains; HTTP 429/5xx still trigger immediately.
+    // TEMPORARY: Cloudflare Dynamic Routing is bypassed because newly created
+    // or recreated routes can fail with Error 2005 before provider invocation,
+    // and Custom Providers are not yet supported by Dynamic Routing. Personal
+    // open models are pinned to direct provider paths until Cloudflare resolves
+    // cloudflare/ai#611 and cloudflare/cloudflare-docs#29840.
     "runtime_fallback": {
       "enabled": true,
       "retry_on_errors": [
@@ -176,14 +176,14 @@
     // provider/model strings. The logical models catalog below remains useful
     // for documentation and future migration.
     //
-    // Provider selection is NOT an OmO responsibility for Dynamic models:
-    // OmO selects the model; Cloudflare selects the provider for that same model.
-    // Sisyphus-Junior is intentionally not configured: category-routed tasks
-    // inherit the model from the selected category.
+    // TEMPORARY: Dynamic Routes are bypassed. Open-model agents use direct
+    // provider paths (primarily Ollama Cloud) until the Cloudflare issues are
+    // resolved. Sisyphus-Junior is intentionally not configured: category-routed
+    // tasks inherit the model from the selected category.
     // =========================================================================
     "agents": {
       "sisyphus": {
-        "model": "cloudflare-ai-gateway-dynamic/dynamic/kimi-k2.7-code",
+        "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.7-code",
         "ultrawork": {
           "model": "openai/gpt-5.6-sol",
           "reasoning": "high"
@@ -212,16 +212,16 @@
         "model": "cloudflare-ai-gateway/google-ai-studio/gemini-3.1-pro"
       },
       "prometheus": {
-        "model": "cloudflare-ai-gateway-dynamic/dynamic/kimi-k2.7-code"
+        "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.7-code"
       },
       "metis": {
-        "model": "cloudflare-ai-gateway-dynamic/dynamic/kimi-k2.7-code"
+        "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.7-code"
       },
       "momus": {
         "model": "cloudflare-ai-gateway-octg/gpt-5.6-terra"
       },
       "atlas": {
-        "model": "cloudflare-ai-gateway-dynamic/dynamic/kimi-k2.7-code"
+        "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.7-code"
       }
     },
 
@@ -232,8 +232,8 @@
     // - OCTG Sol STANDARD (1M tokens/day) stays primary only for ultrabrain,
     //   where each call is high-value and comparatively low-frequency.
     // - Hephaestus is high-frequency/iterative, so Plus Sol is primary there.
-    // - Dynamic open models provide capacity while Cloudflare handles the
-    //   Sakura/Ollama/Go/GOAT provider choice for each fixed model.
+    // - TEMPORARY: open models use direct provider paths while Dynamic Routing
+    //   is affected by Cloudflare's known Error 2005 / Custom Provider issues.
     // - Full GLM-5.3 is intentionally omitted; GLM-5.2 covers substantial
     //   coding while GLM-5.3 Flash has a distinct agentic-fast role.
     // =========================================================================
@@ -267,7 +267,7 @@
             "reasoning": "high"
           },
           {
-            "model": "cloudflare-ai-gateway-dynamic/dynamic/glm-5.2"
+            "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/glm-5.2"
           },
           {
             "model": "openai/gpt-5.6-terra",
@@ -287,15 +287,15 @@
             "reasoning": "low"
           },
           {
-            "model": "cloudflare-ai-gateway-dynamic/dynamic/deepseek-v4-flash"
+            "model": "opencode/deepseek-v4-flash-free"
           }
         ]
       },
       "writing": {
-        "model": "cloudflare-ai-gateway-dynamic/dynamic/kimi-k2.7-code",
+        "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.7-code",
         "models": [
           {
-            "model": "cloudflare-ai-gateway-dynamic/dynamic/kimi-k2.7-code"
+            "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.7-code"
           }
         ]
       },
@@ -307,22 +307,22 @@
             "reasoning": "medium"
           },
           {
-            "model": "cloudflare-ai-gateway-dynamic/dynamic/glm-5.3-flash"
+            "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/glm-5.3-flash"
           }
         ]
       },
       "unspecified-high": {
-        "model": "cloudflare-ai-gateway-dynamic/dynamic/glm-5.2",
+        "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/glm-5.2",
         "models": [
           {
-            "model": "cloudflare-ai-gateway-dynamic/dynamic/glm-5.2"
+            "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/glm-5.2"
           },
           {
             "model": "openai/gpt-5.6-luna",
             "reasoning": "max"
           },
           {
-            "model": "cloudflare-ai-gateway-dynamic/dynamic/kimi-k3"
+            "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k3"
           }
         ]
       },
@@ -334,7 +334,7 @@
             "reasoning": "high"
           },
           {
-            "model": "cloudflare-ai-gateway-dynamic/dynamic/kimi-k2.7-code"
+            "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.7-code"
           }
         ]
       },
@@ -346,7 +346,7 @@
             "reasoning": "high"
           },
           {
-            "model": "cloudflare-ai-gateway-dynamic/dynamic/kimi-k2.7-code"
+            "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.7-code"
           }
         ]
       }
@@ -358,19 +358,19 @@
   // ===========================================================================
   "models": {
     "kimi-k27": {
-      "model": "cloudflare-ai-gateway-dynamic/dynamic/kimi-k2.7-code"
+      "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.7-code"
     },
     "kimi-k3": {
-      "model": "cloudflare-ai-gateway-dynamic/dynamic/kimi-k3"
+      "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k3"
     },
     "glm-52": {
-      "model": "cloudflare-ai-gateway-dynamic/dynamic/glm-5.2"
+      "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/glm-5.2"
     },
     "glm-53-flash": {
-      "model": "cloudflare-ai-gateway-dynamic/dynamic/glm-5.3-flash"
+      "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/glm-5.3-flash"
     },
     "deepseek-v4-flash": {
-      "model": "cloudflare-ai-gateway-dynamic/dynamic/deepseek-v4-flash"
+      "model": "opencode/deepseek-v4-flash-free"
     },
     "kimi-k26": {
       "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.6"
@@ -552,6 +552,7 @@
   },
 
   "_migrations": [
-    "2026-07-opencode-config-unification"
+    "2026-07-opencode-config-unification",
+    "2026-09-cloudflare-dynamic-routing-temporary-bypass"
   ]
 }
