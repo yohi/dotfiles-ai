@@ -779,9 +779,6 @@ provider:
         name: Kimi K2.7 Code (Sakura AI Engine)
 
       # AIHubMix
-      custom-aihubmix/gemini-3.1-pro-preview:
-        name: Gemini 3.1 Pro Preview (AIHubMix)
-        variants: *gemini_variants
       custom-aihubmix/coding-kimi-k3-free:
         name: Coding Kimi K3 Free (AIHubMix)
         variants: *kimi_k3_variants
