@@ -728,6 +728,9 @@ provider:
       custom-ollama-cloud/glm-5.3:
         name: GLM 5.3 (Ollama Cloud)
         variants: *glm_variants
+      custom-ollama-cloud/deepseek-v4-flash:
+        name: DeepSeek V4 Flash (Ollama Cloud)
+        variants: *deepseek_v4_variants
 
       # OpenCode Go
       custom-opencode-go/kimi-k2.6:
@@ -747,6 +750,9 @@ provider:
       custom-opencode-go/glm-5.3:
         name: GLM 5.3 (OpenCode Go)
         variants: *glm_variants
+      custom-opencode-go/deepseek-v4-flash:
+        name: DeepSeek V4 Flash (OpenCode Go)
+        variants: *deepseek_v4_variants
 
       # CommandCode
       custom-command-code/moonshotai/kimi-k2.6:
