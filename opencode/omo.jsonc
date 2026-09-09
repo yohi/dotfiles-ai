@@ -125,11 +125,13 @@
       // Dynamic Routes停止中は、実際に利用する直結model IDへ合わせる。
       "modelConcurrency": {
         "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.7-code": 2,
+        "cloudflare-ai-gateway-custom/custom-opencode-go/kimi-k2.7-code": 2,
         "cloudflare-ai-gateway-custom/custom-sakura-ai/preview/Kimi-K2.7-Code": 2,
         "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k3": 1,
-        "cloudflare-ai-gateway-custom/custom-ollama-cloud/glm-5.2": 2,
+        "cloudflare-ai-gateway-custom/custom-command-code/zai-org/glm-5.2": 2,
         "cloudflare-ai-gateway-custom/custom-ollama-cloud/glm-5.3": 2,
         "cloudflare-ai-gateway-custom/custom-ollama-cloud/glm-5.3-flash": 4,
+        "cloudflare-ai-gateway-custom/custom-command-code/z-ai/glm-5.3-flash": 4,
         "cloudflare-ai-gateway-custom/custom-ollama-cloud/deepseek-v4-flash": 5,
         "cloudflare-ai-gateway-custom/custom-command-code/deepseek/deepseek-v4-flash": 5,
         "cloudflare-ai-gateway-custom/custom-opencode-go/deepseek-v4-flash": 5,
@@ -302,20 +304,20 @@
         "model": "cloudflare-ai-gateway/google-ai-studio/gemini-3.1-pro"
       },
       "prometheus": {
-        // "model": "kimi-k27",
-        "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.7-code",
+        // OpenCode GoのK2.7枠を平常時から使い、Ollamaへの集中を避ける。
+        "model": "cloudflare-ai-gateway-custom/custom-opencode-go/kimi-k2.7-code",
         "fallback_models": [
+          "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.7-code",
           "cloudflare-ai-gateway-custom/custom-sakura-ai/preview/Kimi-K2.7-Code",
-          "cloudflare-ai-gateway-custom/custom-opencode-go/kimi-k2.7-code",
           "cloudflare-ai-gateway-custom/custom-command-code/moonshotai/kimi-k2.7-code"
         ]
       },
       "metis": {
-        // "model": "kimi-k27",
-        "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.7-code",
+        // OpenCode GoのK2.7枠を平常時から使い、計画系workloadを分散する。
+        "model": "cloudflare-ai-gateway-custom/custom-opencode-go/kimi-k2.7-code",
         "fallback_models": [
+          "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.7-code",
           "cloudflare-ai-gateway-custom/custom-sakura-ai/preview/Kimi-K2.7-Code",
-          "cloudflare-ai-gateway-custom/custom-opencode-go/kimi-k2.7-code",
           "cloudflare-ai-gateway-custom/custom-command-code/moonshotai/kimi-k2.7-code"
         ]
       },
@@ -343,6 +345,7 @@
     // - Kimi / GLM / DeepSeek等のopen modelはcloudflare-ai-gateway-custom経由に統一する。
     // - Gemini 3.1 Proはcf-ai-gw-dynamic-routingと同じGoogle AI Studio providerを使う。
     // - Dynamic Routes停止中はsame-model provider fallbackをOmO側で明示する。
+    // - provider primaryはworkload単位で分散し、固定費のあるOllama / Go / GOATを平常時から使う。
     // - GLM-5.3 Flashをdefault agentic coding、GLM-5.3 fullをpremium coding escalation、
     //   GLM-5.2をquota / compatibility hedgeとして扱う。
     // =========================================================================
@@ -417,10 +420,11 @@
             "reasoning": "low"
           },
           {
-            "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/deepseek-v4-flash"
+            // GOATのDeepSeek枠を高ボリュームutility fallbackへ割り当てる。
+            "model": "cloudflare-ai-gateway-custom/custom-command-code/deepseek/deepseek-v4-flash"
           },
           {
-            "model": "cloudflare-ai-gateway-custom/custom-command-code/deepseek/deepseek-v4-flash"
+            "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/deepseek-v4-flash"
           },
           {
             "model": "cloudflare-ai-gateway-custom/custom-opencode-go/deepseek-v4-flash"
@@ -455,6 +459,7 @@
             "reasoning": "medium"
           },
           {
+            // quickをGOAT primaryにするため、low側はOllamaを容量吸収に使う。
             "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/deepseek-v4-flash"
           },
           {
@@ -475,19 +480,20 @@
         ]
       },
       "unspecified-high": {
-        // GLM-5.3 Flashをdefaultに昇格し、full 5.3をpremium coding escalationとして続ける。
-        "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/glm-5.3-flash",
+        // GOATのGLM-5.3 Flash枠を平常時から使い、Ollama集中を避ける。
+        "model": "cloudflare-ai-gateway-custom/custom-command-code/z-ai/glm-5.3-flash",
         "models": [
           {
-            "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/glm-5.3-flash"
+            "model": "cloudflare-ai-gateway-custom/custom-command-code/z-ai/glm-5.3-flash"
           },
           {
-            "model": "cloudflare-ai-gateway-custom/custom-command-code/z-ai/glm-5.3-flash"
+            "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/glm-5.3-flash"
           },
           {
             "model": "cloudflare-ai-gateway-custom/custom-opencode-go/glm-5.3-flash"
           },
           {
+            // full 5.3は重いためOllama Legacyをcapacity sinkとして維持する。
             "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/glm-5.3"
           },
           {
@@ -568,8 +574,8 @@
   //
   // ※ OMO の論理カタログ定義。上述の通りサブエージェント実行時の不整合回避のため、
   //   agents / categories 側には provider/model 完全修飾名を直接記述しています。
-  // ※ Dynamic Routes停止中は、open model aliasをcloudflare-ai-gateway-custom配下の
-  //   同一モデル直結先へ向け、Gemini 3.1 ProだけGoogle AI Studioへ向ける。
+  // ※ Dynamic Routes停止中はaliasもpreferred direct providerを指す。実際のcategory/agentは
+  //   workload単位のprovider primaryを完全修飾名で明示する。
   // ===========================================================================
   "models": {
     "kimi-k27": {
@@ -579,16 +585,16 @@
       "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k3"
     },
     "glm-52": {
-      "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/glm-5.2"
+      "model": "cloudflare-ai-gateway-custom/custom-command-code/zai-org/glm-5.2"
     },
     "glm-53": {
       "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/glm-5.3"
     },
     "glm-53-flash": {
-      "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/glm-5.3-flash"
+      "model": "cloudflare-ai-gateway-custom/custom-command-code/z-ai/glm-5.3-flash"
     },
     "deepseek-v4-flash": {
-      "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/deepseek-v4-flash"
+      "model": "cloudflare-ai-gateway-custom/custom-command-code/deepseek/deepseek-v4-flash"
     },
     "kimi-k26": {
       "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.6"
@@ -873,6 +879,7 @@
     "2026-09-cloudflare-dynamic-routing-temporary-bypass",
     "2026-09-personal-open-model-custom-provider",
     "2026-09-gemini-google-ai-studio-direct",
-    "2026-09-glm53-routing-reevaluation"
+    "2026-09-glm53-routing-reevaluation",
+    "2026-09-open-model-provider-primary-balancing"
   ]
 }
