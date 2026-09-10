@@ -122,6 +122,56 @@ def test_codex_server_forwards_environment_references_and_maps_timeout(
     assert server["startup_timeout_sec"] == 60
 
 
+def test_codex_server_maps_remote_authentication_headers() -> None:
+    server = generate_mcp._build_codex_mcp_server(
+        {
+            "name": "remote-server",
+            "transport": "sse",
+            "url": "https://example.test/mcp",
+            "headers": {
+                "Authorization": "Bearer ${env:REMOTE_TOKEN}",
+                "X-API-Key": "${env:API_KEY}",
+                "X-Static": "static-value",
+            },
+        }
+    )
+
+    assert server == {
+        "url": "https://example.test/mcp",
+        "type": "http",
+        "bearer_token_env_var": "REMOTE_TOKEN",
+        "env_http_headers": {"X-API-Key": "API_KEY"},
+        "http_headers": {"X-Static": "static-value"},
+    }
+
+
+def test_codex_generation_maps_remote_timeout_to_startup_timeout(
+    tmp_path, monkeypatch
+) -> None:
+    codex_path = tmp_path / "config.toml"
+    codex_path.write_text("", encoding="utf-8")
+    monkeypatch.setattr(generate_mcp, "CODEX_PATH", codex_path)
+
+    generate_mcp.update_codex(
+        {
+            "dependencies": {
+                "mcp": [
+                    {
+                        "name": "remote-server",
+                        "transport": "streamable-http",
+                        "url": "https://example.test/mcp",
+                        "timeout": 60000,
+                        "enabled": True,
+                    }
+                ]
+            }
+        }
+    )
+
+    config = tomllib.loads(codex_path.read_text(encoding="utf-8"))
+    assert config["mcp_servers"]["remote-server"]["startup_timeout_sec"] == 60
+
+
 def test_codex_generation_waits_for_optional_servers_until_their_timeout(tmp_path, monkeypatch) -> None:
     apm_path = tmp_path / "apm.yml"
     codex_path = tmp_path / "config.toml"

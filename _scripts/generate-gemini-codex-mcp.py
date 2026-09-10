@@ -125,30 +125,63 @@ def _build_codex_environment(
 
 def _build_codex_mcp_server(entry: dict[str, Any]) -> dict[str, Any] | None:
     transport = entry.get("transport", "stdio")
+    server: dict[str, Any]
     if transport in ("sse", "http", "streamable-http"):
-        return _build_mcp_server(entry)
+        url = entry.get("url")
+        if not url:
+            print(
+                f"[warning] Skipping MCP server '{entry.get('name', '?')}': url is missing for {transport} transport."
+            )
+            return None
 
-    command = entry.get("command")
-    if not command:
-        print(
-            f"[warning] Skipping MCP server '{entry.get('name', '?')}': command is missing for stdio transport."
-        )
-        return None
+        server = {
+            "url": _expand_codex_env_syntax(str(url)),
+            "type": "http",
+        }
+        http_headers: dict[str, str] = {}
+        env_http_headers: dict[str, str] = {}
+        for raw_name, raw_value in (entry.get("headers") or {}).items():
+            name = str(raw_name)
+            value = str(raw_value)
+            bearer_match = re.fullmatch(
+                r"Bearer \$\{env:([A-Za-z_][A-Za-z0-9_]*)\}", value
+            )
+            if name.lower() == "authorization" and bearer_match:
+                server["bearer_token_env_var"] = bearer_match.group(1)
+                continue
 
-    server: dict[str, Any] = {
-        "command": _expand_codex_env_syntax(str(command)),
-        "args": [
-            _expand_codex_env_syntax(str(arg)) for arg in (entry.get("args") or [])
-        ],
-        "type": "stdio",
-    }
+            env_match = re.fullmatch(r"\$\{env:([A-Za-z_][A-Za-z0-9_]*)\}", value)
+            if env_match:
+                env_http_headers[name] = env_match.group(1)
+            else:
+                http_headers[name] = _expand_codex_env_syntax(value)
 
-    if entry.get("env"):
-        environment, env_vars = _build_codex_environment(entry["env"])
-        if environment:
-            server["env"] = environment
-        if env_vars:
-            server["env_vars"] = env_vars
+        if http_headers:
+            server["http_headers"] = http_headers
+        if env_http_headers:
+            server["env_http_headers"] = env_http_headers
+    else:
+        command = entry.get("command")
+        if not command:
+            print(
+                f"[warning] Skipping MCP server '{entry.get('name', '?')}': command is missing for stdio transport."
+            )
+            return None
+
+        server = {
+            "command": _expand_codex_env_syntax(str(command)),
+            "args": [
+                _expand_codex_env_syntax(str(arg)) for arg in (entry.get("args") or [])
+            ],
+            "type": "stdio",
+        }
+
+        if entry.get("env"):
+            environment, env_vars = _build_codex_environment(entry["env"])
+            if environment:
+                server["env"] = environment
+            if env_vars:
+                server["env_vars"] = env_vars
 
     timeout_ms = entry.get("timeout")
     if isinstance(timeout_ms, (int, float)) and not isinstance(timeout_ms, bool):
