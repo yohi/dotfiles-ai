@@ -24,7 +24,7 @@ You are an expert AI software engineer assisting the user across various project
 
 ## 4. Universal Coding Standards
 
-The following rules apply to **ALL** projects unless overridden by a local project-specific config.
+The following rules apply to **ALL** projects. Local project rules may add stricter or more specific requirements, but they MUST NOT weaken or override the CRITICAL safety constraints or the mandatory `yohi/*` repository standard defined below.
 **Note**: These reference documents are located in the central configuration repository (e.g., your dotfiles).
 
 - **Markdown**: Follow `markdownlint-cli2` standards.
@@ -39,6 +39,12 @@ The following rules apply to **ALL** projects unless overridden by a local proje
   - Search and load the skill needed for the current task through the available skill mechanism (for example SkillPort/OpenCode skills).
   - Reference catalog: `agent-skills/AVAILABLE_SKILLS.md`
   - Do **not** preload or inline the full skill catalog into the conversation unless the task explicitly requires it.
+- **`yohi/*` repositories**: For GitHub repositories under the `yohi/*` namespace, follow the [Documentation Architecture Standard for `yohi/*`](https://raw.githubusercontent.com/yohi/.github/refs/heads/master/docs/documentation-architecture.md) for documentation structure, ownership, naming, localization, and single-source-of-truth rules. This standard is mandatory for these repositories; local project rules may supplement it but must not weaken or contradict it.
+- **Pull request merges (CRITICAL)**: Merging any pull request is a destructive, potentially irreversible action and is **FORBIDDEN BY DEFAULT**.
+- **Explicit authorization only**: You **MUST NOT** merge any pull request through `gh`, the GitHub web UI or API, MCP tools, scripts, or any other interface unless the user explicitly and directly instructs you to merge that specific pull request or a clearly identified set of pull requests. Authorization applies only to the named pull request(s) and the merge operation.
+- **No inferred authorization**: Never treat an Issue, PR description, acceptance criteria (including `All PRs are merged in dependency order`), task wording, implementation plan, dependency order, approvals, passing checks, repository conventions, or requests to complete, finish, ship, or release the work as permission to merge.
+- **Confirmation before action**: If explicit authorization is absent, ambiguous, or does not identify the pull request(s), do not merge. Stop and ask the user for confirmation immediately before any merge operation. A direct instruction naming a specific pull request or clearly identified set is sufficient authorization; do not extend it to other pull requests or operations. Never merge first and explain afterward.
+- **CodeRabbitCLI (CRITICAL)**: Use of CodeRabbitCLI, including the `coderabbit` binary, installation, authentication or status checks, and execution, is **FORBIDDEN BY DEFAULT**. Do not run, invoke, delegate, install, authenticate, or otherwise use it directly or indirectly through `bash`, MCP, scripts, plugins, commands, skills, CI, or any other interface unless the user explicitly and directly authorizes its use for the current task. A code-review request, PR task, repository instruction, acceptance criterion, or invocation of a review workflow does not authorize it unless the user explicitly names CodeRabbitCLI. If authorization is not explicit, ask the user before using it.
 
 ## 5. Workflow & Context Awareness
 
@@ -46,4 +52,4 @@ The following rules apply to **ALL** projects unless overridden by a local proje
 2. **Resolve Paths**: Paths in Section 3 are relative to the Central Config Repo. Check accessibility before trying to resolve them.
 3. **Execution Environment**: If a `devcontainer` environment (e.g., `.devcontainer/`) is available, **ALWAYS** prioritize executing static analysis, linting, and tests **inside the devcontainer** to ensure environment consistency.
 4. **Token Management**: `GITHUB_TOKEN` is synced automatically via GitHub CLI and is stored locally in `~/.gh_token` (established in `../dotfiles-zsh/zshrc`), which may then be written directly to the `.env` file during interactive repository setup (`make init-env`).
-5. **Priority**: Local project rules > Global user preferences (this file) > Default behaviors.
+5. **Priority**: Local project rules > Global user preferences (this file) > Default behaviors, except that the CRITICAL safety constraints and mandatory `yohi/*` repository standard in this file are non-overridable and always apply.
