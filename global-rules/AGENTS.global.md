@@ -27,22 +27,23 @@ This file contains only cross-project defaults and safety boundaries. Repository
 ## 4. Universal Coding Standards
 
 The following rules apply to **ALL** projects. Local project rules may add stricter or more specific requirements, but they MUST NOT weaken or override the CRITICAL safety constraints or the mandatory `yohi/*` repository standard defined below.
-**Note**: These reference documents are located in the central configuration repository (e.g., your dotfiles).
+**Note**: These reference documents are located in the central configuration repository (e.g., your dotfiles). The references below are relative to the repository's `global-rules/` directory; installed OpenCode copies expose the same files under the `docs/global-rules/` mirror.
 Read linked references and skills only when they are relevant to the current task. Do not duplicate their detailed instructions in this global file.
 
 - **Markdown**: Follow `markdownlint-cli2` standards.
-  - Reference: `global-rules/MARKDOWN.md`
+  - Reference: `MARKDOWN.md`
 - **Shell Scripts**: Follow `shellcheck` standards (POSIX or Bash).
-  - Reference: `global-rules/SHELL.md`
+  - Reference: `SHELL.md`
 - **Documentation Style**: Follow documentation standards.
-  - Reference: `global-rules/DOCS_STYLE.md`
+  - Reference: `DOCS_STYLE.md`
 - **Git Standards**: Follow Conventional Commits in Japanese.
-  - Reference: `global-rules/GIT_STANDARDS.md`
+  - Reference: `GIT_STANDARDS.md`
 - **Agent Skills**: Reusable skill definitions are discovered on demand rather than embedded in this global instruction file.
   - Search and load the skill needed for the current task through the available skill mechanism (for example SkillPort/OpenCode skills).
   - Reference catalog: `agent-skills/AVAILABLE_SKILLS.md`
   - Do **not** preload or inline the full skill catalog into the conversation unless the task explicitly requires it.
 - **`yohi/*` repositories**: For GitHub repositories under the `yohi/*` namespace, follow the [Documentation Architecture Standard for `yohi/*`](https://raw.githubusercontent.com/yohi/.github/refs/heads/master/docs/documentation-architecture.md) for documentation structure, ownership, naming, localization, and single-source-of-truth rules. This standard is mandatory for these repositories; local project rules may supplement it but must not weaken or contradict it.
+- **Stacked PR workflow**: Read `STACKED_PR_WORKFLOW.md` only when the task explicitly uses stacked PRs. It adds workflow-specific constraints and never authorizes a merge.
 - **Pull request merges (CRITICAL)**: Merging any pull request is a destructive, potentially irreversible action and is **FORBIDDEN BY DEFAULT**.
 - **Explicit authorization only**: You **MUST NOT** merge any pull request through `gh`, the GitHub web UI or API, MCP tools, scripts, or any other interface unless the user explicitly and directly instructs you to merge that specific pull request or a clearly identified set of pull requests. Authorization applies only to the named pull request(s) and the merge operation.
 - **No inferred authorization**: Never treat an Issue, PR description, acceptance criteria (including `All PRs are merged in dependency order`), task wording, implementation plan, dependency order, approvals, passing checks, repository conventions, or requests to complete, finish, ship, or release the work as permission to merge.

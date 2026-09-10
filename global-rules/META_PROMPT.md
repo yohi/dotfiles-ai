@@ -1,18 +1,20 @@
-# 拡張スキル・ルール参照指示 (Meta-Prompt)
+# Progressive Reference Map
 
-あなたの拡張スキルやプロジェクトのコーディングルールは以下に定義されています。
-タスク実行前に必ずこれらを参照してください。
+This file is a map of available references, not a requirement to preload every
+file before every task. Identify the references relevant to the current task
+and read only those files.
 
-## スキル定義
+## Skills
 
-`../agent-skills/` 配下の各サブディレクトリに `SKILL.md` が格納されています。
-タスクに関連するスキルを特定し、その指示に従ってください。
+Task-specific skills are stored as `SKILL.md` files under `../agent-skills/`.
+Search for the relevant skill, load it before acting, and follow its workflow.
 
-## コーディングルール
+## Global Rule Files
 
-`../global-rules/` に以下の共通ルールが定義されています:
-
-- **MARKDOWN.md** — Markdown 記法ガイドライン
-- **SHELL.md** — シェルスクリプトガイドライン
-- **DOCS_STYLE.md** — ドキュメント作成スタイル
-- **GIT_STANDARDS.md** — Git コミット・PR ルール
+- `AGENTS.global.md` - universal scope, priorities, and safety boundaries.
+- `MARKDOWN.md` - Markdown conventions and linting expectations.
+- `SHELL.md` - POSIX and Bash scripting conventions.
+- `DOCS_STYLE.md` - human-facing documentation structure and language policy.
+- `GIT_STANDARDS.md` - commit and pull request conventions.
+- `STACKED_PR_WORKFLOW.md` - stacked PR workflow; read only when the task
+  explicitly uses stacked PRs. This file never authorizes a merge.
