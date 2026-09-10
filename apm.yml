@@ -169,6 +169,8 @@ dependencies:
       transport: stdio
       command: "uvx"
       args:
+        - "--python"
+        - "3.13"
         - "semgrep-mcp"
         - "-t"
         - "stdio"
@@ -203,6 +205,7 @@ dependencies:
         - "http-bridge"
       env:
         LOG_LEVEL: "ERROR"
+        GITHUB_TOKEN: "${env:GITHUB_TOKEN}"
         NEXUS_WATCHER_IGNORE_PATHS: "node_modules,opencode/node_modules,.opencode/node_modules,oss/apm/node_modules,oss/apm/docs/node_modules,.git,.nexus,dist,gemini,agent-skills,apm_modules,.agents,.opencode,.gemini,.claude,.codex,.vscode,.devcontainer,oss,codex/.tmp,.worktrees,.venv,target,.mypy_cache,.ruff_cache,build,.serena,.cache,__pycache__,*.db,*.sqlite,*.log"
         CHOKIDAR_USEPOLLING: "false"
         CHOKIDAR_INTERVAL: "2000"

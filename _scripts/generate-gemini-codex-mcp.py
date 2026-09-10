@@ -7,6 +7,8 @@ apm.yml without manually editing each client config.
 from __future__ import annotations
 
 import json
+import math
+import os
 import re
 import sys
 try:
@@ -74,6 +76,118 @@ def _build_mcp_server(entry: dict[str, Any]) -> dict[str, Any] | None:
     }
     if "env" in entry:
         server["env"] = _convert_value(entry["env"])
+    return server
+
+
+def _expand_codex_env_syntax(value: str) -> str:
+    def replace(match: re.Match[str]) -> str:
+        variable = match.group(1)
+        default = match.group(2)
+        if variable in os.environ:
+            return os.environ[variable]
+        if default is not None:
+            return default
+        if variable == "PWD":
+            return str(Path.cwd())
+        if variable == "HOME":
+            return str(Path.home())
+        return match.group(0)
+
+    return re.sub(
+        r"\$\{env:([A-Za-z_][A-Za-z0-9_]*)(?::-(.*))?\}",
+        replace,
+        value,
+    )
+
+
+def _build_codex_environment(
+    values: dict[str, Any],
+) -> tuple[dict[str, str], list[str]]:
+    environment: dict[str, str] = {}
+    env_vars: list[str] = []
+    pattern = r"\$\{env:([A-Za-z_][A-Za-z0-9_]*)(?::-(.*))?\}"
+
+    for name, raw_value in values.items():
+        value = str(raw_value)
+        match = re.fullmatch(pattern, value)
+        if match and match.group(1) == name:
+            variable = match.group(1)
+            default = match.group(2)
+            if variable in os.environ or default is None:
+                env_vars.append(variable)
+            else:
+                environment[name] = default
+            continue
+        environment[name] = _expand_codex_env_syntax(value)
+
+    return environment, env_vars
+
+
+def _build_codex_mcp_server(entry: dict[str, Any]) -> dict[str, Any] | None:
+    transport = entry.get("transport", "stdio")
+    server: dict[str, Any]
+    if transport in ("sse", "http", "streamable-http"):
+        url = entry.get("url")
+        if not url:
+            print(
+                f"[warning] Skipping MCP server '{entry.get('name', '?')}': url is missing for {transport} transport."
+            )
+            return None
+
+        server = {
+            "url": _expand_codex_env_syntax(str(url)),
+            "type": "http",
+        }
+        http_headers: dict[str, str] = {}
+        env_http_headers: dict[str, str] = {}
+        for raw_name, raw_value in (entry.get("headers") or {}).items():
+            name = str(raw_name)
+            value = str(raw_value)
+            bearer_match = re.fullmatch(
+                r"Bearer \$\{env:([A-Za-z_][A-Za-z0-9_]*)\}", value
+            )
+            if name.lower() == "authorization" and bearer_match:
+                server["bearer_token_env_var"] = bearer_match.group(1)
+                continue
+
+            env_match = re.fullmatch(r"\$\{env:([A-Za-z_][A-Za-z0-9_]*)\}", value)
+            if env_match:
+                env_http_headers[name] = env_match.group(1)
+            else:
+                http_headers[name] = _expand_codex_env_syntax(value)
+
+        if http_headers:
+            server["http_headers"] = http_headers
+        if env_http_headers:
+            server["env_http_headers"] = env_http_headers
+    else:
+        command = entry.get("command")
+        if not command:
+            print(
+                f"[warning] Skipping MCP server '{entry.get('name', '?')}': command is missing for stdio transport."
+            )
+            return None
+
+        server = {
+            "command": _expand_codex_env_syntax(str(command)),
+            "args": [
+                _expand_codex_env_syntax(str(arg)) for arg in (entry.get("args") or [])
+            ],
+            "type": "stdio",
+        }
+
+        if entry.get("env"):
+            environment, env_vars = _build_codex_environment(entry["env"])
+            if environment:
+                server["env"] = environment
+            if env_vars:
+                server["env_vars"] = env_vars
+
+    timeout_ms = entry.get("timeout")
+    if isinstance(timeout_ms, (int, float)) and not isinstance(timeout_ms, bool):
+        if timeout_ms > 0:
+            server["startup_timeout_sec"] = max(1, math.ceil(timeout_ms / 1000))
+
     return server
 
 
@@ -192,7 +306,7 @@ def update_codex(apm: dict[str, Any]) -> None:
     mcp_servers = {
         str(e["name"]): cfg
         for e in entries
-        if (cfg := _build_mcp_server(e)) is not None
+        if (cfg := _build_codex_mcp_server(e)) is not None
     }
 
     original_text = ""
@@ -207,6 +321,12 @@ def update_codex(apm: dict[str, Any]) -> None:
     else:
         data = {}
 
+    data = {
+        "mcp_optional_startup_grace_ms": data.get(
+            "mcp_optional_startup_grace_ms", 0
+        ),
+        **data,
+    }
     data["mcp_servers"] = mcp_servers
 
     with open(CODEX_PATH, "w", encoding="utf-8") as f:
@@ -215,6 +335,11 @@ def update_codex(apm: dict[str, Any]) -> None:
 
 
 def main() -> int:
+    mode = sys.argv[1] if len(sys.argv) > 1 else "all"
+    if mode not in {"all", "--codex-only", "--gemini-only"}:
+        print(f"[error] Unknown generation mode: {mode}", file=sys.stderr)
+        return 2
+
     try:
         apm = yaml.safe_load(APM_YML.read_text(encoding="utf-8"))
     except OSError as exc:
@@ -224,8 +349,10 @@ def main() -> int:
         print(f"[error] Failed to parse {APM_YML}: {exc}", file=sys.stderr)
         return 1
 
-    update_gemini(apm)
-    update_codex(apm)
+    if mode in {"all", "--gemini-only"}:
+        update_gemini(apm)
+    if mode in {"all", "--codex-only"}:
+        update_codex(apm)
     return 0
 
 
