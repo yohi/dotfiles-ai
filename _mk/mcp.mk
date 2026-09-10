@@ -1,4 +1,4 @@
-.PHONY: sync-mcp sync-gemini-codex help-mcp
+.PHONY: sync-mcp sync-codex-mcp sync-gemini-codex help-mcp
 
 mcp: sync-mcp
 
@@ -16,8 +16,13 @@ sync-mcp: ## APMを使用してMCP設定を同期
 	else \
 		apm install --force; \
 	fi
-	#	@-$(MAKE) sync-gemini-codex  # disabled: Codex/Gemini CLI integration disabled (see apm.yml targets:)
+	@$(MAKE) sync-opencode
+	@$(MAKE) sync-codex-mcp
 	@echo "[+] MCP synchronization complete."
+
+sync-codex-mcp: ## Codex の MCP 設定を同期
+	@echo "🔄 Synchronizing Codex MCP settings..."
+	@uv run --with pyyaml --with tomli python3 _scripts/generate-gemini-codex-mcp.py --codex-only
 
 sync-gemini-codex: ## Gemini / Codex の MCP 設定を同期
 	@echo "🔄 Synchronizing Gemini / Codex MCP settings..."
@@ -68,4 +73,3 @@ uninstall-codegraph: ## Uninstall codegraph from agents and system
 	@rm -f "$(HOME_DIR)/.local/bin/codegraph"
 	@rm -rf "$(HOME_DIR)/.codegraph"
 	$(Q_ECHO) "✅ codegraph のアンインストールが完了しました。"
-

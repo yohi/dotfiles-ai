@@ -60,7 +60,7 @@ setup-agents:
 	fi
 	$(MAKE) setup-claude
 	#	$(MAKE) setup-gemini  # disabled: Gemini CLI integration disabled (see apm.yml targets:)
-	#	$(MAKE) setup-codex  # disabled: Codex integration disabled (see apm.yml targets:)
+	$(MAKE) setup-codex
 	$(MAKE) setup-opencode
 	$(MAKE) setup-antigravity
 	$(MAKE) setup-codegraph
