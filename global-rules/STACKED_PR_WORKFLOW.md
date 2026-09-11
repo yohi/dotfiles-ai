@@ -1,10 +1,17 @@
-# AI-Native Stacked PR Workflow: 完全定義書 (v1.4.2)
+# Guarded Stacked PR Workflow
 
-このドキュメントは、AIエージェントによる開発の「統制」と「品質」を担保するための最上位プロトコル（憲法）である。AIはこの規則を一文字たりとも違えてはならず、自身の学習データにある一般的な慣習よりも本規定を優先しなければならない。
+## Scope and Priority
 
----
+This workflow is opt-in. Apply it only when the task explicitly uses stacked
+PRs, phase/base/task branches, or this document by name. Ordinary branch and PR
+work is governed by the repository instructions and does not inherit these
+constraints.
 
-## 0. メタデータ定義
+`AGENTS.global.md` remains authoritative for universal safety rules and
+priority. This document adds workflow-specific constraints; it never
+authorizes a pull request merge.
+
+## Metadata
 
 ```yaml
 workflow_metadata:
@@ -12,90 +19,78 @@ workflow_metadata:
   version: 1.4.2
   policy:
     human_in_the_loop: true
-    naming_enforcement: "STRICT" # 命名規則違反はタスク失敗とみなす
-    sync_method: "rebase"
+    naming_enforcement: strict
+    sync_method: rebase
   naming_convention:
-    base: "feature/phase[N]-[機能名]__base"
-    task: "feature/phase[N]-task[M]-[サブ機能名]"
+    base: feature/phase[N]-[feature]__base
+    task: feature/phase[N]-task[M]-[subfeature]
 ```
 
----
+## 1. Branch Naming
 
-## 1. 命名規則の視覚的パターン (Naming Patterns)
+Use the following patterns when this workflow is active. Do not use generic
+prefixes such as `feat/` or `fix/` for these branches.
 
-AIはブランチ作成時、以下の正規表現パターンを厳守すること。**一般的な `feat/` や `fix/` は使用禁止である。**
+- **Base branch**: `feature/phase1-redis-monitor__base`
+- **Task branch**: `feature/phase1-task1-interface-def`
 
-*   **集約ブランチ (Base):**
-    `feature/phase1-redis-monitor__base`
-    (構成: `feature/` + `フェーズ` + `-` + `機能名` + `__base`)
-*   **タスクブランチ (Task):**
-    `feature/phase1-task1-interface-def`
-    (構成: `feature/` + `フェーズ` + `-task` + `連番` + `-` + `サブ機能名`)
+## 2. Workflow
 
----
+### Step 1: Set Up Branches
 
-## 2. ブランチ運用フロー（詳細手順）
+1. Create the base branch from `master` and end its name with `__base`.
+2. Create the first task branch from the base branch.
 
-### STEP 1: 環境構築
-1. **baseブランチの作成**
-   - `master` から分岐し、必ず `__base` で終わる名称にする。
-   - 例: `git checkout -b feature/phase1-redis-monitor__base`
-2. **最初のタスクブランチの作成**
-   - `__base` から分岐する。
-   - 例: `git checkout -b feature/phase1-task1-interface-def`
+```bash
+git checkout master
+git checkout -b feature/phase1-redis-monitor__base
+git checkout -b feature/phase1-task1-interface-def
+```
 
-### STEP 2: 実装とスタッキング
-1. **タスクの実装**
-   - **200 LOC 以内** / **単体テスト 100% PASS** を絶対条件とする。
-2. **PR（下書き）の作成**
-   - **重要:** PRのベース（マージ先）は必ず上記で作成した `__base` ブランチに設定すること。
-3. **後続タスクの開始**
-   - 直前のタスクから分岐: `task1` -> `task2`
-   - 例: `git checkout -b feature/phase1-task2-redis-impl`
+### Step 2: Implement and Stack
 
-### STEP 3: 伝播（Rebase）
-1. 先行タスクが `__base` にマージされたら、即座に `__base` を後続の全タスクブランチに `git rebase` し、常に最新のコンテキストを維持せよ。
-2. **競合（コンフリクト）発生時の対応プロトコル**:
-   - リベース中に競合が発生した場合、AIによる**自動解決は厳禁**とする。
-   - 即座にリベースを中止（`git rebase --abort`）し、人間に競合発生を通知して判断を仰ぐこと。
-   - 競合が軽微に見える場合であっても、競合箇所の変更履歴が複雑に交差している場合は直ちに処理を中断すること。
+1. Keep each task at or below 200 LOC and require unit tests to pass fully.
+2. Create a draft PR whose base is the workflow base branch.
+3. Create each subsequent task branch from the preceding task branch.
 
----
+### Step 3: Propagate Changes
 
-## 3. AIエージェント禁止事項 (Forbidden Actions)
+1. When a preceding task has been merged into `__base` through an explicitly
+   authorized operation, rebase all later task branches onto the updated base.
+2. If a rebase conflict occurs, do not resolve it automatically. Run
+   `git rebase --abort`, report the conflict, and ask a human to decide.
+3. Stop even when a conflict appears small if its history is difficult to
+   interpret.
 
-AIは以下の操作を**いかなる理由があっても実行してはならない**。
+## 3. Forbidden Actions
 
-1.  **Generic Naming**: `feat/`, `fix/`, `hotfix/`, `docs/` 等、本規定外の接頭辞を使用すること。
-2.  **Direct Commit to Base**: `__base` ブランチに対して直接 `push` すること（必ず PR を経由せよ）。
-3.  **Auto-Merge to Master**: `master` へのマージを実行すること（人間が最終承認する）。
-4.  **Implicit Context**: 前のタスクの差分を取り込まずに（Rebaseせずに）次の実装を進めること。
+When this workflow is active, do not:
 
----
+1. Use branch prefixes outside the naming patterns above.
+2. Push directly to the `__base` branch; use a PR instead.
+3. Auto-merge into `master`. This workflow does not grant merge permission;
+   all merges remain subject to `AGENTS.global.md`.
+4. The next task branch may be created from the preceding task branch before the
+   preceding task is merged. Do not begin implementing the next task until the
+   preceding task has been merged into `__base` and the next branch has been
+   rebased onto the updated base; do not start the next task without rebasing the
+   preceding task's changes.
 
-## 4. PR作成時のチェックリスト (Internal Audit)
+## 4. PR Checklist
 
-AIは PR を作成する直前に、以下の思考プロセスを必ず経ること。
+Before creating a PR, verify:
 
-*   [ ] **ブランチ名は `feature/phase[N]-task[M]-...` になっているか？**
-*   [ ] **PRのターゲットは `__base` ブランチに設定されているか？** (masterになっていないか？)
-*   [ ] **差分は 200 LOC 以下に収まっているか？**
-*   [ ] **これは「ついで」の修正を含まない、単一の目的（Atomic Change）か？** (客観的な判定基準として、変更対象が特定の単一レイヤー(UI層のみ、API定義のみ)や1つのファイルカテゴリのみに限定され、複数レイヤーにまたがる変更が混在していないこと)
+- [ ] The branch name matches `feature/phase[N]-task[M]-...`.
+- [ ] The PR targets the workflow `__base` branch, not `master`.
+- [ ] The diff is 200 LOC or smaller.
+- [ ] The change has one purpose and does not include unrelated work.
 
----
+## 5. Progress Report
 
-## 5. AI完了報告テンプレート
+Use this format when reporting progress under this workflow:
 
-AIは進捗を報告する際、必ず以下の形式を使用し、自身がルールを守っていることを証明せよ。
-
-> **AI**: Phase [N] のタスクを以下の通り実行しました。
-> **作成ブランチ**: `feature/phase[N]-task[M]-[名称]`
-> **ターゲット**: `feature/phase[N]-[機能名]__base`
-> **ステータス**: 差分 [XXX] LOC / テスト [PASS] / リベース [完了]
-> **次のアクション**: `task[M+1]` の実装に移行します。
-
----
-
-## 6. 結論
-このプロトコルを遵守できないAIは、開発パートナーとしての資格を失う。
-本規定は、AIの強力な計算能力を「秩序あるコード資産」へと変換するための唯一の道である。
+> **Task**: Phase [N], task [M]
+> **Branch**: `feature/phase[N]-task[M]-[name]`
+> **Target**: `feature/phase[N]-[feature]__base`
+> **Status**: [XXX] LOC / tests [PASS] / rebase [DONE]
+> **Next**: Begin task [M+1]
