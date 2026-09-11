@@ -181,7 +181,7 @@ link-agent-commands: ## agent-commands/ のコマンドを各エージェント�
 # ============================================================
 # inject-meta-prompt-opencode: OpenCode docs への参照リンク作成
 # ============================================================
-inject-meta-prompt-opencode: ## OpenCode の docs/ に global-rules/ へのシンボリックリンクを作成
+inject-meta-prompt-opencode: ## OpenCode の docs/ に global-rules/ と agent-skills/ へのシンボリックリンクを作成
 	@echo "📌 OpenCode: global-rules への参照リンクを作成中..."
 	@mkdir -p "$(OPENCODE_DOCS)"
 	@if [ -L "$(OPENCODE_DOCS)/global-rules" ]; then \
@@ -194,6 +194,15 @@ inject-meta-prompt-opencode: ## OpenCode の docs/ に global-rules/ へのシ�
 	fi
 	@ln -sfn "../../global-rules" "$(OPENCODE_DOCS)/global-rules"
 	@echo "✅ OpenCode: $(OPENCODE_DOCS)/global-rules -> ../../global-rules"
+	@# global-rules 内の相対参照を論理ミラーからも解決できるようにする
+	@if [ -L "$(OPENCODE_DOCS)/agent-skills" ] && \
+		[ "$$(readlink -f "$(OPENCODE_DOCS)/agent-skills" 2>/dev/null || true)" = \
+		  "$$(readlink -f "$(AGENT_SKILLS_DIR)" 2>/dev/null || true)" ]; then \
+		echo "  [SKIP] 既にリンク済み: $(OPENCODE_DOCS)/agent-skills -> $(AGENT_SKILLS_DIR)"; \
+	else \
+		ln -sfn "../../agent-skills" "$(OPENCODE_DOCS)/agent-skills"; \
+		echo "✅ OpenCode: $(OPENCODE_DOCS)/agent-skills -> ../../agent-skills"; \
+	fi
 
 # ============================================================
 # inject-meta-prompt-codex: Codex config.toml へのコメント注入

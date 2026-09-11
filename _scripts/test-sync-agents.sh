@@ -6,8 +6,12 @@ REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 CATALOG="$REPO_ROOT/agent-skills/AVAILABLE_SKILLS.md"
 GLOBAL_RULES_DIR="$REPO_ROOT/global-rules"
 GLOBAL_RULES="$REPO_ROOT/global-rules/AGENTS.global.md"
+META_PROMPT="$REPO_ROOT/global-rules/META_PROMPT.md"
 OPENCODE_GLOBAL_RULES="$REPO_ROOT/opencode/docs/global-rules/AGENTS.global.md"
+OPENCODE_META_PROMPT="$REPO_ROOT/opencode/docs/global-rules/META_PROMPT.md"
+OPENCODE_SKILL_CATALOG="$REPO_ROOT/opencode/docs/agent-skills/AVAILABLE_SKILLS.md"
 SKILL_CATALOG_REFERENCE="../agent-skills/AVAILABLE_SKILLS.md"
+SKILL_DIRECTORY_REFERENCE="../agent-skills/"
 
 echo "Running Sync Agents Verification Tests..."
 
@@ -71,6 +75,15 @@ fi
 if [ ! -f "$OPENCODE_GLOBAL_RULES" ] || \
    ! grep -qF "$SKILL_CATALOG_REFERENCE" "$OPENCODE_GLOBAL_RULES"; then
     echo "FAIL: OpenCode global-rules mirror does not reference the skill catalog"
+    exit 1
+fi
+if ! grep -qF "$SKILL_DIRECTORY_REFERENCE" "$META_PROMPT" || \
+   ! grep -qF "$SKILL_DIRECTORY_REFERENCE" "$OPENCODE_META_PROMPT"; then
+    echo "FAIL: global-rules META_PROMPT references are not synchronized"
+    exit 1
+fi
+if [ ! -f "$OPENCODE_SKILL_CATALOG" ]; then
+    echo "FAIL: OpenCode mirror skill catalog reference resolves to a missing file"
     exit 1
 fi
 
