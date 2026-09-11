@@ -78,6 +78,7 @@ if [ ! -f "$OPENCODE_GLOBAL_RULES" ] || \
     exit 1
 fi
 if ! grep -qF "$SKILL_DIRECTORY_REFERENCE" "$META_PROMPT" || \
+   [ ! -f "$OPENCODE_META_PROMPT" ] || \
    ! grep -qF "$SKILL_DIRECTORY_REFERENCE" "$OPENCODE_META_PROMPT"; then
     echo "FAIL: global-rules META_PROMPT references are not synchronized"
     exit 1
