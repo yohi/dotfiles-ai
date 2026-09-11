@@ -42,6 +42,7 @@ prefixes such as `feat/` or `fix/` for these branches.
 2. Create the first task branch from the base branch.
 
 ```bash
+git checkout master
 git checkout -b feature/phase1-redis-monitor__base
 git checkout -b feature/phase1-task1-interface-def
 ```
@@ -69,7 +70,11 @@ When this workflow is active, do not:
 2. Push directly to the `__base` branch; use a PR instead.
 3. Auto-merge into `master`. This workflow does not grant merge permission;
    all merges remain subject to `AGENTS.global.md`.
-4. Start the next task without rebasing the preceding task's changes.
+4. The next task branch may be created from the preceding task branch before the
+   preceding task is merged. Do not begin implementing the next task until the
+   preceding task has been merged into `__base` and the next branch has been
+   rebased onto the updated base; do not start the next task without rebasing the
+   preceding task's changes.
 
 ## 4. PR Checklist
 

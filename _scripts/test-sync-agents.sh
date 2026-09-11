@@ -4,7 +4,10 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 CATALOG="$REPO_ROOT/agent-skills/AVAILABLE_SKILLS.md"
+GLOBAL_RULES_DIR="$REPO_ROOT/global-rules"
 GLOBAL_RULES="$REPO_ROOT/global-rules/AGENTS.global.md"
+OPENCODE_GLOBAL_RULES="$REPO_ROOT/opencode/docs/global-rules/AGENTS.global.md"
+SKILL_CATALOG_REFERENCE="../agent-skills/AVAILABLE_SKILLS.md"
 
 echo "Running Sync Agents Verification Tests..."
 
@@ -57,8 +60,17 @@ if grep -qF "<!-- SKILLPORT_START -->" "$GLOBAL_RULES" || \
     echo "FAIL: global-rules/AGENTS.global.md contains an embedded skill catalog"
     exit 1
 fi
-if ! grep -qF "agent-skills/AVAILABLE_SKILLS.md" "$GLOBAL_RULES"; then
+if ! grep -qF "$SKILL_CATALOG_REFERENCE" "$GLOBAL_RULES"; then
     echo "FAIL: global-rules/AGENTS.global.md no longer references the skill catalog"
+    exit 1
+fi
+if [ ! -f "$GLOBAL_RULES_DIR/$SKILL_CATALOG_REFERENCE" ]; then
+    echo "FAIL: skill catalog reference resolves to a missing file"
+    exit 1
+fi
+if [ ! -f "$OPENCODE_GLOBAL_RULES" ] || \
+   ! grep -qF "$SKILL_CATALOG_REFERENCE" "$OPENCODE_GLOBAL_RULES"; then
+    echo "FAIL: OpenCode global-rules mirror does not reference the skill catalog"
     exit 1
 fi
 
