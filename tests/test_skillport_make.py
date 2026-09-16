@@ -30,3 +30,17 @@ def test_index_skillport_exits_nonzero_when_index_build_fails(tmp_path: Path) ->
 
     assert result.returncode != 0
     assert "失敗" in result.stdout
+
+
+def test_check_skillport_uses_agentskills_cli() -> None:
+    result = subprocess.run(
+        ["make", "--no-print-directory", "-n", "check-skillport"],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0
+    assert "command -v agentskills" in result.stdout
+    assert "command -v skills-ref" not in result.stdout

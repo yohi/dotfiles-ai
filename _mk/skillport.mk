@@ -43,13 +43,13 @@ install-skillport: ## SkillPort と SkillPort MCP をインストール
 	echo "✅ SkillPort のインストールが完了しました"
 
 # Agent Skills の検証・メタデータ処理ツールのインストール
-install-skills-ref: ## skills-ref をインストール
+install-skills-ref: ## skills-ref (agentskills CLI) をインストール
 	@if command -v uv >/dev/null 2>&1; then \
 		CURRENT_REF=$$(uv tool list 2>/dev/null | grep -A 1 "skills-ref" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n 1 || echo "none"); \
 		if [ "$$CURRENT_REF" = "$(SKILLS_REF_VERSION)" ]; then \
-			echo "✅ skills-ref ($$CURRENT_REF) は既に最新バージョンがインストールされています。"; \
+			echo "✅ skills-ref ($$CURRENT_REF、agentskills CLI) は既に最新バージョンがインストールされています。"; \
 		else \
-			echo "📦 skills-ref をインストール中..."; \
+			echo "📦 skills-ref (agentskills CLI) をインストール中..."; \
 			uv tool install skills-ref@$(SKILLS_REF_VERSION) --force; \
 		fi; \
 	else \
@@ -153,10 +153,10 @@ check-skillport: ## SkillPort の状態確認
 	else \
 		echo "⚠️  skillport-mcp が見つかりません"; \
 	fi
-	@if command -v skills-ref >/dev/null 2>&1; then \
-		echo "✅ skills-ref: installed"; \
+	@if command -v agentskills >/dev/null 2>&1; then \
+		echo "✅ agentskills (skills-ref): installed"; \
 	else \
-		echo "⚠️  skills-ref が見つかりません"; \
+		echo "⚠️  agentskills (skills-ref) が見つかりません"; \
 	fi
 	@if [ -L "$(SKILLPORT_SKILLS_DIR)" ]; then \
 		get_realpath() { \
