@@ -5,17 +5,19 @@
 SKILLPORT_SKILLS_DIR ?= $(HOME)/.skillport/skills
 SKILLPORT_RUNTIME_SKILLS_DIR ?= $(RUNTIME_SKILLS_DIR)
 
-.PHONY: skillport install-skillport setup-skillport check-skillport check-skillport-version install-apm stats-skillport status-skillport
+.PHONY: skillport install-skillport install-skills-ref setup-skillport check-skillport check-skillport-version install-apm stats-skillport status-skillport
 
 # SkillPort のインストールとセットアップ
 skillport: ## SkillPortのインストールとセットアップ
 	@$(MAKE) install-skillport
+	@$(MAKE) install-skills-ref
 	@$(MAKE) setup-skillport
 
 SKILLPORT_VERSION ?= 1.1.1
 SKILLPORT_MCP_VERSION ?= 1.1.0
+SKILLS_REF_VERSION ?= 0.1.1
 
-# SkillPort および SkillPort MCP サーバーのインストール
+# SkillPort 関連ツールのインストール
 install-skillport: ## SkillPort と SkillPort MCP をインストール
 	@echo "📦 SkillPort のインストール状態を確認中..."
 	@CURRENT_SP=$$(skillport --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || echo "none"); \
@@ -39,6 +41,21 @@ install-skillport: ## SkillPort と SkillPort MCP をインストール
 		exit 1; \
 	fi; \
 	echo "✅ SkillPort のインストールが完了しました"
+
+# Agent Skills の検証・メタデータ処理ツールのインストール
+install-skills-ref: ## skills-ref をインストール
+	@if command -v uv >/dev/null 2>&1; then \
+		CURRENT_REF=$$(uv tool list 2>/dev/null | grep -A 1 "skills-ref" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n 1 || echo "none"); \
+		if [ "$$CURRENT_REF" = "$(SKILLS_REF_VERSION)" ]; then \
+			echo "✅ skills-ref ($$CURRENT_REF) は既に最新バージョンがインストールされています。"; \
+		else \
+			echo "📦 skills-ref をインストール中..."; \
+			uv tool install skills-ref@$(SKILLS_REF_VERSION) --force; \
+		fi; \
+	else \
+		echo "❌ uv が見つかりません。先に uv をインストールしてください"; \
+		exit 1; \
+	fi
 
 # APM (Agent Package Manager) のインストール
 install-apm: ## Microsoft APM をインストール
@@ -135,6 +152,11 @@ check-skillport: ## SkillPort の状態確認
 		echo "✅ skillport-mcp: installed"; \
 	else \
 		echo "⚠️  skillport-mcp が見つかりません"; \
+	fi
+	@if command -v skills-ref >/dev/null 2>&1; then \
+		echo "✅ skills-ref: installed"; \
+	else \
+		echo "⚠️  skills-ref が見つかりません"; \
 	fi
 	@if [ -L "$(SKILLPORT_SKILLS_DIR)" ]; then \
 		get_realpath() { \
