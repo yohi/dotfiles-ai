@@ -580,15 +580,6 @@
             "model": "openai/gpt-6-sol",
             "reasoning": "high"
           },
-          {
-            "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k3"
-          },
-          {
-            "model": "cloudflare-ai-gateway-custom/custom-command-code/moonshotai/kimi-k3"
-          },
-          {
-            "model": "cloudflare-ai-gateway-custom/custom-opencode-go/kimi-k3"
-          }
         ],
         "fallback_models": [
           {
@@ -610,15 +601,6 @@
             "model": "openai/gpt-6-luna",
             "reasoning": "max"
           },
-          {
-            "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k3"
-          },
-          {
-            "model": "cloudflare-ai-gateway-custom/custom-command-code/moonshotai/kimi-k3"
-          },
-          {
-            "model": "cloudflare-ai-gateway-custom/custom-opencode-go/kimi-k3"
-          }
         ]
       },
       "visual-engineering": {
@@ -713,7 +695,6 @@
       "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.7-code"
     },
     "kimi-k3": {
-      "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k3"
     },
     "glm-52": {
       "model": "cloudflare-ai-gateway-custom/custom-command-code/zai-org/glm-5.2"
