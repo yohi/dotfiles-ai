@@ -352,6 +352,281 @@
     //   各categoryでmodels[1:]と同じ内容・順序を互換定義として維持する。
     // =========================================================================
     "categories": {
+      // -----------------------------------------------------------------------
+      // Justice / Superpowers semantic worker categories
+      // Justice only selects the semantic category; model/provider/fallback
+      // resolution remains an OmO configuration responsibility.
+      // -----------------------------------------------------------------------
+      "sp-mechanical": {
+        "model": "cloudflare-ai-gateway-custom/custom-command-code/deepseek/deepseek-v4-flash",
+        "models": [
+          {
+            "model": "cloudflare-ai-gateway-custom/custom-command-code/deepseek/deepseek-v4-flash",
+            "reasoning": "low"
+          },
+          {
+            "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/deepseek-v4-flash",
+            "reasoning": "low"
+          },
+          {
+            "model": "cloudflare-ai-gateway-custom/custom-opencode-go/deepseek-v4-flash",
+            "reasoning": "low"
+          },
+          {
+            "model": "openai/gpt-6-luna",
+            "reasoning": "low"
+          }
+        ],
+        "fallback_models": [
+          {
+            "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/deepseek-v4-flash",
+            "reasoning": "low"
+          },
+          {
+            "model": "cloudflare-ai-gateway-custom/custom-opencode-go/deepseek-v4-flash",
+            "reasoning": "low"
+          },
+          {
+            "model": "openai/gpt-6-luna",
+            "reasoning": "low"
+          }
+        ]
+      },
+      "sp-implementation": {
+        "model": "cloudflare-ai-gateway-custom/custom-command-code/z-ai/glm-5.3-flash",
+        "models": [
+          {
+            "model": "cloudflare-ai-gateway-custom/custom-command-code/z-ai/glm-5.3-flash",
+            "reasoning": "high"
+          },
+          {
+            "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/glm-5.3-flash",
+            "reasoning": "high"
+          },
+          {
+            "model": "cloudflare-ai-gateway-custom/custom-opencode-go/glm-5.3-flash",
+            "reasoning": "high"
+          },
+          {
+            "model": "openai/gpt-6-sol",
+            "reasoning": "medium"
+          }
+        ],
+        "fallback_models": [
+          {
+            "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/glm-5.3-flash",
+            "reasoning": "high"
+          },
+          {
+            "model": "cloudflare-ai-gateway-custom/custom-opencode-go/glm-5.3-flash",
+            "reasoning": "high"
+          },
+          {
+            "model": "openai/gpt-6-sol",
+            "reasoning": "medium"
+          }
+        ]
+      },
+      "sp-integration": {
+        "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/glm-5.3",
+        "models": [
+          {
+            "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/glm-5.3",
+            "reasoning": "max"
+          },
+          {
+            "model": "cloudflare-ai-gateway-custom/custom-command-code/zai-org/glm-5.3",
+            "reasoning": "max"
+          },
+          {
+            "model": "cloudflare-ai-gateway-custom/custom-opencode-go/glm-5.3",
+            "reasoning": "max"
+          },
+          {
+            "model": "openai/gpt-6-sol",
+            "reasoning": "high"
+          }
+        ],
+        "fallback_models": [
+          {
+            "model": "cloudflare-ai-gateway-custom/custom-command-code/zai-org/glm-5.3",
+            "reasoning": "max"
+          },
+          {
+            "model": "cloudflare-ai-gateway-custom/custom-opencode-go/glm-5.3",
+            "reasoning": "max"
+          },
+          {
+            "model": "openai/gpt-6-sol",
+            "reasoning": "high"
+          }
+        ]
+      },
+      "sp-deep": {
+        "model": "cloudflare-ai-gateway-octg/gpt-5.6-terra",
+        "models": [
+          {
+            "model": "cloudflare-ai-gateway-octg/gpt-5.6-terra",
+            "reasoning": "high"
+          },
+          {
+            "model": "openai/gpt-6-sol",
+            "reasoning": "high"
+          },
+          {
+            "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/glm-5.3",
+            "reasoning": "max"
+          },
+          {
+            "model": "cloudflare-ai-gateway-custom/custom-command-code/zai-org/glm-5.3",
+            "reasoning": "max"
+          },
+          {
+            "model": "cloudflare-ai-gateway-custom/custom-opencode-go/glm-5.3",
+            "reasoning": "max"
+          }
+        ],
+        "fallback_models": [
+          {
+            "model": "openai/gpt-6-sol",
+            "reasoning": "high"
+          },
+          {
+            "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/glm-5.3",
+            "reasoning": "max"
+          },
+          {
+            "model": "cloudflare-ai-gateway-custom/custom-command-code/zai-org/glm-5.3",
+            "reasoning": "max"
+          },
+          {
+            "model": "cloudflare-ai-gateway-custom/custom-opencode-go/glm-5.3",
+            "reasoning": "max"
+          }
+        ]
+      },
+      "sp-architecture": {
+        "model": "cloudflare-ai-gateway-octg/gpt-5.6-sol",
+        "models": [
+          {
+            "model": "cloudflare-ai-gateway-octg/gpt-5.6-sol",
+            "reasoning": "max"
+          },
+          {
+            "model": "openai/gpt-6-sol",
+            "reasoning": "max"
+          },
+          {
+            "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/glm-5.3",
+            "reasoning": "max"
+          },
+          {
+            "model": "cloudflare-ai-gateway-custom/custom-command-code/zai-org/glm-5.3",
+            "reasoning": "max"
+          },
+          {
+            "model": "cloudflare-ai-gateway-custom/custom-opencode-go/glm-5.3",
+            "reasoning": "max"
+          }
+        ],
+        "fallback_models": [
+          {
+            "model": "openai/gpt-6-sol",
+            "reasoning": "max"
+          },
+          {
+            "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/glm-5.3",
+            "reasoning": "max"
+          },
+          {
+            "model": "cloudflare-ai-gateway-custom/custom-command-code/zai-org/glm-5.3",
+            "reasoning": "max"
+          },
+          {
+            "model": "cloudflare-ai-gateway-custom/custom-opencode-go/glm-5.3",
+            "reasoning": "max"
+          }
+        ]
+      },
+      "sp-review": {
+        "model": "cloudflare-ai-gateway-custom/custom-command-code/deepseek/deepseek-v4-flash",
+        "models": [
+          {
+            "model": "cloudflare-ai-gateway-custom/custom-command-code/deepseek/deepseek-v4-flash",
+            "reasoning": "max"
+          },
+          {
+            "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/deepseek-v4-flash",
+            "reasoning": "max"
+          },
+          {
+            "model": "cloudflare-ai-gateway-custom/custom-opencode-go/deepseek-v4-flash",
+            "reasoning": "max"
+          },
+          {
+            "model": "openai/gpt-6-luna",
+            "reasoning": "high"
+          }
+        ],
+        "fallback_models": [
+          {
+            "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/deepseek-v4-flash",
+            "reasoning": "max"
+          },
+          {
+            "model": "cloudflare-ai-gateway-custom/custom-opencode-go/deepseek-v4-flash",
+            "reasoning": "max"
+          },
+          {
+            "model": "openai/gpt-6-luna",
+            "reasoning": "high"
+          }
+        ]
+      },
+      "sp-final-review": {
+        "model": "openai/gpt-6-sol",
+        "models": [
+          {
+            "model": "openai/gpt-6-sol",
+            "reasoning": "max"
+          },
+          {
+            "model": "cloudflare-ai-gateway-octg/gpt-5.6-sol",
+            "reasoning": "max"
+          },
+          {
+            "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/glm-5.3",
+            "reasoning": "max"
+          },
+          {
+            "model": "cloudflare-ai-gateway-custom/custom-command-code/zai-org/glm-5.3",
+            "reasoning": "max"
+          },
+          {
+            "model": "cloudflare-ai-gateway-custom/custom-opencode-go/glm-5.3",
+            "reasoning": "max"
+          }
+        ],
+        "fallback_models": [
+          {
+            "model": "cloudflare-ai-gateway-octg/gpt-5.6-sol",
+            "reasoning": "max"
+          },
+          {
+            "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/glm-5.3",
+            "reasoning": "max"
+          },
+          {
+            "model": "cloudflare-ai-gateway-custom/custom-command-code/zai-org/glm-5.3",
+            "reasoning": "max"
+          },
+          {
+            "model": "cloudflare-ai-gateway-custom/custom-opencode-go/glm-5.3",
+            "reasoning": "max"
+          }
+        ]
+      },
+
       "ultrabrain": {
         // "model": "sol-octg",
         "model": "cloudflare-ai-gateway-octg/gpt-5.6-sol",
@@ -844,6 +1119,91 @@
         // Categories (業務プロファイル用カテゴリ定義)
         // =====================================================================
         "categories": {
+          // Justice / Superpowers semantic worker categories (Bedrock-only)
+          "sp-mechanical": {
+            "model": "amazon-bedrock/global.anthropic.claude-haiku-4-5-20251001-v1:0",
+            "models": [
+              {
+                "model": "amazon-bedrock/global.anthropic.claude-haiku-4-5-20251001-v1:0"
+              },
+              {
+                "model": "amazon-bedrock/global.anthropic.claude-sonnet-5"
+              }
+            ]
+          },
+          "sp-implementation": {
+            "model": "amazon-bedrock/global.anthropic.claude-sonnet-5",
+            "models": [
+              {
+                "model": "amazon-bedrock/global.anthropic.claude-sonnet-5"
+              },
+              {
+                "model": "amazon-bedrock/global.anthropic.claude-opus-5",
+                "reasoning": "high"
+              }
+            ]
+          },
+          "sp-integration": {
+            "model": "amazon-bedrock/global.anthropic.claude-sonnet-5",
+            "models": [
+              {
+                "model": "amazon-bedrock/global.anthropic.claude-sonnet-5"
+              },
+              {
+                "model": "amazon-bedrock/global.anthropic.claude-opus-5",
+                "reasoning": "max"
+              }
+            ]
+          },
+          "sp-deep": {
+            "model": "amazon-bedrock/global.anthropic.claude-opus-5",
+            "models": [
+              {
+                "model": "amazon-bedrock/global.anthropic.claude-opus-5",
+                "reasoning": "max"
+              },
+              {
+                "model": "amazon-bedrock/global.anthropic.claude-sonnet-5"
+              }
+            ]
+          },
+          "sp-architecture": {
+            "model": "amazon-bedrock/global.anthropic.claude-opus-5",
+            "models": [
+              {
+                "model": "amazon-bedrock/global.anthropic.claude-opus-5",
+                "reasoning": "max"
+              },
+              {
+                "model": "amazon-bedrock/global.anthropic.claude-sonnet-5"
+              }
+            ]
+          },
+          "sp-review": {
+            "model": "amazon-bedrock/global.anthropic.claude-sonnet-5",
+            "models": [
+              {
+                "model": "amazon-bedrock/global.anthropic.claude-sonnet-5"
+              },
+              {
+                "model": "amazon-bedrock/global.anthropic.claude-opus-5",
+                "reasoning": "high"
+              }
+            ]
+          },
+          "sp-final-review": {
+            "model": "amazon-bedrock/global.anthropic.claude-opus-5",
+            "models": [
+              {
+                "model": "amazon-bedrock/global.anthropic.claude-opus-5",
+                "reasoning": "max"
+              },
+              {
+                "model": "amazon-bedrock/global.anthropic.claude-sonnet-5"
+              }
+            ]
+          },
+
           // 最上位推論 (Opus/max -> Sonnet)
           "ultrabrain": {
             // "model": "opus",
@@ -991,6 +1351,7 @@
     "2026-09-glm53-routing-reevaluation",
     "2026-09-open-model-provider-primary-balancing",
     "2026-09-category-runtime-fallback-compat",
-    "2026-09-gpt6-sol-luna-routing"
+    "2026-09-gpt6-sol-luna-routing",
+    "2026-09-justice-sp-category-models"
   ]
 }
