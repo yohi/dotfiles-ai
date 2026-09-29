@@ -13,18 +13,23 @@ skills:
 dependencies:
   # Skills
   apm:
-    - obra/superpowers#v6.2.0
+    - obra/superpowers#v6.4.2
     - anthropics/skills
     - coderabbitai/skills
     - greptileai/skills//check-pr
     - greptileai/skills//greploop
     - anthropics/claude-code//plugins/code-review
-    - github/gh-stack
+    - github/gh-stack/skills/gh-stack
     # - yohi/agent-skills//skills/doc-sync-verifier
     - yohi/agent-skills//skills/git-master
     - yohi/agent-skills//skills/github-quality-setup
     - yohi/agent-skills//skills/github-release-packages
     - yohi/agent-skills//skills/temporary-credential-agent
+    - yohi/agent-skills//skills/agent-driven-setup
+    - yohi/chronos-graph//agent-assets/skills/chronos-memory-recall
+    - yohi/chronos-graph//agent-assets/skills/chronos-memory-save
+    - yohi/nexus//skills/code-search
+
 
   # MCP Servers
   mcp:
@@ -53,6 +58,7 @@ dependencies:
       registry: false
       transport: stdio
       command: "_scripts/codegraph-bootstrap.sh"
+      cwd: "."
       args:
         - "serve"
         - "--mcp"
@@ -93,7 +99,7 @@ dependencies:
         DISABLE_THOUGHT_LOGGING: "${env:DISABLE_THOUGHT_LOGGING:-true}"
       standalone: true
       timeout: 60000
-      enabled: true
+      enabled: false
 
     - name: github-official
       title: "GitHub Official MCP"
@@ -201,12 +207,12 @@ dependencies:
       command: "npx"
       args:
         - "-y"
-        - "@yohi/nexus@2.2.2"
+        - "@yohi/nexus@2.6.0"
         - "http-bridge"
       env:
         LOG_LEVEL: "ERROR"
         GITHUB_TOKEN: "${env:GITHUB_TOKEN}"
-        NEXUS_WATCHER_IGNORE_PATHS: "node_modules,opencode/node_modules,.opencode/node_modules,oss/apm/node_modules,oss/apm/docs/node_modules,.git,.nexus,dist,gemini,agent-skills,apm_modules,.agents,.opencode,.gemini,.claude,.codex,.vscode,.devcontainer,oss,codex/.tmp,.worktrees,.venv,target,.mypy_cache,.ruff_cache,build,.serena,.cache,__pycache__,*.db,*.sqlite,*.log"
+        NEXUS_WATCHER_IGNORE_PATHS: "node_modules,opencode/node_modules,.opencode/node_modules,oss/apm/node_modules,oss/apm/docs/node_modules,.git,.nexus,.codegraph,.justice,.omo,.sisyphus,.superpowers,dist,gemini,agent-skills,apm_modules,.agents,.opencode,.gemini,.claude,.codex,.vscode,.devcontainer,oss,codex/.tmp,.worktrees,.venv,target,.mypy_cache,.ruff_cache,build,.serena,.cache,.wrangler,.terraform,.playwright-cli,.eslintcache,.coverage,coverage.xml,*.tsbuildinfo,__pycache__,*.db,*.sqlite,*.log"
         CHOKIDAR_USEPOLLING: "false"
         CHOKIDAR_INTERVAL: "2000"
         NO_PROXY: "127.0.0.1,localhost"
@@ -221,7 +227,7 @@ dependencies:
       command: "uvx"
       args:
         - "--from"
-        - "context-store-mcp[all] @ https://github.com/yohi/chronos-graph/archive/refs/tags/v3.2.0.tar.gz"
+        - "context-store-mcp[all] @ https://github.com/yohi/chronos-graph/archive/refs/tags/v3.2.1.tar.gz"
         - "context-store"
       env:
         STORAGE_BACKEND: "${env:STORAGE_BACKEND}"
@@ -264,14 +270,18 @@ shell: bash
 snapshot: true
 
 plugin:
-  - "@yohi/justice@3.0.0"
-  - "@yohi/akane@1.6.2"
+  - "superpowers@git+https://github.com/obra/superpowers.git#v6.4.2"
   # - "@yohi/sibyl/server@1.0.0"
   - "file:///home/y_ohi/program/private/sibyl/dist/server.js"
   - "oh-my-openagent@4.19.4"
-  - "@yohi/chronos-gate@1.1.0"
   - "@nick-vi/opencode-type-inject@latest"
   - "opencode-vibeguard@latest"
+  - "file://{env:HOME}/program/private/justice-v4/dist/opencode-plugin.js"
+  - "@yohi/akane@1.6.2"
+  - "@yohi/chronos-gate@1.1.0"
+  - "@yohi/cloudflare-ai-gateway-chatgpt@0.3.0"
+  # - "./plugins/herdr-opencode-child-panes/index.js"
+  - "@yohi/herdr-opencode-child-panes@1.0.1"
 
 disabled_providers: []
 
@@ -524,7 +534,6 @@ lsp:
 
 instructions:
   - global-rules/AGENTS.global.md
-  - .agents/skills/superpowers/using-superpowers/SKILL.md
 
 watcher:
   ignore:
@@ -666,7 +675,7 @@ provider:
         variants:
           <<: *gpt_variants
           default:
-            reasoningEffort: medium
+            reasoningEffort: max
       openai/gpt-6-sol:
         name: GPT-6 Sol (OpenAI)
         variants:
@@ -908,40 +917,59 @@ provider:
         cf-aig-skip-cache: "true"
     models:
       gpt-5.6-luna:
-        name: GPT-5.6 Luna
+        name: GPT-5.6 Luna (OCTG)
         variants:
           <<: *gpt_variants
           default:
             reasoningEffort: max
       gpt-5.6-terra:
-        name: GPT-5.6 Terra
+        name: GPT-5.6 Terra (OCTG)
         variants:
           <<: *gpt_variants
           default:
             reasoningEffort: high
       gpt-5.6-sol:
-        name: GPT-5.6 Sol
+        name: GPT-5.6 Sol (OCTG)
+        variants:
+          <<: *gpt_variants
+          default:
+            reasoningEffort: high
+      gpt-6-luna:
+        name: GPT-6 Luna (OCTG)
+        variants:
+          <<: *gpt_variants
+          default:
+            reasoningEffort: max
+      gpt-6-sol:
+        name: GPT-6 Sol (OCTG)
+        variants:
+          <<: *gpt_variants
+          default:
+            reasoningEffort: high
+      gpt-6-astra:
+        name: GPT-6 Astra (OCTG)
         variants:
           <<: *gpt_variants
           default:
             reasoningEffort: high
 
+
   openai:
     whitelist:
       - gpt-6-luna
       - gpt-6-sol
-  opencode:
-    whitelist:
-      - big-pickle
-      - deepseek-v4-flash-free
-      - mimo-v2.5-free
-      - north-mini-code-free
-      - nemotron-3-ultra-free
-      - x-preview-f-free
-    models:
-      deepseek-v4-flash-free:
-        name: DeepSeek V4 Flash Free
-        variants: *deepseek_v4_variants
+  # opencode:
+    # whitelist:
+    #   - big-pickle
+    #   - deepseek-v4-flash-free
+    #   - mimo-v2.5-free
+    #   - north-mini-code-free
+    #   - nemotron-3-ultra-free
+    #   - x-preview-f-free
+    # models:
+    #   deepseek-v4-flash-free:
+    #     name: DeepSeek V4 Flash Free
+    #     variants: *deepseek_v4_variants
   amazon-bedrock:
     whitelist:
       - global.anthropic.claude-fable-5
