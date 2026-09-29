@@ -274,7 +274,7 @@
         ],
         "ultrawork": {
           // "model": "sol",
-          "model": "openai/gpt-6-sol",
+          "model": "openai/gpt-6.1-sol",
           "reasoning": "high"
         }
       },
@@ -282,7 +282,7 @@
         "disable": false,
         // 高頻度の反復実装ではPlus Solを主系にして、OCTG STANDARDを温存する。
         // "model": "sol",
-        "model": "openai/gpt-6-sol",
+        "model": "openai/gpt-6.1-sol",
         "fallback_models": [
           {
             // OCTG STANDARDはPlus側障害時のfallbackとしてのみ使用する。
@@ -310,13 +310,13 @@
       },
       // Justice Review Gate reviewer の利用モデルを profile ごとに明示する。
       // command-level hard pinはOCTG STANDARD枯渇時のfallback余地が弱いため、
-      // mandatory gateの可用性を優先し、ここはPlus GPT-6 Solに固定する。
+      // mandatory gateの可用性を優先し、ここはPlus GPT-6.1 Solに固定する。
       // OCTG Astraはcategory側のordered fallbackが使える高価値taskへ限定する。
       "justice-review-controller": {
-        "model": "openai/gpt-6-sol"
+        "model": "openai/gpt-6.1-sol"
       },
       "justice-review-worker": {
-        "model": "openai/gpt-6-sol"
+        "model": "openai/gpt-6.1-sol"
       },
       "prometheus": {
         // OpenCode GoのK2.7枠を平常時から使い、Ollamaへの集中を避ける。
@@ -357,7 +357,7 @@
         "template": "$ARGUMENTS",
         "description": "Run the Justice Design / Implementation Plan review gate",
         "agent": "justice-review-controller",
-        "model": "openai/gpt-6-sol",
+        "model": "openai/gpt-6.1-sol",
         "subtask": true
       }
     },
@@ -372,9 +372,9 @@
     // - 同じSTANDARD poolを使うなら最高品質のAstraをarchitecture / final-review /
     //   ultrabrain等の高価値・低頻度用途で優先し、Solをmodel-level fallbackにする。
     //   STANDARD quota枯渇時はAstra→OCTG Solでも同じpoolなので回復しない可能性が高く、
-    //   その後のPlus GPT-6 Solがquota-domainを跨ぐ実質的fallbackになる。
+    //   その後のPlus GPT-6.1 Solがquota-domainを跨ぐ実質的fallbackになる。
     // - GPT-5.6 TerraはOCTG MINI (10M tokens/day)の別poolなのでdeep/research用途に維持する。
-    // - Plus GPT-6 Lunaは軽量・高スループット用途、GPT-6 Solは高難度推論・coding用途に使う。
+    // - Plus GPT-6 Lunaは軽量・高スループット用途、GPT-6.1 Solは高難度推論・coding用途に使う。
     // - Kimi / GLM / DeepSeek等のopen modelはcloudflare-ai-gateway-custom経由に統一する。
     // - Gemini 3.1 Proはcf-ai-gw-dynamic-routingと同じGoogle AI Studio providerを使う。
     // - Dynamic Routes停止中はsame-model provider fallbackをOmO側で明示する。
@@ -399,8 +399,8 @@
       //    - integration は GLM-5.3 full
       // 2. 高価値・低頻度タスクは品質を優先し、OCTG STANDARDのGPT-6 Astraを使う。
       //    - architecture / final-review は OCTG GPT-6 Astraをprimaryにし、
-      //      OCTG GPT-6 Sol → Plus GPT-6 Solの順でfallbackする。
-      //    - deep は別枠10MのOCTG Terraを優先しつつ Plus GPT-6 Solへ退避する。
+      //      OCTG GPT-6 Sol → Plus GPT-6.1 Solの順でfallbackする。
+      //    - deep は別枠10MのOCTG Terraを優先しつつ Plus GPT-6.1 Solへ退避する。
       // 3. 同一logical modelのprovider違いを前段fallbackに置き、
       //    一時的なquota枯渇・provider障害では能力クラスを変えない。
       // 4. 異種model fallbackは「同一modelを全providerで使えない場合」のみ。
@@ -458,7 +458,7 @@
       },
       // 通常のTDD実装向け。
       // GLM-5.3 Flashはagentic codingの主力として、full版よりquota効率を優先。
-      // 同一Flashをprovider横断で使い切った後だけGPT-6 Sol/mediumへ移る。
+      // 同一Flashをprovider横断で使い切った後だけGPT-6.1 Sol/mediumへ移る。
       // Solをprimaryにしないのは、反復実装でPlus側quotaへ集中するのを避けるため。
       "sp-implementation": {
         "model": "cloudflare-ai-gateway-custom/custom-command-code/z-ai/glm-5.3-flash",
@@ -476,7 +476,7 @@
             "reasoning": "high"
           },
           {
-            "model": "openai/gpt-6-sol",
+            "model": "openai/gpt-6.1-sol",
             "reasoning": "medium"
           }
         ],
@@ -490,14 +490,14 @@
             "reasoning": "high"
           },
           {
-            "model": "openai/gpt-6-sol",
+            "model": "openai/gpt-6.1-sol",
             "reasoning": "medium"
           }
         ]
       },
       // 複数module / API / state / concurrency / async / migration等の統合作業向け。
       // FlashではなくGLM-5.3 full/maxをprimaryにして長時間・複雑なcodingを優先。
-      // provider障害やquota枯渇が起きた場合の最終保険としてGPT-6 Sol/highを置く。
+      // provider障害やquota枯渇が起きた場合の最終保険としてGPT-6.1 Sol/highを置く。
       // ここではthroughputより整合性・推論力を重視する。
       "sp-integration": {
         "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/glm-5.3",
@@ -515,7 +515,7 @@
             "reasoning": "max"
           },
           {
-            "model": "openai/gpt-6-sol",
+            "model": "openai/gpt-6.1-sol",
             "reasoning": "high"
           }
         ],
@@ -529,14 +529,14 @@
             "reasoning": "max"
           },
           {
-            "model": "openai/gpt-6-sol",
+            "model": "openai/gpt-6.1-sol",
             "reasoning": "high"
           }
         ]
       },
       // research / investigate / deep reasoning向け。
       // コード変更を伴わない場合も多いため、まずOATG Terraの無料quotaを活用。
-      // Terraが使えない場合はGPT-6 Sol/highへ直接上げ、その後にGLM-5.3 full。
+      // Terraが使えない場合はGPT-6.1 Sol/highへ直接上げ、その後にGLM-5.3 full。
       // cheap coding modelへ下げず、deep roleの推論強度を保つ順序。
       "sp-deep": {
         "model": "cloudflare-ai-gateway-octg/gpt-5.6-terra",
@@ -546,7 +546,7 @@
             "reasoning": "high"
           },
           {
-            "model": "openai/gpt-6-sol",
+            "model": "openai/gpt-6.1-sol",
             "reasoning": "high"
           },
           {
@@ -564,7 +564,7 @@
         ],
         "fallback_models": [
           {
-            "model": "openai/gpt-6-sol",
+            "model": "openai/gpt-6.1-sol",
             "reasoning": "high"
           },
           {
@@ -598,7 +598,7 @@
             "reasoning": "max"
           },
           {
-            "model": "openai/gpt-6-sol",
+            "model": "openai/gpt-6.1-sol",
             "reasoning": "max"
           },
           {
@@ -620,7 +620,7 @@
             "reasoning": "max"
           },
           {
-            "model": "openai/gpt-6-sol",
+            "model": "openai/gpt-6.1-sol",
             "reasoning": "max"
           },
           {
@@ -642,7 +642,7 @@
       // 同じモデルの盲点をそのまま再生産しにくくすることを狙う。
       // 高頻度なのでDeepSeek Flash/maxをprimaryにするが、Justice v4.1.0では
       // review失敗がTaskAcceptedを止め得るため、全DeepSeek経路失敗時は
-      // LunaではなくGPT-6 Sol/highへ退避して可用性とreview品質を優先する。
+      // LunaではなくGPT-6.1 Sol/highへ退避して可用性とreview品質を優先する。
       "sp-review": {
         "model": "cloudflare-ai-gateway-custom/custom-command-code/deepseek/deepseek-v4-flash",
         "models": [
@@ -659,7 +659,7 @@
             "reasoning": "max"
           },
           {
-            "model": "openai/gpt-6-sol",
+            "model": "openai/gpt-6.1-sol",
             "reasoning": "high"
           }
         ],
@@ -673,7 +673,7 @@
             "reasoning": "max"
           },
           {
-            "model": "openai/gpt-6-sol",
+            "model": "openai/gpt-6.1-sol",
             "reasoning": "high"
           }
         ]
@@ -682,7 +682,7 @@
       // 最終ゲートなのでコスト最適化よりfalse negative /見落とし低減を優先。
       // OCTGはpaid overflowをfail-closedで遮断するため、同じSTANDARD poolなら
       // Astra/maxをprimary、OCTG Sol/maxをmodel-level fallbackにする。
-      // STANDARD枯渇時はPlus Sol/maxへ跨ぎ、その後にGLM-5.3 full/max。
+      // STANDARD枯渇時はPlus GPT-6.1 Sol/maxへ跨ぎ、その後にGLM-5.3 full/max。
       // failureはPlanCompleteを止め得るため、軽量modelへの降格は行わない。
       "sp-final-review": {
         "model": "cloudflare-ai-gateway-octg/gpt-6-astra",
@@ -696,7 +696,7 @@
             "reasoning": "max"
           },
           {
-            "model": "openai/gpt-6-sol",
+            "model": "openai/gpt-6.1-sol",
             "reasoning": "max"
           },
           {
@@ -718,7 +718,7 @@
             "reasoning": "max"
           },
           {
-            "model": "openai/gpt-6-sol",
+            "model": "openai/gpt-6.1-sol",
             "reasoning": "max"
           },
           {
@@ -752,7 +752,7 @@
           },
           {
             // "model": "sol",
-            "model": "openai/gpt-6-sol",
+            "model": "openai/gpt-6.1-sol",
             "reasoning": "max"
           },
           {
@@ -767,7 +767,7 @@
             "reasoning": "max"
           },
           {
-            "model": "openai/gpt-6-sol",
+            "model": "openai/gpt-6.1-sol",
             "reasoning": "max"
           },
           {
@@ -805,7 +805,7 @@
           },
           {
             // "model": "sol",
-            "model": "openai/gpt-6-sol",
+            "model": "openai/gpt-6.1-sol",
             "reasoning": "medium"
           }
         ],
@@ -829,7 +829,7 @@
             "model": "cloudflare-ai-gateway-custom/custom-opencode-go/glm-5.3"
           },
           {
-            "model": "openai/gpt-6-sol",
+            "model": "openai/gpt-6.1-sol",
             "reasoning": "medium"
           }
         ]
@@ -948,7 +948,7 @@
       "unspecified-high": {
         // GOATのGLM-5.3 Flash枠を平常時から使い、Ollama集中を避ける。
         // Justice専用categoryではないが、sp-*と同じfallback invariantを維持する。
-        // models末尾のGPT-6 Sol/highとfallback_models末尾は必ず同一にすること。
+        // models末尾のGPT-6.1 Sol/highとfallback_models末尾は必ず同一にすること。
         "model": "cloudflare-ai-gateway-custom/custom-command-code/z-ai/glm-5.3-flash",
         "models": [
           {
@@ -972,7 +972,7 @@
           },
           {
             // "model": "sol",
-            "model": "openai/gpt-6-sol",
+            "model": "openai/gpt-6.1-sol",
             "reasoning": "high"
           },
         ],
@@ -993,7 +993,7 @@
             "model": "cloudflare-ai-gateway-custom/custom-opencode-go/glm-5.3"
           },
           {
-            "model": "openai/gpt-6-sol",
+            "model": "openai/gpt-6.1-sol",
             "reasoning": "high"
           },
         ]
@@ -1120,7 +1120,7 @@
       "model": "cloudflare-ai-gateway-octg/gpt-6-luna"
     },
     "sol": {
-      "model": "openai/gpt-6-sol"
+      "model": "openai/gpt-6.1-sol"
     },
     "terra-octg": {
       "model": "cloudflare-ai-gateway-octg/gpt-5.6-terra"
@@ -1548,6 +1548,7 @@
     "2026-09-gpt6-sol-luna-routing",
     "2026-09-justice-sp-category-models",
     "2026-09-justice-v4.1-routing-review",
-    "2026-09-octg-gpt6-standard-routing"
+    "2026-09-octg-gpt6-standard-routing",
+    "2026-09-gpt6.1-sol-direct-routing"
   ]
 }
