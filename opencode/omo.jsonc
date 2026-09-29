@@ -303,6 +303,10 @@
         // "model": "gemini-pro",
         "model": "cloudflare-ai-gateway/google-ai-studio/gemini-3.1-pro"
       },
+      // Justice Review Gate reviewer の利用モデルを profile ごとに明示する。
+      "justice-review-controller": {
+        "model": "openai/gpt-6-sol"
+      },
       "prometheus": {
         // OpenCode GoのK2.7枠を平常時から使い、Ollamaへの集中を避ける。
         "model": "cloudflare-ai-gateway-custom/custom-opencode-go/kimi-k2.7-code",
@@ -333,6 +337,17 @@
           "cloudflare-ai-gateway-custom/custom-opencode-go/kimi-k2.7-code",
           "cloudflare-ai-gateway-custom/custom-command-code/moonshotai/kimi-k2.7-code"
         ]
+      }
+    },
+
+    // Command-level model pins the subtask request independently of the caller's active model.
+    "command": {
+      "justice-review-gate": {
+        "template": "$ARGUMENTS",
+        "description": "Run the Justice Design / Implementation Plan review gate",
+        "agent": "justice-review-controller",
+        "model": "openai/gpt-6-sol",
+        "subtask": true
       }
     },
 
@@ -1174,6 +1189,16 @@
           "atlas": {
             // "model": "sonnet",
             "model": "amazon-bedrock/global.anthropic.claude-sonnet-5"
+          },
+
+          // Review Gate reviewer も業務プロファイル内で Bedrock に固定する。
+          "justice-review-controller": {
+            "model": "amazon-bedrock/global.anthropic.claude-opus-5"
+          }
+        },
+        "command": {
+          "justice-review-gate": {
+            "model": "amazon-bedrock/global.anthropic.claude-opus-5"
           }
         },
 
