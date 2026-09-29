@@ -586,6 +586,22 @@ x-variants:
     max:
       reasoningEffort: max
 
+  # GPT-6.1 Sol: direct OpenAI only. Keep OCTG on the existing GPT-6 models.
+  # 6.1 Sol is used only with low/medium/high/xhigh/max in this config.
+  gpt61_sol_variants: &gpt61_sol_variants
+    default:
+      reasoningEffort: medium
+    low:
+      reasoningEffort: low
+    medium:
+      reasoningEffort: medium
+    high:
+      reasoningEffort: high
+    xhigh:
+      reasoningEffort: xhigh
+    max:
+      reasoningEffort: max
+
   glm_variants: &glm_variants
     default:
       reasoningEffort: high
@@ -676,6 +692,9 @@ provider:
           <<: *gpt_variants
           default:
             reasoningEffort: max
+      openai/gpt-6.1-sol:
+        name: GPT-6.1 Sol (OpenAI)
+        variants: *gpt61_sol_variants
       openai/gpt-6-sol:
         name: GPT-6 Sol (OpenAI)
         variants:
@@ -957,6 +976,7 @@ provider:
   openai:
     whitelist:
       - gpt-6-luna
+      - gpt-6.1-sol
       - gpt-6-sol
   # opencode:
     # whitelist:
