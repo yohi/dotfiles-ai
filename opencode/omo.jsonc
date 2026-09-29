@@ -315,6 +315,9 @@
       "justice-review-controller": {
         "model": "openai/gpt-6-sol"
       },
+      "justice-review-worker": {
+        "model": "openai/gpt-6-sol"
+      },
       "prometheus": {
         // OpenCode GoのK2.7枠を平常時から使い、Ollamaへの集中を避ける。
         "model": "cloudflare-ai-gateway-custom/custom-opencode-go/kimi-k2.7-code",
@@ -1243,6 +1246,9 @@
 
           // Review Gate reviewer も業務プロファイル内で Bedrock に固定する。
           "justice-review-controller": {
+            "model": "amazon-bedrock/global.anthropic.claude-opus-5"
+          },
+          "justice-review-worker": {
             "model": "amazon-bedrock/global.anthropic.claude-opus-5"
           }
         },
