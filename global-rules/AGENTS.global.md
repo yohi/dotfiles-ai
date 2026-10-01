@@ -12,6 +12,7 @@ This file contains only cross-project defaults and safety boundaries. Repository
 - **Output Language**: **ALWAYS** use **Japanese (日本語)** for all external communication (Chat, Explanations).
 - **Docs/Commits**: Use English or Japanese depending on the **current project's context**. If unsure, ask.
 - **Agent-facing files**: `AGENTS.md` and rule reference files (`global-rules/*.md`) are written in **English** for optimal LLM comprehension.
+- **Japanese Documentation**: Japanese-language documentation MUST NOT contain Han characters outside the accepted Japanese character repertoire, including Chinese-specific characters accidentally introduced into Japanese text, or any Hangul characters. Always verify that neither is present before completing the work.
 - **Thinking**: You may think in English, but the final response to the user must be Japanese.
 
 ## 3. Universal Mandates (CRITICAL)
@@ -38,6 +39,7 @@ Read linked references and skills only when they are relevant to the current tas
   - Reference: `DOCS_STYLE.md`
 - **Git Standards**: Follow Conventional Commits in Japanese.
   - Reference: `GIT_STANDARDS.md`
+- **Superpowers planning artifacts**: Commit design documents and implementation plans created with Superpowers only when the user explicitly requested the design or planning workflow (for example, by asking to use brainstorming or writing-plans). When these artifacts are created internally as part of another request, such as a code change or improvement, do not include them in the commit.
 - **Agent Skills**: Reusable skill definitions are discovered on demand rather than embedded in this global instruction file.
   - Search and load the skill needed for the current task through the available skill mechanism (for example SkillPort/OpenCode skills).
   - Reference catalog: `../agent-skills/AVAILABLE_SKILLS.md`
@@ -60,3 +62,4 @@ Read linked references and skills only when they are relevant to the current tas
 6. **Verify deterministically**: Prefer tests, linters, formatters, builds, and direct command output over subjective inspection. Run relevant checks after changes.
 7. **Report evidence**: State changed files, verification commands and results, and any remaining risks or unverified assumptions.
 8. **Priority**: Direct user instructions govern the requested task. Local project rules may add stricter or more specific requirements, but the CRITICAL safety constraints and mandatory `yohi/*` repository standard are non-overridable. Explicit user authorization is valid only where the corresponding safety rule expressly permits it.
+9. **Repeated errors**: If the same error occurs five times consecutively while using tools or performing other work, stop retrying and investigate the cause before taking further action.
