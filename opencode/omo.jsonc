@@ -940,8 +940,8 @@
     // WORK プロファイル (業務環境用 / Amazon Bedrock Claude 統一ポリシー)
     //
     // 【モデルルーティング方針】
-    // - Claude Opus 5   : 司令塔・最上位推論・高度レビュー
-    // - Claude Sonnet 5 : 主力実装・プランニング・汎用オーケストレーション
+    // - Claude Opus 5.5 : 司令塔・最上位推論・高度レビュー
+    // - Claude Sonnet 5.5 : 主力実装・プランニング・汎用オーケストレーション
     // - Claude Haiku 4.5: 高速検索・スクリーニング・軽量作業
     // =========================================================================
     "work": {
@@ -952,14 +952,19 @@
       //   agents / categories 側には provider/model 完全修飾名を直接記述しています。
       // -----------------------------------------------------------------------
       "models": {
-        // Claude Opus 5 (最上位推論)
-        "opus": {
-          "model": "amazon-bedrock/global.anthropic.claude-opus-5"
+        // Claude Fable 5.1 (最上位推論)
+        "fable": {
+          "model": "amazon-bedrock/global.anthropic.claude-fable-5-1"
         },
 
-        // Claude Sonnet 5 (高性能・高速主力)
+        // Claude Opus 5.5 (高性能推論)
+        "opus": {
+          "model": "amazon-bedrock/global.anthropic.claude-opus-5-5"
+        },
+
+        // Claude Sonnet 5.5 (高性能・高速主力)
         "sonnet": {
-          "model": "amazon-bedrock/global.anthropic.claude-sonnet-5"
+          "model": "amazon-bedrock/global.anthropic.claude-sonnet-5-5"
         },
 
         // Claude Haiku 4.5 (超高速・軽量)
@@ -976,10 +981,10 @@
           // Sisyphus (メイン司令塔: Sonnet -> Opus)
           "sisyphus": {
             // "model": "sonnet",
-            "model": "amazon-bedrock/global.anthropic.claude-sonnet-5",
+            "model": "amazon-bedrock/global.anthropic.claude-sonnet-5-5",
             "ultrawork": {
               // "model": "opus",
-              "model": "amazon-bedrock/global.anthropic.claude-opus-5",
+              "model": "amazon-bedrock/global.anthropic.claude-opus-5-5",
               "reasoning": "high"
             }
           },
@@ -992,7 +997,7 @@
           // Oracle (設計相談)
           "oracle": {
             // "model": "opus",
-            "model": "amazon-bedrock/global.anthropic.claude-opus-5"
+            "model": "amazon-bedrock/global.anthropic.claude-opus-5-5"
           },
 
           // Librarian (外部調査)
@@ -1010,44 +1015,44 @@
           // Multimodal Looker (視覚解析)
           "multimodal-looker": {
             // "model": "opus",
-            "model": "amazon-bedrock/global.anthropic.claude-opus-5"
+            "model": "amazon-bedrock/global.anthropic.claude-opus-5-5"
           },
 
           // Prometheus (計画立案)
           "prometheus": {
             // "model": "opus",
-            "model": "amazon-bedrock/global.anthropic.claude-opus-5"
+            "model": "amazon-bedrock/global.anthropic.claude-opus-5-5"
           },
 
           // Metis (メカニクス分析)
           "metis": {
             // "model": "opus",
-            "model": "amazon-bedrock/global.anthropic.claude-opus-5"
+            "model": "amazon-bedrock/global.anthropic.claude-opus-5-5"
           },
 
           // Momus (レビュー)
           "momus": {
             // "model": "opus",
-            "model": "amazon-bedrock/global.anthropic.claude-opus-5"
+            "model": "amazon-bedrock/global.anthropic.claude-opus-5-5"
           },
 
           // Atlas (環境管理・進行監視)
           "atlas": {
             // "model": "sonnet",
-            "model": "amazon-bedrock/global.anthropic.claude-sonnet-5"
+            "model": "amazon-bedrock/global.anthropic.claude-sonnet-5-5"
           },
 
           // Review Gate reviewer も業務プロファイル内で Bedrock に固定する。
           "justice-review-controller": {
-            "model": "amazon-bedrock/global.anthropic.claude-opus-5"
+            "model": "amazon-bedrock/global.anthropic.claude-opus-5-5"
           },
           "justice-review-worker": {
-            "model": "amazon-bedrock/global.anthropic.claude-opus-5"
+            "model": "amazon-bedrock/global.anthropic.claude-opus-5-5"
           }
         },
         "command": {
           "justice-review-gate": {
-            "model": "amazon-bedrock/global.anthropic.claude-opus-5"
+            "model": "amazon-bedrock/global.anthropic.claude-opus-5-5"
           }
         },
 
@@ -1076,117 +1081,117 @@
                 "model": "amazon-bedrock/global.anthropic.claude-haiku-4-5-20251001-v1:0"
               },
               {
-                "model": "amazon-bedrock/global.anthropic.claude-sonnet-5"
+                "model": "amazon-bedrock/global.anthropic.claude-sonnet-5-5"
               }
             ],
             "fallback_models": [
               {
-                "model": "amazon-bedrock/global.anthropic.claude-sonnet-5"
+                "model": "amazon-bedrock/global.anthropic.claude-sonnet-5-5"
               }
             ]
           },
           "sp-implementation": {
-            "model": "amazon-bedrock/global.anthropic.claude-sonnet-5",
+            "model": "amazon-bedrock/global.anthropic.claude-sonnet-5-5",
             "models": [
               {
-                "model": "amazon-bedrock/global.anthropic.claude-sonnet-5"
+                "model": "amazon-bedrock/global.anthropic.claude-sonnet-5-5"
               },
               {
-                "model": "amazon-bedrock/global.anthropic.claude-opus-5",
+                "model": "amazon-bedrock/global.anthropic.claude-opus-5-5",
                 "reasoning": "high"
               }
             ],
             "fallback_models": [
               {
-                "model": "amazon-bedrock/global.anthropic.claude-opus-5",
+                "model": "amazon-bedrock/global.anthropic.claude-opus-5-5",
                 "reasoning": "high"
               }
             ]
           },
           "sp-integration": {
-            "model": "amazon-bedrock/global.anthropic.claude-sonnet-5",
+            "model": "amazon-bedrock/global.anthropic.claude-sonnet-5-5",
             "models": [
               {
-                "model": "amazon-bedrock/global.anthropic.claude-sonnet-5"
+                "model": "amazon-bedrock/global.anthropic.claude-sonnet-5-5"
               },
               {
-                "model": "amazon-bedrock/global.anthropic.claude-opus-5",
+                "model": "amazon-bedrock/global.anthropic.claude-opus-5-5",
                 "reasoning": "max"
               }
             ],
             "fallback_models": [
               {
-                "model": "amazon-bedrock/global.anthropic.claude-opus-5",
+                "model": "amazon-bedrock/global.anthropic.claude-opus-5-5",
                 "reasoning": "max"
               }
             ]
           },
           "sp-deep": {
-            "model": "amazon-bedrock/global.anthropic.claude-opus-5",
+            "model": "amazon-bedrock/global.anthropic.claude-opus-5-5",
             "models": [
               {
-                "model": "amazon-bedrock/global.anthropic.claude-opus-5",
+                "model": "amazon-bedrock/global.anthropic.claude-opus-5-5",
                 "reasoning": "max"
               },
               {
-                "model": "amazon-bedrock/global.anthropic.claude-sonnet-5"
+                "model": "amazon-bedrock/global.anthropic.claude-sonnet-5-5"
               }
             ],
             "fallback_models": [
               {
-                "model": "amazon-bedrock/global.anthropic.claude-sonnet-5"
+                "model": "amazon-bedrock/global.anthropic.claude-sonnet-5-5"
               }
             ]
           },
           "sp-architecture": {
-            "model": "amazon-bedrock/global.anthropic.claude-opus-5",
+            "model": "amazon-bedrock/global.anthropic.claude-opus-5-5",
             "models": [
               {
-                "model": "amazon-bedrock/global.anthropic.claude-opus-5",
+                "model": "amazon-bedrock/global.anthropic.claude-opus-5-5",
                 "reasoning": "max"
               },
               {
-                "model": "amazon-bedrock/global.anthropic.claude-sonnet-5"
+                "model": "amazon-bedrock/global.anthropic.claude-sonnet-5-5"
               }
             ],
             "fallback_models": [
               {
-                "model": "amazon-bedrock/global.anthropic.claude-sonnet-5"
+                "model": "amazon-bedrock/global.anthropic.claude-sonnet-5-5"
               }
             ]
           },
           "sp-review": {
-            "model": "amazon-bedrock/global.anthropic.claude-sonnet-5",
+            "model": "amazon-bedrock/global.anthropic.claude-sonnet-5-5",
             "models": [
               {
-                "model": "amazon-bedrock/global.anthropic.claude-sonnet-5"
+                "model": "amazon-bedrock/global.anthropic.claude-sonnet-5-5"
               },
               {
-                "model": "amazon-bedrock/global.anthropic.claude-opus-5",
+                "model": "amazon-bedrock/global.anthropic.claude-opus-5-5",
                 "reasoning": "high"
               }
             ],
             "fallback_models": [
               {
-                "model": "amazon-bedrock/global.anthropic.claude-opus-5",
+                "model": "amazon-bedrock/global.anthropic.claude-opus-5-5",
                 "reasoning": "high"
               }
             ]
           },
           "sp-final-review": {
-            "model": "amazon-bedrock/global.anthropic.claude-opus-5",
+            "model": "amazon-bedrock/global.anthropic.claude-opus-5-5",
             "models": [
               {
-                "model": "amazon-bedrock/global.anthropic.claude-opus-5",
+                "model": "amazon-bedrock/global.anthropic.claude-opus-5-5",
                 "reasoning": "max"
               },
               {
-                "model": "amazon-bedrock/global.anthropic.claude-sonnet-5"
+                "model": "amazon-bedrock/global.anthropic.claude-sonnet-5-5"
               }
             ],
             "fallback_models": [
               {
-                "model": "amazon-bedrock/global.anthropic.claude-sonnet-5"
+                "model": "amazon-bedrock/global.anthropic.claude-sonnet-5-5"
               }
             ]
           },
@@ -1194,16 +1199,16 @@
           // 最上位推論 (Opus/max -> Sonnet)
           "ultrabrain": {
             // "model": "opus",
-            "model": "amazon-bedrock/global.anthropic.claude-opus-5",
+            "model": "amazon-bedrock/global.anthropic.claude-opus-5-5",
             "models": [
               {
                 // "model": "opus",
-                "model": "amazon-bedrock/global.anthropic.claude-opus-5",
+                "model": "amazon-bedrock/global.anthropic.claude-opus-5-5",
                 "reasoning": "max"
               },
               {
                 // "model": "sonnet",
-                "model": "amazon-bedrock/global.anthropic.claude-sonnet-5"
+                "model": "amazon-bedrock/global.anthropic.claude-sonnet-5-5"
               }
             ]
           },
@@ -1211,16 +1216,16 @@
           // ディープ実装 (Opus/max -> Sonnet)
           "deep": {
             // "model": "opus",
-            "model": "amazon-bedrock/global.anthropic.claude-opus-5",
+            "model": "amazon-bedrock/global.anthropic.claude-opus-5-5",
             "models": [
               {
                 // "model": "opus",
-                "model": "amazon-bedrock/global.anthropic.claude-opus-5",
+                "model": "amazon-bedrock/global.anthropic.claude-opus-5-5",
                 "reasoning": "max"
               },
               {
                 // "model": "sonnet",
-                "model": "amazon-bedrock/global.anthropic.claude-sonnet-5"
+                "model": "amazon-bedrock/global.anthropic.claude-sonnet-5-5"
               }
             ]
           },
@@ -1236,7 +1241,7 @@
               },
               {
                 // "model": "sonnet",
-                "model": "amazon-bedrock/global.anthropic.claude-sonnet-5"
+                "model": "amazon-bedrock/global.anthropic.claude-sonnet-5-5"
               }
             ]
           },
@@ -1244,11 +1249,11 @@
           // ドキュメント執筆 (Sonnet -> Haiku)
           "writing": {
             // "model": "sonnet",
-            "model": "amazon-bedrock/global.anthropic.claude-sonnet-5",
+            "model": "amazon-bedrock/global.anthropic.claude-sonnet-5-5",
             "models": [
               {
                 // "model": "sonnet",
-                "model": "amazon-bedrock/global.anthropic.claude-sonnet-5"
+                "model": "amazon-bedrock/global.anthropic.claude-sonnet-5-5"
               },
               {
                 // "model": "haiku",
@@ -1260,11 +1265,11 @@
           // 汎用軽量タスク (Sonnet -> Haiku)
           "unspecified-low": {
             // "model": "sonnet",
-            "model": "amazon-bedrock/global.anthropic.claude-sonnet-5",
+            "model": "amazon-bedrock/global.anthropic.claude-sonnet-5-5",
             "models": [
               {
                 // "model": "sonnet",
-                "model": "amazon-bedrock/global.anthropic.claude-sonnet-5"
+                "model": "amazon-bedrock/global.anthropic.claude-sonnet-5-5"
               },
               {
                 // "model": "haiku",
@@ -1276,16 +1281,16 @@
           // 汎用高度推論 (Opus/max -> Sonnet)
           "unspecified-high": {
             // "model": "opus",
-            "model": "amazon-bedrock/global.anthropic.claude-opus-5",
+            "model": "amazon-bedrock/global.anthropic.claude-opus-5-5",
             "models": [
               {
                 // "model": "opus",
-                "model": "amazon-bedrock/global.anthropic.claude-opus-5",
+                "model": "amazon-bedrock/global.anthropic.claude-opus-5-5",
                 "reasoning": "max"
               },
               {
                 // "model": "sonnet",
-                "model": "amazon-bedrock/global.anthropic.claude-sonnet-5"
+                "model": "amazon-bedrock/global.anthropic.claude-sonnet-5-5"
               }
             ]
           },
@@ -1293,16 +1298,16 @@
           // ビジュアル・UI設計 (Opus/max -> Sonnet)
           "visual-engineering": {
             // "model": "opus",
-            "model": "amazon-bedrock/global.anthropic.claude-opus-5",
+            "model": "amazon-bedrock/global.anthropic.claude-opus-5-5",
             "models": [
               {
                 // "model": "opus",
-                "model": "amazon-bedrock/global.anthropic.claude-opus-5",
+                "model": "amazon-bedrock/global.anthropic.claude-opus-5-5",
                 "reasoning": "max"
               },
               {
                 // "model": "sonnet",
-                "model": "amazon-bedrock/global.anthropic.claude-sonnet-5"
+                "model": "amazon-bedrock/global.anthropic.claude-sonnet-5-5"
               }
             ]
           },
@@ -1310,11 +1315,11 @@
           // クリエイティブ生成 (Sonnet -> Haiku)
           "artistry": {
             // "model": "sonnet",
-            "model": "amazon-bedrock/global.anthropic.claude-sonnet-5",
+            "model": "amazon-bedrock/global.anthropic.claude-sonnet-5-5",
             "models": [
               {
                 // "model": "sonnet",
-                "model": "amazon-bedrock/global.anthropic.claude-sonnet-5"
+                "model": "amazon-bedrock/global.anthropic.claude-sonnet-5-5"
               },
               {
                 // "model": "haiku",

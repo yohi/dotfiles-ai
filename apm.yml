@@ -992,16 +992,10 @@ provider:
     #     variants: *deepseek_v4_variants
   amazon-bedrock:
     whitelist:
-      - global.anthropic.claude-fable-5
+      - global.anthropic.claude-fable-5-1
       - global.anthropic.claude-haiku-4-5-20251001-v1:0
-      - global.anthropic.claude-opus-4-5-20251101-v1:0
-      - global.anthropic.claude-opus-4-6-v1
-      - global.anthropic.claude-opus-4-7
-      - global.anthropic.claude-opus-4-8
-      - global.anthropic.claude-opus-5
-      - global.anthropic.claude-sonnet-4-5-20250929-v1:0
-      - global.anthropic.claude-sonnet-4-6
-      - global.anthropic.claude-sonnet-5
+      - global.anthropic.claude-opus-5-5
+      - global.anthropic.claude-sonnet-5-5
       - openai.gpt-5.4
       - openai.gpt-5.5
       - openai.gpt-5.6-luna

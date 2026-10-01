@@ -57,22 +57,36 @@ Sisyphus（監督）は、タスクの性質に応じて最適な「知能カテ
 | **writing** | 文書作成 特化 | 技術解説、ドキュメンテーション、リリースノートの作成。 | `kimi-k27`（Sakura検証） |
 | **artistry** | 創造性 特化 | ジェネレーティブアート、クリエイティブな発想、芸術的表現。 | `gemini-pro` |
 
+### Justice / Superpowers カテゴリー
+
+レビュー必須の作業や実装工程では、次の専用カテゴリーを使用します。Work は Bedrock 内で fallback し、Personal は各カテゴリーに定義した provider chain を使用します。
+
+| カテゴリー | 用途 | Work (Bedrock) |
+| :--- | :--- | :--- |
+| **sp-mechanical** | rename、typo、設定変更などの定型作業 | Haiku 4.5 → Sonnet 5.5 |
+| **sp-implementation** | 通常の TDD 実装 | Sonnet 5.5 → Opus 5.5 (high) |
+| **sp-integration** | 複数module、API、state、concurrency の統合作業 | Sonnet 5.5 → Opus 5.5 (max) |
+| **sp-deep** | 調査・深い推論 | Opus 5.5 (max) → Sonnet 5.5 |
+| **sp-architecture** | アーキテクチャ設計・高影響判断 | Opus 5.5 (max) → Sonnet 5.5 |
+| **sp-review** | Task 単位の必須レビュー | Sonnet 5.5 → Opus 5.5 (high) |
+| **sp-final-review** | Plan / branch 全体の必須最終レビュー | Opus 5.5 (max) → Sonnet 5.5 |
+
 ### エージェント一覧とカテゴリー・マッピング
 
 各エージェントは役割を持ち、`personal` 構成では以下の実モデルが割り当てられています。
 
 | エージェント | カテゴリー | personal 実モデル / provider chain | 役割・専門領域 |
 | :--- | :--- | :--- | :--- |
-| **Sisyphus** | `ultrabrain` | Kimi K2.7: Ollama → Sakura → Go → GOAT; ultrawork: `openai/gpt-5.6-sol` (high) | 司令塔。全体の品質管理、タスクの分解と委譲。 |
-| **Hephaestus** | `deep` | `openai/gpt-5.6-sol` → OCTG Sol | 実装職人。反復量が多いため Plus Sol を主系とし、OCTG STANDARD を枯渇させにくくする。 |
+| **Sisyphus** | `ultrabrain` | Ollama Cloud Kimi K2.7 → Sakura K2.7; ultrawork: `openai/gpt-6.1-sol` (high) | 司令塔。全体の品質管理、タスクの分解と委譲。 |
+| **Hephaestus** | `deep` | `openai/gpt-6.1-sol` → OCTG GPT-6 Sol | 実装職人。反復量が多いため Plus Sol を主系とし、OCTG STANDARD を枯渇させにくくする。 |
 | **Oracle** | `ultrabrain` | `cloudflare-ai-gateway-octg/gpt-5.6-terra` | 賢者。アーキテクチャ設計の相談、難解なバグのデバッグ。 |
-| **Librarian** | `quick` | `openai/gpt-5.6-luna` | 司書。外部ドキュメントやOSSの実装例の高速検索。 |
-| **Explore** | `quick` | `openai/gpt-5.6-luna` | 探検家。コードベースの高速探索、grep検索、スキャフォールディング。 |
+| **Librarian** | `quick` | `openai/gpt-6-luna` | 司書。外部ドキュメントやOSSの実装例の高速検索。 |
+| **Explore** | `quick` | `openai/gpt-6-luna` | 探検家。コードベースの高速探索、grep検索、スキャフォールディング。 |
 | **Multimodal-Looker** | `ultrabrain` | `cloudflare-ai-gateway/google-ai-studio/gemini-3.1-pro` | 視覚アナリスト。UIデザイン、画像、図解、PDFの解析。 |
-| **Prometheus** | `ultrabrain` | Kimi K2.7: **Go → Ollama → Sakura → GOAT** | 流れ者。タスクの分解と並列実行計画の作成。 |
-| **Metis** | `ultrabrain` | Kimi K2.7: **Go → Ollama → Sakura → GOAT** | 計画コンサル。計画前のリスク特定と曖昧さの排除。 |
+| **Prometheus** | `ultrabrain` | Ollama Cloud Kimi K2.7 → Sakura K2.7 | 流れ者。タスクの分解と並列実行計画の作成。 |
+| **Metis** | `ultrabrain` | Ollama Cloud Kimi K2.7 → Sakura K2.7 | 計画コンサル。計画前のリスク特定と曖昧さの排除。 |
 | **Momus** | `ultrabrain` | `cloudflare-ai-gateway-octg/gpt-5.6-terra` | 計画レビュアー。Prometheusが作成した計画の厳格な検証。 |
-| **Atlas** | `ultrabrain` | Kimi K2.7: Ollama → Sakura → Go → GOAT | 現場監督。環境管理、Todo項目の体系的な管理と調整。 |
+| **Atlas** | `ultrabrain` | Ollama Cloud Kimi K2.7 → Sakura K2.7 | 現場監督。環境管理、Todo項目の体系的な管理と調整。 |
 
 ## 4. LLMモデル選択のベストプラクティス
 
@@ -94,14 +108,23 @@ Dynamic Routing 停止中は、表中の同一モデル provider chain を OmO �
 
 | カテゴリー | personal デフォルト | personal フォールバックチェーン | work (Bedrock) |
 | :--- | :--- | :--- | :--- |
-| **ultrabrain** | `sol-octg` (max) | `sol-octg` (max) → `sol` (max) → `terra-octg` (high) → `terra` (high) | `opus` (max) → `sonnet` |
-| **deep** | `terra-octg` (high) | `terra-octg` (high) → GLM-5.3 Flash (Ollama→GOAT→Go) → GLM-5.3 (Ollama→GOAT→Go) → `sol` (medium) | `opus` (max) → `sonnet` |
-| **quick** | `luna` (low) | `luna` (low) → DeepSeek V4 Flash (**GOAT→Ollama→Go**) | `haiku` → `sonnet` |
-| **visual-engineering** | `gemini-pro` (high) | `gemini-pro` (high) → Kimi K2.7 (Ollama→Sakura→Go→GOAT) | `opus` (max) → `sonnet` |
-| **artistry** | `gemini-pro` (high) | `gemini-pro` (high) → Kimi K2.7 (Ollama→Sakura→Go→GOAT) | `sonnet` → `haiku` |
-| **unspecified-high** | `glm-53-flash` | GLM-5.3 Flash (**GOAT→Ollama→Go**) → GLM-5.3 (Ollama→GOAT→Go) → `luna` (max) → Kimi K3 (Ollama→GOAT→Go) | `opus` (max) → `sonnet` |
-| **unspecified-low** | `luna` (medium) | `luna` (medium) → DeepSeek V4 Flash (Ollama→GOAT→Go) → GLM-5.3 Flash (Ollama→GOAT→Go) | `sonnet` → `haiku` |
-| **writing** | Kimi K2.7 (Sakura) | Sakura → Ollama → Go → GOAT | `sonnet` → `haiku` |
+| **ultrabrain** | OCTG GPT-6 Astra (max) | Astra → OCTG GPT-6 Sol → Plus GPT-6.1 Sol → OCTG GPT-5.6 Terra | Opus 5.5 (max) → Sonnet 5.5 |
+| **deep** | OCTG GPT-5.6 Terra (high) | Terra → Ollama GLM-5.3 Flash → Ollama GLM-5.3 → GPT-6.1 Sol | Opus 5.5 (max) → Sonnet 5.5 |
+| **quick** | `openai/gpt-6-luna` (low) | GPT-6 Luna → Ollama DeepSeek V4 Flash | Haiku 4.5 → Sonnet 5.5 |
+| **visual-engineering** | Gemini 3.1 Pro (high) | Gemini 3.1 Pro → Ollama Kimi K2.7 → Sakura Kimi K2.7 | Opus 5.5 (max) → Sonnet 5.5 |
+| **artistry** | Gemini 3.1 Pro (high) | Gemini 3.1 Pro → Ollama Kimi K2.7 → Sakura Kimi K2.7 | Sonnet 5.5 → Haiku 4.5 |
+| **unspecified-high** | Ollama GLM-5.3 Flash | GLM-5.3 Flash → GLM-5.3 → GPT-6.1 Sol (high) | Opus 5.5 (max) → Sonnet 5.5 |
+| **unspecified-low** | `openai/gpt-6-luna` (medium) | GPT-6 Luna → Ollama DeepSeek V4 Flash → Ollama GLM-5.3 Flash | Sonnet 5.5 → Haiku 4.5 |
+| **writing** | Sakura Kimi K2.7 | Sakura Kimi K2.7 → Ollama Kimi K2.7 | Sonnet 5.5 → Haiku 4.5 |
+
+Work では Claude Fable 5.1 をモデルカタログに登録し、Claude Opus 5.5 を最上位推論・レビュー、Claude Sonnet 5.5 を主力実装、Claude Haiku 4.5 を高速な軽量作業に割り当てています。Fable はカタログ登録のみで、既定の agent / category routing には使いません。Work profile の agent・category・fallback はすべて Bedrock の Claude モデルを使用します。
+
+| Work モデル | Bedrock model ID | 主な用途 |
+| :--- | :--- | :--- |
+| Claude Fable 5.1 | `amazon-bedrock/global.anthropic.claude-fable-5-1` | カタログ登録（明示選択用） |
+| Claude Opus 5.5 | `amazon-bedrock/global.anthropic.claude-opus-5-5` | 最上位推論・高度レビュー |
+| Claude Sonnet 5.5 | `amazon-bedrock/global.anthropic.claude-sonnet-5-5` | 主力実装・汎用作業 |
+| Claude Haiku 4.5 | `amazon-bedrock/global.anthropic.claude-haiku-4-5-20251001-v1:0` | 高速検索・軽量作業 |
 
 ### provider primary の固定分散
 
@@ -138,7 +161,7 @@ OCTG の STANDARD pool は 1M tokens / UTC day と小さいため、すべての
 Dynamic Routing が復旧したら、provider fallback は `cf-ai-gw-dynamic-routing` へ戻し、OmO は再び logical model 選択だけを担当させます。
 
 ---
-*Updated: 2026-09-09*
+*Updated: 2026-10-01*
 
 ## 5. 環境の切り替え (Switching Environments)
 
