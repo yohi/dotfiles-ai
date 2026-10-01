@@ -27,7 +27,7 @@ make sync-mcp
 
 ## サーバー一覧
 
-`make sync-mcp` 実行時、`apm.yml` の各クライアント設定に基づいて対応するサーバーが登録されます（すべてのサーバーが一律ですべてのツールに登録されるわけではありません。例えば、`sentry-remote` のようなリモートサーバーや、stdio専用の Codex CLI など、クライアントごとの対応差があります）。
+`make sync-mcp` 実行時、`apm.yml` の各クライアント設定に基づいて対応するサーバーが登録されます（すべてのサーバーが一律ですべてのツールに登録されるわけではありません。例えば、無効化されたサーバーや SSE 専用のリモートサーバーなど、クライアントごとの対応差があります）。
 
 - `sqlite` — `uvx mcp-server-sqlite`
 - `filesystem` — `npx @modelcontextprotocol/server-filesystem`

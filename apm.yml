@@ -38,20 +38,14 @@ dependencies:
       registry: false
       transport: streamable-http
       url: https://mcp.y-ohi.com/mcp?codemode=search_and_execute
-      enabled: true
 
-    - name: coderabbit
-      title: "CodeRabbit MCP"
+    - name: cf-mcp-portal-work
+      title: "Cloudflare MCP Portal (Work)"
       registry: false
-      transport: stdio
-      command: "npx"
-      args:
-        - "-y"
-        - "coderabbitai-mcp"
-      env:
-        GITHUB_PAT: "${env:GITHUB_TOKEN}"
-      timeout: 60000
-      enabled: false
+      transport: streamable-http
+      url: https://work.mcp.y-ohi.com/mcp?codemode=search_and_execute
+
+    - "com.atlassian/atlassian-mcp-server"
 
     - name: codegraph
       title: "CodeGraph MCP"
@@ -62,17 +56,6 @@ dependencies:
       args:
         - "serve"
         - "--mcp"
-      enabled: true
-
-    - name: greptile
-      title: "Greptile MCP"
-      registry: false
-      transport: sse
-      url: "https://api.greptile.com/mcp"
-      headers:
-        Authorization: "Bearer ${env:GREPTILE_API_KEY}"
-        X-GitHub-Token: "${env:GITHUB_TOKEN}"
-      enabled: false
 
     - name: filesystem
       title: "Filesystem MCP"
@@ -85,74 +68,6 @@ dependencies:
         - "${env:PWD}"
       standalone: true
       timeout: 60000
-      enabled: true
-
-    - name: sequentialthinking
-      title: "Sequential Thinking MCP"
-      registry: false
-      transport: stdio
-      command: "npx"
-      args:
-        - "-y"
-        - "@modelcontextprotocol/server-sequential-thinking"
-      env:
-        DISABLE_THOUGHT_LOGGING: "${env:DISABLE_THOUGHT_LOGGING:-true}"
-      standalone: true
-      timeout: 60000
-      enabled: false
-
-    - name: github-official
-      title: "GitHub Official MCP"
-      registry: false
-      transport: sse
-      url: "https://api.githubcopilot.com/mcp/"
-      standalone: true
-      enabled: false
-      headers:
-        Authorization: "Bearer ${env:GITHUB_TOKEN}"
-
-    - name: aws-iac
-      title: "AWS IaC MCP"
-      registry: false
-      transport: stdio
-      command: "uvx"
-      args:
-        - "awslabs.aws-iac-mcp-server"
-      env:
-        AWS_PROFILE: "${env:AWS_PROFILE:-default}"
-        AWS_REGION: "${env:AWS_REGION:-us-east-1}"
-        FASTMCP_LOG_LEVEL: "ERROR"
-      standalone: true
-      timeout: 60000
-      enabled: false
-
-
-    - name: aws-documentation
-      title: "AWS Documentation MCP"
-      registry: false
-      transport: stdio
-      command: "uvx"
-      args:
-        - "awslabs.aws-documentation-mcp-server==1.0.0"
-      env:
-        FASTMCP_LOG_LEVEL: "ERROR"
-        AWS_DOCUMENTATION_PARTITION: "${env:AWS_DOCUMENTATION_PARTITION:-aws}"
-      standalone: true
-      enabled: false
-
-    - name: aws-mcp
-      title: "AWS Managed MCP"
-      registry: false
-      transport: sse
-      url: "https://aws-mcp.us-east-1.api.aws/mcp?oauth=initialize"
-      enabled: false
-
-    - name: sentry-remote
-      title: "Sentry Remote MCP"
-      registry: false
-      transport: sse
-      url: "https://mcp.sentry.dev/mcp"
-      enabled: false
 
     - name: sonarqube
       title: "SonarQube MCP"
@@ -167,7 +82,6 @@ dependencies:
         SONARQUBE_URL: "${env:SONARQUBE_URL}"
         SONARQUBE_ORG: "${env:SONARQUBE_ORG}"
       timeout: 60000
-      enabled: true
 
     - name: semgrep
       title: "Semgrep MCP"
@@ -184,7 +98,6 @@ dependencies:
         - "${env:HOME}/.local/bin/semgrep"
       env:
         SEMGREP_APP_TOKEN: "${env:SEMGREP_APP_TOKEN}"
-      enabled: true
       timeout: 60000
 
     - name: skillport
@@ -198,7 +111,6 @@ dependencies:
         SKILLPORT_SKILLS_DIR: "${env:SKILLPORT_SKILLS_DIR:-.agents/skills}"
       standalone: true
       timeout: 60000
-      enabled: true
 
     - name: nexus
       title: "Nexus"
@@ -218,7 +130,6 @@ dependencies:
         NO_PROXY: "127.0.0.1,localhost"
       timeout: 60000
       standalone: true
-      enabled: true
 
     - name: chronos-graph
       title: "Chronos Graph"
@@ -257,7 +168,6 @@ dependencies:
         DASHBOARD_PORT: "${env:DASHBOARD_PORT}"
       standalone: true
       timeout: 120000
-      enabled: true
 
 # --------------------------------------------------------------------------
 # Global Agent Settings (Inherited by all targets)

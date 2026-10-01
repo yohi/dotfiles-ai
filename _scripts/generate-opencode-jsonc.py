@@ -66,6 +66,9 @@ def _convert_mcp_entry(entry: dict[str, Any]) -> tuple[str, dict[str, Any]]:
             "enabled": enabled,
             "command": full_cmd,
         }
+        if entry.get("cwd") is not None:
+            cwd = str(entry["cwd"])
+            result["cwd"] = str(REPO_ROOT) if cwd == "." else cwd
         if "env" in entry:
             result["environment"] = {
                 k: _normalize_env_syntax(str(v)) for k, v in entry["env"].items()
@@ -259,7 +262,11 @@ def build_config(apm: dict[str, Any]) -> dict[str, Any]:
         cfg["experimental"] = apm["experimental"]
 
     # --- MCP ([MCP] anchor) ---
-    mcp_entries = (apm.get("dependencies") or {}).get("mcp") or []
+    mcp_entries = [
+        entry
+        for entry in ((apm.get("dependencies") or {}).get("mcp") or [])
+        if isinstance(entry, dict)
+    ]
     if mcp_entries:
         cfg["mcp"] = _build_mcp_section(mcp_entries)
 

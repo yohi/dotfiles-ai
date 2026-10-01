@@ -15,6 +15,9 @@ from typing import Any
 import yaml
 
 
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
 def expand_env_vars(val: Any) -> Any:
     if isinstance(val, str):
 
@@ -56,6 +59,8 @@ def build_mcp_servers(apm: dict[str, Any]) -> dict[str, Any]:
     mcp_servers: dict[str, Any] = {}
 
     for entry in mcp_entries:
+        if not isinstance(entry, dict):
+            continue
         if not entry.get("enabled", True):
             continue
         transport = entry.get("transport", "stdio")
@@ -99,6 +104,9 @@ def build_mcp_servers(apm: dict[str, Any]) -> dict[str, Any]:
             "command": expand_env_vars(str(command)),
             "args": [expand_env_vars(str(arg)) for arg in (entry.get("args") or [])],
         }
+        if entry.get("cwd") is not None:
+            cwd = str(entry["cwd"])
+            server_cfg["cwd"] = REPO_ROOT if cwd == "." else cwd
         if entry.get("env"):
             server_cfg["env"] = {
                 k: expand_env_vars(str(v)) for k, v in entry["env"].items()
