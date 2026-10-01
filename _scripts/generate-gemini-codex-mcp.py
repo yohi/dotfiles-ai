@@ -43,7 +43,11 @@ def _convert_value(value: Any) -> Any:
 
 def _mcp_entries(apm: dict[str, Any]) -> list[dict[str, Any]]:
     entries = (apm.get("dependencies") or {}).get("mcp") or []
-    return [e for e in entries if e.get("enabled", True)]
+    return [
+        entry
+        for entry in entries
+        if isinstance(entry, dict) and entry.get("enabled", True)
+    ]
 
 
 def _build_mcp_server(entry: dict[str, Any]) -> dict[str, Any] | None:

@@ -36,6 +36,21 @@ def test_apply_generated_fields_synchronizes_all_generated_values() -> None:
     assert current["unrelated"] == "preserved"
 
 
+def test_build_config_skips_registry_string_mcp_entries() -> None:
+    config = generate_opencode_jsonc.build_config(
+        {
+            "dependencies": {
+                "mcp": [
+                    "com.atlassian/atlassian-mcp-server",
+                    {"name": "codegraph", "command": "codegraph"},
+                ]
+            }
+        }
+    )
+
+    assert set(config["mcp"]) == {"codegraph"}
+
+
 def test_convert_mcp_entry_keeps_opencode_env_syntax_for_filesystem_path() -> None:
     _, converted = generate_opencode_jsonc._convert_mcp_entry(
         {

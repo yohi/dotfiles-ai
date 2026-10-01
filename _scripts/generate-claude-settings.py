@@ -56,6 +56,8 @@ def build_mcp_servers(apm: dict[str, Any]) -> dict[str, Any]:
     mcp_servers: dict[str, Any] = {}
 
     for entry in mcp_entries:
+        if not isinstance(entry, dict):
+            continue
         if not entry.get("enabled", True):
             continue
         transport = entry.get("transport", "stdio")

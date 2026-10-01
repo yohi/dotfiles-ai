@@ -259,7 +259,11 @@ def build_config(apm: dict[str, Any]) -> dict[str, Any]:
         cfg["experimental"] = apm["experimental"]
 
     # --- MCP ([MCP] anchor) ---
-    mcp_entries = (apm.get("dependencies") or {}).get("mcp") or []
+    mcp_entries = [
+        entry
+        for entry in ((apm.get("dependencies") or {}).get("mcp") or [])
+        if isinstance(entry, dict)
+    ]
     if mcp_entries:
         cfg["mcp"] = _build_mcp_section(mcp_entries)
 
