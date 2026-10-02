@@ -12,28 +12,26 @@ generate_opencode_jsonc = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(generate_opencode_jsonc)
 
 
-def test_apply_generated_fields_synchronizes_all_generated_values() -> None:
-    current = {
-        "mcp": {"old": {"enabled": False}},
-        "agent": {"old": {"model": "old"}},
-        "provider": {"old": {"name": "old"}},
-        "enabled_providers": ["old"],
-        "unrelated": "preserved",
-    }
-    config = {
-        "mcp": {"new": {"enabled": True}},
-        "agent": {"new": {"model": "new"}},
-        "provider": {"new": {"name": "new"}},
-        "enabled_providers": ["new"],
-    }
+def test_main_does_not_rewrite_project_root_opencode_config(
+    tmp_path: Path, monkeypatch
+) -> None:
+    repo_root = tmp_path
+    output = repo_root / "opencode" / "opencode.jsonc"
+    output.parent.mkdir()
+    output.write_text("{}\n", encoding="utf-8")
+    project_config = repo_root / "opencode.json"
+    original_config = '{"mcp":{"local-only":{"enabled":false}}}\n'
+    project_config.write_text(original_config, encoding="utf-8")
+    (repo_root / "apm.yml").write_text(
+        "dependencies:\n  mcp: []\n", encoding="utf-8"
+    )
+    monkeypatch.setattr(generate_opencode_jsonc, "REPO_ROOT", repo_root)
+    monkeypatch.setattr(generate_opencode_jsonc, "APM_YML", repo_root / "apm.yml")
+    monkeypatch.setattr(generate_opencode_jsonc, "OUTPUT", output)
 
-    generate_opencode_jsonc._apply_generated_fields(current, config)
+    generate_opencode_jsonc.main()
 
-    assert current["mcp"] == config["mcp"]
-    assert current["agent"] == config["agent"]
-    assert current["provider"] == config["provider"]
-    assert current["enabled_providers"] == config["enabled_providers"]
-    assert current["unrelated"] == "preserved"
+    assert project_config.read_text(encoding="utf-8") == original_config
 
 
 def test_build_config_skips_registry_string_mcp_entries() -> None:

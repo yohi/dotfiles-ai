@@ -33,6 +33,11 @@ dependencies:
 
   # MCP Servers
   mcp:
+
+    - "com.atlassian/atlassian-mcp-server"
+
+    - "io.github.SonarSource/sonarqube-mcp-server"
+
     - name: cf-mcp-portal
       title: "Cloudflare MCP Portal (Personal)"
       registry: false
@@ -44,8 +49,6 @@ dependencies:
       registry: false
       transport: streamable-http
       url: https://work.mcp.y-ohi.com/mcp?codemode=search_and_execute
-
-    - "com.atlassian/atlassian-mcp-server"
 
     - name: codegraph
       title: "CodeGraph MCP"
@@ -67,20 +70,6 @@ dependencies:
         - "@modelcontextprotocol/server-filesystem"
         - "${env:PWD}"
       standalone: true
-      timeout: 60000
-
-    - name: sonarqube
-      title: "SonarQube MCP"
-      registry: false
-      transport: stdio
-      command: "npx"
-      args:
-        - "-y"
-        - "sonarqube-mcp-server"
-      env:
-        SONARQUBE_TOKEN: "${env:SONARQUBE_TOKEN}"
-        SONARQUBE_URL: "${env:SONARQUBE_URL}"
-        SONARQUBE_ORG: "${env:SONARQUBE_ORG}"
       timeout: 60000
 
     - name: semgrep

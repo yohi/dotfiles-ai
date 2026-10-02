@@ -8,16 +8,12 @@ Options:
     --check     Exit 1 if generated output differs from existing file (CI use)
 
 Side effects (normal mode only):
-    In addition to writing opencode/opencode.jsonc, this script normalises
-    opencode.json at the repository root (if it exists) by converting MCP
-    command arguments to use portable environment-variable syntax.  This
-    side effect is also validated in --check mode: if opencode.json exists
-    and is not normalised, the script exits with code 1.
+    Writes only the generated opencode/opencode.jsonc export.  Project-root
+    opencode.json files are user configuration and are left untouched.
 """
 
 from __future__ import annotations
 
-import copy
 import json
 import re
 import sys
@@ -87,26 +83,6 @@ def _normalize_env_syntax(value: str) -> str:
     if re.match(r"^{env:[^}]+}$", value):
         return value
     return re.sub(r"\$\{(env:[^}]+)\}", r"{\1}", value)
-
-
-def _normalize_opencode_json_data(data: dict[str, Any]) -> dict[str, Any]:
-    """Return a deep-copied normalised dict of opencode.json data."""
-    normalized = copy.deepcopy(data)
-    if "mcp" in normalized:
-        for entry in normalized["mcp"].values():
-            if entry.get("type") == "local" and "command" in entry:
-                entry["command"] = [
-                    _normalize_env_syntax(str(arg)) for arg in entry["command"]
-                ]
-    return normalized
-
-
-def _apply_generated_fields(data: dict[str, Any], cfg: dict[str, Any]) -> None:
-    """Apply the fields generated from apm.yml to an existing config."""
-    data["mcp"] = cfg.get("mcp", {})
-    for key in ("agent", "provider", "enabled_providers"):
-        if key in cfg:
-            data[key] = cfg[key]
 
 
 def _build_mcp_section(mcp_entries: list[dict[str, Any]]) -> dict[str, Any]:
@@ -360,41 +336,10 @@ def main() -> None:
             sys.exit(1)
         print("[check] OK: opencode.jsonc is up to date.")
 
-        # Also verify opencode.json normalisation state
-        opencode_json = REPO_ROOT / "opencode.json"
-        if opencode_json.exists():
-            try:
-                data = json.loads(opencode_json.read_text(encoding="utf-8"))
-                _apply_generated_fields(data, cfg)
-                normalised = _normalize_opencode_json_data(data)
-                expected = json.dumps(normalised, indent=2, ensure_ascii=False) + "\n"
-                actual = json.dumps(data, indent=2, ensure_ascii=False) + "\n"
-                if actual != expected:
-                    print(
-                        "[check] FAIL: opencode.json is not normalised. Run: make sync-opencode"
-                    )
-                    sys.exit(1)
-                print("[check] OK: opencode.json is normalised.")
-            except (json.JSONDecodeError, OSError) as e:
-                print(f"[check] WARN: could not verify opencode.json: {e}")
         return
 
     OUTPUT.write_text(output, encoding="utf-8")
     print(f"[ok] Generated: {OUTPUT}")
-
-    opencode_json = REPO_ROOT / "opencode.json"
-    if opencode_json.exists():
-        try:
-            data = json.loads(opencode_json.read_text(encoding="utf-8"))
-            _apply_generated_fields(data, cfg)
-            normalized = _normalize_opencode_json_data(data)
-            opencode_json.write_text(
-                json.dumps(normalized, indent=2, ensure_ascii=False) + "\n",
-                encoding="utf-8",
-            )
-            print(f"[ok] Normalized: {opencode_json}")
-        except (json.JSONDecodeError, OSError) as e:
-            print(f"[warning] Failed to normalize opencode.json: {e}")
 
 
 if __name__ == "__main__":

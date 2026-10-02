@@ -1,4 +1,4 @@
-"""Generate/update Claude settings files (.claude.json and claude/settings.json) from apm.yml.
+"""Generate the Claude settings export in claude/settings.json from apm.yml.
 
 This script filters out SSE/HTTP transport servers and only includes stdio servers
 in the mcpServers configuration to comply with Claude Desktop's validation schema.
@@ -173,7 +173,6 @@ def main() -> None:
 
     mcp_servers = build_mcp_servers(apm)
 
-    save_settings(".claude.json", mcp_servers)
     save_settings("claude/settings.json", mcp_servers, create_dir=True)
 
 
