@@ -74,6 +74,21 @@ def test_codex_only_generation_preserves_gemini_config(tmp_path, monkeypatch) ->
     assert "disabled-server" not in generated_codex
 
 
+def test_mcp_entries_skips_registry_string_entries() -> None:
+    entries = generate_mcp._mcp_entries(
+        {
+            "dependencies": {
+                "mcp": [
+                    "com.atlassian/atlassian-mcp-server",
+                    {"name": "codegraph", "command": "codegraph"},
+                ]
+            }
+        }
+    )
+
+    assert entries == [{"name": "codegraph", "command": "codegraph"}]
+
+
 def test_sync_mcp_normalizes_opencode_after_apm_install() -> None:
     makefile = (PROJECT_ROOT / "_mk" / "mcp.mk").read_text(encoding="utf-8")
 
@@ -99,6 +114,34 @@ def test_codex_server_resolves_environment_placeholders_in_stdio_arguments(
 
     assert server is not None
     assert server["args"] == ["/workspace/project", "/workspace/home/.local/bin/semgrep"]
+
+
+def test_gemini_server_resolves_relative_cwd_to_repository_root() -> None:
+    server = generate_mcp._build_mcp_server(
+        {
+            "name": "codegraph",
+            "command": "_scripts/codegraph-bootstrap.sh",
+            "args": ["serve", "--mcp"],
+            "cwd": ".",
+        }
+    )
+
+    assert server is not None
+    assert server["cwd"] == str(PROJECT_ROOT)
+
+
+def test_codex_server_resolves_relative_cwd_to_repository_root() -> None:
+    server = generate_mcp._build_codex_mcp_server(
+        {
+            "name": "codegraph",
+            "command": "_scripts/codegraph-bootstrap.sh",
+            "args": ["serve", "--mcp"],
+            "cwd": ".",
+        }
+    )
+
+    assert server is not None
+    assert server["cwd"] == str(PROJECT_ROOT)
 
 
 def test_codex_server_forwards_environment_references_and_maps_timeout(
@@ -216,7 +259,7 @@ def test_nexus_codex_config_forwards_github_package_auth() -> None:
     nexus = next(
         entry
         for entry in apm["dependencies"]["mcp"]
-        if entry["name"] == "nexus"
+        if isinstance(entry, dict) and entry["name"] == "nexus"
     )
 
     server = generate_mcp._build_codex_mcp_server(nexus)

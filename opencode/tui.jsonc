@@ -1,27 +1,19 @@
 {
   "$schema": "https://opencode.ai/tui.json",
-
   "theme": "tokyonight",
   "diff_style": "auto",
-
   "mouse": true,
-
   "scroll_speed": 3,
   "scroll_acceleration": {
     "enabled": true,
     "factor": 1.5
   },
-
   "editor": {
     "use_external": true
   },
-
-  "keybinds": {
-  },
-
+  "keybinds": {},
   "plugin": [
-    "oh-my-openagent/tui",
-    "@yohi/akane@1.6.2",
+    "oh-my-openagent@4.19.4/tui",
+    "@yohi/akane@1.6.2"
   ]
 }
-

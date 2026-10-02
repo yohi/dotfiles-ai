@@ -155,7 +155,7 @@ Single Source of Truth (SSOT) です。
 - **役割**: AI エージェントが利用する各種ツール（ファイルシステム、データベース、
   GitHub、AWS、Sentry 等）を標準的な MCP 経由で提供します。
 - **設定の同期**: `make sync-mcp` を実行すると、`apm.yml` から
-  対応するエージェント/IDE 向け（Claude Code, OpenCode, VSCode, Cursor, Antigravity）の MCP 設定ファイルが自動生成されます。Gemini CLI や Codex CLI については自動同期の対象外であるため、個別の設定同期コマンドを実行するか、各ツールの手順に従って手動で設定してください。
+  対応するエージェント/IDE 向け（Claude Code, OpenCode, Codex, VSCode, Cursor, Antigravity）の MCP 設定ファイルが自動生成されます。Gemini CLI は引き続き自動同期の対象外です。
 
 そのため、Antigravity CLI では `skillport` / `nexus` / `chronos-graph` を
  direct stdio MCP として使う構成を推奨します。
@@ -187,12 +187,12 @@ Antigravity 設定は `make sync-antigravity` で
 | エージェント | 接続方式 | 管理主体 |
 | :--- | :--- | :--- |
 | Claude Code | stdio / remote | `make sync-mcp` (生成元 `.claude.json` 等) |
-| Gemini CLI | stdio | `make sync-mcp`（非自動同期。手動配置） |
+| Gemini CLI | stdio | 手動配置 |
 | Antigravity CLI | Direct stdio MCP | `make sync-antigravity` |
 | Cursor | stdio | `make sync-mcp` (生成元 `.cursor/mcp.json`) |
 | OpenCode | stdio / remote | `make sync-opencode` |
 | VSCode | stdio | `make sync-mcp` (生成元 `ide/vscode/settings.json`) |
-| Codex | stdio | `make sync-mcp`（非自動同期。手動配置） |
+| Codex | stdio / Streamable HTTP | `make sync-mcp` -> `sync-codex-mcp` |
 
 `make setup` を実行すると、リポジトリ内の設定ファイルが各エージェントの
 構成ディレクトリへ配備されます。
@@ -202,6 +202,7 @@ Antigravity 設定は `make sync-antigravity` で
 | Global Rules | `~/.gemini/GEMINI.md` | `global-rules/AGENTS.global.md` |
 | MCP Config | `~/.config/...` | `mcp/README.md` (ガイド) |
 | Gemini CLI | `~/.gemini/settings.json` | Updated by sync script |
+| Codex | `~/.codex/config.toml` | `codex/config.toml` |
 | Antigravity | `~/.gemini/antigravity/...` | `antigravity/mcp_config.json` |
 | Cursor | `.cursor/mcp.json` | `ide/cursor/mcp.json` |
 
@@ -226,6 +227,7 @@ Antigravity 設定は `make sync-antigravity` で
 | `make apm-install` | APM インストール + 同期 |
 | `make setup-apm-env` | .env ファイルの雛形作成 |
 | `make sync-mcp` | MCP 設定の再生成と各エージェントへの反映 |
+| `make sync-codex-mcp` | Codex の MCP 設定を `apm.yml` から生成 |
 | `make sync-gemini-codex` | Gemini / Codex の MCP 設定を `apm.yml` から生成 |
 | `make sync-claude` | Claude の MCP 設定を `apm.yml` から生成 |
 | `make skillport` | SkillPort の初期セットアップ |

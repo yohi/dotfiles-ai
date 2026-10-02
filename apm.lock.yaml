@@ -1,6 +1,6 @@
 lockfile_version: '1'
-generated_at: '2026-09-07T15:37:47.988569+00:00'
-apm_version: 0.28.0
+generated_at: '2026-10-01T14:52:34.559808+00:00'
+apm_version: 0.31.0
 dependencies:
 - repo_url: anthropics/claude-code
   name: code-review
@@ -14,7 +14,7 @@ dependencies:
   - .opencode/commands/code-review.md
   deployed_file_hashes:
     .opencode/commands/code-review.md: sha256:ecab79f22b6e2bef07a524d2015aaa9e0b7abce82445f38b31a231b19c7bd43a
-  content_hash: sha256:d25f797947bbd724551746c24ed4ac40788aaf370a7857eb120180fbb00ac2be
+  content_hash: sha256:346db5bc190d850ae20b05e6784279d4c94965ffc64cab55f3e27f2e19376715
 - repo_url: anthropics/skills
   name: skills
   host: github.com
@@ -350,8 +350,6 @@ dependencies:
   - .agents/skills/skill-creator/eval-viewer/viewer.html
   - .agents/skills/skill-creator/references/schemas.md
   - .agents/skills/skill-creator/scripts/__init__.py
-  - .agents/skills/skill-creator/scripts/__pycache__/__init__.cpython-314.pyc
-  - .agents/skills/skill-creator/scripts/__pycache__/aggregate_benchmark.cpython-314.pyc
   - .agents/skills/skill-creator/scripts/aggregate_benchmark.py
   - .agents/skills/skill-creator/scripts/generate_report.py
   - .agents/skills/skill-creator/scripts/improve_description.py
@@ -767,8 +765,6 @@ dependencies:
     .agents/skills/skill-creator/eval-viewer/viewer.html: sha256:a53213426ee1100441d701a3a0d49cda7a842f992d2c36463f4d3cc0258575fa
     .agents/skills/skill-creator/references/schemas.md: sha256:8e8876180a8989b406a4d3edddf875b04cdfd5805cc8616686d552b11ce4455f
     .agents/skills/skill-creator/scripts/__init__.py: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
-    .agents/skills/skill-creator/scripts/__pycache__/__init__.cpython-314.pyc: sha256:850ab763583a9d4ea5589f7a616b5d0ac089cda3ba61d8e23b8ed44a51eefcac
-    .agents/skills/skill-creator/scripts/__pycache__/aggregate_benchmark.cpython-314.pyc: sha256:23a5d21e1c51455358e0c2ef74aa1abe87f0996f46efcf4eae25ca6b51e2fd66
     .agents/skills/skill-creator/scripts/aggregate_benchmark.py: sha256:123ef128ea5ccc01a4b1ac212ef5567f21e9c13d3d240609780beeb3200c49aa
     .agents/skills/skill-creator/scripts/generate_report.py: sha256:13df7118a3c50c83c4c3250a606d5f2b20b25a3d44cbc392b3d669ec75281453
     .agents/skills/skill-creator/scripts/improve_description.py: sha256:87d864570220b699fac52da309d2d6efdb060647bfebc74f768128e646accf80
@@ -862,7 +858,7 @@ dependencies:
     .agents/skills/xlsx/scripts/office/validators/pptx.py: sha256:f937961e62a5fa0d002b8dc51a4c4e2cd8fcd59fe65853fa54edaca3fe99eccc
     .agents/skills/xlsx/scripts/office/validators/redlining.py: sha256:f4c33fdb9da0651d1d9aa76f0d5294cc9955869339ae131b2f75f3b2e366cb40
     .agents/skills/xlsx/scripts/recalc.py: sha256:cf419d15e02965aeaec17773c05b61303f7f520f67fa2696547e7da07502eac7
-  content_hash: sha256:dcaf79476abae6ad1fcf3d35c4564bcba51082a505926fb311a194d2c27c1707
+  content_hash: sha256:846976d3f681f629df23e72d86c6d40a01fde1529e97940cc36c7d51d53b9a6c
 - repo_url: coderabbitai/skills
   name: coderabbit
   host: github.com
@@ -883,14 +879,16 @@ dependencies:
     .agents/skills/code-review/SKILL.md: sha256:18c9c3c69a6a58ae0b7baa5b19637eaa9aaf02c21b1242f0bb073dc24942fe0a
     .opencode/agents/code-reviewer.md: sha256:5677b371344cdc444390fbb366041eee7ad204fdbc85b6a37f92671afa8bce7f
     .opencode/commands/coderabbit-review.md: sha256:cba1e6915ee98d24f288e3fb2dfb4b9b5bdc9e3164abf66b885aa9b66d8ce17d
-  content_hash: sha256:6c4d9f9fa574b8546857ce3ce5f08d02c0c236dc3071023d6d0b45d62127bdbd
+  content_hash: sha256:ddc5b9afdc7b80d5ecea029ccff529d2441787a9459a3181c8f908e3bc4aa8b2
   declared_license: MIT
 - repo_url: github/gh-stack
   name: gh-stack
   host: github.com
-  resolved_commit: 14fc42ed9b6c376a53b2f999f138d3bd26dac546
+  resolved_commit: 2bd699a544a09cb5c45a013d03416e0894b0454e
   version: unknown
-  package_type: skill_bundle
+  virtual_path: skills/gh-stack
+  is_virtual: true
+  package_type: claude_skill
   deployed_files:
   - .agents/skills/gh-stack
   - .agents/skills/gh-stack/SKILL.md
@@ -898,11 +896,11 @@ dependencies:
   - .agents/skills/gh-stack/references/stack-design.md
   - .agents/skills/gh-stack/references/troubleshooting.md
   deployed_file_hashes:
-    .agents/skills/gh-stack/SKILL.md: sha256:1ff5a23a7f66a3f5853ef411e48ae66ebe0b47d98d248a3a41ee0de8e237a796
-    .agents/skills/gh-stack/references/commands.md: sha256:362bca643fa84aae90627c4d1797c2343aaf5427713e6aa8572e04454c555fa9
+    .agents/skills/gh-stack/SKILL.md: sha256:5d966fc1ff92014db49d6689f41f70ddf1af40879f9dc8a12bb75b82d7850c25
+    .agents/skills/gh-stack/references/commands.md: sha256:31049425b8db652e80fa6994d5289f20169f57d7af0a0651fa72c3f25e8fe7c7
     .agents/skills/gh-stack/references/stack-design.md: sha256:4a61e3065ce61a5d129a30f5dcbebe73bfde250e34c382277facdc31d2c4e5ce
     .agents/skills/gh-stack/references/troubleshooting.md: sha256:fe1958036e663c7471a0d3efdf1fefe47ee65e06713b13a96e3db95becccdc47
-  content_hash: sha256:a665723d62643caac4d397bb69c6c2d9b163be53c8803e641e4c7edaf04876c6
+  content_hash: sha256:39b7803bf32b4ef195de76fa2d4730ac5dfc686d3d6654f93a162873febef0b1
 - repo_url: greptileai/skills
   name: check-pr
   host: github.com
@@ -942,9 +940,9 @@ dependencies:
 - repo_url: obra/superpowers
   name: superpowers
   host: github.com
-  resolved_commit: 3dcbd5c4b48e02263fbf4a3c01e3fe4f81d584d9
-  resolved_ref: v6.2.0
-  version: 6.2.0
+  resolved_commit: 8ca22dba9a94f28898bbce59f2537ff4d87c747d
+  resolved_ref: v6.4.2
+  version: 6.4.2
   package_type: marketplace_plugin
   deployed_files:
   - .agents/skills/brainstorming
@@ -956,10 +954,33 @@ dependencies:
   - .agents/skills/brainstorming/scripts/stop-server.sh
   - .agents/skills/brainstorming/spec-document-reviewer-prompt.md
   - .agents/skills/brainstorming/visual-companion.md
+  - .agents/skills/diagnosing-superpowers
+  - .agents/skills/diagnosing-superpowers/SKILL.md
+  - .agents/skills/diagnosing-superpowers/prompts/analyst-common.md
+  - .agents/skills/diagnosing-superpowers/prompts/cost-and-time.md
+  - .agents/skills/diagnosing-superpowers/prompts/plan-adherence.md
+  - .agents/skills/diagnosing-superpowers/prompts/quality-evidence.md
+  - .agents/skills/diagnosing-superpowers/prompts/repeated-work.md
+  - .agents/skills/diagnosing-superpowers/prompts/request-conflicts.md
+  - .agents/skills/diagnosing-superpowers/prompts/scrub-audit.md
+  - .agents/skills/diagnosing-superpowers/prompts/scrub.md
+  - .agents/skills/diagnosing-superpowers/prompts/similar-session.md
+  - .agents/skills/diagnosing-superpowers/prompts/skill-timeline.md
+  - .agents/skills/diagnosing-superpowers/prompts/stumbles.md
+  - .agents/skills/diagnosing-superpowers/references/context-safety.md
+  - .agents/skills/diagnosing-superpowers/references/github-issues.md
+  - .agents/skills/diagnosing-superpowers/references/redaction-policy.md
+  - .agents/skills/diagnosing-superpowers/references/session-discovery.md
+  - .agents/skills/diagnosing-superpowers/templates/bundle-README.md
+  - .agents/skills/diagnosing-superpowers/templates/case.md
+  - .agents/skills/diagnosing-superpowers/templates/issue.md
+  - .agents/skills/diagnosing-superpowers/templates/report.md
   - .agents/skills/dispatching-parallel-agents
   - .agents/skills/dispatching-parallel-agents/SKILL.md
   - .agents/skills/executing-plans
   - .agents/skills/executing-plans/SKILL.md
+  - .agents/skills/executing-plans/scripts/task-done
+  - .agents/skills/executing-plans/scripts/task-start
   - .agents/skills/finishing-a-development-branch
   - .agents/skills/finishing-a-development-branch/SKILL.md
   - .agents/skills/receiving-code-review
@@ -995,14 +1016,16 @@ dependencies:
   - .agents/skills/using-superpowers
   - .agents/skills/using-superpowers/SKILL.md
   - .agents/skills/using-superpowers/references/antigravity-tools.md
+  - .agents/skills/using-superpowers/references/claude-code-tools.md
   - .agents/skills/using-superpowers/references/codex-tools.md
   - .agents/skills/using-superpowers/references/gemini-tools.md
+  - .agents/skills/using-superpowers/references/hermes-tools.md
+  - .agents/skills/using-superpowers/references/muse-tools.md
   - .agents/skills/using-superpowers/references/pi-tools.md
   - .agents/skills/verification-before-completion
   - .agents/skills/verification-before-completion/SKILL.md
   - .agents/skills/writing-plans
   - .agents/skills/writing-plans/SKILL.md
-  - .agents/skills/writing-plans/plan-document-reviewer-prompt.md
   - .agents/skills/writing-skills
   - .agents/skills/writing-skills/SKILL.md
   - .agents/skills/writing-skills/anthropic-best-practices.md
@@ -1012,58 +1035,128 @@ dependencies:
   - .agents/skills/writing-skills/render-graphs.js
   - .agents/skills/writing-skills/testing-skills-with-subagents.md
   deployed_file_hashes:
-    .agents/skills/brainstorming/SKILL.md: sha256:4a54a4858b99807f3155ed1614b2f116e35ea5c1b788e793f565dd837fd3891f
+    .agents/skills/brainstorming/SKILL.md: sha256:a32d2255354775aa124855aa7100cf276bea096fff4ebb3a0edf57be216e6c72
     .agents/skills/brainstorming/scripts/frame-template.html: sha256:6a8a4e58bd6a44b904e2e3c57de774481d909204597e1498de53f1b2fecc4c4e
     .agents/skills/brainstorming/scripts/helper.js: sha256:43c6d69954a46ec34a2a262bcc62a9a7e83e839c739f199cb72646d397c686e3
     .agents/skills/brainstorming/scripts/server.cjs: sha256:2d2961ea8d11f56c5f4c3a1a68d22709efa5d7601a2246d8c880774e7e9e8412
     .agents/skills/brainstorming/scripts/start-server.sh: sha256:a4e5ae84275bcaacd2f84345afeabe59cf7b00ba080e123da7cc1fb226f12847
     .agents/skills/brainstorming/scripts/stop-server.sh: sha256:0b5ccbbd57f62d3ed88993f7940b5ee0e5c0fc9b21c550c623da4f6292e47daf
     .agents/skills/brainstorming/spec-document-reviewer-prompt.md: sha256:95a0a195de9d984be2fffa95bab16fc8c563bc296a9cfc5e9c29cb3ece0d7457
-    .agents/skills/brainstorming/visual-companion.md: sha256:60cbad29b9dd7eaf08da020e301c498a72230b2e13c1813fa967a135ffcc1d71
+    .agents/skills/brainstorming/visual-companion.md: sha256:6ffcb038b53254bd31debaa15e12dcd4ff24bd63d690e0b644ac6396701cf2e2
+    .agents/skills/diagnosing-superpowers/SKILL.md: sha256:5a652f8132cc901eb5ca61f89157839f87a2f20aed037fc7a2b51051bc37cd19
+    .agents/skills/diagnosing-superpowers/prompts/analyst-common.md: sha256:88801c36070be2a54a8a9a29632b01ab21db053e2e76ee49b5252a9b74ca4090
+    .agents/skills/diagnosing-superpowers/prompts/cost-and-time.md: sha256:fe97a66d4db3b436816ef82694bda413b522b3a862dd41978da01e358fffecc4
+    .agents/skills/diagnosing-superpowers/prompts/plan-adherence.md: sha256:1dcbab82033598a2e9c9ee42e950d4b1822d2c871c02cef9e102cdd5cbbda113
+    .agents/skills/diagnosing-superpowers/prompts/quality-evidence.md: sha256:749d11cf678f379ed77a29274cad456634e0284aa523639a1a214a9f2b986eb1
+    .agents/skills/diagnosing-superpowers/prompts/repeated-work.md: sha256:895027f2dfa4b1b8bcdb7ac9aec8d45a80bff212fad6ec6cad5ab38fa68322f5
+    .agents/skills/diagnosing-superpowers/prompts/request-conflicts.md: sha256:e800e38d8b7752c212c76c5c3ed75cd78b749684263ea0c313586f26af6f4b5c
+    .agents/skills/diagnosing-superpowers/prompts/scrub-audit.md: sha256:5cc48f05a7f81f5f7e05e0c7ceafc0fb8774bcaf75fe88dcb5c7e408026c70ad
+    .agents/skills/diagnosing-superpowers/prompts/scrub.md: sha256:854cb3320cc5377b493cea2f72519d67983464882db68a0f408a7d0a0f040b8c
+    .agents/skills/diagnosing-superpowers/prompts/similar-session.md: sha256:b190f713b463df2bb5ec3914647e204074d1bd50643a53159db6d13cace916c1
+    .agents/skills/diagnosing-superpowers/prompts/skill-timeline.md: sha256:45d604d583b57a77b9033eced8eb875ef342af70fcd66cf7d15c6dc89964890f
+    .agents/skills/diagnosing-superpowers/prompts/stumbles.md: sha256:1f2d1f048aff7b8b400006301f1ce8c232ecc7e9d5f705af27a849b2c03ea2e7
+    .agents/skills/diagnosing-superpowers/references/context-safety.md: sha256:e6be2bd3495f454d4bedee9484d728d245d1fa656e11fc4ceec5693c16e4730a
+    .agents/skills/diagnosing-superpowers/references/github-issues.md: sha256:a656f5e15b21c7a200c39c038f5ede74b9d6ea3ceeb90f39af7e930c8d8424d6
+    .agents/skills/diagnosing-superpowers/references/redaction-policy.md: sha256:96b16f47074838fe2d7e609577d6f8b0ad460f8378b281a3f96ee23cb5a08bde
+    .agents/skills/diagnosing-superpowers/references/session-discovery.md: sha256:6d1dced083e5d978448a78df298cf515531b0eb39b2854a4a2afbffeb69a7435
+    .agents/skills/diagnosing-superpowers/templates/bundle-README.md: sha256:2e6ddc6b106028d5ebd00a50ad93a77111d675c219ee1273cd0857869e8d51ec
+    .agents/skills/diagnosing-superpowers/templates/case.md: sha256:597892462be83bc478536ec91f7c285f6dd25d119c560734a3a180fe8471301d
+    .agents/skills/diagnosing-superpowers/templates/issue.md: sha256:8f28dbfe60602f77dda76d81815cb4e2dce7d3e2a93348890e1581be8310ac1f
+    .agents/skills/diagnosing-superpowers/templates/report.md: sha256:38295d0fd785e8608f330815c59ebd7047942002ec7085aecbed54681f56b0c1
     .agents/skills/dispatching-parallel-agents/SKILL.md: sha256:1968923066f3b707eb01d1992cdf4c42284c3855f70253b9cd5000ff45fca13c
-    .agents/skills/executing-plans/SKILL.md: sha256:c4c3d8b628c51114cd165fb8246fe02744cd8be180032328391252e653028d9b
-    .agents/skills/finishing-a-development-branch/SKILL.md: sha256:d0ac8360ed9d59121776ef95c84bcb38e9747de0d7ae7e227dca81e437593b9b
+    .agents/skills/executing-plans/SKILL.md: sha256:7aaac2a4a9234d50c8d5f5caf4760e537047ba6fb516c03565b41f47d08edd8c
+    .agents/skills/executing-plans/scripts/task-done: sha256:f704dc216e0602f95c601b9ee1113c9a55cc1c5f6e4d149dddfba0fd3ad1c314
+    .agents/skills/executing-plans/scripts/task-start: sha256:f833693c8fce3700fc9f841562d80f8015cd40f652c168a3405ac3e46947a1fe
+    .agents/skills/finishing-a-development-branch/SKILL.md: sha256:8db5a922b242dd4e1bf824cb91c13b3e8d8e8a86d6ceaf7f0774eb9cce909d65
     .agents/skills/receiving-code-review/SKILL.md: sha256:091df1629510af1b92fc4abd6f96732ebedb4cb2c0f3457e8f2740b0504a2438
-    .agents/skills/requesting-code-review/SKILL.md: sha256:d71cc01ba56d2325cf8af5f7c11837819b63ecd57de0bfdb812f7f3ff7751df8
-    .agents/skills/requesting-code-review/code-reviewer.md: sha256:b2f2ec7596925fe52dac158fdfbca19b3a7d779d619c481e6706a6c0001662d3
-    .agents/skills/subagent-driven-development/SKILL.md: sha256:ca49b5d6acd6259e47b71b8f04345902a3b43fab8a63eac33532edfcec861376
-    .agents/skills/subagent-driven-development/implementer-prompt.md: sha256:946601616a6f76ab3f165ef98377390968f1ec124ecef87422bc3553404e0332
-    .agents/skills/subagent-driven-development/re-review-prompt.md: sha256:e1d8e0e65e58ccde6dc920843da9148d23e65aeb0f8932bcc30be1341a703c4c
-    .agents/skills/subagent-driven-development/scripts/review-package: sha256:fac3d4bd7f94369e8037b9ead2a8a502dca6ab333902b560b9455dbb3c450ebe
-    .agents/skills/subagent-driven-development/scripts/sdd-workspace: sha256:95a09d9d3983ad1aafd093ca72b4587946dea885c6e302caa02a779a2f911c31
-    .agents/skills/subagent-driven-development/scripts/task-brief: sha256:d6954ef7841c7da3d77373e6ff5118b3f2f2e998606fd95d33e6527851bce044
-    .agents/skills/subagent-driven-development/task-reviewer-prompt.md: sha256:e3b4a1bfe7cd55ed0459e5ca9cdddb6ff086c345b99e9097036db6a18545729e
+    .agents/skills/requesting-code-review/SKILL.md: sha256:cfcee1b06774e7c0517f1e09be1a11f2d5680257072723e709ddbcf7e08b795a
+    .agents/skills/requesting-code-review/code-reviewer.md: sha256:82e370be6b3447523816286195571e4216ba56ba1ad6ad0e87862294c4c78dcb
+    .agents/skills/subagent-driven-development/SKILL.md: sha256:b70cb2ac89d1f3001bed53c288dbf740c4925a8b422e5d2694b9217bbad157cf
+    .agents/skills/subagent-driven-development/implementer-prompt.md: sha256:81dd9d5a3fb0b09b96b5829f03b9796842f3199ef7591d1ba1c2db2a515f64d0
+    .agents/skills/subagent-driven-development/re-review-prompt.md: sha256:0828a5e9cbb12ba49f14621dd8c3953c48c0fc383e75bb5494f055ed0d6d824f
+    .agents/skills/subagent-driven-development/scripts/review-package: sha256:f9275175b2276b1d5fdb1bae0bedaadd2a950659b7c6f311ea37ff85e1861b1f
+    .agents/skills/subagent-driven-development/scripts/sdd-workspace: sha256:75ca46c756ba4209ca36e0d3d65567257ceb33bc7a6775b9dad946707cb3bd7b
+    .agents/skills/subagent-driven-development/scripts/task-brief: sha256:cc563538e09abf719b34ddf4b2fa7a65cf3b301729039dbfa923cb060f729146
+    .agents/skills/subagent-driven-development/task-reviewer-prompt.md: sha256:bfed55c8f19d0ff6ed57b0fe09127c92890e9311c6c73917129598826bf9ebe8
     .agents/skills/systematic-debugging/CREATION-LOG.md: sha256:c24733a5b1821bd6bed1fc950261f0b9f4e90097e0bbb96459d8179713730789
     .agents/skills/systematic-debugging/SKILL.md: sha256:808fc5717aa88ad65efff312b11c186294d3e6ee301afb584e2f86599b137787
     .agents/skills/systematic-debugging/condition-based-waiting-example.ts: sha256:40ae5ebe497fdf310200e43fe986552546d0a22837c0d39e855db1cfd33eb88e
     .agents/skills/systematic-debugging/condition-based-waiting.md: sha256:e89fec8400d6cd50f43407cec9fab50976ba4d55d0ec2eb51c0bd68036b54c26
     .agents/skills/systematic-debugging/defense-in-depth.md: sha256:1e175fb86fc357e58c6aebf5441e481e1b7868b4380c0456b63a17eefbd18ba7
     .agents/skills/systematic-debugging/find-polluter.sh: sha256:dd7b8f13c4cc2a24b33ff87b18da9248f3e1c80a085c3316224f69ff0fa5c43c
-    .agents/skills/systematic-debugging/root-cause-tracing.md: sha256:6b0622269e098ca1399e123e553fd385f0b6412d88ef0e9c4f5a8ea9cf1cec7b
+    .agents/skills/systematic-debugging/root-cause-tracing.md: sha256:75b933b6a8c40bdb2031b10f21654395b56ec6ab6bc7b018c18d3fe57aeb7fb8
     .agents/skills/systematic-debugging/test-academic.md: sha256:fe2ba480d78ac0d686dc025f41c2a32a43d642bf533f91b0c6053a04d35d6486
     .agents/skills/systematic-debugging/test-pressure-1.md: sha256:0b6a915db0054577819834c79be9eb614e97bddba10d73768e1fbe91cfed048a
     .agents/skills/systematic-debugging/test-pressure-2.md: sha256:b2030aeffba07050e8ad573ddf87486457c4a016a786bb326235bebd856f2016
     .agents/skills/systematic-debugging/test-pressure-3.md: sha256:96b50a52e2c7989c9cf20fb752c47c1e9a3a70dc362f8f7989f8f5b64dac7708
-    .agents/skills/test-driven-development/SKILL.md: sha256:bf1b8216e523851a411e91d429a7c1c2a173e79d88957bc78e348218d50edd54
+    .agents/skills/test-driven-development/SKILL.md: sha256:64b03fce4aee5a97a93160cea8111f3ba13a17b7c001db4bd5836d67fd10705d
     .agents/skills/test-driven-development/writing-good-tests.md: sha256:51471c853306ff92ca8bb41dcaea05f31c0e46b03651f8f3c99754b7172f4ae1
     .agents/skills/using-git-worktrees/SKILL.md: sha256:8cfb86f121269e8f7f12361e6795c4f6738828340e28964c9229d365666c9edd
-    .agents/skills/using-superpowers/SKILL.md: sha256:55379fe7c1c473a02c61961c822996bff30e1320d6921d9062509bc508482c05
+    .agents/skills/using-superpowers/SKILL.md: sha256:82c5c8866ad7f5dd4440ce66bd7806ba48a2f13771beae5cf112e53f08fe36ba
     .agents/skills/using-superpowers/references/antigravity-tools.md: sha256:4880f6de3da4e32f9659ebe7a72b9e0ebfff04e028c2ed96173f86d0387a04c0
-    .agents/skills/using-superpowers/references/codex-tools.md: sha256:d3f113a8ebbd748e8ba847b09b57b7685442775ca4ee194d693ce3663f8fac68
+    .agents/skills/using-superpowers/references/claude-code-tools.md: sha256:21479a3fee27448cab8748a3b5687e53bb257883bda9c070426f9a1ab5cebf1b
+    .agents/skills/using-superpowers/references/codex-tools.md: sha256:1a38ad9b188c393052f58d95657a1c35ea6aafc8b5a27f198f3922912f70bbe7
     .agents/skills/using-superpowers/references/gemini-tools.md: sha256:62b9157bcb0ee3c6784e3d0da0798ddfa5872f9e0c34bea48f3079dabea71965
+    .agents/skills/using-superpowers/references/hermes-tools.md: sha256:e2185c976a3c87503910e05e2aea58cc89bc8e569bb624b93df9958ac47a9190
+    .agents/skills/using-superpowers/references/muse-tools.md: sha256:5a1da5c575fe18456ca71cd47ebfd8a38c745f8d82a67fe64d5b83080000eeb3
     .agents/skills/using-superpowers/references/pi-tools.md: sha256:703dbc83d23ecab9c6f388460c38abc482e9dee2fe6772a8c7a255152ad3a4d5
     .agents/skills/verification-before-completion/SKILL.md: sha256:2befe7fc55bcadaa3d97dd9e8efeb633d2561c0ebe74c5a8b17c4d9e7e4520b3
-    .agents/skills/writing-plans/SKILL.md: sha256:72190c88b2b5a67a96b91d66aa72b9161913e10e8769da3f28a226f4cc7b99d0
-    .agents/skills/writing-plans/plan-document-reviewer-prompt.md: sha256:aa728b96aad603c8be28875a4305637f6c984aa81ffcadcb13e743202fa2a0c7
-    .agents/skills/writing-skills/SKILL.md: sha256:16148d03c58f718abe2a9cfbb3edd06159b4a454391c5c2b933dfa1c25f9601e
+    .agents/skills/writing-plans/SKILL.md: sha256:a6c67c1900064347c2a329990dd3c555657c51c3ec53b259a08aa01a2c26139a
+    .agents/skills/writing-skills/SKILL.md: sha256:9cf8c7ba0fdc521f103299a17e2f681a3112b730a75c78a6881e41ce8e5f6c2a
     .agents/skills/writing-skills/anthropic-best-practices.md: sha256:217629b356c09c9bd11017c9788e8fc654ca1b32c92d4a51cd490e16dd65e59a
     .agents/skills/writing-skills/examples/CLAUDE_MD_TESTING.md: sha256:0b379a3415e185d3c434b3ad283d8aa132f3022c2a4f210f168865b5986bcef0
     .agents/skills/writing-skills/graphviz-conventions.dot: sha256:e2890a593c91370e384b42f2f67b1a6232c9e69dddea7891a0c1c46d7b20b694
     .agents/skills/writing-skills/persuasion-principles.md: sha256:a51bc9bf75189ea73a27b3fb504a2fdfdb966fb1f7f1cdf03203230a216ccc03
-    .agents/skills/writing-skills/render-graphs.js: sha256:ccda971a87bb185f8febf81c56b556a20d026fa980c17b35fa3e8824fbb37852
+    .agents/skills/writing-skills/render-graphs.js: sha256:c7f412cc629461c4d10287e668731874c0497707023e3e3f74a5355eb2cee196
     .agents/skills/writing-skills/testing-skills-with-subagents.md: sha256:c711346852c911b24a84aa161e0cff06a4cd7f4e2fa9e9c0a266cead5afcbade
-  content_hash: sha256:f4ba2a0b0275955535927e8635806758416f20b7dd7ff598c051cf5cdd08051d
+  content_hash: sha256:7e60c3ec033ee4ee9ee3ba40fbb16d62f8b483f2276e6f57793ff511b15db54a
   declared_license: MIT
+- repo_url: yohi/agent-skills
+  name: agent-driven-setup
+  host: github.com
+  resolved_commit: 5eb9c1183082d4dcc65ae991721fc48af3b2c072
+  version: unknown
+  virtual_path: skills/agent-driven-setup
+  is_virtual: true
+  package_type: claude_skill
+  deployed_files:
+  - .agents/skills/agent-driven-setup
+  - .agents/skills/agent-driven-setup/README.md
+  - .agents/skills/agent-driven-setup/SKILL.md
+  - .agents/skills/agent-driven-setup/evals/eval-2-metadata.json
+  - .agents/skills/agent-driven-setup/evals/eval-3-metadata.json
+  - .agents/skills/agent-driven-setup/evals/eval-4-metadata.json
+  - .agents/skills/agent-driven-setup/evals/eval_metadata.json
+  - .agents/skills/agent-driven-setup/evals/evals.json
+  - .agents/skills/agent-driven-setup/references/agent-capability-matrix.md
+  - .agents/skills/agent-driven-setup/references/agent-protocol-template.md
+  - .agents/skills/agent-driven-setup/references/human-entry-point-template.md
+  - .agents/skills/agent-driven-setup/references/repository-investigation-checklist.md
+  - .agents/skills/agent-driven-setup/references/secret-handling-patterns.md
+  - .agents/skills/agent-driven-setup/references/setup-approach-decision-guide.md
+  - .agents/skills/agent-driven-setup/references/verification-patterns.md
+  - .agents/skills/agent-driven-setup/scripts/analyze-repo.sh
+  - .agents/skills/agent-driven-setup/scripts/test-scripts.sh
+  - .agents/skills/agent-driven-setup/scripts/verify-setup.sh
+  deployed_file_hashes:
+    .agents/skills/agent-driven-setup/README.md: sha256:6dad665bb5b6df73358df2ffe7c84b689dbe4c0f355d387365ae420874faeafc
+    .agents/skills/agent-driven-setup/SKILL.md: sha256:f4248759ca268b6ddb00c2659d962a60032d406e49e51f4dd8e6183b52ad6ff0
+    .agents/skills/agent-driven-setup/evals/eval-2-metadata.json: sha256:9a11cd6fabee5c585f643c4a5ae9b6c2299b798acd72c1294fee0d1a401f790e
+    .agents/skills/agent-driven-setup/evals/eval-3-metadata.json: sha256:03ba1bcbc79e972d2f1ddb0cbfed3c0340ef761a73a59afe4faf511da459049b
+    .agents/skills/agent-driven-setup/evals/eval-4-metadata.json: sha256:3fdc980d21e4fd7abd46ff396ad69281db8c21017d988f755ce4bdb889b77bef
+    .agents/skills/agent-driven-setup/evals/eval_metadata.json: sha256:cb8dd767d7b305c597e18089bfeb3fa83efe1970943c9f876053fc84b15300c3
+    .agents/skills/agent-driven-setup/evals/evals.json: sha256:d3cc972fdeb151da68eed54f0efd61b8d69ee7f1c12c909ab5b4ee90a8623031
+    .agents/skills/agent-driven-setup/references/agent-capability-matrix.md: sha256:2e46712c17b8296c3cd83e53a3773d385f2d4620162d99470c90449baecba847
+    .agents/skills/agent-driven-setup/references/agent-protocol-template.md: sha256:b81933f09cfec0ce59e6563f894f8bc846fc8832148a6b03842b308c3e506c9c
+    .agents/skills/agent-driven-setup/references/human-entry-point-template.md: sha256:92690f3d4e22285eae8872f212b92f010ed0878fa01863a62bdd66d342a8864b
+    .agents/skills/agent-driven-setup/references/repository-investigation-checklist.md: sha256:1578738ee5a7c1abaaba9a7cc3268f1208d2a12e0285878f82cc57414211d1e0
+    .agents/skills/agent-driven-setup/references/secret-handling-patterns.md: sha256:cae9424c87db1c48f21d7dd979412f173f3d2f014d77ca24da367fe579b24c11
+    .agents/skills/agent-driven-setup/references/setup-approach-decision-guide.md: sha256:acc289f726b673f82fe827ac8cbf3aa3bbbbc450060dd8783218759d7b1d4f7e
+    .agents/skills/agent-driven-setup/references/verification-patterns.md: sha256:35a859dda55a42f31fe992857edf5725bc8ceeebc7e2dc0786dbf53349d92d0e
+    .agents/skills/agent-driven-setup/scripts/analyze-repo.sh: sha256:a9b029e1faf009384e48a95674b321afa812fae124db885a714a9f57a119f2b2
+    .agents/skills/agent-driven-setup/scripts/test-scripts.sh: sha256:dde3a0aa6e1dfafc67b239f44a4dcfc908b7ab4b65d3884eaa83c08e57974f3d
+    .agents/skills/agent-driven-setup/scripts/verify-setup.sh: sha256:91dbaa1e485aebb43198675a055e863ce7368e3938513b1af25f1c78c877cae7
+  content_hash: sha256:7f23b8e8b2bc87c9bb69d9828ac562dae18de20f0944ce325d238e9e25420307
 - repo_url: yohi/agent-skills
   name: git-master
   host: github.com
@@ -1150,37 +1243,65 @@ dependencies:
     .agents/skills/temporary-credential-agent/references/evaluation-matrix.md: sha256:b8a573cf632b8c2b65c9c17733dee8fea2873a0851ee6f9dcdbbdc73507e0a6b
     .agents/skills/temporary-credential-agent/references/service-profiles.md: sha256:16297622e056e7497fdf824e03c01bc662585a0533293b182b37c373033a4007
   content_hash: sha256:7bcaef97a452cee80b97d478d88ff30ee0c118edaf3d6da6f0759ff956c15bd8
+- repo_url: yohi/chronos-graph
+  name: chronos-memory-recall
+  host: github.com
+  resolved_commit: 6eaf561a36cb80d6b57d7d18a2ddfacb16abf70b
+  version: unknown
+  virtual_path: agent-assets/skills/chronos-memory-recall
+  is_virtual: true
+  package_type: claude_skill
+  deployed_files:
+  - .agents/skills/chronos-memory-recall
+  - .agents/skills/chronos-memory-recall/.chronosgraph-managed
+  - .agents/skills/chronos-memory-recall/SKILL.md
+  deployed_file_hashes:
+    .agents/skills/chronos-memory-recall/.chronosgraph-managed: sha256:42c747264236ffeffd9a3be678c18f88ff9df04b76b061c28eefa51b33a02488
+    .agents/skills/chronos-memory-recall/SKILL.md: sha256:4655d8ea767c4db416b9b901c4f7aba24909fe683496251a302d711ad40cbe5b
+  content_hash: sha256:5ba8a1fc40d9f3085a7fcb0e074a6cd1d25d38b1824acf51b714743f7f5d85f1
+- repo_url: yohi/chronos-graph
+  name: chronos-memory-save
+  host: github.com
+  resolved_commit: 6eaf561a36cb80d6b57d7d18a2ddfacb16abf70b
+  version: unknown
+  virtual_path: agent-assets/skills/chronos-memory-save
+  is_virtual: true
+  package_type: claude_skill
+  deployed_files:
+  - .agents/skills/chronos-memory-save
+  - .agents/skills/chronos-memory-save/.chronosgraph-managed
+  - .agents/skills/chronos-memory-save/SKILL.md
+  deployed_file_hashes:
+    .agents/skills/chronos-memory-save/.chronosgraph-managed: sha256:42c747264236ffeffd9a3be678c18f88ff9df04b76b061c28eefa51b33a02488
+    .agents/skills/chronos-memory-save/SKILL.md: sha256:5b012b64cb2703b495f7059c3e93ba3aa27c37bbd7e37409defea960a0d763e1
+  content_hash: sha256:cd1cc4e101c3509ebd88755f02697fe41cafb57c30f755c08446b8e11ed4ffcc
+- repo_url: yohi/nexus
+  name: code-search
+  host: github.com
+  resolved_commit: 1cd33742559a6774526ceb60ef5317fa48791c1a
+  version: unknown
+  virtual_path: skills/code-search
+  is_virtual: true
+  package_type: claude_skill
+  deployed_files:
+  - .agents/skills/code-search
+  - .agents/skills/code-search/SKILL.md
+  deployed_file_hashes:
+    .agents/skills/code-search/SKILL.md: sha256:cab66e9c8e6bd40dcd9649ea2affac828cc52634a9f14c60874972ccb80a8bb8
+  content_hash: sha256:cf18ccf8d8e1b04409d37ac2135930de9ba25d639db01ef6c8326743b7bdabbc
 deployments:
 - kind: uri
   target: mcp
-  value: aws-documentation
-  runtime: opencode
-  scope: project
-  owners:
-  - .
-  active_owner: .
-  content_hash: null
-- kind: uri
-  target: mcp
-  value: aws-iac
-  runtime: opencode
-  scope: project
-  owners:
-  - .
-  active_owner: .
-  content_hash: null
-- kind: uri
-  target: mcp
-  value: aws-mcp
-  runtime: opencode
-  scope: project
-  owners:
-  - .
-  active_owner: .
-  content_hash: null
-- kind: uri
-  target: mcp
   value: cf-mcp-portal
+  runtime: opencode
+  scope: project
+  owners:
+  - .
+  active_owner: .
+  content_hash: null
+- kind: uri
+  target: mcp
+  value: cf-mcp-portal-work
   runtime: opencode
   scope: project
   owners:
@@ -1207,7 +1328,7 @@ deployments:
   content_hash: null
 - kind: uri
   target: mcp
-  value: coderabbit
+  value: com.atlassian/atlassian-mcp-server
   runtime: opencode
   scope: project
   owners:
@@ -1217,24 +1338,6 @@ deployments:
 - kind: uri
   target: mcp
   value: filesystem
-  runtime: opencode
-  scope: project
-  owners:
-  - .
-  active_owner: .
-  content_hash: null
-- kind: uri
-  target: mcp
-  value: github-official
-  runtime: opencode
-  scope: project
-  owners:
-  - .
-  active_owner: .
-  content_hash: null
-- kind: uri
-  target: mcp
-  value: greptile
   runtime: opencode
   scope: project
   owners:
@@ -1261,24 +1364,6 @@ deployments:
   content_hash: null
 - kind: uri
   target: mcp
-  value: sentry-remote
-  runtime: opencode
-  scope: project
-  owners:
-  - .
-  active_owner: .
-  content_hash: null
-- kind: uri
-  target: mcp
-  value: sequentialthinking
-  runtime: opencode
-  scope: project
-  owners:
-  - .
-  active_owner: .
-  content_hash: null
-- kind: uri
-  target: mcp
   value: skillport
   runtime: opencode
   scope: project
@@ -1295,6 +1380,168 @@ deployments:
   - .
   active_owner: .
   content_hash: null
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/agent-driven-setup
+  runtime: null
+  scope: project
+  owners:
+  - yohi/agent-skills/skills/agent-driven-setup
+  active_owner: yohi/agent-skills/skills/agent-driven-setup
+  content_hash: null
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/agent-driven-setup/README.md
+  runtime: null
+  scope: project
+  owners:
+  - yohi/agent-skills/skills/agent-driven-setup
+  active_owner: yohi/agent-skills/skills/agent-driven-setup
+  content_hash: sha256:6dad665bb5b6df73358df2ffe7c84b689dbe4c0f355d387365ae420874faeafc
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/agent-driven-setup/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - yohi/agent-skills/skills/agent-driven-setup
+  active_owner: yohi/agent-skills/skills/agent-driven-setup
+  content_hash: sha256:f4248759ca268b6ddb00c2659d962a60032d406e49e51f4dd8e6183b52ad6ff0
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/agent-driven-setup/evals/eval-2-metadata.json
+  runtime: null
+  scope: project
+  owners:
+  - yohi/agent-skills/skills/agent-driven-setup
+  active_owner: yohi/agent-skills/skills/agent-driven-setup
+  content_hash: sha256:9a11cd6fabee5c585f643c4a5ae9b6c2299b798acd72c1294fee0d1a401f790e
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/agent-driven-setup/evals/eval-3-metadata.json
+  runtime: null
+  scope: project
+  owners:
+  - yohi/agent-skills/skills/agent-driven-setup
+  active_owner: yohi/agent-skills/skills/agent-driven-setup
+  content_hash: sha256:03ba1bcbc79e972d2f1ddb0cbfed3c0340ef761a73a59afe4faf511da459049b
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/agent-driven-setup/evals/eval-4-metadata.json
+  runtime: null
+  scope: project
+  owners:
+  - yohi/agent-skills/skills/agent-driven-setup
+  active_owner: yohi/agent-skills/skills/agent-driven-setup
+  content_hash: sha256:3fdc980d21e4fd7abd46ff396ad69281db8c21017d988f755ce4bdb889b77bef
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/agent-driven-setup/evals/eval_metadata.json
+  runtime: null
+  scope: project
+  owners:
+  - yohi/agent-skills/skills/agent-driven-setup
+  active_owner: yohi/agent-skills/skills/agent-driven-setup
+  content_hash: sha256:cb8dd767d7b305c597e18089bfeb3fa83efe1970943c9f876053fc84b15300c3
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/agent-driven-setup/evals/evals.json
+  runtime: null
+  scope: project
+  owners:
+  - yohi/agent-skills/skills/agent-driven-setup
+  active_owner: yohi/agent-skills/skills/agent-driven-setup
+  content_hash: sha256:d3cc972fdeb151da68eed54f0efd61b8d69ee7f1c12c909ab5b4ee90a8623031
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/agent-driven-setup/references/agent-capability-matrix.md
+  runtime: null
+  scope: project
+  owners:
+  - yohi/agent-skills/skills/agent-driven-setup
+  active_owner: yohi/agent-skills/skills/agent-driven-setup
+  content_hash: sha256:2e46712c17b8296c3cd83e53a3773d385f2d4620162d99470c90449baecba847
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/agent-driven-setup/references/agent-protocol-template.md
+  runtime: null
+  scope: project
+  owners:
+  - yohi/agent-skills/skills/agent-driven-setup
+  active_owner: yohi/agent-skills/skills/agent-driven-setup
+  content_hash: sha256:b81933f09cfec0ce59e6563f894f8bc846fc8832148a6b03842b308c3e506c9c
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/agent-driven-setup/references/human-entry-point-template.md
+  runtime: null
+  scope: project
+  owners:
+  - yohi/agent-skills/skills/agent-driven-setup
+  active_owner: yohi/agent-skills/skills/agent-driven-setup
+  content_hash: sha256:92690f3d4e22285eae8872f212b92f010ed0878fa01863a62bdd66d342a8864b
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/agent-driven-setup/references/repository-investigation-checklist.md
+  runtime: null
+  scope: project
+  owners:
+  - yohi/agent-skills/skills/agent-driven-setup
+  active_owner: yohi/agent-skills/skills/agent-driven-setup
+  content_hash: sha256:1578738ee5a7c1abaaba9a7cc3268f1208d2a12e0285878f82cc57414211d1e0
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/agent-driven-setup/references/secret-handling-patterns.md
+  runtime: null
+  scope: project
+  owners:
+  - yohi/agent-skills/skills/agent-driven-setup
+  active_owner: yohi/agent-skills/skills/agent-driven-setup
+  content_hash: sha256:cae9424c87db1c48f21d7dd979412f173f3d2f014d77ca24da367fe579b24c11
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/agent-driven-setup/references/setup-approach-decision-guide.md
+  runtime: null
+  scope: project
+  owners:
+  - yohi/agent-skills/skills/agent-driven-setup
+  active_owner: yohi/agent-skills/skills/agent-driven-setup
+  content_hash: sha256:acc289f726b673f82fe827ac8cbf3aa3bbbbc450060dd8783218759d7b1d4f7e
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/agent-driven-setup/references/verification-patterns.md
+  runtime: null
+  scope: project
+  owners:
+  - yohi/agent-skills/skills/agent-driven-setup
+  active_owner: yohi/agent-skills/skills/agent-driven-setup
+  content_hash: sha256:35a859dda55a42f31fe992857edf5725bc8ceeebc7e2dc0786dbf53349d92d0e
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/agent-driven-setup/scripts/analyze-repo.sh
+  runtime: null
+  scope: project
+  owners:
+  - yohi/agent-skills/skills/agent-driven-setup
+  active_owner: yohi/agent-skills/skills/agent-driven-setup
+  content_hash: sha256:a9b029e1faf009384e48a95674b321afa812fae124db885a714a9f57a119f2b2
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/agent-driven-setup/scripts/test-scripts.sh
+  runtime: null
+  scope: project
+  owners:
+  - yohi/agent-skills/skills/agent-driven-setup
+  active_owner: yohi/agent-skills/skills/agent-driven-setup
+  content_hash: sha256:dde3a0aa6e1dfafc67b239f44a4dcfc908b7ab4b65d3884eaa83c08e57974f3d
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/agent-driven-setup/scripts/verify-setup.sh
+  runtime: null
+  scope: project
+  owners:
+  - yohi/agent-skills/skills/agent-driven-setup
+  active_owner: yohi/agent-skills/skills/agent-driven-setup
+  content_hash: sha256:91dbaa1e485aebb43198675a055e863ce7368e3938513b1af25f1c78c877cae7
 - kind: project-relative
   target: opencode
   value: .agents/skills/algorithmic-art
@@ -1384,7 +1631,7 @@ deployments:
   owners:
   - obra/superpowers
   active_owner: obra/superpowers
-  content_hash: sha256:4a54a4858b99807f3155ed1614b2f116e35ea5c1b788e793f565dd837fd3891f
+  content_hash: sha256:a32d2255354775aa124855aa7100cf276bea096fff4ebb3a0edf57be216e6c72
 - kind: project-relative
   target: opencode
   value: .agents/skills/brainstorming/scripts/frame-template.html
@@ -1447,7 +1694,7 @@ deployments:
   owners:
   - obra/superpowers
   active_owner: obra/superpowers
-  content_hash: sha256:60cbad29b9dd7eaf08da020e301c498a72230b2e13c1813fa967a135ffcc1d71
+  content_hash: sha256:6ffcb038b53254bd31debaa15e12dcd4ff24bd63d690e0b644ac6396701cf2e2
 - kind: project-relative
   target: opencode
   value: .agents/skills/brand-guidelines
@@ -2269,6 +2516,60 @@ deployments:
   content_hash: sha256:f850841783ef3df4f28f4f45731f08591c8994fbe3e742eef5a370454d575d02
 - kind: project-relative
   target: opencode
+  value: .agents/skills/chronos-memory-recall
+  runtime: null
+  scope: project
+  owners:
+  - yohi/chronos-graph/agent-assets/skills/chronos-memory-recall
+  active_owner: yohi/chronos-graph/agent-assets/skills/chronos-memory-recall
+  content_hash: null
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/chronos-memory-recall/.chronosgraph-managed
+  runtime: null
+  scope: project
+  owners:
+  - yohi/chronos-graph/agent-assets/skills/chronos-memory-recall
+  active_owner: yohi/chronos-graph/agent-assets/skills/chronos-memory-recall
+  content_hash: sha256:42c747264236ffeffd9a3be678c18f88ff9df04b76b061c28eefa51b33a02488
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/chronos-memory-recall/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - yohi/chronos-graph/agent-assets/skills/chronos-memory-recall
+  active_owner: yohi/chronos-graph/agent-assets/skills/chronos-memory-recall
+  content_hash: sha256:4655d8ea767c4db416b9b901c4f7aba24909fe683496251a302d711ad40cbe5b
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/chronos-memory-save
+  runtime: null
+  scope: project
+  owners:
+  - yohi/chronos-graph/agent-assets/skills/chronos-memory-save
+  active_owner: yohi/chronos-graph/agent-assets/skills/chronos-memory-save
+  content_hash: null
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/chronos-memory-save/.chronosgraph-managed
+  runtime: null
+  scope: project
+  owners:
+  - yohi/chronos-graph/agent-assets/skills/chronos-memory-save
+  active_owner: yohi/chronos-graph/agent-assets/skills/chronos-memory-save
+  content_hash: sha256:42c747264236ffeffd9a3be678c18f88ff9df04b76b061c28eefa51b33a02488
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/chronos-memory-save/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - yohi/chronos-graph/agent-assets/skills/chronos-memory-save
+  active_owner: yohi/chronos-graph/agent-assets/skills/chronos-memory-save
+  content_hash: sha256:5b012b64cb2703b495f7059c3e93ba3aa27c37bbd7e37409defea960a0d763e1
+- kind: project-relative
+  target: opencode
   value: .agents/skills/claude-api
   runtime: null
   scope: project
@@ -2890,6 +3191,213 @@ deployments:
   content_hash: sha256:18c9c3c69a6a58ae0b7baa5b19637eaa9aaf02c21b1242f0bb073dc24942fe0a
 - kind: project-relative
   target: opencode
+  value: .agents/skills/code-search
+  runtime: null
+  scope: project
+  owners:
+  - yohi/nexus/skills/code-search
+  active_owner: yohi/nexus/skills/code-search
+  content_hash: null
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/code-search/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - yohi/nexus/skills/code-search
+  active_owner: yohi/nexus/skills/code-search
+  content_hash: sha256:cab66e9c8e6bd40dcd9649ea2affac828cc52634a9f14c60874972ccb80a8bb8
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/diagnosing-superpowers
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: null
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/diagnosing-superpowers/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: sha256:5a652f8132cc901eb5ca61f89157839f87a2f20aed037fc7a2b51051bc37cd19
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/diagnosing-superpowers/prompts/analyst-common.md
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: sha256:88801c36070be2a54a8a9a29632b01ab21db053e2e76ee49b5252a9b74ca4090
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/diagnosing-superpowers/prompts/cost-and-time.md
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: sha256:fe97a66d4db3b436816ef82694bda413b522b3a862dd41978da01e358fffecc4
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/diagnosing-superpowers/prompts/plan-adherence.md
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: sha256:1dcbab82033598a2e9c9ee42e950d4b1822d2c871c02cef9e102cdd5cbbda113
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/diagnosing-superpowers/prompts/quality-evidence.md
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: sha256:749d11cf678f379ed77a29274cad456634e0284aa523639a1a214a9f2b986eb1
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/diagnosing-superpowers/prompts/repeated-work.md
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: sha256:895027f2dfa4b1b8bcdb7ac9aec8d45a80bff212fad6ec6cad5ab38fa68322f5
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/diagnosing-superpowers/prompts/request-conflicts.md
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: sha256:e800e38d8b7752c212c76c5c3ed75cd78b749684263ea0c313586f26af6f4b5c
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/diagnosing-superpowers/prompts/scrub-audit.md
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: sha256:5cc48f05a7f81f5f7e05e0c7ceafc0fb8774bcaf75fe88dcb5c7e408026c70ad
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/diagnosing-superpowers/prompts/scrub.md
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: sha256:854cb3320cc5377b493cea2f72519d67983464882db68a0f408a7d0a0f040b8c
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/diagnosing-superpowers/prompts/similar-session.md
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: sha256:b190f713b463df2bb5ec3914647e204074d1bd50643a53159db6d13cace916c1
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/diagnosing-superpowers/prompts/skill-timeline.md
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: sha256:45d604d583b57a77b9033eced8eb875ef342af70fcd66cf7d15c6dc89964890f
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/diagnosing-superpowers/prompts/stumbles.md
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: sha256:1f2d1f048aff7b8b400006301f1ce8c232ecc7e9d5f705af27a849b2c03ea2e7
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/diagnosing-superpowers/references/context-safety.md
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: sha256:e6be2bd3495f454d4bedee9484d728d245d1fa656e11fc4ceec5693c16e4730a
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/diagnosing-superpowers/references/github-issues.md
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: sha256:a656f5e15b21c7a200c39c038f5ede74b9d6ea3ceeb90f39af7e930c8d8424d6
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/diagnosing-superpowers/references/redaction-policy.md
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: sha256:96b16f47074838fe2d7e609577d6f8b0ad460f8378b281a3f96ee23cb5a08bde
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/diagnosing-superpowers/references/session-discovery.md
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: sha256:6d1dced083e5d978448a78df298cf515531b0eb39b2854a4a2afbffeb69a7435
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/diagnosing-superpowers/templates/bundle-README.md
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: sha256:2e6ddc6b106028d5ebd00a50ad93a77111d675c219ee1273cd0857869e8d51ec
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/diagnosing-superpowers/templates/case.md
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: sha256:597892462be83bc478536ec91f7c285f6dd25d119c560734a3a180fe8471301d
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/diagnosing-superpowers/templates/issue.md
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: sha256:8f28dbfe60602f77dda76d81815cb4e2dce7d3e2a93348890e1581be8310ac1f
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/diagnosing-superpowers/templates/report.md
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: sha256:38295d0fd785e8608f330815c59ebd7047942002ec7085aecbed54681f56b0c1
+- kind: project-relative
+  target: opencode
   value: .agents/skills/dispatching-parallel-agents
   runtime: null
   scope: project
@@ -3499,7 +4007,25 @@ deployments:
   owners:
   - obra/superpowers
   active_owner: obra/superpowers
-  content_hash: sha256:c4c3d8b628c51114cd165fb8246fe02744cd8be180032328391252e653028d9b
+  content_hash: sha256:7aaac2a4a9234d50c8d5f5caf4760e537047ba6fb516c03565b41f47d08edd8c
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/executing-plans/scripts/task-done
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: sha256:f704dc216e0602f95c601b9ee1113c9a55cc1c5f6e4d149dddfba0fd3ad1c314
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/executing-plans/scripts/task-start
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: sha256:f833693c8fce3700fc9f841562d80f8015cd40f652c168a3405ac3e46947a1fe
 - kind: project-relative
   target: opencode
   value: .agents/skills/finishing-a-development-branch
@@ -3517,7 +4043,7 @@ deployments:
   owners:
   - obra/superpowers
   active_owner: obra/superpowers
-  content_hash: sha256:d0ac8360ed9d59121776ef95c84bcb38e9747de0d7ae7e227dca81e437593b9b
+  content_hash: sha256:8db5a922b242dd4e1bf824cb91c13b3e8d8e8a86d6ceaf7f0774eb9cce909d65
 - kind: project-relative
   target: opencode
   value: .agents/skills/frontend-design
@@ -3551,8 +4077,8 @@ deployments:
   runtime: null
   scope: project
   owners:
-  - github/gh-stack
-  active_owner: github/gh-stack
+  - github/gh-stack/skills/gh-stack
+  active_owner: github/gh-stack/skills/gh-stack
   content_hash: null
 - kind: project-relative
   target: opencode
@@ -3560,26 +4086,26 @@ deployments:
   runtime: null
   scope: project
   owners:
-  - github/gh-stack
-  active_owner: github/gh-stack
-  content_hash: sha256:1ff5a23a7f66a3f5853ef411e48ae66ebe0b47d98d248a3a41ee0de8e237a796
+  - github/gh-stack/skills/gh-stack
+  active_owner: github/gh-stack/skills/gh-stack
+  content_hash: sha256:5d966fc1ff92014db49d6689f41f70ddf1af40879f9dc8a12bb75b82d7850c25
 - kind: project-relative
   target: opencode
   value: .agents/skills/gh-stack/references/commands.md
   runtime: null
   scope: project
   owners:
-  - github/gh-stack
-  active_owner: github/gh-stack
-  content_hash: sha256:362bca643fa84aae90627c4d1797c2343aaf5427713e6aa8572e04454c555fa9
+  - github/gh-stack/skills/gh-stack
+  active_owner: github/gh-stack/skills/gh-stack
+  content_hash: sha256:31049425b8db652e80fa6994d5289f20169f57d7af0a0651fa72c3f25e8fe7c7
 - kind: project-relative
   target: opencode
   value: .agents/skills/gh-stack/references/stack-design.md
   runtime: null
   scope: project
   owners:
-  - github/gh-stack
-  active_owner: github/gh-stack
+  - github/gh-stack/skills/gh-stack
+  active_owner: github/gh-stack/skills/gh-stack
   content_hash: sha256:4a61e3065ce61a5d129a30f5dcbebe73bfde250e34c382277facdc31d2c4e5ce
 - kind: project-relative
   target: opencode
@@ -3587,8 +4113,8 @@ deployments:
   runtime: null
   scope: project
   owners:
-  - github/gh-stack
-  active_owner: github/gh-stack
+  - github/gh-stack/skills/gh-stack
+  active_owner: github/gh-stack/skills/gh-stack
   content_hash: sha256:fe1958036e663c7471a0d3efdf1fefe47ee65e06713b13a96e3db95becccdc47
 - kind: project-relative
   target: opencode
@@ -4633,7 +5159,7 @@ deployments:
   owners:
   - obra/superpowers
   active_owner: obra/superpowers
-  content_hash: sha256:d71cc01ba56d2325cf8af5f7c11837819b63ecd57de0bfdb812f7f3ff7751df8
+  content_hash: sha256:cfcee1b06774e7c0517f1e09be1a11f2d5680257072723e709ddbcf7e08b795a
 - kind: project-relative
   target: opencode
   value: .agents/skills/requesting-code-review/code-reviewer.md
@@ -4642,7 +5168,7 @@ deployments:
   owners:
   - obra/superpowers
   active_owner: obra/superpowers
-  content_hash: sha256:b2f2ec7596925fe52dac158fdfbca19b3a7d779d619c481e6706a6c0001662d3
+  content_hash: sha256:82e370be6b3447523816286195571e4216ba56ba1ad6ad0e87862294c4c78dcb
 - kind: project-relative
   target: opencode
   value: .agents/skills/skill-creator
@@ -4742,24 +5268,6 @@ deployments:
   - anthropics/skills
   active_owner: anthropics/skills
   content_hash: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
-- kind: project-relative
-  target: opencode
-  value: .agents/skills/skill-creator/scripts/__pycache__/__init__.cpython-314.pyc
-  runtime: null
-  scope: project
-  owners:
-  - anthropics/skills
-  active_owner: anthropics/skills
-  content_hash: sha256:850ab763583a9d4ea5589f7a616b5d0ac089cda3ba61d8e23b8ed44a51eefcac
-- kind: project-relative
-  target: opencode
-  value: .agents/skills/skill-creator/scripts/__pycache__/aggregate_benchmark.cpython-314.pyc
-  runtime: null
-  scope: project
-  owners:
-  - anthropics/skills
-  active_owner: anthropics/skills
-  content_hash: sha256:23a5d21e1c51455358e0c2ef74aa1abe87f0996f46efcf4eae25ca6b51e2fd66
 - kind: project-relative
   target: opencode
   value: .agents/skills/skill-creator/scripts/aggregate_benchmark.py
@@ -4921,7 +5429,7 @@ deployments:
   owners:
   - obra/superpowers
   active_owner: obra/superpowers
-  content_hash: sha256:ca49b5d6acd6259e47b71b8f04345902a3b43fab8a63eac33532edfcec861376
+  content_hash: sha256:b70cb2ac89d1f3001bed53c288dbf740c4925a8b422e5d2694b9217bbad157cf
 - kind: project-relative
   target: opencode
   value: .agents/skills/subagent-driven-development/implementer-prompt.md
@@ -4930,7 +5438,7 @@ deployments:
   owners:
   - obra/superpowers
   active_owner: obra/superpowers
-  content_hash: sha256:946601616a6f76ab3f165ef98377390968f1ec124ecef87422bc3553404e0332
+  content_hash: sha256:81dd9d5a3fb0b09b96b5829f03b9796842f3199ef7591d1ba1c2db2a515f64d0
 - kind: project-relative
   target: opencode
   value: .agents/skills/subagent-driven-development/re-review-prompt.md
@@ -4939,7 +5447,7 @@ deployments:
   owners:
   - obra/superpowers
   active_owner: obra/superpowers
-  content_hash: sha256:e1d8e0e65e58ccde6dc920843da9148d23e65aeb0f8932bcc30be1341a703c4c
+  content_hash: sha256:0828a5e9cbb12ba49f14621dd8c3953c48c0fc383e75bb5494f055ed0d6d824f
 - kind: project-relative
   target: opencode
   value: .agents/skills/subagent-driven-development/scripts/review-package
@@ -4948,7 +5456,7 @@ deployments:
   owners:
   - obra/superpowers
   active_owner: obra/superpowers
-  content_hash: sha256:fac3d4bd7f94369e8037b9ead2a8a502dca6ab333902b560b9455dbb3c450ebe
+  content_hash: sha256:f9275175b2276b1d5fdb1bae0bedaadd2a950659b7c6f311ea37ff85e1861b1f
 - kind: project-relative
   target: opencode
   value: .agents/skills/subagent-driven-development/scripts/sdd-workspace
@@ -4957,7 +5465,7 @@ deployments:
   owners:
   - obra/superpowers
   active_owner: obra/superpowers
-  content_hash: sha256:95a09d9d3983ad1aafd093ca72b4587946dea885c6e302caa02a779a2f911c31
+  content_hash: sha256:75ca46c756ba4209ca36e0d3d65567257ceb33bc7a6775b9dad946707cb3bd7b
 - kind: project-relative
   target: opencode
   value: .agents/skills/subagent-driven-development/scripts/task-brief
@@ -4966,7 +5474,7 @@ deployments:
   owners:
   - obra/superpowers
   active_owner: obra/superpowers
-  content_hash: sha256:d6954ef7841c7da3d77373e6ff5118b3f2f2e998606fd95d33e6527851bce044
+  content_hash: sha256:cc563538e09abf719b34ddf4b2fa7a65cf3b301729039dbfa923cb060f729146
 - kind: project-relative
   target: opencode
   value: .agents/skills/subagent-driven-development/task-reviewer-prompt.md
@@ -4975,7 +5483,7 @@ deployments:
   owners:
   - obra/superpowers
   active_owner: obra/superpowers
-  content_hash: sha256:e3b4a1bfe7cd55ed0459e5ca9cdddb6ff086c345b99e9097036db6a18545729e
+  content_hash: sha256:bfed55c8f19d0ff6ed57b0fe09127c92890e9311c6c73917129598826bf9ebe8
 - kind: project-relative
   target: opencode
   value: .agents/skills/systematic-debugging
@@ -5047,7 +5555,7 @@ deployments:
   owners:
   - obra/superpowers
   active_owner: obra/superpowers
-  content_hash: sha256:6b0622269e098ca1399e123e553fd385f0b6412d88ef0e9c4f5a8ea9cf1cec7b
+  content_hash: sha256:75b933b6a8c40bdb2031b10f21654395b56ec6ab6bc7b018c18d3fe57aeb7fb8
 - kind: project-relative
   target: opencode
   value: .agents/skills/systematic-debugging/test-academic.md
@@ -5155,7 +5663,7 @@ deployments:
   owners:
   - obra/superpowers
   active_owner: obra/superpowers
-  content_hash: sha256:bf1b8216e523851a411e91d429a7c1c2a173e79d88957bc78e348218d50edd54
+  content_hash: sha256:64b03fce4aee5a97a93160cea8111f3ba13a17b7c001db4bd5836d67fd10705d
 - kind: project-relative
   target: opencode
   value: .agents/skills/test-driven-development/writing-good-tests.md
@@ -5326,7 +5834,7 @@ deployments:
   owners:
   - obra/superpowers
   active_owner: obra/superpowers
-  content_hash: sha256:55379fe7c1c473a02c61961c822996bff30e1320d6921d9062509bc508482c05
+  content_hash: sha256:82c5c8866ad7f5dd4440ce66bd7806ba48a2f13771beae5cf112e53f08fe36ba
 - kind: project-relative
   target: opencode
   value: .agents/skills/using-superpowers/references/antigravity-tools.md
@@ -5338,13 +5846,22 @@ deployments:
   content_hash: sha256:4880f6de3da4e32f9659ebe7a72b9e0ebfff04e028c2ed96173f86d0387a04c0
 - kind: project-relative
   target: opencode
+  value: .agents/skills/using-superpowers/references/claude-code-tools.md
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: sha256:21479a3fee27448cab8748a3b5687e53bb257883bda9c070426f9a1ab5cebf1b
+- kind: project-relative
+  target: opencode
   value: .agents/skills/using-superpowers/references/codex-tools.md
   runtime: null
   scope: project
   owners:
   - obra/superpowers
   active_owner: obra/superpowers
-  content_hash: sha256:d3f113a8ebbd748e8ba847b09b57b7685442775ca4ee194d693ce3663f8fac68
+  content_hash: sha256:1a38ad9b188c393052f58d95657a1c35ea6aafc8b5a27f198f3922912f70bbe7
 - kind: project-relative
   target: opencode
   value: .agents/skills/using-superpowers/references/gemini-tools.md
@@ -5354,6 +5871,24 @@ deployments:
   - obra/superpowers
   active_owner: obra/superpowers
   content_hash: sha256:62b9157bcb0ee3c6784e3d0da0798ddfa5872f9e0c34bea48f3079dabea71965
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/using-superpowers/references/hermes-tools.md
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: sha256:e2185c976a3c87503910e05e2aea58cc89bc8e569bb624b93df9958ac47a9190
+- kind: project-relative
+  target: opencode
+  value: .agents/skills/using-superpowers/references/muse-tools.md
+  runtime: null
+  scope: project
+  owners:
+  - obra/superpowers
+  active_owner: obra/superpowers
+  content_hash: sha256:5a1da5c575fe18456ca71cd47ebfd8a38c745f8d82a67fe64d5b83080000eeb3
 - kind: project-relative
   target: opencode
   value: .agents/skills/using-superpowers/references/pi-tools.md
@@ -5515,16 +6050,7 @@ deployments:
   owners:
   - obra/superpowers
   active_owner: obra/superpowers
-  content_hash: sha256:72190c88b2b5a67a96b91d66aa72b9161913e10e8769da3f28a226f4cc7b99d0
-- kind: project-relative
-  target: opencode
-  value: .agents/skills/writing-plans/plan-document-reviewer-prompt.md
-  runtime: null
-  scope: project
-  owners:
-  - obra/superpowers
-  active_owner: obra/superpowers
-  content_hash: sha256:aa728b96aad603c8be28875a4305637f6c984aa81ffcadcb13e743202fa2a0c7
+  content_hash: sha256:a6c67c1900064347c2a329990dd3c555657c51c3ec53b259a08aa01a2c26139a
 - kind: project-relative
   target: opencode
   value: .agents/skills/writing-skills
@@ -5542,7 +6068,7 @@ deployments:
   owners:
   - obra/superpowers
   active_owner: obra/superpowers
-  content_hash: sha256:16148d03c58f718abe2a9cfbb3edd06159b4a454391c5c2b933dfa1c25f9601e
+  content_hash: sha256:9cf8c7ba0fdc521f103299a17e2f681a3112b730a75c78a6881e41ce8e5f6c2a
 - kind: project-relative
   target: opencode
   value: .agents/skills/writing-skills/anthropic-best-practices.md
@@ -5587,7 +6113,7 @@ deployments:
   owners:
   - obra/superpowers
   active_owner: obra/superpowers
-  content_hash: sha256:ccda971a87bb185f8febf81c56b556a20d026fa980c17b35fa3e8824fbb37852
+  content_hash: sha256:c7f412cc629461c4d10287e668731874c0497707023e3e3f74a5355eb2cee196
 - kind: project-relative
   target: opencode
   value: .agents/skills/writing-skills/testing-skills-with-subagents.md
@@ -6120,65 +6646,29 @@ deployments:
   active_owner: coderabbitai/skills
   content_hash: sha256:cba1e6915ee98d24f288e3fb2dfb4b9b5bdc9e3164abf66b885aa9b66d8ce17d
 mcp_servers:
-- aws-documentation
-- aws-iac
-- aws-mcp
 - cf-mcp-portal
+- cf-mcp-portal-work
 - chronos-graph
 - codegraph
-- coderabbit
+- com.atlassian/atlassian-mcp-server
 - filesystem
-- github-official
-- greptile
 - nexus
 - semgrep
-- sentry-remote
-- sequentialthinking
 - skillport
 - sonarqube
 mcp_configs:
-  aws-documentation:
-    name: aws-documentation
-    transport: stdio
-    env:
-      FASTMCP_LOG_LEVEL: ERROR
-      AWS_DOCUMENTATION_PARTITION: ${env:AWS_DOCUMENTATION_PARTITION:-aws}
-    args:
-    - awslabs.aws-documentation-mcp-server==1.0.0
-    registry: false
-    command: uvx
-    title: AWS Documentation MCP
-    standalone: true
-    enabled: false
-  aws-iac:
-    name: aws-iac
-    transport: stdio
-    env:
-      AWS_PROFILE: ${env:AWS_PROFILE:-default}
-      AWS_REGION: ${env:AWS_REGION:-us-east-1}
-      FASTMCP_LOG_LEVEL: ERROR
-    args:
-    - awslabs.aws-iac-mcp-server
-    registry: false
-    command: uvx
-    title: AWS IaC MCP
-    standalone: true
-    timeout: 60000
-    enabled: false
-  aws-mcp:
-    name: aws-mcp
-    transport: sse
-    registry: false
-    url: https://aws-mcp.us-east-1.api.aws/mcp?oauth=initialize
-    title: AWS Managed MCP
-    enabled: false
   cf-mcp-portal:
     name: cf-mcp-portal
     transport: streamable-http
     registry: false
     url: https://mcp.y-ohi.com/mcp?codemode=search_and_execute
     title: Cloudflare MCP Portal (Personal)
-    enabled: true
+  cf-mcp-portal-work:
+    name: cf-mcp-portal-work
+    transport: streamable-http
+    registry: false
+    url: https://work.mcp.y-ohi.com/mcp?codemode=search_and_execute
+    title: Cloudflare MCP Portal (Work)
   chronos-graph:
     name: chronos-graph
     transport: stdio
@@ -6210,14 +6700,13 @@ mcp_configs:
       DASHBOARD_PORT: ${env:DASHBOARD_PORT}
     args:
     - --from
-    - context-store-mcp[all] @ https://github.com/yohi/chronos-graph/archive/refs/tags/v3.2.0.tar.gz
+    - context-store-mcp[all] @ https://github.com/yohi/chronos-graph/archive/refs/tags/v3.2.1.tar.gz
     - context-store
     registry: false
     command: uvx
     title: Chronos Graph
     standalone: true
     timeout: 120000
-    enabled: true
   codegraph:
     name: codegraph
     transport: stdio
@@ -6226,21 +6715,10 @@ mcp_configs:
     - --mcp
     registry: false
     command: _scripts/codegraph-bootstrap.sh
+    cwd: .
     title: CodeGraph MCP
-    enabled: true
-  coderabbit:
-    name: coderabbit
-    transport: stdio
-    env:
-      GITHUB_PAT: ${env:GITHUB_TOKEN}
-    args:
-    - -y
-    - coderabbitai-mcp
-    registry: false
-    command: npx
-    title: CodeRabbit MCP
-    timeout: 60000
-    enabled: false
+  com.atlassian/atlassian-mcp-server:
+    name: com.atlassian/atlassian-mcp-server
   filesystem:
     name: filesystem
     transport: stdio
@@ -6253,52 +6731,33 @@ mcp_configs:
     title: Filesystem MCP
     standalone: true
     timeout: 60000
-    enabled: true
-  github-official:
-    name: github-official
-    transport: sse
-    registry: false
-    headers:
-      Authorization: Bearer ${env:GITHUB_TOKEN}
-    url: https://api.githubcopilot.com/mcp/
-    title: GitHub Official MCP
-    standalone: true
-    enabled: false
-  greptile:
-    name: greptile
-    transport: sse
-    registry: false
-    headers:
-      Authorization: Bearer ${env:GREPTILE_API_KEY}
-      X-GitHub-Token: ${env:GITHUB_TOKEN}
-    url: https://api.greptile.com/mcp
-    title: Greptile MCP
-    enabled: false
   nexus:
     name: nexus
     transport: stdio
     env:
       LOG_LEVEL: ERROR
-      NEXUS_WATCHER_IGNORE_PATHS: node_modules,opencode/node_modules,.opencode/node_modules,oss/apm/node_modules,oss/apm/docs/node_modules,.git,.nexus,dist,gemini,agent-skills,apm_modules,.agents,.opencode,.gemini,.claude,.codex,.vscode,.devcontainer,oss,codex/.tmp,.worktrees,.venv,target,.mypy_cache,.ruff_cache,build,.serena,.cache,__pycache__,*.db,*.sqlite,*.log
+      GITHUB_TOKEN: ${env:GITHUB_TOKEN}
+      NEXUS_WATCHER_IGNORE_PATHS: node_modules,opencode/node_modules,.opencode/node_modules,oss/apm/node_modules,oss/apm/docs/node_modules,.git,.nexus,.codegraph,.justice,.omo,.sisyphus,.superpowers,dist,gemini,agent-skills,apm_modules,.agents,.opencode,.gemini,.claude,.codex,.vscode,.devcontainer,oss,codex/.tmp,.worktrees,.venv,target,.mypy_cache,.ruff_cache,build,.serena,.cache,.wrangler,.terraform,.playwright-cli,.eslintcache,.coverage,coverage.xml,*.tsbuildinfo,__pycache__,*.db,*.sqlite,*.log
       CHOKIDAR_USEPOLLING: 'false'
       CHOKIDAR_INTERVAL: '2000'
       NO_PROXY: 127.0.0.1,localhost
     args:
     - -y
-    - '@yohi/nexus@2.2.2'
+    - '@yohi/nexus@2.6.0'
     - http-bridge
     registry: false
     command: npx
     title: Nexus
     timeout: 60000
     standalone: true
-    enabled: true
   semgrep:
     name: semgrep
     transport: stdio
     env:
       SEMGREP_APP_TOKEN: ${env:SEMGREP_APP_TOKEN}
     args:
+    - --python
+    - '3.13'
     - semgrep-mcp
     - -t
     - stdio
@@ -6307,29 +6766,7 @@ mcp_configs:
     registry: false
     command: uvx
     title: Semgrep MCP
-    enabled: true
     timeout: 60000
-  sentry-remote:
-    name: sentry-remote
-    transport: sse
-    registry: false
-    url: https://mcp.sentry.dev/mcp
-    title: Sentry Remote MCP
-    enabled: false
-  sequentialthinking:
-    name: sequentialthinking
-    transport: stdio
-    env:
-      DISABLE_THOUGHT_LOGGING: ${env:DISABLE_THOUGHT_LOGGING:-true}
-    args:
-    - -y
-    - '@modelcontextprotocol/server-sequential-thinking'
-    registry: false
-    command: npx
-    title: Sequential Thinking MCP
-    standalone: true
-    timeout: 60000
-    enabled: true
   skillport:
     name: skillport
     transport: stdio
@@ -6342,7 +6779,6 @@ mcp_configs:
     title: Skillport
     standalone: true
     timeout: 60000
-    enabled: true
   sonarqube:
     name: sonarqube
     transport: stdio
@@ -6357,22 +6793,15 @@ mcp_configs:
     command: npx
     title: SonarQube MCP
     timeout: 60000
-    enabled: true
 mcp_target_servers:
   opencode:
-  - aws-documentation
-  - aws-iac
-  - aws-mcp
   - cf-mcp-portal
+  - cf-mcp-portal-work
   - chronos-graph
   - codegraph
-  - coderabbit
+  - com.atlassian/atlassian-mcp-server
   - filesystem
-  - github-official
-  - greptile
   - nexus
   - semgrep
-  - sentry-remote
-  - sequentialthinking
   - skillport
   - sonarqube

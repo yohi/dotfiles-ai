@@ -32,6 +32,11 @@ Each skill contains step-by-step instructions, templates, and scripts.
 
 <available_skills>
 <skill>
+  <name>agent-driven-setup</name>
+  <description>Introduces an Agent-driven setup framework into a GitHub or local repository. Use whenever the user wants to make a repository installable or developable by an AI coding agent from a short paste prompt, add an AI setup handoff to README, make an existing installer Agent-friendly, or redesign onboarding for Agent consumption. Do not use for one-shot "set up this repo on my machine" requests, generic CI/quality-only improvements, temporary-credential-only tasks, or unrelated HR/organization onboarding.</description>
+  <location>.agents/skills/agent-driven-setup/SKILL.md</location>
+</skill>
+<skill>
   <name>algorithmic-art</name>
   <description>Creating algorithmic art using p5.js with seeded randomness and interactive parameter exploration. Use this when users request creating art using code, generative art, algorithmic art, flow fields, or particle systems. Create original algorithmic art rather than copying existing artists' work to avoid copyright violations.</description>
   <location>.agents/skills/algorithmic-art/SKILL.md</location>
@@ -62,6 +67,16 @@ Each skill contains step-by-step instructions, templates, and scripts.
   <location>.agents/skills/check-pr/SKILL.md</location>
 </skill>
 <skill>
+  <name>chronos-memory-recall</name>
+  <description>Load at task start, when prior work is referenced, when a known resolution may help an error, or before a convention decision. Use ChronosGraph recall tools, surface the result, and ground it against current state.</description>
+  <location>.agents/skills/chronos-memory-recall/SKILL.md</location>
+</skill>
+<skill>
+  <name>chronos-memory-save</name>
+  <description>In `CHRONOS_INGESTION_MODE=selective`, load after a user instruction completes or a command changes from failure to success to decide whether durable ChronosGraph memory should be saved. Do not use this Skill in `all` mode because turn-end ingestion owns saving.</description>
+  <location>.agents/skills/chronos-memory-save/SKILL.md</location>
+</skill>
+<skill>
   <name>claude-api</name>
   <description>Reference for the Claude API / Anthropic SDK. Use when working with Claude/Anthropic APIs, model selection, pricing, tool use. Skip when working with other providers like OpenAI or Gemini.</description>
   <location>.agents/skills/claude-api/SKILL.md</location>
@@ -72,6 +87,11 @@ Each skill contains step-by-step instructions, templates, and scripts.
   <location>.agents/skills/code-review/SKILL.md</location>
 </skill>
 <skill>
+  <name>code-search</name>
+  <description>Use Nexus code search tools when investigating, tracing, or retrieving verified context from a codebase.</description>
+  <location>.agents/skills/code-search/SKILL.md</location>
+</skill>
+<skill>
   <name>custom/agent-skill-architect</name>
   <description>Designs and generates best-practice-compliant SKILL.md files for OpenCode agent skills. Use when creating new agent skills, drafting skill definitions, or improving existing skill files. Guides through requirements discovery and outputs production-ready SKILL.md with proper YAML frontmatter, XML-structured instructions, and progressive disclosure patterns.</description>
   <location>agent-skills/custom/agent-skill-architect/SKILL.md</location>
@@ -80,6 +100,11 @@ Each skill contains step-by-step instructions, templates, and scripts.
   <name>custom/config-modernizer</name>
   <description>A specialized skill for analyzing OpenCode configuration files and performing refactoring based on the latest best practices and release information. Triggered when requested for "configuration modernization" or "upgrading", or when configuration files like .jsonc are present.</description>
   <location>agent-skills/custom/config-modernizer/SKILL.md</location>
+</skill>
+<skill>
+  <name>diagnosing-superpowers</name>
+  <description>Use when a superpowers session went wrong and your human partner wants to know why — repeated work, ignored plans, stumbles, poor results, a skill that didn't fire, "it took too long", "why is it so expensive", "what is it doing" — or wants to build a bug report for the superpowers maintainers, for the current session or a past one identified by id or path, on any harness.</description>
+  <location>.agents/skills/diagnosing-superpowers/SKILL.md</location>
 </skill>
 <skill>
   <name>dispatching-parallel-agents</name>
@@ -98,7 +123,7 @@ Each skill contains step-by-step instructions, templates, and scripts.
 </skill>
 <skill>
   <name>executing-plans</name>
-  <description>Use when you have a written implementation plan to execute in a separate session with review checkpoints</description>
+  <description>Use when executing an implementation plan in the current session as the implementer yourself — your human partner chose inline execution, or no subagent tool is available</description>
   <location>.agents/skills/executing-plans/SKILL.md</location>
 </skill>
 <skill>

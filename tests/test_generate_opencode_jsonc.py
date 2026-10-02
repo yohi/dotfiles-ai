@@ -36,6 +36,21 @@ def test_apply_generated_fields_synchronizes_all_generated_values() -> None:
     assert current["unrelated"] == "preserved"
 
 
+def test_build_config_skips_registry_string_mcp_entries() -> None:
+    config = generate_opencode_jsonc.build_config(
+        {
+            "dependencies": {
+                "mcp": [
+                    "com.atlassian/atlassian-mcp-server",
+                    {"name": "codegraph", "command": "codegraph"},
+                ]
+            }
+        }
+    )
+
+    assert set(config["mcp"]) == {"codegraph"}
+
+
 def test_convert_mcp_entry_keeps_opencode_env_syntax_for_filesystem_path() -> None:
     _, converted = generate_opencode_jsonc._convert_mcp_entry(
         {
@@ -65,3 +80,24 @@ def test_build_config_uses_python_313_for_semgrep() -> None:
         "--semgrep-path",
         "{env:HOME}/.local/bin/semgrep",
     ]
+
+
+def test_build_config_resolves_codegraph_cwd_to_repository_root() -> None:
+    apm = yaml.safe_load(
+        (Path(__file__).resolve().parents[1] / "apm.yml").read_text(encoding="utf-8")
+    )
+    config = generate_opencode_jsonc.build_config(apm)
+
+    assert config["mcp"]["codegraph"]["cwd"] == str(
+        Path(__file__).resolve().parents[1]
+    )
+
+
+def test_build_config_uses_native_superpowers_plugin() -> None:
+    apm = yaml.safe_load(
+        (Path(__file__).resolve().parents[1] / "apm.yml").read_text(encoding="utf-8")
+    )
+    config = generate_opencode_jsonc.build_config(apm)
+
+    assert "superpowers@git+https://github.com/obra/superpowers.git#v6.4.2" in config["plugin"]
+    assert config["instructions"] == ["global-rules/AGENTS.global.md"]

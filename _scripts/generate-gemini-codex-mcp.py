@@ -43,7 +43,11 @@ def _convert_value(value: Any) -> Any:
 
 def _mcp_entries(apm: dict[str, Any]) -> list[dict[str, Any]]:
     entries = (apm.get("dependencies") or {}).get("mcp") or []
-    return [e for e in entries if e.get("enabled", True)]
+    return [
+        entry
+        for entry in entries
+        if isinstance(entry, dict) and entry.get("enabled", True)
+    ]
 
 
 def _build_mcp_server(entry: dict[str, Any]) -> dict[str, Any] | None:
@@ -74,6 +78,9 @@ def _build_mcp_server(entry: dict[str, Any]) -> dict[str, Any] | None:
         "args": _convert_value(entry.get("args") or []),
         "type": "stdio",
     }
+    if entry.get("cwd") is not None:
+        cwd = str(entry["cwd"])
+        server["cwd"] = str(REPO_ROOT) if cwd == "." else cwd
     if "env" in entry:
         server["env"] = _convert_value(entry["env"])
     return server
@@ -175,6 +182,9 @@ def _build_codex_mcp_server(entry: dict[str, Any]) -> dict[str, Any] | None:
             ],
             "type": "stdio",
         }
+        if entry.get("cwd") is not None:
+            cwd = str(entry["cwd"])
+            server["cwd"] = str(REPO_ROOT) if cwd == "." else cwd
 
         if entry.get("env"):
             environment, env_vars = _build_codex_environment(entry["env"])

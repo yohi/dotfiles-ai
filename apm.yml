@@ -13,18 +13,23 @@ skills:
 dependencies:
   # Skills
   apm:
-    - obra/superpowers#v6.2.0
+    - obra/superpowers#v6.4.2
     - anthropics/skills
     - coderabbitai/skills
     - greptileai/skills//check-pr
     - greptileai/skills//greploop
     - anthropics/claude-code//plugins/code-review
-    - github/gh-stack
+    - github/gh-stack/skills/gh-stack
     # - yohi/agent-skills//skills/doc-sync-verifier
     - yohi/agent-skills//skills/git-master
     - yohi/agent-skills//skills/github-quality-setup
     - yohi/agent-skills//skills/github-release-packages
     - yohi/agent-skills//skills/temporary-credential-agent
+    - yohi/agent-skills//skills/agent-driven-setup
+    - yohi/chronos-graph//agent-assets/skills/chronos-memory-recall
+    - yohi/chronos-graph//agent-assets/skills/chronos-memory-save
+    - yohi/nexus//skills/code-search
+
 
   # MCP Servers
   mcp:
@@ -33,40 +38,24 @@ dependencies:
       registry: false
       transport: streamable-http
       url: https://mcp.y-ohi.com/mcp?codemode=search_and_execute
-      enabled: true
 
-    - name: coderabbit
-      title: "CodeRabbit MCP"
+    - name: cf-mcp-portal-work
+      title: "Cloudflare MCP Portal (Work)"
       registry: false
-      transport: stdio
-      command: "npx"
-      args:
-        - "-y"
-        - "coderabbitai-mcp"
-      env:
-        GITHUB_PAT: "${env:GITHUB_TOKEN}"
-      timeout: 60000
-      enabled: false
+      transport: streamable-http
+      url: https://work.mcp.y-ohi.com/mcp?codemode=search_and_execute
+
+    - "com.atlassian/atlassian-mcp-server"
 
     - name: codegraph
       title: "CodeGraph MCP"
       registry: false
       transport: stdio
       command: "_scripts/codegraph-bootstrap.sh"
+      cwd: "."
       args:
         - "serve"
         - "--mcp"
-      enabled: true
-
-    - name: greptile
-      title: "Greptile MCP"
-      registry: false
-      transport: sse
-      url: "https://api.greptile.com/mcp"
-      headers:
-        Authorization: "Bearer ${env:GREPTILE_API_KEY}"
-        X-GitHub-Token: "${env:GITHUB_TOKEN}"
-      enabled: false
 
     - name: filesystem
       title: "Filesystem MCP"
@@ -79,74 +68,6 @@ dependencies:
         - "${env:PWD}"
       standalone: true
       timeout: 60000
-      enabled: true
-
-    - name: sequentialthinking
-      title: "Sequential Thinking MCP"
-      registry: false
-      transport: stdio
-      command: "npx"
-      args:
-        - "-y"
-        - "@modelcontextprotocol/server-sequential-thinking"
-      env:
-        DISABLE_THOUGHT_LOGGING: "${env:DISABLE_THOUGHT_LOGGING:-true}"
-      standalone: true
-      timeout: 60000
-      enabled: true
-
-    - name: github-official
-      title: "GitHub Official MCP"
-      registry: false
-      transport: sse
-      url: "https://api.githubcopilot.com/mcp/"
-      standalone: true
-      enabled: false
-      headers:
-        Authorization: "Bearer ${env:GITHUB_TOKEN}"
-
-    - name: aws-iac
-      title: "AWS IaC MCP"
-      registry: false
-      transport: stdio
-      command: "uvx"
-      args:
-        - "awslabs.aws-iac-mcp-server"
-      env:
-        AWS_PROFILE: "${env:AWS_PROFILE:-default}"
-        AWS_REGION: "${env:AWS_REGION:-us-east-1}"
-        FASTMCP_LOG_LEVEL: "ERROR"
-      standalone: true
-      timeout: 60000
-      enabled: false
-
-
-    - name: aws-documentation
-      title: "AWS Documentation MCP"
-      registry: false
-      transport: stdio
-      command: "uvx"
-      args:
-        - "awslabs.aws-documentation-mcp-server==1.0.0"
-      env:
-        FASTMCP_LOG_LEVEL: "ERROR"
-        AWS_DOCUMENTATION_PARTITION: "${env:AWS_DOCUMENTATION_PARTITION:-aws}"
-      standalone: true
-      enabled: false
-
-    - name: aws-mcp
-      title: "AWS Managed MCP"
-      registry: false
-      transport: sse
-      url: "https://aws-mcp.us-east-1.api.aws/mcp?oauth=initialize"
-      enabled: false
-
-    - name: sentry-remote
-      title: "Sentry Remote MCP"
-      registry: false
-      transport: sse
-      url: "https://mcp.sentry.dev/mcp"
-      enabled: false
 
     - name: sonarqube
       title: "SonarQube MCP"
@@ -161,7 +82,6 @@ dependencies:
         SONARQUBE_URL: "${env:SONARQUBE_URL}"
         SONARQUBE_ORG: "${env:SONARQUBE_ORG}"
       timeout: 60000
-      enabled: true
 
     - name: semgrep
       title: "Semgrep MCP"
@@ -178,7 +98,6 @@ dependencies:
         - "${env:HOME}/.local/bin/semgrep"
       env:
         SEMGREP_APP_TOKEN: "${env:SEMGREP_APP_TOKEN}"
-      enabled: true
       timeout: 60000
 
     - name: skillport
@@ -192,7 +111,6 @@ dependencies:
         SKILLPORT_SKILLS_DIR: "${env:SKILLPORT_SKILLS_DIR:-.agents/skills}"
       standalone: true
       timeout: 60000
-      enabled: true
 
     - name: nexus
       title: "Nexus"
@@ -201,18 +119,17 @@ dependencies:
       command: "npx"
       args:
         - "-y"
-        - "@yohi/nexus@2.2.2"
+        - "@yohi/nexus@2.6.0"
         - "http-bridge"
       env:
         LOG_LEVEL: "ERROR"
         GITHUB_TOKEN: "${env:GITHUB_TOKEN}"
-        NEXUS_WATCHER_IGNORE_PATHS: "node_modules,opencode/node_modules,.opencode/node_modules,oss/apm/node_modules,oss/apm/docs/node_modules,.git,.nexus,dist,gemini,agent-skills,apm_modules,.agents,.opencode,.gemini,.claude,.codex,.vscode,.devcontainer,oss,codex/.tmp,.worktrees,.venv,target,.mypy_cache,.ruff_cache,build,.serena,.cache,__pycache__,*.db,*.sqlite,*.log"
+        NEXUS_WATCHER_IGNORE_PATHS: "node_modules,opencode/node_modules,.opencode/node_modules,oss/apm/node_modules,oss/apm/docs/node_modules,.git,.nexus,.codegraph,.justice,.omo,.sisyphus,.superpowers,dist,gemini,agent-skills,apm_modules,.agents,.opencode,.gemini,.claude,.codex,.vscode,.devcontainer,oss,codex/.tmp,.worktrees,.venv,target,.mypy_cache,.ruff_cache,build,.serena,.cache,.wrangler,.terraform,.playwright-cli,.eslintcache,.coverage,coverage.xml,*.tsbuildinfo,__pycache__,*.db,*.sqlite,*.log"
         CHOKIDAR_USEPOLLING: "false"
         CHOKIDAR_INTERVAL: "2000"
         NO_PROXY: "127.0.0.1,localhost"
       timeout: 60000
       standalone: true
-      enabled: true
 
     - name: chronos-graph
       title: "Chronos Graph"
@@ -221,7 +138,7 @@ dependencies:
       command: "uvx"
       args:
         - "--from"
-        - "context-store-mcp[all] @ https://github.com/yohi/chronos-graph/archive/refs/tags/v3.2.0.tar.gz"
+        - "context-store-mcp[all] @ https://github.com/yohi/chronos-graph/archive/refs/tags/v3.2.1.tar.gz"
         - "context-store"
       env:
         STORAGE_BACKEND: "${env:STORAGE_BACKEND}"
@@ -251,7 +168,6 @@ dependencies:
         DASHBOARD_PORT: "${env:DASHBOARD_PORT}"
       standalone: true
       timeout: 120000
-      enabled: true
 
 # --------------------------------------------------------------------------
 # Global Agent Settings (Inherited by all targets)
@@ -264,14 +180,18 @@ shell: bash
 snapshot: true
 
 plugin:
-  - "@yohi/justice@3.0.0"
-  - "@yohi/akane@1.6.2"
+  - "superpowers@git+https://github.com/obra/superpowers.git#v6.4.2"
   # - "@yohi/sibyl/server@1.0.0"
   - "file:///home/y_ohi/program/private/sibyl/dist/server.js"
   - "oh-my-openagent@4.19.4"
-  - "@yohi/chronos-gate@1.1.0"
   - "@nick-vi/opencode-type-inject@latest"
   - "opencode-vibeguard@latest"
+  - "file://{env:HOME}/program/private/justice-v4/dist/opencode-plugin.js"
+  - "@yohi/akane@1.6.2"
+  - "@yohi/chronos-gate@1.1.0"
+  - "@yohi/cloudflare-ai-gateway-chatgpt@0.3.0"
+  # - "./plugins/herdr-opencode-child-panes/index.js"
+  - "@yohi/herdr-opencode-child-panes@1.0.1"
 
 disabled_providers: []
 
@@ -524,7 +444,6 @@ lsp:
 
 instructions:
   - global-rules/AGENTS.global.md
-  - .agents/skills/superpowers/using-superpowers/SKILL.md
 
 watcher:
   ignore:
@@ -566,6 +485,22 @@ x-variants:
       reasoningEffort: medium
     none:
       reasoningEffort: none
+    low:
+      reasoningEffort: low
+    medium:
+      reasoningEffort: medium
+    high:
+      reasoningEffort: high
+    xhigh:
+      reasoningEffort: xhigh
+    max:
+      reasoningEffort: max
+
+  # GPT-6.1 Sol: direct OpenAI only. Keep OCTG on the existing GPT-6 models.
+  # 6.1 Sol is used only with low/medium/high/xhigh/max in this config.
+  gpt61_sol_variants: &gpt61_sol_variants
+    default:
+      reasoningEffort: medium
     low:
       reasoningEffort: low
     medium:
@@ -666,7 +601,10 @@ provider:
         variants:
           <<: *gpt_variants
           default:
-            reasoningEffort: medium
+            reasoningEffort: max
+      openai/gpt-6.1-sol:
+        name: GPT-6.1 Sol (OpenAI)
+        variants: *gpt61_sol_variants
       openai/gpt-6-sol:
         name: GPT-6 Sol (OpenAI)
         variants:
@@ -908,52 +846,66 @@ provider:
         cf-aig-skip-cache: "true"
     models:
       gpt-5.6-luna:
-        name: GPT-5.6 Luna
+        name: GPT-5.6 Luna (OCTG)
         variants:
           <<: *gpt_variants
           default:
             reasoningEffort: max
       gpt-5.6-terra:
-        name: GPT-5.6 Terra
+        name: GPT-5.6 Terra (OCTG)
         variants:
           <<: *gpt_variants
           default:
             reasoningEffort: high
       gpt-5.6-sol:
-        name: GPT-5.6 Sol
+        name: GPT-5.6 Sol (OCTG)
+        variants:
+          <<: *gpt_variants
+          default:
+            reasoningEffort: high
+      gpt-6-luna:
+        name: GPT-6 Luna (OCTG)
+        variants:
+          <<: *gpt_variants
+          default:
+            reasoningEffort: max
+      gpt-6-sol:
+        name: GPT-6 Sol (OCTG)
+        variants:
+          <<: *gpt_variants
+          default:
+            reasoningEffort: high
+      gpt-6-astra:
+        name: GPT-6 Astra (OCTG)
         variants:
           <<: *gpt_variants
           default:
             reasoningEffort: high
 
+
   openai:
     whitelist:
       - gpt-6-luna
+      - gpt-6.1-sol
       - gpt-6-sol
-  opencode:
-    whitelist:
-      - big-pickle
-      - deepseek-v4-flash-free
-      - mimo-v2.5-free
-      - north-mini-code-free
-      - nemotron-3-ultra-free
-      - x-preview-f-free
-    models:
-      deepseek-v4-flash-free:
-        name: DeepSeek V4 Flash Free
-        variants: *deepseek_v4_variants
+  # opencode:
+    # whitelist:
+    #   - big-pickle
+    #   - deepseek-v4-flash-free
+    #   - mimo-v2.5-free
+    #   - north-mini-code-free
+    #   - nemotron-3-ultra-free
+    #   - x-preview-f-free
+    # models:
+    #   deepseek-v4-flash-free:
+    #     name: DeepSeek V4 Flash Free
+    #     variants: *deepseek_v4_variants
   amazon-bedrock:
     whitelist:
-      - global.anthropic.claude-fable-5
+      - global.anthropic.claude-fable-5-1
       - global.anthropic.claude-haiku-4-5-20251001-v1:0
-      - global.anthropic.claude-opus-4-5-20251101-v1:0
-      - global.anthropic.claude-opus-4-6-v1
-      - global.anthropic.claude-opus-4-7
-      - global.anthropic.claude-opus-4-8
-      - global.anthropic.claude-opus-5
-      - global.anthropic.claude-sonnet-4-5-20250929-v1:0
-      - global.anthropic.claude-sonnet-4-6
-      - global.anthropic.claude-sonnet-5
+      - global.anthropic.claude-opus-5-5
+      - global.anthropic.claude-sonnet-5-5
       - openai.gpt-5.4
       - openai.gpt-5.5
       - openai.gpt-5.6-luna

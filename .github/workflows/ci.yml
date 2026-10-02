@@ -37,7 +37,7 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         GITHUB_APM_PAT: ${{ secrets.GITHUB_APM_PAT }}
       run: |
-        uv tool install "apm-cli==0.22.0" --force
+        uv tool install "apm-cli==0.31.0" --force
         apm install --force
         apm compile
         apm compile --target antigravity

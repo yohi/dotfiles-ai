@@ -1,7 +1,8 @@
 # MCP Client 設定ガイド (APM 直接管理)
 
-このプロジェクトでは、すべての MCP サーバーを `apm.yml` で定義し、
-`make sync-mcp` によって各クライアントの設定ファイルを生成します。
+このプロジェクトでは、有効にする MCP サーバーを `apm.yml` の
+`dependencies.mcp` に定義し、`make sync-mcp` によって各クライアントの設定を生成します。
+`mcp/optional-servers.yaml` の任意サーバーは自動同期されません。
 各ツールは直接 stdio プロセス、リモート SSE、またはリモート Streamable HTTP
 エンドポイントに接続します。
 
@@ -27,15 +28,13 @@ make sync-mcp
 
 ## サーバー一覧
 
-`make sync-mcp` 実行時、`apm.yml` の各クライアント設定に基づいて対応するサーバーが登録されます（すべてのサーバーが一律ですべてのツールに登録されるわけではありません。例えば、`sentry-remote` のようなリモートサーバーや、stdio専用の Codex CLI など、クライアントごとの対応差があります）。
+`make sync-mcp` 実行時、`apm.yml` に記載された有効なサーバーがクライアントごとの対応形式で登録されます。APM はサーバー単位の `enabled` フラグを扱わないため、無効にしておくサーバーは `dependencies.mcp` に入れず、任意カタログに置きます。
 
-- `sqlite` — `uvx mcp-server-sqlite`
+- `cf-mcp-portal`, `cf-mcp-portal-work` — Streamable HTTP
+- `com.atlassian/atlassian-mcp-server` — MCP Registry
+- `codegraph` — ローカルコード解析
 - `filesystem` — `npx @modelcontextprotocol/server-filesystem`
-- `sequentialthinking` — `npx @modelcontextprotocol/server-sequential-thinking`
-- `github-official` — `github-mcp-server stdio`
-- `aws-api` — `uvx awslabs.aws-api-mcp-server`
-- `aws-cdk-mcp-server` — `uvx awslabs.cdk-mcp-server`
-- `aws-diagram` — `uvx awslabs.aws-diagram-mcp-server`
-- `cf-mcp-portal` — Streamable HTTP / Code Mode: `https://mcp.y-ohi.com/mcp?codemode=search_and_execute`
-- `sentry-remote` — SSE: `https://mcp.sentry.dev/mcp`
-- 既存の `nexus`, `chronos-graph`, `skillport` 等
+- `sonarqube`, `semgrep` — 品質・セキュリティ分析
+- `nexus`, `chronos-graph`, `skillport` — ローカルコンテキスト
+
+無効の任意サーバーは [`mcp/optional-servers.yaml`](../mcp/optional-servers.yaml) を参照してください。

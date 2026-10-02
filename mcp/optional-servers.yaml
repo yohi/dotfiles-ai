@@ -1,0 +1,81 @@
+optional_mcp_servers:
+  - name: coderabbit
+    title: "CodeRabbit MCP"
+    registry: false
+    transport: stdio
+    command: "npx"
+    args:
+      - "-y"
+      - "coderabbitai-mcp"
+    env:
+      GITHUB_PAT: "${env:GITHUB_TOKEN}"
+    timeout: 60000
+
+  - name: greptile
+    title: "Greptile MCP"
+    registry: false
+    transport: sse
+    url: "https://api.greptile.com/mcp"
+    headers:
+      Authorization: "Bearer ${env:GREPTILE_API_KEY}"
+      X-GitHub-Token: "${env:GITHUB_TOKEN}"
+
+  - name: sequentialthinking
+    title: "Sequential Thinking MCP"
+    registry: false
+    transport: stdio
+    command: "npx"
+    args:
+      - "-y"
+      - "@modelcontextprotocol/server-sequential-thinking"
+    env:
+      DISABLE_THOUGHT_LOGGING: "${env:DISABLE_THOUGHT_LOGGING:-true}"
+    standalone: true
+    timeout: 60000
+
+  - name: github-official
+    title: "GitHub Official MCP"
+    registry: false
+    transport: sse
+    url: "https://api.githubcopilot.com/mcp/"
+    standalone: true
+    headers:
+      Authorization: "Bearer ${env:GITHUB_TOKEN}"
+
+  - name: aws-iac
+    title: "AWS IaC MCP"
+    registry: false
+    transport: stdio
+    command: "uvx"
+    args:
+      - "awslabs.aws-iac-mcp-server"
+    env:
+      AWS_PROFILE: "${env:AWS_PROFILE:-default}"
+      AWS_REGION: "${env:AWS_REGION:-us-east-1}"
+      FASTMCP_LOG_LEVEL: "ERROR"
+    standalone: true
+    timeout: 60000
+
+  - name: aws-documentation
+    title: "AWS Documentation MCP"
+    registry: false
+    transport: stdio
+    command: "uvx"
+    args:
+      - "awslabs.aws-documentation-mcp-server==1.0.0"
+    env:
+      FASTMCP_LOG_LEVEL: "ERROR"
+      AWS_DOCUMENTATION_PARTITION: "${env:AWS_DOCUMENTATION_PARTITION:-aws}"
+    standalone: true
+
+  - name: aws-mcp
+    title: "AWS Managed MCP"
+    registry: false
+    transport: sse
+    url: "https://aws-mcp.us-east-1.api.aws/mcp?oauth=initialize"
+
+  - name: sentry-remote
+    title: "Sentry Remote MCP"
+    registry: false
+    transport: sse
+    url: "https://mcp.sentry.dev/mcp"

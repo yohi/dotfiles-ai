@@ -7,17 +7,23 @@ MCP サーバーの設定、管理スクリプト、および接続仕様のリ�
 
 ### APM 直接管理 MCP サーバー（ローカル stdio）
 
-すべての MCP サーバーは `apm.yml` の `dependencies.mcp` で定義され、
-`make sync-mcp` によって各エージェントの設定ファイルに反映されます。
-主なローカルサーバーは以下の通りです。
+有効にする MCP サーバーは `apm.yml` の `dependencies.mcp` に定義し、
+`make sync-mcp` によって各エージェントへ反映します。APM はサーバー単位の
+`enabled` フラグを扱わず、宣言されたサーバーをすべて設定対象にします。
+無効の候補は `mcp/optional-servers.yaml` に保管し、APM には読み込ませません。
+
+主な有効なローカルサーバーは以下の通りです。
 
 - **Filesystem**: プロジェクトルート以下のファイルアクセス。
 - **SQLite**: ローカル DB 操作 (`${HOME}/.mcp/sqlite/sqlite.db`)。
-- **Sequential Thinking**: 複雑な思考プロセスの補助。
 - **Skillport**: エージェントスキルの検索・ロード。
-- **AWS IaC / AWS Documentation**: ローカル `uvx` 実行。
 - **SonarQube / Semgrep**: ローカル CLI と連携した品質・セキュリティ分析。
-- **LSP / CodeGraph**: ローカルコード解析。
+- **CodeGraph**: ローカルコード解析。
+
+無効の任意サーバー（CodeRabbit、Greptile、Sequential Thinking、GitHub Official、
+AWS IaC / Documentation / Managed、Sentry Remote）の定義は
+[`optional-servers.yaml`](optional-servers.yaml) にあります。有効化するときは、
+必要なエントリを `apm.yml` の `dependencies.mcp` に移してください。
 
 ### Chronos Graph & Nexus (Direct APM)
 
@@ -70,10 +76,11 @@ GitHub Official、Greptile、AWS Managed、Sentry RemoteのAPM直接接続は無
 > 設定を変更する場合は必ず `apm.yml` を修正し、`make sync-mcp` を実行してください。
 
 - **`apm.yml`**:
-  - 全 AI エージェント (Gemini, Claude, Cursor, VSCode, Antigravity,
-    OpenCode, Codex 等) のマスター設定。
-  - 各サーバーの定義 (stdio コマンド、環境変数、リモート URL 等) と、
-    各エージェントがどのサーバーを利用するかを定義します。
+  - APM 経由で有効にする MCP サーバーの唯一の定義元です。
+  - `dependencies.mcp` に記載した全サーバーが APM の設定対象になります。
+- **`mcp/optional-servers.yaml`**:
+  - 有効化していないサーバーの参照用カタログです。APM はこのファイルを読みません。
+  - サーバーを有効化するときは、エントリを `apm.yml` に移してください。
 - **自動生成されるファイル**:
   - `make sync-mcp` を実行すると、**APM (Agent Package Manager)** の
     標準機能によって以下のファイルが自動生成・更新されます。
@@ -103,14 +110,14 @@ Cloudflare MCP PortalのStreamable HTTP URLへ集約します。
 | **Cursor** | 〇 | **`command` / `url`** | `.cursor/mcp.json` | JSON |
 | **VSCode** | 〇 | **`url`** | `ide/vscode/settings.json` | JSON |
 | **OpenCode** | 〇 | `command` / `url` | `opencode/opencode.jsonc` | JSONC |
-| **Codex CLI** | 〇 | **`command`** | `~/.codex/config.toml` | TOML |
+| **Codex CLI** | 〇 | **`command` / `url`** | `~/.codex/config.toml` | TOML |
 
 ### 特筆すべき設定仕様
 
 #### Codex CLI (TOML)
 
-Codex CLI は stdio 専用クライアントです。
-APM は各サーバーの `command` / `args` をそのまま生成します。
+Codex CLI は stdio と Streamable HTTP に対応しています。
+APM は有効なサーバーの `command` / `args` または `url` を生成します。
 
 ```toml
 [mcp_servers.sqlite]
@@ -135,8 +142,8 @@ APM によって直接管理されます。
 1. Cloudflare Dashboardの **Zero Trust > Access controls > AI controls >
    MCP servers** で、上流サーバーが `Ready` であることを確認する。
 2. `cf-mcp-portal` へ必要な上流サーバーとツールだけを追加する。
-3. `apm.yml` 内の直接リモートMCP（`greptile`、`github-official`、`aws-mcp`、`sentry-remote`）が
-   `enabled: false` になっていることを確認する。
+3. 直接接続を使わない場合、該当サーバーが `apm.yml` の
+   `dependencies.mcp` に含まれず、参照用カタログにのみ存在することを確認する。
 4. クライアント側の生成済み設定ファイル（`.claude.json`、`.cursor/mcp.json`、
    `ide/vscode/settings.json` 等）から、これらの直接リモートMCPエントリを
    削除または無効化する。
