@@ -1,5 +1,5 @@
 lockfile_version: '1'
-generated_at: '2026-10-01T14:52:34.559808+00:00'
+generated_at: '2026-10-02T18:22:16.401658+00:00'
 apm_version: 0.31.0
 dependencies:
 - repo_url: anthropics/claude-code
@@ -1346,6 +1346,15 @@ deployments:
   content_hash: null
 - kind: uri
   target: mcp
+  value: io.github.SonarSource/sonarqube-mcp-server
+  runtime: opencode
+  scope: project
+  owners:
+  - .
+  active_owner: .
+  content_hash: null
+- kind: uri
+  target: mcp
   value: nexus
   runtime: opencode
   scope: project
@@ -1365,15 +1374,6 @@ deployments:
 - kind: uri
   target: mcp
   value: skillport
-  runtime: opencode
-  scope: project
-  owners:
-  - .
-  active_owner: .
-  content_hash: null
-- kind: uri
-  target: mcp
-  value: sonarqube
   runtime: opencode
   scope: project
   owners:
@@ -6652,10 +6652,10 @@ mcp_servers:
 - codegraph
 - com.atlassian/atlassian-mcp-server
 - filesystem
+- io.github.SonarSource/sonarqube-mcp-server
 - nexus
 - semgrep
 - skillport
-- sonarqube
 mcp_configs:
   cf-mcp-portal:
     name: cf-mcp-portal
@@ -6731,6 +6731,8 @@ mcp_configs:
     title: Filesystem MCP
     standalone: true
     timeout: 60000
+  io.github.SonarSource/sonarqube-mcp-server:
+    name: io.github.SonarSource/sonarqube-mcp-server
   nexus:
     name: nexus
     transport: stdio
@@ -6779,20 +6781,6 @@ mcp_configs:
     title: Skillport
     standalone: true
     timeout: 60000
-  sonarqube:
-    name: sonarqube
-    transport: stdio
-    env:
-      SONARQUBE_TOKEN: ${env:SONARQUBE_TOKEN}
-      SONARQUBE_URL: ${env:SONARQUBE_URL}
-      SONARQUBE_ORG: ${env:SONARQUBE_ORG}
-    args:
-    - -y
-    - sonarqube-mcp-server
-    registry: false
-    command: npx
-    title: SonarQube MCP
-    timeout: 60000
 mcp_target_servers:
   opencode:
   - cf-mcp-portal
@@ -6801,7 +6789,7 @@ mcp_target_servers:
   - codegraph
   - com.atlassian/atlassian-mcp-server
   - filesystem
+  - io.github.SonarSource/sonarqube-mcp-server
   - nexus
   - semgrep
   - skillport
-  - sonarqube

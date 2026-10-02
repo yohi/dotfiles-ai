@@ -186,7 +186,7 @@ Antigravity 設定は `make sync-antigravity` で
 
 | エージェント | 接続方式 | 管理主体 |
 | :--- | :--- | :--- |
-| Claude Code | stdio / remote | `make sync-mcp` (生成元 `.claude.json` 等) |
+| Claude Code | stdio / remote | `make sync-mcp` (生成元 `claude/settings.json`) |
 | Gemini CLI | stdio | 手動配置 |
 | Antigravity CLI | Direct stdio MCP | `make sync-antigravity` |
 | Cursor | stdio | `make sync-mcp` (生成元 `.cursor/mcp.json`) |

@@ -48,3 +48,17 @@ def test_build_mcp_servers_skips_registry_string_entries() -> None:
     )
 
     assert set(servers) == {"codegraph"}
+
+
+def test_main_does_not_create_project_root_claude_settings(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "apm.yml").write_text(
+        "dependencies:\n  mcp: []\n", encoding="utf-8"
+    )
+
+    generate_claude.main()
+
+    assert not (tmp_path / ".claude.json").exists()
+    assert (tmp_path / "claude" / "settings.json").exists()
