@@ -13,7 +13,7 @@
   },
   "keybinds": {},
   "plugin": [
-    "oh-my-openagent@4.19.4",
+    "oh-my-openagent@4.19.4/tui",
     "@yohi/akane@1.6.2"
   ]
 }

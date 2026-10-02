@@ -99,9 +99,19 @@ def build_mcp_servers(apm: dict[str, Any]) -> dict[str, Any]:
             )
             continue
 
+        resolved_command = expand_env_vars(str(command))
+        if (
+            entry.get("cwd") == "."
+            and not os.path.isabs(resolved_command)
+            and os.path.dirname(resolved_command)
+        ):
+            resolved_command = os.path.normpath(
+                os.path.join(REPO_ROOT, resolved_command)
+            )
+
         server_cfg: dict[str, Any] = {
             "type": "stdio",
-            "command": expand_env_vars(str(command)),
+            "command": resolved_command,
             "args": [expand_env_vars(str(arg)) for arg in (entry.get("args") or [])],
         }
         if entry.get("cwd") is not None:
