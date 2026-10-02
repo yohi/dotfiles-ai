@@ -546,7 +546,7 @@ x-variants:
         thinking:
           type: disabled
 
-  deepseek_v4_variants: &deepseek_v4_variants
+  deepseek_flash_variants: &deepseek_flash_variants
     default:
       reasoningEffort: high
       body:
@@ -663,9 +663,9 @@ provider:
       custom-ollama-cloud/glm-5.3:
         name: GLM 5.3 (Ollama Cloud)
         variants: *glm_variants
-      custom-ollama-cloud/deepseek-v4-flash:
-        name: DeepSeek V4 Flash (Ollama Cloud)
-        variants: *deepseek_v4_variants
+      custom-ollama-cloud/deepseek-v4.1-flash:
+        name: DeepSeek V4.1 Flash (Ollama Cloud)
+        variants: *deepseek_flash_variants
 
       # OpenCode Go
       custom-opencode-go/kimi-k2.6:
@@ -685,9 +685,9 @@ provider:
       custom-opencode-go/glm-5.3:
         name: GLM 5.3 (OpenCode Go)
         variants: *glm_variants
-      custom-opencode-go/deepseek-v4-flash:
-        name: DeepSeek V4 Flash (OpenCode Go)
-        variants: *deepseek_v4_variants
+      custom-opencode-go/deepseek-v4.1-flash:
+        name: DeepSeek V4.1 Flash (OpenCode Go)
+        variants: *deepseek_flash_variants
 
       # CommandCode
       custom-command-code/moonshotai/kimi-k2.6:
@@ -707,9 +707,9 @@ provider:
       custom-command-code/zai-org/glm-5.3:
         name: GLM 5.3 (CommandCode)
         variants: *glm_variants
-      custom-command-code/deepseek/deepseek-v4-flash:
-        name: DeepSeek V4 Flash (CommandCode)
-        variants: *deepseek_v4_variants
+      custom-command-code/deepseek/deepseek-v4.1-flash:
+        name: DeepSeek V4.1 Flash (CommandCode)
+        variants: *deepseek_flash_variants
 
       # Sakura AI Engine
       custom-sakura-ai/preview/Kimi-K2.6:
@@ -813,9 +813,9 @@ provider:
       dynamic/glm-5.3:free:
         name: GLM 5.3 Free
         variants: *glm_variants
-      dynamic/deepseek-v4-flash:
-        name: DeepSeek V4 Flash
-        variants: *deepseek_v4_variants
+      dynamic/deepseek-v4.1-flash:
+        name: DeepSeek V4.1 Flash
+        variants: *deepseek_flash_variants
       dynamic/gemini-3.1-pro:free:
         name: Gemini 3.1 Pro
       dynamic/gemini-3.5-flash-lite:free:
@@ -899,7 +899,7 @@ provider:
     # models:
     #   deepseek-v4-flash-free:
     #     name: DeepSeek V4 Flash Free
-    #     variants: *deepseek_v4_variants
+    #     variants: *deepseek_flash_variants
   amazon-bedrock:
     whitelist:
       - global.anthropic.claude-fable-5-1
