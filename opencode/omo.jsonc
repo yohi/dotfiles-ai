@@ -132,9 +132,9 @@
         "cloudflare-ai-gateway-custom/custom-ollama-cloud/glm-5.3": 2,
         "cloudflare-ai-gateway-custom/custom-ollama-cloud/glm-5.3-flash": 4,
         "cloudflare-ai-gateway-custom/custom-command-code/z-ai/glm-5.3-flash": 4,
-        "cloudflare-ai-gateway-custom/custom-ollama-cloud/deepseek-v4-flash": 5,
-        "cloudflare-ai-gateway-custom/custom-command-code/deepseek/deepseek-v4-flash": 5,
-        "cloudflare-ai-gateway-custom/custom-opencode-go/deepseek-v4-flash": 5,
+        "cloudflare-ai-gateway-custom/custom-ollama-cloud/deepseek-v4.1-flash": 5,
+        "cloudflare-ai-gateway-custom/custom-command-code/deepseek/deepseek-v4.1-flash": 5,
+        "cloudflare-ai-gateway-custom/custom-opencode-go/deepseek-v4.1-flash": 5,
         "cloudflare-ai-gateway/google-ai-studio/gemini-3.1-pro": 2,
         // OCTG STANDARD (1M/day shared pool): Astra/Sol/Lunaは同一quotaを共有する。
         // 高価値・低頻度用途を優先し、同時実行でpoolを急消費しないよう絞る。
@@ -400,7 +400,7 @@
       // 単純な「強いモデル順」ではなく次の原則で routing を組んでいる。
       //
       // 1. 高頻度タスクは固定費subscriptionの安価なopen modelをprimaryにする。
-      //    - mechanical / review は DeepSeek Flash
+      //    - mechanical / review は DeepSeek V4.1 Flash
       //    - implementation は GLM-5.3 Flash
       //    - integration は GLM-5.3 full
       // 2. 高価値・低頻度タスクは品質を優先し、OCTG STANDARDのGPT-6 Astraを使う。
@@ -425,14 +425,14 @@
       // -----------------------------------------------------------------------
       // 定型・低リスク・高頻度タスク向け。
       // rename / typo / config / test-only などに高価な推論モデルを使わない。
-      // 通常はDeepSeek Flashを同一modelの3 providerで回すが、credit override中は
+      // 通常はDeepSeek V4.1 Flashを同一modelの3 providerで回すが、credit override中は
       // Ollamaのみを使い、失敗した場合だけ
       // GPT-6 Lunaへ退避する。Lunaはここでは「品質向上」ではなく可用性保険。
       "sp-mechanical": {
-        "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/deepseek-v4-flash",
+        "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/deepseek-v4.1-flash",
         "models": [
           {
-            "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/deepseek-v4-flash",
+            "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/deepseek-v4.1-flash",
             "reasoning": "low"
           },
           {
@@ -568,15 +568,15 @@
       // Task単位のmandatory review向け。
       // 実装系(GLM中心)とreview系(DeepSeek中心)でmodel familyを分け、
       // 同じモデルの盲点をそのまま再生産しにくくすることを狙う。
-      // 高頻度なのでDeepSeek Flash/maxをprimaryにする。credit override中は
+      // 高頻度なのでDeepSeek V4.1 Flash/maxをprimaryにする。credit override中は
       // Ollamaのみ利用し、Justice v4.1.0ではreview失敗がTaskAcceptedを止め得るため、
       // Ollama DeepSeek失敗時は
       // LunaではなくGPT-6.1 Sol/highへ退避して可用性とreview品質を優先する。
       "sp-review": {
-        "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/deepseek-v4-flash",
+        "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/deepseek-v4.1-flash",
         "models": [
           {
-            "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/deepseek-v4-flash",
+            "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/deepseek-v4.1-flash",
             "reasoning": "max"
           },
           {
@@ -717,12 +717,12 @@
             "reasoning": "low"
           },
           {
-            "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/deepseek-v4-flash"
+            "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/deepseek-v4.1-flash"
           },
         ],
         "fallback_models": [
           {
-            "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/deepseek-v4-flash"
+            "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/deepseek-v4.1-flash"
           },
         ]
       },
@@ -754,7 +754,7 @@
           },
           {
             // quickをGOAT primaryにするため、low側はOllamaを容量吸収に使う。
-            "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/deepseek-v4-flash"
+            "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/deepseek-v4.1-flash"
           },
           {
             "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/glm-5.3-flash"
@@ -762,7 +762,7 @@
         ],
         "fallback_models": [
           {
-            "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/deepseek-v4-flash"
+            "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/deepseek-v4.1-flash"
           },
           {
             "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/glm-5.3-flash"
@@ -882,8 +882,8 @@
     "glm-53-flash": {
       "model": "cloudflare-ai-gateway-custom/custom-command-code/z-ai/glm-5.3-flash"
     },
-    "deepseek-v4-flash": {
-      "model": "cloudflare-ai-gateway-custom/custom-command-code/deepseek/deepseek-v4-flash"
+    "deepseek-v41-flash": {
+      "model": "cloudflare-ai-gateway-custom/custom-command-code/deepseek/deepseek-v4.1-flash"
     },
     "kimi-k26": {
       "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.6"
@@ -1334,6 +1334,7 @@
     "2026-09-justice-v4.1-routing-review",
     "2026-09-octg-gpt6-standard-routing",
     "2026-09-gpt6.1-sol-direct-routing",
-    "2026-09-commandcode-opencodego-credit-exhaustion-bypass"
+    "2026-09-commandcode-opencodego-credit-exhaustion-bypass",
+    "2026-10-deepseek-v4.1-flash-migration"
   ]
 }
