@@ -13,7 +13,7 @@ CODEX_GLOBAL_CONFIG ?= $(CODEX_DOT_DIR)/config.toml
 CODEX_SEED_CONFIG ?= $(CODEX_REPO_DIR)/config.toml
 APM_COMMAND ?= uv run apm
 
-.PHONY: setup-codex sync-codex sync-codex-apm-mcp uninstall-codex check-codex install-packages-codex
+.PHONY: setup-codex sync-codex sync-codex-apm-seed sync-codex-apm-mcp uninstall-codex check-codex install-packages-codex
 
 # Codex CLI のインストール
 install-packages-codex: ## Codex CLI のインストール / アップデート
@@ -78,7 +78,13 @@ sync-codex: ## リポジトリ内の設定ファイルを ~/.codex へ個別に�
 	
 	@# APM config.toml
 	@if [ -f "$(CODEX_APM_CONFIG)" ]; then \
-		if [ -e "$(CODEX_GLOBAL_CONFIG)" ] && [ ! -L "$(CODEX_GLOBAL_CONFIG)" ]; then \
+		if [ -L "$(CODEX_GLOBAL_CONFIG)" ]; then \
+			if [ "$$(readlink "$(CODEX_GLOBAL_CONFIG)")" != "$(CODEX_APM_CONFIG)" ]; then \
+				backup="$(CODEX_GLOBAL_CONFIG).bak.$$(date +%Y%m%d%H%M%S)"; \
+				mv "$(CODEX_GLOBAL_CONFIG)" "$$backup"; \
+				echo "  ⚠️  Existing config symlink backed up to $$backup"; \
+			fi; \
+		elif [ -e "$(CODEX_GLOBAL_CONFIG)" ]; then \
 			backup="$(CODEX_GLOBAL_CONFIG).bak.$$(date +%Y%m%d%H%M%S)"; \
 			mv "$(CODEX_GLOBAL_CONFIG)" "$$backup"; \
 			echo "  ⚠️  Existing config backed up to $$backup"; \
@@ -121,7 +127,7 @@ sync-codex: ## リポジトリ内の設定ファイルを ~/.codex へ個別に�
 
 	@echo "✅ 同期が完了しました"
 
-sync-codex-apm-mcp: ## APMからCodexプロジェクト設定を生成
+sync-codex-apm-seed: ## APM install 前に既存Codex設定をプロジェクト出力へ引き継ぐ
 	@mkdir -p "$(dir $(CODEX_APM_CONFIG))"
 	@if [ ! -f "$(CODEX_APM_CONFIG)" ]; then \
 		if [ -f "$(CODEX_GLOBAL_CONFIG)" ]; then \
@@ -130,6 +136,8 @@ sync-codex-apm-mcp: ## APMからCodexプロジェクト設定を生成
 			cp -p "$(CODEX_SEED_CONFIG)" "$(CODEX_APM_CONFIG)"; \
 		fi; \
 	fi
+
+sync-codex-apm-mcp: sync-codex-apm-seed ## APMからCodexプロジェクト設定を生成
 	@if [ -f ".env" ]; then \
 		set -a; . ./.env; set +a; \
 		$(APM_COMMAND) install --only mcp --root "$(CODEX_APM_ROOT)"; \

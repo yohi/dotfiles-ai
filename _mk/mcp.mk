@@ -5,7 +5,7 @@ mcp: sync-mcp
 help-mcp: ## MCP の使い方を表示
 	$(call show-guide,$(REPO_ROOT)/_docs/guides/mcp.md)
 
-sync-mcp: ## APMを使用してMCP設定を同期
+sync-mcp: sync-codex-apm-seed ## APMを使用してMCP設定を同期
 	@echo "🔄 Synchronizing MCP settings via APM..."
 	@if ! command -v semgrep &> /dev/null; then \
 		echo "[*] Installing semgrep via uv..."; \

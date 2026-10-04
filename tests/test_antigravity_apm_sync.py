@@ -13,6 +13,10 @@ def test_antigravity_sync_installs_project_mcp_before_linking_global_config(
     apm_root = tmp_path / "project"
     config_dir = tmp_path / "home" / ".gemini" / "antigravity-cli"
     mcp_config = apm_root / ".agents" / "mcp_config.json"
+    custom_config = tmp_path / "custom-mcp.json"
+    custom_config.write_text("{}\n", encoding="utf-8")
+    config_dir.mkdir(parents=True)
+    (config_dir / "mcp_config.json").symlink_to(custom_config)
     apm_call_log = tmp_path / "apm-call.txt"
     fake_apm = tmp_path / "fake-apm"
     fake_apm.write_text(
@@ -55,6 +59,10 @@ def test_antigravity_sync_installs_project_mcp_before_linking_global_config(
         f"entries={list(config_dir.iterdir()) if config_dir.exists() else []}"
     )
     assert global_mcp_config.resolve() == mcp_config.resolve()
+    backups = list(config_dir.glob("mcp_config.json.bak.*"))
+    assert len(backups) == 1
+    assert backups[0].is_symlink()
+    assert backups[0].resolve() == custom_config.resolve()
     apm_args = apm_call_log.read_text(encoding="utf-8")
     assert "--only mcp" in apm_args
     assert "--target" not in apm_args

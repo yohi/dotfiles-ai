@@ -98,6 +98,8 @@ GitHub Official、Greptile、AWS Managed、Sentry RemoteのAPM直接接続は無
     リンクし、`apm install --global --only mcp --target claude` を実行します。
   - APMは `~/.claude.json` または `$CLAUDE_CONFIG_DIR/.claude.json` の
     `mcpServers` を更新し、他のClaudeユーザー設定を保持します。
+  - APMはファイルをatomic replaceするため、有効な `.claude.json` が
+    シンボリックリンクの場合は同期を停止します。
   - 別のユーザースコープAPM manifestが存在する場合は、上書きせず停止します。
 - **グローバル設定への接続**:
   - OpenCodeはAPMプロジェクト出力 `opencode.json` を

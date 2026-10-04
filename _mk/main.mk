@@ -3,7 +3,7 @@
 UV_VERSION ?= 0.11.19
 
 # --- APM Entry Point ---
-apm-install: ## APM install と全設定の同期を実行
+apm-install: sync-codex-apm-seed ## APM install と全設定の同期を実行
 	$(Q_ECHO) "📦 APM install を実行中..."
 	@apm install
 	$(Q_ECHO) "🔄 opencode.jsonc を生成中..."

@@ -32,7 +32,13 @@ OPENCODE_INSTALL_URL := https://opencode.ai/install
 
 define link_config
 	if [ -e "$(1)" ]; then \
-		if [ -e "$(2)" ] && [ ! -L "$(2)" ]; then \
+		if [ -L "$(2)" ]; then \
+			if [ "$$(readlink "$(2)")" != "$(1)" ]; then \
+				backup="$(2).bak.$$(date +%Y%m%d%H%M%S)"; \
+				echo "⚠️  既存の $(3) シンボリックリンクを退避します: $$backup"; \
+				mv "$(2)" "$$backup"; \
+			fi; \
+		elif [ -e "$(2)" ]; then \
 			backup="$(2).bak.$$(date +%Y%m%d%H%M%S)"; \
 			if [ -d "$(2)" ]; then \
 				echo "⚠️  既存の $(3) ディレクトリを退避します: $$backup"; \

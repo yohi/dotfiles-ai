@@ -44,6 +44,8 @@ the managed servers into `~/.claude.json` or
 `$CLAUDE_CONFIG_DIR/.claude.json`, preserving the other Claude user settings;
 the global config file itself is not replaced by a symlink. If a separate
 user-scope APM manifest already exists, setup stops rather than overwriting it.
+Setup also refuses a symlink at the active `.claude.json` path because APM uses
+atomic replacement when updating that file.
 
 ### Codex and Antigravity MCP configuration
 

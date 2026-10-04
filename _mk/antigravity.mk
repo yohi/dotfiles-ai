@@ -50,7 +50,7 @@ install-antigravity-cli: ## Antigravity CLI をインストール
 	@echo "✅ Antigravity CLI installed"
 
 # Antigravityの設定を生成して同期
-sync-antigravity: ## APMを使用してAntigravity用の設定を生成して同期
+sync-antigravity: sync-codex-apm-seed ## APMを使用してAntigravity用の設定を生成して同期
 	@echo "🔄 Generating Antigravity MCP config using APM..."
 	@if [ -f ".env" ]; then \
 		set -a; . ./.env; set +a; \
@@ -62,7 +62,7 @@ sync-antigravity: ## APMを使用してAntigravity用の設定を生成して同
 	@$(APM_COMMAND) compile --target antigravity --root "$(ANTIGRAVITY_APM_ROOT)"
 	@$(MAKE) setup-antigravity
 
-sync-antigravity-mcp: ## Antigravity 向けMCPをAPMから生成
+sync-antigravity-mcp: sync-codex-apm-seed ## Antigravity 向けMCPをAPMから生成
 	@if [ -f ".env" ]; then \
 		set -a; . ./.env; set +a; \
 		$(APM_COMMAND) install --only mcp --root "$(ANTIGRAVITY_APM_ROOT)"; \
@@ -123,7 +123,13 @@ setup-antigravity: ## 生成された設定をAntigravityのグローバル設�
 setup-antigravity-mcp: ## APM生成MCP設定をAntigravity CLIへリンク
 	@mkdir -p "$(ANTIGRAVITY_CONFIG_DIR)"
 	@if [ -f "$(ANTIGRAVITY_PROJECT_MCP_CONFIG)" ]; then \
-		if [ -e "$(ANTIGRAVITY_MCP_PATH)" ] && [ ! -L "$(ANTIGRAVITY_MCP_PATH)" ]; then \
+		if [ -L "$(ANTIGRAVITY_MCP_PATH)" ]; then \
+			if [ "$$(readlink "$(ANTIGRAVITY_MCP_PATH)")" != "$(ANTIGRAVITY_PROJECT_MCP_CONFIG)" ]; then \
+				backup="$(ANTIGRAVITY_MCP_PATH).bak.$$(date +%Y%m%d%H%M%S)"; \
+				echo "⚠️  Existing symlink backed up to: $$backup"; \
+				mv "$(ANTIGRAVITY_MCP_PATH)" "$$backup"; \
+			fi; \
+		elif [ -e "$(ANTIGRAVITY_MCP_PATH)" ]; then \
 			backup="$(ANTIGRAVITY_MCP_PATH).bak.$$(date +%Y%m%d%H%M%S)"; \
 			echo "⚠️  Existing config backed up to: $$backup"; \
 			mv "$(ANTIGRAVITY_MCP_PATH)" "$$backup"; \

@@ -13,6 +13,10 @@ def test_setup_opencode_links_apm_mcp_config_without_replacing_global_config(
     config_dir = tmp_path / "config" / "opencode"
     opencode_home = tmp_path / ".opencode"
     omo_dir = tmp_path / ".omo"
+    config_dir.mkdir(parents=True)
+    previous_mcp_config = tmp_path / "previous-opencode.json"
+    previous_mcp_config.write_text('{"mcp":{}}\n', encoding="utf-8")
+    (config_dir / "opencode.json").symlink_to(previous_mcp_config)
     apm_mcp_config = tmp_path / "project" / "opencode.json"
     apm_mcp_config.parent.mkdir()
     apm_mcp_config.write_text(
@@ -49,6 +53,10 @@ def test_setup_opencode_links_apm_mcp_config_without_replacing_global_config(
     global_mcp_config = config_dir / "opencode.json"
     assert global_mcp_config.is_symlink()
     assert global_mcp_config.resolve() == apm_mcp_config.resolve()
+    backups = list(config_dir.glob("opencode.json.bak.*"))
+    assert len(backups) == 1
+    assert backups[0].is_symlink()
+    assert backups[0].resolve() == previous_mcp_config.resolve()
     normalized_config = json.loads(apm_mcp_config.read_text(encoding="utf-8"))
     assert normalized_config["mcp"]["filesystem"]["command"] == [
         "npx",
