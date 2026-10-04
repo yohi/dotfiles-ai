@@ -34,13 +34,12 @@ define link_config
 	if [ -e "$(1)" ]; then \
 		if [ -L "$(2)" ]; then \
 			if [ "$$(readlink "$(2)")" != "$(1)" ]; then \
-				backup="$(2).bak.$$(date +%Y%m%d%H%M%S)"; \
+				backup=$$(sh "$(REPO_ROOT)/_scripts/backup-config-path.sh" "$(2)") || exit $$?; \
 				echo "⚠️  既存の $(3) シンボリックリンクを退避します: $$backup"; \
-				mv "$(2)" "$$backup"; \
 			fi; \
 		elif [ -e "$(2)" ]; then \
-			backup="$(2).bak.$$(date +%Y%m%d%H%M%S)"; \
-			if [ -d "$(2)" ]; then \
+			backup=$$(sh "$(REPO_ROOT)/_scripts/backup-config-path.sh" "$(2)") || exit $$?; \
+			if [ -d "$$backup" ]; then \
 				echo "⚠️  既存の $(3) ディレクトリを退避します: $$backup"; \
 			else \
 				if [ "$(3)" = "opencode" ]; then \
@@ -53,7 +52,6 @@ define link_config
 					echo "⚠️  既存の $(3) 設定ファイルを退避します: $$backup"; \
 				fi; \
 			fi; \
-			mv "$(2)" "$$backup"; \
 		fi; \
 		ln -sfn "$(1)" "$(2)"; \
 		echo "✅ 設定を適用しました: $(2)"; \

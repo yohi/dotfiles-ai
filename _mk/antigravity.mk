@@ -110,10 +110,14 @@ setup-antigravity: ## 生成された設定をAntigravityのグローバル設�
 	@echo "✅ Linked all skills to $(ANTIGRAVITY_CONFIG_DIR)/skills/"
 	@# settings.jsonのリンク作成
 	@if [ -f "$(PROJECT_SETTINGS_CONFIG)" ]; then \
-		if [ -e "$(ANTIGRAVITY_SETTINGS_PATH)" ] && [ ! -L "$(ANTIGRAVITY_SETTINGS_PATH)" ]; then \
-			backup="$(ANTIGRAVITY_SETTINGS_PATH).bak.$$(date +%Y%m%d%H%M%S)"; \
+		if [ -L "$(ANTIGRAVITY_SETTINGS_PATH)" ]; then \
+			if [ "$$(readlink "$(ANTIGRAVITY_SETTINGS_PATH)")" != "$(PROJECT_SETTINGS_CONFIG)" ]; then \
+				backup=$$(sh "$(REPO_ROOT)/_scripts/backup-config-path.sh" "$(ANTIGRAVITY_SETTINGS_PATH)") || exit $$?; \
+				echo "⚠️  Existing settings symlink backed up to: $$backup"; \
+			fi; \
+		elif [ -e "$(ANTIGRAVITY_SETTINGS_PATH)" ]; then \
+			backup=$$(sh "$(REPO_ROOT)/_scripts/backup-config-path.sh" "$(ANTIGRAVITY_SETTINGS_PATH)") || exit $$?; \
 			echo "⚠️  Existing settings backed up to: $$backup"; \
-			mv "$(ANTIGRAVITY_SETTINGS_PATH)" "$$backup"; \
 		fi; \
 		ln -sfn "$(PROJECT_SETTINGS_CONFIG)" "$(ANTIGRAVITY_SETTINGS_PATH)"; \
 		echo "✅ Linked: $(ANTIGRAVITY_SETTINGS_PATH) -> $(PROJECT_SETTINGS_CONFIG)"; \
@@ -125,14 +129,12 @@ setup-antigravity-mcp: ## APM生成MCP設定をAntigravity CLIへリンク
 	@if [ -f "$(ANTIGRAVITY_PROJECT_MCP_CONFIG)" ]; then \
 		if [ -L "$(ANTIGRAVITY_MCP_PATH)" ]; then \
 			if [ "$$(readlink "$(ANTIGRAVITY_MCP_PATH)")" != "$(ANTIGRAVITY_PROJECT_MCP_CONFIG)" ]; then \
-				backup="$(ANTIGRAVITY_MCP_PATH).bak.$$(date +%Y%m%d%H%M%S)"; \
+				backup=$$(sh "$(REPO_ROOT)/_scripts/backup-config-path.sh" "$(ANTIGRAVITY_MCP_PATH)") || exit $$?; \
 				echo "⚠️  Existing symlink backed up to: $$backup"; \
-				mv "$(ANTIGRAVITY_MCP_PATH)" "$$backup"; \
 			fi; \
 		elif [ -e "$(ANTIGRAVITY_MCP_PATH)" ]; then \
-			backup="$(ANTIGRAVITY_MCP_PATH).bak.$$(date +%Y%m%d%H%M%S)"; \
+			backup=$$(sh "$(REPO_ROOT)/_scripts/backup-config-path.sh" "$(ANTIGRAVITY_MCP_PATH)") || exit $$?; \
 			echo "⚠️  Existing config backed up to: $$backup"; \
-			mv "$(ANTIGRAVITY_MCP_PATH)" "$$backup"; \
 		fi; \
 		ln -sfn "$(ANTIGRAVITY_PROJECT_MCP_CONFIG)" "$(ANTIGRAVITY_MCP_PATH)"; \
 		echo "✅ Linked: $(ANTIGRAVITY_MCP_PATH) -> $(ANTIGRAVITY_PROJECT_MCP_CONFIG)"; \

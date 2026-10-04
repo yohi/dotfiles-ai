@@ -21,8 +21,7 @@ endef
 define link_claude_managed_file
 	if [ -L "$(2)" ]; then \
 		if [ "$$(readlink "$(2)")" != "$(1)" ]; then \
-			backup="$(2).bak.$$(date +%Y%m%d%H%M%S)"; \
-			mv "$(2)" "$$backup"; \
+			backup=$$(sh "$(REPO_ROOT)/_scripts/backup-config-path.sh" "$(2)") || exit $$?; \
 			echo "⚠️  Existing $(3) symlink backed up to $$backup"; \
 		fi; \
 	fi; \
@@ -258,14 +257,12 @@ setup-claude: sync-claude sync-claude-apm-mcp ## Claude Codeの設定を適用
 	@# skills/
 	@if [ -L "$(HOME_DIR)/.claude/skills" ]; then \
 		if [ "$$(readlink "$(HOME_DIR)/.claude/skills")" != "$(RUNTIME_SKILLS_DIR)" ]; then \
-			backup="$(HOME_DIR)/.claude/skills.bak.$$(date +%Y%m%d%H%M%S)"; \
+			backup=$$(sh "$(REPO_ROOT)/_scripts/backup-config-path.sh" "$(HOME_DIR)/.claude/skills") || exit $$?; \
 			echo "[!] Existing Claude skills symlink backed up to $$backup"; \
-			mv "$(HOME_DIR)/.claude/skills" "$$backup"; \
 		fi; \
 	elif [ -e "$(HOME_DIR)/.claude/skills" ]; then \
-		backup="$(HOME_DIR)/.claude/skills.bak.$$(date +%Y%m%d%H%M%S)"; \
+		backup=$$(sh "$(REPO_ROOT)/_scripts/backup-config-path.sh" "$(HOME_DIR)/.claude/skills") || exit $$?; \
 		echo "[!] Existing Claude skills directory is not a symlink; moving it to $$backup"; \
-		mv "$(HOME_DIR)/.claude/skills" "$$backup"; \
 	fi
 	@ln -sfn "$(RUNTIME_SKILLS_DIR)" "$(HOME_DIR)/.claude/skills"
 	@# statusline.sh

@@ -80,13 +80,11 @@ sync-codex: ## リポジトリ内の設定ファイルを ~/.codex へ個別に�
 	@if [ -f "$(CODEX_APM_CONFIG)" ]; then \
 		if [ -L "$(CODEX_GLOBAL_CONFIG)" ]; then \
 			if [ "$$(readlink "$(CODEX_GLOBAL_CONFIG)")" != "$(CODEX_APM_CONFIG)" ]; then \
-				backup="$(CODEX_GLOBAL_CONFIG).bak.$$(date +%Y%m%d%H%M%S)"; \
-				mv "$(CODEX_GLOBAL_CONFIG)" "$$backup"; \
+				backup=$$(sh "$(REPO_ROOT)/_scripts/backup-config-path.sh" "$(CODEX_GLOBAL_CONFIG)") || exit $$?; \
 				echo "  ⚠️  Existing config symlink backed up to $$backup"; \
 			fi; \
 		elif [ -e "$(CODEX_GLOBAL_CONFIG)" ]; then \
-			backup="$(CODEX_GLOBAL_CONFIG).bak.$$(date +%Y%m%d%H%M%S)"; \
-			mv "$(CODEX_GLOBAL_CONFIG)" "$$backup"; \
+			backup=$$(sh "$(REPO_ROOT)/_scripts/backup-config-path.sh" "$(CODEX_GLOBAL_CONFIG)") || exit $$?; \
 			echo "  ⚠️  Existing config backed up to $$backup"; \
 		fi; \
 		ln -sfn "$(CODEX_APM_CONFIG)" "$(CODEX_GLOBAL_CONFIG)"; \
@@ -101,9 +99,14 @@ sync-codex: ## リポジトリ内の設定ファイルを ~/.codex へ個別に�
 
 	@# rules/ (ディレクトリごとリンク)
 	@if [ -d "$(CODEX_REPO_DIR)/rules" ]; then \
-		if [ -d "$(CODEX_DOT_DIR)/rules" ] && [ ! -L "$(CODEX_DOT_DIR)/rules" ]; then \
-			mv "$(CODEX_DOT_DIR)/rules" "$(CODEX_DOT_DIR)/rules.bak.$$(date +%Y%m%d%H%M%S)"; \
-			echo "  ⚠️  Existing rules/ backed up"; \
+		if [ -L "$(CODEX_DOT_DIR)/rules" ]; then \
+			if [ "$$(readlink "$(CODEX_DOT_DIR)/rules")" != "$(CODEX_REPO_DIR)/rules" ]; then \
+				backup=$$(sh "$(REPO_ROOT)/_scripts/backup-config-path.sh" "$(CODEX_DOT_DIR)/rules") || exit $$?; \
+				echo "  ⚠️  Existing rules/ symlink backed up to $$backup"; \
+			fi; \
+		elif [ -e "$(CODEX_DOT_DIR)/rules" ]; then \
+			backup=$$(sh "$(REPO_ROOT)/_scripts/backup-config-path.sh" "$(CODEX_DOT_DIR)/rules") || exit $$?; \
+			echo "  ⚠️  Existing rules/ backed up to $$backup"; \
 		fi; \
 		ln -sfn "$(CODEX_REPO_DIR)/rules" "$(CODEX_DOT_DIR)/rules"; \
 		echo "  ✅ rules/ -> $(CODEX_REPO_DIR)/rules"; \
@@ -111,9 +114,14 @@ sync-codex: ## リポジトリ内の設定ファイルを ~/.codex へ個別に�
 
 	@# skills/ (ディレクトリごとリンク)
 	@if [ -d "$(CODEX_REPO_DIR)/skills" ]; then \
-		if [ -d "$(CODEX_DOT_DIR)/skills" ] && [ ! -L "$(CODEX_DOT_DIR)/skills" ]; then \
-			mv "$(CODEX_DOT_DIR)/skills" "$(CODEX_DOT_DIR)/skills.bak.$$(date +%Y%m%d%H%M%S)"; \
-			echo "  ⚠️  Existing skills/ backed up"; \
+		if [ -L "$(CODEX_DOT_DIR)/skills" ]; then \
+			if [ "$$(readlink "$(CODEX_DOT_DIR)/skills")" != "$(CODEX_REPO_DIR)/skills" ]; then \
+				backup=$$(sh "$(REPO_ROOT)/_scripts/backup-config-path.sh" "$(CODEX_DOT_DIR)/skills") || exit $$?; \
+				echo "  ⚠️  Existing skills/ symlink backed up to $$backup"; \
+			fi; \
+		elif [ -e "$(CODEX_DOT_DIR)/skills" ]; then \
+			backup=$$(sh "$(REPO_ROOT)/_scripts/backup-config-path.sh" "$(CODEX_DOT_DIR)/skills") || exit $$?; \
+			echo "  ⚠️  Existing skills/ backed up to $$backup"; \
 		fi; \
 		ln -sfn "$(CODEX_REPO_DIR)/skills" "$(CODEX_DOT_DIR)/skills"; \
 		echo "  ✅ skills/ -> $(CODEX_REPO_DIR)/skills"; \
