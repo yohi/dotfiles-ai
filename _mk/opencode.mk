@@ -101,6 +101,7 @@ opencode: sync-opencode ## OpenCode(opencode)のインストールとセット�
 		if check_link "$(OPENCODE_CONFIG_PATH)" "$(OPENCODE_DOTFILES_CONFIG)"; then \
 			skip=1; \
 			if [ -f "$(OPENCODE_APM_MCP_CONFIG_SOURCE)" ]; then \
+				if grep -Fq '$${env:' "$(OPENCODE_APM_MCP_CONFIG_SOURCE)"; then skip=0; fi; \
 				if [ -L "$(OPENCODE_MCP_CONFIG_PATH)" ]; then \
 					if ! check_link "$(OPENCODE_MCP_CONFIG_PATH)" "$(OPENCODE_APM_MCP_CONFIG_SOURCE)"; then skip=0; fi; \
 				else skip=0; fi; \
