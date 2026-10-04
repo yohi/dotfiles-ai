@@ -225,7 +225,7 @@ setup-opencode: sync-opencode ## OpenCode（opencode）の設定ファイルを�
 	@mkdir -p "$(OPENCODE_HOME)"
 	@# opencode.jsonc の設定
 	@$(call link_config,$(OPENCODE_DOTFILES_CONFIG),$(OPENCODE_CONFIG_PATH),opencode)
-	@if [ -f "$(OPENCODE_APM_MCP_CONFIG_SOURCE)" ]; then \
+	@if [ "$(OPENCODE_APM_MCP_CONFIG_SOURCE)" = "$(REPO_ROOT)/opencode.json" ] && [ -f "$(OPENCODE_APM_MCP_CONFIG_SOURCE)" ]; then \
 		if command -v uv >/dev/null 2>&1; then \
 			uv run --script "$(REPO_ROOT)/_scripts/normalize_opencode_mcp_env.py" "$(OPENCODE_APM_MCP_CONFIG_SOURCE)"; \
 		else \

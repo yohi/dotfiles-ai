@@ -60,7 +60,7 @@ def test_setup_opencode_links_apm_mcp_config_without_replacing_global_config(
     normalized_config = json.loads(apm_mcp_config.read_text(encoding="utf-8"))
     assert normalized_config["mcp"]["filesystem"]["command"] == [
         "npx",
-        "{env:PWD}",
+        "${env:PWD}",
     ]
     assert (config_dir / "opencode.jsonc").resolve() == (
         REPO_ROOT / "opencode" / "opencode.jsonc"
