@@ -7,8 +7,13 @@ HOME_DIR ?= $(HOME)
 REPO_ROOT ?= $(CURDIR)
 CODEX_DOT_DIR := $(HOME_DIR)/.codex
 CODEX_REPO_DIR := $(REPO_ROOT)/codex
+CODEX_APM_ROOT ?= $(REPO_ROOT)
+CODEX_APM_CONFIG ?= $(CODEX_APM_ROOT)/.codex/config.toml
+CODEX_GLOBAL_CONFIG ?= $(CODEX_DOT_DIR)/config.toml
+CODEX_SEED_CONFIG ?= $(CODEX_REPO_DIR)/config.toml
+APM_COMMAND ?= uv run apm
 
-.PHONY: setup-codex sync-codex uninstall-codex check-codex install-packages-codex
+.PHONY: setup-codex sync-codex sync-codex-apm-mcp uninstall-codex check-codex install-packages-codex
 
 # Codex CLI のインストール
 install-packages-codex: ## Codex CLI のインストール / アップデート
@@ -39,8 +44,11 @@ install-packages-codex: ## Codex CLI のインストール / アップデート
 		exit 1; \
 	fi
 # Codex CLI のセットアップ
-setup-codex: ## ~/.codex を実体化し、設定ファイルをリポジトリからリンクする
+setup-codex: ## ~/.codex を実体化し、APM生成設定をグローバルにリンクする
 	@echo "🚀 Codex CLI のセットアップを開始..."
+	@if [ ! -f "$(CODEX_APM_CONFIG)" ]; then \
+		$(MAKE) --no-print-directory sync-codex-apm-mcp; \
+	fi
 	
 	@# 1. ~/.codex がシンボリックリンクなら、内容を待避して実体ディレクトリに置き換える
 	@if [ -L "$(CODEX_DOT_DIR)" ]; then \
@@ -68,10 +76,15 @@ sync-codex: ## リポジトリ内の設定ファイルを ~/.codex へ個別に�
 	@echo "🔄 Codex 設定ファイルの同期中..."
 	@mkdir -p "$(CODEX_DOT_DIR)"
 	
-	@# config.toml
-	@if [ -f "$(CODEX_REPO_DIR)/config.toml" ]; then \
-		ln -sf "$(CODEX_REPO_DIR)/config.toml" "$(CODEX_DOT_DIR)/config.toml"; \
-		echo "  ✅ config.toml -> $(CODEX_REPO_DIR)/config.toml"; \
+	@# APM config.toml
+	@if [ -f "$(CODEX_APM_CONFIG)" ]; then \
+		if [ -e "$(CODEX_GLOBAL_CONFIG)" ] && [ ! -L "$(CODEX_GLOBAL_CONFIG)" ]; then \
+			backup="$(CODEX_GLOBAL_CONFIG).bak.$$(date +%Y%m%d%H%M%S)"; \
+			mv "$(CODEX_GLOBAL_CONFIG)" "$$backup"; \
+			echo "  ⚠️  Existing config backed up to $$backup"; \
+		fi; \
+		ln -sfn "$(CODEX_APM_CONFIG)" "$(CODEX_GLOBAL_CONFIG)"; \
+		echo "  ✅ config.toml -> $(CODEX_APM_CONFIG)"; \
 	fi
 
 	@# AGENTS.md (SSOT)
@@ -107,6 +120,22 @@ sync-codex: ## リポジトリ内の設定ファイルを ~/.codex へ個別に�
 	fi
 
 	@echo "✅ 同期が完了しました"
+
+sync-codex-apm-mcp: ## APMからCodexプロジェクト設定を生成
+	@mkdir -p "$(dir $(CODEX_APM_CONFIG))"
+	@if [ ! -f "$(CODEX_APM_CONFIG)" ]; then \
+		if [ -f "$(CODEX_GLOBAL_CONFIG)" ]; then \
+			cp -p "$(CODEX_GLOBAL_CONFIG)" "$(CODEX_APM_CONFIG)"; \
+		elif [ -f "$(CODEX_SEED_CONFIG)" ]; then \
+			cp -p "$(CODEX_SEED_CONFIG)" "$(CODEX_APM_CONFIG)"; \
+		fi; \
+	fi
+	@if [ -f ".env" ]; then \
+		set -a; . ./.env; set +a; \
+		$(APM_COMMAND) install --only mcp --root "$(CODEX_APM_ROOT)"; \
+	else \
+		$(APM_COMMAND) install --only mcp --root "$(CODEX_APM_ROOT)"; \
+	fi
 
 # アンインストール
 uninstall-codex: ## 設定ファイルのリンクを解除する（実体ファイルは残す）

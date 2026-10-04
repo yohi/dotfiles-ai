@@ -932,6 +932,8 @@ experimental:
 # APM Standard Targets
 targets:
   - opencode
+  - codex
+  - antigravity
 
 # Exported Artifacts
 exports:

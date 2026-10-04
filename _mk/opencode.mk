@@ -7,6 +7,8 @@ OPENCODE_HOME ?= $(HOME_DIR)/.opencode
 OPENCODE_BIN ?= $(OPENCODE_HOME)/bin/opencode
 OPENCODE_CONFIG_DIR ?= $(CONFIG_DIR)/opencode
 OPENCODE_CONFIG_PATH ?= $(OPENCODE_CONFIG_DIR)/opencode.jsonc
+OPENCODE_MCP_CONFIG_PATH ?= $(OPENCODE_CONFIG_DIR)/opencode.json
+OPENCODE_APM_MCP_CONFIG_SOURCE ?= $(REPO_ROOT)/opencode.json
 OPENCODE_TUI_CONFIG_PATH ?= $(OPENCODE_CONFIG_DIR)/tui.json
 OPENCODE_TUI_DOTFILES_CONFIG ?= $(REPO_ROOT)/opencode/tui.jsonc
 OPENCODE_DOTFILES_CONFIG ?= $(REPO_ROOT)/opencode/opencode.jsonc
@@ -94,6 +96,11 @@ opencode: sync-opencode ## OpenCode(opencode)のインストールとセット�
 		}; \
 		if check_link "$(OPENCODE_CONFIG_PATH)" "$(OPENCODE_DOTFILES_CONFIG)"; then \
 			skip=1; \
+			if [ -f "$(OPENCODE_APM_MCP_CONFIG_SOURCE)" ]; then \
+				if [ -L "$(OPENCODE_MCP_CONFIG_PATH)" ]; then \
+					if ! check_link "$(OPENCODE_MCP_CONFIG_PATH)" "$(OPENCODE_APM_MCP_CONFIG_SOURCE)"; then skip=0; fi; \
+				else skip=0; fi; \
+			fi; \
 			if [ -f "$(OPENCODE_DOTFILES_ANTIGRAVITY)" ]; then \
 				if [ -L "$(OPENCODE_ANTIGRAVITY_PATH)" ]; then \
 					if ! check_link "$(OPENCODE_ANTIGRAVITY_PATH)" "$(OPENCODE_DOTFILES_ANTIGRAVITY)"; then skip=0; fi; \
@@ -214,6 +221,15 @@ setup-opencode: sync-opencode ## OpenCode（opencode）の設定ファイルを�
 	@mkdir -p "$(OPENCODE_HOME)"
 	@# opencode.jsonc の設定
 	@$(call link_config,$(OPENCODE_DOTFILES_CONFIG),$(OPENCODE_CONFIG_PATH),opencode)
+	@if [ -f "$(OPENCODE_APM_MCP_CONFIG_SOURCE)" ]; then \
+		if command -v uv >/dev/null 2>&1; then \
+			uv run --script "$(REPO_ROOT)/_scripts/normalize_opencode_mcp_env.py" "$(OPENCODE_APM_MCP_CONFIG_SOURCE)"; \
+		else \
+			python3 "$(REPO_ROOT)/_scripts/normalize_opencode_mcp_env.py" "$(OPENCODE_APM_MCP_CONFIG_SOURCE)"; \
+		fi; \
+	fi
+	@# APM が管理する opencode.json をそのまま OpenCode のグローバル設定として公開
+	@$(call link_config,$(OPENCODE_APM_MCP_CONFIG_SOURCE),$(OPENCODE_MCP_CONFIG_PATH),opencode-mcp)
 	@# antigravity.json の設定
 	@$(call link_config,$(OPENCODE_DOTFILES_ANTIGRAVITY),$(OPENCODE_ANTIGRAVITY_PATH),antigravity)
 	@# AGENTS.md の設定
@@ -262,6 +278,21 @@ check-opencode: ## OpenCode（opencode）の状態を確認
 		echo "⚠️  config: $(OPENCODE_CONFIG_PATH) exists but is not a symlink"; \
 	else \
 		echo "⚠️  config: $(OPENCODE_CONFIG_PATH) is not configured"; \
+	fi
+	@if [ -f "$(OPENCODE_APM_MCP_CONFIG_SOURCE)" ]; then \
+		if [ -L "$(OPENCODE_MCP_CONFIG_PATH)" ]; then \
+			actual=$$(readlink -f "$(OPENCODE_MCP_CONFIG_PATH)" 2>/dev/null || readlink "$(OPENCODE_MCP_CONFIG_PATH)" 2>/dev/null || true); \
+			expected=$$(readlink -f "$(OPENCODE_APM_MCP_CONFIG_SOURCE)" 2>/dev/null || readlink "$(OPENCODE_APM_MCP_CONFIG_SOURCE)" 2>/dev/null || true); \
+			if [ -n "$$actual" ] && [ "$$actual" = "$$expected" ]; then \
+				echo "✅ APM MCP config: $(OPENCODE_MCP_CONFIG_PATH) -> $(OPENCODE_APM_MCP_CONFIG_SOURCE)"; \
+			else \
+				echo "⚠️  APM MCP config: $(OPENCODE_MCP_CONFIG_PATH) points to $$actual (expected $(OPENCODE_APM_MCP_CONFIG_SOURCE))"; \
+			fi; \
+		elif [ -e "$(OPENCODE_MCP_CONFIG_PATH)" ]; then \
+			echo "⚠️  APM MCP config: $(OPENCODE_MCP_CONFIG_PATH) exists but is not a symlink"; \
+		else \
+			echo "⚠️  APM MCP config: $(OPENCODE_MCP_CONFIG_PATH) is not configured"; \
+		fi; \
 	fi
 	@if [ -f "$(OMO_DOTFILES_CONFIG)" ]; then \
 		if [ -L "$(OMO_CONFIG_PATH)" ]; then \

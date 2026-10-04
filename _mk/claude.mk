@@ -5,6 +5,10 @@
 
 HOME_DIR ?= $(HOME)
 REPO_ROOT ?= $(CURDIR)
+CLAUDE_CONFIG_DIR ?= $(HOME_DIR)
+CLAUDE_APM_MANIFEST_PATH ?= $(HOME_DIR)/.apm/apm.yml
+CLAUDE_APM_MANIFEST_SOURCE ?= $(REPO_ROOT)/apm.yml
+APM_COMMAND ?= uv run apm
 
 define create_desktop_entry
 	echo "📝 デスクトップエントリーを作成中..."; \
@@ -184,7 +188,7 @@ run-claude: ## Claude Code を起動
 # エイリアス
 # ========================================
 
-.PHONY: install-claude-code install-opcode setup-claude uninstall-claude sync-claude
+.PHONY: install-claude-code install-opcode setup-claude uninstall-claude sync-claude sync-claude-apm-mcp
 
 install-claude-code: install-packages-claude-code  ## Claude Codeをインストール(エイリアス)
 
@@ -204,7 +208,25 @@ sync-claude: ## apm.yml (SSOT) から Claude 用設定ファイルを生成す�
 	fi
 	$(Q_ECHO) "✅ Claude 設定ファイルの生成が完了しました"
 
-setup-claude: sync-claude ## Claude Codeの設定を適用
+sync-claude-apm-mcp: ## apm.ymlをClaudeのユーザースコープMCP設定に適用
+	@mkdir -p "$(dir $(CLAUDE_APM_MANIFEST_PATH))"
+	@if [ -e "$(CLAUDE_APM_MANIFEST_PATH)" ] || [ -L "$(CLAUDE_APM_MANIFEST_PATH)" ]; then \
+		if [ ! -L "$(CLAUDE_APM_MANIFEST_PATH)" ] || \
+			[ "$$(readlink -f "$(CLAUDE_APM_MANIFEST_PATH)")" != "$$(readlink -f "$(CLAUDE_APM_MANIFEST_SOURCE)")" ]; then \
+			echo "❌ Existing APM user manifest is not linked to this project: $(CLAUDE_APM_MANIFEST_PATH)" >&2; \
+			exit 1; \
+		fi; \
+	else \
+		ln -s "$(CLAUDE_APM_MANIFEST_SOURCE)" "$(CLAUDE_APM_MANIFEST_PATH)"; \
+	fi
+	@if [ -f ".env" ]; then \
+		set -a; . ./.env; set +a; \
+		HOME="$(HOME_DIR)" CLAUDE_CONFIG_DIR="$(CLAUDE_CONFIG_DIR)" $(APM_COMMAND) install --global --only mcp --target claude; \
+	else \
+		HOME="$(HOME_DIR)" CLAUDE_CONFIG_DIR="$(CLAUDE_CONFIG_DIR)" $(APM_COMMAND) install --global --only mcp --target claude; \
+	fi
+
+setup-claude: sync-claude sync-claude-apm-mcp ## Claude Codeの設定を適用
 	@echo "📝 Claude Codeの設定を適用中..."
 	@# グローバル設定ディレクトリ (~/.claude) を作成
 	@mkdir -p "$(HOME_DIR)/.claude"
@@ -314,4 +336,3 @@ uninstall-claude-desktop: ## Uninstall Claude Desktop on Linux
 		fi; \
 		echo "[+] Uninstallation complete."; \
 	fi
-
