@@ -24,6 +24,8 @@ case $stamp in
 		printf '%s\n' 'Backup stamp contains invalid filename characters' >&2
 		exit 2
 		;;
+	*)
+		;;
 esac
 
 backup_path="${source_path}.bak.${stamp}"

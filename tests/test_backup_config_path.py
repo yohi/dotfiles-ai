@@ -50,3 +50,19 @@ def test_backup_config_path_moves_a_symlink_without_following_it(
     assert backup.is_symlink()
     assert backup.resolve() == target.resolve()
     assert target.read_text(encoding="utf-8") == "user config\n"
+
+
+def test_backup_config_path_rejects_invalid_stamp(tmp_path: Path) -> None:
+    source = tmp_path / "config.json"
+    source.write_text("current config\n", encoding="utf-8")
+
+    result = subprocess.run(
+        ["sh", str(BACKUP_SCRIPT), str(source), "../outside"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 2
+    assert source.read_text(encoding="utf-8") == "current config\n"
+    assert not (tmp_path.parent / "outside").exists()
