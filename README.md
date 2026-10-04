@@ -120,22 +120,22 @@ instruction file です。共通のスキル一覧が必要な場合は `agent-s
     `skillport` CLI を直接使用してください（`make` 経由ではありません）。
   - `skillport check`: スキル定義ファイル（.md）の構文や整合性をチェックします。
 
-## APM による一元管理と MCP 直接管理
+## APM による一元管理と MCP 同期
 
 [Agent Package Manager (APM)](https://github.com/microsoft/apm)
 ([Docs](https://microsoft.github.io/apm/)) は AI エージェント設定の
 Single Source of Truth (SSOT) です。
 本プロジェクトでは、すべての MCP サーバーを APM (`apm.yml`) から
-直接管理する**単一レイヤーアーキテクチャ**を採用しています。
+直接管理します。サーバー定義の変更は `apm.yml` に行い、生成済み設定を
+直接編集しないでください。
 
-- **APM 直接管理**: Filesystem / SQLite / GitHub / AWS 各種 / Sentry など、
-  すべての MCP サーバーを `apm.yml` で定義し、
-  `make sync-mcp` で各エージェントへ反映します。
-- **安全な実行**: ホストに直接アクセスするツールも、
-    APM による標準的な stdio、リモート SSE、または Streamable HTTP 接続で管理します。
-- **スキル配置**: `.agents/skills/` に集約（全エージェントが参照）
-- **自動生成ファイルと Git**:
-  これらは `.gitignore` で除外されており、Git 管理の対象外です。
+- `make sync-mcp` は `apm.yml` の `targets:` で宣言した OpenCode、Codex、
+  Antigravity の設定を一括同期します。ターゲットを個別に順番にインストール
+  すると、APMのstale cleanupが別ターゲットの設定を消すため、一括同期します。
+- Claude CodeのグローバルMCPは `make setup-claude` がAPMユーザースコープで同期します。
+
+詳しい同期範囲と運用手順は [MCP ガイド](mcp/README.md) と
+[Claude Code ガイド](_docs/guides/claude.md) を参照してください。
 
 ### 環境変数の3層モデル
 
@@ -154,13 +154,14 @@ Single Source of Truth (SSOT) です。
 
 - **役割**: AI エージェントが利用する各種ツール（ファイルシステム、データベース、
   GitHub、AWS、Sentry 等）を標準的な MCP 経由で提供します。
-- **設定の同期**: `make sync-mcp` を実行すると、`apm.yml` から
-  対応するエージェント/IDE 向け（Claude Code, OpenCode, Codex, VSCode, Cursor, Antigravity）の MCP 設定ファイルが自動生成されます。Gemini CLI は引き続き自動同期の対象外です。
+- **設定の同期**: `make sync-mcp` は `apm.yml` の `targets:` にある
+  OpenCode、Codex、Antigravity を同期します。Claude CodeのグローバルMCPは
+  `make setup-claude` がAPMのユーザースコープで更新します。
+- **Gemini CLI**: APMの標準同期対象外のため、Gemini用設定は専用の同期手順を使います。
 
 そのため、Antigravity CLI では `skillport` / `nexus` / `chronos-graph` を
  direct stdio MCP として使う構成を推奨します。
-Antigravity 設定は `make sync-antigravity` で
-`antigravity/mcp_config.json` を生成し、
+APMは `.agents/mcp_config.json` を生成し、`setup-antigravity` が
 `~/.gemini/antigravity-cli/mcp_config.json` へリンクします。
 
 ## SkillPort & MCP の統合
@@ -178,33 +179,24 @@ Antigravity 設定は `make sync-antigravity` で
 
 ## エージェント設定の自動同期 (APM)
 
-`make sync-mcp` によって、APM は各エージェントの設定ファイル
-（`mcp.json` や `settings.json` 等）を自動生成・更新します。
+`make sync-mcp` とクライアント別セットアップによって、APM はプロジェクト設定を
+生成し、対応するグローバル設定へ同期します。
 
 - **Automated Flow**:
   `make setup` -> `apm install` -> `make sync-mcp` -> `make setup-agents`。
 
-| エージェント | 接続方式 | 管理主体 |
+| エージェント | APMの設定スコープ | グローバル設定の接続 |
 | :--- | :--- | :--- |
-| Claude Code | stdio / remote | `make sync-mcp` (生成元 `claude/settings.json`) |
-| Gemini CLI | stdio | 手動配置 |
-| Antigravity CLI | Direct stdio MCP | `make sync-antigravity` |
-| Cursor | stdio | `make sync-mcp` (生成元 `.cursor/mcp.json`) |
-| OpenCode | stdio / remote | `make sync-opencode` |
-| VSCode | stdio | `make sync-mcp` (生成元 `ide/vscode/settings.json`) |
-| Codex | stdio / Streamable HTTP | `make sync-mcp` -> `sync-codex-mcp` |
+| Claude Code | ユーザー (`--global --target claude`) | APMが `.claude.json` を直接更新 |
+| OpenCode | プロジェクト `opencode.json` | `setup-opencode` が `~/.config/opencode/opencode.json` へリンク |
+| Codex | プロジェクト `.codex/config.toml` | `setup-codex` が `~/.codex/config.toml` へリンク |
+| Antigravity CLI | プロジェクト `.agents/mcp_config.json` | `setup-antigravity` がCLIの設定先へリンク |
+| Gemini CLI | 専用同期 | APM標準ターゲット外 |
+| Cursor / VSCode | 専用同期 | `make sync-mcp` の各アダプター |
 
 `make setup` を実行すると、リポジトリ内の設定ファイルが各エージェントの
-構成ディレクトリへ配備されます。
-
-| エージェント / ツール | シンボリックリンク (配置先) | 実体 (リポジトリ内) |
-| :--- | :--- | :--- |
-| Global Rules | `~/.gemini/GEMINI.md` | `global-rules/AGENTS.global.md` |
-| MCP Config | `~/.config/...` | `mcp/README.md` (ガイド) |
-| Gemini CLI | `~/.gemini/settings.json` | Updated by sync script |
-| Codex | `~/.codex/config.toml` | `codex/config.toml` |
-| Antigravity | `~/.gemini/antigravity/...` | `antigravity/mcp_config.json` |
-| Cursor | `.cursor/mcp.json` | `ide/cursor/mcp.json` |
+構成ディレクトリへ配備されます。MCPごとの出力先とリンク元は
+[MCP 設定・運用ガイド](mcp/README.md) を参照してください。
 
 ## SSOT 原則
 
@@ -229,7 +221,8 @@ Antigravity 設定は `make sync-antigravity` で
 | `make sync-mcp` | MCP 設定の再生成と各エージェントへの反映 |
 | `make sync-codex-mcp` | Codex の MCP 設定を `apm.yml` から生成 |
 | `make sync-gemini-codex` | Gemini / Codex の MCP 設定を `apm.yml` から生成 |
-| `make sync-claude` | Claude の MCP 設定を `apm.yml` から生成 |
+| `make sync-claude` | Claude settings export を `apm.yml` から生成 |
+| `make sync-claude-apm-mcp` | Claude Code のグローバルMCPをAPMユーザースコープで同期 |
 | `make skillport` | SkillPort の初期セットアップ |
 | `make check-skillport` | インストール状態の確認 |
 

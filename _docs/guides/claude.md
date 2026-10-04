@@ -2,6 +2,22 @@
 
 🤖 Claude Code のセットアップが完了しました！
 
+## MCP 設定
+
+Claude Code のMCP定義はリポジトリルートの `apm.yml` が正本です。
+`make setup-claude` は、Claude Codeが対応するAPMのユーザースコープを使って、
+グローバルMCPを同期します。
+
+1. `~/.apm/apm.yml` がなければ、リポジトリの `apm.yml` へシンボリックリンクします。
+2. `apm install --global --only mcp --target claude` を実行します。
+3. APMが `$CLAUDE_CONFIG_DIR/.claude.json`、または未設定なら
+   `~/.claude.json` の `mcpServers` を更新します。
+
+APMは既存のClaudeユーザー設定とMCPを維持しながら管理対象を更新します。
+`.claude.json` 自体はユーザー状態を含むため、プロジェクト出力へのリンクで置き換えません。
+別の `~/.apm/apm.yml` が既にある場合は上書きせず、セットアップを停止します。
+MCPだけを再同期する場合は `make sync-claude-apm-mcp` を実行してください。
+
 ## 🚀 使用方法
 1. プロジェクトディレクトリに移動: `cd your-project-directory`
 2. Claude Code を開始: `claude`
@@ -23,3 +39,4 @@ make check-claude
 ## 📚 ドキュメント
 - [Claude Code](https://docs.anthropic.com/claude-code)
 - [Opcode](https://github.com/winfunc/opcode)
+- [MCP 設定・運用ガイド](../../mcp/README.md)
