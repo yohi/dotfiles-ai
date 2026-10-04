@@ -21,10 +21,10 @@ def main() -> int:
         print("Usage: normalize_opencode_mcp_env.py <opencode.json>", file=sys.stderr)
         return 2
 
-    config_path = Path(sys.argv[1])
     repository_root = Path(__file__).resolve().parent.parent
-    if not config_path.resolve().is_relative_to(repository_root):
-        print("Configuration path must stay within the repository", file=sys.stderr)
+    config_path = repository_root / "opencode.json"
+    if Path(sys.argv[1]).resolve() != config_path:
+        print("Configuration path must be the repository's opencode.json", file=sys.stderr)
         return 2
 
     config = config_path.read_text(encoding="utf-8")
