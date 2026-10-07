@@ -78,15 +78,37 @@ GitHub Official、Greptile、AWS Managed、Sentry RemoteのAPM直接接続は無
 - **`apm.yml`**:
   - APM 経由で有効にする MCP サーバーの唯一の定義元です。
   - `dependencies.mcp` に記載した全サーバーが APM の設定対象になります。
+- **対象ランタイム (`targets:`)**:
+  - `opencode`, `codex`, `antigravity` を同じ APM インストールで同期します。
+  - これらを `--target` で別々にインストールすると、APMのstale cleanupが
+    別ターゲットの設定を削除するため、必ず一括で同期してください。
 - **`mcp/optional-servers.yaml`**:
   - 有効化していないサーバーの参照用カタログです。APM はこのファイルを読みません。
   - サーバーを有効化するときは、エントリを `apm.yml` に移してください。
 - **自動生成されるファイル**:
-  - `make sync-mcp` を実行すると、**APM (Agent Package Manager)** の
-    標準機能によって以下のファイルが自動生成・更新されます。
-    - **各エージェントの設定ファイル**:
-      `gemini/settings.json`, `.mcp.json`, `opencode/opencode.jsonc`,
-      `ide/cursor/mcp.json`, `codex/config.toml` 等。
+  - `make sync-mcp` は `apm.yml` の `targets:` にあるOpenCode、Codex、
+    Antigravityを一括で更新します。
+  - APMプロジェクト出力はOpenCodeの `opencode.json`、Codexの
+    `.codex/config.toml`、Antigravity CLIの `.agents/mcp_config.json` です。
+  - `opencode/opencode.jsonc` は同じ `apm.yml` から生成されるOpenCode用の
+    全体設定です。環境変数プレースホルダーは、リンク前にOpenCodeの記法へ
+    正規化されます。
+- **Claude Code のユーザースコープ**:
+  - `setup-claude` は `~/.apm/apm.yml` がなければリポジトリの `apm.yml` へ
+    リンクし、`apm install --global --only mcp --target claude` を実行します。
+  - APMは `~/.claude.json` または `$CLAUDE_CONFIG_DIR/.claude.json` の
+    `mcpServers` を更新し、他のClaudeユーザー設定を保持します。
+  - APMはファイルをatomic replaceするため、有効な `.claude.json` が
+    シンボリックリンクの場合は同期を停止します。
+  - 別のユーザースコープAPM manifestが存在する場合は、上書きせず停止します。
+- **グローバル設定への接続**:
+  - OpenCodeはAPMプロジェクト出力 `opencode.json` を
+    `~/.config/opencode/opencode.json` からシンボリックリンクで参照します。
+  - Codexは `.codex/config.toml` を `~/.codex/config.toml` へリンクします。
+    初回生成時は既存のグローバルCodex設定を土台として使い、通常ファイルは
+    リンク前にバックアップします。
+  - Antigravity CLIは `.agents/mcp_config.json` を
+    `~/.gemini/antigravity-cli/mcp_config.json` へリンクします。
 - **プレースホルダー置換**:
   `__HOME__`, `__REPO_ROOT__` は生成時に動的に置換されます。
   また、`${VAR}` 形式の環境変数も APM によって展開されます。
@@ -104,13 +126,13 @@ Cloudflare MCP PortalのStreamable HTTP URLへ集約します。
 
 | ツール名 | 対応 | 正しいキー名 | 設定ファイル (例) | 形式 |
 | :--- | :---: | :--- | :--- | :--- |
-| Antigravity | ◎ | `serverUrl` | `~/.gemini/antigravity/...` | JSON |
+| Antigravity CLI | ◎ | `command` / `url` | `.agents/mcp_config.json` → `~/.gemini/antigravity-cli/mcp_config.json` | JSON |
 | **Gemini CLI** | ◎ | `command` / `url` | `~/.gemini/settings.json` | JSON |
-| **Claude Code** | ◎ | **`command` / `url`** | `.claude.json` | JSON |
+| **Claude Code** | ◎ | **`command` / `url`** | `~/.claude.json` または `$CLAUDE_CONFIG_DIR/.claude.json` | JSON |
 | **Cursor** | 〇 | **`command` / `url`** | `.cursor/mcp.json` | JSON |
 | **VSCode** | 〇 | **`url`** | `ide/vscode/settings.json` | JSON |
-| **OpenCode** | 〇 | `command` / `url` | `opencode/opencode.jsonc` | JSONC |
-| **Codex CLI** | 〇 | **`command` / `url`** | `~/.codex/config.toml` | TOML |
+| **OpenCode** | 〇 | `command` / `url` | `opencode.json` → `~/.config/opencode/opencode.json` | JSON |
+| **Codex CLI** | 〇 | **`command` / `url`** | `.codex/config.toml` → `~/.codex/config.toml` | TOML |
 
 ### 特筆すべき設定仕様
 
@@ -135,7 +157,10 @@ APM によって直接管理されます。
 ## 4. メンテナンスコマンド
 
 - **`make sync-mcp`**: `apm install` を実行し、`apm.yml` の定義に基づいて
-  各エージェントの MCP 設定ファイルを同期。
+  `targets:` にあるOpenCode、Codex、Antigravityのプロジェクト設定を一括同期。
+- **`make sync-claude-apm-mcp`**: `apm.yml` をユーザースコープのAPM manifestとして
+  参照し、Claude CodeのグローバルMCPを同期。
+- **`make setup-claude`**: Claude用の設定適用時に、上記のユーザースコープ同期も実行。
 
 ### Portal移行後の確認手順
 

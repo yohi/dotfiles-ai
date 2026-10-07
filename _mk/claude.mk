@@ -5,12 +5,31 @@
 
 HOME_DIR ?= $(HOME)
 REPO_ROOT ?= $(CURDIR)
+CLAUDE_CONFIG_DIR ?= $(HOME_DIR)
+CLAUDE_APM_CONFIG_PATH ?= $(CLAUDE_CONFIG_DIR)/.claude.json
+CLAUDE_APM_MANIFEST_PATH ?= $(HOME_DIR)/.apm/apm.yml
+CLAUDE_APM_MANIFEST_SOURCE ?= $(REPO_ROOT)/apm.yml
+APM_COMMAND ?= uv run apm
 
 define create_desktop_entry
 	echo "📝 デスクトップエントリーを作成中..."; \
 	printf "[Desktop Entry]\nName=Opcode\nComment=A powerful GUI app and Toolkit for Claude Code\nExec=/opt/opcode/opcode\nTryExec=/opt/opcode/opcode\nIcon=applications-development\nTerminal=false\nType=Application\nCategories=Development;IDE;Utility;\nStartupWMClass=opcode\n" | sudo tee /usr/share/applications/opcode.desktop > /dev/null && \
 	sudo chmod +x /usr/share/applications/opcode.desktop && \
 	(sudo update-desktop-database 2>/dev/null || true)
+endef
+
+define link_claude_managed_file
+	if [ -L "$(2)" ]; then \
+		if [ "$$(readlink "$(2)")" != "$(1)" ]; then \
+			backup=$$(sh "$(REPO_ROOT)/_scripts/backup-config-path.sh" "$(2)") || exit $$?; \
+			echo "⚠️  Existing $(3) symlink backed up to $$backup"; \
+		fi; \
+	fi; \
+	if [ -e "$(2)" ] && [ ! -L "$(2)" ]; then \
+		echo "⚠️  $(3) is a regular file; preserving it"; \
+	else \
+		ln -sfn "$(1)" "$(2)"; \
+	fi
 endef
 
 # Opcode (Claude Code GUI) のバージョンは _mk/variables.mk で定義されています
@@ -184,7 +203,7 @@ run-claude: ## Claude Code を起動
 # エイリアス
 # ========================================
 
-.PHONY: install-claude-code install-opcode setup-claude uninstall-claude sync-claude
+.PHONY: install-claude-code install-opcode setup-claude uninstall-claude sync-claude sync-claude-apm-mcp
 
 install-claude-code: install-packages-claude-code  ## Claude Codeをインストール(エイリアス)
 
@@ -204,47 +223,56 @@ sync-claude: ## apm.yml (SSOT) から Claude 用設定ファイルを生成す�
 	fi
 	$(Q_ECHO) "✅ Claude 設定ファイルの生成が完了しました"
 
-setup-claude: sync-claude ## Claude Codeの設定を適用
+sync-claude-apm-mcp: ## apm.ymlをClaudeのユーザースコープMCP設定に適用
+	@if [ -L "$(CLAUDE_APM_CONFIG_PATH)" ]; then \
+		echo "❌ Claude user config is a symlink; refusing APM atomic write: $(CLAUDE_APM_CONFIG_PATH)" >&2; \
+		exit 1; \
+	fi
+	@mkdir -p "$(dir $(CLAUDE_APM_MANIFEST_PATH))"
+	@if [ -e "$(CLAUDE_APM_MANIFEST_PATH)" ] || [ -L "$(CLAUDE_APM_MANIFEST_PATH)" ]; then \
+		if [ ! -L "$(CLAUDE_APM_MANIFEST_PATH)" ] || \
+			[ "$$(readlink "$(CLAUDE_APM_MANIFEST_PATH)")" != "$(CLAUDE_APM_MANIFEST_SOURCE)" ]; then \
+			echo "❌ Existing APM user manifest is not linked to this project: $(CLAUDE_APM_MANIFEST_PATH)" >&2; \
+			exit 1; \
+		fi; \
+	else \
+		ln -s "$(CLAUDE_APM_MANIFEST_SOURCE)" "$(CLAUDE_APM_MANIFEST_PATH)"; \
+	fi
+	@if [ -f ".env" ]; then \
+		set -a; . ./.env; set +a; \
+		HOME="$(HOME_DIR)" CLAUDE_CONFIG_DIR="$(CLAUDE_CONFIG_DIR)" $(APM_COMMAND) install --global --only mcp --target claude; \
+	else \
+		HOME="$(HOME_DIR)" CLAUDE_CONFIG_DIR="$(CLAUDE_CONFIG_DIR)" $(APM_COMMAND) install --global --only mcp --target claude; \
+	fi
+
+setup-claude: sync-claude sync-claude-apm-mcp ## Claude Codeの設定を適用
 	@echo "📝 Claude Codeの設定を適用中..."
 	@# グローバル設定ディレクトリ (~/.claude) を作成
 	@mkdir -p "$(HOME_DIR)/.claude"
 	@# CLAUDE.md
-	@if [ -e "$(HOME_DIR)/.claude/CLAUDE.md" ] && [ ! -L "$(HOME_DIR)/.claude/CLAUDE.md" ]; then \
-		echo "⚠️  $(HOME_DIR)/.claude/CLAUDE.md が実体ファイルとして既に存在するため、スキップします。"; \
-	else \
-		ln -sf "$(REPO_ROOT)/global-rules/AGENTS.global.md" "$(HOME_DIR)/.claude/CLAUDE.md"; \
-	fi
-	@# .claude.json (Home root)
-	@if [ -e "$(HOME_DIR)/.claude.json" ] && [ ! -L "$(HOME_DIR)/.claude.json" ]; then \
-		echo "⚠️  $(HOME_DIR)/.claude.json が実体ファイルとして既に存在するため、スキップします。"; \
-	else \
-		ln -sf "$(REPO_ROOT)/claude/settings.json" "$(HOME_DIR)/.claude.json"; \
-	fi
+	@$(call link_claude_managed_file,$(REPO_ROOT)/global-rules/AGENTS.global.md,$(HOME_DIR)/.claude/CLAUDE.md,CLAUDE.md)
+	@# .claude.json is written by APM user-scope MCP sync; do not replace it with a settings export.
 	@# settings.json
-	@if [ -e "$(HOME_DIR)/.claude/settings.json" ] && [ ! -L "$(HOME_DIR)/.claude/settings.json" ]; then \
-		echo "⚠️  $(HOME_DIR)/.claude/settings.json が実体ファイルとして既に存在するため、スキップします。"; \
-	else \
-		ln -sf "$(REPO_ROOT)/claude/settings.json" "$(HOME_DIR)/.claude/settings.json"; \
-	fi
+	@$(call link_claude_managed_file,$(REPO_ROOT)/claude/settings.json,$(HOME_DIR)/.claude/settings.json,settings.json)
 	@# skills/
-	@if [ -e "$(HOME_DIR)/.claude/skills" ] && [ ! -L "$(HOME_DIR)/.claude/skills" ]; then \
-		backup="$(HOME_DIR)/.claude/skills.bak.$$(date +%Y%m%d%H%M%S)"; \
+	@if [ -L "$(HOME_DIR)/.claude/skills" ]; then \
+		if [ "$$(readlink "$(HOME_DIR)/.claude/skills")" != "$(RUNTIME_SKILLS_DIR)" ]; then \
+			backup=$$(sh "$(REPO_ROOT)/_scripts/backup-config-path.sh" "$(HOME_DIR)/.claude/skills") || exit $$?; \
+			echo "[!] Existing Claude skills symlink backed up to $$backup"; \
+		fi; \
+	elif [ -e "$(HOME_DIR)/.claude/skills" ]; then \
+		backup=$$(sh "$(REPO_ROOT)/_scripts/backup-config-path.sh" "$(HOME_DIR)/.claude/skills") || exit $$?; \
 		echo "[!] Existing Claude skills directory is not a symlink; moving it to $$backup"; \
-		mv "$(HOME_DIR)/.claude/skills" "$$backup"; \
 	fi
 	@ln -sfn "$(RUNTIME_SKILLS_DIR)" "$(HOME_DIR)/.claude/skills"
 	@# statusline.sh
 	@chmod +x "$(REPO_ROOT)/claude/statusline.sh"
-	@if [ -e "$(HOME_DIR)/.claude/statusline.sh" ] && [ ! -L "$(HOME_DIR)/.claude/statusline.sh" ]; then \
-		echo "⚠️  $(HOME_DIR)/.claude/statusline.sh が実体ファイルとして既に存在するため、スキップします。"; \
-	else \
-		ln -sf "$(REPO_ROOT)/claude/statusline.sh" "$(HOME_DIR)/.claude/statusline.sh"; \
-	fi
+	@$(call link_claude_managed_file,$(REPO_ROOT)/claude/statusline.sh,$(HOME_DIR)/.claude/statusline.sh,statusline.sh)
 	@echo "✅ Claude Codeの設定が完了しました"
 
 uninstall-claude: ## Claude Codeの設定を削除
 	@echo "🗑️  Claude Codeの設定を削除中..."
-	@for target in "$(HOME_DIR)/.claude.json" "$(HOME_DIR)/.claude/CLAUDE.md" "$(HOME_DIR)/.claude/settings.json" "$(HOME_DIR)/.claude/statusline.sh"; do \
+	@for target in "$(HOME_DIR)/.claude/CLAUDE.md" "$(HOME_DIR)/.claude/settings.json" "$(HOME_DIR)/.claude/statusline.sh"; do \
 		if [ -L "$$target" ]; then \
 			rm "$$target"; \
 		elif [ -e "$$target" ]; then \
@@ -314,4 +342,3 @@ uninstall-claude-desktop: ## Uninstall Claude Desktop on Linux
 		fi; \
 		echo "[+] Uninstallation complete."; \
 	fi
-

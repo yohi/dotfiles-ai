@@ -7,8 +7,13 @@ HOME_DIR ?= $(HOME)
 REPO_ROOT ?= $(CURDIR)
 CODEX_DOT_DIR := $(HOME_DIR)/.codex
 CODEX_REPO_DIR := $(REPO_ROOT)/codex
+CODEX_APM_ROOT ?= $(REPO_ROOT)
+CODEX_APM_CONFIG ?= $(CODEX_APM_ROOT)/.codex/config.toml
+CODEX_GLOBAL_CONFIG ?= $(CODEX_DOT_DIR)/config.toml
+CODEX_SEED_CONFIG ?= $(CODEX_REPO_DIR)/config.toml
+APM_COMMAND ?= uv run apm
 
-.PHONY: setup-codex sync-codex uninstall-codex check-codex install-packages-codex
+.PHONY: setup-codex sync-codex sync-codex-apm-seed sync-codex-apm-mcp uninstall-codex check-codex install-packages-codex
 
 # Codex CLI のインストール
 install-packages-codex: ## Codex CLI のインストール / アップデート
@@ -39,8 +44,11 @@ install-packages-codex: ## Codex CLI のインストール / アップデート
 		exit 1; \
 	fi
 # Codex CLI のセットアップ
-setup-codex: ## ~/.codex を実体化し、設定ファイルをリポジトリからリンクする
+setup-codex: ## ~/.codex を実体化し、APM生成設定をグローバルにリンクする
 	@echo "🚀 Codex CLI のセットアップを開始..."
+	@if [ ! -f "$(CODEX_APM_CONFIG)" ]; then \
+		$(MAKE) --no-print-directory sync-codex-apm-mcp; \
+	fi
 	
 	@# 1. ~/.codex がシンボリックリンクなら、内容を待避して実体ディレクトリに置き換える
 	@if [ -L "$(CODEX_DOT_DIR)" ]; then \
@@ -68,10 +76,19 @@ sync-codex: ## リポジトリ内の設定ファイルを ~/.codex へ個別に�
 	@echo "🔄 Codex 設定ファイルの同期中..."
 	@mkdir -p "$(CODEX_DOT_DIR)"
 	
-	@# config.toml
-	@if [ -f "$(CODEX_REPO_DIR)/config.toml" ]; then \
-		ln -sf "$(CODEX_REPO_DIR)/config.toml" "$(CODEX_DOT_DIR)/config.toml"; \
-		echo "  ✅ config.toml -> $(CODEX_REPO_DIR)/config.toml"; \
+	@# APM config.toml
+	@if [ -f "$(CODEX_APM_CONFIG)" ]; then \
+		if [ -L "$(CODEX_GLOBAL_CONFIG)" ]; then \
+			if [ "$$(readlink "$(CODEX_GLOBAL_CONFIG)")" != "$(CODEX_APM_CONFIG)" ]; then \
+				backup=$$(sh "$(REPO_ROOT)/_scripts/backup-config-path.sh" "$(CODEX_GLOBAL_CONFIG)") || exit $$?; \
+				echo "  ⚠️  Existing config symlink backed up to $$backup"; \
+			fi; \
+		elif [ -e "$(CODEX_GLOBAL_CONFIG)" ]; then \
+			backup=$$(sh "$(REPO_ROOT)/_scripts/backup-config-path.sh" "$(CODEX_GLOBAL_CONFIG)") || exit $$?; \
+			echo "  ⚠️  Existing config backed up to $$backup"; \
+		fi; \
+		ln -sfn "$(CODEX_APM_CONFIG)" "$(CODEX_GLOBAL_CONFIG)"; \
+		echo "  ✅ config.toml -> $(CODEX_APM_CONFIG)"; \
 	fi
 
 	@# AGENTS.md (SSOT)
@@ -82,9 +99,14 @@ sync-codex: ## リポジトリ内の設定ファイルを ~/.codex へ個別に�
 
 	@# rules/ (ディレクトリごとリンク)
 	@if [ -d "$(CODEX_REPO_DIR)/rules" ]; then \
-		if [ -d "$(CODEX_DOT_DIR)/rules" ] && [ ! -L "$(CODEX_DOT_DIR)/rules" ]; then \
-			mv "$(CODEX_DOT_DIR)/rules" "$(CODEX_DOT_DIR)/rules.bak.$$(date +%Y%m%d%H%M%S)"; \
-			echo "  ⚠️  Existing rules/ backed up"; \
+		if [ -L "$(CODEX_DOT_DIR)/rules" ]; then \
+			if [ "$$(readlink "$(CODEX_DOT_DIR)/rules")" != "$(CODEX_REPO_DIR)/rules" ]; then \
+				backup=$$(sh "$(REPO_ROOT)/_scripts/backup-config-path.sh" "$(CODEX_DOT_DIR)/rules") || exit $$?; \
+				echo "  ⚠️  Existing rules/ symlink backed up to $$backup"; \
+			fi; \
+		elif [ -e "$(CODEX_DOT_DIR)/rules" ]; then \
+			backup=$$(sh "$(REPO_ROOT)/_scripts/backup-config-path.sh" "$(CODEX_DOT_DIR)/rules") || exit $$?; \
+			echo "  ⚠️  Existing rules/ backed up to $$backup"; \
 		fi; \
 		ln -sfn "$(CODEX_REPO_DIR)/rules" "$(CODEX_DOT_DIR)/rules"; \
 		echo "  ✅ rules/ -> $(CODEX_REPO_DIR)/rules"; \
@@ -92,9 +114,14 @@ sync-codex: ## リポジトリ内の設定ファイルを ~/.codex へ個別に�
 
 	@# skills/ (ディレクトリごとリンク)
 	@if [ -d "$(CODEX_REPO_DIR)/skills" ]; then \
-		if [ -d "$(CODEX_DOT_DIR)/skills" ] && [ ! -L "$(CODEX_DOT_DIR)/skills" ]; then \
-			mv "$(CODEX_DOT_DIR)/skills" "$(CODEX_DOT_DIR)/skills.bak.$$(date +%Y%m%d%H%M%S)"; \
-			echo "  ⚠️  Existing skills/ backed up"; \
+		if [ -L "$(CODEX_DOT_DIR)/skills" ]; then \
+			if [ "$$(readlink "$(CODEX_DOT_DIR)/skills")" != "$(CODEX_REPO_DIR)/skills" ]; then \
+				backup=$$(sh "$(REPO_ROOT)/_scripts/backup-config-path.sh" "$(CODEX_DOT_DIR)/skills") || exit $$?; \
+				echo "  ⚠️  Existing skills/ symlink backed up to $$backup"; \
+			fi; \
+		elif [ -e "$(CODEX_DOT_DIR)/skills" ]; then \
+			backup=$$(sh "$(REPO_ROOT)/_scripts/backup-config-path.sh" "$(CODEX_DOT_DIR)/skills") || exit $$?; \
+			echo "  ⚠️  Existing skills/ backed up to $$backup"; \
 		fi; \
 		ln -sfn "$(CODEX_REPO_DIR)/skills" "$(CODEX_DOT_DIR)/skills"; \
 		echo "  ✅ skills/ -> $(CODEX_REPO_DIR)/skills"; \
@@ -107,6 +134,24 @@ sync-codex: ## リポジトリ内の設定ファイルを ~/.codex へ個別に�
 	fi
 
 	@echo "✅ 同期が完了しました"
+
+sync-codex-apm-seed: ## APM install 前に既存Codex設定をプロジェクト出力へ引き継ぐ
+	@mkdir -p "$(dir $(CODEX_APM_CONFIG))"
+	@if [ ! -f "$(CODEX_APM_CONFIG)" ]; then \
+		if [ -f "$(CODEX_GLOBAL_CONFIG)" ]; then \
+			cp -p "$(CODEX_GLOBAL_CONFIG)" "$(CODEX_APM_CONFIG)"; \
+		elif [ -f "$(CODEX_SEED_CONFIG)" ]; then \
+			cp -p "$(CODEX_SEED_CONFIG)" "$(CODEX_APM_CONFIG)"; \
+		fi; \
+	fi
+
+sync-codex-apm-mcp: sync-codex-apm-seed ## APMからCodexプロジェクト設定を生成
+	@if [ -f ".env" ]; then \
+		set -a; . ./.env; set +a; \
+		$(APM_COMMAND) install --only mcp --root "$(CODEX_APM_ROOT)"; \
+	else \
+		$(APM_COMMAND) install --only mcp --root "$(CODEX_APM_ROOT)"; \
+	fi
 
 # アンインストール
 uninstall-codex: ## 設定ファイルのリンクを解除する（実体ファイルは残す）

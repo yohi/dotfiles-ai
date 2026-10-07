@@ -34,7 +34,7 @@ sync-agents: ## Run APM install, compile, generate Antigravity config, and sync 
 	@python3 _scripts/generate_atlassian_auth.py
 	@$(MAKE) sync-agents-run
 
-sync-agents-run:
+sync-agents-run: sync-codex-apm-seed
 	@if [ -f .env ]; then \
 		set -a && . ./.env && set +a && uv run apm install; \
 	 else \
