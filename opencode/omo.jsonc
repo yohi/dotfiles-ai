@@ -128,12 +128,9 @@
         "cloudflare-ai-gateway-custom/custom-opencode-go/kimi-k2.7-code": 2,
         "cloudflare-ai-gateway-custom/custom-sakura-ai/preview/Kimi-K2.7-Code": 2,
         "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k3": 1,
-        "cloudflare-ai-gateway-custom/custom-command-code/zai-org/glm-5.2": 2,
         "cloudflare-ai-gateway-custom/custom-ollama-cloud/glm-5.3": 2,
         "cloudflare-ai-gateway-custom/custom-ollama-cloud/glm-5.3-flash": 4,
-        "cloudflare-ai-gateway-custom/custom-command-code/z-ai/glm-5.3-flash": 4,
         "cloudflare-ai-gateway-custom/custom-ollama-cloud/deepseek-v4.1-flash": 5,
-        "cloudflare-ai-gateway-custom/custom-command-code/deepseek/deepseek-v4.1-flash": 5,
         "cloudflare-ai-gateway-custom/custom-opencode-go/deepseek-v4.1-flash": 5,
         "cloudflare-ai-gateway/google-ai-studio/gemini-3.1-pro": 2,
         // OCTG STANDARD (1M/day shared pool): Astra/Sol/Lunaは同一quotaを共有する。
@@ -273,8 +270,7 @@
         "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.7-code",
         "fallback_models": [
           "cloudflare-ai-gateway-custom/custom-sakura-ai/preview/Kimi-K2.7-Code",
-          "cloudflare-ai-gateway-custom/custom-opencode-go/kimi-k2.7-code",
-          "cloudflare-ai-gateway-custom/custom-command-code/moonshotai/kimi-k2.7-code"
+          "cloudflare-ai-gateway-custom/custom-opencode-go/kimi-k2.7-code"
         ],
         "ultrawork": {
           // "model": "sol",
@@ -327,8 +323,7 @@
         "model": "cloudflare-ai-gateway-custom/custom-opencode-go/kimi-k2.7-code",
         "fallback_models": [
           "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.7-code",
-          "cloudflare-ai-gateway-custom/custom-sakura-ai/preview/Kimi-K2.7-Code",
-          "cloudflare-ai-gateway-custom/custom-command-code/moonshotai/kimi-k2.7-code"
+          "cloudflare-ai-gateway-custom/custom-sakura-ai/preview/Kimi-K2.7-Code"
         ]
       },
       "metis": {
@@ -336,8 +331,7 @@
         "model": "cloudflare-ai-gateway-custom/custom-opencode-go/kimi-k2.7-code",
         "fallback_models": [
           "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.7-code",
-          "cloudflare-ai-gateway-custom/custom-sakura-ai/preview/Kimi-K2.7-Code",
-          "cloudflare-ai-gateway-custom/custom-command-code/moonshotai/kimi-k2.7-code"
+          "cloudflare-ai-gateway-custom/custom-sakura-ai/preview/Kimi-K2.7-Code"
         ]
       },
       "momus": {
@@ -349,8 +343,7 @@
         "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.7-code",
         "fallback_models": [
           "cloudflare-ai-gateway-custom/custom-sakura-ai/preview/Kimi-K2.7-Code",
-          "cloudflare-ai-gateway-custom/custom-opencode-go/kimi-k2.7-code",
-          "cloudflare-ai-gateway-custom/custom-command-code/moonshotai/kimi-k2.7-code"
+          "cloudflare-ai-gateway-custom/custom-opencode-go/kimi-k2.7-code"
         ]
       }
     },
@@ -382,9 +375,9 @@
     // - Kimi / GLM / DeepSeek等のopen modelはcloudflare-ai-gateway-custom経由に統一する。
     // - Gemini 3.1 Proはcf-ai-gw-dynamic-routingと同じGoogle AI Studio providerを使う。
     // - Dynamic Routes停止中はsame-model provider fallbackをOmO側で明示する。
-    // - provider primaryはworkload単位で分散し、固定費のあるOllama / Go / GOATを平常時から使う。
-    // - GLM-5.3 Flashをdefault agentic coding、GLM-5.3 fullをpremium coding escalation、
-    //   GLM-5.2をquota / compatibility hedgeとして扱う。
+    // - provider primaryはworkload単位で分散し、固定費のあるOllama / Goを平常時から使う（GOATは週間枠到達で一時停止）。
+    // - GLM-5.3 Flashをagentic codingと統合実装の標準とする。
+    // - GLM-5.3 fullはモデルカタログにのみ残し、自動routingには使用しない。
     // - v4.19.4のruntime-fallback hookはcategoryのfallback_modelsを参照するため、
     //   各categoryでmodels[1:]と同じ内容・順序を互換定義として維持する。
     // =========================================================================
@@ -400,7 +393,7 @@
       // 1. 高頻度タスクは固定費subscriptionの安価なopen modelをprimaryにする。
       //    - mechanical / review は DeepSeek V4.1 Flash
       //    - implementation は GLM-5.3 Flash
-      //    - integration は GLM-5.3 full
+      //    - integration は GLM-5.3 Flash
       // 2. 高価値・低頻度タスクは品質を優先し、OCTG STANDARDのGPT-6 Astraを使う。
       //    - architecture / final-review は OCTG GPT-6 Astraをprimaryにし、
       //      OCTG GPT-6 Sol → Plus GPT-6.1 Solの順でfallbackする。
@@ -423,21 +416,17 @@
       // -----------------------------------------------------------------------
       // 定型・低リスク・高頻度タスク向け。
       // rename / typo / config / test-only などに高価な推論モデルを使わない。
-      // DeepSeek V4.1 Flashを同一modelの3 providerで回し、全経路が失敗した場合だけ
+      // DeepSeek V4.1 Flashを同一modelの2 providerで回し、全経路が失敗した場合だけ
       // GPT-6 Lunaへ退避する。Lunaはここでは「品質向上」ではなく可用性保険。
       "sp-mechanical": {
-        "model": "cloudflare-ai-gateway-custom/custom-command-code/deepseek/deepseek-v4.1-flash",
+        "model": "cloudflare-ai-gateway-custom/custom-opencode-go/deepseek-v4.1-flash",
         "models": [
           {
-            "model": "cloudflare-ai-gateway-custom/custom-command-code/deepseek/deepseek-v4.1-flash",
+            "model": "cloudflare-ai-gateway-custom/custom-opencode-go/deepseek-v4.1-flash",
             "reasoning": "low"
           },
           {
             "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/deepseek-v4.1-flash",
-            "reasoning": "low"
-          },
-          {
-            "model": "cloudflare-ai-gateway-custom/custom-opencode-go/deepseek-v4.1-flash",
             "reasoning": "low"
           },
           {
@@ -448,10 +437,6 @@
         "fallback_models": [
           {
             "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/deepseek-v4.1-flash",
-            "reasoning": "low"
-          },
-          {
-            "model": "cloudflare-ai-gateway-custom/custom-opencode-go/deepseek-v4.1-flash",
             "reasoning": "low"
           },
           {
@@ -465,12 +450,8 @@
       // 同一Flashをprovider横断で使い切った後だけGPT-6.1 Sol/mediumへ移る。
       // Solをprimaryにしないのは、反復実装でPlus側quotaへ集中するのを避けるため。
       "sp-implementation": {
-        "model": "cloudflare-ai-gateway-custom/custom-command-code/z-ai/glm-5.3-flash",
+        "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/glm-5.3-flash",
         "models": [
-          {
-            "model": "cloudflare-ai-gateway-custom/custom-command-code/z-ai/glm-5.3-flash",
-            "reasoning": "high"
-          },
           {
             "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/glm-5.3-flash",
             "reasoning": "high"
@@ -485,10 +466,6 @@
           }
         ],
         "fallback_models": [
-          {
-            "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/glm-5.3-flash",
-            "reasoning": "high"
-          },
           {
             "model": "cloudflare-ai-gateway-custom/custom-opencode-go/glm-5.3-flash",
             "reasoning": "high"
@@ -500,23 +477,19 @@
         ]
       },
       // 複数module / API / state / concurrency / async / migration等の統合作業向け。
-      // FlashではなくGLM-5.3 full/maxをprimaryにして長時間・複雑なcodingを優先。
+      // GLM-5.3 Flash/highをprimaryにして統合実装のquota効率を改善。
       // provider障害やquota枯渇が起きた場合の最終保険としてGPT-6.1 Sol/highを置く。
       // ここではthroughputより整合性・推論力を重視する。
       "sp-integration": {
-        "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/glm-5.3",
+        "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/glm-5.3-flash",
         "models": [
           {
-            "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/glm-5.3",
-            "reasoning": "max"
+            "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/glm-5.3-flash",
+            "reasoning": "high"
           },
           {
-            "model": "cloudflare-ai-gateway-custom/custom-command-code/zai-org/glm-5.3",
-            "reasoning": "max"
-          },
-          {
-            "model": "cloudflare-ai-gateway-custom/custom-opencode-go/glm-5.3",
-            "reasoning": "max"
+            "model": "cloudflare-ai-gateway-custom/custom-opencode-go/glm-5.3-flash",
+            "reasoning": "high"
           },
           {
             "model": "openai/gpt-6.1-sol",
@@ -525,12 +498,8 @@
         ],
         "fallback_models": [
           {
-            "model": "cloudflare-ai-gateway-custom/custom-command-code/zai-org/glm-5.3",
-            "reasoning": "max"
-          },
-          {
-            "model": "cloudflare-ai-gateway-custom/custom-opencode-go/glm-5.3",
-            "reasoning": "max"
+            "model": "cloudflare-ai-gateway-custom/custom-opencode-go/glm-5.3-flash",
+            "reasoning": "high"
           },
           {
             "model": "openai/gpt-6.1-sol",
@@ -539,9 +508,9 @@
         ]
       },
       // research / investigate / deep reasoning向け。
-      // コード変更を伴わない場合も多いため、まずOATG Terraの無料quotaを活用。
-      // Terraが使えない場合はGPT-6.1 Sol/highへ直接上げ、その後にGLM-5.3 full。
-      // cheap coding modelへ下げず、deep roleの推論強度を保つ順序。
+      // コード変更を伴わない場合も多いため、まずOCTG Terraの無料quotaを活用。
+      // Terraが使えない場合はGPT-6.1 Sol/highへ上げ、fullを自動投入しない。
+      // deep roleは高品質モデルを優先し、fullへの自動fallbackは行わない。
       "sp-deep": {
         "model": "cloudflare-ai-gateway-octg/gpt-5.6-terra",
         "models": [
@@ -552,36 +521,12 @@
           {
             "model": "openai/gpt-6.1-sol",
             "reasoning": "high"
-          },
-          {
-            "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/glm-5.3",
-            "reasoning": "max"
-          },
-          {
-            "model": "cloudflare-ai-gateway-custom/custom-command-code/zai-org/glm-5.3",
-            "reasoning": "max"
-          },
-          {
-            "model": "cloudflare-ai-gateway-custom/custom-opencode-go/glm-5.3",
-            "reasoning": "max"
           }
         ],
         "fallback_models": [
           {
             "model": "openai/gpt-6.1-sol",
             "reasoning": "high"
-          },
-          {
-            "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/glm-5.3",
-            "reasoning": "max"
-          },
-          {
-            "model": "cloudflare-ai-gateway-custom/custom-command-code/zai-org/glm-5.3",
-            "reasoning": "max"
-          },
-          {
-            "model": "cloudflare-ai-gateway-custom/custom-opencode-go/glm-5.3",
-            "reasoning": "max"
           }
         ]
       },
@@ -589,7 +534,7 @@
       // OCTG STANDARD内ではAstraとSolが同じ1M/day poolを共有するため、
       // fail-closedなOCTGを前提にAstra/maxをprimaryとして品質を最大化する。
       // Astra固有障害にはOCTG Sol、STANDARD枯渇時にはquota-domainを跨ぐPlus Sol、
-      // その後にGLM-5.3 full/maxをprovider横断で使う。
+      // STANDARD枯渇後はPlus Sol/maxを使い、GLM fullを自動投入しない。
       "sp-architecture": {
         "model": "cloudflare-ai-gateway-octg/gpt-6-astra",
         "models": [
@@ -604,18 +549,6 @@
           {
             "model": "openai/gpt-6.1-sol",
             "reasoning": "max"
-          },
-          {
-            "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/glm-5.3",
-            "reasoning": "max"
-          },
-          {
-            "model": "cloudflare-ai-gateway-custom/custom-command-code/zai-org/glm-5.3",
-            "reasoning": "max"
-          },
-          {
-            "model": "cloudflare-ai-gateway-custom/custom-opencode-go/glm-5.3",
-            "reasoning": "max"
           }
         ],
         "fallback_models": [
@@ -625,18 +558,6 @@
           },
           {
             "model": "openai/gpt-6.1-sol",
-            "reasoning": "max"
-          },
-          {
-            "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/glm-5.3",
-            "reasoning": "max"
-          },
-          {
-            "model": "cloudflare-ai-gateway-custom/custom-command-code/zai-org/glm-5.3",
-            "reasoning": "max"
-          },
-          {
-            "model": "cloudflare-ai-gateway-custom/custom-opencode-go/glm-5.3",
             "reasoning": "max"
           }
         ]
@@ -648,12 +569,8 @@
       // review失敗がTaskAcceptedを止め得るため、全DeepSeek経路失敗時は
       // LunaではなくGPT-6.1 Sol/highへ退避して可用性とreview品質を優先する。
       "sp-review": {
-        "model": "cloudflare-ai-gateway-custom/custom-command-code/deepseek/deepseek-v4.1-flash",
+        "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/deepseek-v4.1-flash",
         "models": [
-          {
-            "model": "cloudflare-ai-gateway-custom/custom-command-code/deepseek/deepseek-v4.1-flash",
-            "reasoning": "max"
-          },
           {
             "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/deepseek-v4.1-flash",
             "reasoning": "max"
@@ -668,10 +585,6 @@
           }
         ],
         "fallback_models": [
-          {
-            "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/deepseek-v4.1-flash",
-            "reasoning": "max"
-          },
           {
             "model": "cloudflare-ai-gateway-custom/custom-opencode-go/deepseek-v4.1-flash",
             "reasoning": "max"
@@ -686,7 +599,7 @@
       // 最終ゲートなのでコスト最適化よりfalse negative /見落とし低減を優先。
       // OCTGはpaid overflowをfail-closedで遮断するため、同じSTANDARD poolなら
       // Astra/maxをprimary、OCTG Sol/maxをmodel-level fallbackにする。
-      // STANDARD枯渇時はPlus GPT-6.1 Sol/maxへ跨ぎ、その後にGLM-5.3 full/max。
+      // STANDARD枯渇時はPlus GPT-6.1 Sol/maxへ跨ぎ、GLM fullを自動投入しない。
       // failureはPlanCompleteを止め得るため、軽量modelへの降格は行わない。
       "sp-final-review": {
         "model": "cloudflare-ai-gateway-octg/gpt-6-astra",
@@ -702,18 +615,6 @@
           {
             "model": "openai/gpt-6.1-sol",
             "reasoning": "max"
-          },
-          {
-            "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/glm-5.3",
-            "reasoning": "max"
-          },
-          {
-            "model": "cloudflare-ai-gateway-custom/custom-command-code/zai-org/glm-5.3",
-            "reasoning": "max"
-          },
-          {
-            "model": "cloudflare-ai-gateway-custom/custom-opencode-go/glm-5.3",
-            "reasoning": "max"
           }
         ],
         "fallback_models": [
@@ -723,18 +624,6 @@
           },
           {
             "model": "openai/gpt-6.1-sol",
-            "reasoning": "max"
-          },
-          {
-            "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/glm-5.3",
-            "reasoning": "max"
-          },
-          {
-            "model": "cloudflare-ai-gateway-custom/custom-command-code/zai-org/glm-5.3",
-            "reasoning": "max"
-          },
-          {
-            "model": "cloudflare-ai-gateway-custom/custom-opencode-go/glm-5.3",
             "reasoning": "max"
           }
         ]
@@ -781,11 +670,9 @@
         ]
       },
       "deep": {
-        // "model": "terra-octg",
         "model": "cloudflare-ai-gateway-octg/gpt-5.6-terra",
         "models": [
           {
-            // "model": "terra-octg",
             "model": "cloudflare-ai-gateway-octg/gpt-5.6-terra",
             "reasoning": "high"
           },
@@ -793,22 +680,9 @@
             "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/glm-5.3-flash"
           },
           {
-            "model": "cloudflare-ai-gateway-custom/custom-command-code/z-ai/glm-5.3-flash"
-          },
-          {
             "model": "cloudflare-ai-gateway-custom/custom-opencode-go/glm-5.3-flash"
           },
           {
-            "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/glm-5.3"
-          },
-          {
-            "model": "cloudflare-ai-gateway-custom/custom-command-code/zai-org/glm-5.3"
-          },
-          {
-            "model": "cloudflare-ai-gateway-custom/custom-opencode-go/glm-5.3"
-          },
-          {
-            // "model": "sol",
             "model": "openai/gpt-6.1-sol",
             "reasoning": "medium"
           }
@@ -818,19 +692,7 @@
             "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/glm-5.3-flash"
           },
           {
-            "model": "cloudflare-ai-gateway-custom/custom-command-code/z-ai/glm-5.3-flash"
-          },
-          {
             "model": "cloudflare-ai-gateway-custom/custom-opencode-go/glm-5.3-flash"
-          },
-          {
-            "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/glm-5.3"
-          },
-          {
-            "model": "cloudflare-ai-gateway-custom/custom-command-code/zai-org/glm-5.3"
-          },
-          {
-            "model": "cloudflare-ai-gateway-custom/custom-opencode-go/glm-5.3"
           },
           {
             "model": "openai/gpt-6.1-sol",
@@ -839,17 +701,11 @@
         ]
       },
       "quick": {
-        // "model": "luna",
         "model": "openai/gpt-6-luna",
         "models": [
           {
-            // "model": "luna",
             "model": "openai/gpt-6-luna",
             "reasoning": "low"
-          },
-          {
-            // GOATのDeepSeek枠を高ボリュームutility fallbackへ割り当てる。
-            "model": "cloudflare-ai-gateway-custom/custom-command-code/deepseek/deepseek-v4.1-flash"
           },
           {
             "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/deepseek-v4.1-flash"
@@ -859,9 +715,6 @@
           }
         ],
         "fallback_models": [
-          {
-            "model": "cloudflare-ai-gateway-custom/custom-command-code/deepseek/deepseek-v4.1-flash"
-          },
           {
             "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/deepseek-v4.1-flash"
           },
@@ -871,7 +724,6 @@
         ]
       },
       "writing": {
-        // SakuraのK2.7 previewを低リスクな実運用で検証し、Ollama以降をsame-model fallbackにする。
         "model": "cloudflare-ai-gateway-custom/custom-sakura-ai/preview/Kimi-K2.7-Code",
         "models": [
           {
@@ -882,9 +734,6 @@
           },
           {
             "model": "cloudflare-ai-gateway-custom/custom-opencode-go/kimi-k2.7-code"
-          },
-          {
-            "model": "cloudflare-ai-gateway-custom/custom-command-code/moonshotai/kimi-k2.7-code"
           }
         ],
         "fallback_models": [
@@ -893,36 +742,24 @@
           },
           {
             "model": "cloudflare-ai-gateway-custom/custom-opencode-go/kimi-k2.7-code"
-          },
-          {
-            "model": "cloudflare-ai-gateway-custom/custom-command-code/moonshotai/kimi-k2.7-code"
           }
         ]
       },
       "unspecified-low": {
-        // "model": "luna",
         "model": "openai/gpt-6-luna",
         "models": [
           {
-            // "model": "luna",
             "model": "openai/gpt-6-luna",
             "reasoning": "medium"
           },
           {
-            // quickをGOAT primaryにするため、low側はOllamaを容量吸収に使う。
             "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/deepseek-v4.1-flash"
-          },
-          {
-            "model": "cloudflare-ai-gateway-custom/custom-command-code/deepseek/deepseek-v4.1-flash"
           },
           {
             "model": "cloudflare-ai-gateway-custom/custom-opencode-go/deepseek-v4.1-flash"
           },
           {
             "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/glm-5.3-flash"
-          },
-          {
-            "model": "cloudflare-ai-gateway-custom/custom-command-code/z-ai/glm-5.3-flash"
           },
           {
             "model": "cloudflare-ai-gateway-custom/custom-opencode-go/glm-5.3-flash"
@@ -933,16 +770,10 @@
             "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/deepseek-v4.1-flash"
           },
           {
-            "model": "cloudflare-ai-gateway-custom/custom-command-code/deepseek/deepseek-v4.1-flash"
-          },
-          {
             "model": "cloudflare-ai-gateway-custom/custom-opencode-go/deepseek-v4.1-flash"
           },
           {
             "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/glm-5.3-flash"
-          },
-          {
-            "model": "cloudflare-ai-gateway-custom/custom-command-code/z-ai/glm-5.3-flash"
           },
           {
             "model": "cloudflare-ai-gateway-custom/custom-opencode-go/glm-5.3-flash"
@@ -950,65 +781,33 @@
         ]
       },
       "unspecified-high": {
-        // GOATのGLM-5.3 Flash枠を平常時から使い、Ollama集中を避ける。
-        // Justice専用categoryではないが、sp-*と同じfallback invariantを維持する。
-        // models末尾のGPT-6.1 Sol/highとfallback_models末尾は必ず同一にすること。
-        "model": "cloudflare-ai-gateway-custom/custom-command-code/z-ai/glm-5.3-flash",
+        "model": "cloudflare-ai-gateway-custom/custom-opencode-go/glm-5.3-flash",
         "models": [
           {
-            "model": "cloudflare-ai-gateway-custom/custom-command-code/z-ai/glm-5.3-flash"
+            "model": "cloudflare-ai-gateway-custom/custom-opencode-go/glm-5.3-flash"
           },
           {
             "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/glm-5.3-flash"
           },
           {
-            "model": "cloudflare-ai-gateway-custom/custom-opencode-go/glm-5.3-flash"
-          },
-          {
-            // full 5.3は重いためOllama Legacyをcapacity sinkとして維持する。
-            "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/glm-5.3"
-          },
-          {
-            "model": "cloudflare-ai-gateway-custom/custom-command-code/zai-org/glm-5.3"
-          },
-          {
-            "model": "cloudflare-ai-gateway-custom/custom-opencode-go/glm-5.3"
-          },
-          {
-            // "model": "sol",
             "model": "openai/gpt-6.1-sol",
             "reasoning": "high"
-          },
+          }
         ],
         "fallback_models": [
           {
             "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/glm-5.3-flash"
           },
           {
-            "model": "cloudflare-ai-gateway-custom/custom-opencode-go/glm-5.3-flash"
-          },
-          {
-            "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/glm-5.3"
-          },
-          {
-            "model": "cloudflare-ai-gateway-custom/custom-command-code/zai-org/glm-5.3"
-          },
-          {
-            "model": "cloudflare-ai-gateway-custom/custom-opencode-go/glm-5.3"
-          },
-          {
             "model": "openai/gpt-6.1-sol",
             "reasoning": "high"
-          },
+          }
         ]
       },
       "visual-engineering": {
-        // "model": "gemini-pro",
         "model": "cloudflare-ai-gateway/google-ai-studio/gemini-3.1-pro",
         "models": [
           {
-            // Gemini 3.1 Proの視覚・UI設計役割を維持し、Google AI Studioを使う。
-            // "model": "gemini-pro",
             "model": "cloudflare-ai-gateway/google-ai-studio/gemini-3.1-pro",
             "reasoning": "high"
           },
@@ -1020,9 +819,6 @@
           },
           {
             "model": "cloudflare-ai-gateway-custom/custom-opencode-go/kimi-k2.7-code"
-          },
-          {
-            "model": "cloudflare-ai-gateway-custom/custom-command-code/moonshotai/kimi-k2.7-code"
           }
         ],
         "fallback_models": [
@@ -1034,19 +830,13 @@
           },
           {
             "model": "cloudflare-ai-gateway-custom/custom-opencode-go/kimi-k2.7-code"
-          },
-          {
-            "model": "cloudflare-ai-gateway-custom/custom-command-code/moonshotai/kimi-k2.7-code"
           }
         ]
       },
       "artistry": {
-        // "model": "gemini-pro",
         "model": "cloudflare-ai-gateway/google-ai-studio/gemini-3.1-pro",
         "models": [
           {
-            // Gemini 3.1 Proの高品質生成役割を維持し、Google AI Studioを使う。
-            // "model": "gemini-pro",
             "model": "cloudflare-ai-gateway/google-ai-studio/gemini-3.1-pro",
             "reasoning": "high"
           },
@@ -1058,9 +848,6 @@
           },
           {
             "model": "cloudflare-ai-gateway-custom/custom-opencode-go/kimi-k2.7-code"
-          },
-          {
-            "model": "cloudflare-ai-gateway-custom/custom-command-code/moonshotai/kimi-k2.7-code"
           }
         ],
         "fallback_models": [
@@ -1072,9 +859,6 @@
           },
           {
             "model": "cloudflare-ai-gateway-custom/custom-opencode-go/kimi-k2.7-code"
-          },
-          {
-            "model": "cloudflare-ai-gateway-custom/custom-command-code/moonshotai/kimi-k2.7-code"
           }
         ]
       }
@@ -1098,17 +882,14 @@
     "kimi-k27": {
       "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.7-code"
     },
-    "glm-52": {
-      "model": "cloudflare-ai-gateway-custom/custom-command-code/zai-org/glm-5.2"
-    },
     "glm-53": {
       "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/glm-5.3"
     },
     "glm-53-flash": {
-      "model": "cloudflare-ai-gateway-custom/custom-command-code/z-ai/glm-5.3-flash"
+      "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/glm-5.3-flash"
     },
     "deepseek-v41-flash": {
-      "model": "cloudflare-ai-gateway-custom/custom-command-code/deepseek/deepseek-v4.1-flash"
+      "model": "cloudflare-ai-gateway-custom/custom-opencode-go/deepseek-v4.1-flash"
     },
     "kimi-k26": {
       "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.6"
