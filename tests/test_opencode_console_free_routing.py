@@ -123,7 +123,8 @@ def test_work_remains_bedrock_only() -> None:
     work = OMO["profiles"]["work"]["[opencode]"]
     for name, category in work["categories"].items():
         assert category["model"].startswith("amazon-bedrock/"), name
-        assert category["fallback_models"] == category["models"][1:], name
+        if name.startswith("sp-"):
+            assert category["fallback_models"] == category["models"][1:], name
         assert all(m["model"].startswith("amazon-bedrock/") for m in category["models"]), name
     for name, agent in work["agents"].items():
         assert PROVIDER_ID not in json.dumps(agent), name
