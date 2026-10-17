@@ -14,11 +14,11 @@ import yaml
 ROOT = Path(__file__).resolve().parents[1]
 APM = yaml.safe_load((ROOT / "apm.yml").read_text(encoding="utf-8"))
 OMO_SOURCE = (ROOT / "opencode" / "omo.jsonc").read_text(encoding="utf-8")
-PROVIDER_ID = "cloudflare-ai-gateway-console-free"
+PROVIDER_ID = "cloudflare-ai-gateway-opencode-free"
 UPSTREAM_IDS = {"glm-5.3-flash-free", "deepseek-v4.1-flash-free"}
 ALIASES = {
-    "glm-53-flash-console-free": PROVIDER_ID + "/glm-5.3-flash-free",
-    "deepseek-v41-console-free": PROVIDER_ID + "/deepseek-v4.1-flash-free",
+    "glm-53-flash-opencode-free": PROVIDER_ID + "/glm-5.3-flash-free",
+    "deepseek-v41-opencode-free": PROVIDER_ID + "/deepseek-v4.1-flash-free",
 }
 
 
@@ -77,11 +77,11 @@ def test_console_free_uses_correct_cloudflare_to_upstream_mapping() -> None:
     assert url == (
         "https://gateway.ai.cloudflare.com/v1/"
         "${env:OC_CF_ACCOUNT_ID}/${env:OC_CF_GATEWAY_ID}/"
-        "custom-opencode-console-free/inference/openai/v1"
+        "custom-opencode-free/inference/openai/v1"
     )
     # When the Cloudflare Custom Provider base_url is https://opencode.ai,
     # this path maps to https://opencode.ai/inference/openai/v1/chat/completions.
-    assert url.endswith("/custom-opencode-console-free/inference/openai/v1")
+    assert url.endswith("/custom-opencode-free/inference/openai/v1")
 
 
 def test_no_upstream_billing_credentials_or_retry_fallback() -> None:

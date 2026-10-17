@@ -452,7 +452,7 @@ enabled_providers:
   - cloudflare-ai-gateway
   - cloudflare-ai-gateway-custom
   # Opt-in catalog only: Console Free is not used by any default OmO route.
-  - cloudflare-ai-gateway-console-free
+  - cloudflare-ai-gateway-opencode-free
   # TEMPORARY: Cloudflare AI Gateway Dynamic Routes are disabled because newly
   # created/recreated routes can fail before provider invocation (cloudflare/ai#611),
   # and Custom Providers are not supported by Dynamic Routing yet
@@ -746,7 +746,7 @@ provider:
 
   # 3. OpenCode Console FREE preview — separate Cloudflare Custom Provider.
   # STRICTLY opt-in: no OmO agent/category selects this provider automatically.
-  # Cloudflare custom provider slug: opencode-console-free
+  # Cloudflare custom provider slug: opencode-free
   # base_url (Cloudflare side): https://opencode.ai
   # Expected upstream: https://opencode.ai/inference/openai/v1/chat/completions
   # Do NOT configure a Console/Go API key, BYOK credential, or paid fallback on
@@ -754,11 +754,11 @@ provider:
   # A provider with stored credentials MUST NOT be used for this free-only path.
   # Do not enable live routing until Cloudflare unkeyed passthrough and Console
   # $0 budget / disabled auto-reload have been checked; see docs below.
-  cloudflare-ai-gateway-console-free:
+  cloudflare-ai-gateway-opencode-free:
     npm: "@ai-sdk/openai-compatible"
-    name: "Cloudflare AI Gateway (OpenCode Console Free, manual only)"
+    name: "Cloudflare AI Gateway (OpenCode Free, manual only)"
     options:
-      baseURL: "https://gateway.ai.cloudflare.com/v1/${env:OC_CF_ACCOUNT_ID}/${env:OC_CF_GATEWAY_ID}/custom-opencode-console-free/inference/openai/v1"
+      baseURL: "https://gateway.ai.cloudflare.com/v1/${env:OC_CF_ACCOUNT_ID}/${env:OC_CF_GATEWAY_ID}/custom-opencode-free/inference/openai/v1"
       # No provider API key; free models only. Do not substitute a Go API key.
       apiKey: ""
       headers:
