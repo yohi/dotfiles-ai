@@ -20,6 +20,11 @@ OpenCode プラットフォーム自体のコア設定ファイルです。
 - **`opencode.jsonc`**: `apm.yml` (SSOT) から自動生成されるため、直接編集せず `apm.yml` を編集して `make sync-opencode` を実行してください。このファイルは Git の追跡対象外です。
 - **`omo.jsonc`**: このファイルを直接編集してください。このファイルは OMO ネイティブプロファイルの SSOT として Git で追跡されています。
 
+### OpenCode Console Free — 検証用Provider（未有効化）
+
+[Console Free の段階導入・課金境界・検証ゲート](docs/console-free-routing.md) を参照してください。
+GLM-5.3 Flash Free / DeepSeek V4.1 Flash Free は **Go契約とは別のConsole無料モデル** で、期間限定提供です。既存のOllama / Go / OCTGルーティングと、CommandCode退避設定は変更しません。認証キーなしのCloudflare Custom Provider経路、Consoleの$0予算・自動チャージ停止、実API/Tool Calling、非課金を確認するまでは **手動選択専用（自動ルーティング禁止）** です。
+
 ### personal のモデル選択とプロバイダー選択
 
 本来の責務分離は次の通りです。
