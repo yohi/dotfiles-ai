@@ -23,7 +23,7 @@ OpenCode プラットフォーム自体のコア設定ファイルです。
 ### OpenCode Console Free — 検証用Provider（未有効化）
 
 [Console Free の段階導入・課金境界・検証ゲート](docs/console-free-routing.md) を参照してください。
-GLM-5.3 Flash Free / DeepSeek V4.1 Flash Free は **Go契約とは別のConsole無料モデル** で、期間限定提供です。既存のOllama / Go / OCTGルーティングと、CommandCode退避設定は変更しません。認証キーなしのCloudflare Custom Provider経路、Consoleの$0予算・自動チャージ停止、実API/Tool Calling、非課金を確認するまでは **手動選択専用（自動ルーティング禁止）** です。
+GLM-5.3 Flash Free / DeepSeek V4.1 Flash Free は **Go契約とは別のConsole無料モデル** で、期間限定提供です。2026-10-18の実API検証で、OpenCode直結がHTTP 403 `FreeTierError`、CloudflareがHTTP 401 `2009 Unauthorized` でした。現在のCloudflare用Providerは **無効化（BLOCKED）** し、OmO手動aliasも削除しています。既存のOllama / Go / OCTGルーティングとCommandCode退避設定は変更していません。OpenCodeネイティブProviderでの利用は別途検証します。
 
 ### personal のモデル選択とプロバイダー選択
 

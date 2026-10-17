@@ -1,4 +1,4 @@
-"""Offline regression checks for opt-in OpenCode Console Free candidates.
+"""Offline regression checks for BLOCKED OpenCode Console Free candidates.
 
 No calls are made to Cloudflare, OpenCode Console, or other paid services.
 """
@@ -58,7 +58,7 @@ OMO = _parse_jsonc(OMO_SOURCE)
 
 
 def test_console_free_is_a_separate_provider() -> None:
-    assert PROVIDER_ID in APM["enabled_providers"]
+    assert PROVIDER_ID not in APM["enabled_providers"]
     assert PROVIDER_ID in APM["provider"]
     assert APM["provider"][PROVIDER_ID]["npm"] == "@ai-sdk/openai-compatible"
     assert "custom-opencode-go/" not in APM["provider"][PROVIDER_ID]["options"]["baseURL"]
@@ -98,7 +98,8 @@ def test_no_upstream_billing_credentials_or_retry_fallback() -> None:
 def test_free_candidates_are_opt_in_and_not_live_routing() -> None:
     aliases = OMO["models"]
     for name, model in ALIASES.items():
-        assert aliases[name]["model"] == model
+        assert name not in aliases
+        assert model not in json.dumps(aliases)
 
     core = OMO["[opencode]"]
     for name, agent in core["agents"].items():
