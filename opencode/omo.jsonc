@@ -874,6 +874,14 @@
   //   workload単位のprovider primaryを完全修飾名で明示する。
   // ===========================================================================
   "models": {
+    // OpenCode Console Free (limited-time): catalog only, never automatic.
+    // Cloudflare Custom Provider provisioning and $0 budget checks are required.
+    "glm-53-flash-console-free": {
+      "model": "cloudflare-ai-gateway-console-free/glm-5.3-flash-free"
+    },
+    "deepseek-v41-console-free": {
+      "model": "cloudflare-ai-gateway-console-free/deepseek-v4.1-flash-free"
+    },
     // NOTE: kimi-k3 aliasは意図的に定義しない。
     // K3はautomatic routingから外しており、将来一時的に使う場合も
     // catalog alias経由ではなく完全修飾model IDを明示する。
