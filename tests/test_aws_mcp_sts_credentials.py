@@ -9,7 +9,8 @@ import pytest
 
 SCRIPT = Path(__file__).resolve().parents[1] / "_scripts" / "aws-mcp-sts-credentials.py"
 spec = importlib.util.spec_from_file_location("aws_mcp_sts_credentials", SCRIPT)
-assert spec and spec.loader
+assert spec is not None
+assert spec.loader is not None
 mod = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(mod)
 
@@ -66,6 +67,16 @@ def test_wrong_role_fails_closed(tmp_path, monkeypatch):
     with patch.object(mod.subprocess, "run") as runner:
         with pytest.raises(mod.CredentialError, match="invalid AWS STS role ARN"):
             mod._issue("invalid", "signin", "ap-northeast-1")
+    runner.assert_not_called()
+
+
+def test_invalid_region_fails_closed_before_running_aws(tmp_path, monkeypatch):
+    config = tmp_path / "config"
+    config.write_text("[profile signin]\nlogin_session = valid\n")
+    monkeypatch.setenv("AWS_CONFIG_FILE", str(config))
+    with patch.object(mod.subprocess, "run") as runner:
+        with pytest.raises(mod.CredentialError, match="invalid AWS region"):
+            mod._issue(ROLE, "signin", "--endpoint-url=https://attacker.test")
     runner.assert_not_called()
 
 

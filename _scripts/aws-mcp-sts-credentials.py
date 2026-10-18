@@ -18,7 +18,8 @@ import subprocess
 import sys
 
 SESSION_POLICY_ARN = "arn:aws:iam::aws:policy/ReadOnlyAccess"
-ROLE_ARN_RE = re.compile(r"^arn:aws:iam::[0-9]{12}:role/[A-Za-z0-9_+=,.@/-]+$")
+ROLE_ARN_RE = re.compile(r"^arn:aws:iam::\d{12}:role/[A-Za-z0-9_+=,.@/-]+$")
+REGION_RE = re.compile(r"[a-z]{2}(?:-[a-z0-9]+)+-\d+")
 
 
 class CredentialError(Exception):
@@ -53,6 +54,8 @@ def _issue(role_arn: str, source_profile: str, region: str) -> dict[str, str | i
         raise CredentialError("invalid AWS STS role ARN")
     if not re.fullmatch(r"[A-Za-z0-9_-]+", source_profile):
         raise CredentialError("invalid source profile")
+    if not REGION_RE.fullmatch(region):
+        raise CredentialError("invalid AWS region")
     config_path = Path(os.environ.get("AWS_CONFIG_FILE", str(Path.home() / ".aws" / "config"))).expanduser()
     _check_login_source(source_profile, config_path)
 
