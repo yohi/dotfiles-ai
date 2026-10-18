@@ -73,7 +73,7 @@ Cloudflare MCP Portal側の AWS Managed MCP とは**別経路**で、AWSツー�
 で構成してください。長期IAMアクセスキーは不要です。AWSの認証情報、ロールARN、
 アカウントIDは公開リポジトリの設定に固定しないでください。
 
-1. AWS CLI v2で `aws login --profile signin` を実行します。`~/.aws/config` に
+1. AWS CLI v2で `aws login --remote --profile signin` を実行します。表示されるURLをブラウザで開き、認可コードをCLIへ入力します。`~/.aws/config` に
    `[profile signin]` と `login_session` が作成されます。
 2. **ローカルの** `~/.aws/config` に以下を追記します。スクリプトの絶対パスと
    ロールARNは実際の値に置き換えてください。AWS設定の `credential_process`
