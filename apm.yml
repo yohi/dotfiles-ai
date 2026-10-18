@@ -677,6 +677,14 @@ provider:
       custom-opencode-go/deepseek-v4.1-flash:
         name: DeepSeek V4.1 Flash (OpenCode Go)
         variants: *deepseek_flash_variants
+      # Go Free: manual catalog only. LongCat was proven via the direct Go API
+      # (2026-10-18, HTTP 200); the Cloudflare route is NOT YET PROVEN.
+      # Beam appears in the official Go model list, but inference is untested.
+      # Neither is used by OmO automatic primary/fallback routes.
+      custom-opencode-go/longcat-2.5-preview-free:
+        name: LongCat 2.5 Preview Free (OpenCode Go, manual only)
+      custom-opencode-go/beam-free:
+        name: Beam Free (OpenCode Go, manual only)
 
       # CommandCode
       custom-command-code/moonshotai/kimi-k2.6:

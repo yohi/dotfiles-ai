@@ -894,6 +894,29 @@
     "kimi-k26": {
       "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.6"
     },
+    // OpenCode Console Free: native OpenCode direct connection ONLY.
+    // CATALOG_ONLY / BLOCKED at runtime as of 2026-10-18:
+    // OpenCode 1.18.32 did not list these IDs and returned UnknownError;
+    // unauthenticated external API returned FreeTierError HTTP 403.
+    // Never put these aliases in agents/categories/commands until a supported
+    // native OpenCode smoke test, cost, and privacy verification succeeds.
+    // Do NOT proxy Console Free through Cloudflare AI Gateway.
+    "glm-53-flash-opencode-free": {
+      "model": "opencode/glm-5.3-flash-free"
+    },
+    "deepseek-v41-opencode-free": {
+      "model": "opencode/deepseek-v4.1-flash-free"
+    },
+    // OpenCode Go Free: independent from Console Free.
+    // LongCat direct Go API HTTP 200 was observed on 2026-10-18.
+    // Cloudflare Go Custom Provider and Beam inference are NOT VERIFIED.
+    // Keep these aliases manual-only until Cloudflare/billing/tool tests pass.
+    "longcat-25-go-free": {
+      "model": "cloudflare-ai-gateway-custom/custom-opencode-go/longcat-2.5-preview-free"
+    },
+    "beam-go-free": {
+      "model": "cloudflare-ai-gateway-custom/custom-opencode-go/beam-free"
+    },
     // OCTG STANDARD aliases. Astra/Sol/Lunaは同じ1M/day poolを共有する。
     "astra-octg": {
       "model": "cloudflare-ai-gateway-octg/gpt-6-astra"
