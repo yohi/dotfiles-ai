@@ -60,24 +60,27 @@ Portal側には、次のリモート上流MCPを登録して集約します。
 上流の登録、認証、`Ready` 状態の確認はCloudflare Dashboardで行います。ExaはPortalのCustom Headersに `x-api-key` を設定します。APIキーやOAuthシークレットはこのリポジトリへ記載しません。
 Portalの仕様は [MCP server portals](https://developers.cloudflare.com/cloudflare-one/access-controls/ai-controls/mcp-portals/)、保護設定は [Secure MCP servers](https://developers.cloudflare.com/cloudflare-one/access-controls/ai-controls/secure-mcp-servers/)、内部アプリ連携は [Linked Apps](https://developers.cloudflare.com/cloudflare-one/access-controls/ai-controls/linked-apps/) を参照します。
 `optimize_context=search_and_execute` は別機能のContext optimizationであり、Code Modeの指定には使用しません。
-GitHub Official、Greptile、AWS Managed、Sentry RemoteのAPM直接接続は無効化し、Portal経由に統一します。
+GitHub Official、Greptile、Sentry RemoteはPortal経由に統一します。AWS Managedのみ、STS/SigV4経由の直接接続（`aws-mcp`）もAPMに登録しています。
 
 ---
 
-### AWS Labs AWS API MCP（ローカル / STS読み取り専用）
+### AWS管理型MCP（SigV4 / STS）
 
-`apm.yml` の `aws-api` は、ローカルの `aws-mcp-readonly` AWSプロファイルを参照します。
-Cloudflare MCP Portal側の AWS Managed MCP とは**別経路**で、AWSツールには重複が生じます。
+`apm.yml` の `aws-mcp` は、AWSが運用する管理型MCPへ
+`mcp-proxy-for-aws-cli==1.7.0` から接続します。
+旧 `awslabs.aws-api-mcp-server` は使用しません。東京のエンドポイント
+`https://aws-mcp.ap-northeast-1.api.aws/mcp` に接続し、
+API実行リージョンは `--metadata AWS_REGION=ap-northeast-1` で指定します。
 
-このプロファイルは **`aws login` → STS AssumeRole → ReadOnlyAccess Session Policy**
-で構成してください。長期IAMアクセスキーは不要です。AWSの認証情報、ロールARN、
-アカウントIDは公開リポジトリの設定に固定しないでください。
+MCPの資格情報は **`aws login --remote` → STS AssumeRole →
+ReadOnlyAccess Session Policy → SigV4** の順に取得・使用します。
+長期IAMアクセスキーは不要です。ARNや認証情報を公開リポジトリに固定しないでください。
 
-1. AWS CLI v2で `aws login --remote --profile signin` を実行します。表示されるURLをブラウザで開き、認可コードをCLIへ入力します。`~/.aws/config` に
-   `[profile signin]` と `login_session` が作成されます。
-2. **ローカルの** `~/.aws/config` に以下を追記します。スクリプトの絶対パスと
-   ロールARNは実際の値に置き換えてください。AWS設定の `credential_process`
-   は `${...}` の環境変数展開を行いません。
+1. AWS CLI v2で `aws login --remote --profile signin` を実行します。
+   `~/.aws/config` に `[profile signin]` と `login_session` が必要です。
+2. **ローカルの** `~/.aws/config` に以下を追記します。
+   スクリプトのパスとロールARNは実際の値に置き換えてください。
+   `credential_process` は `${VAR}` を展開しません。
 
    ```ini
    [profile aws-mcp-readonly]
@@ -85,21 +88,34 @@ Cloudflare MCP Portal側の AWS Managed MCP とは**別経路**で、AWSツー�
    credential_process = python3 /absolute/path/to/dotfiles-ai/_scripts/aws-mcp-sts-credentials.py --source-profile signin --role-arn arn:aws:iam::111122223333:role/EXISTING_READONLY_ROLE
    ```
 
-3. `aws sts get-caller-identity --profile aws-mcp-readonly` でロールの引受け結果を確認します。
-   これは実効権限の読み取り専用を証明する操作ではありません。
-4. `make sync-mcp` でMCP設定を一括同期します。自動生成先は直接編集しません。
+3. `aws sts get-caller-identity --profile aws-mcp-readonly` を実行し、
+   ロールを引き受けられることを確認します。この操作は権限制限の証明ではありません。
+4. `make sync-mcp` でAPM設定を同期し、`opencode mcp list` で
+   `aws-mcp` が接続できるか確認します。
 
-`_scripts/aws-mcp-sts-credentials.py` はAssumeRole呼び出し時に必ず
+`_scripts/aws-mcp-sts-credentials.py` はSTS AssumeRole時に
 `arn:aws:iam::aws:policy/ReadOnlyAccess` をSession Policyとして指定します。
-取得したSTS認証情報の `Expiration` を `credential_process` 形式で返すため、
-SDKは有効期限前に再実行できます。`aws login` が失効したときやAssumeRoleが拒否された
-ときは認証を失敗させ、秘密情報を保存・ログ出力しません。
-AWS CLI起動元のプロファイルには `login_session` が必要で、固定キーへのフォールバックを禁止します。
+ロールの信頼ポリシーと呼び出し元のAssumeRole権限が必要です。
+同ヘルパーはCLI v2の `login_session` に依存します。
+`mcp-proxy-for-aws-cli` は旧AWS API MCPと異なり、
+`awscli==1.46.0` を内部依存として追加しません。
+ただしホストのPATHでCLI v2を選択できることを実環境で確認してください。
 
-**注意:** `READ_OPERATIONS_ONLY=true` とReadOnlyAccess Session Policyは防御層ですが、
-厳密な無副作用・完全なNo-Writeの証明ではありません。ロールの信頼ポリシー、
-SCP、Permission Boundary、サービス別の権限制約などは別途確認してください。
-実機接続・AWS APIの動作検証はこの設定変更に含みません。
+**読み取り制限について:** 汎用のAWS API呼び出しに必要な
+`aws___run_script` は書き込み可能ツールとして扱われ得るため、
+プロキシの `--read-only` は付けていません。これは読み取り専用の
+動作が証明されたことを意味しません。AWS側の権限制限は
+**必須のSTS Session Policy** に依存します。
+人間承認なしの書き込み実行は認可しません。
+AWS CLIプロファイルの外部変更や実効権限については別途検証が必要です。
+
+`AWS_MCP_PROXY_PROFILES=aws-mcp-readonly` で使用可能なプロファイルを
+明示的に一つへ制限しています。AWS管理型MCPはCloudflare MCP Portalの
+上流にも登録済みであり、この直接接続とは**別経路**です。重複ツールが
+生じ得るため、利用する経路を統一してください。
+
+**重要:** このリポジトリの変更は設定とオフライン検証のみです。
+AWS接続、ロール引受け成功、実効的なNo-Writeはいずれも未検証です。
 
 ---
 
