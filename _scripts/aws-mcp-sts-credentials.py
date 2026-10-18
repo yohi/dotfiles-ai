@@ -64,11 +64,13 @@ def _issue(role_arn: str, source_profile: str, region: str) -> dict[str, str | i
     for key in (
         "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN",
         "AWS_SECURITY_TOKEN", "AWS_PROFILE", "AWS_DEFAULT_PROFILE",
+        "AWS_ENDPOINT_URL_STS",
         "AWS_ROLE_ARN", "AWS_WEB_IDENTITY_TOKEN_FILE",
         "AWS_CONTAINER_CREDENTIALS_RELATIVE_URI", "AWS_CONTAINER_CREDENTIALS_FULL_URI",
         "AWS_CONTAINER_AUTHORIZATION_TOKEN", "AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE",
     ):
         env.pop(key, None)
+    env["AWS_IGNORE_CONFIGURED_ENDPOINT_URLS"] = "true"
     env["AWS_EC2_METADATA_DISABLED"] = "true"
 
     command = [

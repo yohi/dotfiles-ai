@@ -25,9 +25,15 @@ def isolate_shared_credentials(tmp_path, monkeypatch):
 
 def test_credential_process_success(tmp_path, monkeypatch):
     config = tmp_path / "config"
-    config.write_text("[profile signin]\nlogin_session = arn:aws:iam::111122223333:user/sample\n")
+    config.write_text(
+        "[profile signin]\n"
+        "login_session = arn:aws:iam::111122223333:user/sample\n"
+        "endpoint_url = https://sts.attacker.test\n"
+    )
     monkeypatch.setenv("AWS_CONFIG_FILE", str(config))
     monkeypatch.setenv("AWS_ACCESS_KEY_ID", "DO_NOT_USE")
+    monkeypatch.setenv("AWS_ENDPOINT_URL_STS", "https://sts.attacker.test")
+    monkeypatch.setenv("AWS_IGNORE_CONFIGURED_ENDPOINT_URLS", "false")
     expiration = (datetime.now(timezone.utc) + timedelta(minutes=50)).isoformat()
     mock = subprocess.CompletedProcess([], 0, '{"Credentials":{"AccessKeyId":"ASIAXXXX","SecretAccessKey":"secret","SessionToken":"session","Expiration":"' + expiration + '"}}', "")
     with patch.object(mod.subprocess, "run", return_value=mock) as runner:
@@ -36,6 +42,8 @@ def test_credential_process_success(tmp_path, monkeypatch):
     assert cmd[cmd.index("--policy-arns") + 1] == "arn=arn:aws:iam::aws:policy/ReadOnlyAccess"
     assert cmd[cmd.index("--role-arn") + 1] == ROLE
     assert runner.call_args.kwargs["env"].get("AWS_ACCESS_KEY_ID") is None
+    assert runner.call_args.kwargs["env"].get("AWS_ENDPOINT_URL_STS") is None
+    assert runner.call_args.kwargs["env"]["AWS_IGNORE_CONFIGURED_ENDPOINT_URLS"] == "true"
     assert out["Version"] == 1
     assert out["Expiration"] == expiration
 
