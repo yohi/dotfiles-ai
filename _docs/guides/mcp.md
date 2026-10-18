@@ -5,9 +5,8 @@
 
 ## 同期方式
 
-- `make sync-mcp` は `apm.yml` の `targets:` に記載された OpenCode、Codex、
-  Antigravity を一括で同期します。APMのstale cleanupが別ターゲットの設定を
-  消さないよう、これらを個別ターゲット指定で順番にインストールしません。
+- `make sync-mcp` は `apm.yml` の `targets:` に記載された OpenCode、Codex
+  を一括で同期します（Antigravity は `apm compile --target antigravity` で明示的に生成）。
 - Claude CodeはAPMのユーザースコープを使います。`make setup-claude` は
   `~/.apm/apm.yml` をリポジトリの `apm.yml` へリンクし、Claude向けMCPを
   `~/.claude.json` または `$CLAUDE_CONFIG_DIR/.claude.json` に反映します。

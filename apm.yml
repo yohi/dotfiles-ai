@@ -933,7 +933,6 @@ experimental:
 targets:
   - opencode
   - codex
-  - antigravity
 
 # Exported Artifacts
 exports:
