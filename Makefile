@@ -13,6 +13,7 @@ SHELL := /bin/bash
 include _mk/main.mk
 
 # 4. Component Modules
+-include _mk/apm.mk
 -include _mk/claude.mk
 -include _mk/gemini.mk
 -include _mk/codex.mk
