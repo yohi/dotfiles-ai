@@ -47,6 +47,11 @@ sync-agents-run: sync-codex-apm-seed
 	 else \
 		uv run apm compile; \
 	 fi
+	@if [ -f .env ]; then \
+		set -a && . ./.env && set +a && uv run apm compile --target antigravity; \
+	 else \
+		uv run apm compile --target antigravity; \
+	 fi
 	@$(MAKE) setup-antigravity
 	@$(MAKE) sync-claude
 	@$(MAKE) setup-opencode
