@@ -16,6 +16,12 @@ spec.loader.exec_module(mod)
 ROLE = "arn:aws:iam::111122223333:role/EXISTING_READONLY_ROLE"
 
 
+@pytest.fixture(autouse=True)
+def isolate_shared_credentials(tmp_path, monkeypatch):
+    monkeypatch.setenv("AWS_SHARED_CREDENTIALS_FILE", str(tmp_path / "nonexistent"))
+
+
+
 def test_credential_process_success(tmp_path, monkeypatch):
     config = tmp_path / "config"
     config.write_text("[profile signin]\nlogin_session = arn:aws:iam::111122223333:user/sample\n")
@@ -60,4 +66,17 @@ def test_wrong_role_fails_closed(tmp_path, monkeypatch):
     with patch.object(mod.subprocess, "run") as runner:
         with pytest.raises(mod.CredentialError, match="invalid AWS STS role ARN"):
             mod._issue("invalid", "signin", "ap-northeast-1")
+    runner.assert_not_called()
+
+
+def test_static_keys_in_shared_file_are_rejected(tmp_path, monkeypatch):
+    config = tmp_path / "config"
+    config.write_text("[profile signin]\nlogin_session = console\n")
+    credentials = tmp_path / "credentials"
+    credentials.write_text("[signin]\naws_access_key_id = AKIAFAKE\naws_secret_access_key = secret\n")
+    monkeypatch.setenv("AWS_CONFIG_FILE", str(config))
+    monkeypatch.setenv("AWS_SHARED_CREDENTIALS_FILE", str(credentials))
+    with patch.object(mod.subprocess, "run") as runner:
+        with pytest.raises(mod.CredentialError, match="static credentials"):
+            mod._issue(ROLE, "signin", "ap-northeast-1")
     runner.assert_not_called()
