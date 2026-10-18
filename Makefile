@@ -13,6 +13,7 @@ SHELL := /bin/bash
 include _mk/main.mk
 
 # 4. Component Modules
+-include _mk/apm.mk
 -include _mk/claude.mk
 -include _mk/gemini.mk
 -include _mk/codex.mk
@@ -45,6 +46,11 @@ sync-agents-run: sync-codex-apm-seed
 		set -a && . ./.env && set +a && uv run apm compile; \
 	 else \
 		uv run apm compile; \
+	 fi
+	@if [ -f .env ]; then \
+		set -a && . ./.env && set +a && uv run apm compile --target antigravity; \
+	 else \
+		uv run apm compile --target antigravity; \
 	 fi
 	@$(MAKE) setup-antigravity
 	@$(MAKE) sync-claude

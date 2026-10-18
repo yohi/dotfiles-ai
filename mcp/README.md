@@ -134,15 +134,13 @@ AWS接続、ロール引受け成功、実効的なNo-Writeはいずれも未検
   - APM 経由で有効にする MCP サーバーの唯一の定義元です。
   - `dependencies.mcp` に記載した全サーバーが APM の設定対象になります。
 - **対象ランタイム (`targets:`)**:
-  - `opencode`, `codex`, `antigravity` を同じ APM インストールで同期します。
-  - これらを `--target` で別々にインストールすると、APMのstale cleanupが
-    別ターゲットの設定を削除するため、必ず一括で同期してください。
+  - `opencode`, `codex` を同じ APM インストールで同期します。
+  - Antigravity は APM CLI の仕様上 explicit-only ターゲットのため、`apm compile --target antigravity` で明示的に生成されます。
 - **`mcp/optional-servers.yaml`**:
   - 有効化していないサーバーの参照用カタログです。APM はこのファイルを読みません。
   - サーバーを有効化するときは、エントリを `apm.yml` に移してください。
 - **自動生成されるファイル**:
-  - `make sync-mcp` は `apm.yml` の `targets:` にあるOpenCode、Codex、
-    Antigravityを一括で更新します。
+  - `make sync-mcp` は `apm.yml` の `targets:` にあるOpenCode、Codexを一括で更新します。
   - APMプロジェクト出力はOpenCodeの `opencode.json`、Codexの
     `.codex/config.toml`、Antigravity CLIの `.agents/mcp_config.json` です。
   - `opencode/opencode.jsonc` は同じ `apm.yml` から生成されるOpenCode用の
@@ -212,7 +210,7 @@ APM によって直接管理されます。
 ## 4. メンテナンスコマンド
 
 - **`make sync-mcp`**: `apm install` を実行し、`apm.yml` の定義に基づいて
-  `targets:` にあるOpenCode、Codex、Antigravityのプロジェクト設定を一括同期。
+  `targets:` にあるOpenCode、Codexのプロジェクト設定を一括同期（Antigravity は個別生成）。
 - **`make sync-claude-apm-mcp`**: `apm.yml` をユーザースコープのAPM manifestとして
   参照し、Claude CodeのグローバルMCPを同期。
 - **`make setup-claude`**: Claude用の設定適用時に、上記のユーザースコープ同期も実行。

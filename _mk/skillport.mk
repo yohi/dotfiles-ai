@@ -5,7 +5,7 @@
 SKILLPORT_SKILLS_DIR ?= $(HOME)/.skillport/skills
 SKILLPORT_RUNTIME_SKILLS_DIR ?= $(RUNTIME_SKILLS_DIR)
 
-.PHONY: skillport install-skillport install-skills-ref setup-skillport check-skillport check-skillport-version install-apm stats-skillport status-skillport
+.PHONY: skillport install-skillport install-skills-ref setup-skillport check-skillport check-skillport-version stats-skillport status-skillport
 
 # SkillPort のインストールとセットアップ
 skillport: ## SkillPortのインストールとセットアップ
@@ -55,62 +55,6 @@ install-skills-ref: ## skills-ref (agentskills CLI) をインストール
 	else \
 		echo "❌ uv が見つかりません。先に uv をインストールしてください"; \
 		exit 1; \
-	fi
-
-# APM (Agent Package Manager) のインストール
-install-apm: ## Microsoft APM をインストール
-	@if command -v apm >/dev/null 2>&1; then \
-		echo "✅ APM は既にインストールされています ($$(apm --version 2>/dev/null || echo 'installed'))"; \
-	else \
-		INSTALL_SUCCESS=false; \
-		if command -v brew >/dev/null 2>&1; then \
-			echo "📦 Homebrew を使用して APM をインストール中..."; \
-			if brew install apm >/dev/null 2>&1; then \
-				INSTALL_SUCCESS=true; \
-			else \
-				echo "⚠️  Homebrew でのインストールに失敗しました。スクリプトによるインストールを試みます。"; \
-			fi; \
-		fi; \
-		\
-		if [ "$$INSTALL_SUCCESS" = "false" ]; then \
-			if ! command -v sha256sum >/dev/null 2>&1 && ! command -v shasum >/dev/null 2>&1; then \
-				echo "❌ ハッシュ検証ユーティリティ (sha256sum または shasum) が見つかりません。"; \
-				exit 1; \
-			fi; \
-			echo "📦 APM インストールスクリプトを実行中..."; \
-			INSTALL_SCRIPT=$$(mktemp /tmp/apm-install.XXXXXX.sh); \
-			if curl -f --max-time 30 -sSL "$(APM_INSTALL_URL)" -o "$$INSTALL_SCRIPT"; then \
-				ACTUAL_HASH=$$( (command -v sha256sum >/dev/null 2>&1 && sha256sum "$$INSTALL_SCRIPT" | cut -d" " -f1) || shasum -a 256 "$$INSTALL_SCRIPT" | cut -d" " -f1 ); \
-				if [ "$$ACTUAL_HASH" != "$(APM_INSTALLER_HASH)" ]; then \
-					echo "❌ APM インストーラーのハッシュ検証に失敗しました"; \
-					echo "期待値: $(APM_INSTALLER_HASH)"; \
-					echo "実際の値: $$ACTUAL_HASH"; \
-					rm -f "$$INSTALL_SCRIPT"; \
-					exit 1; \
-				fi; \
-				if sh "$$INSTALL_SCRIPT"; then \
-					rm -f "$$INSTALL_SCRIPT"; \
-				else \
-					EXIT_CODE=$$?; \
-					echo "❌ APM インストールスクリプトの実行に失敗しました (終了コード: $$EXIT_CODE)"; \
-					echo "URL: $(APM_INSTALL_URL)"; \
-					echo "ハッシュ: $(APM_INSTALLER_HASH)"; \
-					rm -f "$$INSTALL_SCRIPT"; \
-					exit $$EXIT_CODE; \
-				fi; \
-			else \
-				echo "❌ インストールスクリプトのダウンロードに失敗しました"; \
-				rm -f "$$INSTALL_SCRIPT"; \
-				exit 1; \
-			fi; \
-		fi; \
-		\
-		if command -v apm >/dev/null 2>&1; then \
-			echo "✅ APM のインストールが完了しました"; \
-		else \
-			echo "❌ APM のインストールに失敗したか、PATH が通っていません。"; \
-			exit 1; \
-		fi; \
 	fi
 
 # SkillPort の設定（ディレクトリ作成とリンク）

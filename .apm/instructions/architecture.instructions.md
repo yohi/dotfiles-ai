@@ -52,9 +52,10 @@ atomic replacement when updating that file.
 Codex and Antigravity use APM project-scope MCP outputs followed by global
 symlinks, so `apm.yml` remains the MCP source of truth for these clients too:
 
-- `apm.yml` declares `opencode`, `codex`, and `antigravity` in `targets:` so one
-  APM install updates all three targets without one target's stale cleanup
-  removing another target's MCP configuration.
+- `apm.yml` declares `opencode` and `codex` in `targets:` so one
+  APM install updates both targets. Antigravity uses explicit-only compile
+  (`apm compile --target antigravity`) because APM CLI treats `antigravity`
+  as an explicit target rather than a canonical target list entry.
 - APM writes Codex's project `.codex/config.toml`. If it does not exist, the
   sync seeds it from the existing global Codex configuration, or from
   `codex/config.toml` on a new machine. APM updates `mcp_servers` while
