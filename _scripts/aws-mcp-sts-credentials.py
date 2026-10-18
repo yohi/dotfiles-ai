@@ -37,6 +37,16 @@ def _check_login_source(profile: str, config_path: Path) -> None:
            ("aws_access_key_id", "aws_secret_access_key", "credential_process", "source_profile")):
         raise CredentialError("source profile contains an unsupported credential provider")
 
+    credentials_path = Path(os.environ.get(
+        "AWS_SHARED_CREDENTIALS_FILE", str(Path.home() / ".aws" / "credentials")
+    )).expanduser()
+    shared = configparser.RawConfigParser()
+    if credentials_path.exists():
+        shared.read(credentials_path)
+        if shared.has_section(profile) and any(shared.has_option(profile, key) for key in
+                                               ("aws_access_key_id", "aws_secret_access_key")):
+            raise CredentialError("source profile has static credentials in credentials file")
+
 
 def _issue(role_arn: str, source_profile: str, region: str) -> dict[str, str | int]:
     if not ROLE_ARN_RE.fullmatch(role_arn):
