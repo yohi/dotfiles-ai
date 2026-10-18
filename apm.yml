@@ -50,6 +50,36 @@ dependencies:
       transport: streamable-http
       url: https://work.mcp.y-ohi.com/mcp?codemode=search_and_execute
 
+    # Direct AWS Managed MCP via SigV4; AWS API MCP Server is deprecated.
+    # Constrain calls with the aws-mcp-readonly STS session policy; the proxy
+    # intentionally does not use --read-only because it hides aws___run_script.
+    - name: aws-mcp
+      title: "AWS Managed MCP (STS Scoped)"
+      registry: false
+      transport: stdio
+      command: "uvx"
+      args:
+        - "mcp-proxy-for-aws-cli==1.7.0"
+        - "https://aws-mcp.ap-northeast-1.api.aws/mcp"
+        - "--service"
+        - "aws-mcp"
+        - "--region"
+        - "ap-northeast-1"
+        - "--metadata"
+        - "AWS_REGION=ap-northeast-1"
+        - "--profile"
+        - "aws-mcp-readonly"
+        - "--retries"
+        - "0"
+        - "--log-level"
+        - "ERROR"
+      env:
+        AWS_MCP_PROXY_PROFILES: "aws-mcp-readonly"
+        AWS_REGION: "ap-northeast-1"
+        AWS_DEFAULT_REGION: "ap-northeast-1"
+      standalone: true
+      timeout: 120000
+
     - name: codegraph
       title: "CodeGraph MCP"
       registry: false
