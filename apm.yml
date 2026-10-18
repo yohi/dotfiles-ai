@@ -60,14 +60,14 @@ dependencies:
       args:
         - "awslabs.aws-api-mcp-server==1.5.6"
       env:
-        AWS_API_MCP_PROFILE_NAME: "${env:AWS_API_MCP_PROFILE_NAME:-aws-mcp-readonly}"
-        AWS_REGION: "${env:AWS_REGION:-ap-northeast-1}"
+        AWS_API_MCP_PROFILE_NAME: "aws-mcp-readonly"
+        AWS_REGION: "ap-northeast-1"
         READ_OPERATIONS_ONLY: "true"
         REQUIRE_MUTATION_CONSENT: "true"
         AWS_API_MCP_ALLOW_UNRESTRICTED_LOCAL_FILE_ACCESS: "no-access"
         FASTMCP_LOG_LEVEL: "ERROR"
       standalone: true
-      timeout: 60000
+      timeout: 120000
 
     - name: codegraph
       title: "CodeGraph MCP"
