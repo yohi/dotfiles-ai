@@ -64,6 +64,45 @@ GitHub Official、Greptile、AWS Managed、Sentry RemoteのAPM直接接続は無
 
 ---
 
+### AWS Labs AWS API MCP（ローカル / STS読み取り専用）
+
+`apm.yml` の `aws-api` は、ローカルの `aws-mcp-readonly` AWSプロファイルを参照します。
+Cloudflare MCP Portal側の AWS Managed MCP とは**別経路**で、AWSツールには重複が生じます。
+
+このプロファイルは **`aws login` → STS AssumeRole → ReadOnlyAccess Session Policy**
+で構成してください。長期IAMアクセスキーは不要です。AWSの認証情報、ロールARN、
+アカウントIDは公開リポジトリの設定に固定しないでください。
+
+1. AWS CLI v2で `aws login --profile signin` を実行します。`~/.aws/config` に
+   `[profile signin]` と `login_session` が作成されます。
+2. **ローカルの** `~/.aws/config` に以下を追記します。スクリプトの絶対パスと
+   ロールARNは実際の値に置き換えてください。AWS設定の `credential_process`
+   は `${...}` の環境変数展開を行いません。
+
+   ```ini
+   [profile aws-mcp-readonly]
+   region = ap-northeast-1
+   credential_process = python3 /absolute/path/to/dotfiles-ai/_scripts/aws-mcp-sts-credentials.py --source-profile signin --role-arn arn:aws:iam::111122223333:role/EXISTING_READONLY_ROLE
+   ```
+
+3. `aws sts get-caller-identity --profile aws-mcp-readonly` でロールの引受け結果を確認します。
+   これは実効権限の読み取り専用を証明する操作ではありません。
+4. `make sync-mcp` でMCP設定を一括同期します。自動生成先は直接編集しません。
+
+`_scripts/aws-mcp-sts-credentials.py` はAssumeRole呼び出し時に必ず
+`arn:aws:iam::aws:policy/ReadOnlyAccess` をSession Policyとして指定します。
+取得したSTS認証情報の `Expiration` を `credential_process` 形式で返すため、
+SDKは有効期限前に再実行できます。`aws login` が失効したときやAssumeRoleが拒否された
+ときは認証を失敗させ、秘密情報を保存・ログ出力しません。
+AWS CLI起動元のプロファイルには `login_session` が必要で、固定キーへのフォールバックを禁止します。
+
+**注意:** `READ_OPERATIONS_ONLY=true` とReadOnlyAccess Session Policyは防御層ですが、
+厳密な無副作用・完全なNo-Writeの証明ではありません。ロールの信頼ポリシー、
+SCP、Permission Boundary、サービス別の権限制約などは別途確認してください。
+実機接続・AWS APIの動作検証はこの設定変更に含みません。
+
+---
+
 ## 2. 設定管理の仕組み (SSOT)
 
 本プロジェクトでは、MCP 設定をリポジトリルートの **`apm.yml`** を
