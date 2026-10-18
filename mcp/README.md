@@ -54,13 +54,13 @@ Portal側には、次のリモート上流MCPを登録して集約します。
 | grep.app | `https://mcp.grep.app` | GitHubコード検索 |
 | Greptile | `https://api.greptile.com/mcp` | コードレビュー・解析 |
 | GitHub Official | `https://api.githubcopilot.com/mcp/` | GitHub連携 |
-| AWS Managed | `https://aws-mcp.us-east-1.api.aws/mcp?oauth=initialize` | AWS連携 |
+| AWS Managed（Portal経由、us-east-1） | `https://aws-mcp.us-east-1.api.aws/mcp?oauth=initialize` | AWS連携 |
 | Sentry Remote | `https://mcp.sentry.dev/mcp` | Sentry連携 |
 
 上流の登録、認証、`Ready` 状態の確認はCloudflare Dashboardで行います。ExaはPortalのCustom Headersに `x-api-key` を設定します。APIキーやOAuthシークレットはこのリポジトリへ記載しません。
 Portalの仕様は [MCP server portals](https://developers.cloudflare.com/cloudflare-one/access-controls/ai-controls/mcp-portals/)、保護設定は [Secure MCP servers](https://developers.cloudflare.com/cloudflare-one/access-controls/ai-controls/secure-mcp-servers/)、内部アプリ連携は [Linked Apps](https://developers.cloudflare.com/cloudflare-one/access-controls/ai-controls/linked-apps/) を参照します。
 `optimize_context=search_and_execute` は別機能のContext optimizationであり、Code Modeの指定には使用しません。
-GitHub Official、Greptile、Sentry RemoteはPortal経由に統一します。AWS Managedのみ、STS/SigV4経由の直接接続（`aws-mcp`）もAPMに登録しています。
+GitHub Official、Greptile、Sentry RemoteはPortal経由に統一します。AWS Managedのみ、Portal経由（us-east-1）に加え、東京リージョン（ap-northeast-1）のSTS/SigV4直接接続（`aws-mcp`）もAPMに登録しています。
 
 ---
 
