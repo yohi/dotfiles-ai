@@ -68,7 +68,6 @@ BLOCKED_AUTO_TOKENS = (
     "custom-nvidia/",
     "custom-opencode-free/",
     "cloudflare-ai-gateway-opencode-free/",
-    "/glm-5.3",
     "opencode/glm-5.3-flash-free",
     "opencode/deepseek-v4.1-flash-free",
     "longcat-2.5-preview-free",
@@ -137,6 +136,8 @@ def test_personal_auto_routes_are_only_approved_providers() -> None:
     assert all(m.startswith(ALLOWED_AUTO_PREFIXES) for m in model_ids)
     for model in model_ids:
         assert not any(token in model for token in BLOCKED_AUTO_TOKENS)
+        # Exclude full GLM without falsely excluding GLM-5.3 Flash.
+        assert not model.endswith("/glm-5.3")
     # GLM-5.3 full remains selectable manually but is never routed automatically.
     assert OMO["models"]["glm-53"]["model"].endswith("/glm-5.3")
 
