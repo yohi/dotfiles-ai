@@ -34,7 +34,7 @@ Cloudflare AI Gateway Dynamic Route
 
 ただし **Cloudflare Dynamic Routing は現在一時停止中**です。新規作成・再作成した Route が provider invocation 前に Error 2005 となる事象（`cloudflare/ai#611`）があり、さらに Dynamic Routing は Custom Providers をまだサポートしていません（`cloudflare/cloudflare-docs#29840`）。
 
-そのため `personal` では当面、Kimi / GLM / DeepSeek の同一モデル provider fallback を OmO の `models` / `fallback_models` で明示し、`cloudflare-ai-gateway-custom` の直結パスを使用します。provider primary は一律に Ollama へ寄せず、**workload 単位で Ollama Cloud Legacy / OpenCode Go / Command Code GOAT / Sakura AI Engine に固定分散**します。これにより cache locality を保ちつつ、各サブスクリプションの利用枠を平常時から活用します。Gemini 3.1 Pro は Dynamic Route 定義と同じ Google AI Studio provider へ直接接続します。
+そのため `personal` では当面、Kimi / GLM / DeepSeek の同一モデル provider fallback を OmO の `models` / `fallback_models` で明示し、`cloudflare-ai-gateway-custom` の直結パスを使用します。provider primary は一律に Ollama へ寄せず、**workload 単位で Ollama Cloud Legacy / OpenCode Go / Sakura AI Engine に固定分散**します。GOAT は週間上限到達のため、Primary / Fallback / モデルカタログ参照から一時的に除外しています。これにより cache locality を保ちつつ、利用可能なサブスクリプションの利用枠を活用します。Gemini 3.1 Pro は Dynamic Route 定義と同じ Google AI Studio provider へ直接接続します。
 
 Sisyphus-Junior は意図的に固定モデルを設定しません。category-routed task では、選択された category のモデルを引き継がせます。
 
@@ -48,7 +48,7 @@ Sisyphus（監督）は、タスクの性質に応じて最適な「知能カテ
 
 | カテゴリー | 特徴・バリアント | 想定される用途 | デフォルトモデル (personal カタログ) |
 | :--- | :--- | :--- | :--- |
-| **ultrabrain** | `max` / 最強推論 | 複雑な計画立案、コード監査、アーキテクチャ設計、リスク分析。 | `sol-octg` |
+| **ultrabrain** | `max` / 最強推論 | 複雑な計画立案、コード監査、アーキテクチャ設計、リスク分析。 | `astra-octg` |
 | **deep** | `high` / 自律解決 | 難解なバグ修正、機能実装、リファクタリングなど職人的作業。 | `terra-octg` |
 | **quick** | `low` / 高速応答 | ドキュメント検索、コード探索、些細な修正、プロトタイピング。 | `luna` |
 | **visual-engineering** | UI/UX 特化 | UIデザイン解析、CSSアニメーション、フロントエンド最適化。 | `gemini-pro` |
@@ -77,16 +77,16 @@ Sisyphus（監督）は、タスクの性質に応じて最適な「知能カテ
 
 | エージェント | カテゴリー | personal 実モデル / provider chain | 役割・専門領域 |
 | :--- | :--- | :--- | :--- |
-| **Sisyphus** | `ultrabrain` | Ollama Cloud Kimi K2.7 → Sakura K2.7; ultrawork: `openai/gpt-6.1-sol` (high) | 司令塔。全体の品質管理、タスクの分解と委譲。 |
+| **Sisyphus** | `ultrabrain` | Ollama Cloud Kimi K2.7 → Sakura K2.7 → OpenCode Go K2.7; ultrawork: `openai/gpt-6.1-sol` (high) | 司令塔。全体の品質管理、タスクの分解と委譲。 |
 | **Hephaestus** | `deep` | `openai/gpt-6.1-sol` → OCTG GPT-6 Sol | 実装職人。反復量が多いため Plus Sol を主系とし、OCTG STANDARD を枯渇させにくくする。 |
 | **Oracle** | `ultrabrain` | `cloudflare-ai-gateway-octg/gpt-5.6-terra` | 賢者。アーキテクチャ設計の相談、難解なバグのデバッグ。 |
 | **Librarian** | `quick` | `openai/gpt-6-luna` | 司書。外部ドキュメントやOSSの実装例の高速検索。 |
 | **Explore** | `quick` | `openai/gpt-6-luna` | 探検家。コードベースの高速探索、grep検索、スキャフォールディング。 |
 | **Multimodal-Looker** | `ultrabrain` | `cloudflare-ai-gateway/google-ai-studio/gemini-3.1-pro` | 視覚アナリスト。UIデザイン、画像、図解、PDFの解析。 |
-| **Prometheus** | `ultrabrain` | Ollama Cloud Kimi K2.7 → Sakura K2.7 | 流れ者。タスクの分解と並列実行計画の作成。 |
-| **Metis** | `ultrabrain` | Ollama Cloud Kimi K2.7 → Sakura K2.7 | 計画コンサル。計画前のリスク特定と曖昧さの排除。 |
+| **Prometheus** | `ultrabrain` | OpenCode Go Kimi K2.7 → Ollama K2.7 → Sakura K2.7 | 流れ者。タスクの分解と並列実行計画の作成。 |
+| **Metis** | `ultrabrain` | OpenCode Go Kimi K2.7 → Ollama K2.7 → Sakura K2.7 | 計画コンサル。計画前のリスク特定と曖昧さの排除。 |
 | **Momus** | `ultrabrain` | `cloudflare-ai-gateway-octg/gpt-5.6-terra` | 計画レビュアー。Prometheusが作成した計画の厳格な検証。 |
-| **Atlas** | `ultrabrain` | Ollama Cloud Kimi K2.7 → Sakura K2.7 | 現場監督。環境管理、Todo項目の体系的な管理と調整。 |
+| **Atlas** | `ultrabrain` | Ollama Cloud Kimi K2.7 → Sakura K2.7 → OpenCode Go K2.7 | 現場監督。環境管理、Todo項目の体系的な管理と調整。 |
 
 ## 4. LLMモデル選択のベストプラクティス
 
@@ -108,14 +108,21 @@ Dynamic Routing 停止中は、表中の同一モデル provider chain を OmO �
 
 | カテゴリー | personal デフォルト | personal フォールバックチェーン | work (Bedrock) |
 | :--- | :--- | :--- | :--- |
-| **ultrabrain** | OCTG GPT-6 Astra (max) | Astra → OCTG GPT-6 Sol → Plus GPT-6.1 Sol → OCTG GPT-5.6 Terra | Opus 5.5 (max) → Sonnet 5.5 |
-| **deep** | OCTG GPT-5.6 Terra (high) | Terra → Ollama GLM-5.3 Flash → Ollama GLM-5.3 → GPT-6.1 Sol | Opus 5.5 (max) → Sonnet 5.5 |
-| **quick** | `openai/gpt-6-luna` (low) | GPT-6 Luna → Ollama DeepSeek V4 Flash | Haiku 4.5 → Sonnet 5.5 |
-| **visual-engineering** | Gemini 3.1 Pro (high) | Gemini 3.1 Pro → Ollama Kimi K2.7 → Sakura Kimi K2.7 | Opus 5.5 (max) → Sonnet 5.5 |
-| **artistry** | Gemini 3.1 Pro (high) | Gemini 3.1 Pro → Ollama Kimi K2.7 → Sakura Kimi K2.7 | Sonnet 5.5 → Haiku 4.5 |
-| **unspecified-high** | Ollama GLM-5.3 Flash | GLM-5.3 Flash → GLM-5.3 → GPT-6.1 Sol (high) | Opus 5.5 (max) → Sonnet 5.5 |
-| **unspecified-low** | `openai/gpt-6-luna` (medium) | GPT-6 Luna → Ollama DeepSeek V4 Flash → Ollama GLM-5.3 Flash | Sonnet 5.5 → Haiku 4.5 |
-| **writing** | Sakura Kimi K2.7 | Sakura Kimi K2.7 → Ollama Kimi K2.7 | Sonnet 5.5 → Haiku 4.5 |
+| **sp-mechanical** | Go DeepSeek V4.1 Flash (low) | Go → Ollama → GPT-6 Luna | Haiku 4.5 → Sonnet 5.5 |
+| **sp-implementation** | Ollama GLM-5.3 Flash (high) | Ollama → Go → GPT-6.1 Sol | Sonnet 5.5 → Opus 5.5 |
+| **sp-integration** | Ollama GLM-5.3 Flash (high) | Ollama → Go → GPT-6.1 Sol (high) | Sonnet 5.5 → Opus 5.5 |
+| **sp-deep** | OCTG GPT-5.6 Terra (high) | Terra → GPT-6.1 Sol (high) | Opus 5.5 → Sonnet 5.5 |
+| **sp-architecture** | OCTG GPT-6 Astra (max) | Astra → OCTG GPT-6 Sol → GPT-6.1 Sol (max) | Opus 5.5 → Sonnet 5.5 |
+| **sp-review** | Ollama DeepSeek V4.1 Flash (max) | Ollama → Go → GPT-6.1 Sol (high) | Sonnet 5.5 → Opus 5.5 |
+| **sp-final-review** | OCTG GPT-6 Astra (max) | Astra → OCTG GPT-6 Sol → GPT-6.1 Sol (max) | Opus 5.5 → Sonnet 5.5 |
+| **ultrabrain** | OCTG GPT-6 Astra (max) | Astra → OCTG GPT-6 Sol → Plus GPT-6.1 Sol → Terra | Opus 5.5 → Sonnet 5.5 |
+| **deep** | OCTG GPT-5.6 Terra (high) | Terra → Ollama GLM-5.3 Flash → Go GLM-5.3 Flash → GPT-6.1 Sol | Opus 5.5 → Sonnet 5.5 |
+| **quick** | GPT-6 Luna (low) | Luna → Ollama DeepSeek V4.1 Flash → Go DeepSeek V4.1 Flash | Haiku 4.5 → Sonnet 5.5 |
+| **visual-engineering** | Gemini 3.1 Pro (high) | Gemini → Ollama Kimi K2.7 → Sakura K2.7 → Go K2.7 | Opus 5.5 → Sonnet 5.5 |
+| **artistry** | Gemini 3.1 Pro (high) | Gemini → Ollama Kimi K2.7 → Sakura K2.7 → Go K2.7 | Sonnet 5.5 → Haiku 4.5 |
+| **unspecified-high** | Go GLM-5.3 Flash | Go → Ollama GLM-5.3 Flash → GPT-6.1 Sol (high) | Opus 5.5 → Sonnet 5.5 |
+| **unspecified-low** | GPT-6 Luna (medium) | Luna → Ollama/Go DeepSeek V4.1 Flash → Ollama/Go GLM-5.3 Flash | Sonnet 5.5 → Haiku 4.5 |
+| **writing** | Sakura Kimi K2.7 | Sakura → Ollama K2.7 → Go K2.7 | Sonnet 5.5 → Haiku 4.5 |
 
 Work では Claude Fable 5.1 をモデルカタログに登録し、Claude Opus 5.5 を最上位推論・レビュー、Claude Sonnet 5.5 を主力実装、Claude Haiku 4.5 を高速な軽量作業に割り当てています。Fable はカタログ登録のみで、既定の agent / category routing には使いません。Work profile の agent・category・fallback はすべて Bedrock の Claude モデルを使用します。
 
@@ -128,22 +135,23 @@ Work では Claude Fable 5.1 をモデルカタログに登録し、Claude Opus 
 
 ### provider primary の固定分散
 
-Dynamic Routing 停止中はランダム分散ではなく、workload ごとに primary provider を固定します。これにより provider 内キャッシュの局所性を保ちながら、固定費を払っている各サービスを平常時から利用します。
+Dynamic Routing 停止中は workload ごとに primary provider を固定します。2026-10-12 時点で Command Code GOAT は週間枠 100%（月間 86%）に達しているため、**すべての自動経路から退避**しています。利用枠回復後も GLM-5.3 full は戻さず、モデル別消費状況を確認してから GOAT の復帰を判断します。
 
 | workload | primary provider | 主な理由 |
 | :--- | :--- | :--- |
 | Sisyphus / Atlas Kimi K2.7 | **Ollama Cloud Legacy** | 長時間・大contextの容量吸収 |
 | Prometheus / Metis Kimi K2.7 | **OpenCode Go** | K2.7の利用枠を計画系workloadへ割り当て |
 | `writing` Kimi K2.7 | **Sakura AI Engine** | 無料Previewの品質・安定性検証 |
-| `deep` GLM-5.3 Flash / GLM-5.3 full | **Ollama Cloud Legacy** | 重い実装・premium open codingの容量吸収 |
-| `unspecified-high` GLM-5.3 Flash | **Command Code GOAT** | GOATのGLM-5.3 Flash枠を平常時から利用 |
-| `quick` DeepSeek V4 Flash | **Command Code GOAT** | 高ボリュームutility枠として利用 |
-| `unspecified-low` DeepSeek / GLM Flash | **Ollama Cloud Legacy** | quick側との負荷分散 |
-| Kimi K3 reserve / GLM-5.3 full escalation | **Ollama Cloud Legacy** | 高コストモデルをLegacy容量で吸収 |
+| `sp-mechanical` DeepSeek V4.1 Flash | **OpenCode Go** | 定型作業をGOATに依存させず処理 |
+| `sp-review` DeepSeek V4.1 Flash | **Ollama Cloud Legacy** | mandatory reviewの可用性を維持 |
+| `sp-implementation` / `sp-integration` GLM-5.3 Flash | **Ollama Cloud Legacy** | 長時間実装をFlashで処理、Goへfallback |
+| `unspecified-high` GLM-5.3 Flash | **OpenCode Go** | Ollamaへの集中を抑える |
+| `quick` | **OpenAI Plus GPT-6 Luna** | 軽量taskを安定処理 |
+| Kimi K3 reserve / GLM-5.3 full（明示指定のみ） | **Ollama Cloud Legacy** | 自動ルーティング外で必要時だけ使用 |
 
 ### OCTG Sol (STANDARD) の利用方針
 
-OCTG の STANDARD pool は 1M tokens / UTC day と小さいため、すべての Sol workload の primary にはしません。一方で全経路を secondary にすると未使用のまま日次枠が失効しやすいため、**高価値・比較的低頻度の `ultrabrain` では OCTG Sol を primary のまま維持**します。
+OCTG の STANDARD pool は 1M tokens / UTC day と小さいため、すべての Sol workload の primary にはしません。一方で全経路を secondary にすると未使用のまま日次枠が失効しやすいため、**高価値・比較的低頻度の `ultrabrain` では OCTG Astra を primary とし、OCTG Sol を fallback として維持**します。
 
 高頻度で実装・テスト・修正を反復する Hephaestus は Plus Sol を primary とし、OCTG Sol は fallback にします。また `modelConcurrency` で OCTG Sol を 1 並列に制限し、巨大コンテキスト要求の同時 reservation を抑制します。
 
@@ -151,17 +159,18 @@ OCTG の STANDARD pool は 1M tokens / UTC day と小さいため、すべての
 
 | モデル | 主な役割 |
 | :--- | :--- |
-| **Kimi K2.7 Code** | Sisyphus / Prometheus / Metis / Atlas の主力オーケストレーション。Sisyphus / Atlas は Ollama、Prometheus / Metis は Go、`writing` は Sakura を primary として provider を固定分散。 |
-| **Kimi K3** | 高負荷汎用タスクの premium orchestration reserve。Ollama Legacy primary。 |
-| **GLM-5.3 Flash** | default agentic coding。`deep` は Ollama primary、`unspecified-high` は GOAT primary として負荷分散。 |
-| **GLM-5.3 full** | premium open coding / long-horizon escalation。Ollama Legacy を primary provider にして Go / GOAT の狭い5.3枠への依存を抑える。 |
-| **GLM-5.2** | quota / compatibility hedge。通常の category chain からは外し、preferred direct alias は GOAT に向ける。 |
-| **DeepSeek V4 Flash** | 高ボリューム探索・調査・utility work。`quick` は GOAT primary、`unspecified-low` は Ollama primary。 |
+| **Kimi K2.7 Code** | Sisyphus / Prometheus / Metis / Atlas の主力オーケストレーション。Ollama / Go / Sakura に分散（GOAT除外）。 |
+| **Kimi K3** | premium orchestration reserve。Ollama Legacyで明示利用（自動chainには置かない）。 |
+| **GLM-5.3 Flash** | `sp-implementation` と `sp-integration` を含むagentic codingの標準。Ollama / Goで実行。 |
+| **GLM-5.3 full** | **手動指定のみ**。料金・quota効率の悪化を避け、agent/categoryのPrimaryとFallbackには配置しない。カタログ `glm-53` は維持。 |
+| **DeepSeek V4.1 Flash** | `sp-mechanical` / `sp-review` / `quick` 等。Go / Ollamaに分散。 |
+| **GLM-5.2** | GOAT停止中はカタログから除外。代替の実経路を確認後に再登録を検討。 |
 
+GLM-5.3 fullを明示する場合は、OmO v4.19.4 のalias解決不整合を避けて `cloudflare-ai-gateway-custom/custom-ollama-cloud/glm-5.3` を直接指定します。
 Dynamic Routing が復旧したら、provider fallback は `cf-ai-gw-dynamic-routing` へ戻し、OmO は再び logical model 選択だけを担当させます。
 
 ---
-*Updated: 2026-10-01*
+*Updated: 2026-10-12 (GOAT一時退避 / GLM-5.3 Flash統一)*
 
 ## 5. 環境の切り替え (Switching Environments)
 
