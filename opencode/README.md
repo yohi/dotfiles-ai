@@ -88,6 +88,18 @@ Sisyphus（監督）は、タスクの性質に応じて最適な「知能カテ
 | **Momus** | `ultrabrain` | `cloudflare-ai-gateway-octg/gpt-5.6-terra` | 計画レビュアー。Prometheusが作成した計画の厳格な検証。 |
 | **Atlas** | `ultrabrain` | Ollama Cloud Kimi K2.7 → Sakura K2.7 → OpenCode Go K2.7 | 現場監督。環境管理、Todo項目の体系的な管理と調整。 |
 
+### モデルカタログ運用（2026-10-19）
+
+- **Go / Console Free を分離**: `opencode-go/<id>` は Go の契約内モデル、`opencode/<id>` は Console の別枠（従量課金モデルと期間限定 Free）。同名モデルもAPI/契約は別。
+- **Go の候補**: Kimi K2.7 / K3、GLM-5.3 Flash、DeepSeek V4.1 Flash。LongCat 2.5 Preview Free、MiniMax M3.1 Flash Free、Beam Free は期間限定の手動選択候補としてのみ登録。
+- **Console Free の候補**: GLM-5.3 Flash Free、DeepSeek V4.1 Flash Free、MiniMax M3.1 Flash Free、LongCat 2.5 Preview Free。2026-10-19 時点の公式情報で無料・ゼロ保持・学習不使用のモデルだけを登録。自動ルーティングには入れない。
+- **監視のみ**: MiMo / Nemotron / stealth Free 等はデータ利用条件の相違から利用カタログに追加しない。
+- **退避・廃止**: CommandCode GOAT は利用枠回復までカタログから退避。未使用の AIHubMix / ZenMax / TokenRouter / NVIDIA Custom / OpenRouter Free の定義を削除。Dynamic Routing は無効のまま維持し、未検証の Free Route を除去。
+- **請求上の注意**: `Free` というモデル名やホワイトリストだけで無料継続・課金 fail-closed は保証されない。Console の自動チャージ、Go の Extra usage は別途確認して無効化する。
+- **ログとルーティング**: `cf-aig-collect-log-payload: "true"`、Agent / Category / Fallback、Justice mandatory review、Work プロファイルは変更しない。
+
+公式: [OpenCode Console Models](https://dev.opencode.ai/v2/docs/console/models) / [OpenCode Go](https://dev.opencode.ai/v2/docs/console/go)
+
 ## 4. LLMモデル選択のベストプラクティス
 
 エージェントの能力を最大限に引き出すためには、エージェントの思考スタイルに合った「脳（モデルファミリー）」を割り当てることが重要です。

@@ -891,6 +891,20 @@
     "deepseek-v41-flash": {
       "model": "cloudflare-ai-gateway-custom/custom-opencode-go/deepseek-v4.1-flash"
     },
+    // Console Free (native opencode provider; manual selection only).
+    // ZDR / no-training per official Console docs as of 2026-10-19.
+    "console-free-glm-53-flash": {
+      "model": "opencode/glm-5.3-flash-free"
+    },
+    "console-free-deepseek-v41-flash": {
+      "model": "opencode/deepseek-v4.1-flash-free"
+    },
+    "console-free-minimax-m31-flash": {
+      "model": "opencode/minimax-m3.1-flash-free"
+    },
+    "console-free-longcat-25": {
+      "model": "opencode/longcat-2.5-preview-free"
+    },
     "kimi-k26": {
       "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.6"
     },
