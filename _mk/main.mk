@@ -1,22 +1,6 @@
-.PHONY: all install install-agents install-ides setup setup-agents setup-ides link clean-internal install-requirements lint init sync secrets status clean test clean-legacy configure-git-ignore doctor apm-install install-apm
+.PHONY: all install install-agents install-ides setup setup-agents setup-ides link clean-internal install-requirements lint init sync secrets status clean test clean-legacy configure-git-ignore doctor
 
 UV_VERSION ?= 0.11.19
-
-# --- APM Entry Point ---
-apm-install: sync-codex-apm-seed ## APM install と全設定の同期を実行
-	$(Q_ECHO) "📦 APM install を実行中..."
-	@apm install
-	$(Q_ECHO) "🔄 opencode.jsonc を生成中..."
-	@$(MAKE) sync-opencode
-	$(Q_ECHO) "🔄 エージェントを同期中..."
-	@$(MAKE) sync-agents
-	$(Q_ECHO) "🔗 MCP設定を同期中..."
-	@$(MAKE) sync-mcp
-	$(Q_ECHO) "📝 .env 雛形を確認中..."
-	@$(MAKE) setup-apm-env
-	$(Q_ECHO) "🔗 OpenCode 設定を適用中..."
-	@$(MAKE) setup-opencode
-	$(Q_ECHO) "✅ APM install と全設定の同期が完了しました"
 
 # --- Standard Entry Points ---
 all: install setup ## [完全セットアップ] インストール、環境構築、エージェント/IDE/MCPの設定をすべて行う

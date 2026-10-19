@@ -54,13 +54,68 @@ Portal側には、次のリモート上流MCPを登録して集約します。
 | grep.app | `https://mcp.grep.app` | GitHubコード検索 |
 | Greptile | `https://api.greptile.com/mcp` | コードレビュー・解析 |
 | GitHub Official | `https://api.githubcopilot.com/mcp/` | GitHub連携 |
-| AWS Managed | `https://aws-mcp.us-east-1.api.aws/mcp?oauth=initialize` | AWS連携 |
+| AWS Managed（Portal経由、us-east-1） | `https://aws-mcp.us-east-1.api.aws/mcp?oauth=initialize` | AWS連携 |
 | Sentry Remote | `https://mcp.sentry.dev/mcp` | Sentry連携 |
 
 上流の登録、認証、`Ready` 状態の確認はCloudflare Dashboardで行います。ExaはPortalのCustom Headersに `x-api-key` を設定します。APIキーやOAuthシークレットはこのリポジトリへ記載しません。
 Portalの仕様は [MCP server portals](https://developers.cloudflare.com/cloudflare-one/access-controls/ai-controls/mcp-portals/)、保護設定は [Secure MCP servers](https://developers.cloudflare.com/cloudflare-one/access-controls/ai-controls/secure-mcp-servers/)、内部アプリ連携は [Linked Apps](https://developers.cloudflare.com/cloudflare-one/access-controls/ai-controls/linked-apps/) を参照します。
 `optimize_context=search_and_execute` は別機能のContext optimizationであり、Code Modeの指定には使用しません。
-GitHub Official、Greptile、AWS Managed、Sentry RemoteのAPM直接接続は無効化し、Portal経由に統一します。
+GitHub Official、Greptile、Sentry RemoteはPortal経由に統一します。AWS Managedのみ、Portal経由（us-east-1）に加え、東京リージョン（ap-northeast-1）のSTS/SigV4直接接続（`aws-mcp`）もAPMに登録しています。
+
+---
+
+### AWS管理型MCP（SigV4 / STS）
+
+`apm.yml` の `aws-mcp` は、AWSが運用する管理型MCPへ
+`mcp-proxy-for-aws-cli==1.7.0` から接続します。
+旧 `awslabs.aws-api-mcp-server` は使用しません。東京のエンドポイント
+`https://aws-mcp.ap-northeast-1.api.aws/mcp` に接続し、
+API実行リージョンは `--metadata AWS_REGION=ap-northeast-1` で指定します。
+
+MCPの資格情報は **`aws login --remote` → STS AssumeRole →
+ReadOnlyAccess Session Policy → SigV4** の順に取得・使用します。
+長期IAMアクセスキーは不要です。ARNや認証情報を公開リポジトリに固定しないでください。
+
+1. AWS CLI v2で `aws login --remote --profile signin` を実行します。
+   `~/.aws/config` に `[profile signin]` と `login_session` が必要です。
+2. **ローカルの** `~/.aws/config` に以下を追記します。
+   スクリプトのパスとロールARNは実際の値に置き換えてください。
+   `credential_process` は `${VAR}` を展開しません。
+
+   ```ini
+   [profile aws-mcp-readonly]
+   region = ap-northeast-1
+   credential_process = python3 /absolute/path/to/dotfiles-ai/_scripts/aws-mcp-sts-credentials.py --source-profile signin --role-arn arn:aws:iam::111122223333:role/EXISTING_READONLY_ROLE
+   ```
+
+3. `aws sts get-caller-identity --profile aws-mcp-readonly` を実行し、
+   ロールを引き受けられることを確認します。この操作は権限制限の証明ではありません。
+4. `make sync-mcp` でAPM設定を同期し、`opencode mcp list` で
+   `aws-mcp` が接続できるか確認します。
+
+`_scripts/aws-mcp-sts-credentials.py` はSTS AssumeRole時に
+`arn:aws:iam::aws:policy/ReadOnlyAccess` をSession Policyとして指定します。
+ロールの信頼ポリシーと呼び出し元のAssumeRole権限が必要です。
+同ヘルパーはCLI v2の `login_session` に依存します。
+`mcp-proxy-for-aws-cli` は旧AWS API MCPと異なり、
+`awscli==1.46.0` を内部依存として追加しません。
+ただしホストのPATHでCLI v2を選択できることを実環境で確認してください。
+
+**読み取り制限について:** 汎用のAWS API呼び出しに必要な
+`aws___run_script` は書き込み可能ツールとして扱われ得るため、
+プロキシの `--read-only` は付けていません。これは読み取り専用の
+動作が証明されたことを意味しません。AWS側の権限制限は
+**必須のSTS Session Policy** に依存します。
+人間承認なしの書き込み実行は認可しません。
+AWS CLIプロファイルの外部変更や実効権限については別途検証が必要です。
+
+`AWS_MCP_PROXY_PROFILES=aws-mcp-readonly` で使用可能なプロファイルを
+明示的に一つへ制限しています。AWS管理型MCPはCloudflare MCP Portalの
+上流にも登録済みであり、この直接接続とは**別経路**です。重複ツールが
+生じ得るため、利用する経路を統一してください。
+
+**重要:** このリポジトリの変更は設定とオフライン検証のみです。
+AWS接続、ロール引受け成功、実効的なNo-Writeはいずれも未検証です。
 
 ---
 
@@ -79,15 +134,13 @@ GitHub Official、Greptile、AWS Managed、Sentry RemoteのAPM直接接続は無
   - APM 経由で有効にする MCP サーバーの唯一の定義元です。
   - `dependencies.mcp` に記載した全サーバーが APM の設定対象になります。
 - **対象ランタイム (`targets:`)**:
-  - `opencode`, `codex`, `antigravity` を同じ APM インストールで同期します。
-  - これらを `--target` で別々にインストールすると、APMのstale cleanupが
-    別ターゲットの設定を削除するため、必ず一括で同期してください。
+  - `opencode`, `codex` を同じ APM インストールで同期します。
+  - Antigravity は APM CLI の仕様上 explicit-only ターゲットのため、`apm compile --target antigravity` で明示的に生成されます。
 - **`mcp/optional-servers.yaml`**:
   - 有効化していないサーバーの参照用カタログです。APM はこのファイルを読みません。
   - サーバーを有効化するときは、エントリを `apm.yml` に移してください。
 - **自動生成されるファイル**:
-  - `make sync-mcp` は `apm.yml` の `targets:` にあるOpenCode、Codex、
-    Antigravityを一括で更新します。
+  - `make sync-mcp` は `apm.yml` の `targets:` にあるOpenCode、Codexを一括で更新します。
   - APMプロジェクト出力はOpenCodeの `opencode.json`、Codexの
     `.codex/config.toml`、Antigravity CLIの `.agents/mcp_config.json` です。
   - `opencode/opencode.jsonc` は同じ `apm.yml` から生成されるOpenCode用の
@@ -157,7 +210,7 @@ APM によって直接管理されます。
 ## 4. メンテナンスコマンド
 
 - **`make sync-mcp`**: `apm install` を実行し、`apm.yml` の定義に基づいて
-  `targets:` にあるOpenCode、Codex、Antigravityのプロジェクト設定を一括同期。
+  `targets:` にあるOpenCode、Codexのプロジェクト設定を一括同期（Antigravity は個別生成）。
 - **`make sync-claude-apm-mcp`**: `apm.yml` をユーザースコープのAPM manifestとして
   参照し、Claude CodeのグローバルMCPを同期。
 - **`make setup-claude`**: Claude用の設定適用時に、上記のユーザースコープ同期も実行。

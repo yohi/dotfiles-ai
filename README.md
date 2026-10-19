@@ -129,9 +129,8 @@ Single Source of Truth (SSOT) です。
 直接管理します。サーバー定義の変更は `apm.yml` に行い、生成済み設定を
 直接編集しないでください。
 
-- `make sync-mcp` は `apm.yml` の `targets:` で宣言した OpenCode、Codex、
-  Antigravity の設定を一括同期します。ターゲットを個別に順番にインストール
-  すると、APMのstale cleanupが別ターゲットの設定を消すため、一括同期します。
+- `make sync-mcp` は `apm.yml` の `targets:` で宣言した OpenCode、Codex
+  の設定を一括同期します（Antigravity は `apm compile --target antigravity` で明示的に生成）。
 - Claude CodeのグローバルMCPは `make setup-claude` がAPMユーザースコープで同期します。
 
 詳しい同期範囲と運用手順は [MCP ガイド](mcp/README.md) と
@@ -155,7 +154,8 @@ Single Source of Truth (SSOT) です。
 - **役割**: AI エージェントが利用する各種ツール（ファイルシステム、データベース、
   GitHub、AWS、Sentry 等）を標準的な MCP 経由で提供します。
 - **設定の同期**: `make sync-mcp` は `apm.yml` の `targets:` にある
-  OpenCode、Codex、Antigravity を同期します。Claude CodeのグローバルMCPは
+  OpenCode、Codex を同期します。Antigravity は `apm compile --target antigravity` で
+  明示的に生成されます。Claude CodeのグローバルMCPは
   `make setup-claude` がAPMのユーザースコープで更新します。
 - **Gemini CLI**: APMの標準同期対象外のため、Gemini用設定は専用の同期手順を使います。
 

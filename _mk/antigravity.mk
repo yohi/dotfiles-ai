@@ -54,9 +54,9 @@ sync-antigravity: sync-codex-apm-seed ## APMを使用してAntigravity用の設�
 	@echo "🔄 Generating Antigravity MCP config using APM..."
 	@if [ -f ".env" ]; then \
 		set -a; . ./.env; set +a; \
-		$(APM_COMMAND) install --root "$(ANTIGRAVITY_APM_ROOT)"; \
+		$(APM_COMMAND) install --target antigravity --root "$(ANTIGRAVITY_APM_ROOT)"; \
 	else \
-		$(APM_COMMAND) install --root "$(ANTIGRAVITY_APM_ROOT)"; \
+		$(APM_COMMAND) install --target antigravity --root "$(ANTIGRAVITY_APM_ROOT)"; \
 	fi
 	@$(MAKE) setup-skill-adapters
 	@$(APM_COMMAND) compile --target antigravity --root "$(ANTIGRAVITY_APM_ROOT)"
@@ -65,9 +65,9 @@ sync-antigravity: sync-codex-apm-seed ## APMを使用してAntigravity用の設�
 sync-antigravity-mcp: sync-codex-apm-seed ## Antigravity 向けMCPをAPMから生成
 	@if [ -f ".env" ]; then \
 		set -a; . ./.env; set +a; \
-		$(APM_COMMAND) install --only mcp --root "$(ANTIGRAVITY_APM_ROOT)"; \
+		$(APM_COMMAND) install --only mcp --target antigravity --root "$(ANTIGRAVITY_APM_ROOT)"; \
 	else \
-		$(APM_COMMAND) install --only mcp --root "$(ANTIGRAVITY_APM_ROOT)"; \
+		$(APM_COMMAND) install --only mcp --target antigravity --root "$(ANTIGRAVITY_APM_ROOT)"; \
 	fi
 
 # Antigravityの設定を同期

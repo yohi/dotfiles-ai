@@ -65,6 +65,6 @@ def test_antigravity_sync_installs_project_mcp_before_linking_global_config(
     assert backups[0].resolve() == custom_config.resolve()
     apm_args = apm_call_log.read_text(encoding="utf-8")
     assert "--only mcp" in apm_args
-    assert "--target" not in apm_args
+    assert "--target antigravity" in apm_args
     installed_config = json.loads(mcp_config.read_text(encoding="utf-8"))
     assert "registry-server" in installed_config["mcpServers"]

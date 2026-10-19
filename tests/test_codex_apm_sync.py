@@ -71,7 +71,9 @@ def test_setup_codex_preserves_existing_config_and_links_apm_output(
 
 def test_apm_manifest_targets_cover_linked_mcp_clients() -> None:
     manifest = yaml.safe_load((REPO_ROOT / "apm.yml").read_text(encoding="utf-8"))
-    assert {"opencode", "codex", "antigravity"}.issubset(set(manifest["targets"]))
+    assert {"opencode", "codex"}.issubset(set(manifest["targets"]))
+    # antigravity is explicit-only in apm-cli (triggers UnknownTargetError if declared in apm.yml targets)
+    assert "antigravity" not in manifest["targets"]
 
 
 def test_setup_codex_backs_up_a_conflicting_config_symlink(tmp_path: Path) -> None:

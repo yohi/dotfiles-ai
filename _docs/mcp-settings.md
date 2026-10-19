@@ -6,9 +6,8 @@
 
 ## 同期方法
 
-`make sync-mcp` は `apm.yml` の `targets:` に宣言された OpenCode、Codex、
-Antigravity を1回のAPMインストールで同期します。APMのstale cleanupにより
-別ターゲットの設定が消えないよう、これらをターゲットごとに別々にインストールしません。
+`make sync-mcp` は `apm.yml` の `targets:` に宣言された OpenCode、Codex
+を一括で同期します（Antigravity は `apm compile --target antigravity` で明示的に生成）。
 
 ```bash
 make sync-mcp
