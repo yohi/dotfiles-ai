@@ -145,6 +145,14 @@ Work では Claude Fable 5.1 をモデルカタログに登録し、Claude Opus 
 | Claude Sonnet 5.5 | `amazon-bedrock/global.anthropic.claude-sonnet-5-5` | 主力実装・汎用作業 |
 | Claude Haiku 4.5 | `amazon-bedrock/global.anthropic.claude-haiku-4-5-20251001-v1:0` | 高速検索・軽量作業 |
 
+### Work Fallback の明示的なBedrock-only制約
+
+OmO v4.19.4のruntime fallbackは、`models` だけでなく `fallback_models` の明示指定が必要な実行経路を含む。Workの8カテゴリー（`ultrabrain`、`deep`、`quick`、`writing`、`unspecified-low`、`unspecified-high`、`visual-engineering`、`artistry`）について `fallback_models = models[1:]` を補完する。これにより全15カテゴリーで **Bedrock-only** の順序を固定する。personalへのProvider越境を許さない。
+
+モデル選択・Primary・Fallback順序は変更しない。実運用上の429認識・Fallback逆行・Goの `x-opencode-session` 伝播は独立に検証する。ログ保持、GOAT一時退避、GLM-5.3 full手動運用、Console Free手動運用、Justice mandatory reviewのPinは維持する。
+
+参考: https://github.com/code-yeongyu/oh-my-openagent/issues/6868 / https://dev.opencode.ai/v2/docs/console/go
+
 ### provider primary の固定分散
 
 Dynamic Routing 停止中は workload ごとに primary provider を固定します。2026-10-12 時点で Command Code GOAT は週間枠 100%（月間 86%）に達しているため、**すべての自動経路から退避**しています。利用枠回復後も GLM-5.3 full は戻さず、モデル別消費状況を確認してから GOAT の復帰を判断します。

@@ -1216,6 +1216,12 @@
                 // "model": "sonnet",
                 "model": "amazon-bedrock/global.anthropic.claude-sonnet-5-5"
               }
+            ],
+            // Explicit Bedrock-only runtime fallback (OmO v4.19.4).
+            "fallback_models": [
+              {
+                "model": "amazon-bedrock/global.anthropic.claude-sonnet-5-5"
+              }
             ]
           },
 
@@ -1231,6 +1237,12 @@
               },
               {
                 // "model": "sonnet",
+                "model": "amazon-bedrock/global.anthropic.claude-sonnet-5-5"
+              }
+            ],
+            // Explicit Bedrock-only runtime fallback (OmO v4.19.4).
+            "fallback_models": [
+              {
                 "model": "amazon-bedrock/global.anthropic.claude-sonnet-5-5"
               }
             ]
@@ -1249,6 +1261,12 @@
                 // "model": "sonnet",
                 "model": "amazon-bedrock/global.anthropic.claude-sonnet-5-5"
               }
+            ],
+            // Explicit Bedrock-only runtime fallback (OmO v4.19.4).
+            "fallback_models": [
+              {
+                "model": "amazon-bedrock/global.anthropic.claude-sonnet-5-5"
+              }
             ]
           },
 
@@ -1265,6 +1283,12 @@
                 // "model": "haiku",
                 "model": "amazon-bedrock/global.anthropic.claude-haiku-4-5-20251001-v1:0"
               }
+            ],
+            // Explicit Bedrock-only runtime fallback (OmO v4.19.4).
+            "fallback_models": [
+              {
+                "model": "amazon-bedrock/global.anthropic.claude-haiku-4-5-20251001-v1:0"
+              }
             ]
           },
 
@@ -1279,6 +1303,12 @@
               },
               {
                 // "model": "haiku",
+                "model": "amazon-bedrock/global.anthropic.claude-haiku-4-5-20251001-v1:0"
+              }
+            ],
+            // Explicit Bedrock-only runtime fallback (OmO v4.19.4).
+            "fallback_models": [
+              {
                 "model": "amazon-bedrock/global.anthropic.claude-haiku-4-5-20251001-v1:0"
               }
             ]
@@ -1298,6 +1328,12 @@
                 // "model": "sonnet",
                 "model": "amazon-bedrock/global.anthropic.claude-sonnet-5-5"
               }
+            ],
+            // Explicit Bedrock-only runtime fallback (OmO v4.19.4).
+            "fallback_models": [
+              {
+                "model": "amazon-bedrock/global.anthropic.claude-sonnet-5-5"
+              }
             ]
           },
 
@@ -1315,6 +1351,12 @@
                 // "model": "sonnet",
                 "model": "amazon-bedrock/global.anthropic.claude-sonnet-5-5"
               }
+            ],
+            // Explicit Bedrock-only runtime fallback (OmO v4.19.4).
+            "fallback_models": [
+              {
+                "model": "amazon-bedrock/global.anthropic.claude-sonnet-5-5"
+              }
             ]
           },
 
@@ -1329,6 +1371,12 @@
               },
               {
                 // "model": "haiku",
+                "model": "amazon-bedrock/global.anthropic.claude-haiku-4-5-20251001-v1:0"
+              }
+            ],
+            // Explicit Bedrock-only runtime fallback (OmO v4.19.4).
+            "fallback_models": [
+              {
                 "model": "amazon-bedrock/global.anthropic.claude-haiku-4-5-20251001-v1:0"
               }
             ]
