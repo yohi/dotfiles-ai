@@ -265,6 +265,9 @@
     // until Dynamic Routing can safely be re-enabled.
     // =========================================================================
     "agents": {
+      // OmO公式のKimi K2.7対応を優先。長いTodo階層・委譲・ツール連携向け。
+      // 高頻度でもLunaへ置換しない。Ollama週次 → Sakura → Go月次。
+      // 論理alias: kimi-k27。ultraworkのみPlus Sol/highへ昇格。
       "sisyphus": {
         "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.7-code",
         "fallback_models": [
@@ -276,6 +279,8 @@
           "reasoning": "high"
         }
       },
+      // GPT-nativeの深い自律実装。OmOのSol系推奨に合わせPlus Sol/high。
+      // OCTG STANDARD Sol/highはPlus障害時のみ使う緊急Fallback。
       "hephaestus": {
         "disable": false,
         "model": "openai/gpt-6.1-sol",
@@ -287,6 +292,8 @@
           }
         ]
       },
+      // 設計判断・難解バグ相談の独立専門家。公式のSol/xhigh推奨に従う。
+      // 異なる推論系統のGemini Pro/highを代替に配置する。
       "oracle": {
         "model": "openai/gpt-6.1-sol",
         "reasoning": "xhigh",
@@ -297,6 +304,8 @@
           }
         ]
       },
+      // 外部資料・OSSコード検索。公式Luna Fast系に合わせPlus Luna/low。
+      // 大量検索にmaxを常用せず、Ollama DeepSeek/lowで補完。
       "librarian": {
         "model": "openai/gpt-6-luna",
         "reasoning": "low",
@@ -307,6 +316,8 @@
           }
         ]
       },
+      // コード探索・grep等の高頻度Utility。Plus Luna/lowを使用。
+      // Ollama DeepSeek/lowへ退避し、月次Goを温存する。
       "explore": {
         "model": "openai/gpt-6-luna",
         "reasoning": "low",
@@ -317,6 +328,8 @@
           }
         ]
       },
+      // 図・画像・PDF解析。公式GPT Sol/lowをPrimaryに置く。
+      // Gemini Pro/highをFallbackにし、媒体対応は実行時検証する。
       "multimodal-looker": {
         "model": "openai/gpt-6.1-sol",
         "reasoning": "low",
@@ -327,26 +340,37 @@
           }
         ]
       },
+      // Justice Review GateのController。Plus Sol/highを明示的に固定。
+      // command pinを含むGateの失敗をモデル障害でPASS扱いしない。
       "justice-review-controller": {
         "model": "openai/gpt-6.1-sol",
         "reasoning": "high"
       },
+      // Justice実査Worker。Plus Sol/highを明示的に固定。
+      // 実ランタイムのGate/証拠検証とモデルPinは独立の要件。
       "justice-review-worker": {
         "model": "openai/gpt-6.1-sol",
         "reasoning": "high"
       },
+      // 計画立案Agent。公式のClaude Fable/Kimi K3系を参考にする。
+      // K2.7は同系統の代替（K3同等の検証済みモデルではない）。
+      // 週次Ollamaを主系にし、月次GoはFallbackとして温存。
       "prometheus": {
         "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.7-code",
         "fallback_models": [
           "cloudflare-ai-gateway-custom/custom-opencode-go/kimi-k2.7-code"
         ]
       },
+      // 計画の曖昧さ・リスクを分析する低頻度・高価値Agent。
+      // 公式Claude Opus/Kimi K3系。Go K2.7を限定的に使用。
       "metis": {
         "model": "cloudflare-ai-gateway-custom/custom-opencode-go/kimi-k2.7-code",
         "fallback_models": [
           "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.7-code"
         ]
       },
+      // 計画の独立レビュー。公式のGPT Terra/high系を採用。
+      // OCTG MINI Terra → Plus Sol/xhighで品質を確保。
       "momus": {
         "model": "cloudflare-ai-gateway-octg/gpt-5.6-terra",
         "reasoning": "high",
@@ -357,6 +381,8 @@
           }
         ]
       },
+      // Todo管理・実行調整のオーケストレーション。Claude/Kimi系適性。
+      // Ollama K2.7を維持し、Sakura → 月次Goの順に退避。
       "atlas": {
         "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.7-code",
         "fallback_models": [
@@ -378,14 +404,45 @@
     },
 
     // =========================================================================
-    // Base Categories (personal profile)
-    // AgentはOmO v4.19.4公式推奨ファミリーを重視、CategoryはPlus Luna/maxを実装主力にする。
-    // Ollamaは週次枠を積極利用し、Go・GOATは月次枠を温存する。
-    // OCTG STANDARD（Astra/Sol/Luna共有の小容量枠）をPrimaryに置かない。
-    // GOAT（カタログ維持）、Kimi K3、GLM-5.3 full、Console Freeは自動経路に配置しない。
-    // mandatory sp-final-reviewはPlus Sol/max固定で、自動降格しない。
-    // OmO v4.19.4 の models[1:] と fallback_models は同じ順序・reasoningを維持する。
+    // =========================================================================
+    // Base Categories (デフォルト: personal 構成)
+    //
+    // 【モデル適性と利用枠の分離】
+    // - AgentはOmO v4.19.4のモデルファミリー適性・プロンプト調整を優先。
+    //   Sisyphus / Atlas: Claude/Kimi系、Hephaestus / Oracle: GPT Sol系。
+    //   Librarian / Explore: 高速Luna系、Momus: GPT Terra系を使用する。
+    // - Categoryの通常実装はPlus Luna/maxを主力にしPlus利用枠を活用。
+    //   ただしdeep / ultrabrain / mandatory final-reviewはPlus Solを優先。
+    // - Ollama Cloud Legacyは週次、OpenCode GoとCommandCodeは月次のquota。
+    //   週次Ollamaは積極利用。月次GoはMetisや障害時の予備に温存。
+    // - OCTG STANDARDはAstra/Sol/Luna共有の小容量pool（設定上1M/day）。
+    //   Category Primaryに使わず、Hephaestusの緊急Fallbackに限定する。
+    //   同pool枯渇ならAstra→Solでも回復しない可能性が高い。
+    // - OCTG MINI Terraは別pool（設定上10M/day）で調査・評価に使う。
+    // - Kimi/GLM/DeepSeekはCloudflare Custom Provider、GeminiはGoogle
+    //   AI StudioをGateway経由で使用する。Dynamic Routesは停止継続。
+    // - Kimi K3 / GLM-5.3 full / Console Free / GOATは自動経路から除外。
+    //   手動用のモデルカタログ定義は維持し、停止と廃止を区別する。
+    // - OmO v4.19.4のruntime fallbackにはfallback_models参照経路あり。
+    //   Categoryのmodels[1:]とfallback_modelsはmodel/reasoning/順序一致。
+    // - Justiceが決めるのはsemantic category。Provider/model/fallbackの
+    //   選択はOmO側の責務だが、Gate判定や承認権限はモデルへ移管しない。
+    // - workload role / subscription quota / provider diversity /
+    //   mandatory gate impactを検証して変更する。
+    // =========================================================================
     "categories": {
+      // -----------------------------------------------------------------------
+      // Justice / Superpowers semantic worker categories
+      //
+      // Justice v4.1.0 が決定するのはsemantic categoryまで。
+      // 実際のmodel/provider/reasoning/fallback順序はOmO側の責務。
+      // 高頻度の実装とmandatory reviewではモデル系統を分離する。
+      // review失敗はTaskAccepted / PlanCompleteを止め得るため、
+      // 障害時の自動昇格・降格には必須Gateへの影響を考慮する。
+      // モデルPinは実行証明・合格判定を保証するものではない。
+      // -----------------------------------------------------------------------
+      // 定型・低リスク・高頻度（rename / typo / config / test-only）。
+      // 月次Goは使わず、Plus Luna/low → Ollama DeepSeek/low。
       "sp-mechanical": {
         "model": "openai/gpt-6-luna",
         "models": [
@@ -405,6 +462,10 @@
           }
         ]
       },
+      // 通常のTDD実装・反復agentic coding。
+      // Plus Luna/maxをPrimaryにし、Ollama GLM Flash/highで補完。
+      // さらにPlus Sol/highへ昇格し、月次Go GLM/highは最後に使用。
+      // GLM-5.3 fullは自動投入しない。
       "sp-implementation": {
         "model": "openai/gpt-6-luna",
         "models": [
@@ -440,6 +501,9 @@
           }
         ]
       },
+      // 複数module / API / state / concurrency / async / migrationの統合。
+      // Plus Luna/max → Ollama GLM Flash/high → Plus Sol/high。
+      // 最後のGo GLM Flash/highのみ月次枠を消費する。
       "sp-integration": {
         "model": "openai/gpt-6-luna",
         "models": [
@@ -475,6 +539,8 @@
           }
         ]
       },
+      // research / investigate / deep reasoningを担当。
+      // OCTG MINI Terra/high → Plus Sol/high。STANDARDは使わない。
       "sp-deep": {
         "model": "cloudflare-ai-gateway-octg/gpt-5.6-terra",
         "models": [
@@ -494,6 +560,9 @@
           }
         ]
       },
+      // architecture / design system / 高影響設計判断。
+      // 小容量STANDARDのAstraを外し、Plus Luna/maxをPrimaryにする。
+      // Plus Sol/maxへ昇格後、Terra/highは品質降格に注意した保険。
       "sp-architecture": {
         "model": "openai/gpt-6-luna",
         "models": [
@@ -521,6 +590,9 @@
           }
         ]
       },
+      // Task単位のmandatory review。実装側Lunaと異なる系統のDeepSeek/max。
+      // Ollama → Plus Sol/high → 月次Go DeepSeek/maxの順に退避。
+      // Review失敗はTaskAcceptedを止め得る。失敗をPASSと扱わない。
       "sp-review": {
         "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/deepseek-v4.1-flash",
         "models": [
@@ -548,6 +620,10 @@
           }
         ]
       },
+      // Plan / branch全体のmandatory final review。
+      // コストより見落とし・false negative低減を優先する。
+      // Plus Sol/maxのみ。Fallback無しで障害時の自動降格を認めない。
+      // Gate判定/証拠のruntime検証は別途必要。
       "sp-final-review": {
         "model": "openai/gpt-6.1-sol",
         "models": [
@@ -558,6 +634,8 @@
         ],
         "fallback_models": []
       },
+      // 最上位推論・複雑な設計/監査。公式のGPT Sol系を尊重。
+      // Plus Sol/max → OCTG MINI Terra/high（降格に注意）。
       "ultrabrain": {
         "model": "openai/gpt-6.1-sol",
         "models": [
@@ -577,6 +655,8 @@
           }
         ]
       },
+      // 深い自律実装と難解バグ修正。公式のSol系推奨に合わせる。
+      // Plus Sol/high → OCTG MINI Terra/high。
       "deep": {
         "model": "openai/gpt-6.1-sol",
         "models": [
@@ -596,6 +676,8 @@
           }
         ]
       },
+      // 検索・軽微修正・プロトタイプ向け高速タスク。
+      // Plus Luna/low。失敗時は週次Ollama DeepSeek/low。
       "quick": {
         "model": "openai/gpt-6-luna",
         "models": [
@@ -615,6 +697,8 @@
           }
         ]
       },
+      // 文書・リリースノート・技術解説。公式Claude/Kimi系適性。
+      // Ollama Kimi K2.7 → Sakura → 月次Go。K2.7 Variant未指定。
       "writing": {
         "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.7-code",
         "models": [
@@ -637,6 +721,8 @@
           }
         ]
       },
+      // 専門用途に分類できない低負荷の汎用作業。
+      // Plus Luna/medium → Ollama DeepSeek/low。月次Goは温存。
       "unspecified-low": {
         "model": "openai/gpt-6-luna",
         "models": [
@@ -656,6 +742,9 @@
           }
         ]
       },
+      // 専門用途に分類できない高難度の汎用作業。
+      // Plus Luna/max → Ollama Kimi K2.7 → Plus Sol/high → Go K2.7。
+      // 最終レビュー/高リスク承認の代替にはしない。
       "unspecified-high": {
         "model": "openai/gpt-6-luna",
         "models": [
@@ -687,6 +776,9 @@
           }
         ]
       },
+      // UI/UX、CSS、画面構造の視覚系実装。
+      // 公式のClaude/Kimi推奨とは異なる意図的なGemini Pro/high例外。
+      // Ollama Kimi K2.7 → Plus Luna/maxへFallback。
       "visual-engineering": {
         "model": "cloudflare-ai-gateway/google-ai-studio/gemini-3.1-pro",
         "models": [
@@ -712,6 +804,8 @@
           }
         ]
       },
+      // 創作・アート・表現系。Claude/Kimi系との相性を重視。
+      // Ollama Kimi K2.7 → Sakura → Gemini Pro/high。
       "artistry": {
         "model": "cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.7-code",
         "models": [
