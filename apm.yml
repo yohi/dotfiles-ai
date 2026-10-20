@@ -703,6 +703,29 @@ provider:
         name: DeepSeek V4.1 Flash (OpenCode Go)
         variants: *deepseek_flash_variants
 
+      # CommandCode GOAT — catalog retained; auto-routing disabled in omo.jsonc.
+      # Temporary quota exhaustion affects agents/categories/fallback only.
+      custom-command-code/moonshotai/kimi-k2.6:
+        name: Kimi K2.6 (CommandCode)
+        variants: *kimi_k2_6_variants
+      custom-command-code/moonshotai/kimi-k2.7-code:
+        name: Kimi K2.7 Code (CommandCode)
+      custom-command-code/moonshotai/kimi-k3:
+        name: Kimi K3 (CommandCode)
+        variants: *kimi_k3_variants
+      custom-command-code/zai-org/glm-5.2:
+        name: GLM 5.2 (CommandCode)
+        variants: *glm_variants
+      custom-command-code/z-ai/glm-5.3-flash:
+        name: GLM 5.3 Flash (CommandCode)
+        variants: *glm_variants
+      custom-command-code/zai-org/glm-5.3:
+        name: GLM 5.3 (CommandCode)
+        variants: *glm_variants
+      custom-command-code/deepseek/deepseek-v4.1-flash:
+        name: DeepSeek V4.1 Flash (CommandCode)
+        variants: *deepseek_flash_variants
+
       # Sakura AI Engine
       custom-sakura-ai/preview/Kimi-K2.6:
         name: Kimi K2.6 (Sakura AI Engine)
