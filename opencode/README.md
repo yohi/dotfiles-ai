@@ -34,7 +34,7 @@ Cloudflare AI Gateway Dynamic Route
 
 ただし **Cloudflare Dynamic Routing は現在一時停止中**です。新規作成・再作成した Route が provider invocation 前に Error 2005 となる事象（`cloudflare/ai#611`）があり、さらに Dynamic Routing は Custom Providers をまだサポートしていません（`cloudflare/cloudflare-docs#29840`）。
 
-そのため `personal` では当面、Kimi / GLM / DeepSeek の同一モデル provider fallback を OmO の `models` / `fallback_models` で明示し、`cloudflare-ai-gateway-custom` の直結パスを使用します。provider primary は一律に Ollama へ寄せず、**workload 単位で Ollama Cloud Legacy / OpenCode Go / Sakura AI Engine に固定分散**します。GOAT は週間上限到達のため、Primary / Fallback / モデルカタログ参照から一時的に除外しています。これにより cache locality を保ちつつ、利用可能なサブスクリプションの利用枠を活用します。Gemini 3.1 Pro は Dynamic Route 定義と同じ Google AI Studio provider へ直接接続します。
+そのため `personal` では当面、Kimi / GLM / DeepSeek の同一モデル provider fallback を OmO の `models` / `fallback_models` で明示し、`cloudflare-ai-gateway-custom` の直結パスを使用します。provider primary は一律に Ollama へ寄せず、**workload 単位で Ollama Cloud Legacy / OpenCode Go / Sakura AI Engine に固定分散**します。GOAT は週間上限到達のため、Primary / Fallback から一時的に除外しています（モデルカタログ定義は維持し、手動選択は可能）。これにより cache locality を保ちつつ、利用可能なサブスクリプションの利用枠を活用します。Gemini 3.1 Pro は Dynamic Route 定義と同じ Google AI Studio provider へ直接接続します。
 
 Sisyphus-Junior は意図的に固定モデルを設定しません。category-routed task では、選択された category のモデルを引き継がせます。
 
@@ -87,6 +87,18 @@ Sisyphus（監督）は、タスクの性質に応じて最適な「知能カテ
 | **Metis** | `ultrabrain` | OpenCode Go Kimi K2.7 → Ollama K2.7 → Sakura K2.7 | 計画コンサル。計画前のリスク特定と曖昧さの排除。 |
 | **Momus** | `ultrabrain` | `cloudflare-ai-gateway-octg/gpt-5.6-terra` | 計画レビュアー。Prometheusが作成した計画の厳格な検証。 |
 | **Atlas** | `ultrabrain` | Ollama Cloud Kimi K2.7 → Sakura K2.7 → OpenCode Go K2.7 | 現場監督。環境管理、Todo項目の体系的な管理と調整。 |
+
+### モデルカタログ運用（2026-10-19）
+
+- **Go / Console Free を分離**: `opencode-go/<id>` は Go の契約内モデル、`opencode/<id>` は Console の別枠（従量課金モデルと期間限定 Free）。同名モデルもAPI/契約は別。
+- **Go の候補**: Kimi K2.7 / K3、GLM-5.3 Flash、DeepSeek V4.1 Flash。LongCat 2.5 Preview Free、MiniMax M3.1 Flash Free、Beam Free は期間限定の手動選択候補としてのみ登録。
+- **Console Free の候補**: GLM-5.3 Flash Free、DeepSeek V4.1 Flash Free、MiniMax M3.1 Flash Free、LongCat 2.5 Preview Free。2026-10-19 時点の公式情報で無料・ゼロ保持・学習不使用のモデルだけを登録。自動ルーティングには入れない。
+- **監視のみ**: MiMo / Nemotron / stealth Free 等はデータ利用条件の相違から利用カタログに追加しない。
+- **退避・廃止**: CommandCode GOAT はモデルカタログを維持し、利用枠回復まで自動ルーティングからのみ退避。未使用の AIHubMix / ZenMax / TokenRouter / NVIDIA Custom / OpenRouter Free の定義を削除。Dynamic Routing は無効のまま維持し、未検証の Free Route を除去。
+- **請求上の注意**: `Free` というモデル名やホワイトリストだけで無料継続・課金 fail-closed は保証されない。Console の自動チャージ、Go の Extra usage は別途確認して無効化する。
+- **ログとルーティング**: `cf-aig-collect-log-payload: "true"`、Agent / Category / Fallback、Justice mandatory review、Work プロファイルは変更しない。
+
+公式: [OpenCode Console Models](https://dev.opencode.ai/v2/docs/console/models) / [OpenCode Go](https://dev.opencode.ai/v2/docs/console/go)
 
 ## 4. LLMモデル選択のベストプラクティス
 
@@ -164,7 +176,7 @@ OCTG の STANDARD pool は 1M tokens / UTC day と小さいため、すべての
 | **GLM-5.3 Flash** | `sp-implementation` と `sp-integration` を含むagentic codingの標準。Ollama / Goで実行。 |
 | **GLM-5.3 full** | **手動指定のみ**。料金・quota効率の悪化を避け、agent/categoryのPrimaryとFallbackには配置しない。カタログ `glm-53` は維持。 |
 | **DeepSeek V4.1 Flash** | `sp-mechanical` / `sp-review` / `quick` 等。Go / Ollamaに分散。 |
-| **GLM-5.2** | GOAT停止中はカタログから除外。代替の実経路を確認後に再登録を検討。 |
+| **GLM-5.2** | GOAT側モデル定義は維持。自動ルーティングから除外し、必要時に手動選択。 |
 
 GLM-5.3 fullを明示する場合は、OmO v4.19.4 のalias解決不整合を避けて `cloudflare-ai-gateway-custom/custom-ollama-cloud/glm-5.3` を直接指定します。
 Dynamic Routing が復旧したら、provider fallback は `cf-ai-gw-dynamic-routing` へ戻し、OmO は再び logical model 選択だけを担当させます。
