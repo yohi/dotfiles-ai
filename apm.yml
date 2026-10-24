@@ -481,6 +481,10 @@ enabled_providers:
   - openai
   - cloudflare-ai-gateway
   - cloudflare-ai-gateway-custom
+  # BLOCKED (2026-10-18): free-model API returns FreeTierError HTTP 403
+  # on a synthetic unkeyed request outside the official OpenCode client.
+  # Keep the provider definition for investigation, but DO NOT enable it.
+  # - cloudflare-ai-gateway-opencode-free
   # TEMPORARY: Cloudflare AI Gateway Dynamic Routes are disabled because newly
   # created/recreated routes can fail before provider invocation (cloudflare/ai#611),
   # and Custom Providers are not supported by Dynamic Routing yet
@@ -772,7 +776,41 @@ provider:
         name: Kimi K3 Free (Nvidia)
         variants: *kimi_k3_variants
 
-  # 3. Cloudflare Dynamic Routes — TEMPORARILY DISABLED.
+  # 3. OpenCode Console FREE candidate — DISABLED / NOT DEPLOYABLE.
+  # The unkeyed upstream API returned FreeTierError (HTTP 403) on 2026-10-18.
+  # No automatic OR manual OpenCode route should use this provider until
+  # OpenCode explicitly supports external/API Gateway use, and a fresh
+  # authorized unkeyed smoke test succeeds. Do not spoof client identity.
+  # Cloudflare custom provider slug: opencode-free
+  # base_url (Cloudflare side): https://opencode.ai
+  # Expected upstream: https://opencode.ai/inference/openai/v1/chat/completions
+  # Do NOT configure a Console/Go API key, BYOK credential, or paid fallback on
+  # this Cloudflare Custom Provider. Free chat endpoints support no API key.
+  # A provider with stored credentials MUST NOT be used for this free-only path.
+  # Do not enable live routing until Cloudflare unkeyed passthrough and Console
+  # $0 budget / disabled auto-reload have been checked; see docs below.
+  cloudflare-ai-gateway-opencode-free:
+    npm: "@ai-sdk/openai-compatible"
+    name: "Cloudflare AI Gateway (OpenCode Free, manual only)"
+    options:
+      baseURL: "https://gateway.ai.cloudflare.com/v1/${env:OC_CF_ACCOUNT_ID}/${env:OC_CF_GATEWAY_ID}/custom-opencode-free/inference/openai/v1"
+      # No provider API key; free models only. Do not substitute a Go API key.
+      apiKey: ""
+      headers:
+        Authorization: ""
+        cf-aig-authorization: "Bearer ${env:OC_CF_API_TOKEN}"
+        cf-aig-collect-log-payload: "false"
+        cf-aig-max-attempts: "1"
+        cf-aig-skip-cache: "true"
+    models:
+      glm-5.3-flash-free:
+        name: GLM-5.3 Flash Free (OpenCode Console, trial)
+        variants: *glm_variants
+      deepseek-v4.1-flash-free:
+        name: DeepSeek V4.1 Flash Free (OpenCode Console, trial)
+        variants: *deepseek_flash_variants
+
+  # 4. Cloudflare Dynamic Routes — TEMPORARILY DISABLED.
   # Known Cloudflare issue: newly created/recreated routes may return Error 2005
   # before invoking an otherwise healthy provider (cloudflare/ai#611). Dynamic
   # Routing also does not support Custom Providers yet

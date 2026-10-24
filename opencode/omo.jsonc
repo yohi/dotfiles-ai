@@ -874,6 +874,9 @@
   //   workload単位のprovider primaryを完全修飾名で明示する。
   // ===========================================================================
   "models": {
+    // OpenCode Console Free models are not registered while external
+    // access is BLOCKED by FreeTierError (HTTP 403). Use the official
+    // OpenCode native provider in a separate test when authorized.
     // NOTE: kimi-k3 aliasは意図的に定義しない。
     // K3はautomatic routingから外しており、将来一時的に使う場合も
     // catalog alias経由ではなく完全修飾model IDを明示する。
