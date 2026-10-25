@@ -79,3 +79,12 @@ optional_mcp_servers:
     registry: false
     transport: sse
     url: "https://mcp.sentry.dev/mcp"
+
+  # Official Cloudflare API MCP: direct Code Mode, separate OAuth identity.
+  # Optional only. Do not add to dependencies.mcp without reviewing access
+  # scopes, per-client exposure, and overlapping Portal tools first.
+  - name: cloudflare-api-direct
+    title: "Cloudflare API MCP (Direct, Code Mode, OAuth)"
+    registry: false
+    transport: streamable-http
+    url: "https://mcp.cloudflare.com/mcp"

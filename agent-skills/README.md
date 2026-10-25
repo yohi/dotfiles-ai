@@ -12,6 +12,10 @@ SkillPort を利用することで、Cursor、VS Code、Claude Code などの異
 - **外部スキル**: `agent-skills/external/` に APM からインストールした外部 skill を配置します。
 - **管理ツール**: [skillport CLI](https://github.com/gotalab/skillport) を使用して、スキルの追加・検証・同期を行います。
 
+Cloudflare公式SkillsはAPMから個別のSkill subdirectoryとして取得します。
+上流のルートpluginはMCP同梱のため導入せず、`apm.yml` の固定参照を利用します。
+`npx skills add --global` との二重管理は避けてください。
+
 ## スキルの 3 層分類
 
 | 分類 | 置き場 | 管理主体 | Git 管理 |

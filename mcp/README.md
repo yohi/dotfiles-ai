@@ -86,6 +86,44 @@ operations on the separately authenticated STS/SigV4 path.
 
 ---
 
+### Cloudflare公式 Agent Setup（OpenCode V1 / APM）
+
+Cloudflareの公式セットアップ手順は
+[agent-setup/prompt.md](https://developers.cloudflare.com/agent-setup/prompt.md)
+と [OpenCode向けガイド](https://developers.cloudflare.com/agent-setup/opencode/)
+を参照します。公式プロンプトの `npx skills add --global` や
+`opencode.jsonc` への直接追記は、このリポジトリのAPM SSOT管理と重複するため実行しません。
+
+**Cloudflare Skills:** `apm.yml` の `dependencies.apm` に
+`cloudflare`、`cloudflare-one`、`wrangler`、
+`workers-best-practices`、`cf-cli` と、相互参照の必要な
+`gateway-workers`、`workers-profiling`、`nextjs-on-cloudflare` を
+同一上流コミット固定で宣言しています。
+APMが各Skillの `SKILL.md` と同梱参照資料を配備します。
+一部のSkillを省くと相対リンク先が欠落するため、参照先Skillも明示的に固定します。
+RootのCloudflare pluginを丸ごと導入すると、同梱MCPサーバーが既存Portalと
+重複する可能性があるため、必要なSkill subdirectoryのみを使用します。
+`apm install` と通常の同期フローで展開し、SkillPortから要求時にロードします。
+
+**Cloudflare API MCPの直接接続（任意・既定OFF）:**
+`mcp/optional-servers.yaml` に `cloudflare-api-direct` を置いています。
+`https://mcp.cloudflare.com/mcp` はCloudflareの公式Code Mode API MCPであり、
+`default/personal/work` MCP Portalとは**別の認証経路**です。
+現段階では `apm.yml` の `dependencies.mcp` に追加しません。
+直接接続が必要と判断された場合のみ、Ownerが対象クライアントとID、
+OAuthのscope・権限・上流ツールの重複を確認したうえで、APM管理の
+適切なプロファイルへ昇格させてください。OpenCodeでは登録後に
+`opencode mcp auth cloudflare-api-direct` を実施します。
+ドキュメント/設計調査のために勝手にOAuth承認、権限付与、設定変更、
+外部CLIのインストールを行ってはいけません。
+
+**ツール選択:** Cloudflare固有の設計はSkillsをオンデマンドで参照し、
+アカウント情報は認可済みの適切なPersonal/Work Portalを探索します。
+Wrangler設定のあるプロジェクトではWranglerを利用します。
+`cf` CLIはオプションです。導入・`cf auth login`・変更操作は
+利用者の承認と適切な権限が必要です。直接MCPのOAuthを有効にしても
+Cloudflare PortalのAccess/Allowlistが適用されるわけではありません。
+
 ### AWS管理型MCP（SigV4 / STS）
 
 `apm.yml` の `aws-mcp` は、AWSが運用する管理型MCPへ
