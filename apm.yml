@@ -30,6 +30,14 @@ dependencies:
     - yohi/chronos-graph//agent-assets/skills/chronos-memory-save
     - yohi/nexus//skills/code-search
 
+    # Official Cloudflare Agent Skills. Pin a verified upstream commit and
+    # install only skill subfolders, never the root plugin (which bundles MCP).
+    - cloudflare/skills//skills/cloudflare#86505e44f87d801aa1864a3c4109e9a8ae5c409f
+    - cloudflare/skills//skills/cloudflare-one#86505e44f87d801aa1864a3c4109e9a8ae5c409f
+    - cloudflare/skills//skills/wrangler#86505e44f87d801aa1864a3c4109e9a8ae5c409f
+    - cloudflare/skills//skills/workers-best-practices#86505e44f87d801aa1864a3c4109e9a8ae5c409f
+    - cloudflare/skills//skills/cf-cli#86505e44f87d801aa1864a3c4109e9a8ae5c409f
+
 
   # MCP Servers
   mcp:

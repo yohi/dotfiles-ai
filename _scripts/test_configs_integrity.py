@@ -131,6 +131,53 @@ class TestConfigIntegrity(unittest.TestCase):
         self.assertEqual(leaks, [], f"Leaks found in: {leaks}")
         self.assertEqual(read_errors, [], f"Read errors encountered: {read_errors}")
 
+    def test_cloudflare_agent_setup_dependency_scope(self):
+        """Cloudflare skills are pinned; the direct API MCP stays opt-in."""
+        with open(os.path.join(self.PROJECT_ROOT, "apm.yml"), encoding="utf-8") as f:
+            config = yaml.safe_load(f)
+        with open(
+            os.path.join(self.PROJECT_ROOT, "mcp/optional-servers.yaml"),
+            encoding="utf-8",
+        ) as f:
+            optional = yaml.safe_load(f)
+
+        dependencies = config.get("dependencies") or {}
+        skill_deps = dependencies.get("apm") or []
+        cloudflare = [
+            item for item in skill_deps
+            if isinstance(item, str) and item.startswith("cloudflare/skills/")
+        ]
+        expected = {
+            "cloudflare",
+            "cloudflare-one",
+            "wrangler",
+            "workers-best-practices",
+            "cf-cli",
+        }
+        parsed = {}
+        for entry in cloudflare:
+            match = re.fullmatch(
+                r"cloudflare/skills//skills/([a-z0-9-]+)#([a-f0-9]{40})",
+                entry,
+            )
+            self.assertIsNotNone(match, f"Unpinned or unexpected skill: {entry}")
+            assert match is not None
+            parsed[match.group(1)] = match.group(2)
+        self.assertEqual(set(parsed), expected)
+        self.assertEqual(len(set(parsed.values())), 1, "Skills must share one pin")
+
+        active_mcp = [
+            item.get("name")
+            for item in dependencies.get("mcp", [])
+            if isinstance(item, dict)
+        ]
+        self.assertNotIn("cloudflare-api-direct", active_mcp)
+        optional_mcp = optional.get("optional_mcp_servers") or []
+        direct = [item for item in optional_mcp if item.get("name") == "cloudflare-api-direct"]
+        self.assertEqual(len(direct), 1)
+        self.assertEqual(direct[0]["url"], "https://mcp.cloudflare.com/mcp")
+        self.assertEqual(direct[0]["transport"], "streamable-http")
+
     def test_json_validity(self):
         if json5 is None:
             self.fail(

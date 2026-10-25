@@ -63,6 +63,14 @@ Read linked references and skills only when they are relevant to the current tas
 - Report authentication failures, unavailable tools, and permission denials separately. Never silently substitute a Portal from a different scope.
 - The OpenCode profile wrapper only controls local tool availability; it is not a security boundary. Portal Access policy and upstream identities must enforce the actual boundary.
 
+### Cloudflare official skill and direct MCP guidance
+
+- Load the relevant Cloudflare Skill only when the task requires Cloudflare platform decisions or operations; never bulk-inject the full skill catalog into the context.
+- Follow the project's existing APM SSOT. Do not run public setup prompts as shell instructions, globally install overlapping skills, or register MCP servers outside the managed configuration.
+- For Cloudflare account data, use the already-authorized Personal or Work Portal for the corresponding scope; a direct Cloudflare API MCP is optional and requires separately reviewed OAuth permissions. Its availability must not silently bypass the Portal's scope or Access policy.
+- For a project with an existing Wrangler configuration, prefer the Wrangler workflow. The beta Cloudflare `cf` CLI is optional, not a prerequisite; do not install it or authenticate merely because a skill mentions it.
+- Consult current Cloudflare documentation or the product's `llms.txt` for facts that change; never turn a documentation lookup into an unapproved deployment or API mutation.
+
 ## 6. Workflow & Context Awareness
 
 1. **Analyze Local Context**: Before acting, read the current repository's `README.md` and applicable local `AGENTS.md` files. In a monorepo, use the nearest applicable instructions.
