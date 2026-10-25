@@ -38,6 +38,28 @@ Cloudflare AI Gateway Dynamic Route
 
 Sisyphus-Junior は意図的に固定モデルを設定しません。category-routed task では、選択された category のモデルを引き継がせます。
 
+### Personal の接続境界と Free モデル (2026-10-18)
+
+`omo.jsonc` の personal 自動ルーティングでは、以下を採用します。Cloudflare Dynamic Routing は復旧確認まで使用せず、OmO 側で既存の順序を維持します。
+
+| 系統 | 実モデルIDの先頭 | 接続と状態 |
+| :-- | :-- | :-- |
+| OpenAI Plus | `openai/` | OpenCode から直接 |
+| OCTG | `cloudflare-ai-gateway-octg/` | Cloudflare Custom Provider |
+| Ollama Cloud | `cloudflare-ai-gateway-custom/custom-ollama-cloud/` | Cloudflare Custom Provider |
+| CommandCode | `cloudflare-ai-gateway-custom/custom-command-code/` | 設定を保持するが自動経路は停止中 |
+| OpenCode Go | `cloudflare-ai-gateway-custom/custom-opencode-go/` | Cloudflare Custom Provider |
+| OpenCode Console Free | `opencode/` | **Cloudflare を経由せず OpenCode ネイティブで直接接続**（現状 BLOCKED） |
+| Sakura AI Engine | `cloudflare-ai-gateway-custom/custom-sakura-ai/` | Cloudflare Custom Provider |
+| Google AI Studio | `cloudflare-ai-gateway/google-ai-studio/` | Cloudflare Built-in Provider |
+
+**Console Free の扱い:** `opencode/glm-5.3-flash-free` と
+`opencode/deepseek-v4.1-flash-free` を OmO の**論理カタログ上の手動候補**として保持します。OpenCode 1.18.32 ではモデル一覧に表示されず、CLI 実行は `UnknownError`、直接 Console API は `FreeTierError` (HTTP 403) でした。**利用可能・利用許可済みであることを意味しません。** CLI の提供条件と正常動作を確認するまで primary / fallback / command には加えません。Cloudflare の `custom-opencode-free` は使用しません（旧Draft PR #152 は BLOCKED）。
+
+**Go Free の扱い:** `longcat-2.5-preview-free` は既存の Go API キーを使った**直接Go API**で HTTP 200、応答 `OK` を確認しました。`beam-free` は Go のモデル一覧に存在することのみ確認済みです。両方とも `apm.yml` の既存 `custom-opencode-go` 経由の**手動候補**であり、Cloudflare 経由の推論・非課金・Tool Calling・制限超過時挙動は未検証のため OmO の自動経路に追加していません。無料モデルの提供条件は変更され得ます。
+
+**モデルカタログと稼働経路は別:** OmO の `models` カタログへの登録は自動選択を意味しません。OmO v4.19.4 の一部タスクは alias を解決できないため、後日、手動検証するときはモデルの完全修飾IDを使ってください。AIHubMix、ZenMax、TokenRouter 等のモデルは自動選択しません。既存の CommandCode 停止、GLM-5.3 full の手動限定、Sakura・Gemini と Justice 必須レビュー、Work の Bedrock 専用設定を維持します。
+
 ## 3. 知能カテゴリーとエージェント (10 Specialists)
 
 Sisyphus（監督）は、タスクの性質に応じて最適な「知能カテゴリー」を選択し、専門エージェントを指揮します。
