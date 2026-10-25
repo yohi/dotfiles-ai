@@ -39,7 +39,8 @@ APMがMCP部分を更新して他のCodex設定を保持します。OpenCodeのA
 
 `make sync-mcp` 実行時、`apm.yml` に記載したサーバーがクライアント形式に合わせて登録されます。APMはサーバー単位の `enabled` フラグを扱わないため、無効サーバーは `dependencies.mcp` に入れず、任意カタログに置きます。
 
-- `cf-mcp-portal`, `cf-mcp-portal-work` — Streamable HTTP
+- `cf-mcp-portal` (共通・移行完了まで保留), `cf-mcp-portal-personal` (個人), `cf-mcp-portal-work` (業務) — Streamable HTTP
+- OpenCodeの起動時プロファイル切替は `_scripts/opencode-wrapper.sh` が実施します。Cloudflare側のPortal/権限設定は別途必要です。
 - `com.atlassian/atlassian-mcp-server` — MCP Registry
 - `codegraph` — ローカルコード解析
 - `filesystem` — `npx @modelcontextprotocol/server-filesystem`

@@ -66,7 +66,9 @@ with open('apm.yml') as f:
     data = yaml.safe_load(f)
 mcp = data.get('dependencies', {}).get('mcp', [])
 for s in mcp:
-    if s.get('enabled', True):
+    # Registry entries use strings; APM resolves their actual client names.
+    # This test checks named direct servers, not APM Registry resolution.
+    if isinstance(s, dict) and s.get('enabled', True):
         print(s['name'])
 ")
 

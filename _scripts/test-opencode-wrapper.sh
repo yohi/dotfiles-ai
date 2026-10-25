@@ -41,6 +41,21 @@ echo "SKILLPORT_SKILLS_DIR=${SKILLPORT_SKILLS_DIR:-unset}" >> "$MOCK_LOG"
 echo "OCTG_CF_ACCOUNT_ID=${OCTG_CF_ACCOUNT_ID:-unset}" >> "$MOCK_LOG"
 echo "OCTG_CF_GATEWAY_ID=${OCTG_CF_GATEWAY_ID:-unset}" >> "$MOCK_LOG"
 echo "OCTG_CF_API_TOKEN=${OCTG_CF_API_TOKEN:-unset}" >> "$MOCK_LOG"
+python3 - <<'PY' >> "$MOCK_LOG"
+import json
+import os
+
+config = json.loads(os.environ.get("OPENCODE_CONFIG_CONTENT", "{}"))
+mcp = config.get("mcp", {})
+for label, name in (
+    ("DEFAULT", "cf-mcp-portal"),
+    ("PERSONAL", "cf-mcp-portal-personal"),
+    ("WORK", "cf-mcp-portal-work"),
+):
+    print(f"MCP_{label}={str(mcp.get(name, {}).get('enabled', 'missing')).lower()}")
+print(f"MCP_EXTRA={str(mcp.get('other-mcp', {}).get('enabled', 'missing')).lower()}")
+print(f"CONFIG_MARKER={config.get('marker', 'missing')}")
+PY
 EOF
 # Inject MOCK_LOG path into the mock script
 sed -i "s|\"\$MOCK_LOG\"|\"$MOCK_LOG\"|g" "$MOCK_BIN_DIR/opencode"
@@ -264,6 +279,82 @@ elif [ -f "$HOME_OMO_JSONC" ]; then
     skip "~/.omo/omo.jsonc exists but is a regular file (not a symlink)"
 else
     skip "~/.omo/omo.jsonc does not exist"
+fi
+
+# --- Test 9: MCP portal personal isolation ---
+echo "  [9] MCP portal personal isolation"
+rm -f "$MOCK_LOG"
+if CF_MCP_DEFAULT_ENABLED=0 "$WRAPPER" personal --version >/dev/null 2>&1 &&
+   grep -qx "MCP_DEFAULT=false" "$MOCK_LOG" &&
+   grep -qx "MCP_PERSONAL=true" "$MOCK_LOG" &&
+   grep -qx "MCP_WORK=false" "$MOCK_LOG"; then
+    pass "personal exposes only its own Portal; common is held"
+else
+    fail "personal MCP Portal routing incorrect"
+    cat "$MOCK_LOG" 2>/dev/null || true
+fi
+
+# --- Test 10: MCP portal work isolation ---
+echo "  [10] MCP portal work isolation"
+rm -f "$MOCK_LOG"
+if CF_MCP_DEFAULT_ENABLED=0 "$WRAPPER" work --version >/dev/null 2>&1 &&
+   grep -qx "MCP_DEFAULT=false" "$MOCK_LOG" &&
+   grep -qx "MCP_PERSONAL=false" "$MOCK_LOG" &&
+   grep -qx "MCP_WORK=true" "$MOCK_LOG"; then
+    pass "work exposes only its own Portal; common is held"
+else
+    fail "work MCP Portal routing incorrect"
+    cat "$MOCK_LOG" 2>/dev/null || true
+fi
+
+# --- Test 11: deliberate opt-in to curated common portal ---
+echo "  [11] Explicit common Portal opt-in"
+rm -f "$MOCK_LOG"
+if CF_MCP_DEFAULT_ENABLED=1 "$WRAPPER" work --version >/dev/null 2>&1 &&
+   grep -qx "MCP_DEFAULT=true" "$MOCK_LOG" &&
+   grep -qx "MCP_PERSONAL=false" "$MOCK_LOG" &&
+   grep -qx "MCP_WORK=true" "$MOCK_LOG"; then
+    pass "common Portal enables only with explicit opt-in"
+else
+    fail "common Portal opt-in incorrect"
+    cat "$MOCK_LOG" 2>/dev/null || true
+fi
+
+# --- Test 12: unrelated inline overrides preserved ---
+echo "  [12] Existing OPENCODE_CONFIG_CONTENT preserved"
+rm -f "$MOCK_LOG"
+if OPENCODE_CONFIG_CONTENT='{"marker":"kept","mcp":{"other-mcp":{"enabled":true},"cf-mcp-portal-work":{"enabled":true}}}' \
+   CF_MCP_DEFAULT_ENABLED=0 "$WRAPPER" personal --version >/dev/null 2>&1 &&
+   grep -qx "CONFIG_MARKER=kept" "$MOCK_LOG" &&
+   grep -qx "MCP_EXTRA=true" "$MOCK_LOG" &&
+   grep -qx "MCP_WORK=false" "$MOCK_LOG"; then
+    pass "unrelated config is preserved; cross-profile overrides are disabled"
+else
+    fail "inline config merge incorrect"
+    cat "$MOCK_LOG" 2>/dev/null || true
+fi
+
+# --- Test 13: malformed config fails before starting opencode ---
+echo "  [13] Invalid inline config fails closed"
+rm -f "$MOCK_LOG"
+if OPENCODE_CONFIG_CONTENT='{' CF_MCP_DEFAULT_ENABLED=0 \
+   "$WRAPPER" personal --version >/dev/null 2>&1; then
+    fail "wrapper accepted malformed inline config"
+elif [ -e "$MOCK_LOG" ]; then
+    fail "wrapper launched OpenCode after invalid inline config"
+else
+    pass "invalid inline config prevents launching OpenCode"
+fi
+
+# --- Test 14: invalid default opt-in flag fails closed ---
+echo "  [14] Invalid default flag fails closed"
+rm -f "$MOCK_LOG"
+if CF_MCP_DEFAULT_ENABLED=yes "$WRAPPER" work --version >/dev/null 2>&1; then
+    fail "wrapper accepted invalid common Portal opt-in"
+elif [ -e "$MOCK_LOG" ]; then
+    fail "wrapper launched OpenCode despite invalid common Portal opt-in"
+else
+    pass "invalid common Portal opt-in prevents launching OpenCode"
 fi
 
 # --- Summary ---

@@ -38,17 +38,28 @@ dependencies:
 
     - "io.github.SonarSource/sonarqube-mcp-server"
 
+    # Cloudflare Portal mappings. OpenCode's profile-aware launcher enables only
+    # the selected profile. The default portal is disabled until its current
+    # account-bound upstreams have been removed in the Cloudflare dashboard.
+    # Plain /mcp selects direct tools after Portal Code Mode becomes opt_in;
+    # while Portal remains enforced, the server still uses Code Mode.
     - name: cf-mcp-portal
+      title: "Cloudflare MCP Portal (Default / Common)"
+      registry: false
+      transport: streamable-http
+      url: https://mcp.y-ohi.com/mcp
+
+    - name: cf-mcp-portal-personal
       title: "Cloudflare MCP Portal (Personal)"
       registry: false
       transport: streamable-http
-      url: https://mcp.y-ohi.com/mcp?codemode=search_and_execute
+      url: https://personal.mcp.y-ohi.com/mcp
 
     - name: cf-mcp-portal-work
       title: "Cloudflare MCP Portal (Work)"
       registry: false
       transport: streamable-http
-      url: https://work.mcp.y-ohi.com/mcp?codemode=search_and_execute
+      url: https://work.mcp.y-ohi.com/mcp
 
     # Direct AWS Managed MCP via SigV4; AWS API MCP Server is deprecated.
     # Constrain calls with the aws-mcp-readonly STS session policy; the proxy
