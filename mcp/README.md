@@ -65,6 +65,12 @@ this profile selection.** The wrapper is a usability feature, not an
 authorization boundary. Restrict each Portal with Cloudflare Access and
 least-privilege upstream credentials.
 
+APM exports all three Portal definitions to other configured clients as well
+(including Codex and Claude Code). Their connections are NOT profile-gated by
+this OpenCode wrapper. Do not apply the three-scope mapping to other clients
+until their own enablement/routing and Cloudflare Access restrictions have been
+verified; never rely on a descriptive Portal name to separate credentials.
+
 Portal Code Mode is currently `enforced` in Cloudflare. The above URLs omit
 `?codemode=search_and_execute` in preparation for manually switching each
 Portal to `opt_in`; while `enforced` is configured, the Portal remains in
