@@ -131,7 +131,7 @@ class TestConfigIntegrity(unittest.TestCase):
         self.assertEqual(leaks, [], f"Leaks found in: {leaks}")
         self.assertEqual(read_errors, [], f"Read errors encountered: {read_errors}")
 
-    def test_cloudflare_agent_setup_dependency_scope(self):
+    def test_cloudflare_agent_setup_dependency_scope(self) -> None:
         """Cloudflare skills are pinned; the direct API MCP stays opt-in."""
         with open(os.path.join(self.PROJECT_ROOT, "apm.yml"), encoding="utf-8") as f:
             config = yaml.safe_load(f)
@@ -144,9 +144,21 @@ class TestConfigIntegrity(unittest.TestCase):
         dependencies = config.get("dependencies") or {}
         skill_deps = dependencies.get("apm") or []
         cloudflare = [
-            item for item in skill_deps
-            if isinstance(item, str) and item.startswith("cloudflare/skills/")
+            item
+            for item in skill_deps
+            if isinstance(item, str)
+            and (
+                item.startswith("cloudflare/skills/")
+                or item == "cloudflare/skills"
+                or item.startswith("cloudflare/skills#")
+            )
         ]
+        root_plugins = [
+            item
+            for item in cloudflare
+            if item == "cloudflare/skills" or item.startswith("cloudflare/skills#")
+        ]
+        self.assertEqual(root_plugins, [], "Cloudflare root plugin must not be registered")
         expected = {
             "cloudflare",
             "cloudflare-one",
