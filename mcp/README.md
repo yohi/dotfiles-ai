@@ -36,31 +36,47 @@ APM によって直接管理されるローカル知識ベース・長期記憶�
   - **Nexus**: プロジェクトコードの高速なセマンティック検索・インデックス管理。
 - **実装**: `apm.yml` で一括管理されます。
 
-### Cloudflare MCP Portal (Direct / Streamable HTTP)
+### Cloudflare MCP Portal (3 scopes / Streamable HTTP)
 
-Cloudflare One で管理されるリモート MCP ポータルです。
+Cloudflare MCP Portal connections are declared only in `apm.yml` (SSOT).
+Do not edit generated `opencode.json(c)` files. The client configuration does
+**not** create or reconfigure the Portals in Cloudflare.
 
-- **ステータス**: 有効 (`apm.yml` で定義、各エージェントから利用可能)
-- **エンドポイント**: `https://mcp.y-ohi.com/mcp?codemode=search_and_execute`
-- **トランスポート**: `streamable-http`
-- **Code Mode**: `codemode=search_and_execute` をPortal URLに指定し、上流ツールをCode Mode経由で利用します。
-
-Portal側には、次のリモート上流MCPを登録して集約します。
-
-| 上流MCP | URL | 用途 |
+| OpenCode server ID | Endpoint | Intended scope |
 | :--- | :--- | :--- |
-| Exa | `https://mcp.exa.ai/mcp?tools=web_search_exa` | Web検索 |
-| Context7 | `https://mcp.context7.com/mcp` | ライブラリドキュメント検索 |
-| grep.app | `https://mcp.grep.app` | GitHubコード検索 |
-| Greptile | `https://api.greptile.com/mcp` | コードレビュー・解析 |
-| GitHub Official | `https://api.githubcopilot.com/mcp/` | GitHub連携 |
-| AWS Managed（Portal経由、us-east-1） | `https://aws-mcp.us-east-1.api.aws/mcp?oauth=initialize` | AWS連携 |
-| Sentry Remote | `https://mcp.sentry.dev/mcp` | Sentry連携 |
+| `cf-mcp-portal` | `https://mcp.y-ohi.com/mcp` | Default: shared/public documentation |
+| `cf-mcp-portal-personal` | `https://personal.mcp.y-ohi.com/mcp` | Personal account data |
+| `cf-mcp-portal-work` | `https://work.mcp.y-ohi.com/mcp` | Work account data |
 
-上流の登録、認証、`Ready` 状態の確認はCloudflare Dashboardで行います。ExaはPortalのCustom Headersに `x-api-key` を設定します。APIキーやOAuthシークレットはこのリポジトリへ記載しません。
-Portalの仕様は [MCP server portals](https://developers.cloudflare.com/cloudflare-one/access-controls/ai-controls/mcp-portals/)、保護設定は [Secure MCP servers](https://developers.cloudflare.com/cloudflare-one/access-controls/ai-controls/secure-mcp-servers/)、内部アプリ連携は [Linked Apps](https://developers.cloudflare.com/cloudflare-one/access-controls/ai-controls/linked-apps/) を参照します。
-`optimize_context=search_and_execute` は別機能のContext optimizationであり、Code Modeの指定には使用しません。
-GitHub Official、Greptile、Sentry RemoteはPortal経由に統一します。AWS Managedのみ、Portal経由（us-east-1）に加え、東京リージョン（ap-northeast-1）のSTS/SigV4直接接続（`aws-mcp`）もAPMに登録しています。
+**Migration safety hold:** The existing Default Portal still contains
+personal/account-bound upstream MCP servers. It is **disabled by default** by
+`_scripts/opencode-wrapper.sh` for **both** OpenCode profiles. Before enabling
+Default, curate it in the Cloudflare dashboard to contain only authorized,
+non-confidential, shared tools; verify the Access policy, upstream identities,
+and tool allowlist. Once confirmed, launch the wrapper with
+`CF_MCP_DEFAULT_ENABLED=1`. Do not use that switch prematurely.
+
+`opencode personal` (wrapper) enables Personal and disables Work.
+`opencode work` enables Work and disables Personal. Common stays disabled
+until explicitly enabled. The wrapper merges its `mcp.<id>.enabled` overrides
+into any existing `OPENCODE_CONFIG_CONTENT`, preserving unrelated settings;
+invalid JSON stops startup. **Launching the raw `opencode` binary bypasses
+this profile selection.** The wrapper is a usability feature, not an
+authorization boundary. Restrict each Portal with Cloudflare Access and
+least-privilege upstream credentials.
+
+Portal Code Mode is currently `enforced` in Cloudflare. The above URLs omit
+`?codemode=search_and_execute` in preparation for manually switching each
+Portal to `opt_in`; while `enforced` is configured, the Portal remains in
+Code Mode regardless of the URL. Once changed, plain `/mcp` exposes direct
+tools for OpenCode V1 discovery. If Code Mode is intentionally required, append
+`?codemode=search_and_execute` for that client only. Do not stack Code Mode
+on an upstream that itself requires a nested Code Mode search.
+
+The AWS Managed MCP Server without authentication is useful for public AWS
+documentation. `No Auth` does **not** mean the server is universally
+read-only; curate exposed tools on the Default Portal. Keep AWS account API
+operations on the separately authenticated STS/SigV4 path.
 
 ---
 

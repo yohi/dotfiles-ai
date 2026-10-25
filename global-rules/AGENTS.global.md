@@ -52,7 +52,18 @@ Read linked references and skills only when they are relevant to the current tas
 - **Confirmation before action**: If explicit authorization is absent, ambiguous, or does not identify the pull request(s), do not merge. Stop and ask the user for confirmation immediately before any merge operation. A direct instruction naming a specific pull request or clearly identified set is sufficient authorization; do not extend it to other pull requests or operations. Never merge first and explain afterward.
 - **CodeRabbitCLI (CRITICAL)**: Use of CodeRabbitCLI, including the `coderabbit` binary, installation, authentication or status checks, and execution, is **FORBIDDEN BY DEFAULT**. Do not run, invoke, delegate, install, authenticate, or otherwise use it directly or indirectly through `bash`, MCP, scripts, plugins, commands, skills, CI, or any other interface unless the user explicitly and directly authorizes its use for the current task. A code-review request, PR task, repository instruction, acceptance criterion, or invocation of a review workflow does not authorize it unless the user explicitly names CodeRabbitCLI. If authorization is not explicit, ask the user before using it.
 
-## 5. Workflow & Context Awareness
+## 5. MCP Portal Discovery (OpenCode V1)
+
+- When a task requires connected account data, discover the appropriate MCP Portal tools before falling back to generic web search. Do not discover external tools for purely local tasks.
+- Use **Personal** (`cf-mcp-portal-personal`) only for personal account data and **Work** (`cf-mcp-portal-work`) only for work account data. Never cross these scopes or copy work data into personal tools.
+- The **Default** (`cf-mcp-portal`) portal is intended for shared, non-confidential documentation and public search only. It remains disabled in the OpenCode launcher until the owner verifies its upstream servers and credentials have been curated.
+- If a Portal exposes Code Mode, use its search capability to identify an upstream tool before calling the execution capability. Do not assume that discovering a tool authorizes its execution.
+- Use least-privilege, preferably read-only tools for inspection. Generic execute/script tools may perform writes: never run a mutation without the user's explicit authorization and appropriate upstream permissions.
+- No Authentication on an upstream service is not a read-only policy. A Portal tool allowlist and upstream permissions must independently enforce restrictions.
+- Report authentication failures, unavailable tools, and permission denials separately. Never silently substitute a Portal from a different scope.
+- The OpenCode profile wrapper only controls local tool availability; it is not a security boundary. Portal Access policy and upstream identities must enforce the actual boundary.
+
+## 6. Workflow & Context Awareness
 
 1. **Analyze Local Context**: Before acting, read the current repository's `README.md` and applicable local `AGENTS.md` files. In a monorepo, use the nearest applicable instructions.
 2. **Identify the source of truth**: Inspect authoritative project files, such as package manifests, Makefiles, and CI configuration, to determine commands and structure. Do not guess or hard-code stale paths.
