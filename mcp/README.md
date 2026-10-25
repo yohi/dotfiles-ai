@@ -96,8 +96,11 @@ Cloudflareの公式セットアップ手順は
 
 **Cloudflare Skills:** `apm.yml` の `dependencies.apm` に
 `cloudflare`、`cloudflare-one`、`wrangler`、
-`workers-best-practices`、`cf-cli` を上流コミット固定で宣言しています。
+`workers-best-practices`、`cf-cli` と、相互参照の必要な
+`gateway-workers`、`workers-profiling`、`nextjs-on-cloudflare` を
+同一上流コミット固定で宣言しています。
 APMが各Skillの `SKILL.md` と同梱参照資料を配備します。
+一部のSkillを省くと相対リンク先が欠落するため、参照先Skillも明示的に固定します。
 RootのCloudflare pluginを丸ごと導入すると、同梱MCPサーバーが既存Portalと
 重複する可能性があるため、必要なSkill subdirectoryのみを使用します。
 `apm install` と通常の同期フローで展開し、SkillPortから要求時にロードします。

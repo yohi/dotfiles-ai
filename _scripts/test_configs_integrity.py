@@ -153,6 +153,9 @@ class TestConfigIntegrity(unittest.TestCase):
             "wrangler",
             "workers-best-practices",
             "cf-cli",
+            "gateway-workers",
+            "workers-profiling",
+            "nextjs-on-cloudflare",
         }
         parsed = {}
         for entry in cloudflare:

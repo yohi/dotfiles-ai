@@ -37,6 +37,9 @@ dependencies:
     - cloudflare/skills//skills/wrangler#86505e44f87d801aa1864a3c4109e9a8ae5c409f
     - cloudflare/skills//skills/workers-best-practices#86505e44f87d801aa1864a3c4109e9a8ae5c409f
     - cloudflare/skills//skills/cf-cli#86505e44f87d801aa1864a3c4109e9a8ae5c409f
+    - cloudflare/skills//skills/gateway-workers#86505e44f87d801aa1864a3c4109e9a8ae5c409f
+    - cloudflare/skills//skills/workers-profiling#86505e44f87d801aa1864a3c4109e9a8ae5c409f
+    - cloudflare/skills//skills/nextjs-on-cloudflare#86505e44f87d801aa1864a3c4109e9a8ae5c409f
 
 
   # MCP Servers
