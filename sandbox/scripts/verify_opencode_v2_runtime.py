@@ -24,22 +24,25 @@ EXPECTED = {
     "sibyl": ("@yohi/sibyl", "3.0.0-alpha.1", "dist/tui.js"),
 }
 WORKSPACE = Path("/home/agent/workspace")
+INVALID_WORKSPACE_DIRECTORY = "invalid workspace directory"
 
 
 def _workspace_dir(path: Path) -> Path:
     if not path.is_absolute() or ".." in path.parts or path.is_symlink():
-        raise StageError("invalid workspace directory")
+        raise StageError(INVALID_WORKSPACE_DIRECTORY)
     try:
         workspace = WORKSPACE.resolve(strict=True)
         if not path.is_relative_to(WORKSPACE) or path == WORKSPACE:
-            raise StageError("invalid workspace directory")
-        canonical = path.resolve(strict=True)
+            raise StageError(INVALID_WORKSPACE_DIRECTORY)
+        # NOSONAR: Canonicalize only lexically workspace-contained paths, then
+        # reject escapes and normalize all failures to the same CLI response.
+        canonical = path.resolve(strict=True)  # NOSONAR
         if not canonical.is_relative_to(workspace) or canonical == workspace:
-            raise StageError("invalid workspace directory")
+            raise StageError(INVALID_WORKSPACE_DIRECTORY)
         if canonical != path or not path.is_dir():
-            raise StageError("invalid workspace directory")
+            raise StageError(INVALID_WORKSPACE_DIRECTORY)
     except OSError as exc:
-        raise StageError("invalid workspace directory") from exc
+        raise StageError(INVALID_WORKSPACE_DIRECTORY) from exc
     return canonical
 
 
