@@ -34,8 +34,8 @@ def _workspace_dir(path: Path) -> Path:
         workspace = WORKSPACE.resolve(strict=True)
         if not path.is_relative_to(WORKSPACE) or path == WORKSPACE:
             raise StageError(INVALID_WORKSPACE_DIRECTORY)
-        # NOSONAR: Canonicalize only lexically workspace-contained paths, then
-        # reject escapes and normalize all failures to the same CLI response.
+        # Canonicalize only lexically workspace-contained paths, then reject
+        # escapes and normalize all failures to the same CLI response.
         canonical = path.resolve(strict=True)  # NOSONAR
         if not canonical.is_relative_to(workspace) or canonical == workspace:
             raise StageError(INVALID_WORKSPACE_DIRECTORY)
