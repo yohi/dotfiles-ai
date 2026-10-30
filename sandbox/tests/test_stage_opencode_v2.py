@@ -111,6 +111,9 @@ class StageTests(unittest.TestCase):
         self.assertNotIn("--privileged", repr(commands))
         self.assertNotIn("-u", repr(commands))
         self.assertEqual(commands[-1][3], "python3")
+        self.assertEqual(commands[2][-1], "oc-v2-poc:" + commands[-1][4])
+        self.assertFalse(commands[-1][4].startswith(remote + "/"))
+        self.assertEqual(commands[0][-1], commands[-1][4])
 
     def test_apply_requires_valid_sandbox_name(self) -> None:
         with patch.object(stage, "_check_source"), patch.object(stage, "_run") as run:

@@ -130,15 +130,17 @@ def stage(bundle: Path, repo_root: Path, sandbox: str | None, apply: bool) -> No
             (folder / name).chmod(0o644)  # Non-secret output; guest agent may have another UID.
         remote = REMOTE_PARENT + "/" + folder.name
         # The VM owns this path, never a host mount in the intended configuration.
+        remote_verifier = REMOTE_PARENT + "/." + folder.name + ".verify.py"
         _run(["sbx", "exec", sandbox, "sh", "-c",
-              'test -d "$1" && test ! -L "$1" && test ! -e "$2" && test ! -L "$2"',
-              "sh", REMOTE_PARENT, remote])
+              'test -d "$1" && test ! -L "$1" && test ! -e "$2" && test ! -L "$2"'
+              ' && test ! -e "$3" && test ! -L "$3"',
+              "sh", REMOTE_PARENT, remote, remote_verifier])
         _run(["sbx", "cp", str(folder), f"{sandbox}:{remote}"])
         verifier = Path(__file__).resolve(strict=True)
         # Verifier is executed from the sandbox agent's local Python interpreter.
         # Transfer separately to avoid smuggling a script in a supposedly data-only bundle.
-        _run(["sbx", "cp", str(verifier), f"{sandbox}:{remote}/verify_snapshot.py"])
-        _run(["sbx", "exec", sandbox, "python3", f"{remote}/verify_snapshot.py",
+        _run(["sbx", "cp", str(verifier), f"{sandbox}:{remote_verifier}"])
+        _run(["sbx", "exec", sandbox, "python3", remote_verifier,
               "--verify-bundle", remote])
         print("STAGED_AND_VERIFIED: " + sandbox + ":" + remote)
         print("NOT_ACTIVATED: OpenCode settings were not modified")
