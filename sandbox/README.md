@@ -1,6 +1,6 @@
 # OpenCode Sandbox runtime — 設定と開発環境
 
-> **Status: SNAPSHOT_STAGING_POC / NO_CONFIG_ACTIVATION**
+> **Status: ISOLATED_RUNTIME_POC / NOT_LIVE_TESTED**
 >
 > このディレクトリは、ホスト管理・Sandbox実行に向けた設定雛形と、読み取り主体の限定的な設定エクスポーターです。
 > Docker Sandboxの作成、`sbx policy`変更、ホストOpenCode v1の更新、認証情報の転送は行いません。
@@ -19,7 +19,8 @@
 
 1. `feature/sandbox-runtime-scaffold-20261030` — 設定テンプレート・原則
 2. `feature/sandbox-config-exporter-20261030` — エクスポーター・単体テスト
-3. `feature/sandbox-snapshot-stage-20261030` — Sandboxへの明示的な転送・整合性検証（このブランチ）
+3. `feature/sandbox-snapshot-stage-20261030` — Sandboxへの明示的な転送・整合性検証
+4. `feature/sandbox-opencode-runtime-20261030` — OpenCode v2の隔離ランチャーとPlugin登録雛形（このブランチ）
 
 後続のブランチは前段ブランチのHEADから分岐します。masterへの反映は別途レビュー後とします。
 
@@ -77,6 +78,17 @@ python3 -m unittest discover -s sandbox/tests -p 'test_*.py' -v
 
 これまでと同様、ホスト設定・ソースの正本を変更せず、ネットワークポリシー、MCP、有料Providerの設定も変更しません。
 OpenCode起動時の設定読み込みとPlugin実動作は後続の検証対象です。
+
+## 第4段：隔離XDG設定によるOpenCode v2実行構成
+
+`sandbox/scripts/prepare_opencode_v2_runtime.py` を追加しました。第3段のスナップショットをゲスト内で検証し、
+`--write` を指定した場合のみ新規の実行領域にServer側`opencode.jsonc`、TUI側`cli.json`、専用ランチャーを作成します。
+
+ローカルのakane/sibylパッケージを指定した場合、名前・バージョン・エントリポイントを検査したうえで
+それぞれServerとTUIの設定に登録します。OpenCodeプロセスの起動は明示的な別操作です。
+通常Plugin登録の動作、実Sandboxへの適用・起動はまだ検証していません。
+
+**詳しい手順と注意点:** [RUNTIME_V2.md](RUNTIME_V2.md)
 
 ## 雛形ファイル（自動適用されない）
 
