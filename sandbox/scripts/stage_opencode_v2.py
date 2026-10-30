@@ -95,17 +95,14 @@ def _run(command: list[str]) -> None:
 
 
 def _check_source(root: Path, bundle: Path) -> None:
-    exporter = root / "sandbox" / "scripts" / "prepare_opencode_v2.py"
-    if exporter.is_symlink() or not exporter.is_file():
-        raise StageError("missing trusted export generator")
+    import prepare_opencode_v2 as exporter
+
     try:
-        result = subprocess.run(
-            [sys.executable, str(exporter), "--repo-root", str(root), "--out", str(bundle), "--check"],
-            capture_output=True, timeout=60, check=False,
-        )
-    except (OSError, subprocess.TimeoutExpired) as exc:
+        shell, snapshot, source_hash = exporter._read_apm(root)
+    except (OSError, exporter.ExportError) as exc:
         raise StageError("export provenance check could not complete") from exc
-    if result.returncode != 0:
+    expected = exporter._build_files(shell, snapshot, source_hash)
+    if any(_regular_bytes(bundle / name) != content for name, content in expected.items()):
         raise StageError("bundle does not match the current apm.yml SSOT")
 
 

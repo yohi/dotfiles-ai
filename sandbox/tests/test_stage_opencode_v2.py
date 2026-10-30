@@ -14,6 +14,7 @@ from unittest.mock import patch
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "stage_opencode_v2.py"
 sys.path.insert(0, str(SCRIPT.parent))
 import stage_opencode_v2 as stage  # noqa: E402
+import prepare_opencode_v2 as exporter  # noqa: E402
 
 
 class StageTests(unittest.TestCase):
@@ -122,8 +123,16 @@ class StageTests(unittest.TestCase):
                     stage.stage(self.bundle, self.root, bad, apply=True)
             run.assert_not_called()
 
-    def test_source_check_refuses_missing_exporter(self) -> None:
+    def test_source_check_refuses_missing_apm_source(self) -> None:
         with self.assertRaises(stage.StageError):
+            stage._check_source(self.root, self.bundle)
+
+    def test_source_check_verifies_snapshot_without_executing_a_process(self) -> None:
+        shell, snapshot, source_hash = exporter._read_apm(self.root)
+        generated = exporter._build_files(shell, snapshot, source_hash)
+        for name, content in generated.items():
+            (self.bundle / name).write_bytes(content)
+        with patch.object(stage.subprocess, "run", side_effect=AssertionError("unexpected process")):
             stage._check_source(self.root, self.bundle)
 
     def test_no_live_host_paths_are_written(self) -> None:
