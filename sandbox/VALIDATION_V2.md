@@ -18,7 +18,7 @@
 ## 前提
 
 - ホストのOpenCode v1・既存設定・既存ソースリポジトリは変更しない。
-- Docker Sandbox名は oc-v2-poc、ゲストのワークスペースは /home/agent/workspace。
+- Docker Sandbox名は oc-v2-poc、ゲストのワークスペースは $HOME/workspace。
 - ホストの作業ツリーをマウントしないSandboxであることを作業者が確認する。
 - OpenCode v2.1.4、akane@3.0.0-alpha.2、sibyl@3.0.0-alpha.1のビルド成果物がゲストに存在。
 - 第2段の設定Bundle、第3段で配置した3ファイル、第4段で作成した独立runtimeを使用。
@@ -34,7 +34,7 @@ y_ohi と sbx-poc のユーザー間権限を緩めない。
 以下はゲスト内で実施。BUNDLEを実際の第3段ステージング先へ置き換える。
 
 ~~~sh
-BASE=/home/agent/workspace
+BASE="$HOME/workspace"
 BUNDLE="$BASE/sbx-config-REPLACE_WITH_ACTUAL_NAME"
 RUNTIME="$BASE/opencode-v2-runtime-1"
 OC="$HOME/.local/opencode-v2/node_modules/.bin/opencode"
