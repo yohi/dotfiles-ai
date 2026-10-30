@@ -86,6 +86,11 @@ def verify_runtime(bundle: Path, runtime: Path, *, require_both: bool) -> dict:
             or receipt.get("source_manifest_sha256") != snapshot_digest):
         raise StageError("runtime receipt does not match staged snapshot")
     config_dir = runtime / "xdg-config" / "opencode"
+    for relative in ("xdg-config", "xdg-config/opencode", "xdg-data", "xdg-cache", "workspace"):
+        candidate = runtime / relative
+        within_workspace(candidate)
+        if not candidate.is_dir():
+            raise StageError("missing or invalid isolated runtime directory")
     server_path = config_dir / "opencode.jsonc"
     cli_path = config_dir / "cli.json"
     server = read_json(server_path)
@@ -127,6 +132,7 @@ def verify_runtime(bundle: Path, runtime: Path, *, require_both: bool) -> dict:
             status[kind] = verify_plugin(plugins[0], kind)
 
     launcher = runtime / "run-opencode.sh"
+    within_workspace(launcher)
     if (launcher.is_symlink() or not launcher.is_file()
             or launcher.stat().st_size > MAX_BYTES):
         raise StageError("missing or unsafe launcher")
@@ -140,6 +146,8 @@ def verify_runtime(bundle: Path, runtime: Path, *, require_both: bool) -> dict:
 def probe_cli(runtime: Path, binary: Path, expected: dict) -> dict:
     """No model prompt; never emit the potentially sensitive raw CLI output."""
     runtime = within_workspace(runtime)
+    for relative in ("xdg-config", "xdg-config/opencode", "xdg-data", "xdg-cache", "workspace"):
+        within_workspace(runtime / relative)
     if not binary.is_absolute() or not binary.is_file() or not os.access(binary, os.X_OK):
         raise StageError("OpenCode executable is invalid")
     guest_home = str(Path.home())
