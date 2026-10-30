@@ -95,7 +95,7 @@ def check_path_leak(content: str, candidates: set[str], regex: re.Pattern) -> bo
 class TestConfigIntegrity(unittest.TestCase):
     PROJECT_ROOT: str = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     HOME_REGEX: re.Pattern[str] = re.compile(
-        r'(?:/home/|/Users/|C:\\Users\\)(?!(?:username|user|<[^>]+>|skillport)(?:[/\s"\'\\`,.:;()]|$))[^/\s"\'\\`,.:;()]+'
+        r'(?:/home/|/Users/|C:\\Users\\)(?!(?:agent|username|user|<[^>]+>|skillport)(?:[/\s"\'\\`,.:;()]|$))[^/\s"\'\\`,.:;()]+'
     )
     home_candidates: set[str]
 
@@ -130,6 +130,24 @@ class TestConfigIntegrity(unittest.TestCase):
                 continue
         self.assertEqual(leaks, [], f"Leaks found in: {leaks}")
         self.assertEqual(read_errors, [], f"Read errors encountered: {read_errors}")
+
+    def test_guest_agent_workspace_is_not_a_personal_path(self):
+        self.assertFalse(
+            check_path_leak(
+                "/home/agent/workspace/runtime",
+                self.home_candidates,
+                self.HOME_REGEX,
+            )
+        )
+
+    def test_named_home_directory_remains_a_personal_path(self):
+        self.assertTrue(
+            check_path_leak(
+                "/home/alice/workspace",
+                self.home_candidates,
+                self.HOME_REGEX,
+            )
+        )
 
     def test_cloudflare_agent_setup_dependency_scope(self) -> None:
         """Cloudflare skills are pinned; the direct API MCP stays opt-in."""
