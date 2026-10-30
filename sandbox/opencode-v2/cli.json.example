@@ -1,0 +1,6 @@
+{
+  // OpenCode v2.1.4 TUI向けの最小雛形。
+  // sibylの通常パッケージ登録は今後検証。検証用ラッパーは別途PoC済み。
+  "$schema": "https://opencode.ai/v2/cli.json",
+  "plugins": []
+}

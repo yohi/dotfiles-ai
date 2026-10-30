@@ -1,0 +1,34 @@
+# 独自allowlist設計の雛形。実行するexporterは未作成。
+schema: dotfiles-ai/config-selection/v0
+status: template-only
+source_repository: dotfiles-ai
+default: deny
+
+# 現時点ではallowを空に固定。必要なファイルとフィールドを設計・レビューしてから追加する。
+allow: []
+# 将来の候補例（有効化しない）:
+# - source: global-rules/AGENTS.global.md
+#   destination: AGENTS.md
+#   type: text
+#   allow_symlinks: false
+# - source: opencode/omo.jsonc
+#   destination: omo.jsonc
+#   type: sanitized-jsonc
+#   allow_symlinks: false
+
+deny_paths:
+  - ".env"
+  - ".env.*"
+  - "**/.ssh/**"
+  - "**/auth.json"
+  - "**/*credentials*"
+  - "**/.git/**"
+  - "**/node_modules/**"
+  - "**/.local/share/opencode/**"
+  - "**/.config/opencode/**"
+
+# フィールド単位のチェックは将来の実装で強制すること。
+# APMのMCP設定、トークンを参照する環境変数、実行コマンドは自動移植しない。
+refuse_unreviewed_mcp: true
+refuse_unresolved_symlinks: true
+refuse_secret_values: true

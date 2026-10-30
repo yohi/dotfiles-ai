@@ -1,0 +1,7 @@
+{
+  // OpenCode v2.1.4 Server向けの最小雛形。既存v1 configのコピーではない。
+  // Sandbox内に実際に配置する場合は登録方式と依存解決を検証する。
+  "$schema": "https://opencode.ai/config.json",
+  "plugins": [],
+  "mcp": {}
+}

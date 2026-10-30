@@ -1,0 +1,15 @@
+# 独自のポリシー意図表明。sbx policyを変更する実行ファイルではない。
+schema: dotfiles-ai/network-policy/v0
+status: template-only
+default: deny
+allow: []
+
+# 通信が必要な作業ではホスト側で宛先を都度審査し、
+# sbx policy allow network を明示実行し、終了時にsbx policy rm networkで撤回する。
+# 今回のPoCでopencode.ai:443を一時許可し、作業後Deniedへ戻した。
+# 許可候補をここに自動反映しない。
+controls:
+  require_purpose: true
+  require_time_bound: true
+  revoke_after_use: true
+  prohibit_wildcard_domains: true
