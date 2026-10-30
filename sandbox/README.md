@@ -1,6 +1,6 @@
 # OpenCode Sandbox runtime — 設定と開発環境
 
-> **Status: ISOLATED_RUNTIME_POC / NOT_LIVE_TESTED**
+> **Status: RUNTIME_VALIDATION_PREPARED / LIVE_NOT_VERIFIED**
 >
 > このディレクトリは、ホスト管理・Sandbox実行に向けた設定雛形と、読み取り主体の限定的な設定エクスポーターです。
 > Docker Sandboxの作成、`sbx policy`変更、ホストOpenCode v1の更新、認証情報の転送は行いません。
@@ -20,7 +20,8 @@
 1. `feature/sandbox-runtime-scaffold-20261030` — 設定テンプレート・原則
 2. `feature/sandbox-config-exporter-20261030` — エクスポーター・単体テスト
 3. `feature/sandbox-snapshot-stage-20261030` — Sandboxへの明示的な転送・整合性検証
-4. `feature/sandbox-opencode-runtime-20261030` — OpenCode v2の隔離ランチャーとPlugin登録雛形（このブランチ）
+4. `feature/sandbox-opencode-runtime-20261030` — OpenCode v2の隔離ランチャーとPlugin登録雛形
+5. `feature/sandbox-opencode-v2-live-validation-20261030` — ゲスト設定・CLI検証と目視受入手順（このブランチ）
 
 後続のブランチは前段ブランチのHEADから分岐します。masterへの反映は別途レビュー後とします。
 
@@ -89,6 +90,13 @@ OpenCode起動時の設定読み込みとPlugin実動作は後続の検証対象
 通常Plugin登録の動作、実Sandboxへの適用・起動はまだ検証していません。
 
 **詳しい手順と注意点:** [RUNTIME_V2.md](RUNTIME_V2.md)
+
+## 第5段：通常Plugin登録の実機検証準備
+
+ゲスト内の設定・SHA-256・固定Pluginバージョンを検査する `scripts/verify_opencode_v2_runtime.py` と、
+実OpenCode v2.1.4の `--version` / `debug config` を明示実行して、出力を投影評価する手順を追加しました。
+**設定の一致とPlugin setup/Sidebar描画は別の判定**です。
+詳細は [VALIDATION_V2.md](VALIDATION_V2.md)。実Sandboxへの配備や実TUI操作はまだ実施していません。
 
 ## 雛形ファイル（自動適用されない）
 
