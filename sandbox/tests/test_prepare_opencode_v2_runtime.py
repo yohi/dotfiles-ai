@@ -80,6 +80,7 @@ class RuntimePreparationTests(unittest.TestCase):
             launcher = self.destination / "run-opencode.sh"
             self.assertIn("env -i", launcher.read_text())
             self.assertNotIn("never-forwarded", launcher.read_text())
+            self.assertIn("XDG_CONFIG_HOME=", launcher.read_text())
             result = subprocess.run([str(launcher), "--version"], text=True,
                                     capture_output=True, check=False)
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -129,6 +130,17 @@ class RuntimePreparationTests(unittest.TestCase):
         link.symlink_to(akane, target_is_directory=True)
         with self.assertRaises(runtime.StageError):
             runtime.prepare(self.bundle, self.destination, self.binary, link, None, write=True)
+
+    def test_symlinked_plugin_dist_refused(self) -> None:
+        akane = self.plugin("akane")
+        (akane / "dist/index.js").unlink()
+        (akane / "dist").rmdir()
+        outside = self.space / "other-dist"
+        outside.mkdir()
+        (outside / "index.js").write_text("export default {}")
+        (akane / "dist").symlink_to(outside, target_is_directory=True)
+        with self.assertRaises(runtime.StageError):
+            runtime.prepare(self.bundle, self.destination, self.binary, akane, None, write=True)
 
     def test_existing_runtime_refused(self) -> None:
         runtime.prepare(self.bundle, self.destination, self.binary, None, None, write=True)
