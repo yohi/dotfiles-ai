@@ -13,6 +13,7 @@ import hashlib
 import json
 import os
 import sys
+import tempfile
 from pathlib import Path
 
 import yaml
@@ -87,7 +88,7 @@ def _build_files(shell: str, snapshot: bool, apm_sha: str) -> dict[str, bytes]:
     return generated
 
 
-def _validate_destination(root: Path, output: Path) -> None:
+def _validate_destination(root: Path, output: Path) -> Path:
     # Refuse accidental writes into the source checkout or the user's live
     # OpenCode configuration. The destination is an independent staging area.
     if output.is_symlink():
@@ -96,6 +97,9 @@ def _validate_destination(root: Path, output: Path) -> None:
         if candidate.is_symlink():
             raise ExportError("output path contains a symlink")
     actual = output.resolve()
+    temp_root = Path(tempfile.gettempdir()).resolve()
+    if actual == temp_root or not actual.is_relative_to(temp_root):
+        raise ExportError("output must be under the temporary directory")
     if actual == root or actual.is_relative_to(root):
         raise ExportError("output must be outside the source repository")
     home = Path.home().resolve()
@@ -105,6 +109,7 @@ def _validate_destination(root: Path, output: Path) -> None:
         home / ".local" / "share" / "opencode"
     ):
         raise ExportError("output must not be under OpenCode runtime data")
+    return actual
 
 
 def _check(output: Path, generated: dict[str, bytes]) -> None:
@@ -145,15 +150,15 @@ def main(argv: list[str] | None = None) -> int:
         if args.repo_root.is_symlink():
             raise ExportError("repository root must not be a symlink")
         root = args.repo_root.resolve(strict=True)
-        _validate_destination(root, args.out)
+        output = _validate_destination(root, args.out)
         shell, snapshot, apm_sha = _read_apm(root)
         generated = _build_files(shell, snapshot, apm_sha)
         if args.check:
-            _check(args.out, generated)
+            _check(output, generated)
             print("CHECK_OK")
         else:
-            _create(args.out, generated)
-            print("EXPORT_OK: " + str(args.out))
+            _create(output, generated)
+            print("EXPORT_OK: " + str(output))
         return 0
     except (OSError, ExportError) as exc:
         # Do not echo source YAML text or any unselected values.

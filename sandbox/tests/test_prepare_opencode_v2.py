@@ -98,6 +98,12 @@ class ExportTests(unittest.TestCase):
             self.run_export(output=self.root / "sandbox-out").returncode, 0
         )
 
+    def test_refuses_output_outside_temporary_directory(self) -> None:
+        output = Path.home() / "unsafe-opencode-export"
+
+        self.assertNotEqual(self.run_export(output=output).returncode, 0)
+        self.assertFalse(output.exists())
+
     def test_refuses_symlinked_output_parent(self) -> None:
         target = Path(self.tmp.name) / "safe"
         target.mkdir()
