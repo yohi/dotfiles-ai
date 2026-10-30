@@ -49,6 +49,7 @@ def local_plugin(kind: str, location: Path | None) -> str | None:
     meta = path / "package.json"
     target = path / entry
     if (meta.is_symlink() or not meta.is_file() or meta.stat().st_size > 65536
+            or (path / "dist").is_symlink()
             or target.is_symlink() or not target.is_file()):
         raise StageError("invalid local plugin package")
     try:
@@ -123,7 +124,6 @@ def prepare(
             f" XDG_CONFIG_HOME={quote(xdg)}"
             f" XDG_DATA_HOME={quote(dest / 'xdg-data')}"
             f" XDG_CACHE_HOME={quote(dest / 'xdg-cache')}"
-            f" OPENCODE_CONFIG={quote(server_path)}"
             f" {quote(binary)} \"$@\"\n"
         )
         run = dest / "run-opencode.sh"
