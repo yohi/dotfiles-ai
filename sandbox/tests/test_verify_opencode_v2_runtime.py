@@ -169,6 +169,19 @@ class VerifyRuntimeTests(unittest.TestCase):
         with self.assertRaises(verify.StageError):
             verify.verify(self.bundle, self.space.parent)
 
+    def test_workspace_path_errors_do_not_disclose_existence(self) -> None:
+        missing = self.space / "missing"
+        outside = self.space.parent / "existing-outside-workspace"
+        outside.mkdir()
+
+        errors = []
+        for path in (missing, outside):
+            with self.assertRaises(verify.StageError) as ctx:
+                verify._workspace_dir(path)
+            errors.append(str(ctx.exception))
+
+        self.assertEqual(errors[0], errors[1])
+
     def test_verification_does_not_modify_files(self) -> None:
         self.build()
         tracked = [

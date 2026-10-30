@@ -30,12 +30,17 @@ WORKSPACE = Path("/home/agent/workspace")
 def _workspace_dir(path: Path) -> Path:
     if not path.is_absolute() or ".." in path.parts or path.is_symlink():
         raise StageError("invalid workspace directory")
-    canonical = path.resolve(strict=True)
-    workspace = WORKSPACE.resolve(strict=True)
-    if not canonical.is_relative_to(workspace) or canonical == workspace:
-        raise StageError("directory escapes the guest workspace")
-    if canonical != path or not path.is_dir():
-        raise StageError("symlink or non-directory workspace path")
+    try:
+        workspace = WORKSPACE.resolve(strict=True)
+        if not path.is_relative_to(WORKSPACE) or path == WORKSPACE:
+            raise StageError("invalid workspace directory")
+        canonical = path.resolve(strict=True)
+        if not canonical.is_relative_to(workspace) or canonical == workspace:
+            raise StageError("invalid workspace directory")
+        if canonical != path or not path.is_dir():
+            raise StageError("invalid workspace directory")
+    except OSError as exc:
+        raise StageError("invalid workspace directory") from exc
     return canonical
 
 
