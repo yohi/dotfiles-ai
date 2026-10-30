@@ -1,6 +1,6 @@
 # OpenCode Sandbox runtime — 設定と開発環境
 
-> **Status: EXPORTER_POC / NO_DEPLOYMENT**
+> **Status: SNAPSHOT_STAGING_POC / NO_CONFIG_ACTIVATION**
 >
 > このディレクトリは、ホスト管理・Sandbox実行に向けた設定雛形と、読み取り主体の限定的な設定エクスポーターです。
 > Docker Sandboxの作成、`sbx policy`変更、ホストOpenCode v1の更新、認証情報の転送は行いません。
@@ -18,7 +18,8 @@
 ## スタック構成
 
 1. `feature/sandbox-runtime-scaffold-20261030` — 設定テンプレート・原則
-2. `feature/sandbox-config-exporter-20261030` — エクスポーター・単体テスト（このブランチ）
+2. `feature/sandbox-config-exporter-20261030` — エクスポーター・単体テスト
+3. `feature/sandbox-snapshot-stage-20261030` — Sandboxへの明示的な転送・整合性検証（このブランチ）
 
 後続のブランチは前段ブランチのHEADから分岐します。masterへの反映は別途レビュー後とします。
 
@@ -47,6 +48,35 @@ python3 -m unittest discover -s sandbox/tests -p 'test_*.py' -v
 このエクスポーターは標準出力へ設定内容や環境変数を表示しません。生成物は秘密情報を含めない設計ですが、必ず配備前にレビューしてください。
 
 **注意:** 生成結果で `plugins: []`・`mcp: {}` としているのは、**このエクスポーターがPlugin/MCPを出力しない**という意味です。OpenCodeの他の設定ソースや自動検出Pluginを無効化する保証ではありません。実Sandboxの有効設定は別途確認してください。
+
+## 第3段：Sandboxへ転送する前の検査と明示的なステージング
+
+`sandbox/scripts/stage_opencode_v2.py` は第2段の生成物を検証し、デフォルトでは転送しません。
+`--apply` を指定した場合のみ、ローカルのDocker Sandboxへ `sbx cp` で一意な作業用ディレクトリをコピーし、ゲスト側PythonでもSHA-256と許可フィールドを検証します。
+
+```sh
+# 第2段で作成したスナップショットを検証（sbxを起動・呼び出ししない）
+python3 sandbox/scripts/stage_opencode_v2.py --bundle /tmp/opencode-v2-export-20261030
+
+# 既存のmountless Sandboxにだけ、明示的な適用オプションで転送（この例は実行しない）
+python3 sandbox/scripts/stage_opencode_v2.py \
+  --bundle /tmp/opencode-v2-export-20261030 \
+  --sandbox oc-v2-poc --apply
+
+# CI/ローカルの模擬テスト。実際のsbxは呼び出さない
+python3 -m unittest discover -s sandbox/tests -p 'test_*.py' -v
+```
+
+- `--apply` は**OpenCode設定の有効化を意味しません**。Sandbox内の専用ステージングディレクトリに配置・検証するだけです。
+- `sbx exec` は停止中のSandboxを起動する可能性があります。実際のSandboxを指定するのはオペレーターの明示操作に限ります。
+- Docker Sandboxesの利用者とSandbox名は適用時に確定します。ホストの別ユーザー (`y_ohi` / `sbx-poc`) の権限を変更しません。
+- 配備先は**mountless Sandboxを前提**とします。現時点でスクリプトは既存Sandboxのマウント一覧を証明していません。host mountのあるSandboxへ適用しないでください。
+- `sbx cp` はディレクトリ転送時にUID・パーミッションを維持し得るため、秘密情報を含まない構成のみ、ゲストから読めるモードで一時ステージングします。
+- 検証用Pythonスクリプトは設定スナップショットの**隣接ファイル**に配置し、3ファイルの厳格な整合性検査を維持します。ゲスト内の既存プロセスが悪意を持ってステージング内容を置換するような脅威に対する完全な耐改ざん性は証明していません。
+- ゲスト検証に失敗した場合、配置済みの一時ディレクトリは自動削除しません。作業者が確認するまで保持してください。
+
+これまでと同様、ホスト設定・ソースの正本を変更せず、ネットワークポリシー、MCP、有料Providerの設定も変更しません。
+OpenCode起動時の設定読み込みとPlugin実動作は後続の検証対象です。
 
 ## 雛形ファイル（自動適用されない）
 
