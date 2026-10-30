@@ -143,6 +143,21 @@ class ValidateRuntimeTests(unittest.TestCase):
         with self.assertRaises(validator.StageError):
             validator.verify_runtime(self.bundle, self.runtime, require_both=True)
 
+    def test_rejects_symlinked_xdg_config_directory(self) -> None:
+        real = self.runtime / "xdg-config"
+        moved = self.runtime / "real-config"
+        real.rename(moved)
+        real.symlink_to(moved, target_is_directory=True)
+        with self.assertRaises(validator.StageError):
+            validator.verify_runtime(self.bundle, self.runtime, require_both=False)
+
+    def test_rejects_symlinked_runtime_cache_for_cli_probe(self) -> None:
+        cache = self.runtime / "xdg-cache"
+        cache.rmdir()
+        cache.symlink_to(self.space, target_is_directory=True)
+        with self.assertRaises(validator.StageError):
+            validator.probe_cli(self.runtime, self.make_cli_stub(), {})
+
     def test_rejects_runtime_outside_guest_workspace(self) -> None:
         with self.assertRaises(validator.StageError):
             validator.verify_runtime(self.bundle, self.space.parent, require_both=False)
