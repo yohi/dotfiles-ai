@@ -114,17 +114,16 @@ def prepare(
         new_file(server_path, (json.dumps(server, indent=2) + "\n").encode(), 0o600)
         new_file(cli_path, (json.dumps(client, indent=2) + "\n").encode(), 0o600)
 
-        quote = lambda p: shlex.quote(str(p))
         launcher = (
             "#!/bin/sh\nset -eu\n"
-            f"cd {quote(dest / 'workspace')}\n"
+            f"cd {shlex.quote(str(dest / 'workspace'))}\n"
             "exec env -i"
-            f" HOME={quote(Path.home())}"
+            f" HOME={shlex.quote(str(Path.home()))}"
             " PATH=/usr/local/bin:/usr/bin:/bin"
-            f" XDG_CONFIG_HOME={quote(xdg)}"
-            f" XDG_DATA_HOME={quote(dest / 'xdg-data')}"
-            f" XDG_CACHE_HOME={quote(dest / 'xdg-cache')}"
-            f" {quote(binary)} \"$@\"\n"
+            f" XDG_CONFIG_HOME={shlex.quote(str(xdg))}"
+            f" XDG_DATA_HOME={shlex.quote(str(dest / 'xdg-data'))}"
+            f" XDG_CACHE_HOME={shlex.quote(str(dest / 'xdg-cache'))}"
+            f" {shlex.quote(str(binary))} \"$@\"\n"
         )
         run = dest / "run-opencode.sh"
         new_file(run, launcher.encode("utf-8"), 0o700)
