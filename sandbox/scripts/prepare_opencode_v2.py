@@ -76,8 +76,8 @@ def _build_files(shell: str, snapshot: bool, apm_sha: str) -> dict[str, bytes]:
         "source": "apm.yml",
         "source_sha256": apm_sha,
         "opencode_version": "2.1.4",
-        "plugins_enabled": False,
-        "mcp_enabled": False,
+        "plugins_exported": 0,
+        "mcp_entries_exported": 0,
         "artifacts_sha256": {
             name: hashlib.sha256(content).hexdigest()
             for name, content in sorted(generated.items())

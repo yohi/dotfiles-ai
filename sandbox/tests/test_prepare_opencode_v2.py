@@ -25,7 +25,7 @@ class ExportTests(unittest.TestCase):
             "shell: bash\nsnapshot: true\n"
             "plugin:\n - private/plugin\n"
             "dependencies:\n  mcp:\n    - name: privileged\n"
-            "      command: /home/private/secret\n"
+            "      command: /srv/test-only/secret\n"
             "provider:\n  hidden:\n    apiKey: TOP_SECRET_DO_NOT_EXPORT\n",
             encoding="utf-8",
         )
@@ -54,7 +54,7 @@ class ExportTests(unittest.TestCase):
         for output in self.out.iterdir():
             content = output.read_text()
             self.assertNotIn("TOP_SECRET_DO_NOT_EXPORT", content)
-            self.assertNotIn("/home/private/secret", content)
+            self.assertNotIn("/srv/test-only/secret", content)
             self.assertNotIn("private/plugin", content)
         self.assertEqual(self.apm.read_bytes(), before)
 
@@ -63,7 +63,7 @@ class ExportTests(unittest.TestCase):
         manifest = json.loads((self.out / "export-manifest.json").read_text())
         self.assertEqual(manifest["source_sha256"], hashlib.sha256(self.apm.read_bytes()).hexdigest())
         self.assertEqual(manifest["opencode_version"], "2.1.4")
-        self.assertFalse(manifest["mcp_enabled"])
+        self.assertEqual(manifest["mcp_entries_exported"], 0)
         for name, sha in manifest["artifacts_sha256"].items():
             self.assertEqual(sha, hashlib.sha256((self.out / name).read_bytes()).hexdigest())
 
