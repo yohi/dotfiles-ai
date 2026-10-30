@@ -17,7 +17,7 @@ from pathlib import Path
 
 from stage_opencode_v2 import StageError, verify_bundle
 
-WORKSPACE = Path("/home/agent/workspace")
+WORKSPACE = Path.home() / "workspace"
 PLUGINS = {
     "akane": ("@yohi/akane", "3.0.0-alpha.2", "dist/index.js"),
     "sibyl": ("@yohi/sibyl", "3.0.0-alpha.1", "dist/tui.js"),

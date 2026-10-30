@@ -32,17 +32,17 @@
 以下はゲストのagentユーザーが、ホストをマウントしないoc-v2-pocを操作する場合の例です。
 
 事前に第3段のstage_opencode_v2.pyと第4段のprepare_opencode_v2_runtime.pyをゲスト内の
-/home/agent/workspace/へコピーし、同じディレクトリに配置します。ホストでのコピー例：
+`$HOME/workspace/`へコピーし、同じディレクトリに配置します。ホストでのコピー例：
 
 ~~~sh
-sbx cp sandbox/scripts/stage_opencode_v2.py oc-v2-poc:/home/agent/workspace/stage_opencode_v2.py
-sbx cp sandbox/scripts/prepare_opencode_v2_runtime.py oc-v2-poc:/home/agent/workspace/prepare_opencode_v2_runtime.py
+sbx cp sandbox/scripts/stage_opencode_v2.py oc-v2-poc:/home/username/workspace/stage_opencode_v2.py
+sbx cp sandbox/scripts/prepare_opencode_v2_runtime.py oc-v2-poc:/home/username/workspace/prepare_opencode_v2_runtime.py
 ~~~
 
 ゲスト内：
 
 ~~~sh
-BASE=/home/agent/workspace
+BASE="$HOME/workspace"
 BUNDLE="$BASE/sbx-config-REPLACE_WITH_ACTUAL_NAME"
 RUNTIME="$BASE/opencode-v2-runtime-1"
 OC="$HOME/.local/opencode-v2/node_modules/.bin/opencode"
