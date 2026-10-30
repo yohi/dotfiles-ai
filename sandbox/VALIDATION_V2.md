@@ -101,7 +101,7 @@ python3 "$BASE/verify_opencode_v2_runtime.py" \
 "$RUNTIME/run-opencode.sh" --standalone
 ~~~
 
-- 有効設定のServer pluginsにakaneのディレクトリ、TUI pluginsにsibylのディレクトリがあるか確認する。
+- 有効設定のServer pluginsにakaneのディレクトリがあるか確認する。TUI pluginsは`$RUNTIME/xdg-config/opencode/cli.json`を別途確認する（Serverの`debug config`だけではTUI設定の証明にならない）。
 - OpenCode起動時にPluginのimport/setupのエラーが出ていないか確認する。
 - Sidebarを確認し、必要ならセッションを選択する。akaneの状態が未生成ならSidebarは非表示になり得る。
 - \`opencode plugin list\`だけで、実行時のPlugin初期化を判断しない。
