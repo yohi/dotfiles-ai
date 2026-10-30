@@ -181,6 +181,13 @@ class VerifyRuntimeTests(unittest.TestCase):
 
         self.assertEqual(errors[0], errors[1])
 
+    def test_external_workspace_path_is_rejected_before_symlink_probe(self) -> None:
+        outside = self.space.parent / "outside"
+
+        with patch.object(Path, "is_symlink", side_effect=AssertionError):
+            with self.assertRaises(verify.StageError):
+                verify._workspace_dir(outside)
+
     def test_verification_does_not_modify_files(self) -> None:
         self.build()
         tracked = [

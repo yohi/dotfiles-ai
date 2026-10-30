@@ -28,15 +28,17 @@ INVALID_WORKSPACE_DIRECTORY = "invalid workspace directory"
 
 
 def _workspace_dir(path: Path) -> Path:
-    if not path.is_absolute() or ".." in path.parts or path.is_symlink():
+    if not path.is_absolute() or ".." in path.parts:
         raise StageError(INVALID_WORKSPACE_DIRECTORY)
     try:
         workspace = WORKSPACE.resolve(strict=True)
         if not path.is_relative_to(WORKSPACE) or path == WORKSPACE:
             raise StageError(INVALID_WORKSPACE_DIRECTORY)
+        if path.is_symlink():
+            raise StageError(INVALID_WORKSPACE_DIRECTORY)
         # Canonicalize only lexically workspace-contained paths, then reject
         # escapes and normalize all failures to the same CLI response.
-        canonical = path.resolve(strict=True)  # NOSONAR
+        canonical = path.resolve(strict=True)
         if not canonical.is_relative_to(workspace) or canonical == workspace:
             raise StageError(INVALID_WORKSPACE_DIRECTORY)
         if canonical != path or not path.is_dir():
