@@ -1,0 +1,44 @@
+# dotfiles-ai独自の設計用manifest。Docker Sandboxes公式スキーマではない。
+# 読み取る実装は未作成。実行・配備はされない。
+schema: dotfiles-ai/sandbox-profile/v0
+status: template-only
+name: opencode-v2-dev
+
+runtime:
+  provider: docker-sandboxes
+  sandbox_name: oc-v2-dev   # 例。現在のoc-v2-pocを変更しない
+  cpus: 4
+  memory: 8g
+  workspace_strategy: explicit-copy  # 今回のPoCで検証済みの方式
+  direct_host_mount: false
+  ssh_agent_forwarding: false
+  skills_auto_install: false
+
+opencode:
+  version: "2.1.4"
+  # 実際のOpenCode設定は ../opencode-v2/ の雛形から別途構築する
+  server_config: sandbox/opencode-v2/opencode.jsonc.example
+  tui_config: sandbox/opencode-v2/cli.json.example
+  plugins:
+    akane:
+      version: "3.0.0-alpha.2"
+      role: server
+      entry: dist/index.js
+    sibyl:
+      version: "3.0.0-alpha.1"
+      role: tui
+      entry: dist/tui.js
+
+sources:
+  configuration_ssot: apm.yml
+  configuration_export_policy: sandbox/config/config-selection.example.yaml
+  project_repositories: separate-host-git-repositories
+  workspace_import: reviewed-copy-only
+  result_export: reviewed-diff-and-test-evidence-only
+
+security:
+  network_policy: sandbox/policy/network.example.yaml
+  secrets: not-exported
+  mcp: disabled-until-reviewed
+  import_symlinks: reject
+  host_write_back: manual-review-only
