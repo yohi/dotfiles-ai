@@ -248,7 +248,7 @@ class GuestTest(unittest.TestCase):
 
     def _assets(self):
         names = sorted(guest.ASSET_TARGETS)
-        contents = {name: ("# selected text\\n" if name != 'theme.json'
+        contents = {name: ("# selected text\n" if name != 'theme.json'
                            else '{"name":"tokyonight"}')
                     for name in names}
         hashes = {name: hashlib.sha256(data.encode('utf-8')).hexdigest()
@@ -257,7 +257,7 @@ class GuestTest(unittest.TestCase):
         directory = self.base / 'assets'
         directory.mkdir(exist_ok=True)
         path = directory / 'assets.json'
-        raw = (json.dumps(payload, sort_keys=True) + '\\n').encode()
+        raw = (json.dumps(payload, sort_keys=True) + '\n').encode()
         path.write_bytes(raw)
         return path, hashlib.sha256(raw).hexdigest()
 
@@ -327,10 +327,10 @@ class AssetExporterTest(unittest.TestCase):
             if source == assets.THEME_SOURCE:
                 file.write_text('{"theme":"tokyonight","plugin":["DO_NOT_IMPORT"]}')
             elif source.startswith('agent-commands/'):
-                file.write_text('---\\ndescription: Safe skill command\\nagent: old-agent\\n'
-                                'model: unavailable/v1-model\\n---\\nBody of command\\n')
+                file.write_text('---\ndescription: Safe skill command\nagent: old-agent\n'
+                                'model: unavailable/v1-model\n---\nBody of command\n')
             else:
-                file.write_text('# Reviewed content\\n', encoding='utf-8')
+                file.write_text('# Reviewed content\n', encoding='utf-8')
 
     def tearDown(self):
         self.temp.cleanup()
