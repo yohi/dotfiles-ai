@@ -14,7 +14,7 @@ from pathlib import Path
 SCHEMA = "dotfiles-ai/oc2-agent-routes/v1"
 SOURCE = "opencode/omo.jsonc"
 MAX_SOURCE = 256 * 1024
-MAX_OUTPUT = 128 * 1024
+MAX_OUTPUT = 64 * 1024
 
 # Native role adapters are intentionally narrower than full OMO functionality.
 # In particular, Justice gate controllers are NOT imported as V2 agents.
@@ -196,6 +196,7 @@ def build(repo: Path) -> tuple[dict, str]:
             item["permissions"] = [
                 {"action": "edit", "resource": "*", "effect": "deny"},
                 {"action": "shell", "resource": "*", "effect": "deny"},
+                {"action": "subagent", "resource": "*", "effect": "deny"},
             ]
         native[role] = item
     payload = {
