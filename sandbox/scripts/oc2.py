@@ -135,7 +135,8 @@ def execute(runner: Runner, name: str, *args: str) -> None:
 
 
 def stage(runner: Runner, name: str, bundle: pathlib.Path, manifest_sha: str,
-          guest_script: pathlib.Path) -> None:
+          guest_script: pathlib.Path, assets_file: pathlib.Path | None = None,
+          assets_sha: str | None = None) -> None:
     destination = f'{ROOT}/bundles/{manifest_sha[:16]}'
     script_sha = hashlib.sha256(guest_script.read_bytes()).hexdigest()
     script_dest = f'{ROOT}/scripts/oc2_guest_{script_sha[:16]}.py'
@@ -162,8 +163,27 @@ def stage(runner: Runner, name: str, bundle: pathlib.Path, manifest_sha: str,
     remote_sha = runner.sbx('exec', name, 'sha256sum', script_dest, capture=True).split()[0]
     if remote_sha != script_sha:
         raise Stop('guest bootstrap code SHA mismatch')
-    execute(runner, name, 'python3', script_dest, '--bundle', destination,
-            '--expected-sha', manifest_sha)
+    args = ['--bundle', destination, '--expected-sha', manifest_sha]
+    if (assets_file is None) != (assets_sha is None):
+        raise Stop('asset file and hash must be supplied together')
+    if assets_file is not None and assets_sha is not None:
+        if re.fullmatch(r'[0-9a-f]{64}', assets_sha) is None:
+            raise Stop('invalid asset hash')
+        remote_assets = f'{ROOT}/assets/{assets_sha[:16]}.json'
+        execute(runner, name, 'mkdir', '-p', f'{ROOT}/assets')
+        check = runner.sbx('exec', name, 'bash', '-c',
+                           f'if test -e {shlex.quote(remote_assets)}; then echo exists; else echo missing; fi',
+                           capture=True).strip()
+        if check == 'missing':
+            runner.sbx('cp', str(assets_file), f'{name}:{remote_assets}')
+        elif check != 'exists':
+            raise Stop('cannot establish guest asset state')
+        actual = runner.sbx('exec', name, 'sha256sum',
+                            remote_assets, capture=True).split()[0]
+        if actual != assets_sha:
+            raise Stop('guest asset bundle SHA mismatch')
+        args.extend(['--assets', remote_assets, '--expected-assets-sha', assets_sha])
+    execute(runner, name, 'python3', script_dest, *args)
 
 
 def cli_path(runner: Runner, name: str) -> str | None:
@@ -294,6 +314,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.dry_run:
             print('OC2 PLAN: mountless sandbox=' + args.sandbox)
             print('OC2 PLAN: source=apm.yml; allowlist=shell,snapshot; no MCP/credentials')
+            print('OC2 PLAN: strict asset allowlist (rules 7, commands 1, skills 2, theme 1)')
             print('OC2 PLAN: export, stage, pinned CLI provision, --standalone TUI')
             return 0
         if not shutil.which('sbx'):
@@ -301,10 +322,17 @@ def main(argv: list[str] | None = None) -> int:
             if args.sbx_user == getpass.getuser():
                 raise Stop('sbx CLI was not found')
         guest_script = HERE / 'oc2_guest.py'
+        from oc2_assets import AssetError, build, write_new
         with tempfile.TemporaryDirectory(prefix='oc2-export-') as temp:
             tmp = pathlib.Path(temp)
             tmp.chmod(0o755)
             bundle, digest = export_config(repo, tmp / 'bundle')
+            try:
+                asset_bytes, asset_sha = build(repo)
+                asset_file = tmp / 'oc2-assets.json'
+                write_new(asset_file, asset_bytes)
+            except AssetError as exc:
+                raise Stop('safe settings export failed: ' + str(exc)) from exc
             code = tmp / 'oc2_guest.py'
             shutil.copyfile(guest_script, code)
             code.chmod(0o644)
@@ -314,11 +342,13 @@ def main(argv: list[str] | None = None) -> int:
                 runner.sbx('create', '--name', args.sandbox, 'shell')
             else:
                 print('OC2: reusing verified mountless Sandbox ' + args.sandbox)
-            stage(runner, args.sandbox, bundle, digest, code)
+            stage(runner, args.sandbox, bundle, digest, code, asset_file, asset_sha)
             cli = provision_cli(runner, args.sandbox, args.seed_sandbox, tmp)
-            print('OC2_PREPARED: sandbox=' + args.sandbox + ' config_sha=' + digest[:16])
+            runtime_sha = hashlib.sha256(bytes.fromhex(digest) + bytes.fromhex(asset_sha)).hexdigest()
+            print('OC2_PREPARED: sandbox=' + args.sandbox +
+                  ' config_sha=' + digest[:16] + ' assets_sha=' + asset_sha[:16])
             if not args.prepare_only:
-                launch(runner, args.sandbox, digest, cli)
+                launch(runner, args.sandbox, runtime_sha, cli)
         return 0
     except (Stop, OSError, ValueError, subprocess.TimeoutExpired) as exc:
         # No credentials, source config, or raw subprocess dumps on failure.
