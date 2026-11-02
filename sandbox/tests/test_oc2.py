@@ -33,8 +33,12 @@ guest = load('oc2_guest')
 
 
 class FakeRunner:
-    def __init__(self, rows=None):
+    def __init__(self, rows=None, inspection=None):
         self.rows = rows or []
+        self.inspection = (
+            {'name': 'oc2-dev', 'runtime_mounts': []}
+            if inspection is None else inspection
+        )
         self.calls = []
 
     def sbx(self, *args, **kwargs):
@@ -43,6 +47,8 @@ class FakeRunner:
             return '\n'.join(row['name'] for row in self.rows)
         if args == ('ls', '--format', 'json'):
             return json.dumps(self.rows)
+        if args == ('inspect', 'oc2-dev', '--json'):
+            return json.dumps(self.inspection)
         if args[:2] == ('exec', 'oc2-dev') and 'sha256sum' in args:
             return '0' * 64 + ' /tmp/file\n'
         return ''
@@ -54,18 +60,47 @@ class HostTest(unittest.TestCase):
         self.assertFalse(oc2.is_compatible_sandbox(runner, 'oc2-dev'))
 
     def test_mountless_sandbox_reused(self):
-        runner = FakeRunner([{'name': 'oc2-dev', 'agent': 'shell', 'workspace': '-'}])
+        # sbx v0.49.2 omits mount-related fields from ls --format json.
+        runner = FakeRunner([{'name': 'oc2-dev', 'agent': 'shell'}])
         self.assertTrue(oc2.is_compatible_sandbox(runner, 'oc2-dev'))
+        self.assertIn(('inspect', 'oc2-dev', '--json'), runner.calls)
 
     def test_mounted_workspace_rejected(self):
         runner = FakeRunner([{'name': 'oc2-dev', 'agent': 'shell', 'workspace': '/home/user/repo'}])
         with self.assertRaisesRegex(oc2.Stop, 'workspace mount'):
             oc2.is_compatible_sandbox(runner, 'oc2-dev')
 
-    def test_missing_workspace_evidence_rejected(self):
-        runner = FakeRunner([{'name': 'oc2-dev', 'agent': 'shell'}])
-        with self.assertRaisesRegex(oc2.Stop, 'no Host mount'):
+    def test_missing_runtime_mounts_evidence_rejected(self):
+        runner = FakeRunner([{'name': 'oc2-dev', 'agent': 'shell'}],
+                            inspection={'name': 'oc2-dev'})
+        with self.assertRaisesRegex(oc2.Stop, 'mount information missing'):
             oc2.is_compatible_sandbox(runner, 'oc2-dev')
+
+    def test_runtime_mounts_rejected(self):
+        runner = FakeRunner([{'name': 'oc2-dev', 'agent': 'shell'}],
+                            inspection={'name': 'oc2-dev',
+                                        'runtime_mounts': [{'source': '/home/user'}]})
+        with self.assertRaisesRegex(oc2.Stop, 'runtime mounts'):
+            oc2.is_compatible_sandbox(runner, 'oc2-dev')
+
+    def test_inspect_name_mismatch_rejected(self):
+        runner = FakeRunner([{'name': 'oc2-dev', 'agent': 'shell'}],
+                            inspection={'name': 'other-sandbox', 'runtime_mounts': []})
+        with self.assertRaisesRegex(oc2.Stop, 'identity mismatch'):
+            oc2.is_compatible_sandbox(runner, 'oc2-dev')
+
+    def test_invalid_runtime_mounts_type_rejected(self):
+        runner = FakeRunner([{'name': 'oc2-dev', 'agent': 'shell'}],
+                            inspection={'name': 'oc2-dev', 'runtime_mounts': {}})
+        with self.assertRaisesRegex(oc2.Stop, 'mount information missing'):
+            oc2.is_compatible_sandbox(runner, 'oc2-dev')
+
+    def test_list_workspace_mount_rejected_even_if_inspect_empty(self):
+        runner = FakeRunner([{'name': 'oc2-dev', 'agent': 'shell',
+                              'workspace': '/home/user/source'}])
+        with self.assertRaisesRegex(oc2.Stop, 'workspace mount'):
+            oc2.is_compatible_sandbox(runner, 'oc2-dev')
+        self.assertNotIn(('inspect', 'oc2-dev', '--json'), runner.calls)
 
     def test_wrong_agent_rejected(self):
         runner = FakeRunner([{'name': 'oc2-dev', 'agent': 'opencode', 'workspace': '-'}])
