@@ -1,6 +1,6 @@
 # oc2 — HostからDocker Sandbox内のOpenCode v2.1.4を起動
 
-**Status: FEATURE_BRANCH_IMPLEMENTED / OFFLINE_UNIT_TESTED / LIVE_OC2_NOT_YET_VERIFIED**
+**Status: FEATURE_BRANCH_PATCHED / FIRST_LIVE_ATTEMPT_FAILED / RETEST_PENDING**
 
 この初期実装は、既存P6の設定エクスポートを再利用して単一のHost側ランチャーに統合します。v1設定の完全移行ではありません。
 
@@ -45,7 +45,9 @@ Sandbox内に作成されるデータ：
 - `/home/agent/workspace/oc2/bundles/<manifest-prefix>`
 - `/home/agent/workspace/oc2/runtime/<manifest-prefix>`
 
-本ランチャーによるSandbox構築・TUI起動の実機検証は**未実施**です。現時点で確認したのはソース単体テストのみです。
+2026-11-03の初回実機実行では、`oc2-dev`のmountless Sandbox作成に成功しましたが、直後の `mkdir: cannot create directory '': No such file or directory` で停止しました。これは旧ランチャーが `sbx exec ... bash -c` の `$1` / `$2` 引数に依存していた問題と整合します。featureブランチ上で直接argv実行に修正しましたが、**修正後の実機再検証は未実施**です。
+
+再試行前には別の作業ツリーに未コミット変更がないか確認してください。既存の `oc2-dev` を削除せず、そのまま再利用します。
 
 ## テスト
 
@@ -64,3 +66,16 @@ python3 -m py_compile sandbox/scripts/oc2.py sandbox/scripts/oc2_guest.py
 - クラウドLLMへの資格情報非開示接続とHostの差分回収経路
 
 このfeatureブランチは**ワンコマンド起動の基盤実装**です。設定・モデル・開発Workspaceを含む実用環境がすべて完成したという主張ではありません。
+
+## 2026-11-03 — sbx exec引数転送の初回実機修正
+
+旧実装では初期化や存在チェックに `bash -c '...' oc2 "$path"` を使っていました。実機の初回起動では `mkdir` に空の引数が渡される事象が観測されました。
+
+対策:
+
+- ディレクトリ生成・権限設定を `sbx exec SANDBOX mkdir ...` / `chmod ...` に変更
+- 存在・CLIバージョン検査のパスを固定引用し、`bash -c` の後ろに引数を渡さない
+- TUIを `sbx exec -it -w ... SANDBOX env -i ... opencode --standalone` で直接起動
+- argv形状のオフライン回帰テストを追加
+
+改修後に必要な確認は `python3 -m unittest discover -s sandbox/tests -p 'test_oc2.py' -v` と実機の `oc2 --prepare-only` です。既存のNetwork PolicyやSandboxを削除・初期化しません。オフラインテストと実機確認がPASSするまではワンコマンド構築完了と判定しません。
