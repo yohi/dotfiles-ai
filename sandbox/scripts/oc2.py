@@ -42,7 +42,7 @@ class Runner:
         if self.user != getpass.getuser():
             if not shutil.which('sudo'):
                 raise Stop('sudo is required to use the separate Sandbox operator account')
-            command.extend(['sudo', '-u', self.user, '--'])
+            command.extend(['sudo', '-i', '-u', self.user, '--'])
         command.extend(['sbx', *args])
         if self.dry_run:
             print('PLAN: ' + ' '.join(command[:5]) + ' [...]')
