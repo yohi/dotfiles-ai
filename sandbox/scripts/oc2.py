@@ -13,6 +13,7 @@ import hashlib
 import os
 import pathlib
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -115,21 +116,22 @@ def stage(runner: Runner, name: str, bundle: pathlib.Path, manifest_sha: str,
     destination = f'{ROOT}/bundles/{manifest_sha[:16]}'
     script_sha = hashlib.sha256(guest_script.read_bytes()).hexdigest()
     script_dest = f'{ROOT}/scripts/oc2_guest_{script_sha[:16]}.py'
-    execute(runner, name, 'bash', '-c',
-            'set -eu; mkdir -p "$1" "$2"; chmod 700 "$1" "$2"',
-            'oc2', f'{ROOT}/bundles', f'{ROOT}/scripts')
+    # sbx exec v0.49.2 was observed invoking bash -c without the expected
+    # trailing positional parameters. Use direct argv for filesystem operations.
+    execute(runner, name, 'mkdir', '-p', ROOT, f'{ROOT}/bundles', f'{ROOT}/scripts')
+    execute(runner, name, 'chmod', '700', ROOT, f'{ROOT}/bundles', f'{ROOT}/scripts')
     # Never overwrite an existing bundle or bootstrap script. Reuse is allowed
     # only after the guest validates their content and hash.
     exists = runner.sbx('exec', name, 'bash', '-c',
-                        'if test -e "$1"; then echo exists; else echo missing; fi',
-                        'oc2', destination, capture=True).strip()
+                        f'if test -e {shlex.quote(destination)}; then echo exists; else echo missing; fi',
+                        capture=True).strip()
     if exists == 'missing':
         runner.sbx('cp', str(bundle), f'{name}:{destination}')
     elif exists != 'exists':
         raise Stop('cannot determine remote bundle state')
     script_exists = runner.sbx('exec', name, 'bash', '-c',
-                               'if test -e "$1"; then echo exists; else echo missing; fi',
-                               'oc2', script_dest, capture=True).strip()
+                               f'if test -e {shlex.quote(script_dest)}; then echo exists; else echo missing; fi',
+                               capture=True).strip()
     if script_exists == 'missing':
         runner.sbx('cp', str(guest_script), f'{name}:{script_dest}')
     elif script_exists != 'exists':
@@ -143,10 +145,11 @@ def stage(runner: Runner, name: str, bundle: pathlib.Path, manifest_sha: str,
 
 def cli_path(runner: Runner, name: str) -> str | None:
     for candidate in PINNED:
+        quoted = shlex.quote(candidate)
         result = runner.sbx('exec', name, 'bash', '-c',
-                            'if test -x "$1"; then "$1" --version; fi',
-                            'oc2', candidate, capture=True).strip()
-        if result == 'opencode v' + VERSION:
+                            f'if test -x {quoted}; then {quoted} --version; fi',
+                            capture=True).strip()
+        if result in (VERSION, 'v' + VERSION, 'opencode v' + VERSION):
             return candidate
     return None
 
@@ -162,10 +165,11 @@ def seed_cli(runner: Runner, name: str, source: str, scratch: pathlib.Path) -> s
     if not is_compatible_sandbox(runner, source):
         return None
     binary = PINNED[0]
+    quoted = shlex.quote(binary)
     version = runner.sbx('exec', source, 'bash', '-c',
-                         'if test -x "$1"; then "$1" --version; fi',
-                         'oc2', binary, capture=True).strip()
-    if version != 'opencode v' + VERSION:
+                         f'if test -x {quoted}; then {quoted} --version; fi',
+                         capture=True).strip()
+    if version not in (VERSION, 'v' + VERSION, 'opencode v' + VERSION):
         return None
     # sbx cp runs as sbx-poc, not the Host repo owner. Give it a private
     # temporary directory owned by the operator instead of chmod 0777 on the
@@ -217,24 +221,32 @@ def provision_cli(runner: Runner, name: str, seed: str, scratch: pathlib.Path) -
 
 
 def launch(runner: Runner, name: str, digest: str, cli: str) -> None:
+    # Use sbx exec's native --workdir and direct argv instead of bash -c
+    # positional parameters. The configured runtime is fully sandbox-local.
+    if re.fullmatch(r'[0-9a-f]{64}', digest) is None:
+        raise Stop('invalid runtime digest')
+    if cli not in PINNED:
+        raise Stop('unapproved OpenCode executable path')
     runtime = f'{ROOT}/runtime/{digest[:16]}'
-    # Fixed bash command; only validated SHA and fixed executable paths are
-    # interpolated. No local shell config / credentials are inherited.
-    command = '''
-set -eu
-R="$1"
-BIN="$2"
-test -s "$R/config/opencode/opencode.jsonc"
-cd "$R/project"
-exec env -i HOME="$R/home" USER=agent SHELL=/bin/bash \
- PATH=/usr/local/bin:/usr/bin:/bin TERM="${TERM:-xterm-256color}" LANG=C.UTF-8 \
- XDG_CONFIG_HOME="$R/config" XDG_DATA_HOME="$R/data" \
- XDG_STATE_HOME="$R/state" XDG_CACHE_HOME="$R/cache" TMPDIR="$R/tmp" \
- OPENCODE_WATCHDOG_ENABLED=false OPENCODE_DISABLE_AUTOUPDATE=1 \
- OPENCODE_DISABLE_MODELS_FETCH=1 "$BIN" --standalone
-'''
-    runner.sbx('exec', '-it', name, 'bash', '-c', command, 'oc2', runtime, cli, tty=True)
-
+    runner.sbx(
+        'exec', '-it', '-w', f'{runtime}/project', name,
+        'env', '-i',
+        f'HOME={runtime}/home',
+        'USER=agent',
+        'SHELL=/bin/bash',
+        'PATH=/usr/local/bin:/usr/bin:/bin',
+        'TERM=xterm-256color',
+        'LANG=C.UTF-8',
+        f'XDG_CONFIG_HOME={runtime}/config',
+        f'XDG_DATA_HOME={runtime}/data',
+        f'XDG_STATE_HOME={runtime}/state',
+        f'XDG_CACHE_HOME={runtime}/cache',
+        f'TMPDIR={runtime}/tmp',
+        'OPENCODE_WATCHDOG_ENABLED=false',
+        'OPENCODE_DISABLE_AUTOUPDATE=1',
+        'OPENCODE_DISABLE_MODELS_FETCH=1',
+        cli, '--standalone', tty=True,
+    )
 
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description=__doc__)
