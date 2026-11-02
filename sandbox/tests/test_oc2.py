@@ -360,6 +360,36 @@ class GuestTest(unittest.TestCase):
         tui = json.loads((target / 'config/opencode/cli.json').read_text())
         self.assertEqual(tui['theme'], {'name': 'tokyonight'})
 
+    def test_guest_rejects_agent_model_pin_even_with_valid_hashes(self):
+        path, sha = self._assets()
+        data = json.loads(path.read_bytes())
+        key = 'metadata/agent-routes.json'
+        metadata = json.loads(data['files'][key])
+        metadata['native_agents']['sisyphus']['model'] = 'openai/unapproved'
+        data['files'][key] = json.dumps(metadata, sort_keys=True)
+        data['sha256'][key] = hashlib.sha256(
+            data['files'][key].encode('utf-8')
+        ).hexdigest()
+        rewritten = (json.dumps(data, sort_keys=True) + '\n').encode()
+        path.write_bytes(rewritten)
+        with self.assertRaisesRegex(ValueError, 'unsafe native agent config'):
+            guest.verify_assets(path, hashlib.sha256(rewritten).hexdigest())
+
+    def test_guest_rejects_review_agent_write_or_delegation(self):
+        path, sha = self._assets()
+        data = json.loads(path.read_bytes())
+        key = 'metadata/agent-routes.json'
+        metadata = json.loads(data['files'][key])
+        metadata['native_agents']['oracle']['permissions'].pop()
+        data['files'][key] = json.dumps(metadata, sort_keys=True)
+        data['sha256'][key] = hashlib.sha256(
+            data['files'][key].encode('utf-8')
+        ).hexdigest()
+        rewritten = (json.dumps(data, sort_keys=True) + '\n').encode()
+        path.write_bytes(rewritten)
+        with self.assertRaisesRegex(ValueError, 'must be read-only'):
+            guest.verify_assets(path, hashlib.sha256(rewritten).hexdigest())
+
     def test_assets_tampering_rejected(self):
         path, sha = self._assets()
         path.write_bytes(path.read_bytes().replace(b'tokyonight', b'othername'))
