@@ -317,6 +317,7 @@ class GuestTest(unittest.TestCase):
                 value['permissions'] = [
                     {'action': 'edit', 'resource': '*', 'effect': 'deny'},
                     {'action': 'shell', 'resource': '*', 'effect': 'deny'},
+                    {'action': 'subagent', 'resource': '*', 'effect': 'deny'},
                 ]
             native[role] = value
         metadata = {
