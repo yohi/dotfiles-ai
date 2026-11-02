@@ -1,6 +1,6 @@
 # oc2 — HostからDocker Sandbox内のOpenCode v2.1.4を起動
 
-**Status: FEATURE_BRANCH_PATCHED / FIRST_LIVE_ATTEMPT_FAILED / RETEST_PENDING**
+**Status: ONE_COMMAND_TUI_LIVE_PASS / SETTINGS_MIGRATION_R1_IMPLEMENTED / ASSET_LIVE_RETEST_PENDING**
 
 この初期実装は、既存P6の設定エクスポートを再利用して単一のHost側ランチャーに統合します。v1設定の完全移行ではありません。
 
@@ -37,7 +37,7 @@ Host実行ユーザーがsbx-pocと異なる場合はsudoを介してsbxを呼�
 
 ## 対象と除外
 
-現行のエクスポーターが許可する設定は`shell`と`snapshot`だけです。Provider、OMO、Agents、Rules、Commands、Skills、Akane、Sibyl、MCP、認証情報は初期実装では自動移植しません。`plugins: []`、`mcp: {}`は出力スナップショットの内容であり、OpenCodeの他の設定ソースからの自動検出まで完全に無効化する保証ではありません。
+元の設定エクスポーターは`apm.yml`から`shell`と`snapshot`だけを移行します。追加の`oc2_assets.py`が固定許可リストからGlobal Rules（AGENTS.md＋補助6件）、`/build-skill`コマンド、2つの自作Skills、TUIの`theme`だけを選別・変換します。Provider、OMO、Agents、その他のCommands、外部Skills、Akane、Sibyl、MCP、認証情報は自動移植しません。`plugins: []`、`mcp: {}`は出力スナップショットの内容であり、OpenCodeの他の設定ソースからの自動検出まで完全に無効化する保証ではありません。
 
 SandboxへSSH Agent・API Key・トークン・Host OpenCode v1の設定全体・HostのGitリポジトリはコピーしません。Hostに書込みWorkspaceをマウントしません。既存`oc-v2-poc`のG3/P6実験データも変更しません。`OPENCODE_WATCHDOG_ENABLED=false`、LLMリクエストは送信しません。
 
@@ -92,3 +92,32 @@ Host Operatorの実測:
 これを受けて既存Sandbox再利用時の判定を`sbx inspect NAME --json`に変更しました。既存の一覧情報による名前・agentの確認も維持し、`runtime_mounts`が空配列のときだけ続行します。既存一覧に`workspace`情報があり、それがマウントを示す場合も拒否します。無条件でmountlessとみなす処理には変更していません。
 
 修正後の実機検証は未実施です。次に新しい修正HEADを一時worktreeへ取り込み、オフラインテスト・`oc2 --prepare-only`の順で実施してください。既存の`oc2-dev`は削除しないでください。
+
+## 2026-11-03 — Settings Migration R1（実機適用前）
+
+`oc2`の作成・再利用・Configステージ・固定CLI準備・`--standalone`によるTUI起動はHuman Operatorの実機確認でPASSしました。この結果は**追加の設定移行処理の検証を意味しません**。
+
+新規の`sandbox/scripts/oc2_assets.py`は、Hostの`dotfiles-ai`から以下の**固定許可リスト**だけをUTF-8テキストとして読みます。
+
+- `global-rules/AGENTS.global.md` → `$XDG_CONFIG_HOME/opencode/AGENTS.md`
+- `global-rules/{DOCS_STYLE,GIT_STANDARDS,MARKDOWN,META_PROMPT,SHELL,STACKED_PR_WORKFLOW}.md` → `$XDG_CONFIG_HOME/opencode/rules/`
+- `agent-commands/build-skill.md` → `$XDG_CONFIG_HOME/opencode/commands/build-skill.md`（v1専用の`agent`/`model`フィールドを除去）
+- `agent-skills/custom/{agent-skill-architect,config-modernizer}/SKILL.md` → `$XDG_CONFIG_HOME/opencode/skills/<id>/SKILL.md`
+- `opencode/tui.jsonc`の`theme`のみ → v2の`cli.json.theme.name`へ変換
+
+JSONに`files`とSHA-256を格納し、Host全体のSHA-256でも固定します。guest側は**独立の許可リスト**に一致する項目だけを検証してから書き込みます。SSH/Git認証情報、`.env`、既存のHost OpenCode auth、MCP、Provider、TUI plugin一覧は読み取りません。出力内容が異なる場合は、新しいRuntime IDを使用し、既存Runtimeを上書きしません。
+
+`opencode.jsonc.instructions`は、Sandbox内に配備した補助ルール6件の絶対パスを参照します。Global `AGENTS.md`はOpenCode v2の自動読み込み対象であり、重複を避けて`instructions`には入れません。
+
+**今後の移行対象**: Agents/OMO/モデルルーティング（v2への意味論的変換が必要）、Akane/Sibyl（バージョン・ロード契約確認）、外部Skills、その他Commands（副作用とモデルピンのレビューが必要）、LLM用Host BrokerとMCP。
+
+### このrevisionの確認
+
+```sh
+python3 -m unittest discover -s sandbox/tests -p 'test_oc2.py' -v
+python3 -m py_compile sandbox/scripts/oc2.py sandbox/scripts/oc2_guest.py sandbox/scripts/oc2_assets.py
+./bin/oc2 --dry-run
+./bin/oc2 --prepare-only
+```
+
+`OC2_ASSETS_VERIFIED`と`OC2_PREPARED`を確認してから`./bin/oc2`でTUIを起動してください。この段階でモデル推論や外部サービスへの接続は行いません。修正対象はfeatureブランチだけで、Host OpenCode v1や`oc-v2-poc`の既存設定は変更しません。
