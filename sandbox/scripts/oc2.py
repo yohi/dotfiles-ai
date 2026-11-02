@@ -167,18 +167,33 @@ def seed_cli(runner: Runner, name: str, source: str, scratch: pathlib.Path) -> s
                          'oc2', binary, capture=True).strip()
     if version != 'opencode v' + VERSION:
         return None
-    local = scratch / 'node_modules'
-    if local.exists():
-        raise Stop('CLI seed staging already exists')
-    print('OC2: seeding pinned CLI from read-only PoC sandbox ' + source)
-    runner.sbx('cp', f'{source}:/home/agent/.local/opencode-v2/node_modules', str(local))
-    runner.sbx('exec', name, 'bash', '-c',
-               'set -eu; mkdir -p /home/agent/.local/opencode-v2; '
-               'test ! -e /home/agent/.local/opencode-v2/node_modules')
-    runner.sbx('cp', str(local), f'{name}:/home/agent/.local/opencode-v2/node_modules')
-    if cli_path(runner, name) != binary:
-        raise Stop('seeded OpenCode CLI did not verify as v2.1.4')
-    return binary
+    # sbx cp runs as sbx-poc, not the Host repo owner. Give it a private
+    # temporary directory owned by the operator instead of chmod 0777 on the
+    # Host-owned export directory.
+    operator = ([] if runner.user == getpass.getuser()
+                else ['sudo', '-i', '-u', runner.user, '--'])
+    try:
+        created = subprocess.run([*operator, 'mktemp', '-d', '/tmp/oc2-seed-XXXXXXXX'],
+                                 capture_output=True, text=True, timeout=15, check=True)
+    except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
+        raise Stop('could not create private Sandbox operator staging directory') from exc
+    staging = created.stdout.strip()
+    if re.fullmatch(r'/tmp/oc2-seed-[A-Za-z0-9]{8}', staging) is None:
+        raise Stop('unsafe seed staging path')
+    local = pathlib.Path(staging) / 'node_modules'
+    try:
+        print('OC2: seeding pinned CLI from read-only PoC sandbox ' + source)
+        runner.sbx('cp', f'{source}:/home/agent/.local/opencode-v2/node_modules', str(local))
+        runner.sbx('exec', name, 'bash', '-c',
+                   'set -eu; mkdir -p /home/agent/.local/opencode-v2; '
+                   'test ! -e /home/agent/.local/opencode-v2/node_modules')
+        runner.sbx('cp', str(local), f'{name}:/home/agent/.local/opencode-v2/node_modules')
+        if cli_path(runner, name) != binary:
+            raise Stop('seeded OpenCode CLI did not verify as v2.1.4')
+        return binary
+    finally:
+        subprocess.run([*operator, 'rm', '-rf', '--', staging],
+                       capture_output=True, timeout=30, check=False)
 
 
 def provision_cli(runner: Runner, name: str, seed: str, scratch: pathlib.Path) -> str:
