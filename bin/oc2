@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Resolve dotfiles-ai independently of the current working directory.
+set -euo pipefail
+ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
+exec python3 "$ROOT/sandbox/scripts/oc2.py" --repo-root "$ROOT" "$@"
