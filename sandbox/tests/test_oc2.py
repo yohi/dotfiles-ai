@@ -33,7 +33,6 @@ def load(name: str):
 oc2 = load('oc2')
 guest = load('oc2_guest')
 assets = load('oc2_assets')
-route_module = load('oc2_agent_routes')
 
 
 class FakeRunner:
@@ -310,27 +309,9 @@ class GuestTest(unittest.TestCase):
 
     def _assets(self):
         names = sorted(guest.ASSET_TARGETS)
-        native = {}
-        for role, (mode, description) in route_module.ROLES.items():
-            value = {'description': description, 'mode': mode}
-            if role in route_module.READ_ONLY:
-                value['permissions'] = [
-                    {'action': 'edit', 'resource': '*', 'effect': 'deny'},
-                    {'action': 'shell', 'resource': '*', 'effect': 'deny'},
-                    {'action': 'subagent', 'resource': '*', 'effect': 'deny'},
-                ]
-            native[role] = value
-        metadata = {
-            'schema': route_module.SCHEMA,
-            'routing_activation': 'disabled-no-provider-broker',
-            'default_agent': 'sisyphus',
-            'native_agents': native,
-            'routes': {'personal': {}, 'work': {}},
-        }
         contents = {name: ('# selected text\n' if name != 'theme.json'
                            else '{"name":"tokyonight"}')
                     for name in names}
-        contents['metadata/agent-routes.json'] = json.dumps(metadata, sort_keys=True)
         hashes = {name: hashlib.sha256(data.encode('utf-8')).hexdigest()
                   for name, data in contents.items()}
         payload = {'schema': guest.ASSET_SCHEMA, 'files': contents, 'sha256': hashes}
@@ -353,42 +334,29 @@ class GuestTest(unittest.TestCase):
         server = json.loads((target / 'config/opencode/opencode.jsonc').read_text())
         self.assertEqual(len(server['instructions']), 6)
         self.assertTrue(all(s.startswith(str(target)) for s in server['instructions']))
-        self.assertEqual(server['default_agent'], 'sisyphus')
-        self.assertEqual(set(server['agents']), set(route_module.ROLES))
-        self.assertNotIn('model', server['agents']['sisyphus'])
-        self.assertTrue((target / 'metadata/agent-routes.json').is_file())
+        self.assertNotIn('default_agent', server)
+        self.assertNotIn('agents', server)
+        self.assertNotIn('model', server)
+        self.assertFalse((target / 'metadata/agent-routes.json').exists())
         tui = json.loads((target / 'config/opencode/cli.json').read_text())
         self.assertEqual(tui['theme'], {'name': 'tokyonight'})
 
-    def test_guest_rejects_agent_model_pin_even_with_valid_hashes(self):
-        path, sha = self._assets()
-        data = json.loads(path.read_bytes())
-        key = 'metadata/agent-routes.json'
-        metadata = json.loads(data['files'][key])
-        metadata['native_agents']['sisyphus']['model'] = 'openai/unapproved'
-        data['files'][key] = json.dumps(metadata, sort_keys=True)
-        data['sha256'][key] = hashlib.sha256(
-            data['files'][key].encode('utf-8')
-        ).hexdigest()
-        rewritten = (json.dumps(data, sort_keys=True) + '\n').encode()
+    def _assert_unapproved_asset_rejected(self, name):
+        path, _ = self._assets()
+        payload = json.loads(path.read_bytes())
+        payload['files'][name] = '{"source":"third-party"}'
+        payload['sha256'][name] = hashlib.sha256(
+            payload['files'][name].encode('utf-8')).hexdigest()
+        rewritten = (json.dumps(payload, sort_keys=True) + '\n').encode()
         path.write_bytes(rewritten)
-        with self.assertRaisesRegex(ValueError, 'unsafe native agent config'):
+        with self.assertRaisesRegex(ValueError, 'allowlist mismatch'):
             guest.verify_assets(path, hashlib.sha256(rewritten).hexdigest())
 
-    def test_guest_rejects_review_agent_write_or_delegation(self):
-        path, sha = self._assets()
-        data = json.loads(path.read_bytes())
-        key = 'metadata/agent-routes.json'
-        metadata = json.loads(data['files'][key])
-        metadata['native_agents']['oracle']['permissions'].pop()
-        data['files'][key] = json.dumps(metadata, sort_keys=True)
-        data['sha256'][key] = hashlib.sha256(
-            data['files'][key].encode('utf-8')
-        ).hexdigest()
-        rewritten = (json.dumps(data, sort_keys=True) + '\n').encode()
-        path.write_bytes(rewritten)
-        with self.assertRaisesRegex(ValueError, 'must be read-only'):
-            guest.verify_assets(path, hashlib.sha256(rewritten).hexdigest())
+    def test_guest_rejects_legacy_routing_asset_even_with_valid_hashes(self):
+        self._assert_unapproved_asset_rejected('metadata/agent-routes.json')
+
+    def test_guest_rejects_imported_agent_asset_even_with_valid_hashes(self):
+        self._assert_unapproved_asset_rejected('config/opencode/agents/legacy.md')
 
     def test_assets_tampering_rejected(self):
         path, sha = self._assets()
@@ -446,33 +414,6 @@ class AssetExporterTest(unittest.TestCase):
             else:
                 file.write_text('# Reviewed content\n', encoding='utf-8')
 
-        omo_file = self.root / route_module.SOURCE
-        omo_file.parent.mkdir(parents=True, exist_ok=True)
-        personal = {
-            name: {'model': 'cloudflare-ai-gateway-custom/kimi-k2.7-code'}
-            for name in route_module.ROLES
-        }
-        work = {
-            name: {'model': 'amazon-bedrock/global.anthropic.claude-sonnet-5-5'}
-            for name in route_module.ROLES
-        }
-        fixture = {
-            '[opencode]': {
-                'agents': personal,
-                'categories': {'quick': {'model': 'openai/gpt-6-luna'}},
-            },
-            'profiles': {
-                'personal': {},
-                'work': {'[opencode]': {
-                    'agents': work,
-                    'categories': {'quick': {
-                        'model': 'amazon-bedrock/global.anthropic.claude-haiku-4-5'
-                    }},
-                }},
-            },
-        }
-        omo_file.write_text(json.dumps(fixture), encoding='utf-8')
-
     def tearDown(self):
         self.temp.cleanup()
 
@@ -482,9 +423,8 @@ class AssetExporterTest(unittest.TestCase):
         payload = json.loads(raw)
         self.assertEqual(set(payload['files']),
                          set(assets.SOURCE_TO_TARGET.values()) |
-                         {assets.THEME_TARGET, assets.AGENT_ROUTE_TARGET})
-        self.assertEqual(json.loads(payload['files'][assets.AGENT_ROUTE_TARGET])
-                         ['routing_activation'], 'disabled-no-provider-broker')
+                         {assets.THEME_TARGET})
+        self.assertNotIn('metadata/agent-routes.json', payload['files'])
         command = payload['files']['config/opencode/commands/build-skill.md']
         self.assertNotIn('agent: old-agent', command)
         self.assertNotIn('model: unavailable/', command)
@@ -506,7 +446,7 @@ class AssetExporterTest(unittest.TestCase):
 
 
 
-class AgentRouteTest(unittest.TestCase):
+class NativeV2IndependenceTest(unittest.TestCase):
     def setUp(self):
         self.fixture = AssetExporterTest()
         self.fixture.setUp()
@@ -515,62 +455,37 @@ class AgentRouteTest(unittest.TestCase):
     def tearDown(self):
         self.fixture.tearDown()
 
-    def test_routes_are_advisory_and_v2_agents_have_no_models(self):
-        payload, digest = route_module.build(self.root)
-        self.assertRegex(digest, '^[a-f0-9]{64}$')
-        self.assertEqual(payload['routing_activation'], 'disabled-no-provider-broker')
-        self.assertEqual(payload['default_agent'], 'sisyphus')
-        self.assertEqual(len(payload['native_agents']), len(route_module.ROLES))
-        self.assertTrue(all('model' not in item for item in
-                            payload['native_agents'].values()))
-        work = payload['routes']['work']['agents']
-        self.assertTrue(all(row['primary']['model'].startswith('amazon-bedrock/')
-                            for row in work.values()))
+    def test_no_legacy_routing_source_required(self):
+        self.assertFalse((self.root / 'opencode/omo.jsonc').exists())
+        raw, digest = assets.build(self.root)
+        self.assertEqual(digest, hashlib.sha256(raw).hexdigest())
 
-    def test_jsonc_preserves_quoted_comment_and_trailing_comma(self):
-        data = route_module._jsonc(
-            '{"url":"https://example.com//a,b", // comment\n'
-            '"list":["one",],"text":"/*literal*/",}'
-        )
-        self.assertEqual(data['url'], 'https://example.com//a,b')
-        self.assertEqual(data['list'], ['one'])
-        self.assertEqual(data['text'], '/*literal*/')
+    def test_legacy_source_ignored_even_if_malformed(self):
+        before = assets.build(self.root)
+        legacy = self.root / 'opencode/omo.jsonc'
+        legacy.parent.mkdir(parents=True, exist_ok=True)
+        legacy.write_text('this is not valid json')
+        self.assertEqual(before, assets.build(self.root))
 
-    def test_work_provider_escape_rejected(self):
-        path = self.root / route_module.SOURCE
-        data = json.loads(path.read_text())
-        data['profiles']['work']['[opencode]']['agents']['sisyphus']['model'] = \
-            'cloudflare-ai-gateway-custom/kimi-k2.7-code'
-        path.write_text(json.dumps(data))
-        with self.assertRaisesRegex(route_module.RouteError, 'Bedrock-only'):
-            route_module.build(self.root)
+    def test_legacy_source_symlink_ignored(self):
+        before = assets.build(self.root)
+        legacy = self.root / 'opencode/omo.jsonc'
+        legacy.parent.mkdir(parents=True, exist_ok=True)
+        legacy.symlink_to('/etc/passwd')
+        self.assertEqual(before, assets.build(self.root))
 
-    def test_work_ultrawork_provider_escape_rejected(self):
-        path = self.root / route_module.SOURCE
-        data = json.loads(path.read_text())
-        data['profiles']['work']['[opencode]']['agents']['sisyphus']['ultrawork'] = {
-            'model': 'cloudflare-ai-gateway-custom/kimi-k2.7-code'
-        }
-        path.write_text(json.dumps(data))
-        with self.assertRaisesRegex(route_module.RouteError, 'Bedrock-only'):
-            route_module.build(self.root)
+    def test_unapproved_agent_directory_ignored(self):
+        before = assets.build(self.root)
+        agent = self.root / 'opencode/agents/old.md'
+        agent.parent.mkdir(parents=True, exist_ok=True)
+        agent.write_text('model: unknown/unapproved\n')
+        self.assertEqual(before, assets.build(self.root))
 
-    def test_missing_work_role_rejected(self):
-        path = self.root / route_module.SOURCE
-        data = json.loads(path.read_text())
-        del data['profiles']['work']['[opencode]']['agents']['sisyphus']
-        path.write_text(json.dumps(data))
-        with self.assertRaisesRegex(route_module.RouteError, 'work agent routes incomplete'):
-            route_module.build(self.root)
-
-    def test_omo_source_symlink_rejected(self):
-        path = self.root / route_module.SOURCE
-        original = path.parent / 'original.jsonc'
-        path.rename(original)
-        path.symlink_to(original)
-        with self.assertRaisesRegex(route_module.RouteError, 'linked'):
-            route_module.build(self.root)
-
+    def test_exported_manifest_has_no_agent_routes(self):
+        raw, _ = assets.build(self.root)
+        payload = json.loads(raw)
+        self.assertFalse(any(p.startswith('metadata/') or
+                             '/agents/' in p for p in payload['files']))
 
 
 if __name__ == '__main__':

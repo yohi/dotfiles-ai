@@ -314,7 +314,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.dry_run:
             print('OC2 PLAN: mountless sandbox=' + args.sandbox)
             print('OC2 PLAN: source=apm.yml; allowlist=shell,snapshot; no MCP/credentials')
-            print('OC2 PLAN: strict assets (rules 7, commands 1, skills 2, theme 1, agents 8, routing advisory)')
+            print('OC2 PLAN: strict assets (rules 7, commands 1, skills 2, theme 1, no imported agents or model routing)')
             print('OC2 PLAN: export, stage, pinned CLI provision, --standalone TUI')
             return 0
         if not shutil.which('sbx'):

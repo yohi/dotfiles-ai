@@ -29,7 +29,6 @@ ASSET_TARGETS = frozenset({
     'config/opencode/skills/agent-skill-architect/SKILL.md',
     'config/opencode/skills/config-modernizer/SKILL.md',
     'theme.json',
-    'metadata/agent-routes.json',
 })
 MAX_ASSETS = 512 * 1024
 
@@ -119,38 +118,7 @@ def verify_assets(source: pathlib.Path, expected_sha: str) -> dict[str, bytes]:
             or not isinstance(theme['name'], str)
             or not re.fullmatch(r'[a-z0-9-]{1,40}', theme['name'])):
         fail('unsafe TUI theme')
-    route_meta = json.loads(result['metadata/agent-routes.json'])
-    if (not isinstance(route_meta, dict)
-            or route_meta.get('schema') != 'dotfiles-ai/oc2-agent-routes/v1'
-            or route_meta.get('routing_activation') != 'disabled-no-provider-broker'
-            or route_meta.get('default_agent') != 'sisyphus'):
-        fail('unsafe OMO routing metadata')
-    agents = route_meta.get('native_agents')
-    allowed = {'sisyphus', 'hephaestus', 'atlas', 'prometheus',
-               'oracle', 'librarian', 'metis', 'momus'}
-    if not isinstance(agents, dict) or set(agents) != allowed:
-        fail('unsafe native agent allowlist')
-    for name, config in agents.items():
-        if not isinstance(config, dict) or set(config) - {
-                'description', 'mode', 'permissions'}:
-            fail('unsafe native agent config')
-        if (config.get('mode') != ('subagent' if name in
-                {'oracle', 'librarian', 'metis', 'momus'} else 'primary')
-                or not isinstance(config.get('description'), str)
-                or not 1 <= len(config['description']) <= 256):
-            fail('invalid native agent role')
-        if name in {'oracle', 'librarian', 'metis', 'momus'}:
-            if config.get('permissions') != [
-                {'action': 'edit', 'resource': '*', 'effect': 'deny'},
-                {'action': 'shell', 'resource': '*', 'effect': 'deny'},
-                {'action': 'subagent', 'resource': '*', 'effect': 'deny'},
-            ]:
-                fail('native review agent must be read-only')
-        elif 'permissions' in config:
-            fail('unapproved native agent permissions')
-    if not isinstance(route_meta.get('routes'), dict) or set(
-            route_meta['routes']) != {'personal', 'work'}:
-        fail('missing model candidate profiles')
+    # No third-party agent metadata or model routing is imported.
     return result
 
 def validate_location(path: pathlib.Path, parent: pathlib.Path) -> None:
@@ -188,9 +156,6 @@ def prepare(
         rule_names = sorted(p for p in assets if p.startswith('config/opencode/rules/'))
         server['instructions'] = [str(dest / name) for name in rule_names]
         client['theme'] = json.loads(assets['theme.json'])
-        metadata = json.loads(assets['metadata/agent-routes.json'])
-        server['default_agent'] = metadata['default_agent']
-        server['agents'] = metadata['native_agents']
         asset_files = {name: value for name, value in assets.items()
                        if name != 'theme.json'}
 
@@ -250,7 +215,7 @@ def main(argv: list[str] | None = None) -> int:
         runtime = prepare(bundle, digest, assets, args.expected_assets_sha)
         print('OC2_GUEST_CONFIG_VERIFIED')
         if assets is not None:
-            print('OC2_ASSETS_VERIFIED: rules=7 commands=1 skills=2 theme=1 agents=8 routing=advisory')
+            print('OC2_ASSETS_VERIFIED: rules=7 commands=1 skills=2 theme=1 custom_agents=0 routing=none')
         print('OC2_RUNTIME_PREPARED: ' + str(runtime))
         print('OC2_RUNTIME_VERSION: ' + VERSION)
         return 0

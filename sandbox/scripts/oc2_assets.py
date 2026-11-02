@@ -27,7 +27,6 @@ SOURCE_TO_TARGET = {
 }
 THEME_SOURCE = "opencode/tui.jsonc"
 THEME_TARGET = "theme.json"
-AGENT_ROUTE_TARGET = "metadata/agent-routes.json"
 MAX_FILE = 65536
 MAX_TOTAL = 512 * 1024
 
@@ -81,13 +80,7 @@ def build(repo: Path) -> tuple[bytes, str]:
         raise AssetError("unapproved TUI theme")
     files[THEME_TARGET] = json.dumps({"name": theme}, sort_keys=True)
 
-    from oc2_agent_routes import build as build_agent_routes
-    route_snapshot, _ = build_agent_routes(repo)
-    files[AGENT_ROUTE_TARGET] = json.dumps(
-        route_snapshot, ensure_ascii=False, sort_keys=True, separators=(",", ":")
-    ) + "\n"
-
-    if set(files) != set(SOURCE_TO_TARGET.values()) | {THEME_TARGET, AGENT_ROUTE_TARGET}:
+    if set(files) != set(SOURCE_TO_TARGET.values()) | {THEME_TARGET}:
         raise AssetError("unexpected asset file set")
     hashes = {name: hashlib.sha256(value.encode("utf-8")).hexdigest()
               for name, value in sorted(files.items())}

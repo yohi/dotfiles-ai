@@ -1,6 +1,6 @@
 # oc2 — HostからDocker Sandbox内のOpenCode v2.1.4を起動
 
-**Status: ONE_COMMAND_TUI_LIVE_PASS / AGENT_ROUTING_R2_IMPLEMENTED / LIVE_RETEST_PENDING**
+**Status: ONE_COMMAND_TUI_LIVE_PASS (historical) / OMO_REMOVAL_PATCH_READY / LIVE_RETEST_PENDING**
 
 この初期実装は、既存P6の設定エクスポートを再利用して単一のHost側ランチャーに統合します。v1設定の完全移行ではありません。
 
@@ -37,7 +37,7 @@ Host実行ユーザーがsbx-pocと異なる場合はsudoを介してsbxを呼�
 
 ## 対象と除外
 
-元の設定エクスポーターは`apm.yml`から`shell`と`snapshot`だけを移行します。追加の`oc2_assets.py`が固定許可リストからGlobal Rules（AGENTS.md＋補助6件）、`/build-skill`コマンド、2つの自作Skills、TUIの`theme`だけを選別・変換します。Provider、OMO、Agents、その他のCommands、外部Skills、Akane、Sibyl、MCP、認証情報は自動移植しません。`plugins: []`、`mcp: {}`は出力スナップショットの内容であり、OpenCodeの他の設定ソースからの自動検出まで完全に無効化する保証ではありません。
+元の設定エクスポーターは`apm.yml`から`shell`と`snapshot`だけを移行します。追加の`oc2_assets.py`が固定許可リストからGlobal Rules（AGENTS.md＋補助6件）、`/build-skill`コマンド、2つの自作Skills、TUIの`theme`だけを選別・変換します。Provider、外部Agent定義、その他のCommands、外部Skills、Akane、Sibyl、MCP、認証情報は自動移植しません。`plugins: []`、`mcp: {}`は出力スナップショットの内容であり、OpenCodeの他の設定ソースからの自動検出まで完全に無効化する保証ではありません。
 
 SandboxへSSH Agent・API Key・トークン・Host OpenCode v1の設定全体・HostのGitリポジトリはコピーしません。Hostに書込みWorkspaceをマウントしません。既存`oc-v2-poc`のG3/P6実験データも変更しません。`OPENCODE_WATCHDOG_ENABLED=false`、LLMリクエストは送信しません。
 
@@ -62,7 +62,7 @@ python3 -m py_compile sandbox/scripts/oc2.py sandbox/scripts/oc2_guest.py
 
 - 実際のsbx v0.49.2のJSON形式、ディレクトリ転送、CLI seedをHost/Sandbox上で確認
 - 通常ユーザーとsbx-pocのsudo/権限境界を確認
-- Rules/Commands/Skills/Agent/Model/OMOおよびAkane/Sibylをv2形式へ選別・変換
+- Rules/Commands/Skillsの安全な移行と、必要時のみV2ネイティブAgentを独立設計
 - クラウドLLMへの資格情報非開示接続とHostの差分回収経路
 
 このfeatureブランチは**ワンコマンド起動の基盤実装**です。設定・モデル・開発Workspaceを含む実用環境がすべて完成したという主張ではありません。
@@ -109,7 +109,7 @@ JSONに`files`とSHA-256を格納し、Host全体のSHA-256でも固定します
 
 `opencode.jsonc.instructions`は、Sandbox内に配備した補助ルール6件の絶対パスを参照します。Global `AGENTS.md`はOpenCode v2の自動読み込み対象であり、重複を避けて`instructions`には入れません。
 
-**今後の移行対象**: Agents/OMO/モデルルーティング（v2への意味論的変換が必要）、Akane/Sibyl（バージョン・ロード契約確認）、外部Skills、その他Commands（副作用とモデルピンのレビューが必要）、LLM用Host BrokerとMCP。
+**今後の移行対象**: 必要時のみ独立設計するV2ネイティブAgent、Akane/Sibyl（バージョン・ロード契約確認）、外部Skills、その他Commands（副作用とモデルピンのレビューが必要）、LLM用Host BrokerとMCP。
 
 ### このrevisionの確認
 
@@ -122,37 +122,30 @@ python3 -m py_compile sandbox/scripts/oc2.py sandbox/scripts/oc2_guest.py sandbo
 
 `OC2_ASSETS_VERIFIED`と`OC2_PREPARED`を確認してから`./bin/oc2`でTUIを起動してください。この段階でモデル推論や外部サービスへの接続は行いません。修正対象はfeatureブランチだけで、Host OpenCode v1や`oc-v2-poc`の既存設定は変更しません。
 
-## 2026-11-03 — Agent・OMO Routing R2（実装後、実機検証前）
+## 2026-11-03 — Scope correction: OmO excluded
 
-`opencode/omo.jsonc`をJSONCとして読み、personal/workのAgent 12件とCategory 15件から
-モデルの主系・代替候補を抽出し、`metadata/agent-routes.json`にSHA-256付きで保存します。
-このファイルは**候補情報のみ**であり、OpenCode v2が自動的にモデルを選ぶ設定ではありません。
+OmOはOpenCode V2移行の対象外とする。過去のR2 Agent/Category・モデル候補
+抽出コードは削除し、`opencode/omo.jsonc`を`oc2`から読み込まない。
+既存OpenCode V1用の設定原本自体は変更・削除しない。
 
-V2ネイティブとして登録するのは8件です: `sisyphus`, `hephaestus`, `atlas`,
-`prometheus`, `oracle`, `librarian`, `metis`, `momus`。
-`sisyphus`は既定のprimary Agentです。レビュー・調査系4件
-（oracle, librarian, metis, momus）は`edit`と`shell`を拒否するsubagentです。
-どのネイティブAgentにも`model`ピン、provider、fallback、資格情報は設定しません。
+`oc2`の移行対象はGlobal Rules 7件、Command 1件、Skills 2件、
+TUIテーマ1件のみ。V2の組込みAgentを使用し、カスタム`agents`、
+`default_agent`、`model`、Provider、Fallback、認証情報は生成しない。
+独自Agentは使用目的と権限を確定した後の別タスクとする。
 
-OMOのプロファイルはpersonalを基準とし、workはBedrock限定の候補として保持します。
-work全Agent/Categoryの存在と全候補が`amazon-bedrock/`で始まることを検証します。
-work用の認証・プロファイル実行切替は未実装です。
+Host/Sandbox隔離、Default Deny、CLIバージョン固定、HASH検証、
+既存Runtime非上書きは維持する。Asset SHAが変わるため新しいRuntime
+Identityで準備されることを想定し、古いR2 Runtimeは変更しない。
 
-OMO v1のプラグイン本体、fallback自動実行、Category自動ルーティング、
-team mode、ultrawork、Hooks、Thinking制御、モデル検証、MCP、Provider認証は未移行です。
-V2組込みの`explore`は上書きしません。
-`multimodal-looker`と`justice-review-controller/worker`はネイティブ登録せず、
-モデル候補だけを保持します。JusticeのレビューGate権限は移行しません。
-既存のLLM契約も変更しません。
-
-### 検証
+### オフライン検証
 
 ~~~sh
 python3 -m unittest discover -s sandbox/tests -p 'test_oc2.py' -v
 python3 -m py_compile sandbox/scripts/oc2.py sandbox/scripts/oc2_assets.py \
-  sandbox/scripts/oc2_agent_routes.py sandbox/scripts/oc2_guest.py
-./bin/oc2 --prepare-only
+  sandbox/scripts/oc2_guest.py
+./bin/oc2 --dry-run
 ~~~
 
-期待: `OC2_ASSETS_VERIFIED: rules=7 commands=1 skills=2 theme=1 agents=8 routing=advisory`
-および`OC2_PREPARED`。モデル実呼び出しや自動Fallbackはまだ未検証・未実装です。
+その後、Human Operatorが隔離されたHostで`./bin/oc2 --prepare-only`、
+OpenCode V2.1.4の`debug config`と`debug agents`を実測する。
+CLIによる実機PASS、Cloud LLM通信、完全な新規Sandbox一発構築は未確認。
