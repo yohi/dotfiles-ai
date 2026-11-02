@@ -183,6 +183,8 @@ def build(repo: Path) -> tuple[dict, str]:
             for candidate in (
                 [row["primary"]] + row.get("fallback_candidates", [])
                 + row.get("category_candidates", [])
+                + ([row["ultrawork_candidate"]]
+                   if "ultrawork_candidate" in row else [])
             ) if "primary" in row else []:
                 if not candidate["model"].startswith("amazon-bedrock/"):
                     raise RouteError("work route escapes Bedrock-only profile")
