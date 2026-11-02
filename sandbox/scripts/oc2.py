@@ -62,30 +62,53 @@ class Runner:
 
 
 def is_compatible_sandbox(runner: Runner, name: str) -> bool:
+    # sbx ls --format json on v0.49.2 gives identity but does not report
+    # workspace/mounts. Inspect the exact named sandbox before trusting it.
+    import json
+
     raw = runner.sbx('ls', '-q', capture=True)
     names = {line.strip() for line in raw.splitlines() if line.strip()}
     if name not in names:
         return False
-    # A checkout may contain secrets. Reject sandboxes with host mounts rather
-    # than trusting them for a purportedly mountless workflow.
-    import json
-    listing = json.loads(runner.sbx('ls', '--format', 'json', capture=True))
-    records = listing if isinstance(listing, list) else listing.get('sandboxes', [])
+
+    try:
+        listing = json.loads(runner.sbx('ls', '--format', 'json', capture=True))
+    except (TypeError, ValueError) as exc:
+        raise Stop('could not parse existing Sandbox identity') from exc
+    if isinstance(listing, list):
+        records = listing
+    elif isinstance(listing, dict):
+        records = listing.get('sandboxes')
+    else:
+        records = None
+    if not isinstance(records, list):
+        raise Stop('could not establish existing Sandbox identity')
     matches = [row for row in records if isinstance(row, dict)
-               and (row.get('name') or row.get('sandbox')) == name]
+               and row.get('name') == name]
     if len(matches) != 1:
         raise Stop('could not establish existing Sandbox identity')
     row = matches[0]
-    if row.get('agent') not in (None, 'shell'):
+    if row.get('agent') != 'shell':
         raise Stop('existing Sandbox agent is not shell')
-    # The API has used both workspace and workspaces between CLI revisions.
-    if 'workspace' not in row and 'workspaces' not in row:
-        raise Stop('could not verify that the existing Sandbox has no Host mount')
-    value = row.get('workspaces', row.get('workspace'))
-    if value not in (None, '', '-', [], {}):
-        raise Stop('existing Sandbox has a workspace mount; refusing reuse')
-    return True
 
+    # Earlier CLI versions included optional workspace fields in the list.
+    # If present and populated, they independently prohibit reuse.
+    for field in ('workspace', 'workspaces'):
+        if field in row and row[field] not in (None, '', '-', [], {}):
+            raise Stop('existing Sandbox has a workspace mount; refusing reuse')
+
+    try:
+        detail = json.loads(runner.sbx('inspect', name, '--json', capture=True))
+    except (TypeError, ValueError) as exc:
+        raise Stop('could not parse Sandbox mount inspection') from exc
+    if not isinstance(detail, dict) or detail.get('name') != name:
+        raise Stop('Sandbox inspection identity mismatch; refusing reuse')
+    mounts = detail.get('runtime_mounts')
+    if not isinstance(mounts, list):
+        raise Stop('Sandbox mount information missing or invalid; refusing reuse')
+    if mounts:
+        raise Stop('existing Sandbox has runtime mounts; refusing reuse')
+    return True
 
 def export_config(repo: pathlib.Path, out: pathlib.Path) -> tuple[pathlib.Path, str]:
     """Reuse existing SSOT exporter and verifier rather than copying v1 config."""
