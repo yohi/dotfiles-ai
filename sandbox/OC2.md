@@ -20,6 +20,8 @@ oc2
 - `oc2 --seed-sandbox oc-v2-poc`: OpenCode v2.1.4導入済みの既存mountless PoCを読み取り専用のseedに使う
 - `oc2 --seed-sandbox ""`: seedを使わない
 
+ホスト側PythonにはPyYAMLが必要です（本リポジトリのpyproject.tomlで管理）。依存環境が未準備の場合は先に整備してください。
+
 Host実行ユーザーがsbx-pocと異なる場合はsudoを介してsbxを呼び出します。sudo権限・パスワード入力が必要になる場合があります。sudoersは変更しません。
 
 ## 処理内容
