@@ -28,7 +28,7 @@ Host実行ユーザーがsbx-pocと異なる場合はsudoを介してsbxを呼�
 
 1. `apm.yml`をSSOTとして、既存の`prepare_opencode_v2.py`で最小設定を出力。
 2. `stage_opencode_v2.verify_bundle()`によるHash・内容検証。
-3. `sbx ls`で既存Sandboxを確認。なければ`sbx create --name oc2-dev shell`でマウントなしSandboxを新規作成。既存SandboxはWorkspaceマウントがあれば停止。
+3. `sbx ls`で既存Sandboxを確認。なければ`sbx create --name oc2-dev shell`でマウントなしSandboxを新規作成。既存Sandboxの再利用は、`sbx ls --format json`でSandbox名とshell agentを照合し、`sbx inspect NAME --json`の`runtime_mounts`が**空配列**である場合だけ許可。名前の不一致・マウント情報の欠落・マウントありは安全停止。
 4. 選別した設定とguest検証スクリプトだけを`sbx cp`でコピー。guest側でもHash・許可フィールドを検証。
 5. 設定Hashごとに専用XDG領域を生成。同一Hashなら検証して再利用。既存成果物を無断上書きしない。
 6. 固定OpenCode v2.1.4を確認。なければmountlessの`oc-v2-poc`からCLIのnode_modulesだけを読み取りコピーし、versionを再検証。
@@ -79,3 +79,16 @@ python3 -m py_compile sandbox/scripts/oc2.py sandbox/scripts/oc2_guest.py
 - argv形状のオフライン回帰テストを追加
 
 改修後に必要な確認は `python3 -m unittest discover -s sandbox/tests -p 'test_oc2.py' -v` と実機の `oc2 --prepare-only` です。既存のNetwork PolicyやSandboxを削除・初期化しません。オフラインテストと実機確認がPASSするまではワンコマンド構築完了と判定しません。
+
+## 2026-11-03 — v0.49.2 mountless再利用判定修正
+
+初回実機試行で`oc2-dev`の作成後、次の実行時には`OC2_STOP: could not verify that the existing Sandbox has no Host mount`で停止しました。原因は`sbx ls --format json`が`workspace`や`workspaces`を返さないことです。
+
+Host Operatorの実測:
+- `oc2-dev`の一覧フィールド: `agent, created_at, id, last_used_at, name, status`
+- `sbx inspect oc2-dev --json`のトップレベルに`runtime_mounts`あり
+- `runtime_mounts: []` （マウントなし）
+
+これを受けて既存Sandbox再利用時の判定を`sbx inspect NAME --json`に変更しました。既存の一覧情報による名前・agentの確認も維持し、`runtime_mounts`が空配列のときだけ続行します。既存一覧に`workspace`情報があり、それがマウントを示す場合も拒否します。無条件でmountlessとみなす処理には変更していません。
+
+修正後の実機検証は未実施です。次に新しい修正HEADを一時worktreeへ取り込み、オフラインテスト・`oc2 --prepare-only`の順で実施してください。既存の`oc2-dev`は削除しないでください。
