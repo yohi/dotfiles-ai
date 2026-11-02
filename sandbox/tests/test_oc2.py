@@ -545,6 +545,16 @@ class AgentRouteTest(unittest.TestCase):
         with self.assertRaisesRegex(route_module.RouteError, 'Bedrock-only'):
             route_module.build(self.root)
 
+    def test_work_ultrawork_provider_escape_rejected(self):
+        path = self.root / route_module.SOURCE
+        data = json.loads(path.read_text())
+        data['profiles']['work']['[opencode]']['agents']['sisyphus']['ultrawork'] = {
+            'model': 'cloudflare-ai-gateway-custom/kimi-k2.7-code'
+        }
+        path.write_text(json.dumps(data))
+        with self.assertRaisesRegex(route_module.RouteError, 'Bedrock-only'):
+            route_module.build(self.root)
+
     def test_missing_work_role_rejected(self):
         path = self.root / route_module.SOURCE
         data = json.loads(path.read_text())
