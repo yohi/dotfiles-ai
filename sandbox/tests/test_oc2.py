@@ -90,11 +90,74 @@ class HostTest(unittest.TestCase):
         runner = FakeRunner()
         oc2.launch(runner, 'oc2-dev', 'a' * 64, oc2.PINNED[0])
         command = runner.calls[-1]
-        self.assertEqual(command[:3], ('exec', '-it', 'oc2-dev'))
-        self.assertIn('env -i', command[5])
-        self.assertIn('--standalone', command[5])
-        self.assertIn('OPENCODE_WATCHDOG_ENABLED=false', command[5])
+        self.assertEqual(command[:3], ('exec', '-it', '-w'))
+        self.assertEqual(command[3], oc2.ROOT + '/runtime/' + 'a' * 16 + '/project')
+        self.assertEqual(command[4:7], ('oc2-dev', 'env', '-i'))
+        self.assertEqual(command[-2:], (oc2.PINNED[0], '--standalone'))
+        self.assertIn('OPENCODE_WATCHDOG_ENABLED=false', command)
+        self.assertNotIn('bash', command)
         self.assertNotIn('--mount', command)
+
+    def test_stage_does_not_depend_on_bash_positional_arguments(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            bundle = pathlib.Path(tmp) / 'bundle'
+            bundle.mkdir()
+            script = pathlib.Path(tmp) / 'oc2_guest.py'
+            script.write_text('# harmless guest fixture\\n')
+            script_sha = hashlib.sha256(script.read_bytes()).hexdigest()
+
+            class StagingRunner:
+                def __init__(self):
+                    self.calls = []
+
+                def sbx(self, *args, **kwargs):
+                    self.calls.append(args)
+                    if args[:4] == ('exec', 'oc2-dev', 'bash', '-c'):
+                        # No synthetic $0/$1/$2 follows the bash code.
+                        assert len(args) == 5, args
+                        assert '$1' not in args[4] and '$2' not in args[4]
+                        return 'missing\\n'
+                    if args[:3] == ('exec', 'oc2-dev', 'sha256sum'):
+                        return script_sha + '  oc2_guest.py\\n'
+                    return ''
+
+            runner = StagingRunner()
+            oc2.stage(runner, 'oc2-dev', bundle, 'a' * 64, script)
+            self.assertIn(
+                ('exec', 'oc2-dev', 'mkdir', '-p', oc2.ROOT,
+                 oc2.ROOT + '/bundles', oc2.ROOT + '/scripts'),
+                runner.calls,
+            )
+            self.assertIn(
+                ('exec', 'oc2-dev', 'chmod', '700', oc2.ROOT,
+                 oc2.ROOT + '/bundles', oc2.ROOT + '/scripts'),
+                runner.calls,
+            )
+            self.assertEqual(len([c for c in runner.calls if c[0] == 'cp']), 2)
+
+    def test_cli_version_probe_avoids_bash_positional_arguments(self):
+        class VersionRunner:
+            def __init__(self):
+                self.calls = []
+
+            def sbx(self, *args, **kwargs):
+                self.calls.append(args)
+                assert args[:4] == ('exec', 'oc2-dev', 'bash', '-c')
+                assert len(args) == 5
+                assert '$1' not in args[4]
+                return 'opencode v2.1.4\\n'
+
+        runner = VersionRunner()
+        self.assertEqual(oc2.cli_path(runner, 'oc2-dev'), oc2.PINNED[0])
+        self.assertEqual(len(runner.calls), 1)
+
+    def test_launch_rejects_unapproved_binary(self):
+        with self.assertRaisesRegex(oc2.Stop, 'unapproved'):
+            oc2.launch(FakeRunner(), 'oc2-dev', 'a' * 64, '/tmp/untrusted')
+
+    def test_launch_rejects_invalid_digest(self):
+        with self.assertRaisesRegex(oc2.Stop, 'invalid runtime digest'):
+            oc2.launch(FakeRunner(), 'oc2-dev', 'not-a-digest', oc2.PINNED[0])
 
 
 class GuestTest(unittest.TestCase):
