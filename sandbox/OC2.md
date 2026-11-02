@@ -1,6 +1,6 @@
 # oc2 — HostからDocker Sandbox内のOpenCode v2.1.4を起動
 
-**Status: ONE_COMMAND_TUI_LIVE_PASS / SETTINGS_MIGRATION_R1_IMPLEMENTED / ASSET_LIVE_RETEST_PENDING**
+**Status: ONE_COMMAND_TUI_LIVE_PASS / AGENT_ROUTING_R2_IMPLEMENTED / LIVE_RETEST_PENDING**
 
 この初期実装は、既存P6の設定エクスポートを再利用して単一のHost側ランチャーに統合します。v1設定の完全移行ではありません。
 
@@ -121,3 +121,38 @@ python3 -m py_compile sandbox/scripts/oc2.py sandbox/scripts/oc2_guest.py sandbo
 ```
 
 `OC2_ASSETS_VERIFIED`と`OC2_PREPARED`を確認してから`./bin/oc2`でTUIを起動してください。この段階でモデル推論や外部サービスへの接続は行いません。修正対象はfeatureブランチだけで、Host OpenCode v1や`oc-v2-poc`の既存設定は変更しません。
+
+## 2026-11-03 — Agent・OMO Routing R2（実装後、実機検証前）
+
+`opencode/omo.jsonc`をJSONCとして読み、personal/workのAgent 12件とCategory 15件から
+モデルの主系・代替候補を抽出し、`metadata/agent-routes.json`にSHA-256付きで保存します。
+このファイルは**候補情報のみ**であり、OpenCode v2が自動的にモデルを選ぶ設定ではありません。
+
+V2ネイティブとして登録するのは8件です: `sisyphus`, `hephaestus`, `atlas`,
+`prometheus`, `oracle`, `librarian`, `metis`, `momus`。
+`sisyphus`は既定のprimary Agentです。レビュー・調査系4件
+（oracle, librarian, metis, momus）は`edit`と`shell`を拒否するsubagentです。
+どのネイティブAgentにも`model`ピン、provider、fallback、資格情報は設定しません。
+
+OMOのプロファイルはpersonalを基準とし、workはBedrock限定の候補として保持します。
+work全Agent/Categoryの存在と全候補が`amazon-bedrock/`で始まることを検証します。
+work用の認証・プロファイル実行切替は未実装です。
+
+OMO v1のプラグイン本体、fallback自動実行、Category自動ルーティング、
+team mode、ultrawork、Hooks、Thinking制御、モデル検証、MCP、Provider認証は未移行です。
+V2組込みの`explore`は上書きしません。
+`multimodal-looker`と`justice-review-controller/worker`はネイティブ登録せず、
+モデル候補だけを保持します。JusticeのレビューGate権限は移行しません。
+既存のLLM契約も変更しません。
+
+### 検証
+
+~~~sh
+python3 -m unittest discover -s sandbox/tests -p 'test_oc2.py' -v
+python3 -m py_compile sandbox/scripts/oc2.py sandbox/scripts/oc2_assets.py \
+  sandbox/scripts/oc2_agent_routes.py sandbox/scripts/oc2_guest.py
+./bin/oc2 --prepare-only
+~~~
+
+期待: `OC2_ASSETS_VERIFIED: rules=7 commands=1 skills=2 theme=1 agents=8 routing=advisory`
+および`OC2_PREPARED`。モデル実呼び出しや自動Fallbackはまだ未検証・未実装です。
