@@ -103,7 +103,7 @@ class HostTest(unittest.TestCase):
             bundle = pathlib.Path(tmp) / 'bundle'
             bundle.mkdir()
             script = pathlib.Path(tmp) / 'oc2_guest.py'
-            script.write_text('# harmless guest fixture\\n')
+            script.write_text('# harmless guest fixture\n')
             script_sha = hashlib.sha256(script.read_bytes()).hexdigest()
 
             class StagingRunner:
@@ -116,9 +116,9 @@ class HostTest(unittest.TestCase):
                         # No synthetic $0/$1/$2 follows the bash code.
                         assert len(args) == 5, args
                         assert '$1' not in args[4] and '$2' not in args[4]
-                        return 'missing\\n'
+                        return 'missing\n'
                     if args[:3] == ('exec', 'oc2-dev', 'sha256sum'):
-                        return script_sha + '  oc2_guest.py\\n'
+                        return script_sha + '  oc2_guest.py\n'
                     return ''
 
             runner = StagingRunner()
@@ -145,7 +145,7 @@ class HostTest(unittest.TestCase):
                 assert args[:4] == ('exec', 'oc2-dev', 'bash', '-c')
                 assert len(args) == 5
                 assert '$1' not in args[4]
-                return 'opencode v2.1.4\\n'
+                return 'opencode v2.1.4\n'
 
         runner = VersionRunner()
         self.assertEqual(oc2.cli_path(runner, 'oc2-dev'), oc2.PINNED[0])
