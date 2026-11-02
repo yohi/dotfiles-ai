@@ -30,6 +30,7 @@ def load(name: str):
 
 oc2 = load('oc2')
 guest = load('oc2_guest')
+assets = load('oc2_assets')
 
 
 class FakeRunner:
@@ -245,12 +246,120 @@ class GuestTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'non-regular'):
             guest.verify(self.bundle)
 
+    def _assets(self):
+        names = sorted(guest.ASSET_TARGETS)
+        contents = {name: ("# selected text\\n" if name != 'theme.json'
+                           else '{"name":"tokyonight"}')
+                    for name in names}
+        hashes = {name: hashlib.sha256(data.encode('utf-8')).hexdigest()
+                  for name, data in contents.items()}
+        payload = {'schema': guest.ASSET_SCHEMA, 'files': contents, 'sha256': hashes}
+        directory = self.base / 'assets'
+        directory.mkdir(exist_ok=True)
+        path = directory / 'assets.json'
+        raw = (json.dumps(payload, sort_keys=True) + '\\n').encode()
+        path.write_bytes(raw)
+        return path, hashlib.sha256(raw).hexdigest()
+
+    def test_assets_materialize_and_reuse(self):
+        path, sha = self._assets()
+        data = guest.verify_assets(path, sha)
+        cfg_sha = guest.verify(self.bundle)
+        target = guest.prepare(self.bundle, cfg_sha, data, sha)
+        self.assertNotEqual(target, guest.runtime_path(cfg_sha))
+        self.assertEqual(target, guest.prepare(self.bundle, cfg_sha, data, sha))
+        self.assertTrue((target / 'config/opencode/AGENTS.md').is_file())
+        self.assertTrue((target / 'config/opencode/skills/config-modernizer/SKILL.md').is_file())
+        server = json.loads((target / 'config/opencode/opencode.jsonc').read_text())
+        self.assertEqual(len(server['instructions']), 6)
+        self.assertTrue(all(s.startswith(str(target)) for s in server['instructions']))
+        tui = json.loads((target / 'config/opencode/cli.json').read_text())
+        self.assertEqual(tui['theme'], {'name': 'tokyonight'})
+
+    def test_assets_tampering_rejected(self):
+        path, sha = self._assets()
+        path.write_bytes(path.read_bytes().replace(b'tokyonight', b'othername'))
+        with self.assertRaisesRegex(ValueError, 'asset SHA mismatch'):
+            guest.verify_assets(path, sha)
+
+    def test_assets_extra_path_rejected(self):
+        path, sha = self._assets()
+        data = json.loads(path.read_bytes())
+        data['files']['../../secret'] = 'forbidden'
+        raw = json.dumps(data).encode()
+        path.write_bytes(raw)
+        with self.assertRaisesRegex(ValueError, 'allowlist mismatch'):
+            guest.verify_assets(path, hashlib.sha256(raw).hexdigest())
+
+    def test_assets_symlink_rejected(self):
+        path, sha = self._assets()
+        real = path.parent / 'real.json'
+        path.rename(real)
+        path.symlink_to(real)
+        with self.assertRaisesRegex(ValueError, 'symlink'):
+            guest.verify_assets(path, sha)
+
+    def test_existing_runtime_asset_tampering_rejected(self):
+        path, sha = self._assets()
+        data = guest.verify_assets(path, sha)
+        cfg_sha = guest.verify(self.bundle)
+        target = guest.prepare(self.bundle, cfg_sha, data, sha)
+        (target / 'config/opencode/AGENTS.md').write_text('tampered')
+        with self.assertRaisesRegex(ValueError, 'runtime asset mismatch'):
+            guest.prepare(self.bundle, cfg_sha, data, sha)
+
     def test_receipt_tampering_stops(self):
         digest = guest.verify(self.bundle)
         out = guest.prepare(self.bundle, digest)
         (out / 'receipt.json').write_text('{}')
         with self.assertRaisesRegex(ValueError, 'receipt mismatch'):
             guest.prepare(self.bundle, digest)
+
+
+
+class AssetExporterTest(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.root = pathlib.Path(self.temp.name)
+        for source in [*assets.SOURCE_TO_TARGET, assets.THEME_SOURCE]:
+            file = self.root / source
+            file.parent.mkdir(parents=True, exist_ok=True)
+            if source == assets.THEME_SOURCE:
+                file.write_text('{"theme":"tokyonight","plugin":["DO_NOT_IMPORT"]}')
+            elif source.startswith('agent-commands/'):
+                file.write_text('---\\ndescription: Safe skill command\\nagent: old-agent\\n'
+                                'model: unavailable/v1-model\\n---\\nBody of command\\n')
+            else:
+                file.write_text('# Reviewed content\\n', encoding='utf-8')
+
+    def tearDown(self):
+        self.temp.cleanup()
+
+    def test_export_selected_assets_with_v1_command_fields_removed(self):
+        raw, digest = assets.build(self.root)
+        self.assertEqual(hashlib.sha256(raw).hexdigest(), digest)
+        payload = json.loads(raw)
+        self.assertEqual(set(payload['files']),
+                         set(assets.SOURCE_TO_TARGET.values()) | {assets.THEME_TARGET})
+        command = payload['files']['config/opencode/commands/build-skill.md']
+        self.assertNotIn('agent: old-agent', command)
+        self.assertNotIn('model: unavailable/', command)
+        self.assertIn('description: Safe skill command', command)
+        self.assertNotIn('DO_NOT_IMPORT', raw.decode('utf-8'))
+        self.assertEqual(json.loads(payload['files']['theme.json']), {'name':'tokyonight'})
+
+    def test_symlinked_source_rejected(self):
+        target = self.root / 'global-rules/AGENTS.global.md'
+        target.unlink()
+        target.symlink_to(self.root / 'opencode/tui.jsonc')
+        with self.assertRaisesRegex(assets.AssetError, 'linked'):
+            assets.build(self.root)
+
+    def test_unapproved_theme_rejected(self):
+        (self.root / assets.THEME_SOURCE).write_text('{"theme":"../../bad"}')
+        with self.assertRaisesRegex(assets.AssetError, 'unapproved TUI theme'):
+            assets.build(self.root)
+
 
 
 if __name__ == '__main__':
