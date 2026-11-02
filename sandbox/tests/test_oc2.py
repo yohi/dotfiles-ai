@@ -171,6 +171,65 @@ class HostTest(unittest.TestCase):
             )
             self.assertEqual(len([c for c in runner.calls if c[0] == 'cp']), 2)
 
+    def test_stage_selected_assets_with_bounded_paths(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            bundle = root / 'bundle'
+            bundle.mkdir()
+            script = root / 'oc2_guest.py'
+            script.write_text('# fixture\n')
+            script_sha = hashlib.sha256(script.read_bytes()).hexdigest()
+            asset = root / 'oc2-assets.json'
+            asset.write_text('{"fixture":true}')
+            asset_sha = hashlib.sha256(asset.read_bytes()).hexdigest()
+
+            class Runner:
+                def __init__(self):
+                    self.calls = []
+
+                def sbx(self, *args, **kwargs):
+                    self.calls.append(args)
+                    if args[:4] == ('exec', 'oc2-dev', 'bash', '-c'):
+                        return 'missing\n'
+                    if args[:3] == ('exec', 'oc2-dev', 'sha256sum'):
+                        return ((asset_sha if '/assets/' in args[3] else script_sha)
+                                + '  verified\n')
+                    return ''
+
+            runner = Runner()
+            oc2.stage(runner, 'oc2-dev', bundle, 'a' * 64, script, asset, asset_sha)
+            self.assertEqual(len([c for c in runner.calls if c[0] == 'cp']), 3)
+            start = [c for c in runner.calls if c[:3] ==
+                     ('exec', 'oc2-dev', 'python3')]
+            self.assertEqual(len(start), 1)
+            self.assertIn('--expected-assets-sha', start[0])
+            self.assertIn(asset_sha, start[0])
+            self.assertIn('--assets', start[0])
+
+    def test_stage_selected_assets_sha_mismatch_stops(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            bundle = root / 'bundle'
+            bundle.mkdir()
+            script = root / 'oc2_guest.py'
+            script.write_text('# fixture\n')
+            asset = root / 'oc2-assets.json'
+            asset.write_text('{}')
+            expected = hashlib.sha256(asset.read_bytes()).hexdigest()
+            script_sha = hashlib.sha256(script.read_bytes()).hexdigest()
+
+            class Runner:
+                def sbx(self, *args, **kwargs):
+                    if args[:4] == ('exec', 'oc2-dev', 'bash', '-c'):
+                        return 'missing\n'
+                    if args[:3] == ('exec', 'oc2-dev', 'sha256sum'):
+                        return (('f' * 64 if '/assets/' in args[3] else script_sha)
+                                + ' verified\n')
+                    return ''
+
+            with self.assertRaisesRegex(oc2.Stop, 'asset bundle SHA mismatch'):
+                oc2.stage(Runner(), 'oc2-dev', bundle, 'a' * 64, script, asset, expected)
+
     def test_cli_version_probe_avoids_bash_positional_arguments(self):
         class VersionRunner:
             def __init__(self):
