@@ -143,6 +143,7 @@ def verify_assets(source: pathlib.Path, expected_sha: str) -> dict[str, bytes]:
             if config.get('permissions') != [
                 {'action': 'edit', 'resource': '*', 'effect': 'deny'},
                 {'action': 'shell', 'resource': '*', 'effect': 'deny'},
+                {'action': 'subagent', 'resource': '*', 'effect': 'deny'},
             ]:
                 fail('native review agent must be read-only')
         elif 'permissions' in config:
