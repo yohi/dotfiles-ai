@@ -18,6 +18,8 @@ import unittest
 from unittest.mock import patch
 
 SCRIPTS = pathlib.Path(__file__).resolve().parents[1] / 'scripts'
+if str(SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS))
 
 
 def load(name: str):
@@ -31,6 +33,7 @@ def load(name: str):
 oc2 = load('oc2')
 guest = load('oc2_guest')
 assets = load('oc2_assets')
+route_module = load('oc2_agent_routes')
 
 
 class FakeRunner:
@@ -307,9 +310,26 @@ class GuestTest(unittest.TestCase):
 
     def _assets(self):
         names = sorted(guest.ASSET_TARGETS)
-        contents = {name: ("# selected text\n" if name != 'theme.json'
+        native = {}
+        for role, (mode, description) in route_module.ROLES.items():
+            value = {'description': description, 'mode': mode}
+            if role in route_module.READ_ONLY:
+                value['permissions'] = [
+                    {'action': 'edit', 'resource': '*', 'effect': 'deny'},
+                    {'action': 'shell', 'resource': '*', 'effect': 'deny'},
+                ]
+            native[role] = value
+        metadata = {
+            'schema': route_module.SCHEMA,
+            'routing_activation': 'disabled-no-provider-broker',
+            'default_agent': 'sisyphus',
+            'native_agents': native,
+            'routes': {'personal': {}, 'work': {}},
+        }
+        contents = {name: ('# selected text\n' if name != 'theme.json'
                            else '{"name":"tokyonight"}')
                     for name in names}
+        contents['metadata/agent-routes.json'] = json.dumps(metadata, sort_keys=True)
         hashes = {name: hashlib.sha256(data.encode('utf-8')).hexdigest()
                   for name, data in contents.items()}
         payload = {'schema': guest.ASSET_SCHEMA, 'files': contents, 'sha256': hashes}
@@ -332,6 +352,10 @@ class GuestTest(unittest.TestCase):
         server = json.loads((target / 'config/opencode/opencode.jsonc').read_text())
         self.assertEqual(len(server['instructions']), 6)
         self.assertTrue(all(s.startswith(str(target)) for s in server['instructions']))
+        self.assertEqual(server['default_agent'], 'sisyphus')
+        self.assertEqual(set(server['agents']), set(route_module.ROLES))
+        self.assertNotIn('model', server['agents']['sisyphus'])
+        self.assertTrue((target / 'metadata/agent-routes.json').is_file())
         tui = json.loads((target / 'config/opencode/cli.json').read_text())
         self.assertEqual(tui['theme'], {'name': 'tokyonight'})
 
@@ -391,6 +415,33 @@ class AssetExporterTest(unittest.TestCase):
             else:
                 file.write_text('# Reviewed content\n', encoding='utf-8')
 
+        omo_file = self.root / route_module.SOURCE
+        omo_file.parent.mkdir(parents=True, exist_ok=True)
+        personal = {
+            name: {'model': 'cloudflare-ai-gateway-custom/kimi-k2.7-code'}
+            for name in route_module.ROLES
+        }
+        work = {
+            name: {'model': 'amazon-bedrock/global.anthropic.claude-sonnet-5-5'}
+            for name in route_module.ROLES
+        }
+        fixture = {
+            '[opencode]': {
+                'agents': personal,
+                'categories': {'quick': {'model': 'openai/gpt-6-luna'}},
+            },
+            'profiles': {
+                'personal': {},
+                'work': {'[opencode]': {
+                    'agents': work,
+                    'categories': {'quick': {
+                        'model': 'amazon-bedrock/global.anthropic.claude-haiku-4-5'
+                    }},
+                }},
+            },
+        }
+        omo_file.write_text(json.dumps(fixture), encoding='utf-8')
+
     def tearDown(self):
         self.temp.cleanup()
 
@@ -399,7 +450,10 @@ class AssetExporterTest(unittest.TestCase):
         self.assertEqual(hashlib.sha256(raw).hexdigest(), digest)
         payload = json.loads(raw)
         self.assertEqual(set(payload['files']),
-                         set(assets.SOURCE_TO_TARGET.values()) | {assets.THEME_TARGET})
+                         set(assets.SOURCE_TO_TARGET.values()) |
+                         {assets.THEME_TARGET, assets.AGENT_ROUTE_TARGET})
+        self.assertEqual(json.loads(payload['files'][assets.AGENT_ROUTE_TARGET])
+                         ['routing_activation'], 'disabled-no-provider-broker')
         command = payload['files']['config/opencode/commands/build-skill.md']
         self.assertNotIn('agent: old-agent', command)
         self.assertNotIn('model: unavailable/', command)
@@ -418,6 +472,63 @@ class AssetExporterTest(unittest.TestCase):
         (self.root / assets.THEME_SOURCE).write_text('{"theme":"../../bad"}')
         with self.assertRaisesRegex(assets.AssetError, 'unapproved TUI theme'):
             assets.build(self.root)
+
+
+
+class AgentRouteTest(unittest.TestCase):
+    def setUp(self):
+        self.fixture = AssetExporterTest()
+        self.fixture.setUp()
+        self.root = self.fixture.root
+
+    def tearDown(self):
+        self.fixture.tearDown()
+
+    def test_routes_are_advisory_and_v2_agents_have_no_models(self):
+        payload, digest = route_module.build(self.root)
+        self.assertRegex(digest, '^[a-f0-9]{64}$')
+        self.assertEqual(payload['routing_activation'], 'disabled-no-provider-broker')
+        self.assertEqual(payload['default_agent'], 'sisyphus')
+        self.assertEqual(len(payload['native_agents']), len(route_module.ROLES))
+        self.assertTrue(all('model' not in item for item in
+                            payload['native_agents'].values()))
+        work = payload['routes']['work']['agents']
+        self.assertTrue(all(row['primary']['model'].startswith('amazon-bedrock/')
+                            for row in work.values()))
+
+    def test_jsonc_preserves_quoted_comment_and_trailing_comma(self):
+        data = route_module._jsonc(
+            '{"url":"https://example.com//a,b", // comment\n'
+            '"list":["one",],"text":"/*literal*/",}'
+        )
+        self.assertEqual(data['url'], 'https://example.com//a,b')
+        self.assertEqual(data['list'], ['one'])
+        self.assertEqual(data['text'], '/*literal*/')
+
+    def test_work_provider_escape_rejected(self):
+        path = self.root / route_module.SOURCE
+        data = json.loads(path.read_text())
+        data['profiles']['work']['[opencode]']['agents']['sisyphus']['model'] = \
+            'cloudflare-ai-gateway-custom/kimi-k2.7-code'
+        path.write_text(json.dumps(data))
+        with self.assertRaisesRegex(route_module.RouteError, 'Bedrock-only'):
+            route_module.build(self.root)
+
+    def test_missing_work_role_rejected(self):
+        path = self.root / route_module.SOURCE
+        data = json.loads(path.read_text())
+        del data['profiles']['work']['[opencode]']['agents']['sisyphus']
+        path.write_text(json.dumps(data))
+        with self.assertRaisesRegex(route_module.RouteError, 'work agent routes incomplete'):
+            route_module.build(self.root)
+
+    def test_omo_source_symlink_rejected(self):
+        path = self.root / route_module.SOURCE
+        original = path.parent / 'original.jsonc'
+        path.rename(original)
+        path.symlink_to(original)
+        with self.assertRaisesRegex(route_module.RouteError, 'linked'):
+            route_module.build(self.root)
 
 
 
