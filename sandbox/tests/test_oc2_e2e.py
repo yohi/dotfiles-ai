@@ -1,15 +1,9 @@
-"""Offline end-to-end tests of the host flow through a Fake sbx adapter."""
 from __future__ import annotations
 
 import contextlib
-import getpass
-import hashlib
 import io
-import json
-import os
 import pathlib
-import re
-import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -18,95 +12,40 @@ from unittest.mock import patch
 SCRIPTS = pathlib.Path(__file__).resolve().parents[1] / 'scripts'
 sys.path.insert(0, str(SCRIPTS))
 import oc2  # noqa: E402
-import oc2_assets  # noqa: E402
 
 
 class FakeSbx:
-    def __init__(self, root: pathlib.Path):
-        self.root = root
+    def __init__(self):
         self.created = False
-        self.fail_project_copy = False
+        self.installed = False
         self.calls: list[tuple[str, ...]] = []
-
-    def _path(self, sandbox: str, remote: str) -> pathlib.Path:
-        return self.root / sandbox / remote.lstrip('/')
 
     def sbx(self, *args: str, capture: bool = False, tty: bool = False) -> str:
         self.calls.append(args)
+        if args == ('version',):
+            return 'sbx version v0.49.2 test\n'
+        if args == ('create', '--help'):
+            return '  --clone  private in-container clone\n'
         if args == ('ls', '-q'):
             return 'oc2-test\n' if self.created else ''
-        if args == ('ls', '--format', 'json'):
-            return json.dumps([{'name': 'oc2-test', 'agent': 'shell'}] if self.created else [])
-        if args[:2] == ('inspect', 'oc2-test'):
-            return json.dumps({'name': 'oc2-test', 'runtime_mounts': []})
         if args[:1] == ('create',):
             self.created = True
             return ''
-        if args[0] == 'cp':
-            source, destination = args[1:]
-            if self.fail_project_copy and pathlib.Path(source).name == 'project':
-                raise oc2.Stop('fake sbx transfer failure')
-            if source.startswith('oc2-test:'):
-                remote = source.split(':', 1)[1]
-                origin = self._path('oc2-test', remote)
-                if origin.is_dir():
-                    shutil.copytree(origin, pathlib.Path(destination))
-                else:
-                    shutil.copy2(origin, pathlib.Path(destination))
-            else:
-                sandbox, remote = destination.split(':', 1)
-                origin = pathlib.Path(source)
-                target = self._path(sandbox, remote)
-                if origin.is_dir():
-                    shutil.copytree(origin, target)
-                else:
-                    target.parent.mkdir(parents=True, exist_ok=True)
-                    shutil.copy2(origin, target)
-            return ''
         if args[:2] == ('exec', 'oc2-test'):
             command = args[2:]
-            if command[:3] == ('chmod', '-R', 'u+rwX'):
-                location = self._path('oc2-test', command[3])
-                for current, directories, filenames in os.walk(location):
-                    for name in directories:
-                        item = pathlib.Path(current) / name
-                        item.chmod(item.stat().st_mode | 0o700)
-                    for name in filenames:
-                        item = pathlib.Path(current) / name
-                        item.chmod(item.stat().st_mode | 0o600)
-                location.chmod(location.stat().st_mode | 0o700)
+            if (command[:2] == ('sh', '-c')
+                    and command[4] == oc2.PINNED[0]):
+                return 'opencode v2.2.5\n' if self.installed else ''
+            if command == ('pwd',):
+                return '/home/agent/workspace/synthetic\n'
+            if (command[:2] == ('git', '-C')
+                    and command[3:] == ('rev-parse', '--show-toplevel')):
+                return command[2] + '\n'
+            if command[:2] == ('npm', 'install'):
+                self.installed = True
                 return ''
-            if command[:2] in (('mkdir', '-p'), ('chmod', '700')):
-                for value in command[2:]:
-                    location = self._path('oc2-test', value)
-                    if command[0] == 'mkdir':
-                        location.mkdir(parents=True, exist_ok=True)
-                return ''
-            if command[:2] == ('bash', '-c'):
-                script = command[2]
-                if 'echo exists' in script:
-                    paths = re.findall(r'test -e ([^ ;]+)', script)
-                    return 'exists\n' if paths and self._path('oc2-test', paths[0]).exists() else 'missing\n'
-                candidates = re.findall(r'test -x ([^ ;]+)', script)
-                if candidates and self._path('oc2-test', candidates[0]).is_file():
-                    return 'opencode v2.1.4\n'
-                if 'npm install' in script:
-                    binary = self._path('oc2-test', oc2.PINNED[1])
-                    binary.parent.mkdir(parents=True, exist_ok=True)
-                    binary.write_text('fake executable')
-                    return ''
-                return ''
-            if command[:1] == ('sha256sum',):
-                file = self._path('oc2-test', command[1])
-                return hashlib.sha256(file.read_bytes()).hexdigest() + '  ' + file.name + '\n'
-            if command[:1] == ('python3',):
-                return ''
-        if args[:4] == ('exec', '-it', '-w', args[3]):
-            remote = args[3]
-            project = self._path(args[4], remote)
-            (project / 'main.py').write_text('print("sandbox")\n')
-            (project / 'created.py').write_text('created = True\n')
-            (project / 'remove.py').unlink(missing_ok=True)
+            return ''
+        if args[:2] == ('exec', '-it'):
             return ''
         return ''
 
@@ -118,160 +57,78 @@ class LauncherFlowTests(unittest.TestCase):
         self.root = pathlib.Path(self.temporary.name)
         self.repo = self.root / 'dotfiles-ai'
         self.repo.mkdir()
-        (self.repo / 'apm.yml').write_text(
-            'shell: bash\nsnapshot: true\n'
-            'provider:\n  api_key: OMITTED\n'
-            'plugin:\n  - unreviewed-plugin\n'
-            'dependencies:\n  mcp:\n    - name: host-tool\n      command: secret-tool\n'
-        )
-        for source in [*oc2_assets.SOURCE_TO_TARGET, oc2_assets.THEME_SOURCE]:
-            target = self.repo / source
-            target.parent.mkdir(parents=True, exist_ok=True)
-            if source.startswith('agent-commands/'):
-                target.write_text('---\ndescription: test\n---\nbody\n')
-            elif source == oc2_assets.THEME_SOURCE:
-                target.write_text('{"theme":"tokyonight"}')
-            else:
-                target.write_text('# test fixture\n')
-        v1 = self.repo / 'opencode'
-        v1.mkdir(exist_ok=True)
-        (v1 / 'omo.jsonc').write_text('{"model":"v1-model"}\n')
-        (v1 / 'opencode.jsonc').write_text('{"plugin":["v1-plugin"]}\n')
-        self.project = self.root / 'project'
+        (self.repo / 'apm.yml').write_text('targets: [opencode]\n')
+        self.project = self.root / 'synthetic'
         self.project.mkdir()
-        (self.project / 'main.py').write_text('print("host")\n')
-        (self.project / 'remove.py').write_text('remove = True\n')
-        (self.project / '.env').write_text('SECRET=fixture\n')
-        self.state = self.root / 'state'
-        self.fake = FakeSbx(self.root / 'fake-sbx')
-        self.acl_grants: list[tuple[pathlib.Path, str]] = []
-        self.collection_acl_grants: list[tuple[pathlib.Path, str]] = []
-        self.collection_read_grants: list[tuple[pathlib.Path, pathlib.Path, str, str]] = []
+        (self.project / 'main.py').write_text('print("safe")\n')
+        subprocess.run(['git', 'init', '-q', str(self.project)], check=True)
+        subprocess.run(
+            ['git', '-C', str(self.project), 'config', 'user.email', 'test@example.invalid'],
+            check=True,
+        )
+        subprocess.run(
+            ['git', '-C', str(self.project), 'config', 'user.name', 'Test Fixture'],
+            check=True,
+        )
+        subprocess.run(['git', '-C', str(self.project), 'add', 'main.py'], check=True)
+        subprocess.run(
+            ['git', '-C', str(self.project), 'commit', '-qm', 'fixture'], check=True,
+        )
+        self.fake = FakeSbx()
 
-    def _run(self, *flags: str) -> tuple[int, str]:
+    def _run(self) -> tuple[int, str]:
         output = io.StringIO()
         args = [
             '--repo-root', str(self.repo), '--workspace', str(self.project),
-            '--state-dir', str(self.state), '--sandbox', 'oc2-test',
-            '--sbx-user', 'sbx-poc', '--seed-sandbox', '', *flags,
+            '--sandbox', 'oc2-test',
         ]
         with patch.object(oc2, 'Runner', return_value=self.fake), \
-             patch.object(oc2.shutil, 'which', return_value='/fake/sbx'), \
-             patch.object(oc2, 'grant_snapshot_access', side_effect=self._grant_snapshot_access), \
-             patch.object(
-                 oc2, 'grant_collection_directory_access',
-                 side_effect=self._grant_collection_directory_access,
-             ), \
-             patch.object(
-                 oc2, 'grant_collected_workspace_access',
-                 side_effect=self._grant_collected_workspace_access,
-             ), \
-             patch.object(oc2, 'run_operator', side_effect=self._fake_operator_run), \
-             contextlib.redirect_stdout(output), contextlib.redirect_stderr(output):
+                patch.object(oc2.shutil, 'which', return_value='/fake/sbx'), \
+                contextlib.redirect_stdout(output), contextlib.redirect_stderr(output):
             status = oc2.main(args)
         return status, output.getvalue()
 
-    def _grant_snapshot_access(self, path: pathlib.Path, operator: str) -> None:
-        self.acl_grants.append((path, operator))
-
-    def _grant_collection_directory_access(self, path: pathlib.Path, operator: str) -> None:
-        self.collection_acl_grants.append((path, operator))
-
-    def _grant_collected_workspace_access(
-        self, incoming: pathlib.Path, operator: str, host_user: str,
-    ) -> None:
-        self.collection_read_grants.append((incoming.parent, incoming, operator, host_user))
-
-    def _fake_operator_run(self, user: str, *args: str, timeout: int = 30) -> str:
-        if args[:2] == ('rm', '-rf'):
-            shutil.rmtree(pathlib.Path(args[-1]), ignore_errors=True)
-        return ''
-
-    def test_workspace_launch_collect_and_apply(self):
-        v1_before = (self.repo / 'apm.yml').read_bytes()
-        v1_config_before = {
-            name: (self.repo / 'opencode' / name).read_bytes()
-            for name in ('omo.jsonc', 'opencode.jsonc')
-        }
+    def test_clone_mode_installs_and_launches_only_pinned_v2(self):
         status, output = self._run()
-        self.assertEqual(status, 0, output + repr(self.fake.calls))
-        self.assertEqual(len(self.acl_grants), 1)
-        self.assertEqual(self.acl_grants[0][1], 'sbx-poc')
-        self.assertEqual((self.project / 'main.py').read_text(), 'print("host")\n')
-        self.assertTrue((self.project / '.env').is_file())
-        self.assertTrue(any(call[0] == 'cp' for call in self.fake.calls))
+        self.assertEqual(status, 0, output)
+        create = next(call for call in self.fake.calls if call[0] == 'create' and '--clone' in call)
+        self.assertEqual(
+            create,
+            ('create', '--clone', '--name', 'oc2-test', 'shell', str(self.project)),
+        )
+        install = next(call for call in self.fake.calls if call[:3] == (
+            'exec', 'oc2-test', 'npm',
+        ))
+        self.assertEqual(install[-1], '@opencode/cli@2.2.5')
         launch = next(call for call in self.fake.calls if call[:2] == ('exec', '-it'))
-        self.assertIn('/projects/', launch[3])
-        remote_project = self.fake._path('oc2-test', launch[3])
-        self.assertFalse((remote_project / '.env').exists())
-        self.assertNotIn('SECRET=fixture', repr(self.fake.calls))
-        bundle_remote = next(
-            call[2].split(':', 1)[1] for call in self.fake.calls
-            if call[0] == 'cp' and '/bundles/' in call[2]
-        )
-        server = json.loads(
-            (self.fake._path('oc2-test', bundle_remote) / 'opencode.jsonc').read_text()
-        )
-        self.assertEqual(server['shell'], 'bash')
-        self.assertIs(server['snapshot'], True)
-        self.assertEqual(server['plugins'], [])
-        self.assertEqual(server['mcp'], {})
-        self.assertNotIn('OMITTED', json.dumps(server))
-        self.assertNotIn('unreviewed-plugin', json.dumps(server))
-        status, output = self._run('--collect')
-        self.assertEqual(status, 0, output)
-        self.assertEqual(self.collection_acl_grants[0][1], 'sbx-poc')
-        incoming_copy = next(
-            call for call in self.fake.calls
-            if call[0] == 'cp' and call[1].startswith('oc2-test:')
-        )
-        self.assertEqual(pathlib.Path(incoming_copy[2]).parent, self.collection_acl_grants[0][0])
-        self.assertTrue(self.collection_acl_grants[0][0].name.startswith('oc2-collect-'))
-        self.assertEqual(
-            self.collection_read_grants[0],
-            (self.collection_acl_grants[0][0], pathlib.Path(incoming_copy[2]),
-             'sbx-poc', getpass.getuser()),
-        )
-        self.assertFalse(self.collection_acl_grants[0][0].exists())
-        self.assertIn('MODIFIED: main.py', output)
-        self.assertIn('ADDED: created.py', output)
-        self.assertIn('DELETED: remove.py', output)
-        self.assertEqual((self.project / 'main.py').read_text(), 'print("host")\n')
-        self.assertTrue((self.project / 'remove.py').exists())
-        status, output = self._run('--apply')
-        self.assertEqual(status, 1)
-        self.assertIn('deletion approval', output)
-        status, output = self._run('--apply', '--allow-deletions')
-        self.assertEqual(status, 0, output)
-        self.assertEqual((self.project / 'main.py').read_text(), 'print("sandbox")\n')
-        self.assertEqual((self.project / 'created.py').read_text(), 'created = True\n')
-        self.assertFalse((self.project / 'remove.py').exists())
-        self.assertEqual((self.repo / 'apm.yml').read_bytes(), v1_before)
-        self.assertEqual(
-            {name: (self.repo / 'opencode' / name).read_bytes() for name in v1_config_before},
-            v1_config_before,
-        )
+        self.assertEqual(launch[3], '/home/agent/workspace/synthetic')
+        self.assertIn('env', launch)
+        self.assertIn('-i', launch)
+        self.assertEqual(launch[-2:], (oc2.PINNED[0], '--standalone'))
+        self.assertIn('opencode=v2.2.5', output)
+        self.assertFalse(any('--collect' in call or '--apply' in call for call in self.fake.calls))
 
-    def test_workspace_apply_refuses_host_conflict(self):
-        status, output = self._run()
-        self.assertEqual(status, 0, output + repr(self.fake.calls))
-        status, output = self._run('--collect')
-        self.assertEqual(status, 0, output)
-        (self.project / 'remove.py').write_text('remove = True\n')
-        (self.project / 'main.py').write_text('print("concurrent host")\n')
-        status, output = self._run('--apply')
-        self.assertEqual(status, 1)
-        self.assertIn('conflict', output)
-        self.assertEqual((self.project / 'main.py').read_text(), 'print("concurrent host")\n')
-
-    def test_sandbox_transfer_failure_fails_closed_without_host_changes(self):
-        self.fake.fail_project_copy = True
-        before = (self.project / 'main.py').read_bytes()
+    def test_clone_mode_refuses_env_file_before_creating_sandbox(self):
+        (self.project / '.env').write_text('TOKEN=fixture-only')
         status, output = self._run()
         self.assertEqual(status, 1)
-        self.assertIn('fake sbx transfer failure', output)
-        self.assertEqual((self.project / 'main.py').read_bytes(), before)
-        self.assertFalse(any(self.state.rglob('receipt.json')))
+        self.assertIn('clone mode would expose', output)
+        self.assertFalse(self.fake.created)
+        self.assertFalse(any(call[0] == 'create' and '--clone' in call for call in self.fake.calls))
+
+    def test_clone_mode_refuses_project_opencode_configuration(self):
+        (self.project / 'opencode.json').write_text('{"mcp":{}}\n')
+        status, output = self._run()
+        self.assertEqual(status, 1)
+        self.assertIn('OpenCode project configuration', output)
+        self.assertFalse(self.fake.created)
+
+    def test_existing_sandbox_is_not_reused_or_rebuilt(self):
+        self.fake.created = True
+        status, output = self._run()
+        self.assertEqual(status, 1)
+        self.assertIn('refusing to reuse or rebuild', output)
+        self.assertFalse(any(call[0] == 'create' and '--clone' in call for call in self.fake.calls))
 
 
 if __name__ == '__main__':

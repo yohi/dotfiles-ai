@@ -21,11 +21,10 @@ import sys
 import tempfile
 
 HERE = pathlib.Path(__file__).resolve().parent
-VERSION = '2.1.4'
+VERSION = '2.2.5'
 ROOT = '/home/agent/workspace/oc2'
 NAME_RE = re.compile(r'^[A-Za-z0-9][A-Za-z0-9.-]{0,61}[A-Za-z0-9]$')
 PINNED = (
-    '/home/agent/.local/opencode-v2/node_modules/.bin/opencode',
     '/home/agent/.local/oc2-runtime/node_modules/.bin/opencode',
 )
 
@@ -76,6 +75,37 @@ class Runner:
         if result.returncode != 0:
             raise Stop(f'sbx command failed (exit {result.returncode})')
         return result.stdout if capture else ''
+
+
+def clone_create_args(name: str, workspace: pathlib.Path) -> list[str]:
+    return ['create', '--clone', '--name', name, 'shell', str(workspace)]
+
+
+def install_cli_args(name: str) -> list[str]:
+    return [
+        'exec', name, 'npm', 'install', '--prefix', '/home/agent/.local/oc2-runtime',
+        '--no-audit', '--no-fund', '--no-save', f'@opencode/cli@{VERSION}',
+    ]
+
+
+def validate_clone_workspace(workspace: pathlib.Path) -> None:
+    """Refuse Clone mode if it would expose files omitted by the safety scan."""
+    import oc2_workspace
+
+    if any((workspace / name).exists() for name in ('opencode.json', 'opencode.jsonc', 'cli.json')):
+        raise Stop('workspace contains OpenCode project configuration')
+    manifest = oc2_workspace.snapshot(workspace)
+    checked = {entry.path for entry in manifest.files}
+    exposed: set[str] = set()
+    for current, directories, filenames in os.walk(workspace, followlinks=False):
+        directories[:] = [name for name in directories if name != '.git']
+        current_path = pathlib.Path(current)
+        exposed.update(
+            (current_path / name).relative_to(workspace).as_posix()
+            for name in filenames
+        )
+    if exposed != checked:
+        raise Stop('clone mode would expose files excluded from the safe workspace scan')
 
 
 def is_compatible_sandbox(runner: Runner, name: str) -> bool:
@@ -304,10 +334,11 @@ def stage(runner: Runner, name: str, bundle: pathlib.Path, manifest_sha: str,
 
 def cli_path(runner: Runner, name: str) -> str | None:
     for candidate in PINNED:
-        quoted = shlex.quote(candidate)
-        result = runner.sbx('exec', name, 'bash', '-c',
-                            f'if test -x {quoted}; then {quoted} --version; fi',
-                            capture=True).strip()
+        result = runner.sbx(
+            'exec', name, 'sh', '-c',
+            'if test -x "$1"; then "$1" --version; fi',
+            'oc2-version-probe', candidate, capture=True,
+        ).strip()
         if result in (VERSION, 'v' + VERSION, 'opencode v' + VERSION):
             return candidate
     return None
@@ -359,23 +390,15 @@ def seed_cli(runner: Runner, name: str, source: str, scratch: pathlib.Path) -> s
                        capture_output=True, timeout=30, check=False)
 
 
-def provision_cli(runner: Runner, name: str, seed: str, scratch: pathlib.Path) -> str:
+def provision_cli(runner: Runner, name: str) -> str:
     found = cli_path(runner, name)
     if found:
         return found
-    seeded = seed_cli(runner, name, seed, scratch)
-    if seeded:
-        return seeded
-    print('OpenCode v2.1.4 is missing; installing pinned @opencode/cli in the Sandbox.')
-    print('Network policy is NOT altered. Registry access must already be approved.')
-    execute(runner, name, 'bash', '-c',
-            'set -eu; command -v npm >/dev/null; '
-            'mkdir -p /home/agent/.local/oc2-runtime; '
-            'npm install --prefix /home/agent/.local/oc2-runtime '
-            '--no-audit --no-fund --no-save @opencode/cli@2.1.4')
+    print(f'OC2: installing @opencode/cli@{VERSION} inside the new Sandbox.')
+    runner.sbx(*install_cli_args(name))
     found = cli_path(runner, name)
     if not found:
-        raise Stop('installed CLI is not the pinned v2.1.4')
+        raise Stop(f'installed CLI is not the pinned v{VERSION}')
     return found
 
 
@@ -389,8 +412,14 @@ def launch(runner: Runner, name: str, digest: str, cli: str,
         raise Stop('unapproved OpenCode executable path')
     runtime = f'{ROOT}/runtime/{digest[:16]}'
     workdir = project or f'{runtime}/project'
-    if not workdir.startswith(ROOT + '/') or '..' in pathlib.PurePosixPath(workdir).parts:
-        raise Stop('workspace path is outside the private OC2 tree')
+    workspace_path = pathlib.PurePosixPath(workdir)
+    if not workspace_path.is_absolute() or '..' in workspace_path.parts:
+        raise Stop('workspace path is not a safe absolute path')
+    runner.sbx(
+        'exec', name, 'mkdir', '-p', '-m', '700', runtime,
+        *(f'{runtime}/{directory}'
+          for directory in ('home', 'config', 'data', 'state', 'cache', 'tmp')),
+    )
     runner.sbx(
         'exec', '-it', '-w', workdir, name,
         'env', '-i',
@@ -484,97 +513,69 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument('--repo-root', type=pathlib.Path, default=HERE.parents[1])
     p.add_argument('--workspace', type=pathlib.Path, default=pathlib.Path.cwd(),
                    help='host project directory (default: current directory)')
-    p.add_argument('--sandbox', default='oc2-dev')
-    p.add_argument('--sbx-user', default=os.getenv('OC2_SBX_USER', 'sbx-poc'))
-    p.add_argument('--seed-sandbox', default=os.getenv('OC2_SEED_SANDBOX', 'oc-v2-poc'),
-                   help='optional mountless PoC containing the pinned CLI; source is read-only')
-    p.add_argument('--dry-run', action='store_true', help='show planned actions without writing or calling sbx')
-    p.add_argument('--prepare-only', action='store_true', help='prepare config and CLI without opening TUI')
-    p.add_argument('--collect', action='store_true', help='collect sandbox changes for review')
-    p.add_argument('--apply', action='store_true', help='apply previously collected changes to the host')
-    p.add_argument('--allow-deletions', action='store_true',
-                   help='approve deletions when used with --apply')
-    p.add_argument('--state-dir', type=pathlib.Path,
-                   default=pathlib.Path.home() / '.local/state/oc2',
-                   help='host-only transfer receipt directory')
+    p.add_argument('--sandbox', default='oc2-v2')
+    p.add_argument('--dry-run', action='store_true', help='show planned actions without calling sbx')
     args = p.parse_args(argv)
+    import oc2_workspace
+
     try:
-        workspace_module = __import__('oc2_workspace')
         workspace = args.workspace
         if workspace.is_symlink():
             raise Stop('workspace root must not be a symlink')
         workspace = workspace.resolve(strict=True)
         if not workspace.is_dir():
             raise Stop('workspace is not a directory')
-        if args.collect and args.apply:
-            raise Stop('--collect and --apply are separate operations')
-        if args.allow_deletions and not args.apply:
-            raise Stop('--allow-deletions requires --apply')
-        if args.collect or args.apply:
-            return _session_action(args, workspace, args.state_dir, collect=args.collect)
-        if args.dry_run:
-            manifest = workspace_module.snapshot(workspace)
-            print('OC2 PLAN: workspace=' + str(workspace))
-            print('OC2 PLAN: files=' + str(len(manifest.files)) +
-                  ' manifest_sha256=' + hashlib.sha256(manifest.encode()).hexdigest())
-            print('OC2 PLAN: secrets, credentials, symlinks, and special files excluded or rejected')
-            print('OC2 PLAN: no Sandbox commands executed')
-            return 0
         if not NAME_RE.fullmatch(args.sandbox):
             raise Stop('invalid Sandbox name')
-        if args.seed_sandbox and not NAME_RE.fullmatch(args.seed_sandbox):
-            raise Stop('invalid seed Sandbox name')
-        if not re.fullmatch(r'[a-z_][a-z0-9_-]*', args.sbx_user):
-            raise Stop('invalid Sandbox operator user')
+        if args.dry_run:
+            print('OC2 PLAN: clone-mode shell Sandbox=' + args.sandbox)
+            print('OC2 PLAN: workspace=' + str(workspace))
+            print(f'OC2 PLAN: install and verify @opencode/cli@{VERSION} inside the Sandbox')
+            print('OC2 PLAN: no credentials, provider settings, MCP, plugins, or host config')
+            print('OC2 PLAN: no Sandbox commands executed')
+            return 0
         repo = args.repo_root.resolve(strict=True)
         if not (repo / 'apm.yml').is_file():
             raise Stop('dotfiles-ai apm.yml not found')
-        import oc2_session as sessions
-        state_session = sessions.session_directory(args.state_dir, workspace)
-        if state_session.exists() or state_session.is_symlink():
-            raise Stop('an OC2 transfer receipt already exists; collect or apply it first')
-        manifest = workspace_module.snapshot(workspace)
+        validate_clone_workspace(workspace)
+        git_root = subprocess.run(
+            ['git', '-C', str(workspace), 'rev-parse', '--show-toplevel'],
+            capture_output=True, text=True, check=False, timeout=10,
+        )
+        if git_root.returncode != 0 or pathlib.Path(git_root.stdout.strip()) != workspace:
+            raise Stop('workspace must be the root of a Git repository for Clone mode')
         if not shutil.which('sbx'):
-            # sbx can be installed only in operator PATH, so also check via sudo.
-            if args.sbx_user == getpass.getuser():
-                raise Stop('sbx CLI was not found')
-        guest_script = HERE / 'oc2_guest.py'
-        from oc2_assets import AssetError, build, write_new
-        with tempfile.TemporaryDirectory(prefix='oc2-export-') as temp:
-            tmp = pathlib.Path(temp)
-            tmp.chmod(0o711)
-            bundle, digest = export_config(repo, tmp / 'bundle')
-            try:
-                asset_bytes, asset_sha = build(repo)
-                asset_file = tmp / 'oc2-assets.json'
-                write_new(asset_file, asset_bytes)
-            except AssetError as exc:
-                raise Stop('safe settings export failed: ' + str(exc)) from exc
-            code = tmp / 'oc2_guest.py'
-            shutil.copyfile(guest_script, code)
-            code.chmod(0o644)
-            runner = Runner(args.sbx_user)
-            if not is_compatible_sandbox(runner, args.sandbox):
-                print('OC2: creating mountless shell Sandbox ' + args.sandbox)
-                runner.sbx('create', '--name', args.sandbox, 'shell')
-            else:
-                print('OC2: reusing verified mountless Sandbox ' + args.sandbox)
-            stage(runner, args.sandbox, bundle, digest, code, asset_file, asset_sha)
-            project_snapshot = tmp / 'project'
-            remote_project = transfer_workspace(
-                runner, args.sandbox, project_snapshot, manifest, args.sbx_user,
-            )
-            sessions.create(args.state_dir, args.sandbox, remote_project, manifest)
-            cli = provision_cli(runner, args.sandbox, args.seed_sandbox, tmp)
-            runtime_sha = hashlib.sha256(bytes.fromhex(digest) + bytes.fromhex(asset_sha)).hexdigest()
-            print('OC2_PREPARED: sandbox=' + args.sandbox +
-                  ' config_sha=' + digest[:16] + ' assets_sha=' + asset_sha[:16])
-            if not args.prepare_only:
-                launch(runner, args.sandbox, runtime_sha, cli, remote_project)
+            raise Stop('Docker Sandboxes CLI was not found')
+        runner = Runner(getpass.getuser())
+        sandbox_version = runner.sbx('version', capture=True).strip()
+        if re.search(r'\bv\d+\.\d+\.\d+\b', sandbox_version) is None:
+            raise Stop('could not verify Docker Sandboxes version')
+        if '--clone' not in runner.sbx('create', '--help', capture=True):
+            raise Stop('installed Docker Sandboxes CLI does not support Clone mode')
+        print('OC2_DOCKER_SANDBOXES: ' + sandbox_version)
+        existing = {line.strip() for line in runner.sbx('ls', '-q', capture=True).splitlines()}
+        if args.sandbox in existing:
+            raise Stop('Sandbox name already exists; refusing to reuse or rebuild it')
+        print('OC2: creating clone-mode shell Sandbox ' + args.sandbox)
+        runner.sbx(*clone_create_args(args.sandbox, workspace))
+        cli = provision_cli(runner, args.sandbox)
+        workdir = runner.sbx('exec', args.sandbox, 'pwd', capture=True).strip()
+        if not workdir.startswith('/') or '..' in pathlib.PurePosixPath(workdir).parts:
+            raise Stop('Sandbox returned an unsafe clone working directory')
+        clone_root = runner.sbx(
+            'exec', args.sandbox, 'git', '-C', workdir,
+            'rev-parse', '--show-toplevel', capture=True,
+        ).strip()
+        if clone_root != workdir:
+            raise Stop('Sandbox working directory is not the Clone-mode Git root')
+        runtime_sha = hashlib.sha256(
+            (str(workspace) + '\0' + VERSION).encode(),
+        ).hexdigest()
+        print(f'OC2_READY: sandbox={args.sandbox} opencode=v{VERSION}')
+        launch(runner, args.sandbox, runtime_sha, cli, workdir)
         return 0
     except (Stop, OSError, ValueError, subprocess.TimeoutExpired,
-            workspace_module.WorkspaceError) as exc:
-        # No credentials, source config, or raw subprocess dumps on failure.
+            oc2_workspace.WorkspaceError) as exc:
         print('OC2_STOP: ' + str(exc), file=sys.stderr)
         return 1
 

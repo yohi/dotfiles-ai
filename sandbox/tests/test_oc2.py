@@ -75,6 +75,30 @@ class FakeRunner:
 
 
 class HostTest(unittest.TestCase):
+    def test_clone_mode_command_requires_a_workspace_path(self):
+        workspace = pathlib.Path('/tmp/oc2-safe-repository')
+        self.assertEqual(
+            oc2.clone_create_args('oc2-safe', workspace),
+            ['create', '--clone', '--name', 'oc2-safe', 'shell', str(workspace)],
+        )
+
+    def test_clone_mode_refuses_excluded_files_that_docker_would_expose(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            (root / 'main.py').write_text('print("safe")\n')
+            (root / '.env').write_text('TOKEN=fixture-value')
+            with self.assertRaisesRegex(oc2.Stop, 'clone mode would expose'):
+                oc2.validate_clone_workspace(root)
+
+    def test_opencode_cli_install_is_pinned_to_v225(self):
+        self.assertEqual(oc2.VERSION, '2.2.5')
+        self.assertEqual(
+            oc2.install_cli_args('oc2-safe'),
+            ['exec', 'oc2-safe', 'npm', 'install', '--prefix',
+             '/home/agent/.local/oc2-runtime', '--no-audit', '--no-fund',
+             '--no-save', '@opencode/cli@2.2.5'],
+        )
+
     def test_workspace_snapshot_excludes_secrets_and_symlinks(self):
         workspace = load('oc2_workspace')
         with tempfile.TemporaryDirectory() as tmp:
@@ -315,13 +339,14 @@ class HostTest(unittest.TestCase):
             capture_output=True, text=True, check=False,
         )
         self.assertEqual(help_result.returncode, 0)
-        self.assertIn('--collect', help_result.stdout)
         version_result = subprocess.run(
             [sys.executable, str(SCRIPTS / 'oc2.py'), '--version'],
             capture_output=True, text=True, check=False,
         )
         self.assertEqual(version_result.returncode, 0)
         self.assertIn(oc2.VERSION, version_result.stdout)
+        self.assertEqual(oc2.VERSION, '2.2.5')
+        self.assertNotIn('--collect', help_result.stdout)
 
     def test_missing_sandbox(self):
         runner = FakeRunner()
@@ -401,6 +426,20 @@ class HostTest(unittest.TestCase):
         self.assertIn('OPENCODE_WATCHDOG_ENABLED=false', command)
         self.assertNotIn('bash', command)
         self.assertNotIn('--mount', command)
+
+    def test_launch_prepares_isolated_runtime_for_clone_workspace(self):
+        runner = FakeRunner()
+        digest = 'b' * 64
+        project = '/clone/workspaces/synthetic'
+        runtime = f'{oc2.ROOT}/runtime/{digest[:16]}'
+        oc2.launch(runner, 'oc2-dev', digest, oc2.PINNED[0], project)
+        self.assertEqual(
+            runner.calls[0],
+            ('exec', 'oc2-dev', 'mkdir', '-p', '-m', '700',
+             runtime, *(f'{runtime}/{name}' for name in
+                        ('home', 'config', 'data', 'state', 'cache', 'tmp'))),
+        )
+        self.assertEqual(runner.calls[1][3], project)
 
     def test_stage_does_not_depend_on_bash_positional_arguments(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -498,20 +537,37 @@ class HostTest(unittest.TestCase):
             with self.assertRaisesRegex(oc2.Stop, 'asset bundle SHA mismatch'):
                 oc2.stage(Runner(), 'oc2-dev', bundle, 'a' * 64, script, asset, expected)
 
-    def test_cli_version_probe_avoids_bash_positional_arguments(self):
+    def test_cli_version_probe_uses_shell_parameter_for_binary_path(self):
         class VersionRunner:
             def __init__(self):
                 self.calls = []
 
             def sbx(self, *args, **kwargs):
                 self.calls.append(args)
-                assert args[:4] == ('exec', 'oc2-dev', 'bash', '-c')
-                assert len(args) == 5
-                assert '$1' not in args[4]
-                return 'opencode v2.1.4\n'
+                assert args == (
+                    'exec', 'oc2-dev', 'sh', '-c',
+                    'if test -x "$1"; then "$1" --version; fi',
+                    'oc2-version-probe', oc2.PINNED[0],
+                )
+                return 'opencode v2.2.5\n'
 
         runner = VersionRunner()
         self.assertEqual(oc2.cli_path(runner, 'oc2-dev'), oc2.PINNED[0])
+        self.assertEqual(len(runner.calls), 1)
+
+    def test_cli_path_returns_none_when_pinned_binary_is_missing(self):
+        class MissingBinaryRunner:
+            def __init__(self):
+                self.calls = []
+
+            def sbx(self, *args, **kwargs):
+                self.calls.append(args)
+                if args[:4] == ('exec', 'oc2-dev', 'sh', '-c'):
+                    return ''
+                raise oc2.Stop('sbx command failed (exit 127)')
+
+        runner = MissingBinaryRunner()
+        self.assertIsNone(oc2.cli_path(runner, 'oc2-dev'))
         self.assertEqual(len(runner.calls), 1)
 
     def test_launch_rejects_unapproved_binary(self):

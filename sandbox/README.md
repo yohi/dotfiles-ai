@@ -1,15 +1,16 @@
 # OpenCode Sandbox runtime — 設定と開発環境
 
-> **Status: STATIC_VALIDATION_PREPARED / LIVE_SANDBOX_NOT_TESTED**
+> **Status: PHASE1_LIVE_PASS**
 >
 > このディレクトリは、ホスト管理・Sandbox実行に向けた設定雛形と、読み取り主体の限定的な設定エクスポーターです。
-> Docker Sandboxの作成、`sbx policy`変更、ホストOpenCode v1の更新、認証情報の転送は行いません。
+> `oc2`実行時は新しいClone-mode Sandboxを作成します。既存Sandboxの再構築・削除、`sbx policy`変更、
+> ホストOpenCode v1の更新、認証情報の転送は自動で行いません。
 > `sandbox/` 配下のYAMLは、Docker Sandboxes公式スキーマではなく独自の設計用メタデータです。
 
 ## 責務と正本
 
 - **Host**: `dotfiles-ai` の `apm.yml` を設定SSOTとし、プロジェクトのGitリポジトリを正本として保持する。
-- **Sandbox**: OpenCode v2.1.4 / Plugin / shell / ビルドとテストを実行する。ホストGitの作業ツリーは直接書き換えない。
+- **Sandbox**: Phase 1の`oc2`はOpenCode v2.2.5のTUI起動だけを行う。Provider認証、MCP、Pluginは扱わない。
 - **受渡し**: 選別済み設定とレビュー済みソースのみを渡し、変更結果はホストでレビュー後に明示的に採用する。
 
 既存の `make setup`、`make sync-opencode`、`make sync-mcp` には接続しません。
@@ -104,54 +105,61 @@ OpenCode起動時の設定読み込みとPlugin実動作は後続の検証対象
 ## Host `oc2` workflow
 
 `sandbox/scripts/oc2.py` はHost側ランチャーです。PATHへの登録は自動では行いません。
-初回だけ、リポジトリのルートで明示的にリンクしてください。
+初回だけ、リポジトリのルートでリンクしてください。
 
 ```sh
-chmod +x sandbox/scripts/oc2.py
 mkdir -p "$HOME/.local/bin"
 ln -s "$PWD/sandbox/scripts/oc2.py" "$HOME/.local/bin/oc2"
 ```
 
-`$HOME/.local/bin` がPATHに含まれていることを確認後、対象プロジェクトで実行します。
+`$HOME/.local/bin` がPATHに含まれていることを確認してください。起動前にDocker Sandboxes CLIの
+インストール済みバージョンと `sbx create --help` の `--clone` 対応を確認します。
+Sandbox名が既に存在する場合は、再利用・再構築せず停止します。
+
+Clone modeはホストのGit RepositoryをRead-onlyでGuestから見える状態にし、Guest内の別Cloneで
+作業します。Dockerの仕様上、`.env`やGit除外ファイルもRead-only sourceに含まれます。
+そのため `oc2` は安全走査から除外されるファイル、特殊ファイル、symlink、認証情報らしい内容が
+あるWorkspaceをSandbox作成前に拒否します。`opencode.json`、`opencode.jsonc`、`cli.json`も拒否します。
+Phase 1の実機確認では、**新規の無害なテスト用Git Repositoryだけ**を使ってください。
+実プロジェクトには適用しないでください。
 
 ```sh
-cd "$HOME/program/my-project"
-oc2 --dry-run
+oc2 --version
+oc2 --dry-run --workspace "$HOME/path/to/oc2-safe-test-repo"
+cd "$HOME/path/to/oc2-safe-test-repo"
 oc2
 ```
 
-通常起動は既存のmountless Sandboxを検査・作成し、`apm.yml`由来の限定設定をステージし、
-Workspace Snapshotを専用のゲストディレクトリへ転送してOpenCode v2.1.4を起動します。
-ホストWorkspaceをmountせず、`.git`、`.env*`、認証情報ディレクトリや鍵ファイルなどは
-Snapshotから除外します。転送対象に含まれるsymlink、特殊ファイル、読めないファイルは
-処理を停止します。一時SnapshotのファイルはHost所有者のまま保ち、Sandbox operatorだけに
-読み取りACLを付与します。ACLを設定できない場合は転送しません。転送後、通常ファイルは
-各SHA-256を確認します。
+通常起動は新規のClone-mode shell Sandboxを作成し、Sandbox内へ `@opencode/cli@2.2.5`を導入します。
+Hostの環境変数は継承せず、Sandbox専用のHome/XDG領域を使います。Provider、認証、MCP、Plugin設定は
+渡しません。Workspace Snapshot、Manifest、ACL、Seed、collect/applyは実行経路に含めません。
+Sandbox作成後に失敗しても、自動削除しません。
 
-転送Baselineと回収物は、プロジェクト外の`$HOME/.local/state/oc2/`に保存します。
-Sandboxでの作業後、まず回収して変更パスを確認してください。
-回収用の受渡しはHost state外の一時ディレクトリで行い、`sbx-poc`とHostユーザーに
-限定したACLを一時設定します。stateディレクトリ自体の権限は広げません。
+Docker Sandboxes `v0.49.2`はClone modeを提供することを確認済みです。`v0.50.1`も公式リリースですが、
+Host CLIの更新はこの手順では行いません。OpenCode `v2.2.5`は公式リリースで、npm package
+`@opencode/cli@2.2.5`をSandbox内に固定導入します。起動前に実行ファイルの`--version`が一致しなければ停止します。
 
-```sh
-oc2 --collect
-```
-
-この操作はHost Workspaceを変更しません。出力された`COLLECTED_FOR_REVIEW`のディレクトリを
-確認し、適用するときだけ次を実行します。
+実証Repositoryは実プロジェクトと独立した新規ディレクトリで作成します。検査で拒否された場合は
+回避せず、安全なテストRepositoryを作り直してください。Sandbox名が存在する場合は別名を指定します。
 
 ```sh
-oc2 --apply
+test_repo=$(mktemp -d)
+git -C "$test_repo" init
+printf 'print("safe sandbox fixture")\n' > "$test_repo/main.py"
+git -C "$test_repo" add main.py
+git -C "$test_repo" -c user.name='OC2 Test' -c user.email='oc2-test@example.invalid' commit -m fixture
+cd "$test_repo"
+oc2 --repo-root "$HOME/dotfiles/components/dotfiles-ai" --sandbox oc2-phase1-test
 ```
 
-Sandbox側の削除も適用する場合は、削除を確認したうえで`--allow-deletions`を明示します。
-Baseline以降にHost側Workspaceが変わっている場合は競合として適用を停止します。
-回収は一つの転送につき一度だけです。再起動・再転送には、適用済みまたは回収済み状態を
-確認したうえで別の状態領域を指定してください。
+TUIの操作確認後は `Ctrl+C` で終了します。Sandboxは残ります。既存Sandboxの再利用・削除が必要な場合は、
+対象を確認したうえでHuman Ownerが別途判断してください。この実機テストはDocker Sandboxes `v0.49.2`の
+Clone modeとOpenCode `v2.2.5`の起動だけを確認し、実プロジェクトでの機密ファイル非露出を保証しません。
 
-Offline tests use a Fake `sbx` adapter. They verify command construction, transfer checksums,
-isolated project workdir, collection, host conflicts and explicit deletion approval. They do not
-prove Docker Sandbox behavior, OpenCode startup, provider/network policy, or live `sbx cp` semantics.
+`sbx diagnose` が `/dev/kvm: permission denied` を示した場合は、起動を迂回せず停止します。
+Human Ownerが権限変更を承認した場合に限り、管理者が `sudo usermod -aG kvm "$USER"` を実行し、
+完全にログアウトして再ログインした後、`sbx diagnose` と `id -nG` で反映を確認してください。
+Docker Sandboxesの更新が必要と判断した場合も、この手順とは別に承認を得てください。
 
 ## 雛形ファイル（自動適用されない）
 
