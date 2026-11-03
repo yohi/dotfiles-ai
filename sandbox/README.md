@@ -124,7 +124,9 @@ oc2
 Workspace Snapshotを専用のゲストディレクトリへ転送してOpenCode v2.1.4を起動します。
 ホストWorkspaceをmountせず、`.git`、`.env*`、認証情報ディレクトリや鍵ファイルなどは
 Snapshotから除外します。転送対象に含まれるsymlink、特殊ファイル、読めないファイルは
-処理を停止します。転送された通常ファイルは各SHA-256を確認します。
+処理を停止します。一時SnapshotのファイルはHost所有者のまま保ち、Sandbox operatorだけに
+読み取りACLを付与します。ACLを設定できない場合は転送しません。転送後、通常ファイルは
+各SHA-256を確認します。
 
 転送Baselineと回収物は、プロジェクト外の`$HOME/.local/state/oc2/`に保存します。
 Sandboxでの作業後、まず回収して変更パスを確認してください。

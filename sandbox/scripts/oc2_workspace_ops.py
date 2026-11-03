@@ -25,7 +25,7 @@ def materialize(source: pathlib.Path, destination: pathlib.Path, manifest: Manif
     if destination.exists() or destination.is_symlink() or not destination.parent.is_dir():
         raise WorkspaceError('snapshot destination is not new and safe')
     directory_mode = 0o711 if for_guest else 0o700
-    file_mode = 0o644 if for_guest else 0o600
+    file_mode = 0o600
     destination.mkdir(mode=directory_mode)
     try:
         for entry in manifest.files:

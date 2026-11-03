@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import contextlib
-import getpass
 import hashlib
 import io
 import json
@@ -144,19 +143,24 @@ class LauncherFlowTests(unittest.TestCase):
         (self.project / '.env').write_text('SECRET=fixture\n')
         self.state = self.root / 'state'
         self.fake = FakeSbx(self.root / 'fake-sbx')
+        self.acl_grants: list[tuple[pathlib.Path, str]] = []
 
     def _run(self, *flags: str) -> tuple[int, str]:
         output = io.StringIO()
         args = [
             '--repo-root', str(self.repo), '--workspace', str(self.project),
             '--state-dir', str(self.state), '--sandbox', 'oc2-test',
-            '--sbx-user', getpass.getuser(), '--seed-sandbox', '', *flags,
+            '--sbx-user', 'sbx-poc', '--seed-sandbox', '', *flags,
         ]
         with patch.object(oc2, 'Runner', return_value=self.fake), \
              patch.object(oc2.shutil, 'which', return_value='/fake/sbx'), \
+             patch.object(oc2, 'grant_snapshot_access', side_effect=self._grant_snapshot_access), \
              contextlib.redirect_stdout(output), contextlib.redirect_stderr(output):
             status = oc2.main(args)
         return status, output.getvalue()
+
+    def _grant_snapshot_access(self, path: pathlib.Path, operator: str) -> None:
+        self.acl_grants.append((path, operator))
 
     def test_workspace_launch_collect_and_apply(self):
         v1_before = (self.repo / 'apm.yml').read_bytes()
@@ -166,6 +170,8 @@ class LauncherFlowTests(unittest.TestCase):
         }
         status, output = self._run()
         self.assertEqual(status, 0, output + repr(self.fake.calls))
+        self.assertEqual(len(self.acl_grants), 1)
+        self.assertEqual(self.acl_grants[0][1], 'sbx-poc')
         self.assertEqual((self.project / 'main.py').read_text(), 'print("host")\n')
         self.assertTrue((self.project / '.env').is_file())
         self.assertTrue(any(call[0] == 'cp' for call in self.fake.calls))

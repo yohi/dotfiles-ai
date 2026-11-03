@@ -11,6 +11,7 @@ import io
 import json
 import os
 import pathlib
+import stat
 import subprocess
 import sys
 import tempfile
@@ -143,6 +144,66 @@ class HostTest(unittest.TestCase):
             self.assertEqual(sorted(item.name for item in stage.iterdir()), ['app.py'])
             self.assertEqual((stage / 'app.py').read_text(), 'print("safe")\n')
 
+    def test_guest_snapshot_keeps_files_private_before_operator_acl(self):
+        workspace = load('oc2_workspace')
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp) / 'source'
+            root.mkdir()
+            source = root / 'app.py'
+            source.write_text('print("safe")\n')
+            manifest = workspace.snapshot(root)
+            stage = pathlib.Path(tmp) / 'stage'
+            workspace.materialize(root, stage, manifest, for_guest=True)
+            self.assertEqual(stat.S_IMODE((stage / 'app.py').stat().st_mode), 0o600)
+
+    def test_workspace_transfer_grants_only_operator_read_access(self):
+        workspace = load('oc2_workspace')
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp) / 'host'
+            root.mkdir()
+            (root / 'main.py').write_text('print("safe")\n')
+            manifest = workspace.snapshot(root)
+            staged = pathlib.Path(tmp) / 'snapshot'
+            runner = FakeRunner()
+            calls = []
+            with patch.object(
+                oc2, 'grant_snapshot_access',
+                side_effect=lambda path, user: calls.append((path, user)),
+                create=True,
+            ):
+                oc2.transfer_workspace(runner, 'oc2-dev', staged, manifest, 'sbx-poc')
+            self.assertEqual(calls, [(staged, 'sbx-poc')])
+
+    def test_snapshot_acl_is_limited_to_named_operator(self):
+        result = subprocess.CompletedProcess(args=[], returncode=0)
+        with patch.object(oc2.shutil, 'which', return_value='/usr/bin/setfacl'), \
+             patch.object(oc2.subprocess, 'run', return_value=result) as run:
+            oc2.grant_snapshot_access(pathlib.Path('/tmp/oc2-stage/project'), 'sbx-poc')
+        self.assertEqual(
+            run.call_args.args[0],
+            ['/usr/bin/setfacl', '-R', '-m', 'u:sbx-poc:rX', '--',
+             '/tmp/oc2-stage/project'],
+        )
+
+    def test_snapshot_acl_fails_closed_when_setfacl_is_missing(self):
+        with patch.object(oc2.shutil, 'which', return_value=None):
+            with self.assertRaisesRegex(oc2.Stop, 'setfacl is required'):
+                oc2.grant_snapshot_access(pathlib.Path('/tmp/oc2-stage/project'), 'sbx-poc')
+
+    def test_workspace_transfer_stops_before_copy_if_private_acl_fails(self):
+        workspace = load('oc2_workspace')
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp) / 'host'
+            root.mkdir()
+            (root / 'main.py').write_text('print("safe")\n')
+            manifest = workspace.snapshot(root)
+            staged = pathlib.Path(tmp) / 'snapshot'
+            runner = FakeRunner()
+            with patch.object(oc2, 'grant_snapshot_access', side_effect=oc2.Stop('ACL denied')):
+                with self.assertRaisesRegex(oc2.Stop, 'ACL denied'):
+                    oc2.transfer_workspace(runner, 'oc2-dev', staged, manifest, 'sbx-poc')
+            self.assertFalse(any(call[0] == 'cp' for call in runner.calls))
+
     def test_workspace_changes_apply_add_modify_and_require_delete_approval(self):
         workspace = load('oc2_workspace')
         with tempfile.TemporaryDirectory() as tmp:
@@ -185,7 +246,10 @@ class HostTest(unittest.TestCase):
             staged = pathlib.Path(tmp) / 'snapshot'
             workspace.materialize(root, staged, manifest)
             runner = FakeRunner()
-            remote = oc2.transfer_workspace(runner, 'oc2-dev', staged, manifest)
+            with patch.object(oc2, 'grant_snapshot_access'):
+                remote = oc2.transfer_workspace(
+                    runner, 'oc2-dev', staged, manifest, 'sbx-poc',
+                )
             self.assertEqual(remote, oc2.ROOT + '/projects/' + remote.rsplit('/', 1)[-1])
             self.assertEqual(runner.workspace_copies[0], (staged, 'oc2-dev:' + remote))
             oc2.launch(runner, 'oc2-dev', 'a' * 64, oc2.PINNED[0], remote)

@@ -132,8 +132,27 @@ def execute(runner: Runner, name: str, *args: str) -> None:
     runner.sbx('exec', name, *args)
 
 
+def grant_snapshot_access(snapshot: pathlib.Path, operator: str) -> None:
+    if operator == getpass.getuser():
+        return
+    if re.fullmatch(r'[a-z_][a-z0-9_-]*', operator) is None:
+        raise Stop('invalid Sandbox operator user')
+    setfacl = shutil.which('setfacl')
+    if setfacl is None:
+        raise Stop('setfacl is required for private Workspace staging')
+    try:
+        result = subprocess.run(
+            [setfacl, '-R', '-m', f'u:{operator}:rX', '--', str(snapshot)],
+            check=False, capture_output=True, text=True, timeout=15,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise Stop('could not grant private Workspace read access') from exc
+    if result.returncode != 0:
+        raise Stop('could not grant private Workspace read access')
+
+
 def transfer_workspace(runner: Runner, name: str, snapshot: pathlib.Path,
-                       manifest: object) -> str:
+                       manifest: object, operator: str) -> str:
     from oc2_workspace import Manifest, materialize
 
     if not isinstance(manifest, Manifest):
@@ -153,6 +172,7 @@ def transfer_workspace(runner: Runner, name: str, snapshot: pathlib.Path,
     if snapshot.exists():
         shutil.rmtree(snapshot)
     checked.rename(snapshot)
+    grant_snapshot_access(snapshot, operator)
     runner.sbx('cp', str(snapshot), f'{name}:{destination}')
     execute(runner, name, 'chmod', '-R', 'u+rwX', destination)
     for entry in manifest.files:
@@ -464,7 +484,7 @@ def main(argv: list[str] | None = None) -> int:
             stage(runner, args.sandbox, bundle, digest, code, asset_file, asset_sha)
             project_snapshot = tmp / 'project'
             remote_project = transfer_workspace(
-                runner, args.sandbox, project_snapshot, manifest,
+                runner, args.sandbox, project_snapshot, manifest, args.sbx_user,
             )
             sessions.create(args.state_dir, args.sandbox, remote_project, manifest)
             cli = provision_cli(runner, args.sandbox, args.seed_sandbox, tmp)
