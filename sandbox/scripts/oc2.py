@@ -34,18 +34,37 @@ class Stop(Exception):
     pass
 
 
+def operator_command(user: str, *args: str) -> list[str]:
+    if user == getpass.getuser():
+        return list(args)
+    if re.fullmatch(r'[a-z_][a-z0-9_-]*', user) is None:
+        raise Stop('invalid Sandbox operator user')
+    sudo = shutil.which('sudo')
+    if sudo is None:
+        raise Stop('sudo is required to use the separate Sandbox operator account')
+    return [sudo, '-i', '-u', user, '--', *args]
+
+
+def run_operator(user: str, *args: str, timeout: int = 30) -> str:
+    try:
+        result = subprocess.run(
+            operator_command(user, *args), check=False, text=True,
+            capture_output=True, timeout=timeout,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise Stop('Sandbox operator command could not complete') from exc
+    if result.returncode != 0:
+        raise Stop('Sandbox operator command failed')
+    return result.stdout
+
+
 class Runner:
     def __init__(self, user: str, *, dry_run: bool = False):
         self.user = user
         self.dry_run = dry_run
 
     def sbx(self, *args: str, capture: bool = False, tty: bool = False) -> str:
-        command = []
-        if self.user != getpass.getuser():
-            if not shutil.which('sudo'):
-                raise Stop('sudo is required to use the separate Sandbox operator account')
-            command.extend(['sudo', '-i', '-u', self.user, '--'])
-        command.extend(['sbx', *args])
+        command = operator_command(self.user, 'sbx', *args)
         if self.dry_run:
             print('PLAN: ' + ' '.join(command[:5]) + ' [...]')
             return ''
@@ -132,23 +151,71 @@ def execute(runner: Runner, name: str, *args: str) -> None:
     runner.sbx('exec', name, *args)
 
 
+def _set_acl(paths: tuple[pathlib.Path, ...], *options: str) -> None:
+    setfacl = shutil.which('setfacl')
+    if setfacl is None:
+        raise Stop('setfacl is required for private Workspace staging')
+    for offset in range(0, len(paths), 64):
+        batch = paths[offset:offset + 64]
+        try:
+            result = subprocess.run(
+                [setfacl, *options, '--', *(str(path) for path in batch)],
+                check=False, capture_output=True, text=True, timeout=15,
+            )
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            raise Stop('could not set private Workspace ACL') from exc
+        if result.returncode != 0:
+            raise Stop('could not set private Workspace ACL')
+
+
 def grant_snapshot_access(snapshot: pathlib.Path, operator: str) -> None:
     if operator == getpass.getuser():
         return
     if re.fullmatch(r'[a-z_][a-z0-9_-]*', operator) is None:
         raise Stop('invalid Sandbox operator user')
+    _set_acl((snapshot,), '-R', '-m', f'u:{operator}:r--')
+    directories = [snapshot]
+
+    def fail_walk(error: OSError) -> None:
+        raise Stop('could not inspect private Workspace staging') from error
+
+    for current, children, _ in os.walk(snapshot, followlinks=False, onerror=fail_walk):
+        for name in children:
+            child = pathlib.Path(current) / name
+            if child.is_symlink():
+                raise Stop('Workspace staging unexpectedly contains a symlink')
+            directories.append(child)
+    for offset in range(0, len(directories), 64):
+        _set_acl(tuple(directories[offset:offset + 64]), '-m', f'u:{operator}:r-x')
+
+
+def grant_collection_directory_access(directory: pathlib.Path, operator: str) -> None:
+    if operator == getpass.getuser():
+        return
+    if re.fullmatch(r'[a-z_][a-z0-9_-]*', operator) is None:
+        raise Stop('invalid Sandbox operator user')
+    _set_acl((directory,), '-m', f'u:{operator}:rwx')
+
+
+def grant_collected_workspace_access(incoming: pathlib.Path, operator: str,
+                                    host_user: str) -> None:
+    if operator == host_user:
+        return
+    if re.fullmatch(r'[a-z_][a-z0-9_-]*', host_user) is None:
+        raise Stop('invalid Host user for collection ACL')
     setfacl = shutil.which('setfacl')
-    if setfacl is None:
-        raise Stop('setfacl is required for private Workspace staging')
-    try:
-        result = subprocess.run(
-            [setfacl, '-R', '-m', f'u:{operator}:rX', '--', str(snapshot)],
-            check=False, capture_output=True, text=True, timeout=15,
-        )
-    except (OSError, subprocess.TimeoutExpired) as exc:
-        raise Stop('could not grant private Workspace read access') from exc
-    if result.returncode != 0:
-        raise Stop('could not grant private Workspace read access')
+    find = shutil.which('find')
+    if setfacl is None or find is None:
+        raise Stop('setfacl and find are required for private change collection')
+    run_operator(operator, setfacl, '-m', f'u:{host_user}:r-x', '--', str(incoming))
+    run_operator(
+        operator, find, str(incoming), '-type', 'd', '-exec', setfacl, '-m',
+        f'u:{host_user}:r-x', '--', '{}', '+',
+    )
+    run_operator(
+        operator, find, str(incoming), '-type', 'f', '-exec', setfacl, '-m',
+        f'u:{host_user}:r--', '--', '{}', '+',
+    )
 
 
 def transfer_workspace(runner: Runner, name: str, snapshot: pathlib.Path,
@@ -361,17 +428,28 @@ def _session_action(args: argparse.Namespace, workspace: pathlib.Path,
         runner = Runner(args.sbx_user)
         if not is_compatible_sandbox(runner, session.sandbox):
             raise Stop('the recorded Sandbox no longer exists')
-        incoming = session.directory / 'incoming'
         collected = session.directory / 'collected'
-        if incoming.exists() or incoming.is_symlink() or collected.exists() or collected.is_symlink():
+        if collected.exists() or collected.is_symlink():
             raise Stop('collection destination already exists')
         try:
-            runner.sbx('cp', f'{session.sandbox}:{session.remote}', str(incoming))
-            candidate = workspaces.snapshot(incoming)
-            workspaces.materialize(incoming, collected, candidate)
-        finally:
-            if incoming.exists():
-                shutil.rmtree(incoming, ignore_errors=True)
+            with tempfile.TemporaryDirectory(prefix='oc2-collect-', dir='/tmp') as temp:
+                staging = pathlib.Path(temp)
+                incoming = staging / 'incoming'
+                grant_collection_directory_access(staging, args.sbx_user)
+                try:
+                    runner.sbx('cp', f'{session.sandbox}:{session.remote}', str(incoming))
+                    grant_collected_workspace_access(
+                        incoming, args.sbx_user, getpass.getuser(),
+                    )
+                    candidate = workspaces.snapshot(incoming)
+                    workspaces.materialize(incoming, collected, candidate)
+                finally:
+                    if incoming.exists() or incoming.is_symlink():
+                        run_operator(args.sbx_user, 'rm', '-rf', '--', str(incoming))
+        except BaseException:
+            if collected.exists() and not collected.is_symlink():
+                shutil.rmtree(collected, ignore_errors=True)
+            raise
         before = {item.path: item for item in session.manifest.files}
         after = {item.path: item for item in candidate.files}
         for relative in sorted(before.keys() | after.keys()):

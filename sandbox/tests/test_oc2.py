@@ -176,13 +176,60 @@ class HostTest(unittest.TestCase):
 
     def test_snapshot_acl_is_limited_to_named_operator(self):
         result = subprocess.CompletedProcess(args=[], returncode=0)
+        with tempfile.TemporaryDirectory() as tmp:
+            snapshot = pathlib.Path(tmp) / 'project'
+            (snapshot / 'src').mkdir(parents=True)
+            (snapshot / 'src' / 'main.py').write_text('print(1)\n')
+            with patch.object(oc2.shutil, 'which', return_value='/usr/bin/setfacl'), \
+                 patch.object(oc2.subprocess, 'run', return_value=result) as run:
+                oc2.grant_snapshot_access(snapshot, 'sbx-poc')
+            self.assertEqual(
+                run.call_args_list[0].args[0],
+                ['/usr/bin/setfacl', '-R', '-m', 'u:sbx-poc:r--', '--', str(snapshot)],
+            )
+            self.assertEqual(
+                run.call_args_list[1].args[0],
+                ['/usr/bin/setfacl', '-m', 'u:sbx-poc:r-x', '--',
+                 str(snapshot), str(snapshot / 'src')],
+            )
+
+    def test_collection_acl_is_limited_to_private_temporary_directory(self):
+        result = subprocess.CompletedProcess(args=[], returncode=0)
         with patch.object(oc2.shutil, 'which', return_value='/usr/bin/setfacl'), \
              patch.object(oc2.subprocess, 'run', return_value=result) as run:
-            oc2.grant_snapshot_access(pathlib.Path('/tmp/oc2-stage/project'), 'sbx-poc')
+            oc2.grant_collection_directory_access(
+                pathlib.Path('/tmp/oc2-collect-x'), 'sbx-poc',
+            )
         self.assertEqual(
             run.call_args.args[0],
-            ['/usr/bin/setfacl', '-R', '-m', 'u:sbx-poc:rX', '--',
-             '/tmp/oc2-stage/project'],
+            ['/usr/bin/setfacl', '-m', 'u:sbx-poc:rwx', '--',
+             '/tmp/oc2-collect-x'],
+        )
+
+    def test_collection_read_acl_grants_host_user_access_only_to_returned_tree(self):
+        with patch.object(oc2.shutil, 'which', side_effect=['/usr/bin/setfacl', '/usr/bin/find']), \
+             patch.object(oc2, 'run_operator', return_value='') as run:
+            oc2.grant_collected_workspace_access(
+                pathlib.Path('/tmp/oc2-collect-x/incoming'),
+                'sbx-poc',
+                'y_ohi',
+            )
+        self.assertEqual(
+            run.call_args_list[0].args,
+            ('sbx-poc', '/usr/bin/setfacl', '-m', 'u:y_ohi:r-x', '--',
+             '/tmp/oc2-collect-x/incoming'),
+        )
+        self.assertEqual(
+            run.call_args_list[1].args,
+            ('sbx-poc', '/usr/bin/find', '/tmp/oc2-collect-x/incoming',
+             '-type', 'd', '-exec', '/usr/bin/setfacl', '-m', 'u:y_ohi:r-x',
+             '--', '{}', '+'),
+        )
+        self.assertEqual(
+            run.call_args_list[2].args,
+            ('sbx-poc', '/usr/bin/find', '/tmp/oc2-collect-x/incoming',
+             '-type', 'f', '-exec', '/usr/bin/setfacl', '-m', 'u:y_ohi:r--',
+             '--', '{}', '+'),
         )
 
     def test_snapshot_acl_fails_closed_when_setfacl_is_missing(self):
@@ -203,6 +250,13 @@ class HostTest(unittest.TestCase):
                 with self.assertRaisesRegex(oc2.Stop, 'ACL denied'):
                     oc2.transfer_workspace(runner, 'oc2-dev', staged, manifest, 'sbx-poc')
             self.assertFalse(any(call[0] == 'cp' for call in runner.calls))
+
+    def test_collection_acl_failure_stops_before_sandbox_copy(self):
+        with patch.object(oc2.shutil, 'which', return_value=None):
+            with self.assertRaisesRegex(oc2.Stop, 'setfacl is required'):
+                oc2.grant_collection_directory_access(
+                    pathlib.Path('/tmp/oc2-collect-x'), 'sbx-poc',
+                )
 
     def test_workspace_changes_apply_add_modify_and_require_delete_approval(self):
         workspace = load('oc2_workspace')

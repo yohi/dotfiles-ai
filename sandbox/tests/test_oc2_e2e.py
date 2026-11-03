@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import contextlib
+import getpass
 import hashlib
 import io
 import json
@@ -144,6 +145,8 @@ class LauncherFlowTests(unittest.TestCase):
         self.state = self.root / 'state'
         self.fake = FakeSbx(self.root / 'fake-sbx')
         self.acl_grants: list[tuple[pathlib.Path, str]] = []
+        self.collection_acl_grants: list[tuple[pathlib.Path, str]] = []
+        self.collection_read_grants: list[tuple[pathlib.Path, pathlib.Path, str, str]] = []
 
     def _run(self, *flags: str) -> tuple[int, str]:
         output = io.StringIO()
@@ -155,12 +158,34 @@ class LauncherFlowTests(unittest.TestCase):
         with patch.object(oc2, 'Runner', return_value=self.fake), \
              patch.object(oc2.shutil, 'which', return_value='/fake/sbx'), \
              patch.object(oc2, 'grant_snapshot_access', side_effect=self._grant_snapshot_access), \
+             patch.object(
+                 oc2, 'grant_collection_directory_access',
+                 side_effect=self._grant_collection_directory_access,
+             ), \
+             patch.object(
+                 oc2, 'grant_collected_workspace_access',
+                 side_effect=self._grant_collected_workspace_access,
+             ), \
+             patch.object(oc2, 'run_operator', side_effect=self._fake_operator_run), \
              contextlib.redirect_stdout(output), contextlib.redirect_stderr(output):
             status = oc2.main(args)
         return status, output.getvalue()
 
     def _grant_snapshot_access(self, path: pathlib.Path, operator: str) -> None:
         self.acl_grants.append((path, operator))
+
+    def _grant_collection_directory_access(self, path: pathlib.Path, operator: str) -> None:
+        self.collection_acl_grants.append((path, operator))
+
+    def _grant_collected_workspace_access(
+        self, incoming: pathlib.Path, operator: str, host_user: str,
+    ) -> None:
+        self.collection_read_grants.append((incoming.parent, incoming, operator, host_user))
+
+    def _fake_operator_run(self, user: str, *args: str, timeout: int = 30) -> str:
+        if args[:2] == ('rm', '-rf'):
+            shutil.rmtree(pathlib.Path(args[-1]), ignore_errors=True)
+        return ''
 
     def test_workspace_launch_collect_and_apply(self):
         v1_before = (self.repo / 'apm.yml').read_bytes()
@@ -195,6 +220,19 @@ class LauncherFlowTests(unittest.TestCase):
         self.assertNotIn('unreviewed-plugin', json.dumps(server))
         status, output = self._run('--collect')
         self.assertEqual(status, 0, output)
+        self.assertEqual(self.collection_acl_grants[0][1], 'sbx-poc')
+        incoming_copy = next(
+            call for call in self.fake.calls
+            if call[0] == 'cp' and call[1].startswith('oc2-test:')
+        )
+        self.assertEqual(pathlib.Path(incoming_copy[2]).parent, self.collection_acl_grants[0][0])
+        self.assertTrue(self.collection_acl_grants[0][0].name.startswith('oc2-collect-'))
+        self.assertEqual(
+            self.collection_read_grants[0],
+            (self.collection_acl_grants[0][0], pathlib.Path(incoming_copy[2]),
+             'sbx-poc', getpass.getuser()),
+        )
+        self.assertFalse(self.collection_acl_grants[0][0].exists())
         self.assertIn('MODIFIED: main.py', output)
         self.assertIn('ADDED: created.py', output)
         self.assertIn('DELETED: remove.py', output)

@@ -130,6 +130,8 @@ Snapshotから除外します。転送対象に含まれるsymlink、特殊フ�
 
 転送Baselineと回収物は、プロジェクト外の`$HOME/.local/state/oc2/`に保存します。
 Sandboxでの作業後、まず回収して変更パスを確認してください。
+回収用の受渡しはHost state外の一時ディレクトリで行い、`sbx-poc`とHostユーザーに
+限定したACLを一時設定します。stateディレクトリ自体の権限は広げません。
 
 ```sh
 oc2 --collect
