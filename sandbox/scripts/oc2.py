@@ -293,15 +293,37 @@ def launch(runner: Runner, name: str, digest: str, cli: str) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description=__doc__)
+    p.add_argument('--version', action='version', version=f'oc2 launcher 1.0; OpenCode v{VERSION}')
     p.add_argument('--repo-root', type=pathlib.Path, default=HERE.parents[1])
+    p.add_argument('--workspace', type=pathlib.Path, default=pathlib.Path.cwd(),
+                   help='host project directory (default: current directory)')
     p.add_argument('--sandbox', default='oc2-dev')
     p.add_argument('--sbx-user', default=os.getenv('OC2_SBX_USER', 'sbx-poc'))
     p.add_argument('--seed-sandbox', default=os.getenv('OC2_SEED_SANDBOX', 'oc-v2-poc'),
                    help='optional mountless PoC containing the pinned CLI; source is read-only')
     p.add_argument('--dry-run', action='store_true', help='show planned actions without writing or calling sbx')
     p.add_argument('--prepare-only', action='store_true', help='prepare config and CLI without opening TUI')
+    p.add_argument('--collect', action='store_true', help='collect sandbox changes for review')
+    p.add_argument('--apply', action='store_true', help='apply previously collected changes to the host')
     args = p.parse_args(argv)
     try:
+        workspace_module = __import__('oc2_workspace')
+        workspace = args.workspace
+        if workspace.is_symlink():
+            raise Stop('workspace root must not be a symlink')
+        workspace = workspace.resolve(strict=True)
+        if not workspace.is_dir():
+            raise Stop('workspace is not a directory')
+        if args.collect or args.apply:
+            raise Stop('change collection requires a persisted transfer receipt; no receipt was supplied')
+        if args.dry_run:
+            manifest = workspace_module.snapshot(workspace)
+            print('OC2 PLAN: workspace=' + str(workspace))
+            print('OC2 PLAN: files=' + str(len(manifest.files)) +
+                  ' manifest_sha256=' + hashlib.sha256(manifest.encode()).hexdigest())
+            print('OC2 PLAN: secrets, credentials, symlinks, and special files excluded or rejected')
+            print('OC2 PLAN: no Sandbox commands executed')
+            return 0
         if not NAME_RE.fullmatch(args.sandbox):
             raise Stop('invalid Sandbox name')
         if args.seed_sandbox and not NAME_RE.fullmatch(args.seed_sandbox):
@@ -311,12 +333,6 @@ def main(argv: list[str] | None = None) -> int:
         repo = args.repo_root.resolve(strict=True)
         if not (repo / 'apm.yml').is_file():
             raise Stop('dotfiles-ai apm.yml not found')
-        if args.dry_run:
-            print('OC2 PLAN: mountless sandbox=' + args.sandbox)
-            print('OC2 PLAN: source=apm.yml; allowlist=shell,snapshot; no MCP/credentials')
-            print('OC2 PLAN: strict assets (rules 7, commands 1, skills 2, theme 1, no imported agents or model routing)')
-            print('OC2 PLAN: export, stage, pinned CLI provision, --standalone TUI')
-            return 0
         if not shutil.which('sbx'):
             # sbx can be installed only in operator PATH, so also check via sudo.
             if args.sbx_user == getpass.getuser():
@@ -350,7 +366,8 @@ def main(argv: list[str] | None = None) -> int:
             if not args.prepare_only:
                 launch(runner, args.sandbox, runtime_sha, cli)
         return 0
-    except (Stop, OSError, ValueError, subprocess.TimeoutExpired) as exc:
+    except (Stop, OSError, ValueError, subprocess.TimeoutExpired,
+            workspace_module.WorkspaceError) as exc:
         # No credentials, source config, or raw subprocess dumps on failure.
         print('OC2_STOP: ' + str(exc), file=sys.stderr)
         return 1

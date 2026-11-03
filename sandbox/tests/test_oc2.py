@@ -26,6 +26,7 @@ def load(name: str):
     spec = importlib.util.spec_from_file_location(name, SCRIPTS / (name + '.py'))
     mod = importlib.util.module_from_spec(spec)
     assert spec and spec.loader
+    sys.modules[name] = mod
     spec.loader.exec_module(mod)
     return mod
 
@@ -58,6 +59,51 @@ class FakeRunner:
 
 
 class HostTest(unittest.TestCase):
+    def test_workspace_snapshot_excludes_secrets_and_symlinks(self):
+        workspace = load('oc2_workspace')
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            (root / 'src').mkdir()
+            (root / 'src' / 'main.py').write_text('print(1)\n')
+            (root / '.env').write_text('TOKEN=not-for-sandbox')
+            manifest = workspace.snapshot(root)
+            self.assertEqual([entry.path for entry in manifest.files], ['src/main.py'])
+            self.assertNotIn('not-for-sandbox', repr(manifest))
+            (root / 'linked').symlink_to(root / 'src' / 'main.py')
+            with self.assertRaises(workspace.WorkspaceError):
+                workspace.snapshot(root)
+
+    def test_workspace_collect_rejects_host_conflicts_and_unapproved_apply(self):
+        workspace = load('oc2_workspace')
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp) / 'host'
+            root.mkdir()
+            source = root / 'note.txt'
+            source.write_text('original')
+            baseline = workspace.snapshot(root)
+            sandbox = pathlib.Path(tmp) / 'guest'
+            sandbox.mkdir()
+            (sandbox / 'note.txt').write_text('sandbox change')
+            with self.assertRaises(workspace.WorkspaceError):
+                workspace.apply_changes(root, sandbox, baseline, approved=False)
+            source.write_text('host concurrent change')
+            with self.assertRaisesRegex(workspace.WorkspaceError, 'conflict'):
+                workspace.apply_changes(root, sandbox, baseline, approved=True)
+
+    def test_oc2_help_and_version_are_local(self):
+        help_result = subprocess.run(
+            [sys.executable, str(SCRIPTS / 'oc2.py'), '--help'],
+            capture_output=True, text=True, check=False,
+        )
+        self.assertEqual(help_result.returncode, 0)
+        self.assertIn('--collect', help_result.stdout)
+        version_result = subprocess.run(
+            [sys.executable, str(SCRIPTS / 'oc2.py'), '--version'],
+            capture_output=True, text=True, check=False,
+        )
+        self.assertEqual(version_result.returncode, 0)
+        self.assertIn(oc2.VERSION, version_result.stdout)
+
     def test_missing_sandbox(self):
         runner = FakeRunner()
         self.assertFalse(oc2.is_compatible_sandbox(runner, 'oc2-dev'))
@@ -116,8 +162,9 @@ class HostTest(unittest.TestCase):
             with patch.object(oc2, 'Runner', side_effect=AssertionError('must not call sbx')):
                 out = io.StringIO()
                 with contextlib.redirect_stdout(out):
-                    self.assertEqual(oc2.main(['--repo-root', tmp, '--dry-run']), 0)
-                self.assertIn('mountless sandbox', out.getvalue())
+                    self.assertEqual(oc2.main(['--repo-root', tmp, '--workspace', tmp,
+                                               '--dry-run']), 0)
+                self.assertIn('no Sandbox commands executed', out.getvalue())
 
     def test_invalid_sandbox_name_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:
