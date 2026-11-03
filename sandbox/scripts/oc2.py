@@ -13,6 +13,7 @@ import hashlib
 import os
 import pathlib
 import re
+import secrets
 import shlex
 import shutil
 import subprocess
@@ -54,9 +55,6 @@ class Runner:
         except (OSError, subprocess.TimeoutExpired) as exc:
             raise Stop('sbx command could not complete') from exc
         if result.returncode != 0:
-            if capture:
-                detail = (result.stderr or '').strip().splitlines()[-1:] or ['unknown error']
-                raise Stop('sbx command failed: ' + '; '.join(detail)[:300])
             raise Stop(f'sbx command failed (exit {result.returncode})')
         return result.stdout if capture else ''
 
@@ -132,6 +130,37 @@ def export_config(repo: pathlib.Path, out: pathlib.Path) -> tuple[pathlib.Path, 
 
 def execute(runner: Runner, name: str, *args: str) -> None:
     runner.sbx('exec', name, *args)
+
+
+def transfer_workspace(runner: Runner, name: str, snapshot: pathlib.Path,
+                       manifest: object) -> str:
+    from oc2_workspace import Manifest, materialize
+
+    if not isinstance(manifest, Manifest):
+        raise Stop('invalid workspace manifest')
+    parent = f'{ROOT}/projects'
+    destination = parent + '/' + secrets.token_hex(16)
+    execute(runner, name, 'mkdir', '-p', parent)
+    state = runner.sbx(
+        'exec', name, 'bash', '-c',
+        f'if test -e {shlex.quote(destination)} || test -L {shlex.quote(destination)}; '
+        'then echo exists; else echo missing; fi', capture=True,
+    ).strip()
+    if state != 'missing':
+        raise Stop('workspace destination already exists or could not be checked')
+    checked = snapshot.parent / (snapshot.name + '-verified')
+    materialize(pathlib.Path(manifest.root), checked, manifest, for_guest=True)
+    if snapshot.exists():
+        shutil.rmtree(snapshot)
+    checked.rename(snapshot)
+    runner.sbx('cp', str(snapshot), f'{name}:{destination}')
+    execute(runner, name, 'chmod', '-R', 'u+rwX', destination)
+    for entry in manifest.files:
+        remote_file = destination + '/' + entry.path
+        result = runner.sbx('exec', name, 'sha256sum', remote_file, capture=True).split()
+        if not result or result[0] != entry.sha256:
+            raise Stop('workspace transfer checksum mismatch')
+    return destination
 
 
 def stage(runner: Runner, name: str, bundle: pathlib.Path, manifest_sha: str,
@@ -263,7 +292,8 @@ def provision_cli(runner: Runner, name: str, seed: str, scratch: pathlib.Path) -
     return found
 
 
-def launch(runner: Runner, name: str, digest: str, cli: str) -> None:
+def launch(runner: Runner, name: str, digest: str, cli: str,
+           project: str | None = None) -> None:
     # Use sbx exec's native --workdir and direct argv instead of bash -c
     # positional parameters. The configured runtime is fully sandbox-local.
     if re.fullmatch(r'[0-9a-f]{64}', digest) is None:
@@ -271,8 +301,11 @@ def launch(runner: Runner, name: str, digest: str, cli: str) -> None:
     if cli not in PINNED:
         raise Stop('unapproved OpenCode executable path')
     runtime = f'{ROOT}/runtime/{digest[:16]}'
+    workdir = project or f'{runtime}/project'
+    if not workdir.startswith(ROOT + '/') or '..' in pathlib.PurePosixPath(workdir).parts:
+        raise Stop('workspace path is outside the private OC2 tree')
     runner.sbx(
-        'exec', '-it', '-w', f'{runtime}/project', name,
+        'exec', '-it', '-w', workdir, name,
         'env', '-i',
         f'HOME={runtime}/home',
         'USER=agent',
@@ -291,6 +324,62 @@ def launch(runner: Runner, name: str, digest: str, cli: str) -> None:
         cli, '--standalone', tty=True,
     )
 
+
+def _session_action(args: argparse.Namespace, workspace: pathlib.Path,
+                    state_root: pathlib.Path, *, collect: bool) -> int:
+    import oc2_session as sessions
+    import oc2_workspace as workspaces
+
+    session = sessions.load(state_root, workspace)
+    if session.sandbox != args.sandbox:
+        raise Stop('requested Sandbox does not match the saved transfer receipt')
+    if session.applied:
+        raise Stop('this OC2 transfer has already been applied')
+    if collect:
+        if session.collected:
+            raise Stop('changes have already been collected for this transfer')
+        runner = Runner(args.sbx_user)
+        if not is_compatible_sandbox(runner, session.sandbox):
+            raise Stop('the recorded Sandbox no longer exists')
+        incoming = session.directory / 'incoming'
+        collected = session.directory / 'collected'
+        if incoming.exists() or incoming.is_symlink() or collected.exists() or collected.is_symlink():
+            raise Stop('collection destination already exists')
+        try:
+            runner.sbx('cp', f'{session.sandbox}:{session.remote}', str(incoming))
+            candidate = workspaces.snapshot(incoming)
+            workspaces.materialize(incoming, collected, candidate)
+        finally:
+            if incoming.exists():
+                shutil.rmtree(incoming, ignore_errors=True)
+        before = {item.path: item for item in session.manifest.files}
+        after = {item.path: item for item in candidate.files}
+        for relative in sorted(before.keys() | after.keys()):
+            if relative not in before:
+                status = 'ADDED'
+            elif relative not in after:
+                status = 'DELETED'
+            elif before[relative] != after[relative]:
+                status = 'MODIFIED'
+            else:
+                continue
+            print(f'{status}: {relative}')
+        sessions.update(session, collected=True)
+        print('COLLECTED_FOR_REVIEW: ' + str(collected))
+        return 0
+
+    if not session.collected:
+        raise Stop('run --collect before --apply')
+    collected = session.directory / 'collected'
+    changed = workspaces.apply_changes(
+        workspace, collected, session.manifest, approved=True,
+        allow_deletions=args.allow_deletions,
+    )
+    sessions.update(session, applied=True)
+    print('APPLIED: ' + str(len(changed)) + ' reviewed paths')
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--version', action='version', version=f'oc2 launcher 1.0; OpenCode v{VERSION}')
@@ -305,6 +394,11 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument('--prepare-only', action='store_true', help='prepare config and CLI without opening TUI')
     p.add_argument('--collect', action='store_true', help='collect sandbox changes for review')
     p.add_argument('--apply', action='store_true', help='apply previously collected changes to the host')
+    p.add_argument('--allow-deletions', action='store_true',
+                   help='approve deletions when used with --apply')
+    p.add_argument('--state-dir', type=pathlib.Path,
+                   default=pathlib.Path.home() / '.local/state/oc2',
+                   help='host-only transfer receipt directory')
     args = p.parse_args(argv)
     try:
         workspace_module = __import__('oc2_workspace')
@@ -314,8 +408,12 @@ def main(argv: list[str] | None = None) -> int:
         workspace = workspace.resolve(strict=True)
         if not workspace.is_dir():
             raise Stop('workspace is not a directory')
+        if args.collect and args.apply:
+            raise Stop('--collect and --apply are separate operations')
+        if args.allow_deletions and not args.apply:
+            raise Stop('--allow-deletions requires --apply')
         if args.collect or args.apply:
-            raise Stop('change collection requires a persisted transfer receipt; no receipt was supplied')
+            return _session_action(args, workspace, args.state_dir, collect=args.collect)
         if args.dry_run:
             manifest = workspace_module.snapshot(workspace)
             print('OC2 PLAN: workspace=' + str(workspace))
@@ -333,6 +431,11 @@ def main(argv: list[str] | None = None) -> int:
         repo = args.repo_root.resolve(strict=True)
         if not (repo / 'apm.yml').is_file():
             raise Stop('dotfiles-ai apm.yml not found')
+        import oc2_session as sessions
+        state_session = sessions.session_directory(args.state_dir, workspace)
+        if state_session.exists() or state_session.is_symlink():
+            raise Stop('an OC2 transfer receipt already exists; collect or apply it first')
+        manifest = workspace_module.snapshot(workspace)
         if not shutil.which('sbx'):
             # sbx can be installed only in operator PATH, so also check via sudo.
             if args.sbx_user == getpass.getuser():
@@ -341,7 +444,7 @@ def main(argv: list[str] | None = None) -> int:
         from oc2_assets import AssetError, build, write_new
         with tempfile.TemporaryDirectory(prefix='oc2-export-') as temp:
             tmp = pathlib.Path(temp)
-            tmp.chmod(0o755)
+            tmp.chmod(0o711)
             bundle, digest = export_config(repo, tmp / 'bundle')
             try:
                 asset_bytes, asset_sha = build(repo)
@@ -359,12 +462,17 @@ def main(argv: list[str] | None = None) -> int:
             else:
                 print('OC2: reusing verified mountless Sandbox ' + args.sandbox)
             stage(runner, args.sandbox, bundle, digest, code, asset_file, asset_sha)
+            project_snapshot = tmp / 'project'
+            remote_project = transfer_workspace(
+                runner, args.sandbox, project_snapshot, manifest,
+            )
+            sessions.create(args.state_dir, args.sandbox, remote_project, manifest)
             cli = provision_cli(runner, args.sandbox, args.seed_sandbox, tmp)
             runtime_sha = hashlib.sha256(bytes.fromhex(digest) + bytes.fromhex(asset_sha)).hexdigest()
             print('OC2_PREPARED: sandbox=' + args.sandbox +
                   ' config_sha=' + digest[:16] + ' assets_sha=' + asset_sha[:16])
             if not args.prepare_only:
-                launch(runner, args.sandbox, runtime_sha, cli)
+                launch(runner, args.sandbox, runtime_sha, cli, remote_project)
         return 0
     except (Stop, OSError, ValueError, subprocess.TimeoutExpired,
             workspace_module.WorkspaceError) as exc:

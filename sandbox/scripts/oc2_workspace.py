@@ -6,17 +6,27 @@ import hashlib
 import json
 import os
 import pathlib
-import shutil
+import re
 import stat
 from dataclasses import dataclass
+from typing import NoReturn
 
 EXCLUDED_NAMES = frozenset({
     '.git', '.hg', '.svn', '.env', '.env.local', '.env.production',
-    '.ssh', '.aws', '.azure', '.config', '.opencode', '.claude', '.codex',
+    '.ssh', '.aws', '.azure', '.gnupg', '.docker', '.kube', '.config',
+    '.opencode', '.claude', '.codex', '.npmrc', '.pypirc', '.netrc',
     'id_rsa', 'id_ed25519', 'credentials', 'secrets', 'token', 'tokens', 'node_modules',
     '.venv', '__pycache__',
 })
 MAX_FILE_BYTES = 64 * 1024 * 1024
+SECRET_PATTERNS = tuple(re.compile(pattern) for pattern in (
+    rb'-----BEGIN (?:OPENSSH |RSA |EC )?PRIVATE KEY-----',
+    rb'\bAKIA[0-9A-Z]{16}\b',
+    rb'\bgh[pousr]_[A-Za-z0-9]{20,}\b',
+    rb'\bsk-[A-Za-z0-9]{24,}\b',
+    rb'(?i)\b(?:api[_-]?key|access[_-]?key|secret|password|token)\s*[:=]\s*["\']?[A-Za-z0-9_./+=-]{16,}',
+))
+SECRET_PLACEHOLDERS = (b'DO_NOT_EXPORT', b'EXAMPLE', b'PLACEHOLDER', b'DUMMY', b'FIXTURE')
 
 
 class WorkspaceError(Exception):
@@ -54,11 +64,103 @@ def _excluded(relative: pathlib.PurePosixPath) -> bool:
 def _safe_file(path: pathlib.Path, relative: pathlib.PurePosixPath) -> FileEntry:
     if relative.is_absolute() or '..' in relative.parts or '\\' in relative.as_posix():
         raise WorkspaceError('unsafe workspace path')
-    metadata = path.lstat()
-    if not stat.S_ISREG(metadata.st_mode) or metadata.st_size > MAX_FILE_BYTES:
-        raise WorkspaceError('workspace contains a special or oversized file')
-    data = path.read_bytes()
+    data = _read_regular(path)
+    if _contains_credential(data):
+        raise WorkspaceError('workspace file appears to contain credential material')
     return FileEntry(relative.as_posix(), len(data), hashlib.sha256(data).hexdigest())
+
+
+def _contains_credential(data: bytes) -> bool:
+    for pattern in SECRET_PATTERNS:
+        for match in pattern.finditer(data):
+            value = match.group(0).upper()
+            if not any(placeholder in value for placeholder in SECRET_PLACEHOLDERS):
+                return True
+    return False
+
+
+def _read_regular(path: pathlib.Path) -> bytes:
+    flags = os.O_RDONLY | os.O_NONBLOCK | getattr(os, 'O_NOFOLLOW', 0)
+    try:
+        descriptor = os.open(path, flags)
+    except OSError as exc:
+        raise WorkspaceError('workspace file cannot be safely opened') from exc
+    try:
+        before = os.fstat(descriptor)
+        if not stat.S_ISREG(before.st_mode) or before.st_size > MAX_FILE_BYTES:
+            raise WorkspaceError('workspace contains a special or oversized file')
+        chunks: list[bytes] = []
+        total = 0
+        while chunk := os.read(descriptor, 1024 * 1024):
+            total += len(chunk)
+            if total > MAX_FILE_BYTES:
+                raise WorkspaceError('workspace file exceeds size limit')
+            chunks.append(chunk)
+        after = os.fstat(descriptor)
+        if (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns) != (
+                after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns):
+            raise WorkspaceError('workspace file changed while being read')
+        return b''.join(chunks)
+    finally:
+        os.close(descriptor)
+
+
+def _fail(message: str) -> NoReturn:
+    raise WorkspaceError(message)
+
+
+def _validate_relative(value: object) -> str:
+    if not isinstance(value, str) or not value or '\x00' in value or '\\' in value:
+        _fail('manifest path is invalid')
+    relative = pathlib.PurePosixPath(value)
+    if (relative.is_absolute() or any(part in ('', '.', '..') for part in value.split('/'))
+            or relative.as_posix() != value or _excluded(relative)):
+        _fail('manifest path is unsafe or excluded')
+    return value
+
+
+def decode_manifest(raw: bytes, root: pathlib.Path) -> Manifest:
+    try:
+        parsed: object = json.loads(raw)
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise WorkspaceError('workspace manifest is invalid') from exc
+    payload = _string_mapping(parsed)
+    if set(payload) != {'schema', 'files'} or \
+            payload.get('schema') != 'dotfiles-ai/oc2-workspace/v1':
+        _fail('workspace manifest schema is invalid')
+    raw_entries = payload.get('files')
+    if not isinstance(raw_entries, list):
+        _fail('workspace manifest schema is invalid')
+    entries: list[FileEntry] = []
+    seen: set[str] = set()
+    for raw_item in raw_entries:
+        item = _string_mapping(raw_item)
+        if set(item) != {'path', 'size', 'sha256'}:
+            _fail('workspace manifest entry is invalid')
+        relative = _validate_relative(item.get('path'))
+        size = item.get('size')
+        if relative in seen or type(size) is not int or not 0 <= size <= MAX_FILE_BYTES:
+            _fail('workspace manifest entry is invalid')
+        digest = item.get('sha256')
+        if not isinstance(digest, str) or len(digest) != 64 or any(
+                char not in '0123456789abcdef' for char in digest):
+            _fail('workspace manifest digest is invalid')
+        seen.add(relative)
+        entries.append(FileEntry(relative, size, digest))
+    if entries != sorted(entries, key=lambda entry: entry.path):
+        _fail('workspace manifest entries are not ordered')
+    return Manifest(str(root.resolve(strict=True)), tuple(entries))
+
+
+def _string_mapping(value: object) -> dict[str, object]:
+    if not isinstance(value, dict):
+        _fail('workspace manifest mapping is invalid')
+    result: dict[str, object] = {}
+    for key in value:
+        if not isinstance(key, str):
+            _fail('workspace manifest mapping key is invalid')
+        result[key] = value[key]
+    return result
 
 
 def snapshot(root: pathlib.Path) -> Manifest:
@@ -96,48 +198,4 @@ def _by_path(manifest: Manifest) -> dict[str, FileEntry]:
     return {item.path: item for item in manifest.files}
 
 
-def changes(baseline: Manifest, guest: pathlib.Path) -> tuple[str, ...]:
-    """Return changed guest paths relative to the transfer baseline."""
-    after = _by_path(snapshot(guest))
-    before = _by_path(baseline)
-    return tuple(sorted(path for path in before.keys() | after.keys()
-                        if before.get(path) != after.get(path)))
-
-
-def apply_changes(host: pathlib.Path, guest: pathlib.Path, baseline: Manifest,
-                  *, approved: bool) -> tuple[str, ...]:
-    """Apply only explicitly approved guest changes when host baseline is intact."""
-    if not approved:
-        raise WorkspaceError('explicit --apply is required')
-    original = pathlib.Path(baseline.root)
-    if host.resolve(strict=True) != original:
-        raise WorkspaceError('host workspace identity mismatch')
-    current = snapshot(host)
-    if _by_path(current) != _by_path(baseline):
-        raise WorkspaceError('host workspace conflict; no files applied')
-    guest_manifest = snapshot(guest)
-    before = _by_path(baseline)
-    after = _by_path(guest_manifest)
-    changed = tuple(sorted(path for path in before.keys() | after.keys()
-                           if before.get(path) != after.get(path)))
-    for relative in changed:
-        rel = pathlib.PurePosixPath(relative)
-        if rel.is_absolute() or '..' in rel.parts or _excluded(rel):
-            raise WorkspaceError('change contains a forbidden path')
-    for relative in changed:
-        target = host.joinpath(*pathlib.PurePosixPath(relative).parts)
-        source = guest.joinpath(*pathlib.PurePosixPath(relative).parts)
-        if relative not in after:
-            if target.exists() or target.is_symlink():
-                target.unlink()
-            continue
-        target.parent.mkdir(parents=True, exist_ok=True)
-        if any(parent.is_symlink() for parent in (target.parent, *target.parent.parents)
-               if parent == host or parent.is_relative_to(host)):
-            raise WorkspaceError('host destination contains a symlink')
-        temporary = target.with_name(target.name + '.oc2-new')
-        if temporary.exists() or temporary.is_symlink():
-            raise WorkspaceError('temporary apply destination already exists')
-        shutil.copyfile(source, temporary, follow_symlinks=False)
-        os.replace(temporary, target)
-    return changed
+from oc2_workspace_ops import apply_changes, changes, materialize

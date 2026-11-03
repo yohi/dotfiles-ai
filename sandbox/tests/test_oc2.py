@@ -23,6 +23,8 @@ if str(SCRIPTS) not in sys.path:
 
 
 def load(name: str):
+    if name in sys.modules:
+        return sys.modules[name]
     spec = importlib.util.spec_from_file_location(name, SCRIPTS / (name + '.py'))
     mod = importlib.util.module_from_spec(spec)
     assert spec and spec.loader
@@ -44,6 +46,8 @@ class FakeRunner:
             if inspection is None else inspection
         )
         self.calls = []
+        self.workspace_copies = []
+        self.remote_files = {}
 
     def sbx(self, *args, **kwargs):
         self.calls.append(args)
@@ -53,8 +57,19 @@ class FakeRunner:
             return json.dumps(self.rows)
         if args == ('inspect', 'oc2-dev', '--json'):
             return json.dumps(self.inspection)
-        if args[:2] == ('exec', 'oc2-dev') and 'sha256sum' in args:
+        if args[:3] == ('exec', 'oc2-dev', 'sha256sum'):
+            remote_file = args[3]
+            for source, destination in self.workspace_copies:
+                prefix = destination.split(':', 1)[1] + '/'
+                if remote_file.startswith(prefix):
+                    relative = remote_file[len(prefix):]
+                    data = (source / relative).read_bytes()
+                    return hashlib.sha256(data).hexdigest() + '  ' + relative + '\n'
             return '0' * 64 + ' /tmp/file\n'
+        if args[:4] == ('exec', 'oc2-dev', 'bash', '-c'):
+            return 'missing\n'
+        if args[0] == 'cp' and len(args) == 3:
+            self.workspace_copies.append((pathlib.Path(args[1]), args[2]))
         return ''
 
 
@@ -73,6 +88,31 @@ class HostTest(unittest.TestCase):
             with self.assertRaises(workspace.WorkspaceError):
                 workspace.snapshot(root)
 
+    def test_workspace_snapshot_rejects_embedded_credential_material(self):
+        workspace = load('oc2_workspace')
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            (root / 'settings.py').write_text(
+                'api_key = "' + '0123456789abcdef' * 2 + '"\n'
+            )
+            with self.assertRaisesRegex(workspace.WorkspaceError, 'credential material') as error:
+                workspace.snapshot(root)
+            self.assertEqual(
+                str(error.exception),
+                'workspace file appears to contain credential material',
+            )
+            (root / 'settings.py').write_text('api_key = "TOP_SECRET_DO_NOT_EXPORT"\n')
+            manifest = workspace.snapshot(root)
+            self.assertEqual([entry.path for entry in manifest.files], ['settings.py'])
+
+    def test_workspace_snapshot_rejects_special_files(self):
+        workspace = load('oc2_workspace')
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            os.mkfifo(root / 'pipe')
+            with self.assertRaisesRegex(workspace.WorkspaceError, 'special'):
+                workspace.snapshot(root)
+
     def test_workspace_collect_rejects_host_conflicts_and_unapproved_apply(self):
         workspace = load('oc2_workspace')
         with tempfile.TemporaryDirectory() as tmp:
@@ -89,6 +129,67 @@ class HostTest(unittest.TestCase):
             source.write_text('host concurrent change')
             with self.assertRaisesRegex(workspace.WorkspaceError, 'conflict'):
                 workspace.apply_changes(root, sandbox, baseline, approved=True)
+
+    def test_workspace_snapshot_materializes_only_manifest_files(self):
+        workspace = load('oc2_workspace')
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp) / 'source'
+            root.mkdir()
+            (root / 'app.py').write_text('print("safe")\n')
+            (root / '.env.production').write_text('SECRET=value')
+            manifest = workspace.snapshot(root)
+            stage = pathlib.Path(tmp) / 'stage'
+            workspace.materialize(root, stage, manifest)
+            self.assertEqual(sorted(item.name for item in stage.iterdir()), ['app.py'])
+            self.assertEqual((stage / 'app.py').read_text(), 'print("safe")\n')
+
+    def test_workspace_changes_apply_add_modify_and_require_delete_approval(self):
+        workspace = load('oc2_workspace')
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp) / 'host'
+            root.mkdir()
+            (root / 'keep.txt').write_text('old')
+            (root / 'remove.txt').write_text('remove')
+            baseline = workspace.snapshot(root)
+            guest = pathlib.Path(tmp) / 'guest'
+            workspace.materialize(root, guest, baseline)
+            (guest / 'keep.txt').write_text('new')
+            (guest / 'added.txt').write_text('added')
+            (guest / 'remove.txt').unlink()
+            with self.assertRaisesRegex(workspace.WorkspaceError, 'deletion approval'):
+                workspace.apply_changes(root, guest, baseline, approved=True)
+            result = workspace.apply_changes(
+                root, guest, baseline, approved=True, allow_deletions=True,
+            )
+            self.assertEqual(result, ('added.txt', 'keep.txt', 'remove.txt'))
+            self.assertEqual((root / 'keep.txt').read_text(), 'new')
+            self.assertEqual((root / 'added.txt').read_text(), 'added')
+            self.assertFalse((root / 'remove.txt').exists())
+
+    def test_workspace_manifest_rejects_path_traversal(self):
+        workspace = load('oc2_workspace')
+        with self.assertRaisesRegex(workspace.WorkspaceError, 'manifest path'):
+            workspace.decode_manifest(
+                b'{"schema":"dotfiles-ai/oc2-workspace/v1","files":'
+                b'[{"path":"../outside","size":0,"sha256":"' + b'0' * 64 + b'"}]}',
+                pathlib.Path('/tmp/workspace'),
+            )
+
+    def test_workspace_launcher_transfers_and_launches_in_project_directory(self):
+        workspace = load('oc2_workspace')
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp) / 'host'
+            root.mkdir()
+            (root / 'main.py').write_text('print("original")\n')
+            manifest = workspace.snapshot(root)
+            staged = pathlib.Path(tmp) / 'snapshot'
+            workspace.materialize(root, staged, manifest)
+            runner = FakeRunner()
+            remote = oc2.transfer_workspace(runner, 'oc2-dev', staged, manifest)
+            self.assertEqual(remote, oc2.ROOT + '/projects/' + remote.rsplit('/', 1)[-1])
+            self.assertEqual(runner.workspace_copies[0], (staged, 'oc2-dev:' + remote))
+            oc2.launch(runner, 'oc2-dev', 'a' * 64, oc2.PINNED[0], remote)
+            self.assertEqual(runner.calls[-1][3], remote)
 
     def test_oc2_help_and_version_are_local(self):
         help_result = subprocess.run(

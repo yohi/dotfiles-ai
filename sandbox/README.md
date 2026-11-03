@@ -101,6 +101,54 @@ OpenCode起動時の設定読み込みとPlugin実動作は後続の検証対象
 必要な実機コマンドと判定条件は [VALIDATION_V2.md](VALIDATION_V2.md) に記載しています。
 ホストOpenCode v1や既存のSandboxは自動で変更しません。
 
+## Host `oc2` workflow
+
+`sandbox/scripts/oc2.py` はHost側ランチャーです。PATHへの登録は自動では行いません。
+初回だけ、リポジトリのルートで明示的にリンクしてください。
+
+```sh
+chmod +x sandbox/scripts/oc2.py
+mkdir -p "$HOME/.local/bin"
+ln -s "$PWD/sandbox/scripts/oc2.py" "$HOME/.local/bin/oc2"
+```
+
+`$HOME/.local/bin` がPATHに含まれていることを確認後、対象プロジェクトで実行します。
+
+```sh
+cd "$HOME/program/my-project"
+oc2 --dry-run
+oc2
+```
+
+通常起動は既存のmountless Sandboxを検査・作成し、`apm.yml`由来の限定設定をステージし、
+Workspace Snapshotを専用のゲストディレクトリへ転送してOpenCode v2.1.4を起動します。
+ホストWorkspaceをmountせず、`.git`、`.env*`、認証情報ディレクトリや鍵ファイルなどは
+Snapshotから除外します。転送対象に含まれるsymlink、特殊ファイル、読めないファイルは
+処理を停止します。転送された通常ファイルは各SHA-256を確認します。
+
+転送Baselineと回収物は、プロジェクト外の`$HOME/.local/state/oc2/`に保存します。
+Sandboxでの作業後、まず回収して変更パスを確認してください。
+
+```sh
+oc2 --collect
+```
+
+この操作はHost Workspaceを変更しません。出力された`COLLECTED_FOR_REVIEW`のディレクトリを
+確認し、適用するときだけ次を実行します。
+
+```sh
+oc2 --apply
+```
+
+Sandbox側の削除も適用する場合は、削除を確認したうえで`--allow-deletions`を明示します。
+Baseline以降にHost側Workspaceが変わっている場合は競合として適用を停止します。
+回収は一つの転送につき一度だけです。再起動・再転送には、適用済みまたは回収済み状態を
+確認したうえで別の状態領域を指定してください。
+
+Offline tests use a Fake `sbx` adapter. They verify command construction, transfer checksums,
+isolated project workdir, collection, host conflicts and explicit deletion approval. They do not
+prove Docker Sandbox behavior, OpenCode startup, provider/network policy, or live `sbx cp` semantics.
+
 ## 雛形ファイル（自動適用されない）
 
 | ファイル | 役割 |
