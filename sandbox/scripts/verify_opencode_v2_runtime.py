@@ -167,8 +167,8 @@ def probe_version(runtime: Path) -> None:
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
         raise StageError("OpenCode --version probe did not complete") from exc
-    if process.returncode != 0 or re.search(rb"\bv?2\.1\.4\b", process.stdout) is None:
-        raise StageError("OpenCode did not report the pinned v2.1.4 version")
+    if process.returncode != 0 or re.search(rb"\bv?2\.2\.5\b", process.stdout) is None:
+        raise StageError("OpenCode did not report the pinned v2.2.5 version")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -181,7 +181,7 @@ def main(argv: list[str] | None = None) -> int:
         result = verify(args.bundle, args.runtime_dir)
         if args.probe_version:
             probe_version(args.runtime_dir)
-            result["version_probe"] = "OPEN_CODE_2_1_4_CONFIRMED"
+            result["version_probe"] = "OPEN_CODE_2_2_5_CONFIRMED"
         print(json.dumps(result, sort_keys=True))
         return 0
     except (StageError, OSError, UnicodeError, ValueError) as exc:

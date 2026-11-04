@@ -105,6 +105,7 @@ OpenCode起動時の設定読み込みとPlugin実動作は後続の検証対象
 ## Host `oc2` workflow
 
 `sandbox/scripts/oc2.py` はHost側ランチャーです。PATHへの登録は自動では行いません。
+[Cloudflare AI Gateway RESTの正本となる英語の運用手順](../docs/cloudflare-ai-gateway-rest.md)を使う場合は参照してください。
 初回だけ、リポジトリのルートでリンクしてください。
 
 ```sh

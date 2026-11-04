@@ -8,8 +8,11 @@ not requested. Existing unrelated sandboxes are never modified.
 from __future__ import annotations
 
 import argparse
+from dataclasses import dataclass
 import getpass
 import hashlib
+import importlib
+import json
 import os
 import pathlib
 import re
@@ -19,18 +22,93 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from typing import TYPE_CHECKING, Final
+
+if TYPE_CHECKING:
+    from sandbox.scripts.oc2_workspace import Manifest as WorkspaceManifest
 
 HERE = pathlib.Path(__file__).resolve().parent
+REPO_ROOT = HERE.parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 VERSION = '2.2.5'
 ROOT = '/home/agent/workspace/oc2'
 NAME_RE = re.compile(r'^[A-Za-z0-9][A-Za-z0-9.-]{0,61}[A-Za-z0-9]$')
+CF_REST_PROVIDER_ID: Final[str] = 'cloudflare-ai-gateway-rest'
+CLOUDFLARE_TOKEN_PLACEHOLDER: Final[str] = 'proxy-managed'
 PINNED = (
     '/home/agent/.local/oc2-runtime/node_modules/.bin/opencode',
 )
 
 
+@dataclass(frozen=True, slots=True)
+class CloudflareRuntime:
+    """Validated non-secret identifiers required by Cloudflare REST requests."""
+
+    account_id: str
+    gateway_id: str
+
+
+@dataclass(frozen=True, slots=True)
+class SandboxLaunch:
+    name: str
+    digest: str
+    cli: str
+    workspace: str
+    config_file: pathlib.Path
+    cloudflare: CloudflareRuntime | None = None
+
+
 class Stop(Exception):
     pass
+
+
+def cloudflare_runtime(
+    config_file: pathlib.Path,
+    account_id: str | None,
+    gateway_id: str | None,
+) -> CloudflareRuntime | None:
+    """Return validated Cloudflare IDs only when the REST provider is selected."""
+    if config_file.is_symlink() or not config_file.is_file():
+        raise Stop('generated OpenCode config is missing or unsafe')
+    try:
+        config = json.loads(config_file.read_text(encoding='utf-8'))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise Stop('generated OpenCode config could not be read') from exc
+    if not isinstance(config, dict):
+        raise Stop('generated OpenCode config is not an object')
+    providers = config.get('providers')
+    if not isinstance(providers, dict):
+        raise Stop('generated OpenCode provider selection is invalid')
+    if CF_REST_PROVIDER_ID not in providers:
+        return None
+    default_model = config.get('model')
+    if (not isinstance(providers[CF_REST_PROVIDER_ID], dict)
+            or not isinstance(default_model, str)
+            or default_model.partition('/')[0] != CF_REST_PROVIDER_ID):
+        raise Stop('generated Cloudflare provider selection is inconsistent')
+    if (not isinstance(account_id, str)
+            or re.fullmatch(r'[0-9a-fA-F]{32}', account_id) is None
+            or not isinstance(gateway_id, str)
+            or re.fullmatch(r'[a-z0-9][a-z0-9-]{0,63}', gateway_id) is None):
+        raise Stop('Cloudflare runtime identifiers are missing or invalid')
+    return CloudflareRuntime(account_id=account_id, gateway_id=gateway_id)
+
+
+def requires_external_inference(config_file: pathlib.Path) -> bool:
+    """Return whether the exported OpenCode config selects an external provider."""
+    if config_file.is_symlink() or not config_file.is_file():
+        raise Stop('generated OpenCode config is missing or unsafe')
+    try:
+        config = json.loads(config_file.read_text(encoding='utf-8'))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise Stop('generated OpenCode config could not be read') from exc
+    if not isinstance(config, dict):
+        raise Stop('generated OpenCode config is not an object')
+    providers = config.get('providers', {})
+    if not isinstance(providers, dict):
+        raise Stop('generated OpenCode provider selection is invalid')
+    return bool(providers)
 
 
 def operator_command(user: str, *args: str) -> list[str]:
@@ -88,9 +166,32 @@ def install_cli_args(name: str) -> list[str]:
     ]
 
 
+def export_v2_config(repo: pathlib.Path, output: pathlib.Path) -> pathlib.Path:
+    script = HERE / 'prepare_opencode_v2.py'
+    try:
+        result = subprocess.run(
+            [sys.executable, str(script), '--repo-root', str(repo), '--out', str(output)],
+            check=False, capture_output=True, text=True, timeout=40,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise Stop('APM V2 config generation could not complete') from exc
+    if result.returncode != 0:
+        raise Stop('APM V2 config generation failed')
+    from sandbox.scripts.stage_opencode_v2 import StageError, verify_bundle
+
+    try:
+        verify_bundle(output)
+    except StageError as exc:
+        raise Stop('APM V2 config bundle failed verification') from exc
+    config = output / 'opencode.jsonc'
+    if config.is_symlink() or not config.is_file():
+        raise Stop('generated V2 config is missing or unsafe')
+    return config
+
+
 def validate_clone_workspace(workspace: pathlib.Path) -> None:
     """Refuse Clone mode if it would expose files omitted by the safety scan."""
-    import oc2_workspace
+    oc2_workspace = importlib.import_module('oc2_workspace')
 
     if any((workspace / name).exists() for name in ('opencode.json', 'opencode.jsonc', 'cli.json')):
         raise Stop('workspace contains OpenCode project configuration')
@@ -159,7 +260,7 @@ def is_compatible_sandbox(runner: Runner, name: str) -> bool:
 
 def export_config(repo: pathlib.Path, out: pathlib.Path) -> tuple[pathlib.Path, str]:
     """Reuse existing SSOT exporter and verifier rather than copying v1 config."""
-    from stage_opencode_v2 import verify_bundle
+    from sandbox.scripts.stage_opencode_v2 import verify_bundle
 
     cmd = [sys.executable, str(HERE / 'prepare_opencode_v2.py'),
            '--repo-root', str(repo), '--out', str(out)]
@@ -249,10 +350,10 @@ def grant_collected_workspace_access(incoming: pathlib.Path, operator: str,
 
 
 def transfer_workspace(runner: Runner, name: str, snapshot: pathlib.Path,
-                       manifest: object, operator: str) -> str:
-    from oc2_workspace import Manifest, materialize
+                       manifest: WorkspaceManifest, operator: str) -> str:
+    oc2_workspace = importlib.import_module('oc2_workspace')
 
-    if not isinstance(manifest, Manifest):
+    if not isinstance(manifest, oc2_workspace.Manifest):
         raise Stop('invalid workspace manifest')
     parent = f'{ROOT}/projects'
     destination = parent + '/' + secrets.token_hex(16)
@@ -265,7 +366,7 @@ def transfer_workspace(runner: Runner, name: str, snapshot: pathlib.Path,
     if state != 'missing':
         raise Stop('workspace destination already exists or could not be checked')
     checked = snapshot.parent / (snapshot.name + '-verified')
-    materialize(pathlib.Path(manifest.root), checked, manifest, for_guest=True)
+    oc2_workspace.materialize(pathlib.Path(manifest.root), checked, manifest, for_guest=True)
     if snapshot.exists():
         shutil.rmtree(snapshot)
     checked.rename(snapshot)
@@ -383,7 +484,7 @@ def seed_cli(runner: Runner, name: str, source: str, scratch: pathlib.Path) -> s
                    'test ! -e /home/agent/.local/opencode-v2/node_modules')
         runner.sbx('cp', str(local), f'{name}:/home/agent/.local/opencode-v2/node_modules')
         if cli_path(runner, name) != binary:
-            raise Stop('seeded OpenCode CLI did not verify as v2.1.4')
+            raise Stop(f'seeded OpenCode CLI did not verify as v{VERSION}')
         return binary
     finally:
         subprocess.run([*operator, 'rm', '-rf', '--', staging],
@@ -402,26 +503,37 @@ def provision_cli(runner: Runner, name: str) -> str:
     return found
 
 
-def launch(runner: Runner, name: str, digest: str, cli: str,
-           project: str | None = None) -> None:
+def launch(runner: Runner, request: SandboxLaunch) -> None:
     # Use sbx exec's native --workdir and direct argv instead of bash -c
     # positional parameters. The configured runtime is fully sandbox-local.
-    if re.fullmatch(r'[0-9a-f]{64}', digest) is None:
+    if re.fullmatch(r'[0-9a-f]{64}', request.digest) is None:
         raise Stop('invalid runtime digest')
-    if cli not in PINNED:
+    if request.cli not in PINNED:
         raise Stop('unapproved OpenCode executable path')
-    runtime = f'{ROOT}/runtime/{digest[:16]}'
-    workdir = project or f'{runtime}/project'
+    runtime = f'{ROOT}/runtime/{request.digest[:16]}'
+    workdir = request.workspace
     workspace_path = pathlib.PurePosixPath(workdir)
     if not workspace_path.is_absolute() or '..' in workspace_path.parts:
         raise Stop('workspace path is not a safe absolute path')
-    runner.sbx(
-        'exec', name, 'mkdir', '-p', '-m', '700', runtime,
-        *(f'{runtime}/{directory}'
-          for directory in ('home', 'config', 'data', 'state', 'cache', 'tmp')),
+    config_dir = f'{runtime}/config/opencode'
+    cloudflare_environment = (
+        () if request.cloudflare is None else (
+            f'OC_CF_ACCOUNT_ID={request.cloudflare.account_id}',
+            f'OC_CF_GATEWAY_ID={request.cloudflare.gateway_id}',
+            f'OC_CF_REST_API_TOKEN={CLOUDFLARE_TOKEN_PLACEHOLDER}',
+        )
     )
     runner.sbx(
-        'exec', '-it', '-w', workdir, name,
+        'exec', request.name, 'mkdir', '-p', '-m', '700', runtime,
+        *(f'{runtime}/{directory}' for directory in
+          ('home', 'config', 'config/opencode', 'data', 'state', 'cache', 'tmp')),
+    )
+    runner.sbx(
+        'cp', str(request.config_file),
+        f'{request.name}:{config_dir}/opencode.jsonc',
+    )
+    runner.sbx(
+        'exec', '-it', '-w', workdir, request.name,
         'env', '-i',
         f'HOME={runtime}/home',
         'USER=agent',
@@ -437,14 +549,15 @@ def launch(runner: Runner, name: str, digest: str, cli: str,
         'OPENCODE_WATCHDOG_ENABLED=false',
         'OPENCODE_DISABLE_AUTOUPDATE=1',
         'OPENCODE_DISABLE_MODELS_FETCH=1',
-        cli, '--standalone', tty=True,
+        *cloudflare_environment,
+        request.cli, '--standalone', tty=True,
     )
 
 
 def _session_action(args: argparse.Namespace, workspace: pathlib.Path,
                     state_root: pathlib.Path, *, collect: bool) -> int:
-    import oc2_session as sessions
-    import oc2_workspace as workspaces
+    sessions = importlib.import_module('oc2_session')
+    workspaces = importlib.import_module('oc2_workspace')
 
     session = sessions.load(state_root, workspace)
     if session.sandbox != args.sandbox:
@@ -510,24 +623,25 @@ def _session_action(args: argparse.Namespace, workspace: pathlib.Path,
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--version', action='version', version=f'oc2 launcher 1.0; OpenCode v{VERSION}')
-    p.add_argument('--repo-root', type=pathlib.Path, default=HERE.parents[1])
+    p.add_argument('--repo-root', type=pathlib.Path, default=REPO_ROOT)
     p.add_argument('--workspace', type=pathlib.Path, default=pathlib.Path.cwd(),
                    help='host project directory (default: current directory)')
     p.add_argument('--sandbox', default='oc2-v2')
     p.add_argument('--dry-run', action='store_true', help='show planned actions without calling sbx')
+    p.add_argument('--prepare-only', action='store_true',
+                   help='export and verify APM config without Sandbox commands')
+    p.add_argument('--allow-paid-inference', action='store_true',
+                   help='authorize external inference for this interactive launch')
     args = p.parse_args(argv)
-    import oc2_workspace
+    oc2_workspace = importlib.import_module('oc2_workspace')
 
     try:
-        workspace = args.workspace
-        if workspace.is_symlink():
-            raise Stop('workspace root must not be a symlink')
-        workspace = workspace.resolve(strict=True)
-        if not workspace.is_dir():
-            raise Stop('workspace is not a directory')
-        if not NAME_RE.fullmatch(args.sandbox):
-            raise Stop('invalid Sandbox name')
         if args.dry_run:
+            workspace = args.workspace.resolve(strict=True)
+            if not workspace.is_dir():
+                raise Stop('workspace is not a directory')
+            if not NAME_RE.fullmatch(args.sandbox):
+                raise Stop('invalid Sandbox name')
             print('OC2 PLAN: clone-mode shell Sandbox=' + args.sandbox)
             print('OC2 PLAN: workspace=' + str(workspace))
             print(f'OC2 PLAN: install and verify @opencode/cli@{VERSION} inside the Sandbox')
@@ -537,6 +651,20 @@ def main(argv: list[str] | None = None) -> int:
         repo = args.repo_root.resolve(strict=True)
         if not (repo / 'apm.yml').is_file():
             raise Stop('dotfiles-ai apm.yml not found')
+        if args.prepare_only:
+            with tempfile.TemporaryDirectory(prefix='oc2-v2-config-') as temporary:
+                export_v2_config(repo, pathlib.Path(temporary) / 'export')
+            print('OC2_PREPARED_ONLY: APM V2 config verified; no Sandbox commands executed')
+            return 0
+
+        workspace = args.workspace
+        if workspace.is_symlink():
+            raise Stop('workspace root must not be a symlink')
+        workspace = workspace.resolve(strict=True)
+        if not workspace.is_dir():
+            raise Stop('workspace is not a directory')
+        if not NAME_RE.fullmatch(args.sandbox):
+            raise Stop('invalid Sandbox name')
         validate_clone_workspace(workspace)
         git_root = subprocess.run(
             ['git', '-C', str(workspace), 'rev-parse', '--show-toplevel'],
@@ -544,36 +672,49 @@ def main(argv: list[str] | None = None) -> int:
         )
         if git_root.returncode != 0 or pathlib.Path(git_root.stdout.strip()) != workspace:
             raise Stop('workspace must be the root of a Git repository for Clone mode')
-        if not shutil.which('sbx'):
-            raise Stop('Docker Sandboxes CLI was not found')
-        runner = Runner(getpass.getuser())
-        sandbox_version = runner.sbx('version', capture=True).strip()
-        if re.search(r'\bv\d+\.\d+\.\d+\b', sandbox_version) is None:
-            raise Stop('could not verify Docker Sandboxes version')
-        if '--clone' not in runner.sbx('create', '--help', capture=True):
-            raise Stop('installed Docker Sandboxes CLI does not support Clone mode')
-        print('OC2_DOCKER_SANDBOXES: ' + sandbox_version)
-        existing = {line.strip() for line in runner.sbx('ls', '-q', capture=True).splitlines()}
-        if args.sandbox in existing:
-            raise Stop('Sandbox name already exists; refusing to reuse or rebuild it')
-        print('OC2: creating clone-mode shell Sandbox ' + args.sandbox)
-        runner.sbx(*clone_create_args(args.sandbox, workspace))
-        cli = provision_cli(runner, args.sandbox)
-        workdir = runner.sbx('exec', args.sandbox, 'pwd', capture=True).strip()
-        if not workdir.startswith('/') or '..' in pathlib.PurePosixPath(workdir).parts:
-            raise Stop('Sandbox returned an unsafe clone working directory')
-        clone_root = runner.sbx(
-            'exec', args.sandbox, 'git', '-C', workdir,
-            'rev-parse', '--show-toplevel', capture=True,
-        ).strip()
-        if clone_root != workdir:
-            raise Stop('Sandbox working directory is not the Clone-mode Git root')
-        runtime_sha = hashlib.sha256(
-            (str(workspace) + '\0' + VERSION).encode(),
-        ).hexdigest()
-        print(f'OC2_READY: sandbox={args.sandbox} opencode=v{VERSION}')
-        launch(runner, args.sandbox, runtime_sha, cli, workdir)
-        return 0
+        with tempfile.TemporaryDirectory(prefix='oc2-v2-config-') as temporary:
+            config_file = export_v2_config(repo, pathlib.Path(temporary) / 'export')
+            if (requires_external_inference(config_file)
+                    and not args.allow_paid_inference):
+                raise Stop('external inference requires --allow-paid-inference')
+            cloudflare = cloudflare_runtime(
+                config_file,
+                os.environ.get('OC_CF_ACCOUNT_ID'),
+                os.environ.get('OC_CF_GATEWAY_ID'),
+            )
+            if not shutil.which('sbx'):
+                raise Stop('Docker Sandboxes CLI was not found')
+            runner = Runner(getpass.getuser())
+            sandbox_version = runner.sbx('version', capture=True).strip()
+            if re.search(r'\bv\d+\.\d+\.\d+\b', sandbox_version) is None:
+                raise Stop('could not verify Docker Sandboxes version')
+            if '--clone' not in runner.sbx('create', '--help', capture=True):
+                raise Stop('installed Docker Sandboxes CLI does not support Clone mode')
+            print('OC2_DOCKER_SANDBOXES: ' + sandbox_version)
+            existing = {line.strip() for line in runner.sbx('ls', '-q', capture=True).splitlines()}
+            if args.sandbox in existing:
+                raise Stop('Sandbox name already exists; refusing to reuse or rebuild it')
+            print('OC2: creating clone-mode shell Sandbox ' + args.sandbox)
+            runner.sbx(*clone_create_args(args.sandbox, workspace))
+            cli = provision_cli(runner, args.sandbox)
+            workdir = runner.sbx('exec', args.sandbox, 'pwd', capture=True).strip()
+            if not workdir.startswith('/') or '..' in pathlib.PurePosixPath(workdir).parts:
+                raise Stop('Sandbox returned an unsafe clone working directory')
+            clone_root = runner.sbx(
+                'exec', args.sandbox, 'git', '-C', workdir,
+                'rev-parse', '--show-toplevel', capture=True,
+            ).strip()
+            if clone_root != workdir:
+                raise Stop('Sandbox working directory is not the Clone-mode Git root')
+            runtime_sha = hashlib.sha256(
+                (str(workspace) + '\0' + VERSION).encode(),
+            ).hexdigest()
+            print(f'OC2_READY: sandbox={args.sandbox} opencode=v{VERSION}')
+            launch(
+                runner,
+                SandboxLaunch(args.sandbox, runtime_sha, cli, workdir, config_file, cloudflare),
+            )
+            return 0
     except (Stop, OSError, ValueError, subprocess.TimeoutExpired,
             oc2_workspace.WorkspaceError) as exc:
         print('OC2_STOP: ' + str(exc), file=sys.stderr)

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib
 import json
 import os
 import re
@@ -17,11 +18,19 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
+from typing import TypeAlias
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+exporter = importlib.import_module("sandbox.scripts.prepare_opencode_v2")
 
 NAMES = frozenset({"opencode.jsonc", "cli.json", "export-manifest.json"})
 MAX_BYTES = 1024 * 1024
 SANDBOX_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9.-]{0,61}[a-zA-Z0-9]$")
 REMOTE_PARENT = str(Path("/home") / "agent" / "workspace")  # guest-only mountless path
+JsonValue: TypeAlias = str | int | float | bool | None | list["JsonValue"] | dict[str, "JsonValue"]
 
 
 class StageError(Exception):
@@ -34,6 +43,52 @@ def _regular_bytes(path: Path) -> bytes:
     if path.stat().st_size > MAX_BYTES:
         raise StageError("bundle file exceeds size limit: " + path.name)
     return path.read_bytes()
+
+
+def _verify_v2_config(server: dict[str, JsonValue]) -> None:
+    """Reject V2 bundles that can activate other providers or Guest auth."""
+    expected_keys = {"$schema", "shell", "snapshot", "model", "providers", "policies"}
+    if set(server) != expected_keys:
+        raise StageError("unexpected V2 server config fields")
+    model = server.get("model")
+    providers = server.get("providers")
+    policies = server.get("policies")
+    if (not isinstance(model, str) or "/" not in model
+            or not isinstance(providers, dict) or len(providers) != 1
+            or not isinstance(policies, list)):
+        raise StageError("invalid V2 provider selection")
+    provider_id, model_id = model.split("/", 1)
+    if not model_id or provider_id not in providers:
+        raise StageError("V2 model does not match the selected provider")
+    provider = providers[provider_id]
+    if not isinstance(provider, dict):
+        raise StageError("invalid V2 provider configuration")
+    models = provider.get("models")
+    if not isinstance(models, dict) or model_id not in models:
+        raise StageError("V2 default model is not in the provider catalog")
+    expected_policies = [
+        {"action": "provider.use", "resource": "*", "effect": "deny"},
+        {"action": "provider.use", "resource": provider_id, "effect": "allow"},
+        {"action": "integration.connect", "resource": "*", "effect": "deny"},
+        {"action": "plugin.use", "resource": "*", "effect": "deny"},
+        {"action": "mcp.use", "resource": "*", "effect": "deny"},
+    ]
+    if policies != expected_policies:
+        raise StageError("V2 fallback or Guest authentication policy is not fail-closed")
+    settings = provider.get("settings", {})
+    headers = provider.get("headers", {})
+    if not isinstance(settings, dict) or not isinstance(headers, dict):
+        raise StageError("invalid V2 provider request settings")
+    api_key = settings.get("apiKey", "")
+    if (not isinstance(api_key, str)
+            or api_key and re.fullmatch(r"\{env:[A-Za-z_][A-Za-z0-9_]*\}", api_key) is None):
+        raise StageError("V2 provider config contains a literal API key")
+    for name, value in headers.items():
+        if not isinstance(name, str) or not isinstance(value, str):
+            raise StageError("invalid V2 provider header")
+        if (name.casefold() in {"authorization", "cf-aig-authorization", "x-api-key"}
+                and value and re.search(r"\{env:[A-Za-z_][A-Za-z0-9_]*\}", value) is None):
+            raise StageError("V2 provider config contains a literal credential header")
 
 
 def verify_bundle(directory: Path) -> str:
@@ -51,15 +106,16 @@ def verify_bundle(directory: Path) -> str:
         raise StageError("bundle is not valid UTF-8 JSON") from exc
     if not isinstance(manifest, dict):
         raise StageError("invalid manifest")
-    expected_keys = {"schema", "generator", "source", "source_sha256", "opencode_version",
-                     "plugins_exported", "mcp_entries_exported", "artifacts_sha256"}
+    expected_keys = {"schema", "generator", "source", "config_format", "source_sha256",
+                     "opencode_version", "plugins_exported", "mcp_entries_exported",
+                     "artifacts_sha256"}
     if set(manifest) != expected_keys:
         raise StageError("unexpected manifest fields")
-    if manifest.get("generator") != "v0.1" or manifest.get("source") != "apm.yml":
+    if manifest.get("generator") != "v0.2" or manifest.get("source") != "apm.yml":
         raise StageError("unexpected export generator or source")
     if manifest.get("schema") != "dotfiles-ai/sandbox-export/v0":
         raise StageError("invalid manifest schema")
-    if manifest.get("opencode_version") != "2.1.4":
+    if manifest.get("opencode_version") != "2.2.5":
         raise StageError("unapproved OpenCode version")
     source_hash = manifest.get("source_sha256")
     if not isinstance(source_hash, str) or re.fullmatch(r"[a-f0-9]{64}", source_hash) is None:
@@ -72,14 +128,23 @@ def verify_bundle(directory: Path) -> str:
         raise StageError("artifact checksum mismatch")
     if manifest.get("plugins_exported") != 0 or manifest.get("mcp_entries_exported") != 0:
         raise StageError("exported plugins or MCP entries are forbidden")
-    if not isinstance(server, dict) or set(server) != {"$schema", "shell", "snapshot", "plugins", "mcp"}:
+    if not isinstance(server, dict):
         raise StageError("unexpected server config fields")
     if server["$schema"] != "https://opencode.ai/config.json":
         raise StageError("unexpected server config schema")
     if server["shell"] not in ("bash", "sh", "zsh") or type(server["shell"]) is not str:
         raise StageError("unapproved shell")
-    if type(server["snapshot"]) is not bool or server["plugins"] != [] or server["mcp"] != {}:
+    if type(server["snapshot"]) is not bool:
         raise StageError("unapproved server config values")
+    match manifest["config_format"]:
+        case "legacy-minimal":
+            if (set(server) != {"$schema", "shell", "snapshot", "plugins", "mcp"}
+                    or server["plugins"] != [] or server["mcp"] != {}):
+                raise StageError("unapproved legacy server config values")
+        case "opencode-v2":
+            _verify_v2_config(server)
+        case _:
+            raise StageError("unrecognized config format")
     if not isinstance(tui, dict) or tui != {"$schema": "https://opencode.ai/v2/cli.json", "plugins": []}:
         raise StageError("unexpected TUI config")
     return hashlib.sha256(data["export-manifest.json"]).hexdigest()
@@ -95,13 +160,13 @@ def _run(command: list[str]) -> None:
 
 
 def _check_source(root: Path, bundle: Path) -> None:
-    import prepare_opencode_v2 as exporter
-
     try:
-        shell, snapshot, source_hash = exporter._read_apm(root)
+        apm = exporter._read_apm_source(root)
     except (OSError, exporter.ExportError) as exc:
         raise StageError("export provenance check could not complete") from exc
-    expected = exporter._build_files(shell, snapshot, source_hash)
+    expected = exporter._build_files(
+        apm.shell, apm.snapshot, apm.source_sha256, apm.v2_config,
+    )
     if any(_regular_bytes(bundle / name) != content for name, content in expected.items()):
         raise StageError("bundle does not match the current apm.yml SSOT")
 

@@ -36,9 +36,10 @@ class StageTests(unittest.TestCase):
             (self.bundle / name).write_text(json.dumps(value) + "\n", encoding="utf-8")
         manifest = {
             "schema": "dotfiles-ai/sandbox-export/v0",
-            "generator": "v0.1", "source": "apm.yml",
+            "generator": "v0.2", "source": "apm.yml",
+            "config_format": "legacy-minimal",
             "source_sha256": hashlib.sha256(self.apm.read_bytes()).hexdigest(),
-            "opencode_version": "2.1.4", "plugins_exported": 0,
+        "opencode_version": "2.2.5", "plugins_exported": 0,
             "mcp_entries_exported": 0,
             "artifacts_sha256": {
                 name: hashlib.sha256((self.bundle / name).read_bytes()).hexdigest()
@@ -52,6 +53,32 @@ class StageTests(unittest.TestCase):
                                  capture_output=True, text=True, check=False)
         self.assertEqual(process.returncode, 0, process.stderr)
         self.assertIn("VERIFY_OK", process.stdout)
+
+    def test_v2_provider_bundle_is_verified_from_apm(self) -> None:
+        self.apm.write_text(
+            "provider:\n  openai:\n    whitelist: [gpt-6-luna]\n"
+            "opencode_v2:\n"
+            "  default_model: openai/gpt-6-luna\n"
+            "  deny_provider_fallback: true\n"
+            "  deny_guest_auth: true\n"
+            "  providers:\n"
+            "    openai:\n"
+            "      enabled: true\n"
+            "      auth_method: docker_openai_oauth\n",
+            encoding="utf-8",
+        )
+        bundle = self.root.parent / "v2-bundle"
+        process = subprocess.run(
+            [sys.executable, str(SCRIPT.parent / "prepare_opencode_v2.py"),
+             "--repo-root", str(self.root), "--out", str(bundle)],
+            capture_output=True, text=True, check=False,
+        )
+        self.assertEqual(process.returncode, 0, process.stderr)
+        self.assertEqual(
+            stage.verify_bundle(bundle),
+            hashlib.sha256((bundle / "export-manifest.json").read_bytes()).hexdigest(),
+        )
+        stage._check_source(self.root, bundle)
 
     def test_rejects_changed_config_and_extra_files(self) -> None:
         config = self.bundle / "cli.json"
@@ -110,7 +137,7 @@ class StageTests(unittest.TestCase):
         self.assertTrue(remote.startswith(stage.REMOTE_PARENT + "/sbx-config-"))
         self.assertNotIn(".config/opencode", repr(commands))
         self.assertNotIn("--privileged", repr(commands))
-        self.assertNotIn("-u", repr(commands))
+        self.assertNotIn("-u", [argument for command in commands for argument in command])
         self.assertEqual(commands[-1][3], "python3")
         self.assertEqual(commands[2][-1], "oc-v2-poc:" + commands[-1][4])
         self.assertFalse(commands[-1][4].startswith(remote + "/"))

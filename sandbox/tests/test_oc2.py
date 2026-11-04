@@ -330,7 +330,13 @@ class HostTest(unittest.TestCase):
                 )
             self.assertEqual(remote, oc2.ROOT + '/projects/' + remote.rsplit('/', 1)[-1])
             self.assertEqual(runner.workspace_copies[0], (staged, 'oc2-dev:' + remote))
-            oc2.launch(runner, 'oc2-dev', 'a' * 64, oc2.PINNED[0], remote)
+            oc2.launch(
+                runner,
+                oc2.SandboxLaunch(
+                    'oc2-dev', 'a' * 64, oc2.PINNED[0], remote,
+                    pathlib.Path('/tmp/opencode-v2-config.jsonc'),
+                ),
+            )
             self.assertEqual(runner.calls[-1][3], remote)
 
     def test_oc2_help_and_version_are_local(self):
@@ -417,29 +423,74 @@ class HostTest(unittest.TestCase):
 
     def test_launch_uses_standalone_no_host_env(self):
         runner = FakeRunner()
-        oc2.launch(runner, 'oc2-dev', 'a' * 64, oc2.PINNED[0])
+        runtime = f'{oc2.ROOT}/runtime/' + 'a' * 16
+        oc2.launch(
+            runner,
+            oc2.SandboxLaunch(
+                'oc2-dev', 'a' * 64, oc2.PINNED[0],
+                runtime + '/project', pathlib.Path('/tmp/opencode-v2-config.jsonc'),
+            ),
+        )
         command = runner.calls[-1]
         self.assertEqual(command[:3], ('exec', '-it', '-w'))
-        self.assertEqual(command[3], oc2.ROOT + '/runtime/' + 'a' * 16 + '/project')
+        self.assertEqual(command[3], runtime + '/project')
         self.assertEqual(command[4:7], ('oc2-dev', 'env', '-i'))
         self.assertEqual(command[-2:], (oc2.PINNED[0], '--standalone'))
         self.assertIn('OPENCODE_WATCHDOG_ENABLED=false', command)
         self.assertNotIn('bash', command)
         self.assertNotIn('--mount', command)
 
+    def test_launch_passes_cloudflare_ids_and_fixed_placeholder_only(self):
+        runner = FakeRunner()
+        runtime = f'{oc2.ROOT}/runtime/' + 'a' * 16
+        cloudflare = oc2.CloudflareRuntime('a' * 32, 'gateway-1')
+        with patch.dict(oc2.os.environ, {'OC_CF_REST_API_TOKEN': 'sensitive-poison-value'}):
+            oc2.launch(
+                runner,
+                oc2.SandboxLaunch(
+                    'oc2-dev', 'a' * 64, oc2.PINNED[0], runtime + '/project',
+                    pathlib.Path('/tmp/opencode-v2-config.jsonc'), cloudflare,
+                ),
+            )
+
+        command = runner.calls[-1]
+        self.assertIn('OC_CF_ACCOUNT_ID=' + 'a' * 32, command)
+        self.assertIn('OC_CF_GATEWAY_ID=gateway-1', command)
+        self.assertIn('OC_CF_REST_API_TOKEN=proxy-managed', command)
+        self.assertNotIn('sensitive-poison-value', repr(runner.calls))
+
+    def test_launch_without_cloudflare_selection_passes_no_cloudflare_environment(self):
+        runner = FakeRunner()
+        runtime = f'{oc2.ROOT}/runtime/' + 'a' * 16
+        oc2.launch(
+            runner,
+            oc2.SandboxLaunch(
+                'oc2-dev', 'a' * 64, oc2.PINNED[0], runtime + '/project',
+                pathlib.Path('/tmp/opencode-v2-config.jsonc'),
+            ),
+        )
+
+        command = runner.calls[-1]
+        self.assertFalse(any(argument.startswith('OC_CF_') for argument in command))
+
     def test_launch_prepares_isolated_runtime_for_clone_workspace(self):
         runner = FakeRunner()
         digest = 'b' * 64
         project = '/clone/workspaces/synthetic'
         runtime = f'{oc2.ROOT}/runtime/{digest[:16]}'
-        oc2.launch(runner, 'oc2-dev', digest, oc2.PINNED[0], project)
+        config_file = pathlib.Path('/tmp/opencode-v2-config.jsonc')
+        oc2.launch(runner, oc2.SandboxLaunch('oc2-dev', digest, oc2.PINNED[0], project, config_file))
         self.assertEqual(
             runner.calls[0],
             ('exec', 'oc2-dev', 'mkdir', '-p', '-m', '700',
              runtime, *(f'{runtime}/{name}' for name in
-                        ('home', 'config', 'data', 'state', 'cache', 'tmp'))),
+                        ('home', 'config', 'config/opencode', 'data', 'state', 'cache', 'tmp'))),
         )
-        self.assertEqual(runner.calls[1][3], project)
+        self.assertEqual(
+            runner.calls[1],
+            ('cp', str(config_file), f'oc2-dev:{runtime}/config/opencode/opencode.jsonc'),
+        )
+        self.assertEqual(runner.calls[2][3], project)
 
     def test_stage_does_not_depend_on_bash_positional_arguments(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -572,11 +623,77 @@ class HostTest(unittest.TestCase):
 
     def test_launch_rejects_unapproved_binary(self):
         with self.assertRaisesRegex(oc2.Stop, 'unapproved'):
-            oc2.launch(FakeRunner(), 'oc2-dev', 'a' * 64, '/tmp/untrusted')
+            oc2.launch(
+                FakeRunner(),
+                oc2.SandboxLaunch(
+                    'oc2-dev', 'a' * 64, '/tmp/untrusted', '/workspace/project',
+                    pathlib.Path('/tmp/opencode-v2-config.jsonc'),
+                ),
+            )
 
     def test_launch_rejects_invalid_digest(self):
         with self.assertRaisesRegex(oc2.Stop, 'invalid runtime digest'):
-            oc2.launch(FakeRunner(), 'oc2-dev', 'not-a-digest', oc2.PINNED[0])
+            oc2.launch(
+                FakeRunner(),
+                oc2.SandboxLaunch(
+                    'oc2-dev', 'not-a-digest', oc2.PINNED[0], '/workspace/project',
+                    pathlib.Path('/tmp/opencode-v2-config.jsonc'),
+                ),
+            )
+
+    def test_cloudflare_runtime_is_absent_when_provider_is_not_selected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config = pathlib.Path(tmp) / 'opencode.jsonc'
+            config.write_text(json.dumps({
+                'model': 'openai/gpt-6-luna', 'providers': {'openai': {}},
+            }))
+            self.assertIsNone(oc2.cloudflare_runtime(config, None, None))
+
+    def test_cloudflare_runtime_requires_valid_identifiers_when_selected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config = pathlib.Path(tmp) / 'opencode.jsonc'
+            config.write_text(json.dumps({
+                'model': 'cloudflare-ai-gateway-rest/openai/gpt-6-luna',
+                'providers': {'cloudflare-ai-gateway-rest': {}},
+            }))
+            for account_id, gateway_id in (
+                (None, 'default'),
+                ('a' * 31, 'default'),
+                ('g' * 32, 'default'),
+                ('a' * 32, None),
+                ('a' * 32, 'invalid gateway'),
+            ):
+                with self.subTest(account_id=account_id, gateway_id=gateway_id):
+                    with self.assertRaisesRegex(oc2.Stop, 'Cloudflare runtime identifiers') as error:
+                        oc2.cloudflare_runtime(config, account_id, gateway_id)
+                    self.assertNotIn(str(account_id), str(error.exception))
+                    self.assertNotIn(str(gateway_id), str(error.exception))
+
+    def test_cloudflare_runtime_accepts_valid_identifiers(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config = pathlib.Path(tmp) / 'opencode.jsonc'
+            config.write_text(json.dumps({
+                'model': 'cloudflare-ai-gateway-rest/openai/gpt-6-luna',
+                'providers': {'cloudflare-ai-gateway-rest': {}},
+            }))
+            self.assertEqual(
+                oc2.cloudflare_runtime(config, 'a' * 32, 'gateway-1'),
+                oc2.CloudflareRuntime('a' * 32, 'gateway-1'),
+            )
+
+    def test_requires_external_inference_when_v2_provider_is_selected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config = pathlib.Path(tmp) / 'opencode.jsonc'
+            config.write_text(json.dumps({
+                'model': 'openai/gpt-6-luna', 'providers': {'openai': {}},
+            }))
+            self.assertTrue(oc2.requires_external_inference(config))
+
+    def test_requires_external_inference_is_false_for_legacy_config(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config = pathlib.Path(tmp) / 'opencode.jsonc'
+            config.write_text(json.dumps({'shell': 'bash', 'snapshot': True}))
+            self.assertFalse(oc2.requires_external_inference(config))
 
 
 class GuestTest(unittest.TestCase):
@@ -595,14 +712,41 @@ class GuestTest(unittest.TestCase):
             (self.bundle / name).write_text(json.dumps(value))
         hashes = {n: hashlib.sha256((self.bundle / n).read_bytes()).hexdigest()
                   for n in ('opencode.jsonc', 'cli.json')}
-        self.manifest = {'schema': 'dotfiles-ai/sandbox-export/v0', 'generator': 'v0.1',
-                         'opencode_version': '2.1.4', 'plugins_exported': 0,
+        self.manifest = {'schema': 'dotfiles-ai/sandbox-export/v0', 'generator': 'v0.2',
+            'source': 'apm.yml', 'source_sha256': '0' * 64,
+            'config_format': 'legacy-minimal',
+            'opencode_version': '2.2.5', 'plugins_exported': 0,
                          'mcp_entries_exported': 0, 'artifacts_sha256': hashes}
         (self.bundle / 'export-manifest.json').write_text(json.dumps(self.manifest))
 
     def tearDown(self):
         guest.BASE = self.orig
         self.tmp.cleanup()
+
+    def test_v2_apm_bundle_has_no_guest_auth_or_other_provider(self):
+        source = self.base / 'source'
+        source.mkdir()
+        (source / 'apm.yml').write_text(
+            'provider:\n  openai:\n    whitelist: [gpt-6-luna]\n'
+            'opencode_v2:\n'
+            '  default_model: openai/gpt-6-luna\n'
+            '  deny_provider_fallback: true\n'
+            '  deny_guest_auth: true\n'
+            '  providers:\n'
+            '    openai:\n'
+            '      enabled: true\n'
+            '      auth_method: docker_openai_oauth\n',
+            encoding='utf-8',
+        )
+        bundle = self.base / 'v2-bundle'
+        generated = subprocess.run(
+            [sys.executable, str(SCRIPTS / 'prepare_opencode_v2.py'),
+             '--repo-root', str(source), '--out', str(bundle)],
+            capture_output=True, text=True, check=False,
+        )
+        self.assertEqual(generated.returncode, 0, generated.stderr)
+        digest = guest.verify(bundle)
+        self.assertEqual(digest, hashlib.sha256((bundle / 'export-manifest.json').read_bytes()).hexdigest())
 
     def test_materialize_idempotently(self):
         digest = guest.verify(self.bundle)

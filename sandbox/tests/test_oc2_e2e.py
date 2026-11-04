@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import contextlib
 import io
+import json
 import pathlib
 import subprocess
 import sys
@@ -18,6 +19,7 @@ class FakeSbx:
     def __init__(self):
         self.created = False
         self.installed = False
+        self.copied_config: str | None = None
         self.calls: list[tuple[str, ...]] = []
 
     def sbx(self, *args: str, capture: bool = False, tty: bool = False) -> str:
@@ -30,6 +32,9 @@ class FakeSbx:
             return 'oc2-test\n' if self.created else ''
         if args[:1] == ('create',):
             self.created = True
+            return ''
+        if args[:1] == ('cp',):
+            self.copied_config = pathlib.Path(args[1]).read_text()
             return ''
         if args[:2] == ('exec', 'oc2-test'):
             command = args[2:]
@@ -57,7 +62,18 @@ class LauncherFlowTests(unittest.TestCase):
         self.root = pathlib.Path(self.temporary.name)
         self.repo = self.root / 'dotfiles-ai'
         self.repo.mkdir()
-        (self.repo / 'apm.yml').write_text('targets: [opencode]\n')
+        (self.repo / 'apm.yml').write_text(
+            'targets: [opencode]\n'
+            'provider:\n  openai:\n    whitelist: [gpt-6-luna]\n'
+            'opencode_v2:\n'
+            '  default_model: openai/gpt-6-luna\n'
+            '  deny_provider_fallback: true\n'
+            '  deny_guest_auth: true\n'
+            '  providers:\n'
+            '    openai:\n'
+            '      enabled: true\n'
+            '      auth_method: docker_openai_oauth\n'
+        )
         self.project = self.root / 'synthetic'
         self.project.mkdir()
         (self.project / 'main.py').write_text('print("safe")\n')
@@ -76,20 +92,48 @@ class LauncherFlowTests(unittest.TestCase):
         )
         self.fake = FakeSbx()
 
-    def _run(self) -> tuple[int, str]:
+    def _run(self, *extra_args: str) -> tuple[int, str]:
         output = io.StringIO()
         args = [
             '--repo-root', str(self.repo), '--workspace', str(self.project),
             '--sandbox', 'oc2-test',
+            *extra_args,
         ]
         with patch.object(oc2, 'Runner', return_value=self.fake), \
                 patch.object(oc2.shutil, 'which', return_value='/fake/sbx'), \
                 contextlib.redirect_stdout(output), contextlib.redirect_stderr(output):
-            status = oc2.main(args)
+            try:
+                status = oc2.main(args)
+            except SystemExit as exc:
+                status = int(exc.code)
         return status, output.getvalue()
 
+    def _write_cloudflare_apm(self) -> None:
+        (self.repo / 'apm.yml').write_text(
+            'provider:\n'
+            '  cloudflare-ai-gateway-rest:\n'
+            "    npm: '@ai-sdk/openai-compatible'\n"
+            '    name: Cloudflare AI Gateway REST\n'
+            '    options:\n'
+            "      baseURL: 'https://api.cloudflare.com/client/v4/accounts/${env:OC_CF_ACCOUNT_ID}/ai/v1'\n"
+            "      apiKey: '${env:OC_CF_REST_API_TOKEN}'\n"
+            '      headers:\n'
+            "        cf-aig-gateway-id: '${env:OC_CF_GATEWAY_ID}'\n"
+            '    models:\n'
+            '      openai/gpt-6-luna:\n'
+            '        name: GPT-6 Luna\n'
+            'opencode_v2:\n'
+            '  default_model: cloudflare-ai-gateway-rest/openai/gpt-6-luna\n'
+            '  deny_provider_fallback: true\n'
+            '  deny_guest_auth: true\n'
+            '  providers:\n'
+            '    cloudflare-ai-gateway-rest:\n'
+            '      enabled: true\n'
+            '      auth_method: docker_custom_secret\n',
+        )
+
     def test_clone_mode_installs_and_launches_only_pinned_v2(self):
-        status, output = self._run()
+        status, output = self._run('--allow-paid-inference')
         self.assertEqual(status, 0, output)
         create = next(call for call in self.fake.calls if call[0] == 'create' and '--clone' in call)
         self.assertEqual(
@@ -100,6 +144,13 @@ class LauncherFlowTests(unittest.TestCase):
             'exec', 'oc2-test', 'npm',
         ))
         self.assertEqual(install[-1], '@opencode/cli@2.2.5')
+        if self.fake.copied_config is None:
+            self.fail('V2 config was not copied into the Sandbox')
+        copied_config = json.loads(self.fake.copied_config)
+        self.assertEqual(copied_config['model'], 'openai/gpt-6-luna')
+        self.assertIn('policies', copied_config)
+        self.assertNotIn('plugin', copied_config)
+        self.assertNotIn('mcp', copied_config)
         launch = next(call for call in self.fake.calls if call[:2] == ('exec', '-it'))
         self.assertEqual(launch[3], '/home/agent/workspace/synthetic')
         self.assertIn('env', launch)
@@ -125,10 +176,49 @@ class LauncherFlowTests(unittest.TestCase):
 
     def test_existing_sandbox_is_not_reused_or_rebuilt(self):
         self.fake.created = True
-        status, output = self._run()
+        status, output = self._run('--allow-paid-inference')
         self.assertEqual(status, 1)
         self.assertIn('refusing to reuse or rebuild', output)
         self.assertFalse(any(call[0] == 'create' and '--clone' in call for call in self.fake.calls))
+
+    def test_external_provider_requires_explicit_authorization_before_sandbox_commands(self):
+        status, output = self._run()
+
+        self.assertEqual(status, 1)
+        self.assertIn('--allow-paid-inference', output)
+        self.assertEqual(self.fake.calls, [])
+
+    def test_prepare_only_skips_inference_authorization_and_sandbox_commands(self):
+        status, output = self._run('--prepare-only')
+
+        self.assertEqual(status, 0, output)
+        self.assertIn('OC2_PREPARED_ONLY', output)
+        self.assertEqual(self.fake.calls, [])
+
+    def test_cloudflare_end_to_end_uses_proxy_placeholder_only(self):
+        self._write_cloudflare_apm()
+        with patch.dict(oc2.os.environ, {
+            'OC_CF_ACCOUNT_ID': 'a' * 32,
+            'OC_CF_GATEWAY_ID': 'gateway-1',
+            'OC_CF_REST_API_TOKEN': 'sensitive-poison-value',
+        }):
+            status, output = self._run('--allow-paid-inference')
+
+        self.assertEqual(status, 0, output)
+        launch = next(call for call in self.fake.calls if call[:2] == ('exec', '-it'))
+        self.assertIn('OC_CF_ACCOUNT_ID=' + 'a' * 32, launch)
+        self.assertIn('OC_CF_GATEWAY_ID=gateway-1', launch)
+        self.assertIn('OC_CF_REST_API_TOKEN=proxy-managed', launch)
+        self.assertNotIn('sensitive-poison-value', repr(self.fake.calls))
+
+    def test_cloudflare_missing_identifiers_stop_before_sandbox_commands(self):
+        self._write_cloudflare_apm()
+        with patch.dict(oc2.os.environ, {'OC_CF_GATEWAY_ID': 'gateway-1'}, clear=True):
+            status, output = self._run('--allow-paid-inference')
+
+        self.assertEqual(status, 1)
+        self.assertIn('Cloudflare runtime identifiers', output)
+        self.assertEqual(self.fake.calls, [])
 
 
 if __name__ == '__main__':

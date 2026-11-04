@@ -516,6 +516,24 @@ enabled_providers:
   - amazon-bedrock
   - google
 
+# OpenCode V2-only settings. The V1 JSONC generator ignores this section.
+# Provider connection details remain in the provider map below; this block
+# selects the V2 model and the providers allowed in the isolated Sandbox.
+opencode_v2:
+  default_model: openai/gpt-6-luna
+  deny_provider_fallback: true
+  deny_guest_auth: true
+  providers:
+    openai:
+      enabled: true
+      auth_method: docker_openai_oauth
+    cloudflare-ai-gateway-custom:
+      enabled: false
+      auth_method: docker_custom_secret
+    cloudflare-ai-gateway-rest:
+      enabled: false
+      auth_method: docker_custom_secret
+
 # --------------------------------------------------------------------------
 # Model Variant Templates (YAML Anchors)
 # --------------------------------------------------------------------------
@@ -664,7 +682,21 @@ provider:
         name: Gemini 3.1 Pro
         variants: *gemini_variants
 
-  # 2. Cloudflare Custom Providers using the generic OpenAI-compatible
+  # Cloudflare AI Gateway REST API. This candidate remains disabled until the
+  # host-side API token is provisioned with Workers AI Read permission.
+  cloudflare-ai-gateway-rest:
+    npm: "@ai-sdk/openai-compatible"
+    name: "Cloudflare AI Gateway REST"
+    options:
+      baseURL: "https://api.cloudflare.com/client/v4/accounts/${env:OC_CF_ACCOUNT_ID}/ai/v1"
+      apiKey: "${env:OC_CF_REST_API_TOKEN}"
+      headers:
+        cf-aig-gateway-id: "${env:OC_CF_GATEWAY_ID}"
+    models:
+      openai/gpt-6-luna:
+        name: "GPT-6 Luna via Cloudflare AI Gateway"
+
+  # Cloudflare Custom Providers using the generic OpenAI-compatible
   # /compat endpoint. Keeping the custom-{slug}/{model} model ID lets a single
   # OpenCode provider address multiple Custom Providers without storing their
   # upstream API keys locally.

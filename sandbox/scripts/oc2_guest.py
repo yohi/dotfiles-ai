@@ -12,11 +12,13 @@ import os
 import pathlib
 import re
 import sys
+from typing import NoReturn, TypeAlias
 
-VERSION = "2.1.4"
+VERSION = "2.2.5"
 BASE = pathlib.Path('/home/agent/workspace/oc2')
 FILES = ('opencode.jsonc', 'cli.json', 'export-manifest.json')
 ASSET_SCHEMA = 'dotfiles-ai/oc2-assets/v1'
+JsonValue: TypeAlias = str | int | float | bool | None | list['JsonValue'] | dict[str, 'JsonValue']
 ASSET_TARGETS = frozenset({
     'config/opencode/AGENTS.md',
     'config/opencode/rules/DOCS_STYLE.md',
@@ -33,12 +35,11 @@ ASSET_TARGETS = frozenset({
 MAX_ASSETS = 512 * 1024
 
 CLI_CANDIDATES = (
-    '/home/agent/.local/opencode-v2/node_modules/.bin/opencode',
     '/home/agent/.local/oc2-runtime/node_modules/.bin/opencode',
 )
 
 
-def fail(reason: str) -> None:
+def fail(reason: str) -> NoReturn:
     raise ValueError(reason)
 
 
@@ -46,6 +47,51 @@ def regular(path: pathlib.Path, max_bytes: int = 1048576) -> bytes:
     if path.is_symlink() or not path.is_file() or path.stat().st_size > max_bytes:
         fail('non-regular or oversized file: ' + path.name)
     return path.read_bytes()
+
+
+def verify_v2_config(server: dict[str, JsonValue]) -> None:
+    """Reject provider fallback, Guest auth, and literal credentials at activation."""
+    if set(server) != {'$schema', 'shell', 'snapshot', 'model', 'providers', 'policies'}:
+        fail('unexpected V2 server config fields')
+    model = server.get('model')
+    providers = server.get('providers')
+    policies = server.get('policies')
+    if (not isinstance(model, str) or '/' not in model
+            or not isinstance(providers, dict) or len(providers) != 1
+            or not isinstance(policies, list)):
+        fail('invalid V2 provider selection')
+    provider_id, model_id = model.split('/', 1)
+    if not model_id or provider_id not in providers:
+        fail('V2 model does not match the selected provider')
+    provider = providers[provider_id]
+    if not isinstance(provider, dict):
+        fail('invalid V2 provider configuration')
+    models = provider.get('models')
+    if not isinstance(models, dict) or model_id not in models:
+        fail('V2 default model is not in the provider catalog')
+    expected_policies = [
+        {'action': 'provider.use', 'resource': '*', 'effect': 'deny'},
+        {'action': 'provider.use', 'resource': provider_id, 'effect': 'allow'},
+        {'action': 'integration.connect', 'resource': '*', 'effect': 'deny'},
+        {'action': 'plugin.use', 'resource': '*', 'effect': 'deny'},
+        {'action': 'mcp.use', 'resource': '*', 'effect': 'deny'},
+    ]
+    if policies != expected_policies:
+        fail('V2 fallback or Guest authentication policy is not fail-closed')
+    settings = provider.get('settings', {})
+    headers = provider.get('headers', {})
+    if not isinstance(settings, dict) or not isinstance(headers, dict):
+        fail('invalid V2 provider request settings')
+    api_key = settings.get('apiKey', '')
+    if (not isinstance(api_key, str)
+            or api_key and re.fullmatch(r'\{env:[A-Za-z_][A-Za-z0-9_]*\}', api_key) is None):
+        fail('V2 provider config contains a literal API key')
+    for name, value in headers.items():
+        if not isinstance(name, str) or not isinstance(value, str):
+            fail('invalid V2 provider header')
+        if (name.casefold() in {'authorization', 'cf-aig-authorization', 'x-api-key'}
+                and value and re.search(r'\{env:[A-Za-z_][A-Za-z0-9_]*\}', value) is None):
+            fail('V2 provider config contains a literal credential header')
 
 
 def verify(bundle: pathlib.Path) -> str:
@@ -56,17 +102,36 @@ def verify(bundle: pathlib.Path) -> str:
     server = json.loads(data['opencode.jsonc'])
     client = json.loads(data['cli.json'])
     if (manifest.get('schema') != 'dotfiles-ai/sandbox-export/v0'
-            or manifest.get('generator') != 'v0.1'
+            or manifest.get('generator') != 'v0.2'
             or manifest.get('opencode_version') != VERSION
             or manifest.get('plugins_exported') != 0
             or manifest.get('mcp_entries_exported') != 0):
         fail('unrecognized exporter manifest')
+    if set(manifest) != {
+        'schema', 'generator', 'source', 'config_format', 'source_sha256',
+        'opencode_version', 'plugins_exported', 'mcp_entries_exported',
+        'artifacts_sha256',
+    } or manifest.get('source') != 'apm.yml':
+        fail('unexpected exporter manifest fields')
+    if re.fullmatch(r'[0-9a-f]{64}', manifest.get('source_sha256', '')) is None:
+        fail('invalid source SHA-256')
     hashes = {k: hashlib.sha256(data[k]).hexdigest() for k in FILES[:2]}
     if manifest.get('artifacts_sha256') != hashes:
         fail('bundle SHA-256 mismatch')
-    if (not isinstance(server, dict) or server.get('plugins') != [] or server.get('mcp') != {}
-            or server.get('shell') not in ('bash', 'sh', 'zsh') or type(server.get('snapshot')) is not bool):
+    if (not isinstance(server, dict)
+            or server.get('$schema') != 'https://opencode.ai/config.json'
+            or server.get('shell') not in ('bash', 'sh', 'zsh')
+            or type(server.get('snapshot')) is not bool):
         fail('unsafe server config')
+    match manifest['config_format']:
+        case 'legacy-minimal':
+            if (set(server) != {'$schema', 'shell', 'snapshot', 'plugins', 'mcp'}
+                    or server.get('plugins') != [] or server.get('mcp') != {}):
+                fail('unsafe legacy server config')
+        case 'opencode-v2':
+            verify_v2_config(server)
+        case _:
+            fail('unrecognized config format')
     if client != {'$schema': 'https://opencode.ai/v2/cli.json', 'plugins': []}:
         fail('unsafe TUI config')
     return hashlib.sha256(data['export-manifest.json']).hexdigest()
