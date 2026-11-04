@@ -528,10 +528,7 @@ opencode_v2:
       enabled: true
       auth_method: docker_openai_oauth
     cloudflare-ai-gateway-custom:
-      enabled: false
-      auth_method: docker_custom_secret
-    cloudflare-ai-gateway-rest:
-      enabled: false
+      enabled: true
       auth_method: docker_custom_secret
 
 # --------------------------------------------------------------------------
@@ -681,20 +678,6 @@ provider:
       google-ai-studio/gemini-3.1-pro:
         name: Gemini 3.1 Pro
         variants: *gemini_variants
-
-  # Cloudflare AI Gateway REST API. This candidate remains disabled until the
-  # host-side API token is provisioned with Workers AI Read permission.
-  cloudflare-ai-gateway-rest:
-    npm: "@ai-sdk/openai-compatible"
-    name: "Cloudflare AI Gateway REST"
-    options:
-      baseURL: "https://api.cloudflare.com/client/v4/accounts/${env:OC_CF_ACCOUNT_ID}/ai/v1"
-      apiKey: "${env:OC_CF_REST_API_TOKEN}"
-      headers:
-        cf-aig-gateway-id: "${env:OC_CF_GATEWAY_ID}"
-    models:
-      openai/gpt-6-luna:
-        name: "GPT-6 Luna via Cloudflare AI Gateway"
 
   # Cloudflare Custom Providers using the generic OpenAI-compatible
   # /compat endpoint. Keeping the custom-{slug}/{model} model ID lets a single

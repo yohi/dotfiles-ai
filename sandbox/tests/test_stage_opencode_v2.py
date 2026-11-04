@@ -54,9 +54,22 @@ class StageTests(unittest.TestCase):
         self.assertEqual(process.returncode, 0, process.stderr)
         self.assertIn("VERIFY_OK", process.stdout)
 
-    def test_v2_provider_bundle_is_verified_from_apm(self) -> None:
+    def _make_v2_bundle(self) -> Path:
         self.apm.write_text(
-            "provider:\n  openai:\n    whitelist: [gpt-6-luna]\n"
+            "provider:\n"
+            "  openai:\n"
+            "    whitelist: [gpt-6-luna]\n"
+            "  cloudflare-ai-gateway-custom:\n"
+            "    npm: '@ai-sdk/openai-compatible'\n"
+            "    name: Cloudflare AI Gateway Custom\n"
+            "    options:\n"
+            "      baseURL: 'https://gateway.ai.cloudflare.com/v1/${env:OC_CF_ACCOUNT_ID}/${env:OC_CF_GATEWAY_ID}/compat'\n"
+            "      apiKey: ''\n"
+            "      headers:\n"
+            "        cf-aig-authorization: 'Bearer ${env:OC_CF_API_TOKEN}'\n"
+            "    models:\n"
+            "      custom-ollama-cloud/kimi-k2.7-code:\n"
+            "        name: Kimi K2.7 Code\n"
             "opencode_v2:\n"
             "  default_model: openai/gpt-6-luna\n"
             "  deny_provider_fallback: true\n"
@@ -64,7 +77,10 @@ class StageTests(unittest.TestCase):
             "  providers:\n"
             "    openai:\n"
             "      enabled: true\n"
-            "      auth_method: docker_openai_oauth\n",
+            "      auth_method: docker_openai_oauth\n"
+            "    cloudflare-ai-gateway-custom:\n"
+            "      enabled: true\n"
+            "      auth_method: docker_custom_secret\n",
             encoding="utf-8",
         )
         bundle = self.root.parent / "v2-bundle"
@@ -74,11 +90,33 @@ class StageTests(unittest.TestCase):
             capture_output=True, text=True, check=False,
         )
         self.assertEqual(process.returncode, 0, process.stderr)
+        return bundle
+
+    def test_v2_multi_provider_bundle_passes_stage_validation(self) -> None:
+        bundle = self._make_v2_bundle()
         self.assertEqual(
             stage.verify_bundle(bundle),
             hashlib.sha256((bundle / "export-manifest.json").read_bytes()).hexdigest(),
         )
         stage._check_source(self.root, bundle)
+
+    def test_v2_multi_provider_bundle_rejects_extra_provider(self) -> None:
+        bundle = self._make_v2_bundle()
+        config_path = bundle / "opencode.jsonc"
+        config = json.loads(config_path.read_text())
+        config["providers"]["unapproved"] = {
+            "models": {"model": {"modelID": "model", "name": "Unapproved"}},
+        }
+        config_path.write_text(json.dumps(config) + "\n", encoding="utf-8")
+        manifest_path = bundle / "export-manifest.json"
+        manifest = json.loads(manifest_path.read_text())
+        manifest["artifacts_sha256"]["opencode.jsonc"] = hashlib.sha256(
+            config_path.read_bytes(),
+        ).hexdigest()
+        manifest_path.write_text(json.dumps(manifest) + "\n", encoding="utf-8")
+
+        with self.assertRaises(stage.StageError):
+            stage.verify_bundle(bundle)
 
     def test_rejects_changed_config_and_extra_files(self) -> None:
         config = self.bundle / "cli.json"

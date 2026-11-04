@@ -440,11 +440,11 @@ class HostTest(unittest.TestCase):
         self.assertNotIn('bash', command)
         self.assertNotIn('--mount', command)
 
-    def test_launch_passes_cloudflare_ids_and_fixed_placeholder_only(self):
+    def test_launch_passes_gateway_token_placeholder_not_host_token(self):
         runner = FakeRunner()
         runtime = f'{oc2.ROOT}/runtime/' + 'a' * 16
-        cloudflare = oc2.CloudflareRuntime('a' * 32, 'gateway-1')
-        with patch.dict(oc2.os.environ, {'OC_CF_REST_API_TOKEN': 'sensitive-poison-value'}):
+        cloudflare = oc2.CloudflareGatewayRuntime('a' * 32, 'gateway-1')
+        with patch.dict(oc2.os.environ, {'OC_CF_API_TOKEN': 'sensitive-poison-value'}):
             oc2.launch(
                 runner,
                 oc2.SandboxLaunch(
@@ -456,7 +456,7 @@ class HostTest(unittest.TestCase):
         command = runner.calls[-1]
         self.assertIn('OC_CF_ACCOUNT_ID=' + 'a' * 32, command)
         self.assertIn('OC_CF_GATEWAY_ID=gateway-1', command)
-        self.assertIn('OC_CF_REST_API_TOKEN=proxy-managed', command)
+        self.assertIn('OC_CF_API_TOKEN=proxy-managed', command)
         self.assertNotIn('sensitive-poison-value', repr(runner.calls))
 
     def test_launch_without_cloudflare_selection_passes_no_cloudflare_environment(self):
@@ -488,9 +488,15 @@ class HostTest(unittest.TestCase):
         )
         self.assertEqual(
             runner.calls[1],
+            ('exec', 'oc2-dev', 'mkdir', '-p', '-m', '700', f'{runtime}/data/opencode'),
+        )
+        self.assertEqual(
+            runner.calls[2],
             ('cp', str(config_file), f'oc2-dev:{runtime}/config/opencode/opencode.jsonc'),
         )
-        self.assertEqual(runner.calls[2][3], project)
+        self.assertEqual(runner.calls[3][0], 'cp')
+        self.assertEqual(runner.calls[3][2], f'oc2-dev:{runtime}/data/opencode/auth.json')
+        self.assertEqual(runner.calls[4][3], project)
 
     def test_stage_does_not_depend_on_bash_positional_arguments(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -641,20 +647,20 @@ class HostTest(unittest.TestCase):
                 ),
             )
 
-    def test_cloudflare_runtime_is_absent_when_provider_is_not_selected(self):
+    def test_cloudflare_gateway_runtime_is_absent_when_provider_is_not_selected(self):
         with tempfile.TemporaryDirectory() as tmp:
             config = pathlib.Path(tmp) / 'opencode.jsonc'
             config.write_text(json.dumps({
                 'model': 'openai/gpt-6-luna', 'providers': {'openai': {}},
             }))
-            self.assertIsNone(oc2.cloudflare_runtime(config, None, None))
+            self.assertIsNone(oc2.cloudflare_gateway_runtime(config, None, None))
 
-    def test_cloudflare_runtime_requires_valid_identifiers_when_selected(self):
+    def test_cloudflare_gateway_runtime_requires_valid_ids(self):
         with tempfile.TemporaryDirectory() as tmp:
             config = pathlib.Path(tmp) / 'opencode.jsonc'
             config.write_text(json.dumps({
-                'model': 'cloudflare-ai-gateway-rest/openai/gpt-6-luna',
-                'providers': {'cloudflare-ai-gateway-rest': {}},
+                'model': 'openai/gpt-6-luna',
+                'providers': {'openai': {}, 'cloudflare-ai-gateway-custom': {}},
             }))
             for account_id, gateway_id in (
                 (None, 'default'),
@@ -665,21 +671,36 @@ class HostTest(unittest.TestCase):
             ):
                 with self.subTest(account_id=account_id, gateway_id=gateway_id):
                     with self.assertRaisesRegex(oc2.Stop, 'Cloudflare runtime identifiers') as error:
-                        oc2.cloudflare_runtime(config, account_id, gateway_id)
+                        oc2.cloudflare_gateway_runtime(config, account_id, gateway_id)
                     self.assertNotIn(str(account_id), str(error.exception))
                     self.assertNotIn(str(gateway_id), str(error.exception))
 
-    def test_cloudflare_runtime_accepts_valid_identifiers(self):
+    def test_cloudflare_gateway_runtime_is_selected_with_openai_default(self):
         with tempfile.TemporaryDirectory() as tmp:
             config = pathlib.Path(tmp) / 'opencode.jsonc'
             config.write_text(json.dumps({
-                'model': 'cloudflare-ai-gateway-rest/openai/gpt-6-luna',
-                'providers': {'cloudflare-ai-gateway-rest': {}},
+                'model': 'openai/gpt-6-luna',
+                'providers': {'openai': {}, 'cloudflare-ai-gateway-custom': {}},
             }))
             self.assertEqual(
-                oc2.cloudflare_runtime(config, 'a' * 32, 'gateway-1'),
-                oc2.CloudflareRuntime('a' * 32, 'gateway-1'),
+                oc2.cloudflare_gateway_runtime(config, 'a' * 32, 'gateway-1'),
+                oc2.CloudflareGatewayRuntime('a' * 32, 'gateway-1'),
             )
+
+    def test_openai_oauth_auth_seed_contains_only_proxy_sentinels(self):
+        seed = json.loads(oc2.openai_oauth_auth_seed())
+
+        self.assertEqual(
+            seed,
+            {
+                'openai': {
+                    'type': 'oauth',
+                    'access': 'oai-oat01-proxy-managed',
+                    'refresh': 'oai-ort01-proxy-managed',
+                    'expires': 0,
+                },
+            },
+        )
 
     def test_requires_external_inference_when_v2_provider_is_selected(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -723,11 +744,24 @@ class GuestTest(unittest.TestCase):
         guest.BASE = self.orig
         self.tmp.cleanup()
 
-    def test_v2_apm_bundle_has_no_guest_auth_or_other_provider(self):
+    def test_v2_multi_provider_bundle_passes_guest_validation(self):
         source = self.base / 'source'
         source.mkdir()
         (source / 'apm.yml').write_text(
-            'provider:\n  openai:\n    whitelist: [gpt-6-luna]\n'
+            'provider:\n'
+            '  openai:\n'
+            '    whitelist: [gpt-6-luna]\n'
+            '  cloudflare-ai-gateway-custom:\n'
+            "    npm: '@ai-sdk/openai-compatible'\n"
+            '    name: Cloudflare AI Gateway Custom\n'
+            '    options:\n'
+            "      baseURL: 'https://gateway.ai.cloudflare.com/v1/${env:OC_CF_ACCOUNT_ID}/${env:OC_CF_GATEWAY_ID}/compat'\n"
+            "      apiKey: ''\n"
+            '      headers:\n'
+            "        cf-aig-authorization: 'Bearer ${env:OC_CF_API_TOKEN}'\n"
+            '    models:\n'
+            '      custom-ollama-cloud/kimi-k2.7-code:\n'
+            '        name: Kimi K2.7 Code\n'
             'opencode_v2:\n'
             '  default_model: openai/gpt-6-luna\n'
             '  deny_provider_fallback: true\n'
@@ -735,7 +769,10 @@ class GuestTest(unittest.TestCase):
             '  providers:\n'
             '    openai:\n'
             '      enabled: true\n'
-            '      auth_method: docker_openai_oauth\n',
+            '      auth_method: docker_openai_oauth\n'
+            '    cloudflare-ai-gateway-custom:\n'
+            '      enabled: true\n'
+            '      auth_method: docker_custom_secret\n',
             encoding='utf-8',
         )
         bundle = self.base / 'v2-bundle'
@@ -747,6 +784,8 @@ class GuestTest(unittest.TestCase):
         self.assertEqual(generated.returncode, 0, generated.stderr)
         digest = guest.verify(bundle)
         self.assertEqual(digest, hashlib.sha256((bundle / 'export-manifest.json').read_bytes()).hexdigest())
+        server = json.loads((bundle / 'opencode.jsonc').read_text())
+        self.assertEqual(set(server['providers']), {'openai', 'cloudflare-ai-gateway-custom'})
 
     def test_materialize_idempotently(self):
         digest = guest.verify(self.bundle)

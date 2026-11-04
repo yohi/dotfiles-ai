@@ -140,7 +140,6 @@ def _parse_v2_settings(
         expected_methods: dict[str, AuthMethod] = {
             "openai": "docker_openai_oauth",
             "cloudflare-ai-gateway-custom": "docker_custom_secret",
-            "cloudflare-ai-gateway-rest": "docker_custom_secret",
         }
         if auth_method != expected_methods.get(provider_id):
             raise ExportError(f"unsupported auth method for provider {provider_id}")
@@ -155,12 +154,16 @@ def _parse_v2_settings(
         )
 
     enabled = tuple(provider for provider in selections if provider.enabled)
-    if len(enabled) != 1:
-        raise ExportError("opencode_v2 must enable exactly one provider")
+    enabled_ids = {provider.provider_id for provider in enabled}
+    if enabled_ids != {"openai", "cloudflare-ai-gateway-custom"} or len(enabled) != 2:
+        raise ExportError("opencode_v2 must enable OpenAI and Cloudflare Custom")
     provider_id, separator, model_id = default_model.partition("/")
-    if not separator or not model_id or provider_id != enabled[0].provider_id:
-        raise ExportError("opencode_v2.default_model must use the enabled provider")
-    if model_id not in enabled[0].model_ids:
+    selected_provider = next(
+        (provider for provider in enabled if provider.provider_id == provider_id), None,
+    )
+    if not separator or not model_id or selected_provider is None:
+        raise ExportError("opencode_v2.default_model must use an enabled provider")
+    if model_id not in selected_provider.model_ids:
         raise ExportError("opencode_v2.default_model is not declared in apm.yml")
     return V2Settings(
         default_model=default_model,
@@ -274,7 +277,6 @@ def _build_v2_config(
 ) -> dict[str, JsonValue]:
     """Build a positive-selection V2 config without exporting credentials."""
     enabled = tuple(provider for provider in settings.providers if provider.enabled)
-    provider_id, _, _ = settings.default_model.partition("/")
     providers: dict[str, JsonValue] = {}
     for selection in enabled:
         source = _mapping(provider_catalog.get(selection.provider_id), f"provider.{selection.provider_id}")
@@ -283,7 +285,10 @@ def _build_v2_config(
         )
     policies: list[JsonValue] = [
         {"action": "provider.use", "resource": "*", "effect": "deny"},
-        {"action": "provider.use", "resource": provider_id, "effect": "allow"},
+        *(
+            {"action": "provider.use", "resource": selection.provider_id, "effect": "allow"}
+            for selection in enabled
+        ),
         {"action": "integration.connect", "resource": "*", "effect": "deny"},
         {"action": "plugin.use", "resource": "*", "effect": "deny"},
         {"action": "mcp.use", "resource": "*", "effect": "deny"},

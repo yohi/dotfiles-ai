@@ -34,16 +34,18 @@ if str(REPO_ROOT) not in sys.path:
 VERSION = '2.2.5'
 ROOT = '/home/agent/workspace/oc2'
 NAME_RE = re.compile(r'^[A-Za-z0-9][A-Za-z0-9.-]{0,61}[A-Za-z0-9]$')
-CF_REST_PROVIDER_ID: Final[str] = 'cloudflare-ai-gateway-rest'
+CF_GATEWAY_PROVIDER_ID: Final[str] = 'cloudflare-ai-gateway-custom'
 CLOUDFLARE_TOKEN_PLACEHOLDER: Final[str] = 'proxy-managed'
+OPENAI_ACCESS_TOKEN_SENTINEL: Final[str] = 'oai-oat01-proxy-managed'
+OPENAI_REFRESH_TOKEN_SENTINEL: Final[str] = 'oai-ort01-proxy-managed'
 PINNED = (
     '/home/agent/.local/oc2-runtime/node_modules/.bin/opencode',
 )
 
 
 @dataclass(frozen=True, slots=True)
-class CloudflareRuntime:
-    """Validated non-secret identifiers required by Cloudflare REST requests."""
+class CloudflareGatewayRuntime:
+    """Validated non-secret identifiers for the configured Cloudflare Gateway."""
 
     account_id: str
     gateway_id: str
@@ -56,19 +58,32 @@ class SandboxLaunch:
     cli: str
     workspace: str
     config_file: pathlib.Path
-    cloudflare: CloudflareRuntime | None = None
+    cloudflare: CloudflareGatewayRuntime | None = None
 
 
 class Stop(Exception):
     pass
 
 
-def cloudflare_runtime(
+def openai_oauth_auth_seed() -> bytes:
+    """Return the fixed Guest OAuth bridge record with proxy sentinels only."""
+    auth_seed = {
+        'openai': {
+            'type': 'oauth',
+            'access': OPENAI_ACCESS_TOKEN_SENTINEL,
+            'refresh': OPENAI_REFRESH_TOKEN_SENTINEL,
+            'expires': 0,
+        },
+    }
+    return (json.dumps(auth_seed, sort_keys=True) + '\n').encode('utf-8')
+
+
+def cloudflare_gateway_runtime(
     config_file: pathlib.Path,
     account_id: str | None,
     gateway_id: str | None,
-) -> CloudflareRuntime | None:
-    """Return validated Cloudflare IDs only when the REST provider is selected."""
+) -> CloudflareGatewayRuntime | None:
+    """Return validated Cloudflare IDs when the Custom Gateway provider is selected."""
     if config_file.is_symlink() or not config_file.is_file():
         raise Stop('generated OpenCode config is missing or unsafe')
     try:
@@ -80,19 +95,16 @@ def cloudflare_runtime(
     providers = config.get('providers')
     if not isinstance(providers, dict):
         raise Stop('generated OpenCode provider selection is invalid')
-    if CF_REST_PROVIDER_ID not in providers:
+    if CF_GATEWAY_PROVIDER_ID not in providers:
         return None
-    default_model = config.get('model')
-    if (not isinstance(providers[CF_REST_PROVIDER_ID], dict)
-            or not isinstance(default_model, str)
-            or default_model.partition('/')[0] != CF_REST_PROVIDER_ID):
-        raise Stop('generated Cloudflare provider selection is inconsistent')
+    if not isinstance(providers[CF_GATEWAY_PROVIDER_ID], dict):
+        raise Stop('generated Cloudflare provider selection is invalid')
     if (not isinstance(account_id, str)
             or re.fullmatch(r'[0-9a-fA-F]{32}', account_id) is None
             or not isinstance(gateway_id, str)
             or re.fullmatch(r'[a-z0-9][a-z0-9-]{0,63}', gateway_id) is None):
         raise Stop('Cloudflare runtime identifiers are missing or invalid')
-    return CloudflareRuntime(account_id=account_id, gateway_id=gateway_id)
+    return CloudflareGatewayRuntime(account_id=account_id, gateway_id=gateway_id)
 
 
 def requires_external_inference(config_file: pathlib.Path) -> bool:
@@ -520,18 +532,28 @@ def launch(runner: Runner, request: SandboxLaunch) -> None:
         () if request.cloudflare is None else (
             f'OC_CF_ACCOUNT_ID={request.cloudflare.account_id}',
             f'OC_CF_GATEWAY_ID={request.cloudflare.gateway_id}',
-            f'OC_CF_REST_API_TOKEN={CLOUDFLARE_TOKEN_PLACEHOLDER}',
+            f'OC_CF_API_TOKEN={CLOUDFLARE_TOKEN_PLACEHOLDER}',
         )
     )
+    data_dir = f'{runtime}/data/opencode'
     runner.sbx(
         'exec', request.name, 'mkdir', '-p', '-m', '700', runtime,
         *(f'{runtime}/{directory}' for directory in
           ('home', 'config', 'config/opencode', 'data', 'state', 'cache', 'tmp')),
     )
+    runner.sbx('exec', request.name, 'mkdir', '-p', '-m', '700', data_dir)
     runner.sbx(
         'cp', str(request.config_file),
         f'{request.name}:{config_dir}/opencode.jsonc',
     )
+    with tempfile.TemporaryDirectory(prefix='oc2-openai-oauth-seed-') as temporary:
+        auth_seed_path = pathlib.Path(temporary) / 'auth.json'
+        auth_seed_path.write_bytes(openai_oauth_auth_seed())
+        os.chmod(auth_seed_path, 0o600)
+        runner.sbx(
+            'cp', str(auth_seed_path),
+            f'{request.name}:{data_dir}/auth.json',
+        )
     runner.sbx(
         'exec', '-it', '-w', workdir, request.name,
         'env', '-i',
@@ -677,7 +699,7 @@ def main(argv: list[str] | None = None) -> int:
             if (requires_external_inference(config_file)
                     and not args.allow_paid_inference):
                 raise Stop('external inference requires --allow-paid-inference')
-            cloudflare = cloudflare_runtime(
+            cloudflare = cloudflare_gateway_runtime(
                 config_file,
                 os.environ.get('OC_CF_ACCOUNT_ID'),
                 os.environ.get('OC_CF_GATEWAY_ID'),

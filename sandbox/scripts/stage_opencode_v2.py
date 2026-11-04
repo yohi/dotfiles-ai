@@ -53,8 +53,9 @@ def _verify_v2_config(server: dict[str, JsonValue]) -> None:
     model = server.get("model")
     providers = server.get("providers")
     policies = server.get("policies")
+    allowed_providers = {"openai", "cloudflare-ai-gateway-custom"}
     if (not isinstance(model, str) or "/" not in model
-            or not isinstance(providers, dict) or len(providers) != 1
+            or not isinstance(providers, dict) or set(providers) != allowed_providers
             or not isinstance(policies, list)):
         raise StageError("invalid V2 provider selection")
     provider_id, model_id = model.split("/", 1)
@@ -68,7 +69,8 @@ def _verify_v2_config(server: dict[str, JsonValue]) -> None:
         raise StageError("V2 default model is not in the provider catalog")
     expected_policies = [
         {"action": "provider.use", "resource": "*", "effect": "deny"},
-        {"action": "provider.use", "resource": provider_id, "effect": "allow"},
+        {"action": "provider.use", "resource": "openai", "effect": "allow"},
+        {"action": "provider.use", "resource": "cloudflare-ai-gateway-custom", "effect": "allow"},
         {"action": "integration.connect", "resource": "*", "effect": "deny"},
         {"action": "plugin.use", "resource": "*", "effect": "deny"},
         {"action": "mcp.use", "resource": "*", "effect": "deny"},

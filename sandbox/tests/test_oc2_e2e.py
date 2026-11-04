@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from collections.abc import Mapping
 from unittest.mock import patch
 
 SCRIPTS = pathlib.Path(__file__).resolve().parents[1] / 'scripts'
@@ -20,6 +21,7 @@ class FakeSbx:
         self.created = False
         self.installed = False
         self.copied_config: str | None = None
+        self.copied_files: dict[str, str] = {}
         self.calls: list[tuple[str, ...]] = []
 
     def sbx(self, *args: str, capture: bool = False, tty: bool = False) -> str:
@@ -34,7 +36,10 @@ class FakeSbx:
             self.created = True
             return ''
         if args[:1] == ('cp',):
-            self.copied_config = pathlib.Path(args[1]).read_text()
+            contents = pathlib.Path(args[1]).read_text()
+            self.copied_files[args[2]] = contents
+            if args[2].endswith('/config/opencode/opencode.jsonc'):
+                self.copied_config = contents
             return ''
         if args[:2] == ('exec', 'oc2-test'):
             command = args[2:]
@@ -62,18 +67,7 @@ class LauncherFlowTests(unittest.TestCase):
         self.root = pathlib.Path(self.temporary.name)
         self.repo = self.root / 'dotfiles-ai'
         self.repo.mkdir()
-        (self.repo / 'apm.yml').write_text(
-            'targets: [opencode]\n'
-            'provider:\n  openai:\n    whitelist: [gpt-6-luna]\n'
-            'opencode_v2:\n'
-            '  default_model: openai/gpt-6-luna\n'
-            '  deny_provider_fallback: true\n'
-            '  deny_guest_auth: true\n'
-            '  providers:\n'
-            '    openai:\n'
-            '      enabled: true\n'
-            '      auth_method: docker_openai_oauth\n'
-        )
+        self._write_cloudflare_apm()
         self.project = self.root / 'synthetic'
         self.project.mkdir()
         (self.project / 'main.py').write_text('print("safe")\n')
@@ -92,42 +86,57 @@ class LauncherFlowTests(unittest.TestCase):
         )
         self.fake = FakeSbx()
 
-    def _run(self, *extra_args: str) -> tuple[int, str]:
+    def _run(
+        self,
+        *extra_args: str,
+        host_env: Mapping[str, str] | None = None,
+    ) -> tuple[int, str]:
         output = io.StringIO()
         args = [
             '--repo-root', str(self.repo), '--workspace', str(self.project),
             '--sandbox', 'oc2-test',
             *extra_args,
         ]
-        with patch.object(oc2, 'Runner', return_value=self.fake), \
-                patch.object(oc2.shutil, 'which', return_value='/fake/sbx'), \
-                contextlib.redirect_stdout(output), contextlib.redirect_stderr(output):
-            try:
-                status = oc2.main(args)
-            except SystemExit as exc:
-                status = int(exc.code)
+        env = host_env or {'OC_CF_ACCOUNT_ID': 'a' * 32, 'OC_CF_GATEWAY_ID': 'gateway-1'}
+        with patch.dict(oc2.os.environ):
+            for name in ('OC_CF_ACCOUNT_ID', 'OC_CF_GATEWAY_ID', 'OC_CF_API_TOKEN'):
+                oc2.os.environ.pop(name, None)
+            oc2.os.environ.update(env)
+            with patch.object(oc2, 'Runner', return_value=self.fake), \
+                    patch.object(oc2.shutil, 'which', return_value='/fake/sbx'), \
+                    contextlib.redirect_stdout(output), contextlib.redirect_stderr(output):
+                try:
+                    status = oc2.main(args)
+                except SystemExit as exc:
+                    status = int(exc.code)
         return status, output.getvalue()
 
     def _write_cloudflare_apm(self) -> None:
         (self.repo / 'apm.yml').write_text(
             'provider:\n'
-            '  cloudflare-ai-gateway-rest:\n'
+            '  openai:\n'
+            '    whitelist: [gpt-6-luna]\n'
+            '  cloudflare-ai-gateway-custom:\n'
             "    npm: '@ai-sdk/openai-compatible'\n"
-            '    name: Cloudflare AI Gateway REST\n'
+            '    name: Cloudflare AI Gateway Custom\n'
             '    options:\n'
-            "      baseURL: 'https://api.cloudflare.com/client/v4/accounts/${env:OC_CF_ACCOUNT_ID}/ai/v1'\n"
-            "      apiKey: '${env:OC_CF_REST_API_TOKEN}'\n"
+            "      baseURL: 'https://gateway.ai.cloudflare.com/v1/${env:OC_CF_ACCOUNT_ID}/${env:OC_CF_GATEWAY_ID}/compat'\n"
+            "      apiKey: ''\n"
             '      headers:\n'
-            "        cf-aig-gateway-id: '${env:OC_CF_GATEWAY_ID}'\n"
+            '        Authorization: ""\n'
+            "        cf-aig-authorization: 'Bearer ${env:OC_CF_API_TOKEN}'\n"
             '    models:\n'
-            '      openai/gpt-6-luna:\n'
-            '        name: GPT-6 Luna\n'
+            '      custom-ollama-cloud/kimi-k2.7-code:\n'
+            '        name: Kimi K2.7 Code\n'
             'opencode_v2:\n'
-            '  default_model: cloudflare-ai-gateway-rest/openai/gpt-6-luna\n'
+            '  default_model: openai/gpt-6-luna\n'
             '  deny_provider_fallback: true\n'
             '  deny_guest_auth: true\n'
             '  providers:\n'
-            '    cloudflare-ai-gateway-rest:\n'
+            '    openai:\n'
+            '      enabled: true\n'
+            '      auth_method: docker_openai_oauth\n'
+            '    cloudflare-ai-gateway-custom:\n'
             '      enabled: true\n'
             '      auth_method: docker_custom_secret\n',
         )
@@ -197,28 +206,60 @@ class LauncherFlowTests(unittest.TestCase):
 
     def test_cloudflare_end_to_end_uses_proxy_placeholder_only(self):
         self._write_cloudflare_apm()
-        with patch.dict(oc2.os.environ, {
+        status, output = self._run('--allow-paid-inference', host_env={
             'OC_CF_ACCOUNT_ID': 'a' * 32,
             'OC_CF_GATEWAY_ID': 'gateway-1',
-            'OC_CF_REST_API_TOKEN': 'sensitive-poison-value',
-        }):
-            status, output = self._run('--allow-paid-inference')
+            'OC_CF_API_TOKEN': 'sensitive-poison-value',
+        })
 
         self.assertEqual(status, 0, output)
         launch = next(call for call in self.fake.calls if call[:2] == ('exec', '-it'))
         self.assertIn('OC_CF_ACCOUNT_ID=' + 'a' * 32, launch)
         self.assertIn('OC_CF_GATEWAY_ID=gateway-1', launch)
-        self.assertIn('OC_CF_REST_API_TOKEN=proxy-managed', launch)
+        self.assertIn('OC_CF_API_TOKEN=proxy-managed', launch)
+        self.assertNotIn('OC_CF_REST_API_TOKEN=proxy-managed', launch)
         self.assertNotIn('sensitive-poison-value', repr(self.fake.calls))
 
     def test_cloudflare_missing_identifiers_stop_before_sandbox_commands(self):
         self._write_cloudflare_apm()
-        with patch.dict(oc2.os.environ, {'OC_CF_GATEWAY_ID': 'gateway-1'}, clear=True):
-            status, output = self._run('--allow-paid-inference')
+        status, output = self._run(
+            '--allow-paid-inference',
+            host_env={'OC_CF_ACCOUNT_ID': '', 'OC_CF_GATEWAY_ID': 'gateway-1'},
+        )
 
         self.assertEqual(status, 1)
         self.assertIn('Cloudflare runtime identifiers', output)
         self.assertEqual(self.fake.calls, [])
+
+    def test_launch_installs_oauth_seed_without_host_credentials(self):
+        self._write_cloudflare_apm()
+        poison = {
+            'OPENAI_API_KEY': 'host-api-key-poison',
+            'OPENAI_ACCESS_TOKEN': 'host-access-token-poison',
+            'OPENAI_REFRESH_TOKEN': 'host-refresh-token-poison',
+        }
+        status, output = self._run(
+            '--allow-paid-inference',
+            host_env={
+                'OC_CF_ACCOUNT_ID': 'a' * 32,
+                'OC_CF_GATEWAY_ID': 'gateway-1',
+                **poison,
+            },
+        )
+
+        self.assertEqual(status, 0, output)
+        auth_path = next(
+            destination for destination in self.fake.copied_files
+            if destination.endswith('/data/opencode/auth.json')
+        )
+        auth = json.loads(self.fake.copied_files[auth_path])
+        self.assertEqual(auth['openai']['access'], 'oai-oat01-proxy-managed')
+        self.assertEqual(auth['openai']['refresh'], 'oai-ort01-proxy-managed')
+        self.assertEqual(auth['openai']['expires'], 0)
+        launch = next(call for call in self.fake.calls if call[:2] == ('exec', '-it'))
+        self.assertNotIn('OPENAI_API_KEY', launch)
+        self.assertFalse(any(value in repr(self.fake.calls) for value in poison.values()))
+        self.assertFalse(any(value in self.fake.copied_files[auth_path] for value in poison.values()))
 
 
 if __name__ == '__main__':
