@@ -2,6 +2,10 @@
 
 **Status: ONE_COMMAND_TUI_LIVE_PASS (historical) / OMO_REMOVAL_PATCH_READY / LIVE_RETEST_PENDING**
 
+> この文書はOpenCode v2.1.4を対象とした初期実装の記録です。現行の
+> OpenCode v2.2.5 Provider経路とCredential Mixinの手順は
+> [Provider運用ガイド](../docs/opencode-v2-provider-routing.md)を参照してください。
+
 この初期実装は、既存P6の設定エクスポートを再利用して単一のHost側ランチャーに統合します。v1設定の完全移行ではありません。
 
 ## 起動

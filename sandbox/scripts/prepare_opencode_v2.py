@@ -16,9 +16,10 @@ import sys
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal, TypeAlias
+from typing import Final, Literal, TypeAlias
 
 import yaml
+from yaml.nodes import MappingNode, Node, ScalarNode, SequenceNode
 
 
 VERSION = "v0.2"
@@ -28,6 +29,17 @@ FILES = ("opencode.jsonc", "cli.json", "export-manifest.json")
 
 JsonValue: TypeAlias = str | int | float | bool | None | list["JsonValue"] | dict[str, "JsonValue"]
 AuthMethod: TypeAlias = Literal["docker_openai_oauth", "docker_custom_secret"]
+CF_CUSTOM_BASE_URL: Final[str] = (
+    "https://gateway.ai.cloudflare.com/v1/"
+    "{env:OC_CF_ACCOUNT_ID}/{env:OC_CF_GATEWAY_ID}/compat"
+)
+CF_CUSTOM_HEADERS: Final[tuple[tuple[str, str], ...]] = (
+    ("Authorization", ""),
+    ("cf-aig-authorization", "Bearer {env:OC_CF_API_TOKEN}"),
+    ("cf-aig-collect-log-payload", "true"),
+    ("cf-aig-max-attempts", "1"),
+    ("cf-aig-skip-cache", "true"),
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -56,6 +68,62 @@ class V2Settings:
 
 class ExportError(Exception):
     """A safe, non-sensitive export failure."""
+
+
+def _unique_json_object(pairs: list[tuple[str, JsonValue]]) -> dict[str, JsonValue]:
+    result: dict[str, JsonValue] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("duplicate JSON object key")
+        result[key] = value
+    return result
+
+
+def _yaml_string_key(node: Node) -> str | None:
+    match node:
+        case ScalarNode(tag="tag:yaml.org,2002:str", value=value):
+            return value
+        case ScalarNode() | SequenceNode() | MappingNode():
+            return None
+        case Node():
+            return None
+
+
+def _reject_duplicate_yaml_keys(
+    node: Node,
+    visited: set[tuple[int, tuple[str, ...]]],
+    active: set[int],
+    path: tuple[str, ...] = (),
+) -> None:
+    node_path = (id(node), path)
+    if id(node) in active or node_path in visited:
+        return
+    visited.add(node_path)
+    active.add(id(node))
+    match node:
+        case MappingNode(value=entries):
+            seen: set[str] = set()
+            if path[-1:] == ("headers",) and any(
+                key_node.tag == "tag:yaml.org,2002:merge" for key_node, _ in entries
+            ):
+                raise ExportError("Provider Header mappings must not use YAML merges")
+            for key_node, value_node in entries:
+                key = _yaml_string_key(key_node)
+                if key is not None:
+                    if key in seen:
+                        raise ExportError("apm.yml contains a duplicate mapping key")
+                    seen.add(key)
+                _reject_duplicate_yaml_keys(key_node, visited, active, path)
+                child_path = path if key is None else (*path, key)
+                _reject_duplicate_yaml_keys(value_node, visited, active, child_path)
+        case SequenceNode(value=items):
+            for item in items:
+                _reject_duplicate_yaml_keys(item, visited, active, path)
+        case ScalarNode():
+            return
+        case Node():
+            raise ExportError("apm.yml contains an unsupported YAML node")
+    active.remove(id(node))
 
 
 def _json_bytes(value: JsonValue) -> bytes:
@@ -177,6 +245,36 @@ def _normalize_env(value: str) -> str:
     return re.sub(r"\$\{(env:[^}]+)\}", r"{\1}", value)
 
 
+def validate_v2_provider_options(
+    provider_id: str,
+    settings: dict[str, JsonValue],
+    headers: dict[str, JsonValue],
+) -> None:
+    if provider_id == "openai":
+        if settings or headers:
+            raise ExportError("OpenAI V2 configuration must not contain Guest credentials")
+        return
+    if provider_id != "cloudflare-ai-gateway-custom":
+        raise ExportError("unsupported V2 provider options")
+    if settings != {"baseURL": CF_CUSTOM_BASE_URL}:
+        raise ExportError("Cloudflare Custom baseURL is not the approved /compat endpoint")
+
+    allowed_headers = {name.casefold(): (name, value) for name, value in CF_CUSTOM_HEADERS}
+    seen: set[str] = set()
+    for name, value in headers.items():
+        if not isinstance(name, str) or not isinstance(value, str):
+            raise ExportError("Cloudflare Custom header names and values must be strings")
+        folded_name = name.casefold()
+        if folded_name in seen:
+            raise ExportError("duplicate Cloudflare Custom header")
+        seen.add(folded_name)
+        allowed = allowed_headers.get(folded_name)
+        if allowed is None or name != allowed[0] or value != allowed[1]:
+            raise ExportError("Cloudflare Custom header is not approved")
+    if headers.get("cf-aig-authorization") != "Bearer {env:OC_CF_API_TOKEN}":
+        raise ExportError("Cloudflare Custom proxy authorization header is required")
+
+
 def _v2_variant(value: JsonValue, label: str) -> dict[str, JsonValue]:
     raw = _mapping(value, label)
     settings: dict[str, JsonValue] = {}
@@ -245,21 +343,16 @@ def _v2_provider(provider_id: str, source: dict[str, JsonValue], model_ids: tupl
         if key == "baseURL":
             settings["baseURL"] = _normalize_env(_string(value, f"provider.{provider_id}.baseURL"))
         elif key == "apiKey":
-            if value == "":
-                continue
-            api_key = _string(value, f"provider.{provider_id}.apiKey")
-            if re.fullmatch(r"(?:\$\{env:[A-Za-z_][A-Za-z0-9_]*\}|\{env:[A-Za-z_][A-Za-z0-9_]*\})", api_key) is None:
-                raise ExportError(f"literal API key is forbidden for provider {provider_id}")
-            settings["apiKey"] = _normalize_env(api_key)
+            if value != "":
+                raise ExportError(f"API keys are forbidden in V2 provider settings for {provider_id}")
         elif key == "headers":
             raw_headers = _mapping(value, f"provider.{provider_id}.headers")
             for header_name, header_value in raw_headers.items():
                 text = _string(header_value, f"provider.{provider_id}.headers.{header_name}") if header_value != "" else ""
-                if header_name.casefold() in {"authorization", "cf-aig-authorization", "x-api-key"} and text and "{env:" not in _normalize_env(text):
-                    raise ExportError(f"literal credential header is forbidden for provider {provider_id}")
                 headers[header_name] = _normalize_env(text)
         else:
             raise ExportError(f"unsupported V1 provider option: {provider_id}.{key}")
+    validate_v2_provider_options(provider_id, settings, headers)
     if settings:
         provider["settings"] = settings
     if headers:
@@ -304,6 +397,9 @@ def _read_apm_source(root: Path) -> APMConfig:
         raise ExportError("apm.yml exceeds the input size limit")
     raw = source.read_bytes()
     try:
+        document = yaml.compose(raw, Loader=yaml.SafeLoader)
+        if document is not None:
+            _reject_duplicate_yaml_keys(document, set(), set())
         loaded = yaml.safe_load(raw)
     except yaml.YAMLError as exc:
         raise ExportError("apm.yml is not valid YAML") from exc

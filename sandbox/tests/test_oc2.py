@@ -18,6 +18,8 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
+import yaml
+
 SCRIPTS = pathlib.Path(__file__).resolve().parents[1] / 'scripts'
 if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
@@ -78,8 +80,11 @@ class HostTest(unittest.TestCase):
     def test_clone_mode_command_requires_a_workspace_path(self):
         workspace = pathlib.Path('/tmp/oc2-safe-repository')
         self.assertEqual(
-            oc2.clone_create_args('oc2-safe', workspace),
-            ['create', '--clone', '--name', 'oc2-safe', 'shell', str(workspace)],
+            oc2.clone_create_args(
+                'oc2-safe', workspace, pathlib.Path('/tmp/oc2-credential-mixin'),
+            ),
+            ['create', '--clone', '--name', 'oc2-safe', '--kit',
+             '/tmp/oc2-credential-mixin', 'shell', str(workspace)],
         )
 
     def test_clone_mode_refuses_excluded_files_that_docker_would_expose(self):
@@ -484,19 +489,21 @@ class HostTest(unittest.TestCase):
             runner.calls[0],
             ('exec', 'oc2-dev', 'mkdir', '-p', '-m', '700',
              runtime, *(f'{runtime}/{name}' for name in
-                        ('home', 'config', 'config/opencode', 'data', 'state', 'cache', 'tmp'))),
+                        ('home', 'home/.local/share', 'config', 'config/opencode',
+                         'state', 'cache', 'tmp'))),
         )
         self.assertEqual(
             runner.calls[1],
-            ('exec', 'oc2-dev', 'mkdir', '-p', '-m', '700', f'{runtime}/data/opencode'),
+            ('exec', 'oc2-dev', 'mkdir', '-p', '-m', '700',
+             f'{runtime}/home/.local/share/opencode'),
         )
         self.assertEqual(
             runner.calls[2],
             ('cp', str(config_file), f'oc2-dev:{runtime}/config/opencode/opencode.jsonc'),
         )
-        self.assertEqual(runner.calls[3][0], 'cp')
-        self.assertEqual(runner.calls[3][2], f'oc2-dev:{runtime}/data/opencode/auth.json')
-        self.assertEqual(runner.calls[4][3], project)
+        self.assertEqual(runner.calls[3][3], project)
+        self.assertFalse(any('auth.json' in argument for call in runner.calls for argument in call))
+        self.assertIn(f'XDG_DATA_HOME={runtime}/home/.local/share', runner.calls[3])
 
     def test_stage_does_not_depend_on_bash_positional_arguments(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -687,19 +694,67 @@ class HostTest(unittest.TestCase):
                 oc2.CloudflareGatewayRuntime('a' * 32, 'gateway-1'),
             )
 
-    def test_openai_oauth_auth_seed_contains_only_proxy_sentinels(self):
-        seed = json.loads(oc2.openai_oauth_auth_seed())
+    def test_credential_mixin_spec_declares_proxy_bindings(self):
+        spec = yaml.safe_load(oc2.credential_mixin_spec('oc2-credentials-a1b2c3'))
 
+        self.assertEqual(spec['schemaVersion'], '2')
+        self.assertEqual(spec['kind'], 'mixin')
+        self.assertEqual(spec['name'], 'oc2-credentials-a1b2c3')
+        self.assertEqual(spec['requires'], {'agent': 'shell'})
+        openai = next(item for item in spec['credentials'] if item['service'] == 'openai')
         self.assertEqual(
-            seed,
+            openai['oauth'],
             {
-                'openai': {
-                    'type': 'oauth',
-                    'access': 'oai-oat01-proxy-managed',
-                    'refresh': 'oai-ort01-proxy-managed',
-                    'expires': 0,
+                'tokenEndpoint': {'host': 'auth.openai.com', 'path': '/oauth/token'},
+                'resourceHosts': ['chatgpt.com'],
+                'sentinels': {
+                    'accessToken': 'oai-oat01-proxy-managed',
+                    'refreshToken': 'oai-ort01-proxy-managed',
+                },
+                'credentialFile': {
+                    'path': '~/.local/share/opencode/auth.json',
+                    'structure': {
+                        'openai': {
+                            'type': 'oauth',
+                            'access': '{{.AccessToken}}',
+                            'refresh': '{{.RefreshToken}}',
+                            'expires': '{{.ExpiresAt}}',
+                        },
+                    },
                 },
             },
+        )
+        cloudflare = next(
+            item for item in spec['credentials']
+            if item['service'] == 'cloudflare-ai-gateway'
+        )
+        self.assertEqual(
+            cloudflare['apiKey'],
+            {
+                'name': 'OC_CF_API_TOKEN',
+                'proxyManaged': True,
+                'inject': [{
+                    'domain': 'gateway.ai.cloudflare.com',
+                    'header': 'cf-aig-authorization',
+                    'format': 'Bearer %s',
+                }],
+            },
+        )
+        self.assertEqual(
+            spec['permissions']['network']['allow'],
+            ['auth.openai.com', 'chatgpt.com', 'gateway.ai.cloudflare.com'],
+        )
+        self.assertNotIn('secret-value', str(spec))
+
+    def test_clone_create_args_attaches_mixin(self):
+        args = oc2.clone_create_args(
+            'oc2-v2', pathlib.Path('/tmp/workspace'), pathlib.Path('/tmp/mixin'),
+        )
+
+        self.assertEqual(
+            args,
+            ['create', '--clone', '--name', 'oc2-v2', '--kit', '/tmp/mixin',
+             'shell', '/tmp/workspace'],
         )
 
     def test_requires_external_inference_when_v2_provider_is_selected(self):

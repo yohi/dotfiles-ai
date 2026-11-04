@@ -67,7 +67,7 @@ def _verify_v2_config(server: dict[str, JsonValue]) -> None:
     models = provider.get("models")
     if not isinstance(models, dict) or model_id not in models:
         raise StageError("V2 default model is not in the provider catalog")
-    expected_policies = [
+    expected_policies: list[JsonValue] = [
         {"action": "provider.use", "resource": "*", "effect": "deny"},
         {"action": "provider.use", "resource": "openai", "effect": "allow"},
         {"action": "provider.use", "resource": "cloudflare-ai-gateway-custom", "effect": "allow"},
@@ -77,20 +77,17 @@ def _verify_v2_config(server: dict[str, JsonValue]) -> None:
     ]
     if policies != expected_policies:
         raise StageError("V2 fallback or Guest authentication policy is not fail-closed")
-    settings = provider.get("settings", {})
-    headers = provider.get("headers", {})
-    if not isinstance(settings, dict) or not isinstance(headers, dict):
-        raise StageError("invalid V2 provider request settings")
-    api_key = settings.get("apiKey", "")
-    if (not isinstance(api_key, str)
-            or api_key and re.fullmatch(r"\{env:[A-Za-z_][A-Za-z0-9_]*\}", api_key) is None):
-        raise StageError("V2 provider config contains a literal API key")
-    for name, value in headers.items():
-        if not isinstance(name, str) or not isinstance(value, str):
-            raise StageError("invalid V2 provider header")
-        if (name.casefold() in {"authorization", "cf-aig-authorization", "x-api-key"}
-                and value and re.search(r"\{env:[A-Za-z_][A-Za-z0-9_]*\}", value) is None):
-            raise StageError("V2 provider config contains a literal credential header")
+    for provider_name, provider_config in providers.items():
+        if not isinstance(provider_name, str) or not isinstance(provider_config, dict):
+            raise StageError("invalid V2 provider configuration")
+        settings = provider_config.get("settings", {})
+        headers = provider_config.get("headers", {})
+        if not isinstance(settings, dict) or not isinstance(headers, dict):
+            raise StageError("invalid V2 provider request settings")
+        try:
+            exporter.validate_v2_provider_options(provider_name, settings, headers)
+        except exporter.ExportError as exc:
+            raise StageError("V2 provider request settings are not approved") from exc
 
 
 def verify_bundle(directory: Path) -> str:
@@ -101,9 +98,13 @@ def verify_bundle(directory: Path) -> str:
         raise StageError("unexpected bundle file set")
     data = {name: _regular_bytes(directory / name) for name in NAMES}
     try:
-        manifest = json.loads(data["export-manifest.json"])
-        server = json.loads(data["opencode.jsonc"])
-        tui = json.loads(data["cli.json"])
+        manifest = json.loads(
+            data["export-manifest.json"], object_pairs_hook=exporter._unique_json_object,
+        )
+        server = json.loads(
+            data["opencode.jsonc"], object_pairs_hook=exporter._unique_json_object,
+        )
+        tui = json.loads(data["cli.json"], object_pairs_hook=exporter._unique_json_object)
     except (ValueError, UnicodeDecodeError) as exc:
         raise StageError("bundle is not valid UTF-8 JSON") from exc
     if not isinstance(manifest, dict):

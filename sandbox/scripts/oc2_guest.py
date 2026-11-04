@@ -12,13 +12,24 @@ import os
 import pathlib
 import re
 import sys
-from typing import NoReturn, TypeAlias
+from typing import Final, NoReturn, TypeAlias
 
 VERSION = "2.2.5"
 BASE = pathlib.Path('/home/agent/workspace/oc2')
 FILES = ('opencode.jsonc', 'cli.json', 'export-manifest.json')
 ASSET_SCHEMA = 'dotfiles-ai/oc2-assets/v1'
 JsonValue: TypeAlias = str | int | float | bool | None | list['JsonValue'] | dict[str, 'JsonValue']
+CF_CUSTOM_BASE_URL: Final[str] = (
+    'https://gateway.ai.cloudflare.com/v1/'
+    '{env:OC_CF_ACCOUNT_ID}/{env:OC_CF_GATEWAY_ID}/compat'
+)
+CF_CUSTOM_HEADERS: Final[tuple[tuple[str, str], ...]] = (
+    ('Authorization', ''),
+    ('cf-aig-authorization', 'Bearer {env:OC_CF_API_TOKEN}'),
+    ('cf-aig-collect-log-payload', 'true'),
+    ('cf-aig-max-attempts', '1'),
+    ('cf-aig-skip-cache', 'true'),
+)
 ASSET_TARGETS = frozenset({
     'config/opencode/AGENTS.md',
     'config/opencode/rules/DOCS_STYLE.md',
@@ -41,6 +52,15 @@ CLI_CANDIDATES = (
 
 def fail(reason: str) -> NoReturn:
     raise ValueError(reason)
+
+
+def _unique_json_object(pairs: list[tuple[str, JsonValue]]) -> dict[str, JsonValue]:
+    result: dict[str, JsonValue] = {}
+    for key, value in pairs:
+        if key in result:
+            fail('duplicate JSON object key')
+        result[key] = value
+    return result
 
 
 def regular(path: pathlib.Path, max_bytes: int = 1048576) -> bytes:
@@ -70,7 +90,7 @@ def verify_v2_config(server: dict[str, JsonValue]) -> None:
     models = provider.get('models')
     if not isinstance(models, dict) or model_id not in models:
         fail('V2 default model is not in the provider catalog')
-    expected_policies = [
+    expected_policies: list[JsonValue] = [
         {'action': 'provider.use', 'resource': '*', 'effect': 'deny'},
         {'action': 'provider.use', 'resource': 'openai', 'effect': 'allow'},
         {'action': 'provider.use', 'resource': 'cloudflare-ai-gateway-custom', 'effect': 'allow'},
@@ -80,29 +100,55 @@ def verify_v2_config(server: dict[str, JsonValue]) -> None:
     ]
     if policies != expected_policies:
         fail('V2 fallback or Guest authentication policy is not fail-closed')
-    settings = provider.get('settings', {})
-    headers = provider.get('headers', {})
-    if not isinstance(settings, dict) or not isinstance(headers, dict):
-        fail('invalid V2 provider request settings')
-    api_key = settings.get('apiKey', '')
-    if (not isinstance(api_key, str)
-            or api_key and re.fullmatch(r'\{env:[A-Za-z_][A-Za-z0-9_]*\}', api_key) is None):
-        fail('V2 provider config contains a literal API key')
+    for provider_name, provider_config in providers.items():
+        if not isinstance(provider_name, str) or not isinstance(provider_config, dict):
+            fail('invalid V2 provider configuration')
+        settings = provider_config.get('settings', {})
+        headers = provider_config.get('headers', {})
+        if not isinstance(settings, dict) or not isinstance(headers, dict):
+            fail('invalid V2 provider request settings')
+        _verify_v2_provider_options(provider_name, settings, headers)
+
+
+def _verify_v2_provider_options(
+    provider_id: str,
+    settings: dict[str, JsonValue],
+    headers: dict[str, JsonValue],
+) -> None:
+    if provider_id == 'openai':
+        if settings or headers:
+            fail('OpenAI V2 configuration must not contain Guest credentials')
+        return
+    if provider_id != 'cloudflare-ai-gateway-custom':
+        fail('unsupported V2 provider options')
+    if settings != {'baseURL': CF_CUSTOM_BASE_URL}:
+        fail('Cloudflare Custom baseURL is not the approved /compat endpoint')
+
+    allowed_headers = {name.casefold(): (name, value) for name, value in CF_CUSTOM_HEADERS}
+    seen: set[str] = set()
     for name, value in headers.items():
         if not isinstance(name, str) or not isinstance(value, str):
-            fail('invalid V2 provider header')
-        if (name.casefold() in {'authorization', 'cf-aig-authorization', 'x-api-key'}
-                and value and re.search(r'\{env:[A-Za-z_][A-Za-z0-9_]*\}', value) is None):
-            fail('V2 provider config contains a literal credential header')
+            fail('Cloudflare Custom header names and values must be strings')
+        folded_name = name.casefold()
+        if folded_name in seen:
+            fail('duplicate Cloudflare Custom header')
+        seen.add(folded_name)
+        allowed = allowed_headers.get(folded_name)
+        if allowed is None or name != allowed[0] or value != allowed[1]:
+            fail('Cloudflare Custom header is not approved')
+    if headers.get('cf-aig-authorization') != 'Bearer {env:OC_CF_API_TOKEN}':
+        fail('Cloudflare Custom proxy authorization header is required')
 
 
 def verify(bundle: pathlib.Path) -> str:
     if bundle.is_symlink() or not bundle.is_dir() or set(x.name for x in bundle.iterdir()) != set(FILES):
         fail('invalid bundle directory or members')
     data = {name: regular(bundle / name) for name in FILES}
-    manifest = json.loads(data['export-manifest.json'])
-    server = json.loads(data['opencode.jsonc'])
-    client = json.loads(data['cli.json'])
+    manifest = json.loads(
+        data['export-manifest.json'], object_pairs_hook=_unique_json_object,
+    )
+    server = json.loads(data['opencode.jsonc'], object_pairs_hook=_unique_json_object)
+    client = json.loads(data['cli.json'], object_pairs_hook=_unique_json_object)
     if (manifest.get('schema') != 'dotfiles-ai/sandbox-export/v0'
             or manifest.get('generator') != 'v0.2'
             or manifest.get('opencode_version') != VERSION

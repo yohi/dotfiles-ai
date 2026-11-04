@@ -11,15 +11,22 @@ Claude Agent is deferred. The V2 configuration does not enable other providers o
 
 ## OpenAI ChatGPT subscription
 
-Store the OpenAI OAuth credential on the Host using Docker's supported host-side flow, for example:
+The launcher generates a temporary Docker schema-v2 credential Mixin and attaches
+it to the built-in `shell` Sandbox at creation. The Mixin declares OpenAI OAuth
+interception, the ChatGPT resource host, and the sentinel-backed OpenCode
+credential file. It also declares the Cloudflare Gateway credential injection
+into `cf-aig-authorization`. The temporary kit is removed after Sandbox
+creation; no credential is copied by the launcher.
 
-```sh
-sbx secret set openai --oauth
-```
+**End-to-end ChatGPT OAuth support for this built-in OpenCode launch remains
+unverified.** The Docker Mixin schema documents the required binding, but this
+launcher has not been validated against a real Sandbox OAuth exchange. Do not
+send GPT prompts through this route until the Host proxy is confirmed to replace
+and refresh the sentinels. Docker may prompt for Host credential binding approval
+during Sandbox creation; approve only through Docker's interactive flow. The
+launcher does not register secrets or suppress the approval.
 
-The launcher seeds OpenCode V2's auth bridge with the Docker-documented sentinels `oai-oat01-proxy-managed` and `oai-ort01-proxy-managed`. The Host proxy is responsible for resolving these when OpenCode calls the ChatGPT/Codex service and refresh endpoint. The real access and refresh tokens must remain in Docker's Host credential store; the Guest auth database contains only the sentinel values.
-
-Do not use `/connect` or `opencode auth login` inside the Guest because OpenCode V2 stores native OAuth credentials in its server-side SQLite database. Docker documents its OAuth bridge for Codex and describes an OpenCode-kit bridge, but the kit conflicts with the built-in `opencode` agent name. Verify that the installed Docker credential proxy supports this launcher's OpenCode bridge before sending a prompt. If it does not, stop rather than authenticating in the Guest.
+Do not use `/connect` or `opencode auth login` inside the Guest: OpenCode V2 stores native OAuth credentials in its Guest-side SQLite database. Do not place an OpenAI API key in APM or Guest files as a workaround. Use the Cloudflare Custom Provider route below while the subscription OAuth path is unresolved.
 
 ## Cloudflare AI Gateway Custom Provider
 
@@ -28,23 +35,28 @@ The existing APM route uses the Cloudflare AI Gateway `/compat` endpoint and APM
 - `custom-ollama-cloud/kimi-k2.7-code`
 - `custom-sakura-ai/preview/Kimi-K2.7-Code`
 
-The corresponding upstream provider credentials must already be configured in Cloudflare. The Guest does not receive those credentials. It receives only `OC_CF_API_TOKEN=proxy-managed` for the `cf-aig-authorization` header.
+The corresponding upstream provider credentials must already be configured in
+Cloudflare. The Guest does not receive those credentials. Docker's proxy supplies
+the bound Host credential to the `cf-aig-authorization: Bearer …` header; the
+launcher itself passes only `OC_CF_API_TOKEN=proxy-managed`.
 
-Set the non-secret Account ID and Gateway ID in the Host environment, and register the Gateway authentication token as a Host-side custom secret before creating the named Sandbox:
+Set the non-secret Account ID and Gateway ID in the Host environment. Provision
+the `cloudflare-ai-gateway` credential through Docker's supported Host-side
+secret/binding flow, or approve its first-run binding prompt when creating the
+Sandbox. The launcher does not register the secret:
 
 ```sh
 export OC_CF_ACCOUNT_ID='<32-hex-account-id>'
 export OC_CF_GATEWAY_ID='default'
 
-sbx secret set-custom \
-  --sandbox oc2-cloudflare \
-  --host gateway.ai.cloudflare.com \
-  --env OC_CF_API_TOKEN \
-  --placeholder proxy-managed \
-  --ref 'op://<vault>/<item>/<field>'
+sbx secret set cloudflare-ai-gateway --sandbox oc2-cloudflare
 ```
 
-Replace the Sandbox name and secret reference with the operator's values. Do not put the real token in `apm.yml`, project files, or Guest configuration.
+Replace `oc2-cloudflare` with the Sandbox name. The `--sandbox` option scopes the
+stored secret to that Sandbox. Use Docker's interactive secret input rather than
+a command-line argument so the token is not exposed in shell history or process
+arguments. Do not put the real token in `apm.yml`, project files, or Guest
+configuration.
 
 ## Launch
 

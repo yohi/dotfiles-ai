@@ -11,6 +11,8 @@ import unittest
 from collections.abc import Mapping
 from unittest.mock import patch
 
+import yaml
+
 SCRIPTS = pathlib.Path(__file__).resolve().parents[1] / 'scripts'
 sys.path.insert(0, str(SCRIPTS))
 import oc2  # noqa: E402
@@ -20,8 +22,12 @@ class FakeSbx:
     def __init__(self):
         self.created = False
         self.installed = False
+        self.kit_supported = True
         self.copied_config: str | None = None
         self.copied_files: dict[str, str] = {}
+        self.created_mixin_spec: str | None = None
+        self.created_mixin_path: pathlib.Path | None = None
+        self.mixin_exists_at_launch: bool | None = None
         self.calls: list[tuple[str, ...]] = []
 
     def sbx(self, *args: str, capture: bool = False, tty: bool = False) -> str:
@@ -29,10 +35,15 @@ class FakeSbx:
         if args == ('version',):
             return 'sbx version v0.49.2 test\n'
         if args == ('create', '--help'):
-            return '  --clone  private in-container clone\n'
+            kit_help = '  --kit  compose a Mixin\n' if self.kit_supported else ''
+            return '  --clone  private in-container clone\n' + kit_help
         if args == ('ls', '-q'):
             return 'oc2-test\n' if self.created else ''
         if args[:1] == ('create',):
+            if '--kit' in args:
+                mixin_path = pathlib.Path(args[args.index('--kit') + 1])
+                self.created_mixin_path = mixin_path
+                self.created_mixin_spec = (mixin_path / 'spec.yaml').read_text()
             self.created = True
             return ''
         if args[:1] == ('cp',):
@@ -56,6 +67,10 @@ class FakeSbx:
                 return ''
             return ''
         if args[:2] == ('exec', '-it'):
+            self.mixin_exists_at_launch = (
+                self.created_mixin_path is not None
+                and self.created_mixin_path.exists()
+            )
             return ''
         return ''
 
@@ -145,10 +160,10 @@ class LauncherFlowTests(unittest.TestCase):
         status, output = self._run('--allow-paid-inference')
         self.assertEqual(status, 0, output)
         create = next(call for call in self.fake.calls if call[0] == 'create' and '--clone' in call)
-        self.assertEqual(
-            create,
-            ('create', '--clone', '--name', 'oc2-test', 'shell', str(self.project)),
-        )
+        self.assertEqual(create[:4], ('create', '--clone', '--name', 'oc2-test'))
+        self.assertIn('--kit', create)
+        self.assertEqual(create[-2:], ('shell', str(self.project)))
+        self.assertIsNotNone(self.fake.created_mixin_spec)
         install = next(call for call in self.fake.calls if call[:3] == (
             'exec', 'oc2-test', 'npm',
         ))
@@ -231,7 +246,7 @@ class LauncherFlowTests(unittest.TestCase):
         self.assertIn('Cloudflare runtime identifiers', output)
         self.assertEqual(self.fake.calls, [])
 
-    def test_launch_installs_oauth_seed_without_host_credentials(self):
+    def test_launch_attaches_temporary_mixin_without_host_credentials(self):
         self._write_cloudflare_apm()
         poison = {
             'OPENAI_API_KEY': 'host-api-key-poison',
@@ -248,18 +263,47 @@ class LauncherFlowTests(unittest.TestCase):
         )
 
         self.assertEqual(status, 0, output)
-        auth_path = next(
-            destination for destination in self.fake.copied_files
-            if destination.endswith('/data/opencode/auth.json')
+        create = next(
+            call for call in self.fake.calls
+            if call[:1] == ('create',) and '--kit' in call
         )
-        auth = json.loads(self.fake.copied_files[auth_path])
-        self.assertEqual(auth['openai']['access'], 'oai-oat01-proxy-managed')
-        self.assertEqual(auth['openai']['refresh'], 'oai-ort01-proxy-managed')
-        self.assertEqual(auth['openai']['expires'], 0)
+        self.assertIn('--clone', create)
+        self.assertIn('--kit', create)
+        mixin_path = pathlib.Path(create[create.index('--kit') + 1])
+        self.assertFalse(mixin_path.exists())
+        self.assertIsNotNone(self.fake.created_mixin_spec)
+        self.assertFalse(self.fake.mixin_exists_at_launch)
+        mixin_spec = yaml.safe_load(self.fake.created_mixin_spec)
+        self.assertFalse(any(
+            value in self.fake.created_mixin_spec for value in poison.values()
+        ))
+        self.assertEqual(mixin_spec['kind'], 'mixin')
+        self.assertEqual(mixin_spec['requires'], {'agent': 'shell'})
         launch = next(call for call in self.fake.calls if call[:2] == ('exec', '-it'))
+        home = next(value.split('=', 1)[1] for value in launch if value.startswith('HOME='))
+        xdg_data_home = next(
+            value.split('=', 1)[1] for value in launch
+            if value.startswith('XDG_DATA_HOME=')
+        )
+        credential_path = next(
+            item['oauth']['credentialFile']['path'] for item in mixin_spec['credentials']
+            if 'oauth' in item
+        )
+        self.assertEqual(credential_path, '~/.local/share/opencode/auth.json')
+        self.assertEqual(xdg_data_home, f'{home}/.local/share')
+        self.assertEqual(f'{xdg_data_home}/opencode/auth.json', f'{home}{credential_path[1:]}')
         self.assertNotIn('OPENAI_API_KEY', launch)
         self.assertFalse(any(value in repr(self.fake.calls) for value in poison.values()))
-        self.assertFalse(any(value in self.fake.copied_files[auth_path] for value in poison.values()))
+        self.assertNotIn('auth.json', self.fake.copied_files)
+
+    def test_launcher_stops_when_sbx_lacks_kit_support(self):
+        self.fake.kit_supported = False
+        status, output = self._run('--allow-paid-inference')
+
+        self.assertEqual(status, 1)
+        self.assertIn('Mixin', output)
+        self.assertFalse(any(call[:1] == ('create',) and '--clone' in call
+                             for call in self.fake.calls))
 
 
 if __name__ == '__main__':

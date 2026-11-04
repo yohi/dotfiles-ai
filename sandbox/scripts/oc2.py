@@ -24,6 +24,8 @@ import sys
 import tempfile
 from typing import TYPE_CHECKING, Final
 
+import yaml
+
 if TYPE_CHECKING:
     from sandbox.scripts.oc2_workspace import Manifest as WorkspaceManifest
 
@@ -65,17 +67,65 @@ class Stop(Exception):
     pass
 
 
-def openai_oauth_auth_seed() -> bytes:
-    """Return the fixed Guest OAuth bridge record with proxy sentinels only."""
-    auth_seed = {
-        'openai': {
-            'type': 'oauth',
-            'access': OPENAI_ACCESS_TOKEN_SENTINEL,
-            'refresh': OPENAI_REFRESH_TOKEN_SENTINEL,
-            'expires': 0,
+def credential_mixin_spec(name: str) -> bytes:
+    """Serialize the proxy credential bindings without embedding credentials."""
+    if re.fullmatch(r'[a-z0-9][a-z0-9-]{0,63}', name) is None:
+        raise Stop('invalid credential Mixin name')
+    spec = {
+        'schemaVersion': '2',
+        'kind': 'mixin',
+        'name': name,
+        'requires': {'agent': 'shell'},
+        'credentials': [
+            {
+                'service': 'openai',
+                'oauth': {
+                    'tokenEndpoint': {
+                        'host': 'auth.openai.com',
+                        'path': '/oauth/token',
+                    },
+                    'resourceHosts': ['chatgpt.com'],
+                    'sentinels': {
+                        'accessToken': OPENAI_ACCESS_TOKEN_SENTINEL,
+                        'refreshToken': OPENAI_REFRESH_TOKEN_SENTINEL,
+                    },
+                    'credentialFile': {
+                        'path': '~/.local/share/opencode/auth.json',
+                        'structure': {
+                            'openai': {
+                                'type': 'oauth',
+                                'access': '{{.AccessToken}}',
+                                'refresh': '{{.RefreshToken}}',
+                                'expires': '{{.ExpiresAt}}',
+                            },
+                        },
+                    },
+                },
+            },
+            {
+                'service': 'cloudflare-ai-gateway',
+                'apiKey': {
+                    'name': 'OC_CF_API_TOKEN',
+                    'proxyManaged': True,
+                    'inject': [{
+                        'domain': 'gateway.ai.cloudflare.com',
+                        'header': 'cf-aig-authorization',
+                        'format': 'Bearer %s',
+                    }],
+                },
+            },
+        ],
+        'permissions': {
+            'network': {
+                'allow': [
+                    'auth.openai.com',
+                    'chatgpt.com',
+                    'gateway.ai.cloudflare.com',
+                ],
+            },
         },
     }
-    return (json.dumps(auth_seed, sort_keys=True) + '\n').encode('utf-8')
+    return yaml.safe_dump(spec, sort_keys=False).encode('utf-8')
 
 
 def cloudflare_gateway_runtime(
@@ -167,8 +217,13 @@ class Runner:
         return result.stdout if capture else ''
 
 
-def clone_create_args(name: str, workspace: pathlib.Path) -> list[str]:
-    return ['create', '--clone', '--name', name, 'shell', str(workspace)]
+def clone_create_args(
+    name: str, workspace: pathlib.Path, mixin_path: pathlib.Path,
+) -> list[str]:
+    return [
+        'create', '--clone', '--name', name, '--kit', str(mixin_path),
+        'shell', str(workspace),
+    ]
 
 
 def install_cli_args(name: str) -> list[str]:
@@ -535,25 +590,18 @@ def launch(runner: Runner, request: SandboxLaunch) -> None:
             f'OC_CF_API_TOKEN={CLOUDFLARE_TOKEN_PLACEHOLDER}',
         )
     )
-    data_dir = f'{runtime}/data/opencode'
     runner.sbx(
         'exec', request.name, 'mkdir', '-p', '-m', '700', runtime,
         *(f'{runtime}/{directory}' for directory in
-          ('home', 'config', 'config/opencode', 'data', 'state', 'cache', 'tmp')),
+          ('home', 'home/.local/share', 'config', 'config/opencode',
+           'state', 'cache', 'tmp')),
     )
-    runner.sbx('exec', request.name, 'mkdir', '-p', '-m', '700', data_dir)
+    runner.sbx('exec', request.name, 'mkdir', '-p', '-m', '700',
+               f'{runtime}/home/.local/share/opencode')
     runner.sbx(
         'cp', str(request.config_file),
         f'{request.name}:{config_dir}/opencode.jsonc',
     )
-    with tempfile.TemporaryDirectory(prefix='oc2-openai-oauth-seed-') as temporary:
-        auth_seed_path = pathlib.Path(temporary) / 'auth.json'
-        auth_seed_path.write_bytes(openai_oauth_auth_seed())
-        os.chmod(auth_seed_path, 0o600)
-        runner.sbx(
-            'cp', str(auth_seed_path),
-            f'{request.name}:{data_dir}/auth.json',
-        )
     runner.sbx(
         'exec', '-it', '-w', workdir, request.name,
         'env', '-i',
@@ -564,7 +612,7 @@ def launch(runner: Runner, request: SandboxLaunch) -> None:
         'TERM=xterm-256color',
         'LANG=C.UTF-8',
         f'XDG_CONFIG_HOME={runtime}/config',
-        f'XDG_DATA_HOME={runtime}/data',
+        f'XDG_DATA_HOME={runtime}/home/.local/share',
         f'XDG_STATE_HOME={runtime}/state',
         f'XDG_CACHE_HOME={runtime}/cache',
         f'TMPDIR={runtime}/tmp',
@@ -695,7 +743,8 @@ def main(argv: list[str] | None = None) -> int:
         if git_root.returncode != 0 or pathlib.Path(git_root.stdout.strip()) != workspace:
             raise Stop('workspace must be the root of a Git repository for Clone mode')
         with tempfile.TemporaryDirectory(prefix='oc2-v2-config-') as temporary:
-            config_file = export_v2_config(repo, pathlib.Path(temporary) / 'export')
+            temporary_path = pathlib.Path(temporary)
+            config_file = export_v2_config(repo, temporary_path / 'export')
             if (requires_external_inference(config_file)
                     and not args.allow_paid_inference):
                 raise Stop('external inference requires --allow-paid-inference')
@@ -710,14 +759,23 @@ def main(argv: list[str] | None = None) -> int:
             sandbox_version = runner.sbx('version', capture=True).strip()
             if re.search(r'\bv\d+\.\d+\.\d+\b', sandbox_version) is None:
                 raise Stop('could not verify Docker Sandboxes version')
-            if '--clone' not in runner.sbx('create', '--help', capture=True):
+            create_help = runner.sbx('create', '--help', capture=True)
+            if '--clone' not in create_help:
                 raise Stop('installed Docker Sandboxes CLI does not support Clone mode')
+            if '--kit' not in create_help:
+                raise Stop('installed Docker Sandboxes CLI does not support credential Mixins')
             print('OC2_DOCKER_SANDBOXES: ' + sandbox_version)
             existing = {line.strip() for line in runner.sbx('ls', '-q', capture=True).splitlines()}
             if args.sandbox in existing:
                 raise Stop('Sandbox name already exists; refusing to reuse or rebuild it')
             print('OC2: creating clone-mode shell Sandbox ' + args.sandbox)
-            runner.sbx(*clone_create_args(args.sandbox, workspace))
+            mixin_name = 'oc2-credentials-' + secrets.token_hex(6)
+            with tempfile.TemporaryDirectory(prefix='oc2-credential-mixin-') as mixin_temporary:
+                mixin_path = pathlib.Path(mixin_temporary)
+                mixin_spec_path = mixin_path / 'spec.yaml'
+                mixin_spec_path.write_bytes(credential_mixin_spec(mixin_name))
+                os.chmod(mixin_spec_path, 0o600)
+                runner.sbx(*clone_create_args(args.sandbox, workspace, mixin_path))
             cli = provision_cli(runner, args.sandbox)
             workdir = runner.sbx('exec', args.sandbox, 'pwd', capture=True).strip()
             if not workdir.startswith('/') or '..' in pathlib.PurePosixPath(workdir).parts:
