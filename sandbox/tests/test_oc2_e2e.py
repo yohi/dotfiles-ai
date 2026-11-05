@@ -278,7 +278,7 @@ class LauncherFlowTests(unittest.TestCase):
             value in self.fake.created_mixin_spec for value in poison.values()
         ))
         self.assertEqual(mixin_spec['kind'], 'mixin')
-        self.assertEqual(mixin_spec['requires'], {'agent': 'shell'})
+        self.assertEqual(mixin_spec['schemaVersion'], '3')
         launch = next(call for call in self.fake.calls if call[:2] == ('exec', '-it'))
         home = next(value.split('=', 1)[1] for value in launch if value.startswith('HOME='))
         xdg_data_home = next(
@@ -286,8 +286,9 @@ class LauncherFlowTests(unittest.TestCase):
             if value.startswith('XDG_DATA_HOME=')
         )
         credential_path = next(
-            item['oauth']['credentialFile']['path'] for item in mixin_spec['credentials']
-            if 'oauth' in item
+            item['config']['oauth']['credentialFile']['path']
+            for item in mixin_spec['capabilities']
+            if item['type'] == 'com.docker.sandbox/credential@1' and 'oauth' in item['config']
         )
         self.assertEqual(credential_path, '~/.local/share/opencode/auth.json')
         self.assertEqual(xdg_data_home, f'{home}/.local/share')

@@ -25,6 +25,7 @@ import tempfile
 from typing import TYPE_CHECKING, Final
 
 import yaml
+from oc2_oauth_bundle import oauth_helper_source
 
 if TYPE_CHECKING:
     from sandbox.scripts.oc2_workspace import Manifest as WorkspaceManifest
@@ -72,14 +73,16 @@ def credential_mixin_spec(name: str) -> bytes:
     if re.fullmatch(r'[a-z0-9][a-z0-9-]{0,63}', name) is None:
         raise Stop('invalid credential Mixin name')
     spec = {
-        'schemaVersion': '2',
+        'schemaVersion': '3',
         'kind': 'mixin',
-        'name': name,
-        'requires': {'agent': 'shell'},
-        'credentials': [
+        'displayName': name,
+        'capabilities': [
             {
-                'service': 'openai',
-                'oauth': {
+                'type': 'com.docker.sandbox/credential@1',
+                'config': {
+                  'service': 'openai',
+                  'phase': 'runtime',
+                  'oauth': {
                     'tokenEndpoint': {
                         'host': 'auth.openai.com',
                         'path': '/oauth/token',
@@ -100,11 +103,16 @@ def credential_mixin_spec(name: str) -> bytes:
                             },
                         },
                     },
+                  },
                 },
             },
             {
-                'service': 'cloudflare-ai-gateway',
-                'apiKey': {
+                'type': 'com.docker.sandbox/credential@1',
+                'optional': True,
+                'config': {
+                  'service': 'cloudflare-ai-gateway',
+                  'phase': 'runtime',
+                  'apiKey': {
                     'name': 'OC_CF_API_TOKEN',
                     'proxyManaged': True,
                     'inject': [{
@@ -112,20 +120,24 @@ def credential_mixin_spec(name: str) -> bytes:
                         'header': 'cf-aig-authorization',
                         'format': 'Bearer %s',
                     }],
+                  },
                 },
             },
-        ],
-        'permissions': {
-            'network': {
+            {
+              'type': 'com.docker.sandbox/network-policy@1',
+              'config': {
+                'runtime': {
                 'allow': [
                     'auth.openai.com',
                     'chatgpt.com',
                     'gateway.ai.cloudflare.com',
                 ],
+                },
+              },
             },
-        },
+        ],
     }
-    return yaml.safe_dump(spec, sort_keys=False).encode('utf-8')
+    return b'# syntax=docker/sandbox-kit:3\n' + yaml.safe_dump(spec, sort_keys=False).encode('utf-8')
 
 
 def cloudflare_gateway_runtime(
@@ -602,9 +614,7 @@ def launch(runner: Runner, request: SandboxLaunch) -> None:
         'cp', str(request.config_file),
         f'{request.name}:{config_dir}/opencode.jsonc',
     )
-    runner.sbx(
-        'exec', '-it', '-w', workdir, request.name,
-        'env', '-i',
+    runtime_environment = (
         f'HOME={runtime}/home',
         'USER=agent',
         'SHELL=/bin/bash',
@@ -613,6 +623,7 @@ def launch(runner: Runner, request: SandboxLaunch) -> None:
         'LANG=C.UTF-8',
         f'XDG_CONFIG_HOME={runtime}/config',
         f'XDG_DATA_HOME={runtime}/home/.local/share',
+        f'OPENCODE_DB={runtime}/home/.local/share/opencode/oc2.db',
         f'XDG_STATE_HOME={runtime}/state',
         f'XDG_CACHE_HOME={runtime}/cache',
         f'TMPDIR={runtime}/tmp',
@@ -620,6 +631,13 @@ def launch(runner: Runner, request: SandboxLaunch) -> None:
         'OPENCODE_DISABLE_AUTOUPDATE=1',
         'OPENCODE_DISABLE_MODELS_FETCH=1',
         *cloudflare_environment,
+    )
+    helper = oauth_helper_source(HERE)
+    runner.sbx('exec', '-w', workdir, request.name, 'env', '-i',
+               *runtime_environment, 'python3', '-c', helper, request.cli, 'oc2_oauth.py')
+    runner.sbx(
+        'exec', '-it', '-w', workdir, request.name,
+        'env', '-i', *runtime_environment,
         request.cli, '--standalone', tty=True,
     )
 
