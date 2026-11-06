@@ -15,14 +15,17 @@ import importlib
 import json
 import os
 import pathlib
+import platform
 import re
 import secrets
 import shlex
 import shutil
 import subprocess
 import sys
+import tarfile
 import tempfile
 from typing import TYPE_CHECKING, Final
+from urllib.parse import urlsplit
 
 import yaml
 from oc2_oauth_bundle import oauth_helper_source
@@ -36,14 +39,52 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 VERSION = '2.2.5'
 ROOT = '/home/agent/workspace/oc2'
+SHELL_WORKLOAD: Final[str] = 'docker.io/docker/sbx-kit-shell:1.0.0'
+CLI_ASSET_URL: Final[str] = (
+    'https://github.com/anomalyco/opencode/releases/download/v2.2.5/'
+    'opencode-linux-x64.tar.gz'
+)
+CLI_ASSET_SIZE: Final[int] = 119_196_162
+CLI_ASSET_SHA256: Final[str] = '09f44302c10fd036912f59c81fd1aef5df45dd06f649197f9dfc9bbe2a79614e'
+CLI_BINARY_SIZE: Final[int] = 252_713_136
+CLI_REDIRECT_HOSTS: Final[frozenset[str]] = frozenset({
+    'github.com',
+    'release-assets.githubusercontent.com',
+    'objects.githubusercontent.com',
+})
 NAME_RE = re.compile(r'^[A-Za-z0-9][A-Za-z0-9.-]{0,61}[A-Za-z0-9]$')
 CF_GATEWAY_PROVIDER_ID: Final[str] = 'cloudflare-ai-gateway-custom'
 CLOUDFLARE_TOKEN_PLACEHOLDER: Final[str] = 'proxy-managed'
 OPENAI_ACCESS_TOKEN_SENTINEL: Final[str] = 'oai-oat01-proxy-managed'
 OPENAI_REFRESH_TOKEN_SENTINEL: Final[str] = 'oai-ort01-proxy-managed'
 PINNED = (
-    '/home/agent/.local/oc2-runtime/node_modules/.bin/opencode',
+    '/opt/oc2/bin/opencode',
 )
+
+DESTINATION_CHECK_SCRIPT = '''import errno, os, sys
+path = sys.argv[1] if len(sys.argv) == 2 else ""
+parts = path.split("/")
+if not path.startswith("/") or len(parts) < 3 or any(p in ("", ".", "..") for p in parts[1:]):
+    sys.exit(11)
+fd = None
+try:
+    flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+    fd = os.open("/", flags)
+    for part in parts[1:-1]:
+        child = os.open(part, flags, dir_fd=fd)
+        os.close(fd)
+        fd = child
+    try:
+        os.stat(parts[-1], dir_fd=fd, follow_symlinks=False)
+    except FileNotFoundError as exc:
+        sys.exit(0 if exc.errno == errno.ENOENT else 11)
+    sys.exit(10)
+except OSError:
+    sys.exit(11)
+finally:
+    if fd is not None:
+        os.close(fd)
+'''
 
 
 @dataclass(frozen=True, slots=True)
@@ -65,6 +106,10 @@ class SandboxLaunch:
 
 
 class Stop(Exception):
+    pass
+
+
+class SandboxCommandTimeout(Stop):
     pass
 
 
@@ -138,6 +183,131 @@ def credential_mixin_spec(name: str) -> bytes:
         ],
     }
     return b'# syntax=docker/sandbox-kit:3\n' + yaml.safe_dump(spec, sort_keys=False).encode('utf-8')
+
+
+def opencode_cli_mixin_spec() -> bytes:
+    """Copy the verified standalone CLI into the Kit without network installs."""
+    build = (
+        'FROM scratch\n'
+        'COPY --chmod=0755 opencode '
+        '/opt/oc2/bin/opencode\n'
+    )
+    spec = {
+        'schemaVersion': '3',
+        'kind': 'mixin',
+        'displayName': 'oc2-opencode-cli-2.2.5',
+        'provides': [f'opencode-cli@{VERSION}'],
+        'build': build,
+    }
+    return b'# syntax=docker/sandbox-kit:3\n' + yaml.safe_dump(
+        spec, sort_keys=False,
+    ).encode('utf-8')
+
+
+def download_verified_cli(destination: pathlib.Path) -> pathlib.Path:
+    """Download, authenticate, and safely extract the pinned official CLI."""
+    if (sys.platform != 'linux' or platform.machine().lower() not in
+            ('x86_64', 'amd64')):
+        raise Stop('pinned OpenCode release asset requires Linux x86-64')
+    if (destination.is_symlink() or not destination.is_dir()
+            or destination.stat().st_mode & 0o077):
+        raise Stop('official CLI download requires a private temporary directory')
+    if any(destination.iterdir()):
+        raise Stop('official CLI temporary directory must be empty')
+    curl = shutil.which('curl')
+    if curl is None:
+        raise Stop('curl is required to download the official OpenCode release')
+
+    archive_path = destination / 'opencode-linux-x64.tar.gz'
+    binary_path = destination / 'opencode'
+    command = [
+        curl, '--disable', '--fail', '--location', '--max-redirs', '5',
+        '--proto', '=https', '--proto-redir', '=https', '--tlsv1.2',
+        '--connect-timeout', '20', '--max-time', '240', '--max-filesize',
+        str(CLI_ASSET_SIZE), '--silent', '--show-error', '--output',
+        str(archive_path), '--write-out',
+        '\nOC2_HTTP_STATUS=%{http_code}\nOC2_FINAL_URL=%{url_effective}\n',
+        CLI_ASSET_URL,
+    ]
+    binary_created = False
+    try:
+        try:
+            result = subprocess.run(
+                command, capture_output=True, text=True, check=False, timeout=300,
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise Stop('official OpenCode release download timed out') from exc
+        except OSError as exc:
+            raise Stop('official OpenCode release download could not run') from exc
+
+        fields = dict(
+            line.split('=', 1) for line in result.stdout.splitlines()
+            if line.startswith(('OC2_HTTP_STATUS=', 'OC2_FINAL_URL='))
+        )
+        if result.returncode != 0:
+            if result.returncode == 6:
+                raise Stop('official OpenCode release download failed: Host DNS resolution failed')
+            if result.returncode == 7:
+                raise Stop('official OpenCode release download failed: Host connection failed')
+            if result.returncode == 28:
+                raise Stop('official OpenCode release download timed out')
+            raise Stop(f'official OpenCode release download failed (curl exit {result.returncode})')
+        if fields.get('OC2_HTTP_STATUS') != '200':
+            raise Stop('official OpenCode release returned an unexpected HTTP status')
+        final_url = urlsplit(fields.get('OC2_FINAL_URL', ''))
+        if (final_url.scheme != 'https'
+                or (final_url.hostname or '').lower() not in CLI_REDIRECT_HOSTS):
+            raise Stop('official OpenCode release redirected to an untrusted host')
+        if archive_path.stat().st_size != CLI_ASSET_SIZE:
+            raise Stop('official OpenCode release asset size mismatch')
+
+        archive_hash = hashlib.sha256()
+        with archive_path.open('rb') as archive_file:
+            for chunk in iter(lambda: archive_file.read(1024 * 1024), b''):
+                archive_hash.update(chunk)
+        if archive_hash.hexdigest() != CLI_ASSET_SHA256:
+            raise Stop('official OpenCode release integrity verification failed')
+
+        with tarfile.open(archive_path, 'r:gz') as archive:
+            members = archive.getmembers()
+            if len(members) != 1:
+                raise Stop('official OpenCode archive contents are invalid')
+            member = members[0]
+            member_path = pathlib.PurePosixPath(member.name)
+            if (member.name != 'opencode' or member_path.is_absolute()
+                    or '..' in member_path.parts or not member.isfile()
+                    or not (member.mode & 0o111)
+                    or member.size != CLI_BINARY_SIZE):
+                raise Stop('official OpenCode archive contents are invalid')
+            source = archive.extractfile(member)
+            if source is None:
+                raise Stop('official OpenCode executable is missing from its archive')
+            flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+            if hasattr(os, 'O_NOFOLLOW'):
+                flags |= os.O_NOFOLLOW
+            fd = os.open(binary_path, flags, 0o600)
+            binary_created = True
+            with os.fdopen(fd, 'wb') as binary_file:
+                extracted = 0
+                while chunk := source.read(1024 * 1024):
+                    extracted += len(chunk)
+                    if extracted > member.size:
+                        raise Stop('official OpenCode executable exceeds its archive size')
+                    binary_file.write(chunk)
+                if extracted != member.size:
+                    raise Stop('official OpenCode executable is truncated')
+        archive_path.unlink()
+        return binary_path
+    except Stop:
+        archive_path.unlink(missing_ok=True)
+        if binary_created:
+            binary_path.unlink(missing_ok=True)
+        raise
+    except (OSError, tarfile.TarError, ValueError) as exc:
+        archive_path.unlink(missing_ok=True)
+        if binary_created:
+            binary_path.unlink(missing_ok=True)
+        raise Stop('official OpenCode release artifact could not be validated') from exc
 
 
 def cloudflare_gateway_runtime(
@@ -214,6 +384,19 @@ class Runner:
         self.user = user
         self.dry_run = dry_run
 
+    def destination_status(self, name: str, destination: str) -> int:
+        command = operator_command(self.user, 'sbx', 'exec', name, 'python3', '-c',
+                                   DESTINATION_CHECK_SCRIPT, destination)
+        if self.dry_run:
+            raise Stop('DESTINATION_CHECK_COMMAND_FAILED')
+        try:
+            result = subprocess.run(command, check=False, capture_output=True, timeout=180)
+        except subprocess.TimeoutExpired as exc:
+            raise Stop('DESTINATION_CHECK_TIMEOUT') from exc
+        except OSError as exc:
+            raise Stop('DESTINATION_CHECK_COMMAND_FAILED') from exc
+        return result.returncode
+
     def sbx(self, *args: str, capture: bool = False, tty: bool = False) -> str:
         command = operator_command(self.user, 'sbx', *args)
         if self.dry_run:
@@ -222,27 +405,46 @@ class Runner:
         try:
             result = subprocess.run(command, check=False, text=True,
                                     capture_output=capture, timeout=None if tty else 180)
-        except (OSError, subprocess.TimeoutExpired) as exc:
+        except subprocess.TimeoutExpired as exc:
+            raise SandboxCommandTimeout('sbx command could not complete') from exc
+        except OSError as exc:
             raise Stop('sbx command could not complete') from exc
         if result.returncode != 0:
             raise Stop(f'sbx command failed (exit {result.returncode})')
         return result.stdout if capture else ''
 
 
-def clone_create_args(
-    name: str, workspace: pathlib.Path, mixin_path: pathlib.Path,
+def mountless_create_args(
+    name: str,
+    credential_mixin_path: pathlib.Path,
+    cli_mixin_path: pathlib.Path,
 ) -> list[str]:
     return [
-        'create', '--clone', '--name', name, '--kit', str(mixin_path),
-        'shell', str(workspace),
+        'create', '--name', name,
+        '--kit', str(credential_mixin_path),
+        '--kit', str(cli_mixin_path),
+        SHELL_WORKLOAD,
     ]
 
 
-def install_cli_args(name: str) -> list[str]:
-    return [
-        'exec', name, 'npm', 'install', '--prefix', '/home/agent/.local/oc2-runtime',
-        '--no-audit', '--no-fund', '--no-save', f'@opencode/cli@{VERSION}',
-    ]
+def workspace_transfer_profile(workspace: pathlib.Path) -> str | None:
+    try:
+        origin = subprocess.run(
+            ['git', '-C', str(workspace), 'remote', 'get-url', 'origin'],
+            capture_output=True, text=True, check=False, timeout=10,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if origin.returncode != 0:
+        return None
+    approved_origins = (
+        r'git@github\.com:yohi/dotfiles-ai(?:\.git)?',
+        r'ssh://git@github\.com/yohi/dotfiles-ai(?:\.git)?',
+        r'https://github\.com/yohi/dotfiles-ai(?:\.git)?',
+    )
+    if any(re.fullmatch(pattern, origin.stdout.strip()) for pattern in approved_origins):
+        return 'dotfiles-ai/workspace-safe-transfer/r1'
+    return None
 
 
 def export_v2_config(repo: pathlib.Path, output: pathlib.Path) -> pathlib.Path:
@@ -266,26 +468,6 @@ def export_v2_config(repo: pathlib.Path, output: pathlib.Path) -> pathlib.Path:
     if config.is_symlink() or not config.is_file():
         raise Stop('generated V2 config is missing or unsafe')
     return config
-
-
-def validate_clone_workspace(workspace: pathlib.Path) -> None:
-    """Refuse Clone mode if it would expose files omitted by the safety scan."""
-    oc2_workspace = importlib.import_module('oc2_workspace')
-
-    if any((workspace / name).exists() for name in ('opencode.json', 'opencode.jsonc', 'cli.json')):
-        raise Stop('workspace contains OpenCode project configuration')
-    manifest = oc2_workspace.snapshot(workspace)
-    checked = {entry.path for entry in manifest.files}
-    exposed: set[str] = set()
-    for current, directories, filenames in os.walk(workspace, followlinks=False):
-        directories[:] = [name for name in directories if name != '.git']
-        current_path = pathlib.Path(current)
-        exposed.update(
-            (current_path / name).relative_to(workspace).as_posix()
-            for name in filenames
-        )
-    if exposed != checked:
-        raise Stop('clone mode would expose files excluded from the safe workspace scan')
 
 
 def is_compatible_sandbox(runner: Runner, name: str) -> bool:
@@ -315,7 +497,7 @@ def is_compatible_sandbox(runner: Runner, name: str) -> bool:
     if len(matches) != 1:
         raise Stop('could not establish existing Sandbox identity')
     row = matches[0]
-    if row.get('agent') != 'shell':
+    if row.get('agent') not in ('shell', 'sbx-kit-shell'):
         raise Stop('existing Sandbox agent is not shell')
 
     # Earlier CLI versions included optional workspace fields in the list.
@@ -437,13 +619,13 @@ def transfer_workspace(runner: Runner, name: str, snapshot: pathlib.Path,
     parent = f'{ROOT}/projects'
     destination = parent + '/' + secrets.token_hex(16)
     execute(runner, name, 'mkdir', '-p', parent)
-    state = runner.sbx(
-        'exec', name, 'bash', '-c',
-        f'if test -e {shlex.quote(destination)} || test -L {shlex.quote(destination)}; '
-        'then echo exists; else echo missing; fi', capture=True,
-    ).strip()
-    if state != 'missing':
-        raise Stop('workspace destination already exists or could not be checked')
+    status = runner.destination_status(name, destination)
+    if status == 10:
+        raise Stop('DESTINATION_EXISTS')
+    if status == 11:
+        raise Stop('DESTINATION_CHECK_INDETERMINATE')
+    if status != 0:
+        raise Stop('DESTINATION_CHECK_COMMAND_FAILED')
     checked = snapshot.parent / (snapshot.name + '-verified')
     oc2_workspace.materialize(pathlib.Path(manifest.root), checked, manifest, for_guest=True)
     if snapshot.exists():
@@ -524,61 +706,10 @@ def cli_path(runner: Runner, name: str) -> str | None:
     return None
 
 
-def seed_cli(runner: Runner, name: str, source: str, scratch: pathlib.Path) -> str | None:
-    """Copy only a verified CLI package tree from a separate mountless PoC.
-
-    This avoids changing network policy. Neither credentials nor XDG data are
-    read from the source Sandbox. No existing target installation is overwritten.
-    """
-    if not source or source == name:
-        return None
-    if not is_compatible_sandbox(runner, source):
-        return None
-    binary = PINNED[0]
-    quoted = shlex.quote(binary)
-    version = runner.sbx('exec', source, 'bash', '-c',
-                         f'if test -x {quoted}; then {quoted} --version; fi',
-                         capture=True).strip()
-    if version not in (VERSION, 'v' + VERSION, 'opencode v' + VERSION):
-        return None
-    # sbx cp runs as sbx-poc, not the Host repo owner. Give it a private
-    # temporary directory owned by the operator instead of chmod 0777 on the
-    # Host-owned export directory.
-    operator = ([] if runner.user == getpass.getuser()
-                else ['sudo', '-i', '-u', runner.user, '--'])
-    try:
-        created = subprocess.run([*operator, 'mktemp', '-d', '/tmp/oc2-seed-XXXXXXXX'],
-                                 capture_output=True, text=True, timeout=15, check=True)
-    except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
-        raise Stop('could not create private Sandbox operator staging directory') from exc
-    staging = created.stdout.strip()
-    if re.fullmatch(r'/tmp/oc2-seed-[A-Za-z0-9]{8}', staging) is None:
-        raise Stop('unsafe seed staging path')
-    local = pathlib.Path(staging) / 'node_modules'
-    try:
-        print('OC2: seeding pinned CLI from read-only PoC sandbox ' + source)
-        runner.sbx('cp', f'{source}:/home/agent/.local/opencode-v2/node_modules', str(local))
-        runner.sbx('exec', name, 'bash', '-c',
-                   'set -eu; mkdir -p /home/agent/.local/opencode-v2; '
-                   'test ! -e /home/agent/.local/opencode-v2/node_modules')
-        runner.sbx('cp', str(local), f'{name}:/home/agent/.local/opencode-v2/node_modules')
-        if cli_path(runner, name) != binary:
-            raise Stop(f'seeded OpenCode CLI did not verify as v{VERSION}')
-        return binary
-    finally:
-        subprocess.run([*operator, 'rm', '-rf', '--', staging],
-                       capture_output=True, timeout=30, check=False)
-
-
 def provision_cli(runner: Runner, name: str) -> str:
     found = cli_path(runner, name)
-    if found:
-        return found
-    print(f'OC2: installing @opencode/cli@{VERSION} inside the new Sandbox.')
-    runner.sbx(*install_cli_args(name))
-    found = cli_path(runner, name)
-    if not found:
-        raise Stop(f'installed CLI is not the pinned v{VERSION}')
+    if found is None:
+        raise Stop('pinned OpenCode CLI is not present in the Sandbox kit')
     return found
 
 
@@ -630,6 +761,7 @@ def launch(runner: Runner, request: SandboxLaunch) -> None:
         'OPENCODE_WATCHDOG_ENABLED=false',
         'OPENCODE_DISABLE_AUTOUPDATE=1',
         'OPENCODE_DISABLE_MODELS_FETCH=1',
+        'OPENCODE_CONFIG_PROJECT_DISABLE=1',
         *cloudflare_environment,
     )
     helper = oauth_helper_source(HERE)
@@ -671,7 +803,9 @@ def _session_action(args: argparse.Namespace, workspace: pathlib.Path,
                     grant_collected_workspace_access(
                         incoming, args.sbx_user, getpass.getuser(),
                     )
-                    candidate = workspaces.snapshot(incoming)
+                    candidate = workspaces.snapshot(
+                        incoming, profile=session.manifest.profile,
+                    )
                     workspaces.materialize(incoming, collected, candidate)
                 finally:
                     if incoming.exists() or incoming.is_symlink():
@@ -730,8 +864,9 @@ def main(argv: list[str] | None = None) -> int:
                 raise Stop('workspace is not a directory')
             if not NAME_RE.fullmatch(args.sandbox):
                 raise Stop('invalid Sandbox name')
-            print('OC2 PLAN: clone-mode shell Sandbox=' + args.sandbox)
+            print('OC2 PLAN: mountless shell Sandbox=' + args.sandbox)
             print('OC2 PLAN: workspace=' + str(workspace))
+            print('OC2 PLAN: transfer only the verified Workspace Snapshot; no .git or OpenCode project config')
             print(f'OC2 PLAN: install and verify @opencode/cli@{VERSION} inside the Sandbox')
             print('OC2 PLAN: no credentials, provider settings, MCP, plugins, or host config')
             print('OC2 PLAN: no Sandbox commands executed')
@@ -753,13 +888,17 @@ def main(argv: list[str] | None = None) -> int:
             raise Stop('workspace is not a directory')
         if not NAME_RE.fullmatch(args.sandbox):
             raise Stop('invalid Sandbox name')
-        validate_clone_workspace(workspace)
         git_root = subprocess.run(
             ['git', '-C', str(workspace), 'rev-parse', '--show-toplevel'],
             capture_output=True, text=True, check=False, timeout=10,
         )
         if git_root.returncode != 0 or pathlib.Path(git_root.stdout.strip()) != workspace:
-            raise Stop('workspace must be the root of a Git repository for Clone mode')
+            raise Stop('workspace must be the root of a Git repository')
+        profile_id = workspace_transfer_profile(workspace)
+        workspace_profile = oc2_workspace.profile_by_id(profile_id)
+        workspace_manifest = oc2_workspace.snapshot(
+            workspace, profile=workspace_profile,
+        )
         with tempfile.TemporaryDirectory(prefix='oc2-v2-config-') as temporary:
             temporary_path = pathlib.Path(temporary)
             config_file = export_v2_config(repo, temporary_path / 'export')
@@ -778,32 +917,41 @@ def main(argv: list[str] | None = None) -> int:
             if re.search(r'\bv\d+\.\d+\.\d+\b', sandbox_version) is None:
                 raise Stop('could not verify Docker Sandboxes version')
             create_help = runner.sbx('create', '--help', capture=True)
-            if '--clone' not in create_help:
-                raise Stop('installed Docker Sandboxes CLI does not support Clone mode')
             if '--kit' not in create_help:
                 raise Stop('installed Docker Sandboxes CLI does not support credential Mixins')
             print('OC2_DOCKER_SANDBOXES: ' + sandbox_version)
             existing = {line.strip() for line in runner.sbx('ls', '-q', capture=True).splitlines()}
             if args.sandbox in existing:
                 raise Stop('Sandbox name already exists; refusing to reuse or rebuild it')
-            print('OC2: creating clone-mode shell Sandbox ' + args.sandbox)
             mixin_name = 'oc2-credentials-' + secrets.token_hex(6)
-            with tempfile.TemporaryDirectory(prefix='oc2-credential-mixin-') as mixin_temporary:
-                mixin_path = pathlib.Path(mixin_temporary)
-                mixin_spec_path = mixin_path / 'spec.yaml'
-                mixin_spec_path.write_bytes(credential_mixin_spec(mixin_name))
-                os.chmod(mixin_spec_path, 0o600)
-                runner.sbx(*clone_create_args(args.sandbox, workspace, mixin_path))
+            print('OC2: verifying official OpenCode v2.2.5 Linux x64 artifact')
+            with tempfile.TemporaryDirectory(prefix='oc2-cli-artifact-') as artifact_temporary:
+                cli_binary = download_verified_cli(pathlib.Path(artifact_temporary))
+                print('OC2_CLI_ARTIFACT_VERIFIED: v2.2.5 sha256=' + CLI_ASSET_SHA256)
+                print('OC2: creating mountless shell Sandbox ' + args.sandbox)
+                with tempfile.TemporaryDirectory(prefix='oc2-kits-') as kits_temporary:
+                    kits_root = pathlib.Path(kits_temporary)
+                    credential_mixin = kits_root / 'oc2-credentials'
+                    cli_mixin = kits_root / 'oc2-opencode-cli'
+                    credential_mixin.mkdir()
+                    cli_mixin.mkdir()
+                    credential_spec = credential_mixin / 'spec.yaml'
+                    credential_spec.write_bytes(credential_mixin_spec(mixin_name))
+                    os.chmod(credential_spec, 0o600)
+                    cli_spec = cli_mixin / 'spec.yaml'
+                    cli_spec.write_bytes(opencode_cli_mixin_spec())
+                    os.chmod(cli_spec, 0o600)
+                    staged_cli = cli_mixin / 'opencode'
+                    shutil.copyfile(cli_binary, staged_cli)
+                    os.chmod(staged_cli, 0o600)
+                    runner.sbx(*mountless_create_args(
+                        args.sandbox, credential_mixin, cli_mixin,
+                    ))
             cli = provision_cli(runner, args.sandbox)
-            workdir = runner.sbx('exec', args.sandbox, 'pwd', capture=True).strip()
-            if not workdir.startswith('/') or '..' in pathlib.PurePosixPath(workdir).parts:
-                raise Stop('Sandbox returned an unsafe clone working directory')
-            clone_root = runner.sbx(
-                'exec', args.sandbox, 'git', '-C', workdir,
-                'rev-parse', '--show-toplevel', capture=True,
-            ).strip()
-            if clone_root != workdir:
-                raise Stop('Sandbox working directory is not the Clone-mode Git root')
+            snapshot_path = temporary_path / 'workspace-snapshot'
+            workdir = transfer_workspace(
+                runner, args.sandbox, snapshot_path, workspace_manifest, runner.user,
+            )
             runtime_sha = hashlib.sha256(
                 (str(workspace) + '\0' + VERSION).encode(),
             ).hexdigest()

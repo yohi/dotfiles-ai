@@ -20,6 +20,7 @@ from typing import Final, Literal, TypeAlias
 
 import yaml
 from yaml.nodes import MappingNode, Node, ScalarNode, SequenceNode
+from oc2_workspace import contains_credential_material
 
 
 VERSION = "v0.2"
@@ -471,6 +472,8 @@ def _build_files(
         },
     }
     generated["export-manifest.json"] = _json_bytes(manifest)
+    if any(contains_credential_material(content) for content in generated.values()):
+        raise ExportError("generated V2 bundle contains credential material")
     return generated
 
 

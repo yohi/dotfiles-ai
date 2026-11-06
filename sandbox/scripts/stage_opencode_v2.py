@@ -97,6 +97,8 @@ def verify_bundle(directory: Path) -> str:
     if {item.name for item in directory.iterdir()} != NAMES:
         raise StageError("unexpected bundle file set")
     data = {name: _regular_bytes(directory / name) for name in NAMES}
+    if any(exporter.contains_credential_material(content) for content in data.values()):
+        raise StageError("bundle contains credential material")
     try:
         manifest = json.loads(
             data["export-manifest.json"], object_pairs_hook=exporter._unique_json_object,

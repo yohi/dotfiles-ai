@@ -20,7 +20,7 @@ def materialize(source: pathlib.Path, destination: pathlib.Path, manifest: Manif
                 *, for_guest: bool = False) -> None:
     if source.resolve(strict=True) != pathlib.Path(manifest.root):
         raise WorkspaceError('workspace manifest root mismatch')
-    if _by_path(snapshot(source)) != _by_path(manifest):
+    if _by_path(snapshot(source, profile=manifest.profile)) != _by_path(manifest):
         raise WorkspaceError('workspace changed after snapshot')
     if destination.exists() or destination.is_symlink() or not destination.parent.is_dir():
         raise WorkspaceError('snapshot destination is not new and safe')
@@ -29,7 +29,7 @@ def materialize(source: pathlib.Path, destination: pathlib.Path, manifest: Manif
     destination.mkdir(mode=directory_mode)
     try:
         for entry in manifest.files:
-            relative = _validate_relative(entry.path)
+            relative = _validate_relative(entry.path, manifest.profile)
             data = _read_regular(source.joinpath(*relative.split('/')))
             if len(data) != entry.size or hashlib.sha256(data).hexdigest() != entry.sha256:
                 raise WorkspaceError('workspace changed while snapshot was copied')
@@ -45,7 +45,7 @@ def materialize(source: pathlib.Path, destination: pathlib.Path, manifest: Manif
 
 
 def changes(baseline: Manifest, guest: pathlib.Path) -> tuple[str, ...]:
-    after = _by_path(snapshot(guest))
+    after = _by_path(snapshot(guest, profile=baseline.profile))
     before = _by_path(baseline)
     return tuple(sorted(path for path in before.keys() | after.keys()
                         if before.get(path) != after.get(path)))
@@ -58,16 +58,16 @@ def apply_changes(host: pathlib.Path, guest: pathlib.Path, baseline: Manifest,
     original = pathlib.Path(baseline.root)
     if host.resolve(strict=True) != original:
         raise WorkspaceError('host workspace identity mismatch')
-    current = snapshot(host)
+    current = snapshot(host, profile=baseline.profile)
     if _by_path(current) != _by_path(baseline):
         raise WorkspaceError('host workspace conflict; no files applied')
-    guest_manifest = snapshot(guest)
+    guest_manifest = snapshot(guest, profile=baseline.profile)
     before = _by_path(baseline)
     after = _by_path(guest_manifest)
     changed = tuple(sorted(path for path in before.keys() | after.keys()
                            if before.get(path) != after.get(path)))
     for relative in changed:
-        _validate_relative(relative)
+        _validate_relative(relative, baseline.profile)
     deleted = tuple(path for path in changed if path not in after)
     if deleted and not allow_deletions:
         raise WorkspaceError('deletion approval is required')
@@ -78,7 +78,9 @@ def apply_changes(host: pathlib.Path, guest: pathlib.Path, baseline: Manifest,
                 break
             if parent.is_symlink():
                 raise WorkspaceError('host destination contains a symlink')
-        if relative in before and _by_path(snapshot(host)).get(relative) != before[relative]:
+        if relative in before and _by_path(
+            snapshot(host, profile=baseline.profile),
+        ).get(relative) != before[relative]:
             raise WorkspaceError('host workspace conflict; no files applied')
     for relative in changed:
         target = host.joinpath(*relative.split('/'))

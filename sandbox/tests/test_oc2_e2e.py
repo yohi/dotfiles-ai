@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+import hashlib
 import io
 import json
 import pathlib
@@ -25,35 +26,78 @@ class FakeSbx:
         self.kit_supported = True
         self.copied_config: str | None = None
         self.copied_files: dict[str, str] = {}
+        self.workspace_files: dict[str, bytes] = {}
+        self.workspace_destination: str | None = None
+        self.remote_files: dict[str, bytes] = {}
         self.created_mixin_spec: str | None = None
         self.created_mixin_path: pathlib.Path | None = None
+        self.created_runtime_mixin_spec: str | None = None
+        self.created_cli_binary: bytes | None = None
         self.mixin_exists_at_launch: bool | None = None
         self.calls: list[tuple[str, ...]] = []
+        self.user = oc2.getpass.getuser()
+
+    def destination_status(self, name: str, destination: str) -> int:
+        self.calls.append(('destination_status', name, destination))
+        return 10 if destination == self.workspace_destination or destination in self.remote_files else 0
 
     def sbx(self, *args: str, capture: bool = False, tty: bool = False) -> str:
         self.calls.append(args)
         if args == ('version',):
             return 'sbx version v0.49.2 test\n'
         if args == ('create', '--help'):
-            kit_help = '  --kit  compose a Mixin\n' if self.kit_supported else ''
-            return '  --clone  private in-container clone\n' + kit_help
+            return '  --kit  compose a Mixin\n' if self.kit_supported else ''
         if args == ('ls', '-q'):
             return 'oc2-test\n' if self.created else ''
         if args[:1] == ('create',):
-            if '--kit' in args:
-                mixin_path = pathlib.Path(args[args.index('--kit') + 1])
-                self.created_mixin_path = mixin_path
-                self.created_mixin_spec = (mixin_path / 'spec.yaml').read_text()
+            kit_paths = [
+                pathlib.Path(args[index + 1])
+                for index, value in enumerate(args[:-1])
+                if value == '--kit'
+            ]
+            if kit_paths:
+                self.created_mixin_path = kit_paths[0]
+                self.created_mixin_spec = (kit_paths[0] / 'spec.yaml').read_text()
+            if len(kit_paths) > 1:
+                self.created_runtime_mixin_spec = (
+                    kit_paths[1] / 'spec.yaml'
+                ).read_text()
+                binary = kit_paths[1] / 'opencode'
+                if binary.is_file() and not binary.is_symlink():
+                    self.created_cli_binary = binary.read_bytes()
+                self.installed = (
+                    'opencode-cli@2.2.5' in self.created_runtime_mixin_spec
+                    and self.created_cli_binary is not None
+                )
             self.created = True
             return ''
         if args[:1] == ('cp',):
-            contents = pathlib.Path(args[1]).read_text()
-            self.copied_files[args[2]] = contents
-            if args[2].endswith('/config/opencode/opencode.jsonc'):
+            source = pathlib.Path(args[1])
+            destination = args[2]
+            remote_destination = destination.split(':', 1)[1]
+            if source.is_dir():
+                self.workspace_destination = remote_destination
+                for path in source.rglob('*'):
+                    if path.is_file() and not path.is_symlink():
+                        relative = path.relative_to(source).as_posix()
+                        data = path.read_bytes()
+                        self.workspace_files[relative] = data
+                        self.remote_files[remote_destination + '/' + relative] = data
+                return ''
+            contents = source.read_text()
+            self.copied_files[destination] = contents
+            self.remote_files[remote_destination] = source.read_bytes()
+            if destination.endswith('/config/opencode/opencode.jsonc'):
                 self.copied_config = contents
             return ''
         if args[:2] == ('exec', 'oc2-test'):
             command = args[2:]
+            if command[:2] == ('bash', '-c'):
+                return 'missing\n'
+            if command[:1] == ('sha256sum',):
+                data = self.remote_files.get(command[1])
+                return (hashlib.sha256(data).hexdigest() + '  ' + command[1] + '\n'
+                        if data is not None else '')
             if (command[:2] == ('sh', '-c')
                     and command[4] == oc2.PINNED[0]):
                 return 'opencode v2.2.5\n' if self.installed else ''
@@ -86,6 +130,14 @@ class LauncherFlowTests(unittest.TestCase):
         self.project = self.root / 'synthetic'
         self.project.mkdir()
         (self.project / 'main.py').write_text('print("safe")\n')
+        self.cli_artifact = self.root / 'verified-opencode'
+        self.cli_artifact.write_bytes(b'offline fake CLI artifact; never executed')
+        self.cli_artifact.chmod(0o600)
+        self.download_patch = patch.object(
+            oc2, 'download_verified_cli', return_value=self.cli_artifact,
+        )
+        self.download_patch.start()
+        self.addCleanup(self.download_patch.stop)
         subprocess.run(['git', 'init', '-q', str(self.project)], check=True)
         subprocess.run(
             ['git', '-C', str(self.project), 'config', 'user.email', 'test@example.invalid'],
@@ -156,18 +208,25 @@ class LauncherFlowTests(unittest.TestCase):
             '      auth_method: docker_custom_secret\n',
         )
 
-    def test_clone_mode_installs_and_launches_only_pinned_v2(self):
+    def test_mountless_snapshot_installs_and_launches_only_pinned_v2(self):
         status, output = self._run('--allow-paid-inference')
         self.assertEqual(status, 0, output)
-        create = next(call for call in self.fake.calls if call[0] == 'create' and '--clone' in call)
-        self.assertEqual(create[:4], ('create', '--clone', '--name', 'oc2-test'))
+        create = next(call for call in self.fake.calls if call[0] == 'create' and '--name' in call)
+        self.assertEqual(create[:3], ('create', '--name', 'oc2-test'))
         self.assertIn('--kit', create)
-        self.assertEqual(create[-2:], ('shell', str(self.project)))
+        self.assertNotIn('--clone', create)
+        self.assertNotIn(str(self.project), create)
         self.assertIsNotNone(self.fake.created_mixin_spec)
-        install = next(call for call in self.fake.calls if call[:3] == (
-            'exec', 'oc2-test', 'npm',
-        ))
-        self.assertEqual(install[-1], '@opencode/cli@2.2.5')
+        self.assertEqual(create[-1], oc2.SHELL_WORKLOAD)
+        self.assertEqual(create.count('--kit'), 2)
+        self.assertIsNotNone(self.fake.created_runtime_mixin_spec)
+        if self.fake.created_runtime_mixin_spec is None:
+            self.fail('Pinned OpenCode CLI Mixin was not included')
+        self.assertIn('opencode-cli@2.2.5', self.fake.created_runtime_mixin_spec)
+        self.assertIn('COPY --chmod=0755 opencode', self.fake.created_runtime_mixin_spec)
+        self.assertEqual(self.fake.created_cli_binary, self.cli_artifact.read_bytes())
+        self.assertFalse(any(call[:3] == ('exec', 'oc2-test', 'npm')
+                             for call in self.fake.calls))
         if self.fake.copied_config is None:
             self.fail('V2 config was not copied into the Sandbox')
         copied_config = json.loads(self.fake.copied_config)
@@ -176,34 +235,62 @@ class LauncherFlowTests(unittest.TestCase):
         self.assertNotIn('plugin', copied_config)
         self.assertNotIn('mcp', copied_config)
         launch = next(call for call in self.fake.calls if call[:2] == ('exec', '-it'))
-        self.assertEqual(launch[3], '/home/agent/workspace/synthetic')
+        self.assertEqual(launch[3], self.fake.workspace_destination)
         self.assertIn('env', launch)
         self.assertIn('-i', launch)
+        self.assertIn('OPENCODE_CONFIG_PROJECT_DISABLE=1', launch)
         self.assertEqual(launch[-2:], (oc2.PINNED[0], '--standalone'))
         self.assertIn('opencode=v2.2.5', output)
         self.assertFalse(any('--collect' in call or '--apply' in call for call in self.fake.calls))
 
-    def test_clone_mode_refuses_env_file_before_creating_sandbox(self):
+    def test_mountless_snapshot_excludes_env_file_before_transfer(self):
         (self.project / '.env').write_text('TOKEN=fixture-only')
-        status, output = self._run()
-        self.assertEqual(status, 1)
-        self.assertIn('clone mode would expose', output)
-        self.assertFalse(self.fake.created)
-        self.assertFalse(any(call[0] == 'create' and '--clone' in call for call in self.fake.calls))
+        status, output = self._run('--allow-paid-inference')
+        self.assertEqual(status, 0, output)
+        self.assertTrue(self.fake.created)
+        self.assertNotIn('.env', self.fake.workspace_files)
 
-    def test_clone_mode_refuses_project_opencode_configuration(self):
+    def test_mountless_workspace_excludes_project_opencode_configuration(self):
         (self.project / 'opencode.json').write_text('{"mcp":{}}\n')
-        status, output = self._run()
-        self.assertEqual(status, 1)
-        self.assertIn('OpenCode project configuration', output)
-        self.assertFalse(self.fake.created)
+        (self.project / '.opencode').mkdir()
+        (self.project / '.opencode' / 'opencode.jsonc').write_text('{"provider":"unsafe"}\n')
+        status, output = self._run('--allow-paid-inference')
+
+        self.assertEqual(status, 0, output)
+        create = next(call for call in self.fake.calls if call[0] == 'create' and '--name' in call)
+        self.assertEqual(create[:3], ('create', '--name', 'oc2-test'))
+        self.assertEqual(create[-1], oc2.SHELL_WORKLOAD)
+        self.assertNotIn('--clone', create)
+        self.assertNotIn(str(self.project), create)
+        self.assertEqual(set(self.fake.workspace_files), {'main.py'})
+        self.assertFalse(any(path.startswith('.opencode/') or path in {
+            'opencode.json', 'opencode.jsonc', 'cli.json', '.git/config',
+        } for path in self.fake.workspace_files))
+
+    def test_dotfiles_ai_profile_excludes_workspace_apm_but_exports_host_apm(self):
+        subprocess.run(
+            ['git', '-C', str(self.project), 'remote', 'add', 'origin',
+             'git@github.com:yohi/dotfiles-ai.git'],
+            check=True,
+        )
+        (self.project / 'apm.yml').write_text('apiKey: ' + 'C' * 32 + '\n')
+
+        status, output = self._run('--allow-paid-inference')
+
+        self.assertEqual(status, 0, output)
+        self.assertNotIn('apm.yml', self.fake.workspace_files)
+        self.assertIsNotNone(self.fake.copied_config)
+        if self.fake.copied_config is None:
+            self.fail('Host APM export was not copied into the Sandbox')
+        copied_config = json.loads(self.fake.copied_config)
+        self.assertEqual(copied_config['model'], 'openai/gpt-6-luna')
 
     def test_existing_sandbox_is_not_reused_or_rebuilt(self):
         self.fake.created = True
         status, output = self._run('--allow-paid-inference')
         self.assertEqual(status, 1)
         self.assertIn('refusing to reuse or rebuild', output)
-        self.assertFalse(any(call[0] == 'create' and '--clone' in call for call in self.fake.calls))
+        self.assertFalse(any(call[0] == 'create' and '--name' in call for call in self.fake.calls))
 
     def test_external_provider_requires_explicit_authorization_before_sandbox_commands(self):
         status, output = self._run()
@@ -267,7 +354,8 @@ class LauncherFlowTests(unittest.TestCase):
             call for call in self.fake.calls
             if call[:1] == ('create',) and '--kit' in call
         )
-        self.assertIn('--clone', create)
+        self.assertNotIn('--clone', create)
+        self.assertNotIn(str(self.project), create)
         self.assertIn('--kit', create)
         mixin_path = pathlib.Path(create[create.index('--kit') + 1])
         self.assertFalse(mixin_path.exists())
@@ -303,7 +391,7 @@ class LauncherFlowTests(unittest.TestCase):
 
         self.assertEqual(status, 1)
         self.assertIn('Mixin', output)
-        self.assertFalse(any(call[:1] == ('create',) and '--clone' in call
+        self.assertFalse(any(call[:1] == ('create',) and '--name' in call
                              for call in self.fake.calls))
 
 

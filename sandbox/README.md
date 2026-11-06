@@ -125,31 +125,52 @@ ln -s "$PWD/sandbox/scripts/oc2.py" "$HOME/.local/bin/oc2"
 インストール済みバージョンと `sbx create --help` の `--clone` 対応を確認します。
 Sandbox名が既に存在する場合は、再利用・再構築せず停止します。
 
-Clone modeはホストのGit RepositoryをRead-onlyでGuestから見える状態にし、Guest内の別Cloneで
-作業します。Dockerの仕様上、`.env`やGit除外ファイルもRead-only sourceに含まれます。
-そのため `oc2` は安全走査から除外されるファイル、特殊ファイル、symlink、認証情報らしい内容が
-あるWorkspaceをSandbox作成前に拒否します。`opencode.json`、`opencode.jsonc`、`cli.json`も拒否します。
-Phase 1の実機確認では、**新規の無害なテスト用Git Repositoryだけ**を使ってください。
-実プロジェクトには適用しないでください。
+通常起動はHost Workspaceをmountせず、検査済みSnapshotだけをGuestへコピーします。
+`.git`、認証情報を含むファイル、symlink、特殊ファイル、未承認のOpenCode設定は転送しません。
+残ったファイルにCredential検出が一致した場合はSandbox作成前に停止します。
+
+Workspace originが正確に `yohi/dotfiles-ai` の場合だけ、Workspace Safe Transfer Profile R1を適用します。
+他のRepositoryの `apm.yml` にはこの除外を適用しません。
+
+- `apm.yml`はHost側SSOTとして読み込み、HostでOpenCode V2設定を生成します。原本はGuestへ転送しません。
+- Guestでの`apm.yml`編集・新規作成はサポート対象外です。Guestで作った`apm.yml`はcollect/apply対象になりません。
+- `_docs/aws-resource-inventory.md`、`_scripts/generate_atlassian_auth.py`、
+  `.agents/skills/claude-api/csharp/claude-api/README.md`、
+  `sandbox/tests/test_v2_provider_security.py`もGuestへ転送しません。
+  内容の安全性を確認したという意味ではありません。
+- ローカル生成物、明示したWorkspace固有ファイル、およびSSOTへのsymlink adapterは転送しません。
+  それ以外のsymlinkやCredential検出対象は引き続きFail-Closedです。
+
+実機確認では、**新規の無害なテスト用Git Repositoryだけ**を使ってください。
+実プロジェクトへの適用は、個別の受入確認が終わるまで行わないでください。
 
 ```sh
 oc2 --version
 oc2 --dry-run --workspace "$HOME/path/to/oc2-safe-test-repo"
 cd "$HOME/path/to/oc2-safe-test-repo"
-oc2
+oc2 --allow-paid-inference
 ```
 
-通常起動は新規のClone-mode shell Sandboxを作成し、Sandbox内へ `@opencode/cli@2.2.5`を導入します。
+このAPM設定は外部Providerを選択するため、通常起動には
+`--allow-paid-inference`による起動ごとの明示承認が必要です。
+未指定の場合はSandbox作成前に停止します。
+
+通常起動はDockerのv3 shell workloadと2つのMixinを合成し、新規のmountless Sandboxを作成します。
+Credential MixinはHost側の認証仲介を担当します。CLI MixinはHostが公式GitHub Releaseから取得し、
+サイズ・SHA-256・Archive構造を検証したOpenCode v2.2.5 standalone BinaryをローカルCOPYします。
+Host PATHへはインストールせず、Guest内の`npm install`やKit build時のnpm Registry接続も行いません。
+新しいSandboxを作るたびに約119 MBの公式AssetをHostから取得します。Docker Hubのshell workload取得は別途必要です。
 Hostの環境変数は継承せず、Sandbox専用のHome/XDG領域を使います。Provider設定と一時
 Docker Credential Mixinを配置します。実CredentialはGuestへコピーせず、DockerのHost側
 Proxyと対話型Credential Bindingで扱います。OpenAI ChatGPT OAuthの実Sandbox上の交換・
 更新は未検証です。実行前に案内を確認してください。MCP、Plugin設定は渡しません。
-Workspace Snapshot、Manifest、ACL、Seed、collect/applyは実行経路に含めません。
+Workspace Snapshot、Manifest、ACLによる限定転送を行います。Guestでの作業をHostへ反映する場合は、
+Session receiptに基づくcollectと明示的なapplyが必要です。Profileで除外したパスは書戻し対象になりません。
 Sandbox作成後に失敗しても、自動削除しません。
 
-Docker Sandboxes `v0.49.2`はClone modeを提供することを確認済みです。`v0.50.1`も公式リリースですが、
-Host CLIの更新はこの手順では行いません。OpenCode `v2.2.5`は公式リリースで、npm package
-`@opencode/cli@2.2.5`をSandbox内に固定導入します。起動前に実行ファイルの`--version`が一致しなければ停止します。
+Docker Sandboxesはv3形式の公式Shell workloadを使います。OpenCode `v2.2.5`は公式Linux x64 Release
+AssetからHostのprivate temporary directoryへ取得し、GitHub Release APIのサイズとSHA-256で検証します。
+Hostへのインストールやnpm Registry利用は行いません。Kitから起動する前に実行ファイルの`--version`を確認します。
 
 実証Repositoryは実プロジェクトと独立した新規ディレクトリで作成します。検査で拒否された場合は
 回避せず、安全なテストRepositoryを作り直してください。Sandbox名が存在する場合は別名を指定します。
