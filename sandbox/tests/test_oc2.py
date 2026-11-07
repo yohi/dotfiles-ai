@@ -85,6 +85,62 @@ class FakeRunner:
         return ''
 
 
+class FakeSecretRunner:
+    def __init__(self, sandbox_scope=None, global_scope=None,
+                 *, set_fails=False, store_after_set=True,
+                 sandbox_service='cloudflare-ai-gateway', sandbox_type='service',
+                 sandbox_listing=None, global_listing=None, list_fails=False):
+        self.sandbox_scope = sandbox_scope
+        self.global_scope = global_scope
+        self.set_fails = set_fails
+        self.store_after_set = store_after_set
+        self.sandbox_service = sandbox_service
+        self.sandbox_type = sandbox_type
+        self.sandbox_listing_override = sandbox_listing
+        self.global_listing_override = global_listing
+        self.list_fails = list_fails
+        self.calls = []
+
+    @staticmethod
+    def listing(scope, service='cloudflare-ai-gateway', secret_type='service'):
+        secrets = []
+        if scope is not None:
+            secrets.append({
+                'name': service,
+                'scope': scope,
+                'secret': '(stored)',
+                'type': secret_type,
+            })
+        return json.dumps({'secrets': secrets})
+
+    def sbx(self, *args, capture=False, tty=False):
+        self.calls.append((args, capture, tty))
+        if args == (
+            'secret', 'ls', '--sandbox', 'oc2-dev',
+            '--service', 'cloudflare-ai-gateway', '--json',
+        ):
+            if self.list_fails:
+                raise oc2.Stop('sbx command failed (exit 1)')
+            if self.sandbox_listing_override is not None:
+                return self.sandbox_listing_override
+            return self.listing(self.sandbox_scope, self.sandbox_service, self.sandbox_type)
+        if args == (
+            'secret', 'ls', '--global', '--service', 'cloudflare-ai-gateway', '--json',
+        ):
+            if self.list_fails:
+                raise oc2.Stop('sbx command failed (exit 1)')
+            if self.global_listing_override is not None:
+                return self.global_listing_override
+            return self.listing(self.global_scope)
+        if args == ('secret', 'set', 'cloudflare-ai-gateway', '--sandbox', 'oc2-dev'):
+            if self.set_fails:
+                raise oc2.Stop('sbx command failed (exit 1)')
+            if self.store_after_set:
+                self.sandbox_scope = 'oc2-dev'
+            return ''
+        raise AssertionError(f'unexpected FakeRunner command: {args!r}')
+
+
 class HostTest(unittest.TestCase):
     def run_guest_wrapper(self, guest_environment, runtime_environment=()):
         target = (
@@ -229,6 +285,146 @@ class HostTest(unittest.TestCase):
         self.assertEqual(auth[4:6], ('python3', '-c'))
         self.assertNotIn('-i', auth)
         self.assertNotIn('-i', tui)
+
+    def test_cloudflare_credential_accepts_existing_sandbox_scope(self):
+        runner = FakeSecretRunner(sandbox_scope='oc2-dev', global_scope='(global)')
+
+        scope = oc2.ensure_cloudflare_credential(runner, 'oc2-dev', interactive=False)
+
+        self.assertEqual(scope, 'sandbox')
+        self.assertEqual(
+            runner.calls,
+            [(('secret', 'ls', '--sandbox', 'oc2-dev', '--service',
+               'cloudflare-ai-gateway', '--json'), True, False)],
+        )
+
+    def test_cloudflare_credential_accepts_existing_global_scope_without_changes(self):
+        runner = FakeSecretRunner(global_scope='(global)')
+
+        scope = oc2.ensure_cloudflare_credential(runner, 'oc2-dev', interactive=False)
+
+        self.assertEqual(scope, 'global')
+        self.assertEqual(
+            runner.calls,
+            [
+                (('secret', 'ls', '--sandbox', 'oc2-dev', '--service',
+                  'cloudflare-ai-gateway', '--json'), True, False),
+                (('secret', 'ls', '--global', '--service',
+                  'cloudflare-ai-gateway', '--json'), True, False),
+            ],
+        )
+
+    def test_cloudflare_credential_rejects_sandbox_scope_in_global_listing(self):
+        runner = FakeSecretRunner(global_scope='oc2-dev')
+
+        with self.assertRaisesRegex(oc2.Stop, 'scope'):
+            oc2.ensure_cloudflare_credential(runner, 'oc2-dev', interactive=True)
+
+        self.assertFalse(any(call[0][:2] == ('secret', 'set') for call in runner.calls))
+
+    def test_cloudflare_credential_missing_without_terminal_fails_closed(self):
+        runner = FakeSecretRunner()
+
+        with self.assertRaisesRegex(oc2.Stop, 'interactive terminal'):
+            oc2.ensure_cloudflare_credential(runner, 'oc2-dev', interactive=False)
+
+        self.assertEqual(
+            [call[0] for call in runner.calls],
+            [
+                ('secret', 'ls', '--sandbox', 'oc2-dev', '--service',
+                 'cloudflare-ai-gateway', '--json'),
+                ('secret', 'ls', '--global', '--service',
+                 'cloudflare-ai-gateway', '--json'),
+            ],
+        )
+        self.assertFalse(any(call[0][:2] == ('secret', 'set') for call in runner.calls))
+
+    def test_cloudflare_credential_missing_with_terminal_sets_and_verifies_scope(self):
+        runner = FakeSecretRunner()
+
+        scope = oc2.ensure_cloudflare_credential(runner, 'oc2-dev', interactive=True)
+
+        self.assertEqual(scope, 'sandbox')
+        self.assertEqual(
+            [call[0] for call in runner.calls],
+            [
+                ('secret', 'ls', '--sandbox', 'oc2-dev', '--service',
+                 'cloudflare-ai-gateway', '--json'),
+                ('secret', 'ls', '--global', '--service',
+                 'cloudflare-ai-gateway', '--json'),
+                ('secret', 'set', 'cloudflare-ai-gateway', '--sandbox', 'oc2-dev'),
+                ('secret', 'ls', '--sandbox', 'oc2-dev', '--service',
+                 'cloudflare-ai-gateway', '--json'),
+            ],
+        )
+        self.assertEqual(runner.calls[2][1:], (False, True))
+
+    def test_cloudflare_credential_set_failure_stops_before_verification(self):
+        runner = FakeSecretRunner(set_fails=True)
+
+        with self.assertRaisesRegex(oc2.Stop, 'sbx command failed'):
+            oc2.ensure_cloudflare_credential(runner, 'oc2-dev', interactive=True)
+
+        self.assertEqual(len(runner.calls), 3)
+        self.assertEqual(runner.calls[-1][0][0:2], ('secret', 'set'))
+
+    def test_cloudflare_credential_unverified_after_set_fails_closed(self):
+        runner = FakeSecretRunner(store_after_set=False)
+
+        with self.assertRaisesRegex(oc2.Stop, 'not verified'):
+            oc2.ensure_cloudflare_credential(runner, 'oc2-dev', interactive=True)
+
+        self.assertEqual(
+            runner.calls[-1][0],
+            ('secret', 'ls', '--sandbox', 'oc2-dev', '--service',
+             'cloudflare-ai-gateway', '--json'),
+        )
+
+    def test_cloudflare_credential_malformed_listing_fails_closed(self):
+        malformed_listings = (
+            '',
+            'not-json',
+            '{}',
+            '{"secrets":null}',
+            '{"secrets":{}}',
+            '{"secrets":[{"name":"cloudflare-ai-gateway"}]}',
+            '{"secrets":[{"name":"cloudflare-ai-gateway","scope":"oc2-dev",'
+            '"secret":"(stored)","type":"service","extra":true}]}',
+        )
+        for listing in malformed_listings:
+            with self.subTest(listing=listing):
+                runner = FakeSecretRunner(sandbox_listing=listing)
+                with self.assertRaisesRegex(oc2.Stop, 'JSON|schema'):
+                    oc2.ensure_cloudflare_credential(runner, 'oc2-dev', interactive=True)
+                self.assertFalse(
+                    any(call[0][:2] == ('secret', 'set') for call in runner.calls),
+                )
+
+    def test_cloudflare_credential_ignores_different_service_name(self):
+        runner = FakeSecretRunner(
+            sandbox_scope='oc2-dev', sandbox_service='another-service',
+        )
+
+        with self.assertRaisesRegex(oc2.Stop, 'interactive terminal'):
+            oc2.ensure_cloudflare_credential(runner, 'oc2-dev', interactive=False)
+
+        self.assertFalse(any(call[0][:2] == ('secret', 'set') for call in runner.calls))
+
+    def test_cloudflare_credential_rejects_unknown_secret_type(self):
+        runner = FakeSecretRunner(sandbox_scope='oc2-dev', sandbox_type='registry')
+
+        with self.assertRaisesRegex(oc2.Stop, 'type'):
+            oc2.ensure_cloudflare_credential(runner, 'oc2-dev', interactive=True)
+
+        self.assertFalse(any(call[0][:2] == ('secret', 'set') for call in runner.calls))
+
+    def test_cloudflare_credential_list_command_failure_is_not_empty_list(self):
+        runner = FakeSecretRunner(list_fails=True)
+
+        with self.assertRaisesRegex(oc2.Stop, 'could not be checked'):
+            oc2.ensure_cloudflare_credential(runner, 'oc2-dev', interactive=True)
+
+        self.assertEqual(len(runner.calls), 1)
 
     def test_destination_guest_exit_codes_for_real_filesystem(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -1312,6 +1508,83 @@ class HostTest(unittest.TestCase):
                 oc2.cloudflare_gateway_runtime(config, 'a' * 32, 'gateway-1'),
                 oc2.CloudflareGatewayRuntime('a' * 32, 'gateway-1'),
             )
+
+    def test_unrequested_cloudflare_provider_is_removed_from_runtime_config(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config = pathlib.Path(tmp) / 'opencode.jsonc'
+            config.write_text(json.dumps({
+                'model': 'openai/gpt-6-luna',
+                'providers': {
+                    'openai': {'models': {}},
+                    'cloudflare-ai-gateway-custom': {'models': {'secret-model': {}}},
+                },
+                'policies': [
+                    {'action': 'provider.use', 'resource': '*', 'effect': 'deny'},
+                    {'action': 'provider.use', 'resource': 'openai', 'effect': 'allow'},
+                    {
+                        'action': 'provider.use',
+                        'resource': 'cloudflare-ai-gateway-custom',
+                        'effect': 'allow',
+                    },
+                ],
+            }))
+
+            selected = oc2.configure_cloudflare_provider(config, include_cloudflare=False)
+
+            runtime_config = json.loads(config.read_text())
+
+        self.assertFalse(selected)
+        self.assertEqual(set(runtime_config['providers']), {'openai'})
+        self.assertFalse(any(
+            policy.get('resource') == 'cloudflare-ai-gateway-custom'
+            for policy in runtime_config['policies']
+        ))
+
+    def test_explicit_cloudflare_mode_keeps_provider_available(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config = pathlib.Path(tmp) / 'opencode.jsonc'
+            original = {
+                'model': 'openai/gpt-6-luna',
+                'providers': {
+                    'openai': {'models': {}},
+                    'cloudflare-ai-gateway-custom': {'models': {'secret-model': {}}},
+                },
+                'policies': [],
+            }
+            config.write_text(json.dumps(original))
+
+            selected = oc2.configure_cloudflare_provider(config, include_cloudflare=True)
+
+            self.assertTrue(selected)
+            self.assertEqual(json.loads(config.read_text()), original)
+
+    def test_cloudflare_default_model_requires_provider_even_without_flag(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config = pathlib.Path(tmp) / 'opencode.jsonc'
+            config.write_text(json.dumps({
+                'model': 'cloudflare-ai-gateway-custom/secret-model',
+                'providers': {
+                    'openai': {'models': {}},
+                    'cloudflare-ai-gateway-custom': {'models': {'secret-model': {}}},
+                },
+                'policies': [],
+            }))
+
+            selected = oc2.configure_cloudflare_provider(config, include_cloudflare=False)
+
+        self.assertTrue(selected)
+
+    def test_cloudflare_mode_without_provider_configuration_fails_closed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config = pathlib.Path(tmp) / 'opencode.jsonc'
+            config.write_text(json.dumps({
+                'model': 'openai/gpt-6-luna',
+                'providers': {'openai': {'models': {}}},
+                'policies': [],
+            }))
+
+            with self.assertRaisesRegex(oc2.Stop, 'no configured provider'):
+                oc2.configure_cloudflare_provider(config, include_cloudflare=True)
 
     def test_credential_mixin_spec_declares_proxy_bindings(self):
         spec = yaml.safe_load(oc2.credential_mixin_spec('oc2-credentials-a1b2c3'))

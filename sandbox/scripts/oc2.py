@@ -24,7 +24,7 @@ import subprocess
 import sys
 import tarfile
 import tempfile
-from typing import TYPE_CHECKING, Final
+from typing import TYPE_CHECKING, Final, Literal
 from urllib.parse import urlsplit
 
 import yaml
@@ -54,6 +54,7 @@ CLI_REDIRECT_HOSTS: Final[frozenset[str]] = frozenset({
 })
 NAME_RE = re.compile(r'^[A-Za-z0-9][A-Za-z0-9.-]{0,61}[A-Za-z0-9]$')
 CF_GATEWAY_PROVIDER_ID: Final[str] = 'cloudflare-ai-gateway-custom'
+CLOUDFLARE_SECRET_NAME: Final[str] = 'cloudflare-ai-gateway'
 CLOUDFLARE_TOKEN_PLACEHOLDER: Final[str] = 'proxy-managed'
 OPENAI_ACCESS_TOKEN_SENTINEL: Final[str] = 'oai-oat01-proxy-managed'
 OPENAI_REFRESH_TOKEN_SENTINEL: Final[str] = 'oai-ort01-proxy-managed'
@@ -324,7 +325,7 @@ def cloudflare_gateway_runtime(
         raise Stop('generated OpenCode config could not be read') from exc
     if not isinstance(config, dict):
         raise Stop('generated OpenCode config is not an object')
-    providers = config.get('providers')
+    providers = config.get('providers', {})
     if not isinstance(providers, dict):
         raise Stop('generated OpenCode provider selection is invalid')
     if CF_GATEWAY_PROVIDER_ID not in providers:
@@ -337,6 +338,158 @@ def cloudflare_gateway_runtime(
             or re.fullmatch(r'[a-z0-9][a-z0-9-]{0,63}', gateway_id) is None):
         raise Stop('Cloudflare runtime identifiers are missing or invalid')
     return CloudflareGatewayRuntime(account_id=account_id, gateway_id=gateway_id)
+
+
+def configure_cloudflare_provider(
+    config_file: pathlib.Path,
+    *,
+    include_cloudflare: bool,
+) -> bool:
+    """Expose the Gateway provider only when explicitly requested or defaulted."""
+    if config_file.is_symlink() or not config_file.is_file():
+        raise Stop('generated OpenCode config is missing or unsafe')
+    try:
+        config = json.loads(config_file.read_text(encoding='utf-8'))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise Stop('generated OpenCode config could not be read') from exc
+    if not isinstance(config, dict):
+        raise Stop('generated OpenCode config is not an object')
+    providers = config.get('providers', {})
+    if not isinstance(providers, dict):
+        raise Stop('generated OpenCode provider selection is invalid')
+    cloudflare_provider = providers.get(CF_GATEWAY_PROVIDER_ID)
+    if cloudflare_provider is not None and not isinstance(cloudflare_provider, dict):
+        raise Stop('generated Cloudflare provider selection is invalid')
+
+    default_model = config.get('model')
+    default_uses_cloudflare = (
+        isinstance(default_model, str)
+        and default_model.partition('/')[0] == CF_GATEWAY_PROVIDER_ID
+    )
+    if include_cloudflare or default_uses_cloudflare:
+        if cloudflare_provider is None:
+            raise Stop('Cloudflare Gateway mode has no configured provider')
+        return True
+    if cloudflare_provider is None:
+        return False
+
+    policies = config.get('policies', [])
+    if not isinstance(policies, list) or any(not isinstance(policy, dict) for policy in policies):
+        raise Stop('generated OpenCode provider policies are invalid')
+    config['providers'] = {
+        provider_id: provider
+        for provider_id, provider in providers.items()
+        if provider_id != CF_GATEWAY_PROVIDER_ID
+    }
+    config['policies'] = [
+        policy for policy in policies
+        if policy.get('resource') != CF_GATEWAY_PROVIDER_ID
+    ]
+    try:
+        config_file.write_text(
+            json.dumps(config, ensure_ascii=False, indent=2) + '\n',
+            encoding='utf-8',
+        )
+    except OSError as exc:
+        raise Stop('generated OpenCode config could not be prepared') from exc
+    return False
+
+
+def _cloudflare_secret_scope(
+    listing: str,
+    sandbox_name: str,
+) -> Literal['sandbox', 'global'] | None:
+    """Parse only scope metadata for the Cloudflare service secret."""
+    try:
+        document = json.loads(listing)
+    except json.JSONDecodeError as exc:
+        raise Stop('Cloudflare credential listing JSON is invalid') from None
+    if not isinstance(document, dict) or set(document) != {'secrets'}:
+        raise Stop('Cloudflare credential listing JSON schema is unsupported')
+    entries = document['secrets']
+    if not isinstance(entries, list):
+        raise Stop('Cloudflare credential listing JSON schema is invalid')
+
+    scopes: set[Literal['sandbox', 'global']] = set()
+    expected_fields = {'name', 'scope', 'secret', 'type'}
+    for entry in entries:
+        if not isinstance(entry, dict) or set(entry) != expected_fields:
+            raise Stop('Cloudflare credential entry schema is unsupported')
+        name = entry['name']
+        scope = entry['scope']
+        secret_type = entry['type']
+        if (not isinstance(name, str) or not isinstance(scope, str)
+                or not isinstance(entry['secret'], str)
+                or not isinstance(secret_type, str)):
+            raise Stop('Cloudflare credential entry schema is invalid')
+        if name != CLOUDFLARE_SECRET_NAME:
+            continue
+        if secret_type != 'service':
+            raise Stop('Cloudflare credential type is unexpected')
+        if scope == sandbox_name:
+            scopes.add('sandbox')
+        elif scope in ('(global)', 'global'):
+            scopes.add('global')
+        else:
+            raise Stop('Cloudflare credential scope is unexpected')
+
+    if 'sandbox' in scopes:
+        return 'sandbox'
+    if 'global' in scopes:
+        return 'global'
+    return None
+
+
+def _read_cloudflare_secret_scope(
+    runner: Runner,
+    sandbox_name: str,
+    *,
+    global_scope: bool,
+) -> Literal['sandbox', 'global'] | None:
+    command = (
+        ('secret', 'ls', '--global', '--service', CLOUDFLARE_SECRET_NAME, '--json')
+        if global_scope
+        else (
+            'secret', 'ls', '--sandbox', sandbox_name,
+            '--service', CLOUDFLARE_SECRET_NAME, '--json',
+        )
+    )
+    try:
+        listing = runner.sbx(*command, capture=True)
+    except Stop:
+        raise Stop('Cloudflare credential availability could not be checked') from None
+    scope = _cloudflare_secret_scope(listing, sandbox_name)
+    expected_scope = 'global' if global_scope else 'sandbox'
+    if scope is not None and scope != expected_scope:
+        raise Stop('Cloudflare credential listing returned an unexpected scope')
+    return scope
+
+
+def ensure_cloudflare_credential(
+    runner: Runner,
+    sandbox_name: str,
+    *,
+    interactive: bool,
+) -> Literal['sandbox', 'global']:
+    scope = _read_cloudflare_secret_scope(runner, sandbox_name, global_scope=False)
+    if scope is not None:
+        return scope
+
+    scope = _read_cloudflare_secret_scope(runner, sandbox_name, global_scope=True)
+    if scope == 'global':
+        return scope
+
+    if not interactive:
+        raise Stop('Cloudflare credential is missing; an interactive terminal is required')
+
+    runner.sbx(
+        'secret', 'set', CLOUDFLARE_SECRET_NAME, '--sandbox', sandbox_name,
+        tty=True,
+    )
+    scope = _read_cloudflare_secret_scope(runner, sandbox_name, global_scope=False)
+    if scope != 'sandbox':
+        raise Stop('Cloudflare sandbox-scoped credential was not verified')
+    return scope
 
 
 def requires_external_inference(config_file: pathlib.Path) -> bool:
@@ -933,6 +1086,8 @@ def main(argv: list[str] | None = None) -> int:
                    help='export and verify APM config without Sandbox commands')
     p.add_argument('--allow-paid-inference', action='store_true',
                    help='authorize external inference for this interactive launch')
+    p.add_argument('--use-cloudflare-ai-gateway', action='store_true',
+                   help='enable Cloudflare AI Gateway and provision its Sandbox credential')
     args = p.parse_args(argv)
     oc2_workspace = importlib.import_module('oc2_workspace')
 
@@ -981,6 +1136,10 @@ def main(argv: list[str] | None = None) -> int:
         with tempfile.TemporaryDirectory(prefix='oc2-v2-config-') as temporary:
             temporary_path = pathlib.Path(temporary)
             config_file = export_v2_config(repo, temporary_path / 'export')
+            configure_cloudflare_provider(
+                config_file,
+                include_cloudflare=args.use_cloudflare_ai_gateway,
+            )
             if (requires_external_inference(config_file)
                     and not args.allow_paid_inference):
                 raise Stop('external inference requires --allow-paid-inference')
@@ -1026,6 +1185,13 @@ def main(argv: list[str] | None = None) -> int:
                     runner.sbx(*mountless_create_args(
                         args.sandbox, credential_mixin, cli_mixin,
                     ))
+            if cloudflare is not None:
+                credential_scope = ensure_cloudflare_credential(
+                    runner,
+                    args.sandbox,
+                    interactive=sys.stdin.isatty(),
+                )
+                print('OC2_CLOUDFLARE_CREDENTIAL: available (' + credential_scope + ' scope)')
             cli = provision_cli(runner, args.sandbox)
             snapshot_path = temporary_path / 'workspace-snapshot'
             workdir = transfer_workspace(

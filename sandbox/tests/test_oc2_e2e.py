@@ -34,8 +34,26 @@ class FakeSbx:
         self.created_runtime_mixin_spec: str | None = None
         self.created_cli_binary: bytes | None = None
         self.mixin_exists_at_launch: bool | None = None
+        self.sandbox_cloudflare_secret = True
+        self.global_cloudflare_secret = False
+        self.secret_set_fails = False
+        self.secret_set_stores = True
+        self.secret_set_tty: bool | None = None
+        self.secret_calls: list[tuple[str, ...]] = []
         self.calls: list[tuple[str, ...]] = []
         self.user = oc2.getpass.getuser()
+
+    @staticmethod
+    def _secret_listing(scope: str | None) -> str:
+        secrets = []
+        if scope is not None:
+            secrets.append({
+                'name': 'cloudflare-ai-gateway',
+                'scope': scope,
+                'secret': '(stored)',
+                'type': 'service',
+            })
+        return json.dumps({'secrets': secrets})
 
     def destination_status(self, name: str, destination: str) -> int:
         self.calls.append(('destination_status', name, destination))
@@ -43,6 +61,27 @@ class FakeSbx:
 
     def sbx(self, *args: str, capture: bool = False, tty: bool = False) -> str:
         self.calls.append(args)
+        if args == (
+            'secret', 'ls', '--sandbox', 'oc2-test', '--service',
+            'cloudflare-ai-gateway', '--json',
+        ):
+            self.secret_calls.append(args)
+            scope = 'oc2-test' if self.sandbox_cloudflare_secret else None
+            return self._secret_listing(scope)
+        if args == (
+            'secret', 'ls', '--global', '--service', 'cloudflare-ai-gateway', '--json',
+        ):
+            self.secret_calls.append(args)
+            scope = '(global)' if self.global_cloudflare_secret else None
+            return self._secret_listing(scope)
+        if args == ('secret', 'set', 'cloudflare-ai-gateway', '--sandbox', 'oc2-test'):
+            self.secret_calls.append(args)
+            self.secret_set_tty = tty
+            if self.secret_set_fails:
+                raise oc2.Stop('sbx command failed (exit 1)')
+            if self.secret_set_stores:
+                self.sandbox_cloudflare_secret = True
+            return ''
         if args == ('version',):
             return 'sbx version v0.49.2 test\n'
         if args == ('create', '--help'):
@@ -157,6 +196,7 @@ class LauncherFlowTests(unittest.TestCase):
         self,
         *extra_args: str,
         host_env: Mapping[str, str] | None = None,
+        stdin_tty: bool | None = None,
     ) -> tuple[int, str]:
         output = io.StringIO()
         args = [
@@ -165,7 +205,12 @@ class LauncherFlowTests(unittest.TestCase):
             *extra_args,
         ]
         env = host_env or {'OC_CF_ACCOUNT_ID': 'a' * 32, 'OC_CF_GATEWAY_ID': 'gateway-1'}
-        with patch.dict(oc2.os.environ):
+        tty_context = (
+            contextlib.nullcontext()
+            if stdin_tty is None
+            else patch.object(oc2.sys, 'stdin', FakeInput(stdin_tty))
+        )
+        with patch.dict(oc2.os.environ), tty_context:
             for name in ('OC_CF_ACCOUNT_ID', 'OC_CF_GATEWAY_ID', 'OC_CF_API_TOKEN'):
                 oc2.os.environ.pop(name, None)
             oc2.os.environ.update(env)
@@ -176,7 +221,7 @@ class LauncherFlowTests(unittest.TestCase):
                     status = oc2.main(args)
                 except SystemExit as exc:
                     status = int(exc.code)
-        return status, output.getvalue()
+                return status, output.getvalue()
 
     def _write_cloudflare_apm(self) -> None:
         (self.repo / 'apm.yml').write_text(
@@ -208,6 +253,123 @@ class LauncherFlowTests(unittest.TestCase):
             '      auth_method: docker_custom_secret\n',
         )
 
+    def test_cloudflare_sandbox_secret_is_checked_before_workspace_and_tui(self):
+        status, output = self._run(
+            '--allow-paid-inference', '--use-cloudflare-ai-gateway',
+        )
+
+        self.assertEqual(status, 0, output)
+        sandbox_check = (
+            'secret', 'ls', '--sandbox', 'oc2-test', '--service',
+            'cloudflare-ai-gateway', '--json',
+        )
+        self.assertIn(sandbox_check, self.fake.secret_calls)
+        self.assertFalse(any(call[:2] == ('secret', 'set') for call in self.fake.secret_calls))
+        check_index = self.fake.calls.index(sandbox_check)
+        create_index = next(
+            index for index, call in enumerate(self.fake.calls)
+            if call[:2] == ('create', '--name')
+        )
+        workspace_copy_index = next(
+            index for index, call in enumerate(self.fake.calls)
+            if call[:1] == ('cp',) and ':/' in call[2]
+        )
+        launch_index = next(
+            index for index, call in enumerate(self.fake.calls)
+            if call[:2] == ('exec', '-it')
+        )
+        self.assertLess(create_index, check_index)
+        self.assertLess(check_index, workspace_copy_index)
+        self.assertLess(check_index, launch_index)
+
+    def test_missing_cloudflare_secret_without_terminal_stops_before_transfer(self):
+        self.fake.sandbox_cloudflare_secret = False
+        status, output = self._run(
+            '--allow-paid-inference', '--use-cloudflare-ai-gateway', stdin_tty=False,
+        )
+
+        self.assertNotEqual(status, 0)
+        self.assertIn('interactive terminal', output)
+        self.assertFalse(any(call[:2] == ('secret', 'set') for call in self.fake.secret_calls))
+        self.assertIsNone(self.fake.workspace_destination)
+        self.assertFalse(any(call[:2] == ('exec', '-it') for call in self.fake.calls))
+
+    def test_cloudflare_default_model_requires_secret_without_mode_flag(self):
+        apm = self.repo / 'apm.yml'
+        apm.write_text(apm.read_text().replace(
+            'default_model: openai/gpt-6-luna',
+            'default_model: cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.7-code',
+        ))
+        self.fake.sandbox_cloudflare_secret = False
+
+        status, output = self._run('--allow-paid-inference', stdin_tty=False)
+
+        self.assertNotEqual(status, 0)
+        self.assertIn('interactive terminal', output)
+        self.assertIn(
+            ('secret', 'ls', '--sandbox', 'oc2-test', '--service',
+             'cloudflare-ai-gateway', '--json'),
+            self.fake.secret_calls,
+        )
+        self.assertIsNone(self.fake.workspace_destination)
+        self.assertFalse(any(call[:2] == ('exec', '-it') for call in self.fake.calls))
+
+    def test_missing_cloudflare_secret_is_set_in_sandbox_scope_and_verified(self):
+        self.fake.sandbox_cloudflare_secret = False
+        status, output = self._run(
+            '--allow-paid-inference', '--use-cloudflare-ai-gateway', stdin_tty=True,
+        )
+
+        self.assertEqual(status, 0, output)
+        self.assertIn(
+            ('secret', 'set', 'cloudflare-ai-gateway', '--sandbox', 'oc2-test'),
+            self.fake.secret_calls,
+        )
+        self.assertTrue(self.fake.secret_set_tty)
+        self.assertEqual(
+            self.fake.secret_calls[-1],
+            ('secret', 'ls', '--sandbox', 'oc2-test', '--service',
+             'cloudflare-ai-gateway', '--json'),
+        )
+        self.assertTrue(any(call[:2] == ('exec', '-it') for call in self.fake.calls))
+
+    def test_existing_global_cloudflare_secret_is_read_only(self):
+        self.fake.sandbox_cloudflare_secret = False
+        self.fake.global_cloudflare_secret = True
+        status, output = self._run(
+            '--allow-paid-inference', '--use-cloudflare-ai-gateway', stdin_tty=False,
+        )
+
+        self.assertEqual(status, 0, output)
+        self.assertIn(
+            ('secret', 'ls', '--global', '--service', 'cloudflare-ai-gateway', '--json'),
+            self.fake.secret_calls,
+        )
+        self.assertFalse(any(call[:2] == ('secret', 'set') for call in self.fake.secret_calls))
+
+    def test_cloudflare_secret_set_failure_stops_before_workspace_transfer(self):
+        self.fake.sandbox_cloudflare_secret = False
+        self.fake.secret_set_fails = True
+        status, output = self._run(
+            '--allow-paid-inference', '--use-cloudflare-ai-gateway', stdin_tty=True,
+        )
+
+        self.assertNotEqual(status, 0)
+        self.assertIsNone(self.fake.workspace_destination)
+        self.assertFalse(any(call[:2] == ('exec', '-it') for call in self.fake.calls))
+
+    def test_configuration_without_gateway_provider_skips_cloudflare_secret(self):
+        (self.repo / 'apm.yml').write_text(
+            'shell: bash\n'
+            'snapshot: true\n',
+        )
+
+        status, output = self._run()
+
+        self.assertEqual(status, 0, output)
+        self.assertFalse(self.fake.secret_calls)
+        self.assertTrue(any(call[:2] == ('exec', '-it') for call in self.fake.calls))
+
     def test_mountless_snapshot_installs_and_launches_only_pinned_v2(self):
         status, output = self._run('--allow-paid-inference')
         self.assertEqual(status, 0, output)
@@ -231,6 +393,7 @@ class LauncherFlowTests(unittest.TestCase):
             self.fail('V2 config was not copied into the Sandbox')
         copied_config = json.loads(self.fake.copied_config)
         self.assertEqual(copied_config['model'], 'openai/gpt-6-luna')
+        self.assertNotIn('cloudflare-ai-gateway-custom', copied_config['providers'])
         self.assertIn('policies', copied_config)
         self.assertNotIn('plugin', copied_config)
         self.assertNotIn('mcp', copied_config)
@@ -242,6 +405,16 @@ class LauncherFlowTests(unittest.TestCase):
         self.assertEqual(launch[-2:], (oc2.PINNED[0], '--standalone'))
         self.assertIn('opencode=v2.2.5', output)
         self.assertFalse(any('--collect' in call or '--apply' in call for call in self.fake.calls))
+
+    def test_openai_mode_hides_cloudflare_without_secret_or_terminal(self):
+        self.fake.sandbox_cloudflare_secret = False
+        status, output = self._run('--allow-paid-inference', stdin_tty=False)
+
+        self.assertEqual(status, 0, output)
+        copied_config = json.loads(self.fake.copied_config)
+        self.assertEqual(copied_config['model'], 'openai/gpt-6-luna')
+        self.assertNotIn('cloudflare-ai-gateway-custom', copied_config['providers'])
+        self.assertFalse(self.fake.secret_calls)
 
     def test_mountless_snapshot_excludes_env_file_before_transfer(self):
         (self.project / '.env').write_text('TOKEN=fixture-only')
@@ -308,11 +481,14 @@ class LauncherFlowTests(unittest.TestCase):
 
     def test_cloudflare_end_to_end_uses_proxy_placeholder_only(self):
         self._write_cloudflare_apm()
-        status, output = self._run('--allow-paid-inference', host_env={
-            'OC_CF_ACCOUNT_ID': 'a' * 32,
-            'OC_CF_GATEWAY_ID': 'gateway-1',
-            'OC_CF_API_TOKEN': 'sensitive-poison-value',
-        })
+        status, output = self._run(
+            '--allow-paid-inference', '--use-cloudflare-ai-gateway',
+            host_env={
+                'OC_CF_ACCOUNT_ID': 'a' * 32,
+                'OC_CF_GATEWAY_ID': 'gateway-1',
+                'OC_CF_API_TOKEN': 'sensitive-poison-value',
+            },
+        )
 
         self.assertEqual(status, 0, output)
         launch = next(call for call in self.fake.calls if call[:2] == ('exec', '-it'))
@@ -325,7 +501,7 @@ class LauncherFlowTests(unittest.TestCase):
     def test_cloudflare_missing_identifiers_stop_before_sandbox_commands(self):
         self._write_cloudflare_apm()
         status, output = self._run(
-            '--allow-paid-inference',
+            '--allow-paid-inference', '--use-cloudflare-ai-gateway',
             host_env={'OC_CF_ACCOUNT_ID': '', 'OC_CF_GATEWAY_ID': 'gateway-1'},
         )
 
@@ -393,6 +569,14 @@ class LauncherFlowTests(unittest.TestCase):
         self.assertIn('Mixin', output)
         self.assertFalse(any(call[:1] == ('create',) and '--name' in call
                              for call in self.fake.calls))
+
+
+class FakeInput:
+    def __init__(self, is_tty: bool):
+        self._is_tty = is_tty
+
+    def isatty(self) -> bool:
+        return self._is_tty
 
 
 if __name__ == '__main__':
