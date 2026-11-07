@@ -86,6 +86,150 @@ class FakeRunner:
 
 
 class HostTest(unittest.TestCase):
+    def run_guest_wrapper(self, guest_environment, runtime_environment=()):
+        target = (
+            'import json, os; '
+            'print(json.dumps(dict(os.environ), sort_keys=True))'
+        )
+        command = [
+            sys.executable, '-c', oc2.GUEST_EXEC_WRAPPER, '--',
+            *runtime_environment, '--', sys.executable, '-c', target,
+        ]
+        return subprocess.run(
+            command, capture_output=True, text=True, check=False,
+            env=guest_environment,
+        )
+
+    def test_guest_wrapper_prefers_guest_proxy_and_discards_other_environment(self):
+        guest_environment = {
+            'PATH': os.environ['PATH'],
+            'HTTPS_PROXY': 'http://guest-proxy.example.test:8080',
+            'GUEST_SECRET': 'guest-poison-value',
+        }
+        with patch.dict(os.environ, {
+            'HTTPS_PROXY': 'http://host-proxy.example.test:8080',
+            'HOST_SECRET': 'host-poison-value',
+        }):
+            result = self.run_guest_wrapper(
+                guest_environment, ('HOME=/runtime/home', 'OPENCODE_DB=/runtime/db'),
+            )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        child_environment = json.loads(result.stdout)
+        self.assertEqual(
+            child_environment['HTTPS_PROXY'],
+            'http://guest-proxy.example.test:8080',
+        )
+        self.assertEqual(child_environment['HOME'], '/runtime/home')
+        self.assertEqual(child_environment['OPENCODE_DB'], '/runtime/db')
+        self.assertNotIn('HOST_SECRET', child_environment)
+        self.assertNotIn('GUEST_SECRET', child_environment)
+
+    def test_guest_wrapper_fails_closed_when_only_host_has_https_proxy(self):
+        with patch.dict(os.environ, {
+            'HTTPS_PROXY': 'http://host-proxy.example.test:8080',
+        }):
+            result = self.run_guest_wrapper({'PATH': os.environ['PATH']})
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(result.stdout, '')
+        self.assertNotIn('host-proxy.example.test', result.stderr)
+
+    def test_guest_wrapper_rejects_invalid_guest_proxy_without_logging_value(self):
+        invalid_proxy = 'http://user:secret@guest-proxy.example.test:8080'
+        result = self.run_guest_wrapper({
+            'PATH': os.environ['PATH'],
+            'HTTPS_PROXY': invalid_proxy,
+        })
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertNotIn(invalid_proxy, result.stdout + result.stderr)
+
+    def test_guest_wrapper_rejects_unsupported_proxy_scheme(self):
+        result = self.run_guest_wrapper({
+            'PATH': os.environ['PATH'],
+            'HTTPS_PROXY': 'file:///tmp/proxy.sock',
+        })
+
+        self.assertNotEqual(result.returncode, 0)
+
+    def test_guest_wrapper_rejects_credentials_in_optional_http_proxy(self):
+        result = self.run_guest_wrapper({
+            'PATH': os.environ['PATH'],
+            'HTTPS_PROXY': 'http://guest-proxy.example.test:8080',
+            'HTTP_PROXY': 'http://user:secret@guest-proxy.example.test:8080',
+        })
+
+        self.assertNotEqual(result.returncode, 0)
+
+    def test_guest_wrapper_rejects_conflicting_case_variants(self):
+        result = self.run_guest_wrapper({
+            'PATH': os.environ['PATH'],
+            'HTTPS_PROXY': 'http://one.example.test:8080',
+            'https_proxy': 'http://two.example.test:8080',
+        })
+
+        self.assertNotEqual(result.returncode, 0)
+
+    def test_guest_wrapper_rejects_openai_host_in_no_proxy(self):
+        result = self.run_guest_wrapper({
+            'PATH': os.environ['PATH'],
+            'HTTPS_PROXY': 'http://guest-proxy.example.test:8080',
+            'NO_PROXY': 'localhost,chatgpt.com',
+        })
+
+        self.assertNotEqual(result.returncode, 0)
+
+    def test_guest_wrapper_accepts_gateway_docker_internal_exact_no_proxy(self):
+        no_proxy = 'localhost,127.0.0.1,::1,gateway.docker.internal'
+        result = self.run_guest_wrapper({
+            'PATH': os.environ['PATH'],
+            'HTTPS_PROXY': 'http://guest-proxy.example.test:8080',
+            'NO_PROXY': no_proxy,
+        })
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(json.loads(result.stdout)['NO_PROXY'], no_proxy)
+
+    def test_guest_wrapper_rejects_nonexact_or_unsafe_no_proxy_entries(self):
+        for no_proxy in (
+            '.gateway.docker.internal',
+            'evil.gateway.docker.internal',
+            '*.docker.internal',
+            '*',
+            'openai.com',
+            'gateway.docker.internal,chatgpt.com',
+        ):
+            with self.subTest(no_proxy=no_proxy):
+                result = self.run_guest_wrapper({
+                    'PATH': os.environ['PATH'],
+                    'HTTPS_PROXY': 'http://guest-proxy.example.test:8080',
+                    'NO_PROXY': no_proxy,
+                })
+
+                self.assertNotEqual(result.returncode, 0)
+
+    def test_launch_uses_guest_wrapper_for_both_processes_without_host_proxy_values(self):
+        runner = FakeRunner()
+        request = oc2.SandboxLaunch(
+            'oc2-dev', 'a' * 64, oc2.PINNED[0], '/workspace/project',
+            pathlib.Path('/tmp/config'),
+        )
+        with patch.dict(os.environ, {
+            'HTTPS_PROXY': 'http://host-proxy.example.test:8080',
+            'SENSITIVE_FAKE_KEY': 'host-poison-value',
+        }, clear=True):
+            oc2.launch(runner, request)
+
+        auth, tui = runner.calls[-2:]
+        self.assertIn(oc2.GUEST_EXEC_WRAPPER, auth)
+        self.assertIn(oc2.GUEST_EXEC_WRAPPER, tui)
+        self.assertNotIn('host-proxy.example.test', repr(runner.calls))
+        self.assertNotIn('host-poison-value', repr(runner.calls))
+        self.assertEqual(auth[4:6], ('python3', '-c'))
+        self.assertNotIn('-i', auth)
+        self.assertNotIn('-i', tui)
+
     def test_destination_guest_exit_codes_for_real_filesystem(self):
         with tempfile.TemporaryDirectory() as tmp:
             parent = pathlib.Path(tmp) / 'parent'
@@ -901,7 +1045,8 @@ class HostTest(unittest.TestCase):
         command = runner.calls[-1]
         self.assertEqual(command[:3], ('exec', '-it', '-w'))
         self.assertEqual(command[3], runtime + '/project')
-        self.assertEqual(command[4:7], ('oc2-dev', 'env', '-i'))
+        self.assertEqual(command[4:7], ('oc2-dev', 'python3', '-c'))
+        self.assertIn(oc2.GUEST_EXEC_WRAPPER, command)
         self.assertEqual(command[-2:], (oc2.PINNED[0], '--standalone'))
         self.assertIn('OPENCODE_WATCHDOG_ENABLED=false', command)
         self.assertNotIn('bash', command)
@@ -967,13 +1112,17 @@ class HostTest(unittest.TestCase):
         )
         auth, tui = runner.calls[3:5]
         self.assertEqual(tui[3], project)
-        compile(auth[auth.index('-c') + 1], '<oc2-inline-helper>', 'exec')
+        self.assertIn(oc2.GUEST_EXEC_WRAPPER, auth)
+        self.assertIn(oc2.GUEST_EXEC_WRAPPER, tui)
+        compile(auth[-3], '<oc2-inline-helper>', 'exec')
         for variable in ('HOME=', 'XDG_DATA_HOME=', 'OPENCODE_DB=', 'XDG_CONFIG_HOME=',
                          'XDG_STATE_HOME=', 'XDG_CACHE_HOME='):
             self.assertEqual([arg for arg in auth if arg.startswith(variable)],
                              [arg for arg in tui if arg.startswith(variable)])
         self.assertIn(f'OPENCODE_DB={runtime}/home/.local/share/opencode/oc2.db', tui)
         self.assertFalse(any(arg.startswith('OPENCODE_CONFIG_DIR=') for arg in tui))
+        self.assertFalse(any(arg.startswith(('HTTP_PROXY=', 'HTTPS_PROXY=', 'NO_PROXY='))
+                             for arg in auth + tui))
 
     def test_stage_does_not_depend_on_bash_positional_arguments(self):
         with tempfile.TemporaryDirectory() as tmp:
