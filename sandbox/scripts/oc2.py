@@ -62,11 +62,11 @@ PINNED = (
     '/opt/oc2/bin/opencode',
 )
 
-DESTINATION_CHECK_SCRIPT = '''import errno, os, sys
+DESTINATION_CHECK_SCRIPT = '''import errno, os, stat, sys
 path = sys.argv[1] if len(sys.argv) == 2 else ""
 parts = path.split("/")
 if not path.startswith("/") or len(parts) < 3 or any(p in ("", ".", "..") for p in parts[1:]):
-    sys.exit(11)
+    sys.exit(12)
 fd = None
 try:
     flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
@@ -76,12 +76,12 @@ try:
         os.close(fd)
         fd = child
     try:
-        os.stat(parts[-1], dir_fd=fd, follow_symlinks=False)
+        mode = os.stat(parts[-1], dir_fd=fd, follow_symlinks=False).st_mode
     except FileNotFoundError as exc:
         sys.exit(0 if exc.errno == errno.ENOENT else 11)
-    sys.exit(10)
-except OSError:
-    sys.exit(11)
+    sys.exit(10 if stat.S_ISREG(mode) else 12)
+except OSError as exc:
+    sys.exit(12 if exc.errno in (errno.ELOOP, errno.ENOTDIR) else 11)
 finally:
     if fd is not None:
         os.close(fd)
@@ -104,6 +104,8 @@ class SandboxLaunch:
     workspace: str
     config_file: pathlib.Path
     cloudflare: CloudflareGatewayRuntime | None = None
+    assets_file: pathlib.Path | None = None
+    assets_sha: str | None = None
 
 
 class Stop(Exception):
@@ -773,7 +775,7 @@ def transfer_workspace(runner: Runner, name: str, snapshot: pathlib.Path,
     destination = parent + '/' + secrets.token_hex(16)
     execute(runner, name, 'mkdir', '-p', parent)
     status = runner.destination_status(name, destination)
-    if status == 10:
+    if status in (10, 12):
         raise Stop('DESTINATION_EXISTS')
     if status == 11:
         raise Stop('DESTINATION_CHECK_INDETERMINATE')
@@ -814,12 +816,14 @@ def stage(runner: Runner, name: str, bundle: pathlib.Path, manifest_sha: str,
         runner.sbx('cp', str(bundle), f'{name}:{destination}')
     elif exists != 'exists':
         raise Stop('cannot determine remote bundle state')
-    script_exists = runner.sbx('exec', name, 'bash', '-c',
-                               f'if test -e {shlex.quote(script_dest)}; then echo exists; else echo missing; fi',
-                               capture=True).strip()
-    if script_exists == 'missing':
+    script_status = runner.destination_status(name, script_dest)
+    if script_status == 0:
         runner.sbx('cp', str(guest_script), f'{name}:{script_dest}')
-    elif script_exists != 'exists':
+    elif script_status == 10:
+        pass
+    elif script_status == 12:
+        raise Stop('unsafe guest asset verifier path')
+    else:
         raise Stop('cannot determine remote bootstrap script state')
     remote_sha = runner.sbx('exec', name, 'sha256sum', script_dest, capture=True).split()[0]
     if remote_sha != script_sha:
@@ -832,12 +836,14 @@ def stage(runner: Runner, name: str, bundle: pathlib.Path, manifest_sha: str,
             raise Stop('invalid asset hash')
         remote_assets = f'{ROOT}/assets/{assets_sha[:16]}.json'
         execute(runner, name, 'mkdir', '-p', f'{ROOT}/assets')
-        check = runner.sbx('exec', name, 'bash', '-c',
-                           f'if test -e {shlex.quote(remote_assets)}; then echo exists; else echo missing; fi',
-                           capture=True).strip()
-        if check == 'missing':
+        status = runner.destination_status(name, remote_assets)
+        if status == 0:
             runner.sbx('cp', str(assets_file), f'{name}:{remote_assets}')
-        elif check != 'exists':
+        elif status == 10:
+            pass
+        elif status == 12:
+            raise Stop('unsafe guest asset bundle path')
+        else:
             raise Stop('cannot establish guest asset state')
         actual = runner.sbx('exec', name, 'sha256sum',
                             remote_assets, capture=True).split()[0]
@@ -950,6 +956,38 @@ def launch(runner: Runner, request: SandboxLaunch) -> None:
     if request.cli not in PINNED:
         raise Stop('unapproved OpenCode executable path')
     runtime = f'{ROOT}/runtime/{request.digest[:16]}'
+    if (request.assets_file is None) != (request.assets_sha is None):
+        raise Stop('asset file and hash must be supplied together')
+    if request.assets_file is not None and request.assets_sha is not None:
+        if re.fullmatch(r'[0-9a-f]{64}', request.assets_sha) is None:
+            raise Stop('invalid asset hash')
+        remote_assets = f'{ROOT}/assets/{request.assets_sha[:16]}.json'
+        guest_script = HERE / 'oc2_guest.py'
+        guest_script_sha = hashlib.sha256(guest_script.read_bytes()).hexdigest()
+        remote_script = f'{ROOT}/scripts/oc2_guest_{guest_script_sha[:16]}.py'
+        runner.sbx('exec', request.name, 'mkdir', '-p', f'{ROOT}/assets', f'{ROOT}/scripts')
+        for local, remote, label in (
+            (request.assets_file, remote_assets, 'asset bundle'),
+            (guest_script, remote_script, 'asset verifier'),
+        ):
+            state = runner.destination_status(request.name, remote)
+            if state == 0:
+                runner.sbx('cp', str(local), f'{request.name}:{remote}')
+            elif state == 10:
+                pass
+            elif state == 12:
+                raise Stop('unsafe guest ' + label + ' path')
+            else:
+                raise Stop('cannot establish guest ' + label + ' state')
+            expected = request.assets_sha if label == 'asset bundle' else guest_script_sha
+            actual = runner.sbx('exec', request.name, 'sha256sum', remote, capture=True).split()
+            if not actual or actual[0] != expected:
+                raise Stop('guest ' + label + ' SHA mismatch')
+        runner.sbx(
+            'exec', request.name, 'python3', remote_script,
+            '--assets', remote_assets, '--expected-assets-sha', request.assets_sha,
+            '--install-assets-runtime', request.digest,
+        )
     workdir = request.workspace
     workspace_path = pathlib.PurePosixPath(workdir)
     if not workspace_path.is_absolute() or '..' in workspace_path.parts:
@@ -1136,6 +1174,12 @@ def main(argv: list[str] | None = None) -> int:
         with tempfile.TemporaryDirectory(prefix='oc2-v2-config-') as temporary:
             temporary_path = pathlib.Path(temporary)
             config_file = export_v2_config(repo, temporary_path / 'export')
+            from oc2_assets import build as build_assets
+
+            asset_raw, asset_sha = build_assets(repo)
+            asset_payload = json.loads(asset_raw)
+            asset_file = temporary_path / 'assets.json'
+            asset_file.write_bytes(asset_raw)
             configure_cloudflare_provider(
                 config_file,
                 include_cloudflare=args.use_cloudflare_ai_gateway,
@@ -1198,12 +1242,23 @@ def main(argv: list[str] | None = None) -> int:
                 runner, args.sandbox, snapshot_path, workspace_manifest, runner.user,
             )
             runtime_sha = hashlib.sha256(
-                (str(workspace) + '\0' + VERSION).encode(),
+                (str(workspace) + '\0' + VERSION + '\0' + asset_sha).encode(),
             ).hexdigest()
+            config = json.loads(config_file.read_text(encoding='utf-8'))
+            config['instructions'] = [
+                f'{ROOT}/runtime/{runtime_sha[:16]}/{name}'
+                for name in sorted(asset_payload['files'])
+                if name == 'config/opencode/AGENTS.md'
+                or name.startswith('config/opencode/rules/')
+            ]
+            config_file.write_text(
+                json.dumps(config, ensure_ascii=False, indent=2) + '\n', encoding='utf-8',
+            )
             print(f'OC2_READY: sandbox={args.sandbox} opencode=v{VERSION}')
             launch(
                 runner,
-                SandboxLaunch(args.sandbox, runtime_sha, cli, workdir, config_file, cloudflare),
+                SandboxLaunch(args.sandbox, runtime_sha, cli, workdir, config_file,
+                              cloudflare, asset_file, asset_sha),
             )
             return 0
     except (Stop, OSError, ValueError, subprocess.TimeoutExpired,

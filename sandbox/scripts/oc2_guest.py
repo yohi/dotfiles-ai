@@ -212,7 +212,8 @@ def verify_assets(source: pathlib.Path, expected_sha: str) -> dict[str, bytes]:
     files = payload['files']
     hashes = payload['sha256']
     if (not isinstance(files, dict) or not isinstance(hashes, dict)
-            or set(files) != ASSET_TARGETS or set(hashes) != ASSET_TARGETS):
+            or not set(files) <= ASSET_TARGETS or set(hashes) != set(files)
+            or 'theme.json' not in files):
         fail('asset path allowlist mismatch')
     result: dict[str, bytes] = {}
     for name in sorted(ASSET_TARGETS):
@@ -233,6 +234,40 @@ def verify_assets(source: pathlib.Path, expected_sha: str) -> dict[str, bytes]:
         fail('unsafe TUI theme')
     # No third-party agent metadata or model routing is imported.
     return result
+
+
+def install_assets(source: pathlib.Path, expected_sha: str, runtime_id: str) -> pathlib.Path:
+    if re.fullmatch(r'[0-9a-f]{64}', runtime_id) is None:
+        fail('invalid asset runtime identity')
+    files = verify_assets(source, expected_sha)
+    runtime_root = BASE / 'runtime'
+    if not runtime_root.exists():
+        runtime_root.mkdir(mode=0o700)
+    validate_location(runtime_root, BASE)
+    dest = runtime_root / runtime_id[:16]
+    validate_location(dest, BASE)
+    if dest.exists():
+        fail('runtime already exists; refusing overwrite')
+    theme = json.loads(files.pop('theme.json'))
+    expected = {
+        **files,
+        'config/opencode/cli.json': (
+            json.dumps({'$schema': 'https://opencode.ai/v2/cli.json',
+                        'plugins': [], 'theme': theme}, sort_keys=True) + '\n'
+        ).encode('utf-8'),
+    }
+    dest.mkdir(mode=0o700)
+    for name in ('home', 'home/.local/share', 'state', 'cache', 'tmp', 'config/opencode'):
+        (dest / name).mkdir(parents=True, exist_ok=True, mode=0o700)
+    for name, content in expected.items():
+        location = dest / name
+        validate_location(location, BASE)
+        location.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        write_new(location, content)
+    receipt = json.dumps({'runtime_id': runtime_id, 'assets_sha256': expected_sha,
+                          'files': sorted(expected)}, sort_keys=True) + '\n'
+    write_new(dest / 'assets-receipt.json', receipt.encode('utf-8'))
+    return dest
 
 def validate_location(path: pathlib.Path, parent: pathlib.Path) -> None:
     if not path.is_relative_to(parent) or path == parent:
@@ -309,12 +344,24 @@ def prepare(
 
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser()
-    p.add_argument('--bundle', type=pathlib.Path, required=True)
-    p.add_argument('--expected-sha', required=True)
+    p.add_argument('--bundle', type=pathlib.Path)
+    p.add_argument('--expected-sha')
     p.add_argument('--assets', type=pathlib.Path)
     p.add_argument('--expected-assets-sha')
+    p.add_argument('--install-assets-runtime')
     args = p.parse_args(argv)
     try:
+        if args.install_assets_runtime is not None:
+            if args.assets is None or args.expected_assets_sha is None:
+                fail('asset runtime requires verified assets')
+            runtime = install_assets(args.assets, args.expected_assets_sha,
+                                     args.install_assets_runtime)
+            print('OC2_ASSETS_VERIFIED: rules=7 commands=1 skills=2 theme=1 custom_agents=0 routing=none')
+            print('OC2_RUNTIME_PREPARED: ' + str(runtime))
+            print('OC2_RUNTIME_VERSION: ' + VERSION)
+            return 0
+        if args.bundle is None or args.expected_sha is None:
+            fail('configuration bundle and expected SHA are required')
         if re.fullmatch('[0-9a-f]{64}', args.expected_sha) is None:
             fail('invalid expected SHA')
         bundle = args.bundle

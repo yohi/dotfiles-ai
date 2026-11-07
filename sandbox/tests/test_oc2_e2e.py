@@ -17,6 +17,7 @@ import yaml
 SCRIPTS = pathlib.Path(__file__).resolve().parents[1] / 'scripts'
 sys.path.insert(0, str(SCRIPTS))
 import oc2  # noqa: E402
+import oc2_assets  # noqa: E402
 
 
 class FakeSbx:
@@ -165,6 +166,7 @@ class LauncherFlowTests(unittest.TestCase):
         self.root = pathlib.Path(self.temporary.name)
         self.repo = self.root / 'dotfiles-ai'
         self.repo.mkdir()
+        self._copy_native_asset_sources()
         self._write_cloudflare_apm()
         self.project = self.root / 'synthetic'
         self.project.mkdir()
@@ -225,6 +227,9 @@ class LauncherFlowTests(unittest.TestCase):
 
     def _write_cloudflare_apm(self) -> None:
         (self.repo / 'apm.yml').write_text(
+            'oc2_assets:\n' + ''.join(
+                f'  - {source}\n' for source in oc2_assets.SOURCE_TO_TARGET
+            ) +
             'provider:\n'
             '  openai:\n'
             '    whitelist: [gpt-6-luna]\n'
@@ -252,6 +257,13 @@ class LauncherFlowTests(unittest.TestCase):
             '      enabled: true\n'
             '      auth_method: docker_custom_secret\n',
         )
+
+    def _copy_native_asset_sources(self) -> None:
+        source_root = pathlib.Path(oc2.__file__).resolve().parents[2]
+        for source in (*oc2_assets.SOURCE_TO_TARGET, oc2_assets.THEME_SOURCE):
+            destination = self.repo / source
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.write_bytes((source_root / source).read_bytes())
 
     def test_cloudflare_sandbox_secret_is_checked_before_workspace_and_tui(self):
         status, output = self._run(
@@ -360,6 +372,9 @@ class LauncherFlowTests(unittest.TestCase):
 
     def test_configuration_without_gateway_provider_skips_cloudflare_secret(self):
         (self.repo / 'apm.yml').write_text(
+            'oc2_assets:\n' + ''.join(
+                f'  - {source}\n' for source in oc2_assets.SOURCE_TO_TARGET
+            ) +
             'shell: bash\n'
             'snapshot: true\n',
         )
@@ -395,8 +410,12 @@ class LauncherFlowTests(unittest.TestCase):
         self.assertEqual(copied_config['model'], 'openai/gpt-6-luna')
         self.assertNotIn('cloudflare-ai-gateway-custom', copied_config['providers'])
         self.assertIn('policies', copied_config)
+        self.assertEqual(len(copied_config['instructions']), 7)
         self.assertNotIn('plugin', copied_config)
         self.assertNotIn('mcp', copied_config)
+        self.assertTrue(any('/assets/' in name and name.endswith('.json')
+                            for name in self.fake.copied_files))
+        self.assertTrue(any('--install-assets-runtime' in call for call in self.fake.calls))
         launch = next(call for call in self.fake.calls if call[:2] == ('exec', '-it'))
         self.assertEqual(launch[3], self.fake.workspace_destination)
         self.assertIn(oc2.GUEST_EXEC_WRAPPER, launch)

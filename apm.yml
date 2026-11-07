@@ -3,6 +3,18 @@ version: 2.0.0
 description: AI Agent settings, skills, and unified MCP configuration for 
   dotfiles
 
+oc2_assets:
+  - global-rules/AGENTS.global.md
+  - global-rules/DOCS_STYLE.md
+  - global-rules/GIT_STANDARDS.md
+  - global-rules/MARKDOWN.md
+  - global-rules/META_PROMPT.md
+  - global-rules/SHELL.md
+  - global-rules/STACKED_PR_WORKFLOW.md
+  - agent-commands/build-skill.md
+  - agent-skills/custom/agent-skill-architect/SKILL.md
+  - agent-skills/custom/config-modernizer/SKILL.md
+
 # CodeRabbit & Greptile Skills
 skills:
   - coderabbitai/skills

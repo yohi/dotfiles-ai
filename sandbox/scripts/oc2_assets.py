@@ -12,6 +12,10 @@ import json
 import os
 from pathlib import Path
 
+import yaml
+from yaml.nodes import MappingNode, ScalarNode
+from oc2_workspace import contains_credential_material
+
 SCHEMA = "dotfiles-ai/oc2-assets/v1"
 SOURCE_TO_TARGET = {
     "global-rules/AGENTS.global.md": "config/opencode/AGENTS.md",
@@ -29,6 +33,42 @@ THEME_SOURCE = "opencode/tui.jsonc"
 THEME_TARGET = "theme.json"
 MAX_FILE = 65536
 MAX_TOTAL = 512 * 1024
+MAX_APM_BYTES = 2 * 1024 * 1024
+
+
+def _declared_sources(repo: Path) -> tuple[str, ...]:
+    """Parse the OC2-only APM source list and reject anything outside its contract."""
+    apm = repo / "apm.yml"
+    if apm.is_symlink() or not apm.is_file() or apm.stat().st_size > MAX_APM_BYTES:
+        raise AssetError("apm.yml is missing, linked or oversized")
+    try:
+        raw = apm.read_bytes()
+        parsed = yaml.compose(raw, Loader=yaml.SafeLoader)
+        if isinstance(parsed, MappingNode):
+            keys = [key.value for key, _ in parsed.value
+                    if isinstance(key, ScalarNode) and key.value == "oc2_assets"]
+            if len(keys) > 1:
+                raise AssetError("apm.yml contains duplicate oc2_assets declarations")
+        document = yaml.safe_load(raw)
+    except (yaml.YAMLError, UnicodeError) as exc:
+        raise AssetError("apm.yml is invalid") from exc
+    if not isinstance(document, dict):
+        raise AssetError("apm.yml must contain a mapping")
+    declared = document.get("oc2_assets")
+    if not isinstance(declared, list) or not declared:
+        raise AssetError("apm.yml oc2_assets must be a non-empty list")
+    allowed = set(SOURCE_TO_TARGET)
+    if any(not isinstance(name, str) for name in declared):
+        raise AssetError("apm.yml oc2_assets entries must be paths")
+    if len(declared) != len(set(declared)):
+        raise AssetError("apm.yml oc2_assets contains duplicate paths")
+    for name in declared:
+        path = Path(name)
+        if path.is_absolute() or ".." in path.parts or "\\" in name:
+            raise AssetError("unsafe OC2 asset path")
+        if name not in allowed:
+            raise AssetError("unapproved OC2 asset: " + name)
+    return tuple(name for name in SOURCE_TO_TARGET if name in declared)
 
 
 class AssetError(ValueError):
@@ -38,6 +78,11 @@ class AssetError(ValueError):
 def _regular_text(repo: Path, name: str) -> str:
     # Every source name comes from the immutable allowlist, never user input.
     source = repo / name
+    directory = repo
+    for part in Path(name).parts[:-1]:
+        directory = directory / part
+        if directory.is_symlink():
+            raise AssetError("linked asset path: " + name)
     if source.is_symlink() or not source.is_file() or source.stat().st_size > MAX_FILE:
         raise AssetError("missing, linked or oversized asset: " + name)
     try:
@@ -62,10 +107,14 @@ def _safe_command(text: str) -> str:
 
 def build(repo: Path) -> tuple[bytes, str]:
     files: dict[str, str] = {}
-    for source, target in SOURCE_TO_TARGET.items():
+    declared_sources = _declared_sources(repo)
+    for source in declared_sources:
+        target = SOURCE_TO_TARGET[source]
         data = _regular_text(repo, source)
         if source.startswith("agent-commands/"):
             data = _safe_command(data)
+        if contains_credential_material(data.encode("utf-8")):
+            raise AssetError("selected asset appears to contain credential material: " + source)
         files[target] = data
 
     theme_source = _regular_text(repo, THEME_SOURCE)
@@ -80,7 +129,8 @@ def build(repo: Path) -> tuple[bytes, str]:
         raise AssetError("unapproved TUI theme")
     files[THEME_TARGET] = json.dumps({"name": theme}, sort_keys=True)
 
-    if set(files) != set(SOURCE_TO_TARGET.values()) | {THEME_TARGET}:
+    expected = {SOURCE_TO_TARGET[source] for source in declared_sources} | {THEME_TARGET}
+    if set(files) != expected:
         raise AssetError("unexpected asset file set")
     hashes = {name: hashlib.sha256(value.encode("utf-8")).hexdigest()
               for name, value in sorted(files.items())}
