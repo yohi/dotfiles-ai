@@ -3,7 +3,7 @@ version: 2.0.0
 description: AI Agent settings, skills, and unified MCP configuration for 
   dotfiles
 
-oc2_assets:
+x-oc2-assets:
   - global-rules/AGENTS.global.md
   - global-rules/DOCS_STYLE.md
   - global-rules/GIT_STANDARDS.md
@@ -14,6 +14,18 @@ oc2_assets:
   - agent-commands/build-skill.md
   - agent-skills/custom/agent-skill-architect/SKILL.md
   - agent-skills/custom/config-modernizer/SKILL.md
+
+x-oc2-agents:
+  hephaestus:
+    mode: primary
+    model: openai/gpt-6-luna
+  oracle:
+    mode: subagent
+    model: openai/gpt-6-luna
+
+x-oc2-mcp:
+  enabled: false
+  servers: []
 
 # CodeRabbit & Greptile Skills
 skills:

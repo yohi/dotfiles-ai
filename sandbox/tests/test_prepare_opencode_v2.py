@@ -132,6 +132,57 @@ class ExportTests(unittest.TestCase):
             self.assertNotIn("TOP_SECRET_DO_NOT_EXPORT", generated.read_text())
             self.assertNotIn("OC_CF_REST_API_TOKEN", generated.read_text())
 
+    def test_v2_native_agents_use_only_apm_selected_fixed_config(self) -> None:
+        self.apm.write_text(
+            "provider:\n"
+            "  openai:\n"
+            "    whitelist: [gpt-6-luna]\n"
+            "  cloudflare-ai-gateway-custom:\n"
+            "    npm: '@ai-sdk/openai-compatible'\n"
+            "    name: Cloudflare AI Gateway Custom\n"
+            "    options:\n"
+            "      baseURL: 'https://gateway.ai.cloudflare.com/v1/${env:OC_CF_ACCOUNT_ID}/${env:OC_CF_GATEWAY_ID}/compat'\n"
+            "      apiKey: ''\n"
+            "      headers:\n"
+            "        cf-aig-authorization: 'Bearer ${env:OC_CF_API_TOKEN}'\n"
+            "    models:\n"
+            "      custom-ollama-cloud/kimi-k2.6:\n"
+            "        name: Kimi K2.6\n"
+            "opencode_v2:\n"
+            "  default_model: openai/gpt-6-luna\n"
+            "  deny_provider_fallback: true\n"
+            "  deny_guest_auth: true\n"
+            "  providers:\n"
+            "    openai:\n"
+            "      enabled: true\n"
+            "      auth_method: docker_openai_oauth\n"
+            "    cloudflare-ai-gateway-custom:\n"
+            "      enabled: true\n"
+            "      auth_method: docker_custom_secret\n"
+            "x-oc2-assets: [global-rules/AGENTS.global.md]\n"
+            "x-oc2-agents:\n"
+            "  hephaestus: {mode: primary, model: openai/gpt-6-luna}\n"
+            "  oracle: {mode: subagent, model: openai/gpt-6-luna}\n"
+            "x-oc2-mcp: {enabled: false, servers: []}\n",
+            encoding="utf-8",
+        )
+
+        result = self.run_export()
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        server = json.loads((self.out / "opencode.jsonc").read_text())
+        self.assertEqual(set(server["agents"]), {"hephaestus", "oracle"})
+        self.assertEqual(server["agents"]["hephaestus"]["mode"], "primary")
+        self.assertEqual(server["agents"]["oracle"]["mode"], "subagent")
+        self.assertEqual(server["agents"]["oracle"]["model"], "openai/gpt-6-luna")
+        self.assertNotIn("default_agent", server)
+        self.assertNotIn("fallback_models", server["agents"]["hephaestus"])
+        self.assertNotIn("mcp", server)
+        self.assertIn(
+            {"action": "mcp.use", "resource": "*", "effect": "deny"},
+            server["policies"],
+        )
+
     def test_v2_provider_config_rejects_unapproved_provider(self) -> None:
         self.apm.write_text(
             "provider:\n"

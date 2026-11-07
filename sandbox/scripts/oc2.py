@@ -803,6 +803,9 @@ def stage(runner: Runner, name: str, bundle: pathlib.Path, manifest_sha: str,
     destination = f'{ROOT}/bundles/{manifest_sha[:16]}'
     script_sha = hashlib.sha256(guest_script.read_bytes()).hexdigest()
     script_dest = f'{ROOT}/scripts/oc2_guest_{script_sha[:16]}.py'
+    native_helper = HERE / 'oc2_agent_native.py'
+    native_helper_sha = hashlib.sha256(native_helper.read_bytes()).hexdigest()
+    native_helper_dest = f'{ROOT}/scripts/oc2_agent_native.py'
     # sbx exec v0.49.2 was observed invoking bash -c without the expected
     # trailing positional parameters. Use direct argv for filesystem operations.
     execute(runner, name, 'mkdir', '-p', ROOT, f'{ROOT}/bundles', f'{ROOT}/scripts')
@@ -828,6 +831,20 @@ def stage(runner: Runner, name: str, bundle: pathlib.Path, manifest_sha: str,
     remote_sha = runner.sbx('exec', name, 'sha256sum', script_dest, capture=True).split()[0]
     if remote_sha != script_sha:
         raise Stop('guest bootstrap code SHA mismatch')
+    helper_status = runner.destination_status(name, native_helper_dest)
+    if helper_status == 0:
+        runner.sbx('cp', str(native_helper), f'{name}:{native_helper_dest}')
+    elif helper_status == 10:
+        pass
+    elif helper_status == 12:
+        raise Stop('unsafe guest native verifier path')
+    else:
+        raise Stop('cannot determine remote native verifier state')
+    helper_sha = runner.sbx(
+        'exec', name, 'sha256sum', native_helper_dest, capture=True,
+    ).split()[0]
+    if helper_sha != native_helper_sha:
+        raise Stop('guest native verifier SHA mismatch')
     args = ['--bundle', destination, '--expected-sha', manifest_sha]
     if (assets_file is None) != (assets_sha is None):
         raise Stop('asset file and hash must be supplied together')
@@ -965,10 +982,14 @@ def launch(runner: Runner, request: SandboxLaunch) -> None:
         guest_script = HERE / 'oc2_guest.py'
         guest_script_sha = hashlib.sha256(guest_script.read_bytes()).hexdigest()
         remote_script = f'{ROOT}/scripts/oc2_guest_{guest_script_sha[:16]}.py'
+        native_helper = HERE / 'oc2_agent_native.py'
+        native_helper_sha = hashlib.sha256(native_helper.read_bytes()).hexdigest()
+        remote_helper = f'{ROOT}/scripts/oc2_agent_native.py'
         runner.sbx('exec', request.name, 'mkdir', '-p', f'{ROOT}/assets', f'{ROOT}/scripts')
         for local, remote, label in (
             (request.assets_file, remote_assets, 'asset bundle'),
             (guest_script, remote_script, 'asset verifier'),
+            (native_helper, remote_helper, 'native verifier'),
         ):
             state = runner.destination_status(request.name, remote)
             if state == 0:
@@ -979,7 +1000,11 @@ def launch(runner: Runner, request: SandboxLaunch) -> None:
                 raise Stop('unsafe guest ' + label + ' path')
             else:
                 raise Stop('cannot establish guest ' + label + ' state')
-            expected = request.assets_sha if label == 'asset bundle' else guest_script_sha
+            expected = (
+                request.assets_sha if label == 'asset bundle'
+                else guest_script_sha if label == 'asset verifier'
+                else native_helper_sha
+            )
             actual = runner.sbx('exec', request.name, 'sha256sum', remote, capture=True).split()
             if not actual or actual[0] != expected:
                 raise Stop('guest ' + label + ' SHA mismatch')

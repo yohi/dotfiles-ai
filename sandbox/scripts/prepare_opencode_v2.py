@@ -21,6 +21,7 @@ from typing import Final, Literal, TypeAlias
 import yaml
 from yaml.nodes import MappingNode, Node, ScalarNode, SequenceNode
 from oc2_workspace import contains_credential_material
+from oc2_native import NativeConfigError, build_native_payload, parse_apm_native
 
 
 VERSION = "v0.2"
@@ -409,6 +410,10 @@ def _read_apm_source(root: Path) -> APMConfig:
     normalized = _normalize_yaml(loaded)
     if not isinstance(normalized, dict):
         raise ExportError("apm.yml must contain a string-keyed mapping")
+    try:
+        native_config = parse_apm_native(raw)
+    except NativeConfigError as exc:
+        raise ExportError("invalid OC2 native configuration") from exc
     shell = normalized.get("shell", "bash")
     snapshot = normalized.get("snapshot", True)
     if type(shell) is not str or shell not in {"bash", "sh", "zsh"}:
@@ -421,6 +426,8 @@ def _read_apm_source(root: Path) -> APMConfig:
         _build_v2_config(v2_settings, provider_catalog)
         if v2_settings is not None else None
     )
+    if v2_config is not None and native_config.agents:
+        v2_config["agents"] = build_native_payload(native_config)["agents"]
     return APMConfig(
         shell=shell,
         snapshot=snapshot,

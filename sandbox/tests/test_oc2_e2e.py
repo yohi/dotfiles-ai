@@ -20,6 +20,28 @@ import oc2  # noqa: E402
 import oc2_assets  # noqa: E402
 
 
+def _oc2_extensions(*, include_agents: bool = True) -> str:
+    agents = (
+        'x-oc2-agents:\n'
+        '  hephaestus:\n'
+        '    mode: primary\n'
+        '    model: openai/gpt-6-luna\n'
+        '  oracle:\n'
+        '    mode: subagent\n'
+        '    model: openai/gpt-6-luna\n'
+        if include_agents else 'x-oc2-agents: {}\n'
+    )
+    return (
+        'x-oc2-assets:\n' + ''.join(
+            f'  - {source}\n' for source in oc2_assets.SOURCE_TO_TARGET
+        ) +
+        agents +
+        'x-oc2-mcp:\n'
+        '  enabled: false\n'
+        '  servers: []\n'
+    )
+
+
 class FakeSbx:
     def __init__(self):
         self.created = False
@@ -227,9 +249,7 @@ class LauncherFlowTests(unittest.TestCase):
 
     def _write_cloudflare_apm(self) -> None:
         (self.repo / 'apm.yml').write_text(
-            'oc2_assets:\n' + ''.join(
-                f'  - {source}\n' for source in oc2_assets.SOURCE_TO_TARGET
-            ) +
+            _oc2_extensions() +
             'provider:\n'
             '  openai:\n'
             '    whitelist: [gpt-6-luna]\n'
@@ -372,9 +392,7 @@ class LauncherFlowTests(unittest.TestCase):
 
     def test_configuration_without_gateway_provider_skips_cloudflare_secret(self):
         (self.repo / 'apm.yml').write_text(
-            'oc2_assets:\n' + ''.join(
-                f'  - {source}\n' for source in oc2_assets.SOURCE_TO_TARGET
-            ) +
+            _oc2_extensions(include_agents=False) +
             'shell: bash\n'
             'snapshot: true\n',
         )

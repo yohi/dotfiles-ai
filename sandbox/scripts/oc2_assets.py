@@ -12,63 +12,23 @@ import json
 import os
 from pathlib import Path
 
-import yaml
-from yaml.nodes import MappingNode, ScalarNode
 from oc2_workspace import contains_credential_material
+from oc2_native import (
+    ASSET_SOURCE_TO_TARGET,
+    NativeConfigError,
+    build_native_payload,
+    parse_apm_native,
+    validate_skill_frontmatter,
+)
 
 SCHEMA = "dotfiles-ai/oc2-assets/v1"
-SOURCE_TO_TARGET = {
-    "global-rules/AGENTS.global.md": "config/opencode/AGENTS.md",
-    "global-rules/DOCS_STYLE.md": "config/opencode/rules/DOCS_STYLE.md",
-    "global-rules/GIT_STANDARDS.md": "config/opencode/rules/GIT_STANDARDS.md",
-    "global-rules/MARKDOWN.md": "config/opencode/rules/MARKDOWN.md",
-    "global-rules/META_PROMPT.md": "config/opencode/rules/META_PROMPT.md",
-    "global-rules/SHELL.md": "config/opencode/rules/SHELL.md",
-    "global-rules/STACKED_PR_WORKFLOW.md": "config/opencode/rules/STACKED_PR_WORKFLOW.md",
-    "agent-commands/build-skill.md": "config/opencode/commands/build-skill.md",
-    "agent-skills/custom/agent-skill-architect/SKILL.md": "config/opencode/skills/agent-skill-architect/SKILL.md",
-    "agent-skills/custom/config-modernizer/SKILL.md": "config/opencode/skills/config-modernizer/SKILL.md",
-}
+SOURCE_TO_TARGET = ASSET_SOURCE_TO_TARGET
 THEME_SOURCE = "opencode/tui.jsonc"
 THEME_TARGET = "theme.json"
+NATIVE_TARGET = "native/oc2-native.json"
 MAX_FILE = 65536
 MAX_TOTAL = 512 * 1024
 MAX_APM_BYTES = 2 * 1024 * 1024
-
-
-def _declared_sources(repo: Path) -> tuple[str, ...]:
-    """Parse the OC2-only APM source list and reject anything outside its contract."""
-    apm = repo / "apm.yml"
-    if apm.is_symlink() or not apm.is_file() or apm.stat().st_size > MAX_APM_BYTES:
-        raise AssetError("apm.yml is missing, linked or oversized")
-    try:
-        raw = apm.read_bytes()
-        parsed = yaml.compose(raw, Loader=yaml.SafeLoader)
-        if isinstance(parsed, MappingNode):
-            keys = [key.value for key, _ in parsed.value
-                    if isinstance(key, ScalarNode) and key.value == "oc2_assets"]
-            if len(keys) > 1:
-                raise AssetError("apm.yml contains duplicate oc2_assets declarations")
-        document = yaml.safe_load(raw)
-    except (yaml.YAMLError, UnicodeError) as exc:
-        raise AssetError("apm.yml is invalid") from exc
-    if not isinstance(document, dict):
-        raise AssetError("apm.yml must contain a mapping")
-    declared = document.get("oc2_assets")
-    if not isinstance(declared, list) or not declared:
-        raise AssetError("apm.yml oc2_assets must be a non-empty list")
-    allowed = set(SOURCE_TO_TARGET)
-    if any(not isinstance(name, str) for name in declared):
-        raise AssetError("apm.yml oc2_assets entries must be paths")
-    if len(declared) != len(set(declared)):
-        raise AssetError("apm.yml oc2_assets contains duplicate paths")
-    for name in declared:
-        path = Path(name)
-        if path.is_absolute() or ".." in path.parts or "\\" in name:
-            raise AssetError("unsafe OC2 asset path")
-        if name not in allowed:
-            raise AssetError("unapproved OC2 asset: " + name)
-    return tuple(name for name in SOURCE_TO_TARGET if name in declared)
 
 
 class AssetError(ValueError):
@@ -107,12 +67,24 @@ def _safe_command(text: str) -> str:
 
 def build(repo: Path) -> tuple[bytes, str]:
     files: dict[str, str] = {}
-    declared_sources = _declared_sources(repo)
+    apm = repo / "apm.yml"
+    if apm.is_symlink() or not apm.is_file() or apm.stat().st_size > MAX_APM_BYTES:
+        raise AssetError("apm.yml is missing, linked or oversized")
+    try:
+        native = parse_apm_native(apm.read_bytes(), require_oc2_assets=True)
+    except NativeConfigError as exc:
+        raise AssetError(str(exc)) from exc
+    declared_sources = native.asset_sources
     for source in declared_sources:
         target = SOURCE_TO_TARGET[source]
         data = _regular_text(repo, source)
         if source.startswith("agent-commands/"):
             data = _safe_command(data)
+        elif source.startswith("agent-skills/"):
+            try:
+                validate_skill_frontmatter(Path(source).parent.name, data)
+            except NativeConfigError as exc:
+                raise AssetError(str(exc)) from exc
         if contains_credential_material(data.encode("utf-8")):
             raise AssetError("selected asset appears to contain credential material: " + source)
         files[target] = data
@@ -129,7 +101,12 @@ def build(repo: Path) -> tuple[bytes, str]:
         raise AssetError("unapproved TUI theme")
     files[THEME_TARGET] = json.dumps({"name": theme}, sort_keys=True)
 
-    expected = {SOURCE_TO_TARGET[source] for source in declared_sources} | {THEME_TARGET}
+    files[NATIVE_TARGET] = json.dumps(
+        build_native_payload(native), ensure_ascii=False, sort_keys=True,
+    )
+    expected = {SOURCE_TO_TARGET[source] for source in declared_sources} | {
+        THEME_TARGET, NATIVE_TARGET,
+    }
     if set(files) != expected:
         raise AssetError("unexpected asset file set")
     hashes = {name: hashlib.sha256(value.encode("utf-8")).hexdigest()

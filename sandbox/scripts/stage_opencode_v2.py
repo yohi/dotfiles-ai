@@ -25,6 +25,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 exporter = importlib.import_module("sandbox.scripts.prepare_opencode_v2")
+agent_policy = importlib.import_module("sandbox.scripts.oc2_agent_native")
 
 NAMES = frozenset({"opencode.jsonc", "cli.json", "export-manifest.json"})
 MAX_BYTES = 1024 * 1024
@@ -48,6 +49,12 @@ def _regular_bytes(path: Path) -> bytes:
 def _verify_v2_config(server: dict[str, JsonValue]) -> None:
     """Reject V2 bundles that can activate other providers or Guest auth."""
     expected_keys = {"$schema", "shell", "snapshot", "model", "providers", "policies"}
+    if "agents" in server:
+        expected_keys.add("agents")
+        try:
+            agent_policy.validate_agent_map(server["agents"])
+        except ValueError as exc:
+            raise StageError("unapproved V2 Native Agent configuration") from exc
     if set(server) != expected_keys:
         raise StageError("unexpected V2 server config fields")
     model = server.get("model")

@@ -41,6 +41,7 @@ oc2 = load('oc2')
 oauth_bundle = load('oc2_oauth_bundle')
 guest = load('oc2_guest')
 assets = load('oc2_assets')
+native = load('oc2_native')
 bootstrap = load('oc2_oauth_bootstrap')
 oauth = load('oc2_oauth')
 
@@ -304,6 +305,8 @@ class HostTest(unittest.TestCase):
         copied = {call[2] for call in runner.calls if call[0] == 'cp'}
         self.assertTrue(any('/assets/' in target for target in copied))
         self.assertTrue(any('/scripts/oc2_guest_' in target for target in copied))
+        self.assertTrue(any(target.endswith('/scripts/oc2_agent_native.py')
+                            for target in copied))
         verify_call = next(call for call in runner.calls if '--install-assets-runtime' in call)
         self.assertIn('--expected-assets-sha', verify_call)
         self.assertIn('a' * 64, verify_call)
@@ -316,9 +319,11 @@ class HostTest(unittest.TestCase):
             digest = hashlib.sha256(assets_file.read_bytes()).hexdigest()
             script = oc2.HERE / 'oc2_guest.py'
             script_sha = hashlib.sha256(script.read_bytes()).hexdigest()
+            native_helper = oc2.HERE / 'oc2_agent_native.py'
             runner.workspace_copies.extend((
                 (assets_file, f'oc2-dev:{oc2.ROOT}/assets/{digest[:16]}.json'),
                 (script, f'oc2-dev:{oc2.ROOT}/scripts/oc2_guest_{script_sha[:16]}.py'),
+                (native_helper, f'oc2-dev:{oc2.ROOT}/scripts/oc2_agent_native.py'),
             ))
 
             oc2.launch(runner, oc2.SandboxLaunch(
@@ -328,10 +333,11 @@ class HostTest(unittest.TestCase):
 
         copied_targets = {call[2] for call in runner.calls if call[0] == 'cp'}
         self.assertFalse(any('/assets/' in target or '/scripts/oc2_guest_' in target
+                             or target.endswith('/scripts/oc2_agent_native.py')
                              for target in copied_targets))
 
     def test_launch_fails_closed_for_unsafe_and_unknown_asset_probe_states(self):
-        for target_kind in ('asset', 'verifier'):
+        for target_kind in ('asset', 'verifier', 'native-helper'):
             for status in (1, 11, 12, 99):
                 with self.subTest(target=target_kind, status=status), \
                         tempfile.TemporaryDirectory() as temporary:
@@ -340,8 +346,13 @@ class HostTest(unittest.TestCase):
                     assets_file.write_text('{}')
                     digest = hashlib.sha256(assets_file.read_bytes()).hexdigest()
                     script_sha = hashlib.sha256((oc2.HERE / 'oc2_guest.py').read_bytes()).hexdigest()
-                    path = (f'{oc2.ROOT}/assets/{digest[:16]}.json' if target_kind == 'asset'
-                            else f'{oc2.ROOT}/scripts/oc2_guest_{script_sha[:16]}.py')
+                    path = (
+                        f'{oc2.ROOT}/assets/{digest[:16]}.json'
+                        if target_kind == 'asset'
+                        else f'{oc2.ROOT}/scripts/oc2_guest_{script_sha[:16]}.py'
+                        if target_kind == 'verifier'
+                        else f'{oc2.ROOT}/scripts/oc2_agent_native.py'
+                    )
                     runner.destination_states[path] = status
 
                     with self.assertRaises(oc2.Stop):
@@ -353,6 +364,9 @@ class HostTest(unittest.TestCase):
                     copied_targets = {call[2] for call in runner.calls if call[0] == 'cp'}
                     if target_kind == 'asset':
                         self.assertFalse(any('/assets/' in target for target in copied_targets))
+                    elif target_kind == 'native-helper':
+                        self.assertFalse(any(target.endswith('/scripts/oc2_agent_native.py')
+                                             for target in copied_targets))
                     else:
                         self.assertFalse(any('/scripts/oc2_guest_' in target
                                              for target in copied_targets))
@@ -1450,6 +1464,7 @@ class HostTest(unittest.TestCase):
             script = pathlib.Path(tmp) / 'oc2_guest.py'
             script.write_text('# harmless guest fixture\n')
             script_sha = hashlib.sha256(script.read_bytes()).hexdigest()
+            native_sha = hashlib.sha256((SCRIPTS / 'oc2_agent_native.py').read_bytes()).hexdigest()
 
             class StagingRunner:
                 def __init__(self):
@@ -1466,7 +1481,8 @@ class HostTest(unittest.TestCase):
                         assert '$1' not in args[4] and '$2' not in args[4]
                         return 'missing\n'
                     if args[:3] == ('exec', 'oc2-dev', 'sha256sum'):
-                        return script_sha + '  oc2_guest.py\n'
+                        digest = native_sha if args[3].endswith('/oc2_agent_native.py') else script_sha
+                        return digest + '  verified\n'
                     return ''
 
             runner = StagingRunner()
@@ -1481,7 +1497,7 @@ class HostTest(unittest.TestCase):
                  oc2.ROOT + '/bundles', oc2.ROOT + '/scripts'),
                 runner.calls,
             )
-            self.assertEqual(len([c for c in runner.calls if c[0] == 'cp']), 2)
+            self.assertEqual(len([c for c in runner.calls if c[0] == 'cp']), 3)
 
     def test_stage_rejects_unsafe_verifier_probe_status(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -1490,6 +1506,7 @@ class HostTest(unittest.TestCase):
             script = pathlib.Path(tmp) / 'oc2_guest.py'
             script.write_text('# fixture\n')
             script_sha = hashlib.sha256(script.read_bytes()).hexdigest()
+            native_sha = hashlib.sha256((SCRIPTS / 'oc2_agent_native.py').read_bytes()).hexdigest()
 
             class Runner:
                 def destination_status(self, name, destination):
@@ -1513,6 +1530,7 @@ class HostTest(unittest.TestCase):
             script = root / 'oc2_guest.py'
             script.write_text('# fixture\n')
             script_sha = hashlib.sha256(script.read_bytes()).hexdigest()
+            native_sha = hashlib.sha256((SCRIPTS / 'oc2_agent_native.py').read_bytes()).hexdigest()
             asset = root / 'oc2-assets.json'
             asset.write_text('{"fixture":true}')
             asset_sha = hashlib.sha256(asset.read_bytes()).hexdigest()
@@ -1529,13 +1547,16 @@ class HostTest(unittest.TestCase):
                     if args[:4] == ('exec', 'oc2-dev', 'bash', '-c'):
                         return 'missing\n'
                     if args[:3] == ('exec', 'oc2-dev', 'sha256sum'):
-                        return ((asset_sha if '/assets/' in args[3] else script_sha)
+                        digest = (asset_sha if '/assets/' in args[3]
+                                  else native_sha if args[3].endswith('/oc2_agent_native.py')
+                                  else script_sha)
+                        return (digest
                                 + '  verified\n')
                     return ''
 
             runner = Runner()
             oc2.stage(runner, 'oc2-dev', bundle, 'a' * 64, script, asset, asset_sha)
-            self.assertEqual(len([c for c in runner.calls if c[0] == 'cp']), 3)
+            self.assertEqual(len([c for c in runner.calls if c[0] == 'cp']), 4)
             start = [c for c in runner.calls if c[:3] ==
                      ('exec', 'oc2-dev', 'python3')]
             self.assertEqual(len(start), 1)
@@ -1554,6 +1575,7 @@ class HostTest(unittest.TestCase):
             asset.write_text('{}')
             expected = hashlib.sha256(asset.read_bytes()).hexdigest()
             script_sha = hashlib.sha256(script.read_bytes()).hexdigest()
+            native_sha = hashlib.sha256((SCRIPTS / 'oc2_agent_native.py').read_bytes()).hexdigest()
 
             class Runner:
                 def destination_status(self, name, destination):
@@ -1563,7 +1585,10 @@ class HostTest(unittest.TestCase):
                     if args[:4] == ('exec', 'oc2-dev', 'bash', '-c'):
                         return 'missing\n'
                     if args[:3] == ('exec', 'oc2-dev', 'sha256sum'):
-                        return (('f' * 64 if '/assets/' in args[3] else script_sha)
+                        digest = ('f' * 64 if '/assets/' in args[3]
+                                  else native_sha if args[3].endswith('/oc2_agent_native.py')
+                                  else script_sha)
+                        return (digest
                                 + ' verified\n')
                     return ''
 
@@ -1581,6 +1606,7 @@ class HostTest(unittest.TestCase):
             asset.write_text('{}')
             asset_sha = hashlib.sha256(asset.read_bytes()).hexdigest()
             script_sha = hashlib.sha256(script.read_bytes()).hexdigest()
+            native_sha = hashlib.sha256((SCRIPTS / 'oc2_agent_native.py').read_bytes()).hexdigest()
 
             class Runner:
                 def destination_status(self, name, destination):
@@ -1590,7 +1616,9 @@ class HostTest(unittest.TestCase):
                     if args[:4] == ('exec', 'oc2-dev', 'bash', '-c'):
                         return 'missing\n'
                     if args[:3] == ('exec', 'oc2-dev', 'sha256sum'):
-                        digest = asset_sha if '/assets/' in args[3] else script_sha
+                        digest = (asset_sha if '/assets/' in args[3]
+                                  else native_sha if args[3].endswith('/oc2_agent_native.py')
+                                  else script_sha)
                         return (digest + ' verified\n')
                     return ''
 
@@ -2469,6 +2497,30 @@ class GuestTest(unittest.TestCase):
         server = json.loads((bundle / 'opencode.jsonc').read_text())
         self.assertEqual(set(server['providers']), {'openai', 'cloudflare-ai-gateway-custom'})
 
+    def test_apm_native_agents_bind_export_assets_and_guest_runtime(self):
+        repo = SCRIPTS.parents[1]
+        output = self.base / 'native-export'
+        output.parent.mkdir(parents=True, exist_ok=True)
+        config_file = oc2.export_v2_config(repo, output)
+        asset_raw, asset_sha = assets.build(repo)
+        asset_file = self.base / 'assets.json'
+        asset_file.write_bytes(asset_raw)
+
+        config_sha = guest.verify(output)
+        native_assets = guest.verify_assets(asset_file, asset_sha)
+        runtime = guest.prepare(output, config_sha, native_assets, asset_sha)
+        server = json.loads((config_file).read_text(encoding='utf-8'))
+        client = json.loads((runtime / 'config/opencode/cli.json').read_text(encoding='utf-8'))
+
+        self.assertEqual(set(server['agents']), {'hephaestus', 'oracle'})
+        self.assertEqual(server['agents']['oracle']['mode'], 'subagent')
+        self.assertNotIn('default_agent', server)
+        self.assertNotIn('mcp', server)
+        self.assertEqual(server['policies'][-1],
+                         {'action': 'mcp.use', 'resource': '*', 'effect': 'deny'})
+        self.assertEqual(client['theme'], {'name': 'tokyonight'})
+        self.assertEqual(runtime, guest.runtime_path(config_sha, asset_sha))
+
     def test_materialize_idempotently(self):
         digest = guest.verify(self.bundle)
         d1 = guest.prepare(self.bundle, digest)
@@ -2499,6 +2551,10 @@ class GuestTest(unittest.TestCase):
         contents = {name: ('# selected text\n' if name != 'theme.json'
                            else '{"name":"tokyonight"}')
                     for name in names}
+        contents[guest.NATIVE_ASSET_TARGET] = json.dumps(
+            native.build_native_payload(native.NativeConfig('0' * 64, (), ())),
+            sort_keys=True,
+        )
         hashes = {name: hashlib.sha256(data.encode('utf-8')).hexdigest()
                   for name, data in contents.items()}
         payload = {'schema': guest.ASSET_SCHEMA, 'files': contents, 'sha256': hashes}
@@ -2527,6 +2583,80 @@ class GuestTest(unittest.TestCase):
         self.assertFalse((target / 'metadata/agent-routes.json').exists())
         tui = json.loads((target / 'config/opencode/cli.json').read_text())
         self.assertEqual(tui['theme'], {'name': 'tokyonight'})
+
+    def test_guest_asset_manifest_requires_native_agent_config(self):
+        path, sha = self._assets()
+        payload = json.loads(path.read_bytes())
+        payload['files'].pop(guest.NATIVE_ASSET_TARGET)
+        payload['sha256'].pop(guest.NATIVE_ASSET_TARGET)
+        raw = (json.dumps(payload, sort_keys=True) + '\n').encode()
+        path.write_bytes(raw)
+
+        with self.assertRaisesRegex(ValueError, 'allowlist mismatch'):
+            guest.verify_assets(path, hashlib.sha256(raw).hexdigest())
+
+    def test_guest_rejects_v2_config_not_bound_to_native_asset_agents(self):
+        path, _ = self._assets()
+        payload = json.loads(path.read_bytes())
+        native_payload = native.build_native_payload(
+            native.parse_apm_native((SCRIPTS.parents[1] / 'apm.yml').read_bytes())
+        )
+        native_payload['source_sha256'] = '0' * 64
+        payload['files'][guest.NATIVE_ASSET_TARGET] = json.dumps(
+            native_payload, sort_keys=True,
+        )
+        encoded_native = payload['files'][guest.NATIVE_ASSET_TARGET]
+        payload['sha256'][guest.NATIVE_ASSET_TARGET] = hashlib.sha256(
+            encoded_native.encode('utf-8'),
+        ).hexdigest()
+        raw = (json.dumps(payload, sort_keys=True) + '\n').encode()
+        path.write_bytes(raw)
+        digest = hashlib.sha256(raw).hexdigest()
+        assets_data = guest.verify_assets(path, digest)
+        config_digest = guest.verify(self.bundle)
+
+        with self.assertRaisesRegex(ValueError, 'Native Agent asset mismatch'):
+            guest.prepare(self.bundle, config_digest, assets_data, digest)
+
+    def test_guest_rejects_native_asset_from_a_different_apm_source(self):
+        path, _ = self._assets()
+        payload = json.loads(path.read_bytes())
+        native_payload = json.loads(payload['files'][guest.NATIVE_ASSET_TARGET])
+        native_payload['source_sha256'] = 'f' * 64
+        encoded_native = json.dumps(native_payload, sort_keys=True)
+        payload['files'][guest.NATIVE_ASSET_TARGET] = encoded_native
+        payload['sha256'][guest.NATIVE_ASSET_TARGET] = hashlib.sha256(
+            encoded_native.encode('utf-8'),
+        ).hexdigest()
+        raw = (json.dumps(payload, sort_keys=True) + '\n').encode()
+        path.write_bytes(raw)
+        assets_data = guest.verify_assets(path, hashlib.sha256(raw).hexdigest())
+        config_digest = guest.verify(self.bundle)
+
+        with self.assertRaisesRegex(ValueError, 'APM config and Native Agent asset source SHA mismatch'):
+            guest.prepare(self.bundle, config_digest, assets_data,
+                          hashlib.sha256(raw).hexdigest())
+
+    def test_guest_rejects_native_agent_permission_escalation(self):
+        path, _ = self._assets()
+        payload = json.loads(path.read_bytes())
+        native_payload = native.build_native_payload(
+            native.parse_apm_native((SCRIPTS.parents[1] / 'apm.yml').read_bytes())
+        )
+        native_payload['source_sha256'] = '0' * 64
+        native_payload['agents']['oracle']['permissions'] = [
+            {'action': 'edit', 'resource': '*', 'effect': 'allow'},
+        ]
+        encoded_native = json.dumps(native_payload, sort_keys=True)
+        payload['files'][guest.NATIVE_ASSET_TARGET] = encoded_native
+        payload['sha256'][guest.NATIVE_ASSET_TARGET] = hashlib.sha256(
+            encoded_native.encode('utf-8'),
+        ).hexdigest()
+        raw = (json.dumps(payload, sort_keys=True) + '\n').encode()
+        path.write_bytes(raw)
+
+        with self.assertRaisesRegex(ValueError, 'not allowlisted'):
+            guest.verify_assets(path, hashlib.sha256(raw).hexdigest())
 
     def test_assets_install_into_new_native_runtime_and_refuse_overwrite(self):
         path, sha = self._assets()
@@ -2623,12 +2753,39 @@ class AssetExporterTest(unittest.TestCase):
             elif source.startswith('agent-commands/'):
                 file.write_text('---\ndescription: Safe skill command\nagent: old-agent\n'
                                 'model: unavailable/v1-model\n---\nBody of command\n')
+            elif source.startswith('agent-skills/'):
+                name = pathlib.Path(source).parent.name
+                file.write_text(
+                    f'---\nname: {name}\ndescription: Valid fixture skill.\n---\nInstructions\n',
+                    encoding='utf-8',
+                )
             else:
                 file.write_text('# Reviewed content\n', encoding='utf-8')
+        self._write_apm_assets(assets.SOURCE_TO_TARGET)
+
+    def _write_apm_assets(self, sources):
         (self.root / 'apm.yml').write_text(
-            'oc2_assets:\n' + ''.join(
-                f'  - {source}\n' for source in assets.SOURCE_TO_TARGET
-            ),
+            'provider:\n'
+            '  openai:\n'
+            '    whitelist: [gpt-6-luna]\n'
+            'opencode_v2:\n'
+            '  default_model: openai/gpt-6-luna\n'
+            '  providers:\n'
+            '    openai:\n'
+            '      enabled: true\n'
+            '    cloudflare-ai-gateway-custom:\n'
+            '      enabled: true\n'
+            'x-oc2-assets:\n' + ''.join(f'  - {source}\n' for source in sources)
+            + 'x-oc2-agents:\n'
+            '  hephaestus:\n'
+            '    mode: primary\n'
+            '    model: openai/gpt-6-luna\n'
+            '  oracle:\n'
+            '    mode: subagent\n'
+            '    model: openai/gpt-6-luna\n'
+            'x-oc2-mcp:\n'
+            '  enabled: false\n'
+            '  servers: []\n',
             encoding='utf-8',
         )
 
@@ -2641,7 +2798,7 @@ class AssetExporterTest(unittest.TestCase):
         payload = json.loads(raw)
         self.assertEqual(set(payload['files']),
                          set(assets.SOURCE_TO_TARGET.values()) |
-                         {assets.THEME_TARGET})
+                         {assets.THEME_TARGET, assets.NATIVE_TARGET})
         self.assertNotIn('metadata/agent-routes.json', payload['files'])
         command = payload['files']['config/opencode/commands/build-skill.md']
         self.assertNotIn('agent: old-agent', command)
@@ -2672,35 +2829,55 @@ class AssetExporterTest(unittest.TestCase):
         with self.assertRaisesRegex(assets.AssetError, 'credential material'):
             assets.build(self.root)
 
+    def test_skill_frontmatter_name_must_match_native_discovery_directory(self):
+        source = 'agent-skills/custom/config-modernizer/SKILL.md'
+        (self.root / source).write_text(
+            '---\nname: wrong-name\ndescription: Valid fixture skill.\n---\nInstructions\n',
+            encoding='utf-8',
+        )
+
+        with self.assertRaisesRegex(assets.AssetError, 'Skill name mismatch'):
+            assets.build(self.root)
+
     def test_unapproved_theme_rejected(self):
         (self.root / assets.THEME_SOURCE).write_text('{"theme":"../../bad"}')
         with self.assertRaisesRegex(assets.AssetError, 'unapproved TUI theme'):
             assets.build(self.root)
 
     def test_apm_assets_must_match_the_fixed_allowlist(self):
-        apm = self.root / 'apm.yml'
-        apm.write_text('oc2_assets:\n  - global-rules/UNAPPROVED.md\n')
-        with self.assertRaisesRegex(assets.AssetError, 'unapproved OC2 asset'):
+        self._write_apm_assets(['global-rules/UNAPPROVED.md'])
+        with self.assertRaisesRegex(assets.AssetError, 'unapproved asset source'):
             assets.build(self.root)
 
     def test_apm_allowlist_intersection_exports_only_declared_approved_path(self):
-        (self.root / 'apm.yml').write_text(
-            'oc2_assets:\n  - global-rules/AGENTS.global.md\n',
-        )
+        self._write_apm_assets(['global-rules/AGENTS.global.md'])
         raw, _ = assets.build(self.root)
         payload = json.loads(raw)
         self.assertEqual(
             set(payload['files']),
-            {'config/opencode/AGENTS.md', assets.THEME_TARGET},
+            {'config/opencode/AGENTS.md', assets.THEME_TARGET, assets.NATIVE_TARGET},
+        )
+
+    def test_native_manifest_change_changes_asset_and_runtime_identity(self):
+        first_raw, first_sha = assets.build(self.root)
+        apm = self.root / 'apm.yml'
+        apm.write_text(apm.read_text(encoding='utf-8') + 'owner: updated\n', encoding='utf-8')
+        second_raw, second_sha = assets.build(self.root)
+        config_sha = 'a' * 64
+
+        self.assertNotEqual(first_raw, second_raw)
+        self.assertNotEqual(first_sha, second_sha)
+        self.assertNotEqual(
+            guest.runtime_path(config_sha, first_sha),
+            guest.runtime_path(config_sha, second_sha),
         )
 
     def test_apm_assets_must_be_unique_and_traversal_free(self):
-        apm = self.root / 'apm.yml'
         for declaration in (
-            'oc2_assets:\n  - global-rules/AGENTS.global.md\n  - global-rules/AGENTS.global.md\n',
-            'oc2_assets:\n  - ../outside.md\n',
+            ['global-rules/AGENTS.global.md', 'global-rules/AGENTS.global.md'],
+            ['../outside.md'],
         ):
-            apm.write_text(declaration)
+            self._write_apm_assets(declaration)
             with self.subTest(declaration=declaration), self.assertRaises(assets.AssetError):
                 assets.build(self.root)
 
@@ -2708,8 +2885,8 @@ class AssetExporterTest(unittest.TestCase):
         apm = self.root / 'apm.yml'
         for content in (
             'name: dotfiles-ai\n',
-            'oc2_assets: global-rules/AGENTS.global.md\n',
-            'oc2_assets: [global-rules/AGENTS.global.md]\noc2_assets: [agent-commands/build-skill.md]\n',
+            'x-oc2-assets: [global-rules/AGENTS.global.md]\n',
+            'x-oc2-assets: [global-rules/AGENTS.global.md]\nx-oc2-assets: [agent-commands/build-skill.md]\n',
         ):
             apm.write_text(content)
             with self.subTest(content=content), self.assertRaises(assets.AssetError):

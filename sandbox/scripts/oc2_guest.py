@@ -14,6 +14,8 @@ import re
 import sys
 from typing import Final, NoReturn, TypeAlias
 
+from oc2_agent_native import validate_agent_map, validate_native_asset
+
 VERSION = "2.2.5"
 BASE = pathlib.Path('/home/agent/workspace/oc2')
 FILES = ('opencode.jsonc', 'cli.json', 'export-manifest.json')
@@ -42,7 +44,9 @@ ASSET_TARGETS = frozenset({
     'config/opencode/skills/agent-skill-architect/SKILL.md',
     'config/opencode/skills/config-modernizer/SKILL.md',
     'theme.json',
+    'native/oc2-native.json',
 })
+NATIVE_ASSET_TARGET = 'native/oc2-native.json'
 MAX_ASSETS = 512 * 1024
 
 CLI_CANDIDATES = (
@@ -71,7 +75,11 @@ def regular(path: pathlib.Path, max_bytes: int = 1048576) -> bytes:
 
 def verify_v2_config(server: dict[str, JsonValue]) -> None:
     """Reject provider fallback, Guest auth, and literal credentials at activation."""
-    if set(server) != {'$schema', 'shell', 'snapshot', 'model', 'providers', 'policies'}:
+    allowed_fields = {'$schema', 'shell', 'snapshot', 'model', 'providers', 'policies'}
+    if 'agents' in server:
+        allowed_fields.add('agents')
+        validate_agent_map(server['agents'])
+    if set(server) != allowed_fields:
         fail('unexpected V2 server config fields')
     model = server.get('model')
     providers = server.get('providers')
@@ -213,10 +221,10 @@ def verify_assets(source: pathlib.Path, expected_sha: str) -> dict[str, bytes]:
     hashes = payload['sha256']
     if (not isinstance(files, dict) or not isinstance(hashes, dict)
             or not set(files) <= ASSET_TARGETS or set(hashes) != set(files)
-            or 'theme.json' not in files):
+            or 'theme.json' not in files or NATIVE_ASSET_TARGET not in files):
         fail('asset path allowlist mismatch')
     result: dict[str, bytes] = {}
-    for name in sorted(ASSET_TARGETS):
+    for name in sorted(files):
         value = files[name]
         if not isinstance(value, str):
             fail('non-text asset')
@@ -232,6 +240,7 @@ def verify_assets(source: pathlib.Path, expected_sha: str) -> dict[str, bytes]:
             or not isinstance(theme['name'], str)
             or not re.fullmatch(r'[a-z0-9-]{1,40}', theme['name'])):
         fail('unsafe TUI theme')
+    validate_native_asset(result[NATIVE_ASSET_TARGET])
     # No third-party agent metadata or model routing is imported.
     return result
 
@@ -300,6 +309,14 @@ def prepare(
     client = json.loads(regular(bundle / 'cli.json'))
     asset_files: dict[str, bytes] = {}
     if assets is not None:
+        native_payload = validate_native_asset(assets[NATIVE_ASSET_TARGET])
+        manifest = json.loads(
+            regular(bundle / 'export-manifest.json'), object_pairs_hook=_unique_json_object,
+        )
+        if native_payload['source_sha256'] != manifest.get('source_sha256'):
+            fail('APM config and Native Agent asset source SHA mismatch')
+        if server.get('agents', {}) != native_payload['agents']:
+            fail('V2 config and Native Agent asset mismatch')
         # Instructions are resolved inside the guest, not on the Host.
         rule_names = sorted(p for p in assets if p.startswith('config/opencode/rules/'))
         server['instructions'] = [str(dest / name) for name in rule_names]
