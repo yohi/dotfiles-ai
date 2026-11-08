@@ -107,7 +107,7 @@ dependencies:
       command: "bash"
       args:
         - "-c"
-        - 'exec "$HOME/dotfiles/components/dotfiles-ai/_scripts/codegraph-bootstrap.sh" serve --mcp'
+        - 'manifest="$(readlink -f "$HOME/.apm/apm.yml")" && root="${manifest%/*}" && exec "$root/_scripts/codegraph-bootstrap.sh" serve --mcp'
 
     - name: filesystem
       title: "Filesystem MCP"
@@ -152,7 +152,7 @@ dependencies:
       command: "bash"
       args:
         - "-c"
-        - 'cd "$HOME/dotfiles/components/dotfiles-ai" && exec npx -y @yohi/nexus@2.6.0 http-bridge'
+        - 'manifest="$(readlink -f "$HOME/.apm/apm.yml")" && root="${manifest%/*}" && cd "$root" && exec npx -y @yohi/nexus@2.6.0 http-bridge'
       env:
         LOG_LEVEL: "ERROR"
         GITHUB_TOKEN: "${env:GITHUB_TOKEN}"

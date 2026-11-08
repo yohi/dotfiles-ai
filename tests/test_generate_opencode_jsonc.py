@@ -84,7 +84,7 @@ def test_build_config_uses_home_resolved_codegraph_bootstrap_command() -> None:
     assert config["mcp"]["codegraph"]["command"] == [
         "bash",
         "-c",
-        'exec "$HOME/dotfiles/components/dotfiles-ai/_scripts/codegraph-bootstrap.sh" serve --mcp',
+        'manifest="$(readlink -f "$HOME/.apm/apm.yml")" && root="${manifest%/*}" && exec "$root/_scripts/codegraph-bootstrap.sh" serve --mcp',
     ]
 
 

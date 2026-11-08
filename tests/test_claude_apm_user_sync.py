@@ -28,13 +28,13 @@ def test_apm_mcp_servers_use_the_dotfiles_runtime() -> None:
     assert servers["codegraph"]["command"] == "bash"
     assert servers["codegraph"]["args"] == [
         "-c",
-        'exec "$HOME/dotfiles/components/dotfiles-ai/_scripts/codegraph-bootstrap.sh" serve --mcp',
+        'manifest="$(readlink -f "$HOME/.apm/apm.yml")" && root="${manifest%/*}" && exec "$root/_scripts/codegraph-bootstrap.sh" serve --mcp',
     ]
     assert servers["filesystem"]["args"][-1] == "."
     assert servers["nexus"]["command"] == "bash"
     assert servers["nexus"]["args"] == [
         "-c",
-        'cd "$HOME/dotfiles/components/dotfiles-ai" && exec npx -y @yohi/nexus@2.6.0 http-bridge',
+        'manifest="$(readlink -f "$HOME/.apm/apm.yml")" && root="${manifest%/*}" && cd "$root" && exec npx -y @yohi/nexus@2.6.0 http-bridge',
     ]
     assert {
         name: servers["nexus"]["env"][name]
@@ -57,6 +57,7 @@ def test_apm_mcp_servers_use_the_dotfiles_runtime() -> None:
         "-c",
         'exec "$HOME/.local/bin/semgrep" mcp -t stdio',
     ]
+    assert "dotfiles/components/dotfiles-ai" not in str(servers)
 
 
 def test_sync_claude_uses_project_manifest_and_preserves_user_config(

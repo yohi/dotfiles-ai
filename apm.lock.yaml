@@ -1,5 +1,5 @@
 lockfile_version: '1'
-generated_at: '2026-11-08T00:39:44.488874+00:00'
+generated_at: '2026-11-08T01:07:11.011189+00:00'
 apm_version: 0.31.0
 dependencies:
 - repo_url: anthropics/claude-code
@@ -7026,8 +7026,8 @@ mcp_configs:
     transport: stdio
     args:
     - -c
-    - exec "$HOME/dotfiles/components/dotfiles-ai/_scripts/codegraph-bootstrap.sh"
-      serve --mcp
+    - manifest="$(readlink -f "$HOME/.apm/apm.yml")" && root="${manifest%/*}" && exec
+      "$root/_scripts/codegraph-bootstrap.sh" serve --mcp
     registry: false
     command: bash
     title: CodeGraph MCP
@@ -7062,8 +7062,8 @@ mcp_configs:
       NO_PROXY: 127.0.0.1,localhost
     args:
     - -c
-    - cd "$HOME/dotfiles/components/dotfiles-ai" && exec npx -y @yohi/nexus@2.6.0
-      http-bridge
+    - manifest="$(readlink -f "$HOME/.apm/apm.yml")" && root="${manifest%/*}" && cd
+      "$root" && exec npx -y @yohi/nexus@2.6.0 http-bridge
     registry: false
     command: bash
     title: Nexus
