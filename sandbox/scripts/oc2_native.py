@@ -17,13 +17,13 @@ from oc2_agent_native import (
     McpServerId,
     McpSelection,
     NATIVE_MODEL,
-    NativePayload,
+    NativePayload as NativePayload,
     PluginId,
     PluginSelection,
     SUPERPOWERS_COMMIT,
     SUPERPOWERS_REF,
     SUPERPOWERS_REPOSITORY,
-    build_native_payload,
+    build_native_payload as build_native_payload,
     parse_agent_name,
 )
 

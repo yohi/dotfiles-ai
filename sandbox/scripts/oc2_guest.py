@@ -12,11 +12,17 @@ import os
 import pathlib
 import re
 import sys
+from dataclasses import dataclass
 from typing import Final, NoReturn, TypeAlias
 
 from oc2_agent_native import (
     SUPERPOWERS_COMMIT,
+    SUPERPOWERS_FILE_COUNT,
     SUPERPOWERS_REPOSITORY,
+    SUPERPOWERS_SOURCE_PATH,
+    SUPERPOWERS_TOTAL_BYTES,
+    SUPERPOWERS_TREE_SHA256,
+    SUPERPOWERS_VERSION,
     validate_agent_map,
     validate_native_asset,
 )
@@ -73,6 +79,81 @@ def _unique_json_object(pairs: list[tuple[str, JsonValue]]) -> dict[str, JsonVal
             fail('duplicate JSON object key')
         result[key] = value
     return result
+
+
+@dataclass(frozen=True, slots=True)
+class SuperpowersFile:
+    path: str
+    content: bytes
+    sha256: str
+
+
+@dataclass(frozen=True, slots=True)
+class VerifiedSuperpowersSource:
+    files: tuple[SuperpowersFile, ...]
+    tree_sha256: str
+    total_bytes: int
+
+
+def verify_superpowers_source() -> VerifiedSuperpowersSource:
+    source = BASE / SUPERPOWERS_SOURCE_PATH
+    validate_location(source, BASE)
+    if source.is_symlink() or not source.is_dir():
+        fail('verified Superpowers source directory is missing or linked')
+
+    files: list[SuperpowersFile] = []
+    total_bytes = 0
+    paths = sorted(source.rglob('*'), key=lambda item: item.relative_to(source).as_posix())
+    for path in paths:
+        if path.is_symlink():
+            fail('symlink in verified Superpowers source')
+        if path.is_dir():
+            continue
+        if not path.is_file():
+            fail('non-regular entry in verified Superpowers source')
+        relative = path.relative_to(source).as_posix()
+        if (relative.startswith('/') or '\\' in relative
+                or any(part in ('', '.', '..') for part in relative.split('/'))):
+            fail('unsafe path in verified Superpowers source')
+        size = path.stat().st_size
+        if size > SUPERPOWERS_TOTAL_BYTES or total_bytes + size > SUPERPOWERS_TOTAL_BYTES:
+            fail('verified Superpowers source exceeds its pinned size')
+        content = path.read_bytes()
+        total_bytes += len(content)
+        files.append(SuperpowersFile(relative, content, hashlib.sha256(content).hexdigest()))
+
+    by_path = {item.path: item for item in files}
+    required = {
+        'index.js',
+        'package.json',
+        '.opencode/plugins/superpowers.js',
+        'skills/using-superpowers/SKILL.md',
+        'skills/brainstorming/SKILL.md',
+        'skills/verification-before-completion/SKILL.md',
+    }
+    if len(files) != SUPERPOWERS_FILE_COUNT or total_bytes != SUPERPOWERS_TOTAL_BYTES:
+        fail('verified Superpowers source size or file count mismatch')
+    if not required <= set(by_path):
+        fail('verified Superpowers entrypoint or required Skills are missing')
+    try:
+        package = json.loads(
+            by_path['package.json'].content, object_pairs_hook=_unique_json_object,
+        )
+    except (ValueError, UnicodeError) as exc:
+        raise ValueError('verified Superpowers package metadata is invalid') from exc
+    if (not isinstance(package, dict)
+            or package.get('name') != SUPERPOWERS_REPOSITORY.split('/')[-1]
+            or package.get('version') != SUPERPOWERS_VERSION
+            or package.get('main') != '.opencode/plugins/superpowers.js'):
+        fail('verified Superpowers package identity mismatch')
+
+    tree_material = ''.join(
+        f'{item.path}\0{item.sha256}\n' for item in files
+    ).encode('utf-8')
+    tree_sha256 = hashlib.sha256(tree_material).hexdigest()
+    if tree_sha256 != SUPERPOWERS_TREE_SHA256:
+        fail('verified Superpowers source tree SHA-256 mismatch')
+    return VerifiedSuperpowersSource(tuple(files), tree_sha256, total_bytes)
 
 
 def regular(path: pathlib.Path, max_bytes: int = 1048576) -> bytes:
@@ -205,13 +286,75 @@ def verify(bundle: pathlib.Path) -> str:
     return hashlib.sha256(data['export-manifest.json']).hexdigest()
 
 
-def runtime_path(manifest_sha: str, assets_sha: str | None = None) -> pathlib.Path:
-    if assets_sha:
-        combined = hashlib.sha256(
-            bytes.fromhex(manifest_sha) + bytes.fromhex(assets_sha)
-        ).hexdigest()
+def runtime_path(
+    manifest_sha: str,
+    assets_sha: str | None = None,
+    generator_fingerprint: str | None = None,
+) -> pathlib.Path:
+    if generator_fingerprint is not None and assets_sha is None:
+        fail('verification Runtime identity requires an asset hash')
+    if assets_sha is not None:
+        if generator_fingerprint is None:
+            combined = hashlib.sha256(
+                bytes.fromhex(manifest_sha) + bytes.fromhex(assets_sha),
+            ).hexdigest()
+        else:
+            from oc2_identity import runtime_identity_sha256
+
+            combined = runtime_identity_sha256(
+                manifest_sha, assets_sha, generator_fingerprint,
+            )
         return BASE / 'runtime' / combined[:16]
     return BASE / 'runtime' / manifest_sha[:16]
+
+
+def _verify_plugin_source_metadata(raw: bytes) -> dict[str, JsonValue]:
+    try:
+        metadata: dict[str, JsonValue] = json.loads(
+            raw, object_pairs_hook=_unique_json_object,
+        )
+    except (ValueError, UnicodeError) as exc:
+        raise ValueError('invalid Superpowers source metadata') from exc
+    expected: dict[str, JsonValue] = {
+        'schema': 'dotfiles-ai/oc2-plugin-source/v1',
+        'source': SUPERPOWERS_REPOSITORY,
+        'version': SUPERPOWERS_VERSION,
+        'commit': SUPERPOWERS_COMMIT,
+        'source_path': SUPERPOWERS_SOURCE_PATH,
+        'entrypoint': '.opencode/plugins/superpowers.js',
+        'skills_directory': 'skills',
+        'file_count': SUPERPOWERS_FILE_COUNT,
+        'total_bytes': SUPERPOWERS_TOTAL_BYTES,
+        'tree_sha256': SUPERPOWERS_TREE_SHA256,
+    }
+    if (set(metadata) != set(expected) | {'plugin_files'}
+            or any(metadata.get(key) != value for key, value in expected.items())):
+        fail('Superpowers source metadata is not allowlisted')
+    plugin_files = metadata.get('plugin_files')
+    if (not isinstance(plugin_files, list)
+            or any(not isinstance(name, str) for name in plugin_files)
+            or plugin_files != sorted(set(plugin_files))):
+        fail('Superpowers Plugin file manifest is invalid')
+    names = set(plugin_files)
+    if not {
+        'index.js',
+        'package.json',
+        '.opencode/plugins/superpowers.js',
+    } <= names:
+        fail('Superpowers Plugin entrypoint files are missing')
+    if not any(
+        name.startswith('skills/') and name.endswith('/SKILL.md')
+        and len(name.split('/')) == 3
+        for name in plugin_files
+    ):
+        fail('Superpowers Native Skill assets are missing')
+    if any(
+        name.startswith('/') or '\\' in name
+        or any(part in ('', '.', '..') for part in name.split('/'))
+        for name in plugin_files
+    ):
+        fail('Superpowers Plugin file path is unsafe')
+    return metadata
 
 
 def verify_assets(source: pathlib.Path, expected_sha: str) -> dict[str, bytes]:
@@ -247,12 +390,10 @@ def verify_assets(source: pathlib.Path, expected_sha: str) -> dict[str, bytes]:
     plugin_enabled = native['plugins']['enabled']
     allowed_targets = set(ASSET_TARGETS)
     if plugin_enabled:
-        allowed_targets.update(plugin_targets)
-        allowed_targets.update({PLUGIN_META_TARGET, MCP_SERVER_TARGET})
-        if (PLUGIN_PREFIX + 'index.js' not in plugin_targets
-                or not plugin_targets or PLUGIN_META_TARGET not in files
+        allowed_targets.update({PLUGIN_META_TARGET, MCP_SERVER_TARGET, *plugin_targets})
+        if (not plugin_targets or PLUGIN_META_TARGET not in files
                 or MCP_SERVER_TARGET not in files):
-            fail('verification Plugin/MCP assets are incomplete')
+            fail('verification Plugin/MCP source metadata is incomplete')
     if set(files) - allowed_targets:
         fail('asset path allowlist mismatch')
     if not plugin_enabled and (plugin_targets or PLUGIN_META_TARGET in files
@@ -276,21 +417,13 @@ def verify_assets(source: pathlib.Path, expected_sha: str) -> dict[str, bytes]:
             or not re.fullmatch(r'[a-z0-9-]{1,40}', theme['name'])):
         fail('unsafe TUI theme')
     if plugin_enabled:
-        metadata = json.loads(
-            result[PLUGIN_META_TARGET], object_pairs_hook=_unique_json_object,
-        )
-        if (not isinstance(metadata, dict)
-                or set(metadata) != {'schema', 'source', 'commit', 'entrypoint', 'files'}
-                or metadata.get('schema') != 'dotfiles-ai/oc2-plugin/v1'
-                or metadata.get('source') != SUPERPOWERS_REPOSITORY
-                or metadata.get('commit') != SUPERPOWERS_COMMIT
-                or metadata.get('entrypoint') != PLUGIN_PREFIX + 'index.js'):
-            fail('unapproved Superpowers Plugin manifest')
-        manifest_files = metadata.get('files')
-        if (not isinstance(manifest_files, dict)
-                or set(manifest_files) != plugin_targets
-                or any(manifest_files.get(name) != hashes[name] for name in plugin_targets)):
-            fail('Superpowers Plugin file manifest mismatch')
+        metadata = _verify_plugin_source_metadata(result[PLUGIN_META_TARGET])
+        plugin_files = metadata['plugin_files']
+        if not isinstance(plugin_files, list):
+            fail('Superpowers Plugin file manifest is invalid')
+        expected_targets = {PLUGIN_PREFIX + name for name in plugin_files if isinstance(name, str)}
+        if plugin_targets != expected_targets:
+            fail('Superpowers Plugin assets do not match their manifest')
     return result
 
 
@@ -351,8 +484,6 @@ def prepare(
 ) -> pathlib.Path:
     if (assets is None) != (assets_sha is None):
         fail('asset content/identity mismatch')
-    dest = runtime_path(manifest_sha, assets_sha)
-    validate_location(dest, BASE)
 
     server = json.loads(regular(bundle / 'opencode.jsonc'))
     client = json.loads(regular(bundle / 'cli.json'))
@@ -360,7 +491,21 @@ def prepare(
         regular(bundle / 'export-manifest.json'), object_pairs_hook=_unique_json_object,
     )
     verification_only = manifest.get('config_format') == 'oc2-verification'
+    generator_fingerprint: str | None = None
+    if verification_only:
+        if assets is None:
+            fail('verification Runtime requires selected Plugin/MCP assets')
+        from oc2_identity import verification_generator_fingerprint
+
+        generator_fingerprint = verification_generator_fingerprint(
+            pathlib.Path(__file__),
+            pathlib.Path(__file__).with_name('oc2_agent_native.py'),
+            pathlib.Path(__file__).with_name('oc2_identity.py'),
+        )
+    dest = runtime_path(manifest_sha, assets_sha, generator_fingerprint)
+    validate_location(dest, BASE)
     asset_files: dict[str, bytes] = {}
+    plugin_source: VerifiedSuperpowersSource | None = None
     if assets is not None:
         native_payload = validate_native_asset(assets[NATIVE_ASSET_TARGET])
         if native_payload['source_sha256'] != manifest.get('source_sha256'):
@@ -379,8 +524,31 @@ def prepare(
         asset_files = {name: value for name, value in assets.items()
                        if name != 'theme.json'}
         if verification_only:
-            plugin_path = str(dest / 'plugins/superpowers')
-            server['plugins'] = [plugin_path]
+            plugin_metadata = _verify_plugin_source_metadata(assets[PLUGIN_META_TARGET])
+            plugin_source = verify_superpowers_source()
+            if plugin_metadata['tree_sha256'] != plugin_source.tree_sha256:
+                fail('Superpowers source tree SHA-256 mismatch')
+            bundled_plugins = {
+                name[len(PLUGIN_PREFIX):]: content
+                for name, content in assets.items()
+                if name.startswith(PLUGIN_PREFIX)
+            }
+            source_files = {item.path: item.content for item in plugin_source.files}
+            required_skills = {
+                name for name in source_files
+                if name.startswith('skills/') and name.endswith('/SKILL.md')
+                and len(name.split('/')) == 3
+            }
+            required_plugin_files = {
+                'index.js', 'package.json', str(plugin_metadata['entrypoint']),
+                *required_skills,
+            }
+            if not required_skills or not required_plugin_files <= set(bundled_plugins):
+                fail('Verification Asset Bundle is missing Native Skill files')
+            if any(source_files.get(name) != content for name, content in bundled_plugins.items()):
+                fail('Plugin Asset Bundle differs from the pinned source tree')
+            plugin_path = dest / 'plugins/superpowers'
+            server['plugins'] = [str(plugin_path)]
             server['mcp'] = {
                 'servers': {
                     'oc2-status': {
@@ -396,7 +564,7 @@ def prepare(
                 {'action': 'provider.use', 'resource': '*', 'effect': 'deny'},
                 {'action': 'integration.connect', 'resource': '*', 'effect': 'deny'},
                 {'action': 'plugin.use', 'resource': '*', 'effect': 'deny'},
-                {'action': 'plugin.use', 'resource': plugin_path, 'effect': 'allow'},
+                {'action': 'plugin.use', 'resource': str(plugin_path), 'effect': 'allow'},
                 {'action': 'mcp.use', 'resource': '*', 'effect': 'deny'},
                 {'action': 'mcp.use', 'resource': 'oc2-status', 'effect': 'allow'},
             ]
@@ -412,6 +580,13 @@ def prepare(
         'config/opencode/cli.json': encoded(client),
         **asset_files,
     }
+    if verification_only:
+        if plugin_source is None:
+            fail('verification Runtime is missing its pinned Plugin source')
+        expected.update({
+            PLUGIN_PREFIX + item.path: item.content
+            for item in plugin_source.files
+        })
     receipt: dict[str, JsonValue] = {
         'manifest_sha256': manifest_sha,
         'opencode_version': VERSION,
@@ -420,8 +595,24 @@ def prepare(
         receipt['assets_sha256'] = assets_sha
     if verification_only:
         receipt['verification_only'] = True
+        if generator_fingerprint is None:
+            fail('verification Runtime is missing its generator fingerprint')
+        receipt['generator_sha256'] = generator_fingerprint
+        if plugin_source is None:
+            fail('verification Runtime is missing its pinned Plugin receipt')
+        receipt['plugin_source'] = {
+            'repository': SUPERPOWERS_REPOSITORY,
+            'commit': SUPERPOWERS_COMMIT,
+            'path': SUPERPOWERS_SOURCE_PATH,
+            'file_count': len(plugin_source.files),
+            'total_bytes': plugin_source.total_bytes,
+            'tree_sha256': plugin_source.tree_sha256,
+            'file_sha256': {item.path: item.sha256 for item in plugin_source.files},
+        }
     marker = dest / 'receipt.json'
     if dest.exists():
+        if verification_only:
+            fail('verification Runtime identity already exists; refusing reuse')
         if not dest.is_dir() or dest.is_symlink() or not marker.is_file() or marker.is_symlink():
             fail('incomplete or untrusted runtime directory; refusing overwrite')
         if json.loads(regular(marker)) != receipt:

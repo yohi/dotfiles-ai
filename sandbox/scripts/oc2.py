@@ -29,6 +29,7 @@ from urllib.parse import urlsplit
 
 import yaml
 from oc2_oauth_bundle import oauth_helper_source
+from oc2_identity import runtime_identity_sha256, verification_generator_fingerprint
 
 if TYPE_CHECKING:
     from sandbox.scripts.oc2_workspace import Manifest as WorkspaceManifest
@@ -810,14 +811,21 @@ def stage(runner: Runner, name: str, bundle: pathlib.Path, manifest_sha: str,
           assets_sha: str | None = None) -> None:
     destination = f'{ROOT}/bundles/{manifest_sha[:16]}'
     script_sha = hashlib.sha256(guest_script.read_bytes()).hexdigest()
-    script_dest = f'{ROOT}/scripts/oc2_guest_{script_sha[:16]}.py'
     native_helper = HERE / 'oc2_agent_native.py'
     native_helper_sha = hashlib.sha256(native_helper.read_bytes()).hexdigest()
-    native_helper_dest = f'{ROOT}/scripts/oc2_agent_native.py'
+    identity_helper = HERE / 'oc2_identity.py'
+    identity_helper_sha = hashlib.sha256(identity_helper.read_bytes()).hexdigest()
+    verifier_dir = (
+        f'{ROOT}/scripts/oc2_guest_{script_sha[:16]}_{native_helper_sha[:16]}_'
+        f'{identity_helper_sha[:16]}'
+    )
+    script_dest = f'{verifier_dir}/oc2_guest.py'
+    native_helper_dest = f'{verifier_dir}/oc2_agent_native.py'
+    identity_helper_dest = f'{verifier_dir}/oc2_identity.py'
     # sbx exec v0.49.2 was observed invoking bash -c without the expected
     # trailing positional parameters. Use direct argv for filesystem operations.
-    execute(runner, name, 'mkdir', '-p', ROOT, f'{ROOT}/bundles', f'{ROOT}/scripts')
-    execute(runner, name, 'chmod', '700', ROOT, f'{ROOT}/bundles', f'{ROOT}/scripts')
+    execute(runner, name, 'mkdir', '-p', ROOT, f'{ROOT}/bundles', f'{ROOT}/scripts', verifier_dir)
+    execute(runner, name, 'chmod', '700', ROOT, f'{ROOT}/bundles', f'{ROOT}/scripts', verifier_dir)
     # Never overwrite an existing bundle or bootstrap script. Reuse is allowed
     # only after the guest validates their content and hash.
     exists = runner.sbx('exec', name, 'bash', '-c',
@@ -853,6 +861,20 @@ def stage(runner: Runner, name: str, bundle: pathlib.Path, manifest_sha: str,
     ).split()[0]
     if helper_sha != native_helper_sha:
         raise Stop('guest native verifier SHA mismatch')
+    identity_status = runner.destination_status(name, identity_helper_dest)
+    if identity_status == 0:
+        runner.sbx('cp', str(identity_helper), f'{name}:{identity_helper_dest}')
+    elif identity_status == 10:
+        pass
+    elif identity_status == 12:
+        raise Stop('unsafe guest identity verifier path')
+    else:
+        raise Stop('cannot determine guest identity verifier state')
+    identity_sha = runner.sbx(
+        'exec', name, 'sha256sum', identity_helper_dest, capture=True,
+    ).split()[0]
+    if identity_sha != identity_helper_sha:
+        raise Stop('guest identity verifier SHA mismatch')
     args = ['--bundle', destination, '--expected-sha', manifest_sha]
     if (assets_file is None) != (assets_sha is None):
         raise Stop('asset file and hash must be supplied together')
@@ -905,13 +927,24 @@ def prepare_verification_runtime(
             raise Stop('verification Plugin/MCP asset export failed: ' + str(exc)) from exc
         asset_file = temporary_path / 'assets.json'
         write_new(asset_file, asset_raw)
+        generator_fingerprint = verification_generator_fingerprint(
+            HERE / 'oc2_guest.py', HERE / 'oc2_agent_native.py', HERE / 'oc2_identity.py',
+        )
+        runtime_sha = runtime_identity_sha256(
+            config_sha, asset_sha, generator_fingerprint,
+        )
+        runtime_destination = f'{ROOT}/runtime/{runtime_sha[:16]}'
+        destination_status = runner.destination_status(sandbox, runtime_destination)
+        if destination_status == 10:
+            raise Stop('verification Runtime identity already exists; refusing reuse')
+        if destination_status == 12:
+            raise Stop('verification Runtime destination is unsafe')
+        if destination_status != 0:
+            raise Stop('could not establish verification Runtime identity availability')
         stage(
             runner, sandbox, bundle, config_sha, HERE / 'oc2_guest.py',
             asset_file, asset_sha,
         )
-        runtime_sha = hashlib.sha256(
-            bytes.fromhex(config_sha) + bytes.fromhex(asset_sha),
-        ).hexdigest()
         print('OC2_VERIFICATION_PREPARED: sandbox=' + sandbox + ' runtime=' + runtime_sha[:16])
         return runtime_sha
 
@@ -1027,11 +1060,17 @@ def launch(runner: Runner, request: SandboxLaunch) -> None:
         remote_assets = f'{ROOT}/assets/{request.assets_sha[:16]}.json'
         guest_script = HERE / 'oc2_guest.py'
         guest_script_sha = hashlib.sha256(guest_script.read_bytes()).hexdigest()
-        remote_script = f'{ROOT}/scripts/oc2_guest_{guest_script_sha[:16]}.py'
         native_helper = HERE / 'oc2_agent_native.py'
         native_helper_sha = hashlib.sha256(native_helper.read_bytes()).hexdigest()
-        remote_helper = f'{ROOT}/scripts/oc2_agent_native.py'
-        runner.sbx('exec', request.name, 'mkdir', '-p', f'{ROOT}/assets', f'{ROOT}/scripts')
+        verifier_dir = (
+            f'{ROOT}/scripts/oc2_guest_{guest_script_sha[:16]}_{native_helper_sha[:16]}'
+        )
+        remote_script = f'{verifier_dir}/oc2_guest.py'
+        remote_helper = f'{verifier_dir}/oc2_agent_native.py'
+        runner.sbx(
+            'exec', request.name, 'mkdir', '-p',
+            f'{ROOT}/assets', f'{ROOT}/scripts', verifier_dir,
+        )
         for local, remote, label in (
             (request.assets_file, remote_assets, 'asset bundle'),
             (guest_script, remote_script, 'asset verifier'),
@@ -1196,7 +1235,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument('--verification-only', action='store_true',
                    help='prepare the fixed Plugin/MCP Runtime without launching OpenCode')
     p.add_argument('--plugin-dir', type=pathlib.Path,
-                   help='local Superpowers Git checkout used only by verification mode')
+                   help='clean local Git checkout for the pinned Superpowers Plugin')
     p.add_argument('--allow-paid-inference', action='store_true',
                    help='authorize external inference for this interactive launch')
     p.add_argument('--use-cloudflare-ai-gateway', action='store_true',
@@ -1205,11 +1244,10 @@ def main(argv: list[str] | None = None) -> int:
     oc2_workspace = importlib.import_module('oc2_workspace')
 
     try:
-        plugin_dir = args.plugin_dir
         if args.verification_only:
             if not args.prepare_only:
                 raise Stop('--verification-only requires --prepare-only')
-            if plugin_dir is None:
+            if args.plugin_dir is None:
                 raise Stop('--verification-only requires --plugin-dir')
             if args.use_cloudflare_ai_gateway or args.allow_paid_inference:
                 raise Stop('verification mode does not permit provider credentials or inference')
@@ -1221,7 +1259,8 @@ def main(argv: list[str] | None = None) -> int:
                     raise Stop('invalid Sandbox name')
                 print('OC2 PLAN: verification-only Sandbox=' + args.sandbox)
                 print('OC2 PLAN: require an existing compatible mountless Sandbox and pinned CLI')
-                print('OC2 PLAN: select only the pinned local Superpowers Plugin and oc2-status MCP')
+                print('OC2 PLAN: verify the pinned local Superpowers Git checkout')
+                print('OC2 PLAN: select pinned Superpowers Git package and oc2-status MCP')
                 print('OC2 PLAN: no Sandbox creation, credential provisioning, CLI install, or TUI launch')
                 print('OC2 PLAN: no Sandbox commands executed')
                 return 0
@@ -1241,7 +1280,7 @@ def main(argv: list[str] | None = None) -> int:
         if not (repo / 'apm.yml').is_file():
             raise Stop('dotfiles-ai apm.yml not found')
         if args.verification_only:
-            prepare_verification_runtime(repo, args.sandbox, plugin_dir)
+            prepare_verification_runtime(repo, args.sandbox, args.plugin_dir)
             return 0
         if args.prepare_only:
             with tempfile.TemporaryDirectory(prefix='oc2-v2-config-') as temporary:

@@ -4,7 +4,7 @@ import json
 import re
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Final, Literal, NotRequired, Protocol, TypedDict, TypeAlias, assert_never
+from typing import Final, NotRequired, Protocol, TypedDict, TypeAlias, assert_never
 
 
 class AgentName(StrEnum):
@@ -109,6 +109,13 @@ NATIVE_MODEL: Final[str] = 'openai/gpt-6-luna'
 SUPERPOWERS_REPOSITORY: Final[str] = 'obra/superpowers'
 SUPERPOWERS_REF: Final[str] = 'v6.4.2'
 SUPERPOWERS_COMMIT: Final[str] = '8ca22dba9a94f28898bbce59f2537ff4d87c747d'
+SUPERPOWERS_VERSION: Final[str] = '6.4.2'
+SUPERPOWERS_SOURCE_PATH: Final[str] = 'verification-superpowers'
+SUPERPOWERS_FILE_COUNT: Final[int] = 229
+SUPERPOWERS_TOTAL_BYTES: Final[int] = 1_974_678
+SUPERPOWERS_TREE_SHA256: Final[str] = (
+    '19ba95fe50e96fb94d8260972cb50595ed31ada3f993e370b381a1e7718c5036'
+)
 
 
 def parse_agent_name(value: str) -> AgentName:

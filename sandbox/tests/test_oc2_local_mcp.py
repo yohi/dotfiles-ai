@@ -12,7 +12,7 @@ from typing import TypeAlias
 SCRIPTS = Path(__file__).resolve().parents[1] / 'scripts'
 SERVER = SCRIPTS / 'oc2_local_mcp.py'
 sys.path.insert(0, str(SCRIPTS))
-import oc2_local_mcp
+import oc2_local_mcp  # noqa: E402
 
 JSON: TypeAlias = str | int | float | bool | None | list['JSON'] | dict[str, 'JSON']
 

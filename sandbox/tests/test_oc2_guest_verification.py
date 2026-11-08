@@ -11,10 +11,11 @@ from unittest.mock import patch
 SCRIPTS = Path(__file__).resolve().parents[1] / 'scripts'
 REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(SCRIPTS))
-import oc2_agent_native
-import oc2_assets
-import oc2_guest
-import prepare_opencode_v2
+import oc2_assets  # noqa: E402
+import oc2_guest  # noqa: E402
+import oc2_identity  # noqa: E402
+import oc2_native  # noqa: E402
+import prepare_opencode_v2  # noqa: E402
 
 
 class VerificationGuestMaterializationTest(unittest.TestCase):
@@ -27,15 +28,46 @@ class VerificationGuestMaterializationTest(unittest.TestCase):
         self.base_patcher = patch.object(oc2_guest, 'BASE', self.base)
         self.base_patcher.start()
         self.addCleanup(self.base_patcher.stop)
-        plugin_content = b'export const superpowers = true;\n'
-        self.artifact = oc2_assets.PluginArtifact(
-            source_commit=oc2_agent_native.SUPERPOWERS_COMMIT,
-            files=(oc2_assets.PluginFile(
-                path='index.js',
-                content=plugin_content,
-                sha256=hashlib.sha256(plugin_content).hexdigest(),
-            ),),
-        )
+        self.plugin_source = self.base / 'verification-superpowers'
+        self.plugin_source.mkdir()
+        files = {
+            'index.js': b'export const plugin = true;\n',
+            'package.json': (
+                b'{"name":"superpowers","version":"6.4.2",'
+                b'"main":".opencode/plugins/superpowers.js"}\n'
+            ),
+            '.opencode/plugins/superpowers.js': b'export const entrypoint = true;\n',
+            'skills/using-superpowers/SKILL.md': b'---\nname: using-superpowers\n---\n',
+            'skills/brainstorming/SKILL.md': b'---\nname: brainstorming\n---\n',
+            'skills/verification-before-completion/SKILL.md':
+                b'---\nname: verification-before-completion\n---\n',
+        }
+        for index in range(229 - len(files)):
+            files[f'support/file-{index:03}.js'] = b'fixture\n'
+        for relative, content in files.items():
+            path = self.plugin_source / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(content)
+        self.plugin_source_files = files
+        self.plugin_bytes = sum(len(content) for content in files.values())
+        file_hashes = {
+            relative: hashlib.sha256(content).hexdigest()
+            for relative, content in files.items()
+        }
+        tree_content = ''.join(
+            f'{relative}\0{file_hashes[relative]}\n'
+            for relative in sorted(file_hashes)
+        ).encode('utf-8')
+        self.plugin_tree_sha = hashlib.sha256(tree_content).hexdigest()
+        for module in (oc2_assets, oc2_guest):
+            for name, value in (
+                ('SUPERPOWERS_FILE_COUNT', len(files)),
+                ('SUPERPOWERS_TOTAL_BYTES', self.plugin_bytes),
+                ('SUPERPOWERS_TREE_SHA256', self.plugin_tree_sha),
+            ):
+                patcher = patch.object(module, name, value, create=True)
+                patcher.start()
+                self.addCleanup(patcher.stop)
 
     def _provider_bundle(self, verification_only: bool) -> Path:
         apm = prepare_opencode_v2._read_apm_source(
@@ -52,17 +84,42 @@ class VerificationGuestMaterializationTest(unittest.TestCase):
         return bundle
 
     def _asset_file(self, verification_only: bool) -> tuple[Path, str]:
-        with patch.object(oc2_assets, 'resolve_superpowers_plugin', return_value=self.artifact):
-            raw, digest = oc2_assets.build(
-                REPO,
-                verification_only=verification_only,
-                plugin_dir=Path('/fixture/superpowers') if verification_only else None,
+        if verification_only:
+            plugin_paths = {
+                'index.js',
+                'package.json',
+                '.opencode/plugins/superpowers.js',
+                *(
+                    name for name in self.plugin_source_files
+                    if name.startswith('skills/') and name.endswith('/SKILL.md')
+                ),
+            }
+            artifact = oc2_assets.PluginArtifact(
+                source_commit=oc2_native.SUPERPOWERS_COMMIT,
+                files=tuple(
+                    oc2_assets.PluginFile(
+                        path=relative,
+                        content=self.plugin_source_files[relative],
+                        sha256=hashlib.sha256(self.plugin_source_files[relative]).hexdigest(),
+                    )
+                    for relative in sorted(plugin_paths)
+                ),
             )
+            with patch.object(
+                oc2_assets, 'resolve_superpowers_plugin', return_value=artifact,
+            ):
+                raw, digest = oc2_assets.build(
+                    REPO,
+                    verification_only=True,
+                    plugin_dir=Path('/fixture/superpowers'),
+                )
+        else:
+            raw, digest = oc2_assets.build(REPO, verification_only=False)
         path = self.base / ('verification-assets.json' if verification_only else 'normal-assets.json')
         path.write_bytes(raw)
         return path, digest
 
-    def test_verification_materializes_only_fixed_local_plugin_and_mcp(self):
+    def test_verification_registers_local_plugin_with_native_skills_and_mcp(self):
         bundle = self._provider_bundle(verification_only=True)
         assets_path, assets_sha = self._asset_file(verification_only=True)
         config_sha = oc2_guest.verify(bundle)
@@ -81,16 +138,125 @@ class VerificationGuestMaterializationTest(unittest.TestCase):
         })
         self.assertNotIn('model', server)
         self.assertNotIn('providers', server)
+        self.assertEqual(server['policies'][0], {
+            'action': 'provider.use', 'resource': '*', 'effect': 'deny',
+        })
+        self.assertEqual(server['policies'][1], {
+            'action': 'integration.connect', 'resource': '*', 'effect': 'deny',
+        })
         policies = {
             (rule['action'], rule['resource']): rule['effect']
             for rule in server['policies']
         }
         self.assertEqual(policies[('plugin.use', '*')], 'deny')
         self.assertEqual(policies[('plugin.use', expected_plugin)], 'allow')
+        self.assertNotIn(('plugin.use', 'superpowers'), policies)
         self.assertEqual(policies[('mcp.use', '*')], 'deny')
         self.assertEqual(policies[('mcp.use', 'oc2-status')], 'allow')
         self.assertTrue((runtime / 'plugins/superpowers/index.js').is_file())
+        self.assertTrue(
+            (runtime / 'plugins/superpowers/skills/using-superpowers/SKILL.md').is_file(),
+        )
         self.assertTrue((runtime / 'mcp/oc2_local_mcp.py').is_file())
+        receipt = json.loads((runtime / 'receipt.json').read_text())
+        self.assertEqual(
+            receipt['generator_sha256'],
+            oc2_identity.verification_generator_fingerprint(
+                Path(oc2_guest.__file__),
+                Path(oc2_guest.__file__).with_name('oc2_agent_native.py'),
+                Path(oc2_guest.__file__).with_name('oc2_identity.py'),
+            ),
+        )
+
+    def test_verification_runtime_identity_tracks_generator_fingerprint(self):
+        manifest_sha = 'a' * 64
+        assets_sha = 'b' * 64
+        original_generator = 'c' * 64
+        revised_generator = 'd' * 64
+
+        original = oc2_guest.runtime_path(
+            manifest_sha, assets_sha, generator_fingerprint=original_generator,
+        )
+        repeated = oc2_guest.runtime_path(
+            manifest_sha, assets_sha, generator_fingerprint=original_generator,
+        )
+        revised = oc2_guest.runtime_path(
+            manifest_sha, assets_sha, generator_fingerprint=revised_generator,
+        )
+        normal = oc2_guest.runtime_path(manifest_sha, assets_sha)
+        expected_normal = hashlib.sha256(
+            bytes.fromhex(manifest_sha) + bytes.fromhex(assets_sha),
+        ).hexdigest()[:16]
+
+        self.assertEqual(original, repeated)
+        self.assertNotEqual(original, revised)
+        self.assertEqual(normal.name, expected_normal)
+
+    def test_verification_generator_fingerprint_tracks_source_bytes(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            guest_script = root / 'oc2_guest.py'
+            native_helper = root / 'oc2_agent_native.py'
+            identity_helper = root / 'oc2_identity.py'
+            guest_script.write_bytes(b'guest one')
+            native_helper.write_bytes(b'helper one')
+            identity_helper.write_bytes(b'identity one')
+            initial = oc2_identity.verification_generator_fingerprint(
+                guest_script, native_helper, identity_helper,
+            )
+            repeated = oc2_identity.verification_generator_fingerprint(
+                guest_script, native_helper, identity_helper,
+            )
+            guest_script.write_bytes(b'guest two')
+            changed_guest = oc2_identity.verification_generator_fingerprint(
+                guest_script, native_helper, identity_helper,
+            )
+            native_helper.write_bytes(b'helper two')
+            changed_helper = oc2_identity.verification_generator_fingerprint(
+                guest_script, native_helper, identity_helper,
+            )
+            identity_helper.write_bytes(b'identity two')
+            changed_identity_helper = oc2_identity.verification_generator_fingerprint(
+                guest_script, native_helper, identity_helper,
+            )
+
+        self.assertEqual(initial, repeated)
+        self.assertNotEqual(initial, changed_guest)
+        self.assertNotEqual(changed_guest, changed_helper)
+        self.assertNotEqual(changed_helper, changed_identity_helper)
+
+    def test_verification_refuses_to_reuse_existing_runtime_identity(self):
+        bundle = self._provider_bundle(verification_only=True)
+        assets_path, assets_sha = self._asset_file(verification_only=True)
+        config_sha = oc2_guest.verify(bundle)
+        assets = oc2_guest.verify_assets(assets_path, assets_sha)
+        oc2_guest.prepare(bundle, config_sha, assets, assets_sha)
+
+        with self.assertRaisesRegex(ValueError, 'identity already exists'):
+            oc2_guest.prepare(bundle, config_sha, assets, assets_sha)
+
+    def test_verification_rejects_plugin_source_tree_hash_mismatch(self):
+        bundle = self._provider_bundle(verification_only=True)
+        assets_path, assets_sha = self._asset_file(verification_only=True)
+        assets = oc2_guest.verify_assets(assets_path, assets_sha)
+        (self.plugin_source / 'index.js').write_text(
+            'export const plugin = nope;\n', encoding='utf-8',
+        )
+
+        with self.assertRaisesRegex(ValueError, 'tree SHA-256'):
+            oc2_guest.prepare(bundle, oc2_guest.verify(bundle), assets, assets_sha)
+
+    def test_verification_rejects_plugin_source_symlink(self):
+        bundle = self._provider_bundle(verification_only=True)
+        assets_path, assets_sha = self._asset_file(verification_only=True)
+        assets = oc2_guest.verify_assets(assets_path, assets_sha)
+        entrypoint = self.plugin_source / 'index.js'
+        entrypoint.unlink()
+        entrypoint.symlink_to(self.root / 'outside.js')
+        (self.root / 'outside.js').write_text('outside\n', encoding='utf-8')
+
+        with self.assertRaisesRegex(ValueError, 'symlink'):
+            oc2_guest.prepare(bundle, oc2_guest.verify(bundle), assets, assets_sha)
 
     def test_normal_and_verification_modes_use_distinct_runtime_storage(self):
         normal_bundle = self._provider_bundle(verification_only=False)

@@ -298,14 +298,18 @@ class HostTest(unittest.TestCase):
             assets_file = pathlib.Path(temporary) / 'assets.json'
             assets_file.write_text('{}')
             digest = hashlib.sha256(assets_file.read_bytes()).hexdigest()
+            guest_sha = hashlib.sha256((SCRIPTS / 'oc2_guest.py').read_bytes()).hexdigest()
+            native_sha = hashlib.sha256((SCRIPTS / 'oc2_agent_native.py').read_bytes()).hexdigest()
+            verifier_dir = f'{oc2.ROOT}/scripts/oc2_guest_{guest_sha[:16]}_{native_sha[:16]}'
             oc2.launch(runner, oc2.SandboxLaunch(
                 'oc2-dev', 'a' * 64, oc2.PINNED[0], '/workspace/project',
                 pathlib.Path('/tmp/config'), assets_file=assets_file, assets_sha=digest,
             ))
         copied = {call[2] for call in runner.calls if call[0] == 'cp'}
         self.assertTrue(any('/assets/' in target for target in copied))
-        self.assertTrue(any('/scripts/oc2_guest_' in target for target in copied))
-        self.assertTrue(any(target.endswith('/scripts/oc2_agent_native.py')
+        self.assertIn(f'oc2-dev:{verifier_dir}/oc2_guest.py', copied)
+        self.assertIn(f'oc2-dev:{verifier_dir}/oc2_agent_native.py', copied)
+        self.assertTrue(any(target.endswith('/oc2_agent_native.py')
                             for target in copied))
         verify_call = next(call for call in runner.calls if '--install-assets-runtime' in call)
         self.assertIn('--expected-assets-sha', verify_call)
@@ -320,10 +324,12 @@ class HostTest(unittest.TestCase):
             script = oc2.HERE / 'oc2_guest.py'
             script_sha = hashlib.sha256(script.read_bytes()).hexdigest()
             native_helper = oc2.HERE / 'oc2_agent_native.py'
+            native_sha = hashlib.sha256(native_helper.read_bytes()).hexdigest()
+            verifier_dir = f'{oc2.ROOT}/scripts/oc2_guest_{script_sha[:16]}_{native_sha[:16]}'
             runner.workspace_copies.extend((
                 (assets_file, f'oc2-dev:{oc2.ROOT}/assets/{digest[:16]}.json'),
-                (script, f'oc2-dev:{oc2.ROOT}/scripts/oc2_guest_{script_sha[:16]}.py'),
-                (native_helper, f'oc2-dev:{oc2.ROOT}/scripts/oc2_agent_native.py'),
+                (script, f'oc2-dev:{verifier_dir}/oc2_guest.py'),
+                (native_helper, f'oc2-dev:{verifier_dir}/oc2_agent_native.py'),
             ))
 
             oc2.launch(runner, oc2.SandboxLaunch(
@@ -333,7 +339,7 @@ class HostTest(unittest.TestCase):
 
         copied_targets = {call[2] for call in runner.calls if call[0] == 'cp'}
         self.assertFalse(any('/assets/' in target or '/scripts/oc2_guest_' in target
-                             or target.endswith('/scripts/oc2_agent_native.py')
+                             or target.endswith('/oc2_agent_native.py')
                              for target in copied_targets))
 
     def test_launch_fails_closed_for_unsafe_and_unknown_asset_probe_states(self):
@@ -346,12 +352,18 @@ class HostTest(unittest.TestCase):
                     assets_file.write_text('{}')
                     digest = hashlib.sha256(assets_file.read_bytes()).hexdigest()
                     script_sha = hashlib.sha256((oc2.HERE / 'oc2_guest.py').read_bytes()).hexdigest()
+                    native_sha = hashlib.sha256(
+                        (oc2.HERE / 'oc2_agent_native.py').read_bytes(),
+                    ).hexdigest()
+                    verifier_dir = (
+                        f'{oc2.ROOT}/scripts/oc2_guest_{script_sha[:16]}_{native_sha[:16]}'
+                    )
                     path = (
                         f'{oc2.ROOT}/assets/{digest[:16]}.json'
                         if target_kind == 'asset'
-                        else f'{oc2.ROOT}/scripts/oc2_guest_{script_sha[:16]}.py'
+                        else f'{verifier_dir}/oc2_guest.py'
                         if target_kind == 'verifier'
-                        else f'{oc2.ROOT}/scripts/oc2_agent_native.py'
+                        else f'{verifier_dir}/oc2_agent_native.py'
                     )
                     runner.destination_states[path] = status
 
@@ -365,7 +377,7 @@ class HostTest(unittest.TestCase):
                     if target_kind == 'asset':
                         self.assertFalse(any('/assets/' in target for target in copied_targets))
                     elif target_kind == 'native-helper':
-                        self.assertFalse(any(target.endswith('/scripts/oc2_agent_native.py')
+                        self.assertFalse(any(target.endswith('/oc2_agent_native.py')
                                              for target in copied_targets))
                     else:
                         self.assertFalse(any('/scripts/oc2_guest_' in target
@@ -394,7 +406,9 @@ class HostTest(unittest.TestCase):
             assets_file.write_text('{}')
             digest = hashlib.sha256(assets_file.read_bytes()).hexdigest()
             script_sha = hashlib.sha256((oc2.HERE / 'oc2_guest.py').read_bytes()).hexdigest()
-            remote_script = f'{oc2.ROOT}/scripts/oc2_guest_{script_sha[:16]}.py'
+            native_sha = hashlib.sha256((oc2.HERE / 'oc2_agent_native.py').read_bytes()).hexdigest()
+            verifier_dir = f'{oc2.ROOT}/scripts/oc2_guest_{script_sha[:16]}_{native_sha[:16]}'
+            remote_script = f'{verifier_dir}/oc2_guest.py'
             stale_script = pathlib.Path(temporary) / 'stale-guest.py'
             stale_script.write_text('unapproved verifier\n')
             runner.workspace_copies.append((
@@ -1465,6 +1479,11 @@ class HostTest(unittest.TestCase):
             script.write_text('# harmless guest fixture\n')
             script_sha = hashlib.sha256(script.read_bytes()).hexdigest()
             native_sha = hashlib.sha256((SCRIPTS / 'oc2_agent_native.py').read_bytes()).hexdigest()
+            identity_sha = hashlib.sha256((SCRIPTS / 'oc2_identity.py').read_bytes()).hexdigest()
+            verifier_dir = (
+                f'{oc2.ROOT}/scripts/oc2_guest_{script_sha[:16]}_'
+                f'{native_sha[:16]}_{identity_sha[:16]}'
+            )
 
             class StagingRunner:
                 def __init__(self):
@@ -1481,7 +1500,11 @@ class HostTest(unittest.TestCase):
                         assert '$1' not in args[4] and '$2' not in args[4]
                         return 'missing\n'
                     if args[:3] == ('exec', 'oc2-dev', 'sha256sum'):
-                        digest = native_sha if args[3].endswith('/oc2_agent_native.py') else script_sha
+                        digest = (
+                            identity_sha if args[3].endswith('/oc2_identity.py')
+                            else native_sha if args[3].endswith('/oc2_agent_native.py')
+                            else script_sha
+                        )
                         return digest + '  verified\n'
                     return ''
 
@@ -1489,15 +1512,18 @@ class HostTest(unittest.TestCase):
             oc2.stage(runner, 'oc2-dev', bundle, 'a' * 64, script)
             self.assertIn(
                 ('exec', 'oc2-dev', 'mkdir', '-p', oc2.ROOT,
-                 oc2.ROOT + '/bundles', oc2.ROOT + '/scripts'),
+                 oc2.ROOT + '/bundles', oc2.ROOT + '/scripts', verifier_dir),
                 runner.calls,
             )
             self.assertIn(
                 ('exec', 'oc2-dev', 'chmod', '700', oc2.ROOT,
-                 oc2.ROOT + '/bundles', oc2.ROOT + '/scripts'),
+                 oc2.ROOT + '/bundles', oc2.ROOT + '/scripts', verifier_dir),
                 runner.calls,
             )
-            self.assertEqual(len([c for c in runner.calls if c[0] == 'cp']), 3)
+            self.assertIn(f'oc2-dev:{verifier_dir}/oc2_identity.py', {
+                call[2] for call in runner.calls if call[0] == 'cp'
+            })
+            self.assertEqual(len([c for c in runner.calls if c[0] == 'cp']), 4)
 
     def test_stage_rejects_unsafe_verifier_probe_status(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -1506,8 +1532,6 @@ class HostTest(unittest.TestCase):
             script = pathlib.Path(tmp) / 'oc2_guest.py'
             script.write_text('# fixture\n')
             script_sha = hashlib.sha256(script.read_bytes()).hexdigest()
-            native_sha = hashlib.sha256((SCRIPTS / 'oc2_agent_native.py').read_bytes()).hexdigest()
-
             class Runner:
                 def destination_status(self, name, destination):
                     return 12
@@ -1531,6 +1555,7 @@ class HostTest(unittest.TestCase):
             script.write_text('# fixture\n')
             script_sha = hashlib.sha256(script.read_bytes()).hexdigest()
             native_sha = hashlib.sha256((SCRIPTS / 'oc2_agent_native.py').read_bytes()).hexdigest()
+            identity_sha = hashlib.sha256((SCRIPTS / 'oc2_identity.py').read_bytes()).hexdigest()
             asset = root / 'oc2-assets.json'
             asset.write_text('{"fixture":true}')
             asset_sha = hashlib.sha256(asset.read_bytes()).hexdigest()
@@ -1548,6 +1573,7 @@ class HostTest(unittest.TestCase):
                         return 'missing\n'
                     if args[:3] == ('exec', 'oc2-dev', 'sha256sum'):
                         digest = (asset_sha if '/assets/' in args[3]
+                                  else identity_sha if args[3].endswith('/oc2_identity.py')
                                   else native_sha if args[3].endswith('/oc2_agent_native.py')
                                   else script_sha)
                         return (digest
@@ -1556,7 +1582,7 @@ class HostTest(unittest.TestCase):
 
             runner = Runner()
             oc2.stage(runner, 'oc2-dev', bundle, 'a' * 64, script, asset, asset_sha)
-            self.assertEqual(len([c for c in runner.calls if c[0] == 'cp']), 4)
+            self.assertEqual(len([c for c in runner.calls if c[0] == 'cp']), 5)
             start = [c for c in runner.calls if c[:3] ==
                      ('exec', 'oc2-dev', 'python3')]
             self.assertEqual(len(start), 1)
@@ -1576,6 +1602,7 @@ class HostTest(unittest.TestCase):
             expected = hashlib.sha256(asset.read_bytes()).hexdigest()
             script_sha = hashlib.sha256(script.read_bytes()).hexdigest()
             native_sha = hashlib.sha256((SCRIPTS / 'oc2_agent_native.py').read_bytes()).hexdigest()
+            identity_sha = hashlib.sha256((SCRIPTS / 'oc2_identity.py').read_bytes()).hexdigest()
 
             class Runner:
                 def destination_status(self, name, destination):
@@ -1586,6 +1613,7 @@ class HostTest(unittest.TestCase):
                         return 'missing\n'
                     if args[:3] == ('exec', 'oc2-dev', 'sha256sum'):
                         digest = ('f' * 64 if '/assets/' in args[3]
+                                  else identity_sha if args[3].endswith('/oc2_identity.py')
                                   else native_sha if args[3].endswith('/oc2_agent_native.py')
                                   else script_sha)
                         return (digest
@@ -1607,6 +1635,7 @@ class HostTest(unittest.TestCase):
             asset_sha = hashlib.sha256(asset.read_bytes()).hexdigest()
             script_sha = hashlib.sha256(script.read_bytes()).hexdigest()
             native_sha = hashlib.sha256((SCRIPTS / 'oc2_agent_native.py').read_bytes()).hexdigest()
+            identity_sha = hashlib.sha256((SCRIPTS / 'oc2_identity.py').read_bytes()).hexdigest()
 
             class Runner:
                 def destination_status(self, name, destination):
@@ -1617,6 +1646,7 @@ class HostTest(unittest.TestCase):
                         return 'missing\n'
                     if args[:3] == ('exec', 'oc2-dev', 'sha256sum'):
                         digest = (asset_sha if '/assets/' in args[3]
+                                  else identity_sha if args[3].endswith('/oc2_identity.py')
                                   else native_sha if args[3].endswith('/oc2_agent_native.py')
                                   else script_sha)
                         return (digest + ' verified\n')

@@ -16,14 +16,20 @@ from dataclasses import dataclass
 from pathlib import Path
 from pathlib import PurePosixPath
 
+from oc2_agent_native import (
+    SUPERPOWERS_FILE_COUNT,
+    SUPERPOWERS_REPOSITORY,
+    SUPERPOWERS_SOURCE_PATH,
+    SUPERPOWERS_TOTAL_BYTES,
+    SUPERPOWERS_TREE_SHA256,
+    SUPERPOWERS_VERSION,
+)
 from oc2_workspace import contains_credential_material
 from oc2_native import (
     ASSET_SOURCE_TO_TARGET,
     NativeConfigError,
     build_native_payload,
     SUPERPOWERS_COMMIT,
-    McpServerId,
-    PluginId,
     parse_apm_native,
     parse_superpowers_lock,
     validate_skill_frontmatter,
@@ -35,6 +41,7 @@ THEME_SOURCE = "opencode/tui.jsonc"
 THEME_TARGET = "theme.json"
 NATIVE_TARGET = "native/oc2-native.json"
 PLUGIN_PREFIX = "plugins/superpowers/"
+PLUGIN_ENTRYPOINT = '.opencode/plugins/superpowers.js'
 PLUGIN_META_TARGET = "metadata/superpowers-plugin.json"
 MCP_SERVER_SOURCE = "sandbox/scripts/oc2_local_mcp.py"
 MCP_SERVER_TARGET = "mcp/oc2_local_mcp.py"
@@ -43,6 +50,9 @@ MAX_TOTAL = 512 * 1024
 MAX_APM_BYTES = 2 * 1024 * 1024
 MAX_PLUGIN_FILES = 256
 RUNTIME_IMPORTS = frozenset({'@opencode-ai/plugin', '@opencode-ai/sdk'})
+NODE_BUILTIN_IMPORTS = frozenset({
+    'fs', 'path', 'url',
+})
 IMPORT_SPECIFIER = re.compile(
     r'''(?:\bfrom\s*|\bimport\s*(?:\(\s*)?|\brequire\s*\(\s*)['"]([^'"]+)['"]''',
 )
@@ -140,10 +150,27 @@ def resolve_superpowers_plugin(repo: Path, source: Path | None) -> PluginArtifac
                    for path in tracked)):
         raise AssetError('NOT_AVAILABLE: local Plugin tracked file set is invalid')
 
-    required = {'index.js'}
-    if 'package.json' in tracked:
-        required.add('package.json')
-    pending = ['index.js']
+    package_path = source / 'package.json'
+    try:
+        package = json.loads(package_path.read_text(encoding='utf-8'))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise AssetError('NOT_AVAILABLE: local Plugin package metadata is invalid') from exc
+    if (not isinstance(package, dict) or package.get('name') != 'superpowers'
+            or package.get('version') != SUPERPOWERS_VERSION):
+        raise AssetError('NOT_AVAILABLE: local Plugin package identity is invalid')
+    entrypoint = package.get('main')
+    if not isinstance(entrypoint, str) or entrypoint != PLUGIN_ENTRYPOINT or entrypoint not in tracked:
+        raise AssetError('NOT_AVAILABLE: local Plugin entrypoint is invalid')
+
+    skills = {
+        name for name in tracked
+        if name.startswith('skills/') and name.endswith('/SKILL.md')
+        and len(PurePosixPath(name).parts) == 3
+    }
+    if not skills:
+        raise AssetError('NOT_AVAILABLE: local Plugin Skills are missing')
+    required = {'index.js', 'package.json', entrypoint, *skills}
+    pending = ['index.js', entrypoint]
     while pending:
         current = pending.pop()
         local_file = source / current
@@ -159,7 +186,7 @@ def resolve_superpowers_plugin(repo: Path, source: Path | None) -> PluginArtifac
                 if resolved not in required:
                     required.add(resolved)
                     pending.append(resolved)
-            elif specifier.startswith('node:') or specifier in RUNTIME_IMPORTS:
+            elif specifier in NODE_BUILTIN_IMPORTS or specifier in RUNTIME_IMPORTS:
                 continue
             else:
                 raise AssetError('NOT_AVAILABLE: local Plugin has an unbundled dependency')
@@ -229,7 +256,7 @@ def build(
     except NativeConfigError as exc:
         raise AssetError(str(exc)) from exc
     if plugin_dir is not None and not verification_only:
-        raise AssetError("Plugin source is accepted only in verification mode")
+        raise AssetError('local Plugin source is accepted only in verification mode')
     declared_sources = native.asset_sources
     for source in declared_sources:
         target = SOURCE_TO_TARGET[source]
@@ -257,29 +284,47 @@ def build(
         raise AssetError("unapproved TUI theme")
     files[THEME_TARGET] = json.dumps({"name": theme}, sort_keys=True)
 
-    artifact: PluginArtifact | None = None
     if verification_only:
+        # APM lock remains authoritative, but OpenCode's native Plugin Manager
+        # owns the Git package and Superpowers' runtime Skill registration.
+        lock = repo / 'apm.lock.yaml'
+        if lock.is_symlink() or not lock.is_file() or lock.stat().st_size > MAX_APM_BYTES:
+            raise AssetError('NOT_AVAILABLE: APM Plugin lock is unavailable')
+        try:
+            locked_commit = parse_superpowers_lock(lock.read_bytes())
+        except (OSError, NativeConfigError) as exc:
+            raise AssetError('NOT_AVAILABLE: APM Plugin lock does not match the pin') from exc
+        if locked_commit != SUPERPOWERS_COMMIT:
+            raise AssetError('NOT_AVAILABLE: APM Plugin lock does not match the pin')
         artifact = resolve_superpowers_plugin(repo, plugin_dir)
-        plugin_hashes: dict[str, str] = {}
+        if artifact.source_commit != locked_commit:
+            raise AssetError('NOT_AVAILABLE: local Plugin commit does not match APM lock')
+        plugin_file_hashes: dict[str, str] = {}
         for item in artifact.files:
-            target = PLUGIN_PREFIX + item.path
+            if contains_credential_material(item.content):
+                raise AssetError('selected Plugin asset appears to contain credential material')
             try:
-                text = item.content.decode("utf-8")
+                files[PLUGIN_PREFIX + item.path] = item.content.decode('utf-8')
             except UnicodeError as exc:
-                raise AssetError("NOT_AVAILABLE: local Plugin file is not UTF-8") from exc
-            files[target] = text
-            plugin_hashes[target] = item.sha256
-        mcp_source = _regular_text(repo, MCP_SERVER_SOURCE)
-        if contains_credential_material(mcp_source.encode("utf-8")):
-            raise AssetError("local MCP source appears to contain credential material")
-        files[MCP_SERVER_TARGET] = mcp_source
+                raise AssetError('NOT_AVAILABLE: local Plugin file is not UTF-8') from exc
+            plugin_file_hashes[item.path] = item.sha256
         files[PLUGIN_META_TARGET] = json.dumps({
-            "schema": "dotfiles-ai/oc2-plugin/v1",
-            "source": "obra/superpowers",
-            "commit": artifact.source_commit,
-            "entrypoint": PLUGIN_PREFIX + "index.js",
-            "files": plugin_hashes,
+            'schema': 'dotfiles-ai/oc2-plugin-source/v1',
+            'source': SUPERPOWERS_REPOSITORY,
+            'version': SUPERPOWERS_VERSION,
+            'commit': locked_commit,
+            'source_path': SUPERPOWERS_SOURCE_PATH,
+            'entrypoint': PLUGIN_ENTRYPOINT,
+            'skills_directory': 'skills',
+            'file_count': SUPERPOWERS_FILE_COUNT,
+            'total_bytes': SUPERPOWERS_TOTAL_BYTES,
+            'tree_sha256': SUPERPOWERS_TREE_SHA256,
+            'plugin_files': sorted(plugin_file_hashes),
         }, ensure_ascii=False, sort_keys=True)
+        mcp_source = _regular_text(repo, MCP_SERVER_SOURCE)
+        if contains_credential_material(mcp_source.encode('utf-8')):
+            raise AssetError('local MCP source appears to contain credential material')
+        files[MCP_SERVER_TARGET] = mcp_source
 
     files[NATIVE_TARGET] = json.dumps(
         build_native_payload(native), ensure_ascii=False, sort_keys=True,
@@ -287,11 +332,9 @@ def build(
     expected = {SOURCE_TO_TARGET[source] for source in declared_sources} | {
         THEME_TARGET, NATIVE_TARGET,
     }
-    if verification_only and artifact is not None:
-        expected |= {MCP_SERVER_TARGET, PLUGIN_META_TARGET}
-        expected |= {PLUGIN_PREFIX + item.path for item in artifact.files}
-    elif verification_only:
-        raise AssetError('NOT_AVAILABLE: local Superpowers Plugin artifact is absent')
+    if verification_only:
+        expected.update({PLUGIN_META_TARGET, MCP_SERVER_TARGET})
+        expected.update(PLUGIN_PREFIX + name for name in plugin_file_hashes)
     if set(files) != expected:
         raise AssetError("unexpected asset file set")
     hashes = {name: hashlib.sha256(value.encode("utf-8")).hexdigest()

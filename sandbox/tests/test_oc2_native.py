@@ -9,8 +9,8 @@ import unittest
 SCRIPTS = pathlib.Path(__file__).resolve().parents[1] / 'scripts'
 REPO = pathlib.Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(SCRIPTS))
-import oc2_native
-import oc2_assets
+import oc2_native  # noqa: E402
+import oc2_assets  # noqa: E402
 
 
 def apm_config(
