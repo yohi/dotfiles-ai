@@ -23,6 +23,14 @@ class Effect(StrEnum):
     ASK = 'ask'
 
 
+class PluginId(StrEnum):
+    SUPERPOWERS = 'superpowers'
+
+
+class McpServerId(StrEnum):
+    OC2_STATUS = 'oc2-status'
+
+
 @dataclass(frozen=True, slots=True)
 class Permission:
     action: str
@@ -52,8 +60,13 @@ class AgentMap(TypedDict):
     oracle: NotRequired[AgentJSON]
 
 
-class MCPDisabledJSON(TypedDict):
-    enabled: Literal[False]
+class PluginSelectionJSON(TypedDict):
+    enabled: bool
+    allowlist: list[str]
+
+
+class McpSelectionJSON(TypedDict):
+    enabled: bool
     servers: list[str]
 
 
@@ -61,7 +74,8 @@ class NativePayload(TypedDict):
     schema: str
     source_sha256: str
     agents: AgentMap
-    mcp: MCPDisabledJSON
+    plugins: PluginSelectionJSON
+    mcp: McpSelectionJSON
 
 
 @dataclass(frozen=True, slots=True)
@@ -72,14 +86,29 @@ class AgentSelection:
 
 
 @dataclass(frozen=True, slots=True)
+class PluginSelection:
+    enabled: bool
+    allowlist: tuple[PluginId, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class McpSelection:
+    enabled: bool
+    servers: tuple[McpServerId, ...]
+
+
+@dataclass(frozen=True, slots=True)
 class AgentDefinition:
     description: str
     system: str
     permissions: tuple[Permission, ...]
 
 
-NATIVE_SCHEMA: Final[str] = 'dotfiles-ai/oc2-native/v1'
+NATIVE_SCHEMA: Final[str] = 'dotfiles-ai/oc2-native/v2'
 NATIVE_MODEL: Final[str] = 'openai/gpt-6-luna'
+SUPERPOWERS_REPOSITORY: Final[str] = 'obra/superpowers'
+SUPERPOWERS_REF: Final[str] = 'v6.4.2'
+SUPERPOWERS_COMMIT: Final[str] = '8ca22dba9a94f28898bbce59f2537ff4d87c747d'
 
 
 def parse_agent_name(value: str) -> AgentName:
@@ -156,6 +185,16 @@ def _agent_config(name: AgentName) -> AgentJSON:
 
 
 def build_native_payload(config: NativeConfigProtocol) -> NativePayload:
+    plugin_allowlist = [plugin.value for plugin in config.plugins.allowlist]
+    mcp_servers = [server.value for server in config.mcp.servers]
+    if config.plugins.enabled != config.mcp.enabled:
+        raise ValueError('Plugin and MCP verification selections must match')
+    if config.plugins.enabled and (
+            plugin_allowlist != [PluginId.SUPERPOWERS.value]
+            or mcp_servers != [McpServerId.OC2_STATUS.value]):
+        raise ValueError('Plugin/MCP selection is not allowlisted')
+    if not config.plugins.enabled and (plugin_allowlist or mcp_servers):
+        raise ValueError('disabled Plugin/MCP selections must be empty')
     agents: AgentMap = {}
     for selection in config.agents:
         value = _agent_config(selection.name)
@@ -170,7 +209,14 @@ def build_native_payload(config: NativeConfigProtocol) -> NativePayload:
         'schema': NATIVE_SCHEMA,
         'source_sha256': config.source_sha256,
         'agents': agents,
-        'mcp': {'enabled': False, 'servers': []},
+        'plugins': {
+            'enabled': config.plugins.enabled,
+            'allowlist': plugin_allowlist,
+        },
+        'mcp': {
+            'enabled': config.mcp.enabled,
+            'servers': mcp_servers,
+        },
     }
     payload['agents'] = validate_agent_map(payload['agents'])
     return payload
@@ -183,11 +229,17 @@ class NativeConfigProtocol(Protocol):
     @property
     def agents(self) -> tuple[AgentSelection, ...]: ...
 
+    @property
+    def plugins(self) -> PluginSelection: ...
+
+    @property
+    def mcp(self) -> McpSelection: ...
+
 
 JsonValue: TypeAlias = str | int | float | bool | None | list['JsonValue'] | dict[str, 'JsonValue']
 
 
-def validate_agent_map(value: JsonValue) -> AgentMap:
+def validate_agent_map(value: JsonValue | AgentMap) -> AgentMap:
     if not isinstance(value, dict) or set(value) - {name.value for name in AgentName}:
         raise ValueError('unapproved Native Agent map')
     result: AgentMap = {}
@@ -221,7 +273,8 @@ def validate_native_asset(raw: bytes) -> NativePayload:
         decoded: JsonValue = json.loads(raw, object_pairs_hook=_unique_json_object)
     except (ValueError, UnicodeError) as exc:
         raise ValueError('invalid native Agent manifest') from exc
-    if not isinstance(decoded, dict) or set(decoded) != {'schema', 'source_sha256', 'agents', 'mcp'}:
+    if not isinstance(decoded, dict) or set(decoded) != {
+            'schema', 'source_sha256', 'agents', 'plugins', 'mcp'}:
         raise ValueError('invalid native Agent manifest fields')
     if decoded['schema'] != NATIVE_SCHEMA:
         raise ValueError('unexpected native Agent manifest schema')
@@ -229,11 +282,48 @@ def validate_native_asset(raw: bytes) -> NativePayload:
     if not isinstance(source_sha, str) or re.fullmatch(r'[0-9a-f]{64}', source_sha) is None:
         raise ValueError('invalid native Agent source SHA-256')
     agents = validate_agent_map(decoded['agents'])
-    if decoded['mcp'] != {'enabled': False, 'servers': []}:
-        raise ValueError('MCP must remain disabled and empty')
+    plugins, mcp = validate_component_selection(decoded['plugins'], decoded['mcp'])
     return NativePayload(
         schema=NATIVE_SCHEMA,
         source_sha256=source_sha,
         agents=agents,
-        mcp={'enabled': False, 'servers': []},
+        plugins=plugins,
+        mcp=mcp,
+    )
+
+
+def validate_component_selection(
+    plugins: JsonValue,
+    mcp: JsonValue,
+) -> tuple[PluginSelectionJSON, McpSelectionJSON]:
+    """Validate the fixed Plugin and MCP selection projection."""
+    if (not isinstance(plugins, dict) or set(plugins) != {'enabled', 'allowlist'}
+            or not isinstance(mcp, dict) or set(mcp) != {'enabled', 'servers'}):
+        raise ValueError('invalid Plugin/MCP selection fields')
+    plugin_enabled = plugins['enabled']
+    allowlist = plugins['allowlist']
+    mcp_enabled = mcp['enabled']
+    servers = mcp['servers']
+    if (type(plugin_enabled) is not bool or type(mcp_enabled) is not bool
+            or not isinstance(allowlist, list) or not isinstance(servers, list)):
+        raise ValueError('invalid Plugin/MCP selection types')
+    normalized_allowlist: list[str] = []
+    for item in allowlist:
+        if not isinstance(item, str):
+            raise ValueError('invalid Plugin/MCP selection types')
+        normalized_allowlist.append(item)
+    normalized_servers: list[str] = []
+    for item in servers:
+        if not isinstance(item, str):
+            raise ValueError('invalid Plugin/MCP selection types')
+        normalized_servers.append(item)
+    expected_plugins = [] if not plugin_enabled else [PluginId.SUPERPOWERS.value]
+    expected_servers = [] if not mcp_enabled else [McpServerId.OC2_STATUS.value]
+    if normalized_allowlist != expected_plugins or normalized_servers != expected_servers:
+        raise ValueError('Plugin/MCP selection is not allowlisted')
+    if plugin_enabled != mcp_enabled:
+        raise ValueError('Plugin and MCP verification selections must match')
+    return (
+        {'enabled': plugin_enabled, 'allowlist': normalized_allowlist},
+        {'enabled': mcp_enabled, 'servers': normalized_servers},
     )

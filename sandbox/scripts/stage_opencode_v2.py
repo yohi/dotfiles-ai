@@ -153,6 +153,10 @@ def verify_bundle(directory: Path) -> str:
             if (set(server) != {"$schema", "shell", "snapshot", "plugins", "mcp"}
                     or server["plugins"] != [] or server["mcp"] != {}):
                 raise StageError("unapproved legacy server config values")
+        case "oc2-verification":
+            if (set(server) != {"$schema", "shell", "snapshot", "plugins", "mcp"}
+                    or server["plugins"] != [] or server["mcp"] != {}):
+                raise StageError("unapproved verification config values")
         case "opencode-v2":
             _verify_v2_config(server)
         case _:
@@ -173,11 +177,14 @@ def _run(command: list[str]) -> None:
 
 def _check_source(root: Path, bundle: Path) -> None:
     try:
-        apm = exporter._read_apm_source(root)
+        manifest = json.loads(_regular_bytes(bundle / "export-manifest.json"))
+        verification_only = isinstance(manifest, dict) and manifest.get("config_format") == "oc2-verification"
+        apm = exporter._read_apm_source(root, verification_only=verification_only)
     except (OSError, exporter.ExportError) as exc:
         raise StageError("export provenance check could not complete") from exc
     expected = exporter._build_files(
         apm.shell, apm.snapshot, apm.source_sha256, apm.v2_config,
+        verification_only=apm.verification_only,
     )
     if any(_regular_bytes(bundle / name) != content for name, content in expected.items()):
         raise StageError("bundle does not match the current apm.yml SSOT")

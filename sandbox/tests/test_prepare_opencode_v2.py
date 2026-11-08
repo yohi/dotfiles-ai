@@ -68,6 +68,28 @@ class ExportTests(unittest.TestCase):
         for name, sha in manifest["artifacts_sha256"].items():
             self.assertEqual(sha, hashlib.sha256((self.out / name).read_bytes()).hexdigest())
 
+    def test_verification_export_contains_no_provider_or_credential_configuration(self) -> None:
+        self.apm.write_text(
+            "shell: bash\nsnapshot: true\n"
+            "x-oc2-assets: [global-rules/AGENTS.global.md]\n"
+            "x-oc2-agents: {}\n"
+            "x-oc2-plugins: {enabled: false, allowlist: [superpowers]}\n"
+            "x-oc2-mcp: {enabled: false, servers: [oc2-status]}\n",
+            encoding="utf-8",
+        )
+
+        result = self.run_export("--verification-only")
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        server = json.loads((self.out / "opencode.jsonc").read_text())
+        manifest = json.loads((self.out / "export-manifest.json").read_text())
+        self.assertEqual(manifest["config_format"], "oc2-verification")
+        self.assertEqual(server["plugins"], [])
+        self.assertEqual(server["mcp"], {})
+        self.assertNotIn("model", server)
+        self.assertNotIn("providers", server)
+        self.assertNotIn("policies", server)
+
     def test_v2_provider_config_supports_openai_and_cloudflare_custom(self) -> None:
         self.apm.write_text(
             "shell: bash\nsnapshot: true\n"
@@ -163,6 +185,7 @@ class ExportTests(unittest.TestCase):
             "x-oc2-agents:\n"
             "  hephaestus: {mode: primary, model: openai/gpt-6-luna}\n"
             "  oracle: {mode: subagent, model: openai/gpt-6-luna}\n"
+            "x-oc2-plugins: {enabled: false, allowlist: [superpowers]}\n"
             "x-oc2-mcp: {enabled: false, servers: []}\n",
             encoding="utf-8",
         )

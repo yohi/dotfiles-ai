@@ -5,12 +5,27 @@ import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Final, TypedDict, assert_never
+from typing import Final, TypedDict
 
 import yaml
 from yaml.nodes import MappingNode, Node, ScalarNode, SequenceNode
 
-from oc2_agent_native import AgentMode, AgentName, AgentSelection, NATIVE_MODEL, NativePayload, build_native_payload, parse_agent_name
+from oc2_agent_native import (
+    AgentMode,
+    AgentName,
+    AgentSelection,
+    McpServerId,
+    McpSelection,
+    NATIVE_MODEL,
+    NativePayload,
+    PluginId,
+    PluginSelection,
+    SUPERPOWERS_COMMIT,
+    SUPERPOWERS_REF,
+    SUPERPOWERS_REPOSITORY,
+    build_native_payload,
+    parse_agent_name,
+)
 
 
 ASSET_SOURCE_TO_TARGET: Final[Mapping[str, str]] = MappingProxyType({
@@ -29,20 +44,12 @@ ASSET_SOURCES: Final[frozenset[str]] = frozenset(ASSET_SOURCE_TO_TARGET)
 
 
 @dataclass(frozen=True, slots=True)
-class Permission:
-    action: str
-    resource: str
-    effect: Effect
-
-    def as_json(self) -> PermissionJSON:
-        return {'action': self.action, 'resource': self.resource, 'effect': self.effect.value}
-
-
-@dataclass(frozen=True, slots=True)
 class NativeConfig:
     source_sha256: str
     asset_sources: tuple[str, ...]
     agents: tuple[AgentSelection, ...]
+    plugins: PluginSelection = PluginSelection(enabled=False, allowlist=())
+    mcp: McpSelection = McpSelection(enabled=False, servers=())
 
 
 class SkillFrontmatter(TypedDict):
@@ -59,13 +66,6 @@ class NativeConfigError(ValueError):
         return self.reason
 
 
-@dataclass(frozen=True, slots=True)
-class AgentDefinition:
-    description: str
-    system: str
-    permissions: tuple[Permission, ...]
-
-
 def _mapping(node: Node, label: str) -> dict[str, Node]:
     match node:
         case MappingNode(value=entries):
@@ -78,8 +78,8 @@ def _mapping(node: Node, label: str) -> dict[str, Node]:
                     raise NativeConfigError(f'duplicate mapping key in {label}')
                 result[key] = value_node
             return result
-        case unreachable:
-            assert_never(unreachable)
+        case _:
+            raise NativeConfigError(f'{label} must be a mapping')
 
 
 def _string(node: Node, label: str) -> str:
@@ -98,6 +98,46 @@ def _sequence(node: Node, label: str) -> tuple[Node, ...]:
             raise NativeConfigError(f'{label} must be a sequence')
 
 
+def parse_superpowers_lock(raw: bytes) -> str:
+    """Return the pinned Superpowers commit after validating its APM lock entry."""
+    try:
+        root = yaml.compose(raw, Loader=yaml.SafeLoader)
+    except (yaml.YAMLError, UnicodeError) as exc:
+        raise NativeConfigError('apm.lock.yaml is invalid') from exc
+    if root is None:
+        raise NativeConfigError('apm.lock.yaml is empty')
+    lock = _mapping(root, 'apm.lock.yaml')
+    dependencies_node = lock.get('dependencies')
+    if dependencies_node is None:
+        raise NativeConfigError('apm.lock.yaml dependencies are missing')
+    dependencies = _sequence(dependencies_node, 'apm.lock.yaml dependencies')
+    matches: list[dict[str, Node]] = []
+    for dependency in dependencies:
+        fields = _mapping(dependency, 'apm.lock.yaml dependency')
+        repository_node = fields.get('repo_url')
+        name_node = fields.get('name')
+        if repository_node is None or name_node is None:
+            continue
+        if (_string(repository_node, 'dependency repo_url') == SUPERPOWERS_REPOSITORY
+                and _string(name_node, 'dependency name') == 'superpowers'):
+            matches.append(fields)
+    if len(matches) != 1:
+        raise NativeConfigError('APM lock must contain one Superpowers entry')
+    entry = matches[0]
+    expected = {
+        'host': 'github.com',
+        'resolved_ref': SUPERPOWERS_REF,
+        'resolved_commit': SUPERPOWERS_COMMIT,
+        'version': '6.4.2',
+        'package_type': 'marketplace_plugin',
+    }
+    for key, value in expected.items():
+        node = entry.get(key)
+        if node is None or _string(node, 'Superpowers lock ' + key) != value:
+            raise NativeConfigError('APM lock Superpowers identity mismatch')
+    return SUPERPOWERS_COMMIT
+
+
 def _boolean(node: Node, label: str) -> bool:
     match node:
         case ScalarNode(tag='tag:yaml.org,2002:bool', value='true'):
@@ -108,7 +148,28 @@ def _boolean(node: Node, label: str) -> bool:
             raise NativeConfigError(f'{label} must be a boolean')
 
 
-def parse_apm_native(raw: bytes, *, require_oc2_assets: bool = False) -> NativeConfig:
+def _plugin_id(value: str) -> PluginId:
+    match value:
+        case 'superpowers':
+            return PluginId.SUPERPOWERS
+        case _:
+            raise NativeConfigError('unapproved plugin candidate')
+
+
+def _mcp_server_id(value: str) -> McpServerId:
+    match value:
+        case 'oc2-status':
+            return McpServerId.OC2_STATUS
+        case _:
+            raise NativeConfigError('unapproved MCP server')
+
+
+def parse_apm_native(
+    raw: bytes,
+    *,
+    require_oc2_assets: bool = False,
+    verification_only: bool = False,
+) -> NativeConfig:
     try:
         root = yaml.compose(raw, Loader=yaml.SafeLoader)
     except (yaml.YAMLError, UnicodeError) as exc:
@@ -117,16 +178,29 @@ def parse_apm_native(raw: bytes, *, require_oc2_assets: bool = False) -> NativeC
         raise NativeConfigError('apm.yml is empty')
     top = _mapping(root, 'apm.yml')
     agents_node = top.get('x-oc2-agents')
+    plugins_node = top.get('x-oc2-plugins')
     assets_node = top.get('x-oc2-assets')
     mcp_node = top.get('x-oc2-mcp')
-    extension_presence = (assets_node is not None, agents_node is not None, mcp_node is not None)
+    extension_presence = (
+        assets_node is not None,
+        agents_node is not None,
+        plugins_node is not None,
+        mcp_node is not None,
+    )
     if not any(extension_presence):
         if require_oc2_assets:
             raise NativeConfigError('OC2 APM extensions are required')
-        return NativeConfig(hashlib.sha256(raw).hexdigest(), (), ())
+        return NativeConfig(
+            hashlib.sha256(raw).hexdigest(),
+            (),
+            (),
+            PluginSelection(enabled=False, allowlist=()),
+            McpSelection(enabled=False, servers=()),
+        )
     if not all(extension_presence):
         raise NativeConfigError('OC2 extensions must be declared together')
-    if assets_node is None or agents_node is None or mcp_node is None:
+    if (assets_node is None or agents_node is None or plugins_node is None
+            or mcp_node is None):
         raise NativeConfigError('OC2 APM extension state is inconsistent')
 
     assets = tuple(_string(item, 'x-oc2-assets entry') for item in _sequence(
@@ -187,15 +261,46 @@ def parse_apm_native(raw: bytes, *, require_oc2_assets: bool = False) -> NativeC
                 raise NativeConfigError('unapproved agent model: ' + name)
             selections.append(AgentSelection(agent_name, expected_modes[agent_name], model))
 
+    plugins = _mapping(plugins_node, 'x-oc2-plugins')
+    if set(plugins) != {'enabled', 'allowlist'}:
+        raise NativeConfigError('x-oc2-plugins fields are invalid')
+    if _boolean(plugins['enabled'], 'x-oc2-plugins.enabled'):
+        raise NativeConfigError('x-oc2-plugins must remain disabled in APM')
+    plugin_ids = tuple(_plugin_id(_string(item, 'x-oc2-plugins.allowlist entry')) for item in
+                       _sequence(plugins['allowlist'], 'x-oc2-plugins.allowlist'))
+    if len(plugin_ids) != len(set(plugin_ids)):
+        raise NativeConfigError('x-oc2-plugins.allowlist must be unique')
+
     mcp = _mapping(mcp_node, 'x-oc2-mcp')
     if set(mcp) != {'enabled', 'servers'}:
         raise NativeConfigError('x-oc2-mcp fields are invalid')
     if _boolean(mcp['enabled'], 'x-oc2-mcp.enabled'):
-        raise NativeConfigError('MCP must remain disabled')
-    if _sequence(mcp['servers'], 'x-oc2-mcp.servers'):
-        raise NativeConfigError('MCP server allowlist must remain empty')
+        raise NativeConfigError('x-oc2-mcp must remain disabled in APM')
+    server_ids = tuple(_mcp_server_id(_string(item, 'x-oc2-mcp.servers entry')) for item in
+                       _sequence(mcp['servers'], 'x-oc2-mcp.servers'))
+    if len(server_ids) != len(set(server_ids)):
+        raise NativeConfigError('x-oc2-mcp.servers must be unique')
+
+    plugin_selection = PluginSelection(
+        enabled=verification_only,
+        allowlist=plugin_ids if verification_only else (),
+    )
+    mcp_selection = McpSelection(
+        enabled=verification_only,
+        servers=server_ids if verification_only else (),
+    )
+    if verification_only and plugin_ids != (PluginId.SUPERPOWERS,):
+        raise NativeConfigError('verification requires the Superpowers plugin candidate')
+    if verification_only and server_ids != (McpServerId.OC2_STATUS,):
+        raise NativeConfigError('verification requires the oc2-status MCP candidate')
     asset_sources = tuple(source for source in ASSET_SOURCE_TO_TARGET if source in assets)
-    return NativeConfig(hashlib.sha256(raw).hexdigest(), asset_sources, tuple(selections))
+    return NativeConfig(
+        hashlib.sha256(raw).hexdigest(),
+        asset_sources,
+        tuple(selections),
+        plugin_selection,
+        mcp_selection,
+    )
 
 
 def validate_skill_frontmatter(expected_name: str, content: str) -> SkillFrontmatter:

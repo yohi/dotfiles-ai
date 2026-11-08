@@ -36,6 +36,7 @@ def _oc2_extensions(*, include_agents: bool = True) -> str:
             f'  - {source}\n' for source in oc2_assets.SOURCE_TO_TARGET
         ) +
         agents +
+        'x-oc2-plugins: {enabled: false, allowlist: [superpowers]}\n' +
         'x-oc2-mcp:\n'
         '  enabled: false\n'
         '  servers: []\n'

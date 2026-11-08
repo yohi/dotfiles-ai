@@ -602,11 +602,19 @@ def workspace_transfer_profile(workspace: pathlib.Path) -> str | None:
     return None
 
 
-def export_v2_config(repo: pathlib.Path, output: pathlib.Path) -> pathlib.Path:
+def export_v2_config(
+    repo: pathlib.Path,
+    output: pathlib.Path,
+    *,
+    verification_only: bool = False,
+) -> pathlib.Path:
     script = HERE / 'prepare_opencode_v2.py'
     try:
+        command = [sys.executable, str(script), '--repo-root', str(repo), '--out', str(output)]
+        if verification_only:
+            command.append('--verification-only')
         result = subprocess.run(
-            [sys.executable, str(script), '--repo-root', str(repo), '--out', str(output)],
+            command,
             check=False, capture_output=True, text=True, timeout=40,
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
@@ -868,6 +876,44 @@ def stage(runner: Runner, name: str, bundle: pathlib.Path, manifest_sha: str,
             raise Stop('guest asset bundle SHA mismatch')
         args.extend(['--assets', remote_assets, '--expected-assets-sha', assets_sha])
     execute(runner, name, 'python3', script_dest, *args)
+
+
+def prepare_verification_runtime(
+    repo: pathlib.Path,
+    sandbox: str,
+    plugin_dir: pathlib.Path,
+) -> str:
+    runner = Runner(getpass.getuser())
+    if not is_compatible_sandbox(runner, sandbox):
+        raise Stop('verification mode requires an existing compatible mountless Sandbox')
+    if cli_path(runner, sandbox) is None:
+        raise Stop('verification mode requires the pinned OpenCode CLI to be present')
+    from sandbox.scripts.stage_opencode_v2 import verify_bundle
+
+    with tempfile.TemporaryDirectory(prefix='oc2-plugin-mcp-') as temporary:
+        temporary_path = pathlib.Path(temporary)
+        bundle = temporary_path / 'bundle'
+        export_v2_config(repo, bundle, verification_only=True)
+        config_sha = verify_bundle(bundle)
+        from oc2_assets import AssetError, build as build_assets, write_new
+
+        try:
+            asset_raw, asset_sha = build_assets(
+                repo, verification_only=True, plugin_dir=plugin_dir,
+            )
+        except AssetError as exc:
+            raise Stop('verification Plugin/MCP asset export failed: ' + str(exc)) from exc
+        asset_file = temporary_path / 'assets.json'
+        write_new(asset_file, asset_raw)
+        stage(
+            runner, sandbox, bundle, config_sha, HERE / 'oc2_guest.py',
+            asset_file, asset_sha,
+        )
+        runtime_sha = hashlib.sha256(
+            bytes.fromhex(config_sha) + bytes.fromhex(asset_sha),
+        ).hexdigest()
+        print('OC2_VERIFICATION_PREPARED: sandbox=' + sandbox + ' runtime=' + runtime_sha[:16])
+        return runtime_sha
 
 
 def cli_path(runner: Runner, name: str) -> str | None:
@@ -1146,7 +1192,11 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument('--sandbox', default='oc2-v2')
     p.add_argument('--dry-run', action='store_true', help='show planned actions without calling sbx')
     p.add_argument('--prepare-only', action='store_true',
-                   help='export and verify APM config without Sandbox commands')
+                   help='prepare config without launching OpenCode')
+    p.add_argument('--verification-only', action='store_true',
+                   help='prepare the fixed Plugin/MCP Runtime without launching OpenCode')
+    p.add_argument('--plugin-dir', type=pathlib.Path,
+                   help='local Superpowers Git checkout used only by verification mode')
     p.add_argument('--allow-paid-inference', action='store_true',
                    help='authorize external inference for this interactive launch')
     p.add_argument('--use-cloudflare-ai-gateway', action='store_true',
@@ -1155,7 +1205,26 @@ def main(argv: list[str] | None = None) -> int:
     oc2_workspace = importlib.import_module('oc2_workspace')
 
     try:
+        plugin_dir = args.plugin_dir
+        if args.verification_only:
+            if not args.prepare_only:
+                raise Stop('--verification-only requires --prepare-only')
+            if plugin_dir is None:
+                raise Stop('--verification-only requires --plugin-dir')
+            if args.use_cloudflare_ai_gateway or args.allow_paid_inference:
+                raise Stop('verification mode does not permit provider credentials or inference')
+        elif args.plugin_dir is not None:
+            raise Stop('--plugin-dir is only valid with --verification-only')
         if args.dry_run:
+            if args.verification_only:
+                if not NAME_RE.fullmatch(args.sandbox):
+                    raise Stop('invalid Sandbox name')
+                print('OC2 PLAN: verification-only Sandbox=' + args.sandbox)
+                print('OC2 PLAN: require an existing compatible mountless Sandbox and pinned CLI')
+                print('OC2 PLAN: select only the pinned local Superpowers Plugin and oc2-status MCP')
+                print('OC2 PLAN: no Sandbox creation, credential provisioning, CLI install, or TUI launch')
+                print('OC2 PLAN: no Sandbox commands executed')
+                return 0
             workspace = args.workspace.resolve(strict=True)
             if not workspace.is_dir():
                 raise Stop('workspace is not a directory')
@@ -1171,6 +1240,9 @@ def main(argv: list[str] | None = None) -> int:
         repo = args.repo_root.resolve(strict=True)
         if not (repo / 'apm.yml').is_file():
             raise Stop('dotfiles-ai apm.yml not found')
+        if args.verification_only:
+            prepare_verification_runtime(repo, args.sandbox, plugin_dir)
+            return 0
         if args.prepare_only:
             with tempfile.TemporaryDirectory(prefix='oc2-v2-config-') as temporary:
                 export_v2_config(repo, pathlib.Path(temporary) / 'export')

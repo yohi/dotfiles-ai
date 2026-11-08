@@ -2783,6 +2783,9 @@ class AssetExporterTest(unittest.TestCase):
             '  oracle:\n'
             '    mode: subagent\n'
             '    model: openai/gpt-6-luna\n'
+            'x-oc2-plugins:\n'
+            '  enabled: false\n'
+            '  allowlist: [superpowers]\n'
             'x-oc2-mcp:\n'
             '  enabled: false\n'
             '  servers: []\n',

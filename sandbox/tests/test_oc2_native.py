@@ -45,6 +45,9 @@ def apm_config(
         + assets
         + 'x-oc2-agents:\n'
         + agents
+        + 'x-oc2-plugins:\n'
+        + '  enabled: false\n'
+        + '  allowlist: [superpowers]\n'
         + 'x-oc2-mcp:\n'
         + mcp
     ).encode('utf-8')
@@ -57,6 +60,7 @@ class NativeApmConfigTest(unittest.TestCase):
         self.assertEqual(set(config.asset_sources), set(oc2_native.ASSET_SOURCES))
         payload = oc2_native.build_native_payload(config)
         self.assertEqual(set(payload['agents']), {'hephaestus', 'oracle'})
+        self.assertEqual(payload['plugins'], {'enabled': False, 'allowlist': []})
         self.assertEqual(payload['mcp'], {'enabled': False, 'servers': []})
 
     def test_asset_manifest_carries_the_native_config_and_apm_identity(self):

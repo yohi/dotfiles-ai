@@ -92,6 +92,31 @@ class StageTests(unittest.TestCase):
         self.assertEqual(process.returncode, 0, process.stderr)
         return bundle
 
+    def test_verification_bundle_is_minimal_and_bound_to_apm_mode(self) -> None:
+        self.apm.write_text(
+            "shell: bash\nsnapshot: true\n"
+            "x-oc2-assets: [global-rules/AGENTS.global.md]\n"
+            "x-oc2-agents: {}\n"
+            "x-oc2-plugins: {enabled: false, allowlist: [superpowers]}\n"
+            "x-oc2-mcp: {enabled: false, servers: [oc2-status]}\n",
+            encoding="utf-8",
+        )
+        bundle = self.root.parent / 'verification-bundle'
+        process = subprocess.run(
+            [sys.executable, str(SCRIPT.parent / 'prepare_opencode_v2.py'),
+             '--repo-root', str(self.root), '--out', str(bundle), '--verification-only'],
+            capture_output=True, text=True, check=False,
+        )
+
+        self.assertEqual(process.returncode, 0, process.stderr)
+        self.assertEqual(stage.verify_bundle(bundle), hashlib.sha256(
+            (bundle / 'export-manifest.json').read_bytes(),
+        ).hexdigest())
+        self.assertEqual(json.loads((bundle / 'export-manifest.json').read_text())[
+            'config_format'], 'oc2-verification')
+        self.assertEqual(json.loads((bundle / 'opencode.jsonc').read_text())['plugins'], [])
+        stage._check_source(self.root, bundle)
+
     def test_v2_multi_provider_bundle_passes_stage_validation(self) -> None:
         bundle = self._make_v2_bundle()
         self.assertEqual(

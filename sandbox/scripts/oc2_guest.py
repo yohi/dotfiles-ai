@@ -14,7 +14,12 @@ import re
 import sys
 from typing import Final, NoReturn, TypeAlias
 
-from oc2_agent_native import validate_agent_map, validate_native_asset
+from oc2_agent_native import (
+    SUPERPOWERS_COMMIT,
+    SUPERPOWERS_REPOSITORY,
+    validate_agent_map,
+    validate_native_asset,
+)
 
 VERSION = "2.2.5"
 BASE = pathlib.Path('/home/agent/workspace/oc2')
@@ -47,6 +52,9 @@ ASSET_TARGETS = frozenset({
     'native/oc2-native.json',
 })
 NATIVE_ASSET_TARGET = 'native/oc2-native.json'
+PLUGIN_PREFIX = 'plugins/superpowers/'
+PLUGIN_META_TARGET = 'metadata/superpowers-plugin.json'
+MCP_SERVER_TARGET = 'mcp/oc2_local_mcp.py'
 MAX_ASSETS = 512 * 1024
 
 CLI_CANDIDATES = (
@@ -184,6 +192,10 @@ def verify(bundle: pathlib.Path) -> str:
             if (set(server) != {'$schema', 'shell', 'snapshot', 'plugins', 'mcp'}
                     or server.get('plugins') != [] or server.get('mcp') != {}):
                 fail('unsafe legacy server config')
+        case 'oc2-verification':
+            if (set(server) != {'$schema', 'shell', 'snapshot', 'plugins', 'mcp'}
+                    or server.get('plugins') != [] or server.get('mcp') != {}):
+                fail('unsafe verification server config')
         case 'opencode-v2':
             verify_v2_config(server)
         case _:
@@ -220,9 +232,32 @@ def verify_assets(source: pathlib.Path, expected_sha: str) -> dict[str, bytes]:
     files = payload['files']
     hashes = payload['sha256']
     if (not isinstance(files, dict) or not isinstance(hashes, dict)
-            or not set(files) <= ASSET_TARGETS or set(hashes) != set(files)
+            or any(not isinstance(name, str) for name in files)
+            or any(not isinstance(name, str) for name in hashes)
+            or set(hashes) != set(files)
             or 'theme.json' not in files or NATIVE_ASSET_TARGET not in files):
         fail('asset path allowlist mismatch')
+    native_value = files[NATIVE_ASSET_TARGET]
+    if not isinstance(native_value, str):
+        fail('invalid native asset type')
+    native = validate_native_asset(native_value.encode('utf-8'))
+    plugin_targets = {name for name in files if name.startswith(PLUGIN_PREFIX)}
+    if any('\\' in name or '..' in name.split('/') for name in plugin_targets):
+        fail('unsafe Plugin asset path')
+    plugin_enabled = native['plugins']['enabled']
+    allowed_targets = set(ASSET_TARGETS)
+    if plugin_enabled:
+        allowed_targets.update(plugin_targets)
+        allowed_targets.update({PLUGIN_META_TARGET, MCP_SERVER_TARGET})
+        if (PLUGIN_PREFIX + 'index.js' not in plugin_targets
+                or not plugin_targets or PLUGIN_META_TARGET not in files
+                or MCP_SERVER_TARGET not in files):
+            fail('verification Plugin/MCP assets are incomplete')
+    if set(files) - allowed_targets:
+        fail('asset path allowlist mismatch')
+    if not plugin_enabled and (plugin_targets or PLUGIN_META_TARGET in files
+                               or MCP_SERVER_TARGET in files):
+        fail('disabled Plugin/MCP assets are present')
     result: dict[str, bytes] = {}
     for name in sorted(files):
         value = files[name]
@@ -240,8 +275,22 @@ def verify_assets(source: pathlib.Path, expected_sha: str) -> dict[str, bytes]:
             or not isinstance(theme['name'], str)
             or not re.fullmatch(r'[a-z0-9-]{1,40}', theme['name'])):
         fail('unsafe TUI theme')
-    validate_native_asset(result[NATIVE_ASSET_TARGET])
-    # No third-party agent metadata or model routing is imported.
+    if plugin_enabled:
+        metadata = json.loads(
+            result[PLUGIN_META_TARGET], object_pairs_hook=_unique_json_object,
+        )
+        if (not isinstance(metadata, dict)
+                or set(metadata) != {'schema', 'source', 'commit', 'entrypoint', 'files'}
+                or metadata.get('schema') != 'dotfiles-ai/oc2-plugin/v1'
+                or metadata.get('source') != SUPERPOWERS_REPOSITORY
+                or metadata.get('commit') != SUPERPOWERS_COMMIT
+                or metadata.get('entrypoint') != PLUGIN_PREFIX + 'index.js'):
+            fail('unapproved Superpowers Plugin manifest')
+        manifest_files = metadata.get('files')
+        if (not isinstance(manifest_files, dict)
+                or set(manifest_files) != plugin_targets
+                or any(manifest_files.get(name) != hashes[name] for name in plugin_targets)):
+            fail('Superpowers Plugin file manifest mismatch')
     return result
 
 
@@ -307,15 +356,21 @@ def prepare(
 
     server = json.loads(regular(bundle / 'opencode.jsonc'))
     client = json.loads(regular(bundle / 'cli.json'))
+    manifest = json.loads(
+        regular(bundle / 'export-manifest.json'), object_pairs_hook=_unique_json_object,
+    )
+    verification_only = manifest.get('config_format') == 'oc2-verification'
     asset_files: dict[str, bytes] = {}
     if assets is not None:
         native_payload = validate_native_asset(assets[NATIVE_ASSET_TARGET])
-        manifest = json.loads(
-            regular(bundle / 'export-manifest.json'), object_pairs_hook=_unique_json_object,
-        )
         if native_payload['source_sha256'] != manifest.get('source_sha256'):
             fail('APM config and Native Agent asset source SHA mismatch')
-        if server.get('agents', {}) != native_payload['agents']:
+        plugin_enabled = native_payload['plugins']['enabled']
+        if verification_only != plugin_enabled:
+            fail('verification mode does not match Plugin/MCP asset selection')
+        if verification_only and 'agents' in server:
+            fail('verification config must not select a model or Native Agent')
+        if not verification_only and server.get('agents', {}) != native_payload['agents']:
             fail('V2 config and Native Agent asset mismatch')
         # Instructions are resolved inside the guest, not on the Host.
         rule_names = sorted(p for p in assets if p.startswith('config/opencode/rules/'))
@@ -323,6 +378,30 @@ def prepare(
         client['theme'] = json.loads(assets['theme.json'])
         asset_files = {name: value for name, value in assets.items()
                        if name != 'theme.json'}
+        if verification_only:
+            plugin_path = str(dest / 'plugins/superpowers')
+            server['plugins'] = [plugin_path]
+            server['mcp'] = {
+                'servers': {
+                    'oc2-status': {
+                        'type': 'local',
+                        'enabled': True,
+                        'command': [
+                            'python3', '-I', str(dest / MCP_SERVER_TARGET),
+                        ],
+                    },
+                },
+            }
+            server['policies'] = [
+                {'action': 'provider.use', 'resource': '*', 'effect': 'deny'},
+                {'action': 'integration.connect', 'resource': '*', 'effect': 'deny'},
+                {'action': 'plugin.use', 'resource': '*', 'effect': 'deny'},
+                {'action': 'plugin.use', 'resource': plugin_path, 'effect': 'allow'},
+                {'action': 'mcp.use', 'resource': '*', 'effect': 'deny'},
+                {'action': 'mcp.use', 'resource': 'oc2-status', 'effect': 'allow'},
+            ]
+    elif verification_only:
+        fail('verification Runtime requires selected Plugin/MCP assets')
 
     def encoded(value: object) -> bytes:
         return (json.dumps(value, ensure_ascii=False, sort_keys=True,
@@ -333,9 +412,14 @@ def prepare(
         'config/opencode/cli.json': encoded(client),
         **asset_files,
     }
-    receipt = {'manifest_sha256': manifest_sha, 'opencode_version': VERSION}
+    receipt: dict[str, JsonValue] = {
+        'manifest_sha256': manifest_sha,
+        'opencode_version': VERSION,
+    }
     if assets_sha is not None:
         receipt['assets_sha256'] = assets_sha
+    if verification_only:
+        receipt['verification_only'] = True
     marker = dest / 'receipt.json'
     if dest.exists():
         if not dest.is_dir() or dest.is_symlink() or not marker.is_file() or marker.is_symlink():
