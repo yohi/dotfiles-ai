@@ -1148,23 +1148,23 @@ class HostTest(unittest.TestCase):
             oc2.grant_collected_workspace_access(
                 pathlib.Path('/tmp/oc2-collect-x/incoming'),
                 'sbx-poc',
-                'y_ohi',
+                'test-user',
             )
         self.assertEqual(
             run.call_args_list[0].args,
-            ('sbx-poc', '/usr/bin/setfacl', '-m', 'u:y_ohi:r-x', '--',
+            ('sbx-poc', '/usr/bin/setfacl', '-m', 'u:test-user:r-x', '--',
              '/tmp/oc2-collect-x/incoming'),
         )
         self.assertEqual(
             run.call_args_list[1].args,
             ('sbx-poc', '/usr/bin/find', '/tmp/oc2-collect-x/incoming',
-             '-type', 'd', '-exec', '/usr/bin/setfacl', '-m', 'u:y_ohi:r-x',
+             '-type', 'd', '-exec', '/usr/bin/setfacl', '-m', 'u:test-user:r-x',
              '--', '{}', '+'),
         )
         self.assertEqual(
             run.call_args_list[2].args,
             ('sbx-poc', '/usr/bin/find', '/tmp/oc2-collect-x/incoming',
-             '-type', 'f', '-exec', '/usr/bin/setfacl', '-m', 'u:y_ohi:r--',
+             '-type', 'f', '-exec', '/usr/bin/setfacl', '-m', 'u:test-user:r--',
              '--', '{}', '+'),
         )
 
@@ -1309,7 +1309,7 @@ class HostTest(unittest.TestCase):
         self.assertTrue(oc2.is_compatible_sandbox(runner, 'oc2-dev'))
 
     def test_mounted_workspace_rejected(self):
-        runner = FakeRunner([{'name': 'oc2-dev', 'agent': 'shell', 'workspace': '/home/user/repo'}])
+        runner = FakeRunner([{'name': 'oc2-dev', 'agent': 'shell', 'workspace': '/home/username/repo'}])
         with self.assertRaisesRegex(oc2.Stop, 'workspace mount'):
             oc2.is_compatible_sandbox(runner, 'oc2-dev')
 
@@ -1322,7 +1322,7 @@ class HostTest(unittest.TestCase):
     def test_runtime_mounts_rejected(self):
         runner = FakeRunner([{'name': 'oc2-dev', 'agent': 'shell'}],
                             inspection={'name': 'oc2-dev',
-                                        'runtime_mounts': [{'source': '/home/user'}]})
+                            'runtime_mounts': [{'source': '/home/username'}]})
         with self.assertRaisesRegex(oc2.Stop, 'runtime mounts'):
             oc2.is_compatible_sandbox(runner, 'oc2-dev')
 
@@ -1340,7 +1340,7 @@ class HostTest(unittest.TestCase):
 
     def test_list_workspace_mount_rejected_even_if_inspect_empty(self):
         runner = FakeRunner([{'name': 'oc2-dev', 'agent': 'shell',
-                              'workspace': '/home/user/source'}])
+                              'workspace': '/home/username/source'}])
         with self.assertRaisesRegex(oc2.Stop, 'workspace mount'):
             oc2.is_compatible_sandbox(runner, 'oc2-dev')
         self.assertNotIn(('inspect', 'oc2-dev', '--json'), runner.calls)
