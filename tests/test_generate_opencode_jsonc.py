@@ -61,7 +61,7 @@ def test_convert_mcp_entry_keeps_opencode_env_syntax_for_filesystem_path() -> No
     assert converted["command"][-1] == "{env:PWD}"
 
 
-def test_build_config_uses_python_313_for_semgrep() -> None:
+def test_build_config_uses_semgrep_cli_mcp_entrypoint() -> None:
     apm = yaml.safe_load(
         (Path(__file__).resolve().parents[1] / "apm.yml").read_text(encoding="utf-8")
     )
@@ -69,26 +69,23 @@ def test_build_config_uses_python_313_for_semgrep() -> None:
     converted = config["mcp"]["semgrep"]
 
     assert converted["command"] == [
-        "uvx",
-        "--python",
-        "3.13",
-        "semgrep-mcp",
-        "-t",
-        "stdio",
-        "--semgrep-path",
-        "{env:HOME}/.local/bin/semgrep",
+        "bash",
+        "-c",
+        'exec "$HOME/.local/bin/semgrep" mcp -t stdio',
     ]
 
 
-def test_build_config_resolves_codegraph_cwd_to_repository_root() -> None:
+def test_build_config_uses_home_resolved_codegraph_bootstrap_command() -> None:
     apm = yaml.safe_load(
         (Path(__file__).resolve().parents[1] / "apm.yml").read_text(encoding="utf-8")
     )
     config = generate_opencode_jsonc.build_config(apm)
 
-    assert config["mcp"]["codegraph"]["cwd"] == str(
-        Path(__file__).resolve().parents[1]
-    )
+    assert config["mcp"]["codegraph"]["command"] == [
+        "bash",
+        "-c",
+        'exec "$HOME/dotfiles/components/dotfiles-ai/_scripts/codegraph-bootstrap.sh" serve --mcp',
+    ]
 
 
 def test_build_config_uses_native_superpowers_plugin() -> None:

@@ -3,8 +3,60 @@ import os
 import subprocess
 from pathlib import Path
 
+import yaml
+
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_apm_manifest_removes_sonarqube_mcp_server() -> None:
+    manifest = yaml.safe_load((REPO_ROOT / "apm.yml").read_text(encoding="utf-8"))
+
+    assert "io.github.SonarSource/sonarqube-mcp-server" not in manifest[
+        "dependencies"
+    ]["mcp"]
+
+
+def test_apm_mcp_servers_use_the_dotfiles_runtime() -> None:
+    manifest = yaml.safe_load((REPO_ROOT / "apm.yml").read_text(encoding="utf-8"))
+    servers = {
+        server["name"]: server
+        for server in manifest["dependencies"]["mcp"]
+        if isinstance(server, dict)
+    }
+
+    assert servers["codegraph"]["command"] == "bash"
+    assert servers["codegraph"]["args"] == [
+        "-c",
+        'exec "$HOME/dotfiles/components/dotfiles-ai/_scripts/codegraph-bootstrap.sh" serve --mcp',
+    ]
+    assert servers["filesystem"]["args"][-1] == "."
+    assert servers["nexus"]["command"] == "bash"
+    assert servers["nexus"]["args"] == [
+        "-c",
+        'cd "$HOME/dotfiles/components/dotfiles-ai" && exec npx -y @yohi/nexus@2.6.0 http-bridge',
+    ]
+    assert {
+        name: servers["nexus"]["env"][name]
+        for name in (
+            "NEXUS_EMBEDDING_PROVIDER",
+            "NEXUS_EMBEDDING_MODEL",
+            "NEXUS_EMBEDDING_DIMENSIONS",
+            "NEXUS_EMBEDDING_BASE_URL",
+            "NEXUS_EMBEDDING_MAX_CONCURRENCY",
+        )
+    } == {
+        "NEXUS_EMBEDDING_PROVIDER": "ollama",
+        "NEXUS_EMBEDDING_MODEL": "bge-m3",
+        "NEXUS_EMBEDDING_DIMENSIONS": "1024",
+        "NEXUS_EMBEDDING_BASE_URL": "http://127.0.0.1:11434",
+        "NEXUS_EMBEDDING_MAX_CONCURRENCY": "2",
+    }
+    assert servers["semgrep"]["command"] == "bash"
+    assert servers["semgrep"]["args"] == [
+        "-c",
+        'exec "$HOME/.local/bin/semgrep" mcp -t stdio',
+    ]
 
 
 def test_sync_claude_uses_project_manifest_and_preserves_user_config(

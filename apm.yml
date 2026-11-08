@@ -47,8 +47,6 @@ dependencies:
 
     - "com.atlassian/atlassian-mcp-server"
 
-    - "io.github.SonarSource/sonarqube-mcp-server"
-
     # Cloudflare Portal mappings. OpenCode's profile-aware launcher enables only
     # the selected profile. The default portal is disabled until its current
     # account-bound upstreams have been removed in the Cloudflare dashboard.
@@ -106,11 +104,10 @@ dependencies:
       title: "CodeGraph MCP"
       registry: false
       transport: stdio
-      command: "_scripts/codegraph-bootstrap.sh"
-      cwd: "."
+      command: "bash"
       args:
-        - "serve"
-        - "--mcp"
+        - "-c"
+        - 'exec "$HOME/dotfiles/components/dotfiles-ai/_scripts/codegraph-bootstrap.sh" serve --mcp'
 
     - name: filesystem
       title: "Filesystem MCP"
@@ -120,7 +117,7 @@ dependencies:
       args:
         - "-y"
         - "@modelcontextprotocol/server-filesystem"
-        - "${env:PWD}"
+        - "."
       standalone: true
       timeout: 60000
 
@@ -128,15 +125,10 @@ dependencies:
       title: "Semgrep MCP"
       registry: false
       transport: stdio
-      command: "uvx"
+      command: "bash"
       args:
-        - "--python"
-        - "3.13"
-        - "semgrep-mcp"
-        - "-t"
-        - "stdio"
-        - "--semgrep-path"
-        - "${env:HOME}/.local/bin/semgrep"
+        - "-c"
+        - 'exec "$HOME/.local/bin/semgrep" mcp -t stdio'
       env:
         SEMGREP_APP_TOKEN: "${env:SEMGREP_APP_TOKEN}"
       timeout: 60000
@@ -157,14 +149,18 @@ dependencies:
       title: "Nexus"
       registry: false
       transport: stdio
-      command: "npx"
+      command: "bash"
       args:
-        - "-y"
-        - "@yohi/nexus@2.6.0"
-        - "http-bridge"
+        - "-c"
+        - 'cd "$HOME/dotfiles/components/dotfiles-ai" && exec npx -y @yohi/nexus@2.6.0 http-bridge'
       env:
         LOG_LEVEL: "ERROR"
         GITHUB_TOKEN: "${env:GITHUB_TOKEN}"
+        NEXUS_EMBEDDING_PROVIDER: "ollama"
+        NEXUS_EMBEDDING_MODEL: "bge-m3"
+        NEXUS_EMBEDDING_DIMENSIONS: "1024"
+        NEXUS_EMBEDDING_BASE_URL: "http://127.0.0.1:11434"
+        NEXUS_EMBEDDING_MAX_CONCURRENCY: "2"
         NEXUS_WATCHER_IGNORE_PATHS: "node_modules,opencode/node_modules,.opencode/node_modules,oss/apm/node_modules,oss/apm/docs/node_modules,.git,.nexus,.codegraph,.justice,.omo,.sisyphus,.superpowers,dist,gemini,agent-skills,apm_modules,.agents,.opencode,.gemini,.claude,.codex,.vscode,.devcontainer,oss,codex/.tmp,.worktrees,.venv,target,.mypy_cache,.ruff_cache,build,.serena,.cache,.wrangler,.terraform,.playwright-cli,.eslintcache,.coverage,coverage.xml,*.tsbuildinfo,__pycache__,*.db,*.sqlite,*.log"
         CHOKIDAR_USEPOLLING: "false"
         CHOKIDAR_INTERVAL: "2000"
