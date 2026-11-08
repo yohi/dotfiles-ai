@@ -1,5 +1,5 @@
 lockfile_version: '1'
-generated_at: '2026-11-08T01:07:11.011189+00:00'
+generated_at: '2026-11-08T01:42:13.482249+00:00'
 apm_version: 0.31.0
 dependencies:
 - repo_url: anthropics/claude-code
@@ -7025,11 +7025,10 @@ mcp_configs:
     name: codegraph
     transport: stdio
     args:
-    - -c
-    - manifest="$(readlink -f "$HOME/.apm/apm.yml")" && root="${manifest%/*}" && exec
-      "$root/_scripts/codegraph-bootstrap.sh" serve --mcp
+    - serve
+    - --mcp
     registry: false
-    command: bash
+    command: codegraph
     title: CodeGraph MCP
   com.atlassian/atlassian-mcp-server:
     name: com.atlassian/atlassian-mcp-server
@@ -7051,21 +7050,21 @@ mcp_configs:
     env:
       LOG_LEVEL: ERROR
       GITHUB_TOKEN: ${env:GITHUB_TOKEN}
-      NEXUS_EMBEDDING_PROVIDER: ollama
-      NEXUS_EMBEDDING_MODEL: bge-m3
-      NEXUS_EMBEDDING_DIMENSIONS: '1024'
-      NEXUS_EMBEDDING_BASE_URL: http://127.0.0.1:11434
-      NEXUS_EMBEDDING_MAX_CONCURRENCY: '2'
+      NEXUS_EMBEDDING_PROVIDER: ''
+      NEXUS_EMBEDDING_MODEL: ''
+      NEXUS_EMBEDDING_DIMENSIONS: ''
+      NEXUS_EMBEDDING_BASE_URL: ''
+      NEXUS_EMBEDDING_MAX_CONCURRENCY: ''
       NEXUS_WATCHER_IGNORE_PATHS: node_modules,opencode/node_modules,.opencode/node_modules,oss/apm/node_modules,oss/apm/docs/node_modules,.git,.nexus,.codegraph,.justice,.omo,.sisyphus,.superpowers,dist,gemini,agent-skills,apm_modules,.agents,.opencode,.gemini,.claude,.codex,.vscode,.devcontainer,oss,codex/.tmp,.worktrees,.venv,target,.mypy_cache,.ruff_cache,build,.serena,.cache,.wrangler,.terraform,.playwright-cli,.eslintcache,.coverage,coverage.xml,*.tsbuildinfo,__pycache__,*.db,*.sqlite,*.log
       CHOKIDAR_USEPOLLING: 'false'
       CHOKIDAR_INTERVAL: '2000'
       NO_PROXY: 127.0.0.1,localhost
     args:
-    - -c
-    - manifest="$(readlink -f "$HOME/.apm/apm.yml")" && root="${manifest%/*}" && cd
-      "$root" && exec npx -y @yohi/nexus@2.6.0 http-bridge
+    - -y
+    - '@yohi/nexus@2.6.0'
+    - http-bridge
     registry: false
-    command: bash
+    command: npx
     title: Nexus
     timeout: 60000
     standalone: true

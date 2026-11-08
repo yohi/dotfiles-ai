@@ -1,0 +1,9 @@
+{
+  "embedding": {
+    "provider": "ollama",
+    "model": "bge-m3",
+    "dimensions": 1024,
+    "baseUrl": "http://127.0.0.1:11434",
+    "maxConcurrency": 2
+  }
+}

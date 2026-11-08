@@ -17,7 +17,7 @@ def test_apm_manifest_removes_sonarqube_mcp_server() -> None:
     ]["mcp"]
 
 
-def test_apm_mcp_servers_use_the_dotfiles_runtime() -> None:
+def test_apm_mcp_servers_use_project_scoped_commands() -> None:
     manifest = yaml.safe_load((REPO_ROOT / "apm.yml").read_text(encoding="utf-8"))
     servers = {
         server["name"]: server
@@ -25,16 +25,14 @@ def test_apm_mcp_servers_use_the_dotfiles_runtime() -> None:
         if isinstance(server, dict)
     }
 
-    assert servers["codegraph"]["command"] == "bash"
-    assert servers["codegraph"]["args"] == [
-        "-c",
-        'manifest="$(readlink -f "$HOME/.apm/apm.yml")" && root="${manifest%/*}" && exec "$root/_scripts/codegraph-bootstrap.sh" serve --mcp',
-    ]
+    assert servers["codegraph"]["command"] == "codegraph"
+    assert servers["codegraph"]["args"] == ["serve", "--mcp"]
     assert servers["filesystem"]["args"][-1] == "."
-    assert servers["nexus"]["command"] == "bash"
+    assert servers["nexus"]["command"] == "npx"
     assert servers["nexus"]["args"] == [
-        "-c",
-        'manifest="$(readlink -f "$HOME/.apm/apm.yml")" && root="${manifest%/*}" && cd "$root" && exec npx -y @yohi/nexus@2.6.0 http-bridge',
+        "-y",
+        "@yohi/nexus@2.6.0",
+        "http-bridge",
     ]
     assert {
         name: servers["nexus"]["env"][name]
@@ -46,18 +44,21 @@ def test_apm_mcp_servers_use_the_dotfiles_runtime() -> None:
             "NEXUS_EMBEDDING_MAX_CONCURRENCY",
         )
     } == {
-        "NEXUS_EMBEDDING_PROVIDER": "ollama",
-        "NEXUS_EMBEDDING_MODEL": "bge-m3",
-        "NEXUS_EMBEDDING_DIMENSIONS": "1024",
-        "NEXUS_EMBEDDING_BASE_URL": "http://127.0.0.1:11434",
-        "NEXUS_EMBEDDING_MAX_CONCURRENCY": "2",
+        "NEXUS_EMBEDDING_PROVIDER": "",
+        "NEXUS_EMBEDDING_MODEL": "",
+        "NEXUS_EMBEDDING_DIMENSIONS": "",
+        "NEXUS_EMBEDDING_BASE_URL": "",
+        "NEXUS_EMBEDDING_MAX_CONCURRENCY": "",
     }
+    nexus_config = json.loads((REPO_ROOT / ".nexus.json").read_text(encoding="utf-8"))
+    assert nexus_config["embedding"]["dimensions"] == 1024
+    assert nexus_config["embedding"]["model"] == "bge-m3"
     assert servers["semgrep"]["command"] == "bash"
     assert servers["semgrep"]["args"] == [
         "-c",
         'exec "$HOME/.local/bin/semgrep" mcp -t stdio',
     ]
-    assert "dotfiles/components/dotfiles-ai" not in str(servers)
+    assert "bash" not in (servers["codegraph"]["command"], servers["nexus"]["command"])
 
 
 def test_sync_claude_uses_project_manifest_and_preserves_user_config(

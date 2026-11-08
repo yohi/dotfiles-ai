@@ -75,17 +75,24 @@ def test_build_config_uses_semgrep_cli_mcp_entrypoint() -> None:
     ]
 
 
-def test_build_config_uses_home_resolved_codegraph_bootstrap_command() -> None:
+def test_build_config_uses_project_scoped_codegraph_command() -> None:
     apm = yaml.safe_load(
         (Path(__file__).resolve().parents[1] / "apm.yml").read_text(encoding="utf-8")
     )
     config = generate_opencode_jsonc.build_config(apm)
 
-    assert config["mcp"]["codegraph"]["command"] == [
-        "bash",
-        "-c",
-        'manifest="$(readlink -f "$HOME/.apm/apm.yml")" && root="${manifest%/*}" && exec "$root/_scripts/codegraph-bootstrap.sh" serve --mcp',
-    ]
+    assert config["mcp"]["codegraph"]["command"] == ["codegraph", "serve", "--mcp"]
+
+
+def test_build_config_uses_npx_for_project_scoped_nexus() -> None:
+    apm = yaml.safe_load(
+        (Path(__file__).resolve().parents[1] / "apm.yml").read_text(encoding="utf-8")
+    )
+    config = generate_opencode_jsonc.build_config(apm)
+    nexus = config["mcp"]["nexus"]
+
+    assert nexus["command"] == ["npx", "-y", "@yohi/nexus@2.6.0", "http-bridge"]
+    assert nexus["environment"]["NEXUS_EMBEDDING_DIMENSIONS"] == ""
 
 
 def test_build_config_uses_native_superpowers_plugin() -> None:
