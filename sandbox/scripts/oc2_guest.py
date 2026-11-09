@@ -204,7 +204,8 @@ def verify_v2_config(server: dict[str, JsonValue]) -> None:
     policies = server.get('policies')
     allowed_providers = {'openai', 'cloudflare-ai-gateway-custom'}
     if (not isinstance(model, str) or '/' not in model
-            or not isinstance(providers, dict) or set(providers) != allowed_providers
+            or not isinstance(providers, dict) or not providers
+            or not set(providers) <= allowed_providers
             or not isinstance(policies, list)):
         fail('invalid V2 provider selection')
     provider_id, model_id = model.split('/', 1)
@@ -218,8 +219,11 @@ def verify_v2_config(server: dict[str, JsonValue]) -> None:
         fail('V2 default model is not in the provider catalog')
     expected_policies: list[JsonValue] = [
         {'action': 'provider.use', 'resource': '*', 'effect': 'deny'},
-        {'action': 'provider.use', 'resource': 'openai', 'effect': 'allow'},
-        {'action': 'provider.use', 'resource': 'cloudflare-ai-gateway-custom', 'effect': 'allow'},
+        *(
+            {'action': 'provider.use', 'resource': provider_id, 'effect': 'allow'}
+            for provider_id in ('openai', 'cloudflare-ai-gateway-custom')
+            if provider_id in providers
+        ),
         {'action': 'integration.connect', 'resource': '*', 'effect': 'deny'},
         {'action': 'plugin.use', 'resource': '*', 'effect': 'deny'},
         {'action': 'mcp.use', 'resource': '*', 'effect': 'deny'},
@@ -308,6 +312,8 @@ def verify(bundle: pathlib.Path) -> str:
                 fail('unsafe verification server config')
         case 'opencode-v2':
             verify_v2_config(server)
+        case 'opencode-v2-unified':
+            verify_v2_config(server)
         case _:
             fail('unrecognized config format')
     if client != {'$schema': 'https://opencode.ai/v2/cli.json', 'plugins': []}:
@@ -356,13 +362,40 @@ def _verify_plugin_source_metadata(raw: bytes) -> dict[str, JsonValue]:
         'total_bytes': SUPERPOWERS_TOTAL_BYTES,
         'tree_sha256': SUPERPOWERS_TREE_SHA256,
     }
-    if (set(metadata) != set(expected) | {'plugin_files'}
+    if (set(metadata) != set(expected) | {'plugin_files', 'tree_files'}
             or any(metadata.get(key) != value for key, value in expected.items())):
         fail('Superpowers source metadata is not allowlisted')
-    plugin_files = metadata.get('plugin_files')
-    if (not isinstance(plugin_files, list)
-            or any(not isinstance(name, str) for name in plugin_files)
-            or plugin_files != sorted(set(plugin_files))):
+    tree_files = metadata.get('tree_files')
+    if not isinstance(tree_files, list) or len(tree_files) != SUPERPOWERS_FILE_COUNT:
+        fail('Superpowers source tree manifest is invalid')
+    tree_rows: list[tuple[str, str]] = []
+    for row in tree_files:
+        if (not isinstance(row, dict) or set(row) != {'path', 'sha256'}
+                or not isinstance(row['path'], str)
+                or not isinstance(row['sha256'], str)
+                or re.fullmatch(r'[0-9a-f]{64}', row['sha256']) is None):
+            fail('Superpowers source tree manifest is invalid')
+        path = row['path']
+        if (path.startswith('/') or '\\' in path
+                or any(part in ('', '.', '..') for part in path.split('/'))):
+            fail('Superpowers source tree path is unsafe')
+        tree_rows.append((path, row['sha256']))
+    if tree_rows != sorted(tree_rows) or len({path for path, _ in tree_rows}) != len(tree_rows):
+        fail('Superpowers source tree order or paths are invalid')
+    tree_material = ''.join(
+        f'{path}\0{digest}\n' for path, digest in tree_rows
+    ).encode('utf-8')
+    if hashlib.sha256(tree_material).hexdigest() != SUPERPOWERS_TREE_SHA256:
+        fail('Superpowers source tree SHA-256 mismatch')
+    raw_plugin_files = metadata.get('plugin_files')
+    if not isinstance(raw_plugin_files, list):
+        fail('Superpowers Plugin file manifest is invalid')
+    plugin_files: list[str] = []
+    for name in raw_plugin_files:
+        if not isinstance(name, str):
+            fail('Superpowers Plugin file manifest is invalid')
+        plugin_files.append(name)
+    if plugin_files != sorted(set(plugin_files)):
         fail('Superpowers Plugin file manifest is invalid')
     names = set(plugin_files)
     if not {
@@ -453,6 +486,20 @@ def verify_assets(source: pathlib.Path, expected_sha: str) -> dict[str, bytes]:
         expected_targets = {PLUGIN_PREFIX + name for name in plugin_files if isinstance(name, str)}
         if plugin_targets != expected_targets:
             fail('Superpowers Plugin assets do not match their manifest')
+        tree_manifest = metadata['tree_files']
+        if not isinstance(tree_manifest, list):
+            fail('Superpowers source tree manifest is invalid')
+        tree_hashes = {
+            row['path']: row['sha256']
+            for row in tree_manifest
+            if isinstance(row, dict)
+            and isinstance(row.get('path'), str)
+            and isinstance(row.get('sha256'), str)
+        }
+        for target in sorted(plugin_targets):
+            relative = target.removeprefix(PLUGIN_PREFIX)
+            if tree_hashes.get(relative) != hashlib.sha256(result[target]).hexdigest():
+                fail('Superpowers Plugin file does not match its pinned source tree')
     return result
 
 
@@ -671,6 +718,10 @@ def prepare(
         regular(bundle / 'export-manifest.json'), object_pairs_hook=_unique_json_object,
     )
     verification_only = manifest.get('config_format') == 'oc2-verification'
+    unified_runtime = manifest.get('config_format') == 'opencode-v2-unified'
+    plugin_runtime = verification_only or unified_runtime
+    if unified_runtime and phase4_plugins is None:
+        fail('unified Runtime requires its pinned Phase 4 plugin bundle')
     generator_fingerprint: str | None = None
     if verification_only:
         if assets is None:
@@ -683,12 +734,13 @@ def prepare(
             pathlib.Path(__file__).with_name('oc2_identity.py'),
         )
     if phase4_plugins is not None:
-        if not verification_only or assets_sha is None:
-            fail('Phase 4 plugins require a verification-only Runtime')
+        if not plugin_runtime or assets_sha is None:
+            fail('Phase 4 plugins require a selected Plugin Runtime')
         from oc2_identity import (
             Phase4RuntimeIdentity,
             phase4_generator_fingerprint,
             phase4_runtime_identity_sha256,
+            unified_runtime_identity_sha256,
         )
 
         generator_fingerprint = phase4_generator_fingerprint((
@@ -697,12 +749,16 @@ def prepare(
             pathlib.Path(__file__).with_name('oc2_identity.py'),
             pathlib.Path(__file__).with_name('oc2_phase4_policy.py'),
         ))
-        runtime_id = phase4_runtime_identity_sha256(Phase4RuntimeIdentity(
+        identity = Phase4RuntimeIdentity(
             manifest_sha,
             assets_sha,
             phase4_plugins.bundle_sha256,
             generator_fingerprint,
-        ))
+        )
+        runtime_id = (
+            unified_runtime_identity_sha256(identity)
+            if unified_runtime else phase4_runtime_identity_sha256(identity)
+        )
         dest = BASE / 'runtime' / runtime_id[:16]
     else:
         dest = runtime_path(manifest_sha, assets_sha, generator_fingerprint)
@@ -719,8 +775,8 @@ def prepare(
                 and phase4_plugins.source_sha256 != native_payload['source_sha256']):
             fail('Phase 4 plugin and base asset source SHA mismatch')
         plugin_enabled = native_payload['plugins']['enabled']
-        if verification_only != plugin_enabled:
-            fail('verification mode does not match Plugin/MCP asset selection')
+        if plugin_runtime != plugin_enabled:
+            fail('Runtime mode does not match Plugin/MCP asset selection')
         if verification_only and 'agents' in server:
             fail('verification config must not select a model or Native Agent')
         if not verification_only and server.get('agents', {}) != native_payload['agents']:
@@ -731,7 +787,7 @@ def prepare(
         client['theme'] = json.loads(assets['theme.json'])
         asset_files = {name: value for name, value in assets.items()
                        if name != 'theme.json'}
-        if verification_only:
+        if plugin_runtime:
             plugin_metadata = _verify_plugin_source_metadata(assets[PLUGIN_META_TARGET])
             if phase4_plugins is None:
                 plugin_source = verify_superpowers_source()
@@ -742,18 +798,26 @@ def prepare(
                 for name, content in assets.items()
                 if name.startswith(PLUGIN_PREFIX)
             }
-            plugin_files = plugin_metadata['plugin_files']
-            if (not isinstance(plugin_files, list)
-                    or any(not isinstance(name, str) for name in plugin_files)
-                    or set(bundled_plugins) != set(plugin_files)):
+            raw_plugin_files = plugin_metadata.get('plugin_files')
+            if not isinstance(raw_plugin_files, list):
+                fail('Superpowers Plugin bundle differs from its file manifest')
+            plugin_files: list[str] = []
+            for name in raw_plugin_files:
+                if not isinstance(name, str):
+                    fail('Superpowers Plugin bundle differs from its file manifest')
+                plugin_files.append(name)
+            if set(bundled_plugins) != set(plugin_files):
                 fail('Superpowers Plugin bundle differs from its file manifest')
             required_skills = {
                 name for name in plugin_files
                 if name.startswith('skills/') and name.endswith('/SKILL.md')
                 and len(name.split('/')) == 3
             }
+            entrypoint = plugin_metadata.get('entrypoint')
+            if not isinstance(entrypoint, str):
+                fail('Superpowers Plugin entrypoint is invalid')
             required_plugin_files = {
-                'index.js', 'package.json', str(plugin_metadata['entrypoint']),
+                'index.js', 'package.json', entrypoint,
                 *required_skills,
             }
             if not required_skills or not required_plugin_files <= set(bundled_plugins):
@@ -775,14 +839,23 @@ def prepare(
                     },
                 },
             }
-            server['policies'] = [
-                {'action': 'provider.use', 'resource': '*', 'effect': 'deny'},
-                {'action': 'integration.connect', 'resource': '*', 'effect': 'deny'},
-                {'action': 'plugin.use', 'resource': '*', 'effect': 'deny'},
-                {'action': 'plugin.use', 'resource': str(plugin_path), 'effect': 'allow'},
-                {'action': 'mcp.use', 'resource': '*', 'effect': 'deny'},
-                {'action': 'mcp.use', 'resource': 'oc2-status', 'effect': 'allow'},
-            ]
+            if unified_runtime:
+                policies = server.get('policies')
+                if not isinstance(policies, list) or not isinstance(server.get('providers'), dict):
+                    fail('unified Runtime Provider policy is missing')
+                policies.extend([
+                    {'action': 'plugin.use', 'resource': str(plugin_path), 'effect': 'allow'},
+                    {'action': 'mcp.use', 'resource': 'oc2-status', 'effect': 'allow'},
+                ])
+            else:
+                server['policies'] = [
+                    {'action': 'provider.use', 'resource': '*', 'effect': 'deny'},
+                    {'action': 'integration.connect', 'resource': '*', 'effect': 'deny'},
+                    {'action': 'plugin.use', 'resource': '*', 'effect': 'deny'},
+                    {'action': 'plugin.use', 'resource': str(plugin_path), 'effect': 'allow'},
+                    {'action': 'mcp.use', 'resource': '*', 'effect': 'deny'},
+                    {'action': 'mcp.use', 'resource': 'oc2-status', 'effect': 'allow'},
+                ]
             if phase4_plugins is not None:
                 akane_path = dest / 'plugins/akane'
                 sibyl_path = dest / 'plugins/sibyl'
@@ -796,7 +869,12 @@ def prepare(
                         'maxToolGateCycles': 1,
                         'notifierType': 'tmux',
                         'notifyWaiting': False,
-                        'agents': {'include': ['__oc2_phase4_fixture__']},
+                        'agents': {
+                            'include': (
+                                ['__oc2_phase4_fixture__'] if not unified_runtime
+                                else ['hephaestus', 'oracle']
+                            ),
+                        },
                     },
                 })
                 server['policies'].append({
@@ -821,8 +899,8 @@ def prepare(
                     if target in asset_files:
                         fail('Phase 4 plugin asset conflicts with base Runtime assets')
                     asset_files[target] = content
-    elif verification_only:
-        fail('verification Runtime requires selected Plugin/MCP assets')
+    elif plugin_runtime:
+        fail('selected Plugin Runtime requires Plugin/MCP assets')
 
     def encoded(value: object) -> bytes:
         return (json.dumps(value, ensure_ascii=False, sort_keys=True,
@@ -833,17 +911,15 @@ def prepare(
         'config/opencode/cli.json': encoded(client),
         **asset_files,
     }
-    if verification_only:
+    if plugin_runtime:
         if plugin_source is not None:
             expected.update({
                 PLUGIN_PREFIX + item.path: item.content
                 for item in plugin_source.files
             })
-        elif phase4_plugins is None:
+        elif verification_only and phase4_plugins is None:
             fail('verification Runtime is missing its pinned Plugin source')
     if phase4_plugins is not None:
-        if not verification_only:
-            fail('Phase 4 plugins require a verification-only Runtime')
         expected.update(dict(phase4_plugins.files))
     receipt: dict[str, JsonValue] = {
         'manifest_sha256': manifest_sha,
@@ -879,6 +955,23 @@ def prepare(
                     for name, content in bundled_plugins.items()
                 },
             }
+    elif unified_runtime:
+        if generator_fingerprint is None or plugin_metadata is None:
+            fail('unified Runtime is missing its generator fingerprint')
+        receipt['unified_runtime'] = True
+        receipt['generator_sha256'] = generator_fingerprint
+        receipt['plugin_source'] = {
+            'repository': SUPERPOWERS_REPOSITORY,
+            'commit': SUPERPOWERS_COMMIT,
+            'path': SUPERPOWERS_SOURCE_PATH,
+            'file_count': plugin_metadata['file_count'],
+            'total_bytes': plugin_metadata['total_bytes'],
+            'tree_sha256': plugin_metadata['tree_sha256'],
+            'file_sha256': {
+                name: hashlib.sha256(content).hexdigest()
+                for name, content in bundled_plugins.items()
+            },
+        }
     if phase4_plugins is not None:
         receipt['phase4_plugins_sha256'] = phase4_plugins.bundle_sha256
         receipt['phase4_plugins'] = [

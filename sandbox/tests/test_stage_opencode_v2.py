@@ -12,6 +12,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "stage_opencode_v2.py"
+REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(SCRIPT.parent))
 import stage_opencode_v2 as stage  # noqa: E402
 import prepare_opencode_v2 as exporter  # noqa: E402
@@ -53,6 +54,21 @@ class StageTests(unittest.TestCase):
                                  capture_output=True, text=True, check=False)
         self.assertEqual(process.returncode, 0, process.stderr)
         self.assertIn("VERIFY_OK", process.stdout)
+
+    def test_verifier_accepts_unified_manifest_with_provider_and_agents(self) -> None:
+        apm = exporter._read_apm_source(REPO)
+        generated = exporter._build_files(
+            apm.shell, apm.snapshot, apm.source_sha256, apm.v2_config,
+            unified_runtime=apm.unified_runtime,
+        )
+        for name, content in generated.items():
+            (self.bundle / name).write_bytes(content)
+
+        digest = stage.verify_bundle(self.bundle)
+
+        manifest = json.loads((self.bundle / "export-manifest.json").read_text())
+        self.assertEqual(manifest["config_format"], "opencode-v2-unified")
+        self.assertEqual(digest, hashlib.sha256(generated["export-manifest.json"]).hexdigest())
 
     def _make_v2_bundle(self) -> Path:
         self.apm.write_text(

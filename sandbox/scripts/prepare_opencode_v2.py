@@ -59,6 +59,7 @@ class APMConfig:
     source_sha256: str
     v2_config: dict[str, JsonValue] | None
     verification_only: bool
+    unified_runtime: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -432,6 +433,7 @@ def _read_apm_source(root: Path, *, verification_only: bool = False) -> APMConfi
         source_sha256=hashlib.sha256(raw).hexdigest(),
         v2_config=v2_config,
         verification_only=verification_only,
+        unified_runtime=native_config.unified_runtime and not verification_only,
     )
 
 
@@ -443,7 +445,7 @@ def _read_apm(root: Path) -> tuple[str, bool, str]:
 def _build_files(
     shell: str, snapshot: bool, apm_sha: str,
     v2_config: dict[str, JsonValue] | None = None,
-    *, verification_only: bool = False,
+    *, verification_only: bool = False, unified_runtime: bool = False,
 ) -> dict[str, bytes]:
     # Strict positive selection: none of the other apm.yml values is serialized.
     server: dict[str, JsonValue] = {
@@ -470,6 +472,7 @@ def _build_files(
         "source": "apm.yml",
         "config_format": (
             "oc2-verification" if verification_only else
+            "opencode-v2-unified" if unified_runtime else
             "opencode-v2" if v2_config is not None else "legacy-minimal"
         ),
         "source_sha256": apm_sha,
@@ -538,6 +541,38 @@ def _create(output: Path, generated: dict[str, bytes]) -> None:
             handle.write(data)
 
 
+def refresh_manifest(output: Path) -> str:
+    """Rebind the temporary export manifest to its selected Provider config."""
+    manifest_path = output / "export-manifest.json"
+    if (output.is_symlink() or not output.is_dir() or manifest_path.is_symlink()
+            or not manifest_path.is_file()):
+        raise ExportError("export manifest is missing or unsafe")
+    try:
+        manifest: JsonValue = json.loads(
+            manifest_path.read_bytes(), object_pairs_hook=_unique_json_object,
+        )
+    except (OSError, ValueError, UnicodeError) as exc:
+        raise ExportError("export manifest could not be read") from exc
+    if (not isinstance(manifest, dict)
+            or set(manifest) != {
+                "schema", "generator", "source", "config_format", "source_sha256",
+                "opencode_version", "plugins_exported", "mcp_entries_exported",
+                "artifacts_sha256",
+            }):
+        raise ExportError("export manifest fields are invalid")
+    hashes = manifest.get("artifacts_sha256")
+    if not isinstance(hashes, dict) or set(hashes) != {"opencode.jsonc", "cli.json"}:
+        raise ExportError("export artifact hashes are invalid")
+    for name in ("opencode.jsonc", "cli.json"):
+        artifact = output / name
+        if artifact.is_symlink() or not artifact.is_file():
+            raise ExportError("export artifact is missing or unsafe")
+        hashes[name] = hashlib.sha256(artifact.read_bytes()).hexdigest()
+    raw = _json_bytes(manifest)
+    manifest_path.write_bytes(raw)
+    return hashlib.sha256(raw).hexdigest()
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo-root", type=Path, default=Path(__file__).resolve().parents[2])
@@ -555,6 +590,7 @@ def main(argv: list[str] | None = None) -> int:
         generated = _build_files(
             apm.shell, apm.snapshot, apm.source_sha256, apm.v2_config,
             verification_only=apm.verification_only,
+            unified_runtime=apm.unified_runtime,
         )
         if args.check:
             _check(output, generated)

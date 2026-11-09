@@ -62,7 +62,8 @@ def _verify_v2_config(server: dict[str, JsonValue]) -> None:
     policies = server.get("policies")
     allowed_providers = {"openai", "cloudflare-ai-gateway-custom"}
     if (not isinstance(model, str) or "/" not in model
-            or not isinstance(providers, dict) or set(providers) != allowed_providers
+            or not isinstance(providers, dict) or not providers
+            or not set(providers) <= allowed_providers
             or not isinstance(policies, list)):
         raise StageError("invalid V2 provider selection")
     provider_id, model_id = model.split("/", 1)
@@ -76,8 +77,11 @@ def _verify_v2_config(server: dict[str, JsonValue]) -> None:
         raise StageError("V2 default model is not in the provider catalog")
     expected_policies: list[JsonValue] = [
         {"action": "provider.use", "resource": "*", "effect": "deny"},
-        {"action": "provider.use", "resource": "openai", "effect": "allow"},
-        {"action": "provider.use", "resource": "cloudflare-ai-gateway-custom", "effect": "allow"},
+        *(
+            {"action": "provider.use", "resource": provider_name, "effect": "allow"}
+            for provider_name in ("openai", "cloudflare-ai-gateway-custom")
+            if provider_name in providers
+        ),
         {"action": "integration.connect", "resource": "*", "effect": "deny"},
         {"action": "plugin.use", "resource": "*", "effect": "deny"},
         {"action": "mcp.use", "resource": "*", "effect": "deny"},
@@ -159,6 +163,8 @@ def verify_bundle(directory: Path) -> str:
                 raise StageError("unapproved verification config values")
         case "opencode-v2":
             _verify_v2_config(server)
+        case "opencode-v2-unified":
+            _verify_v2_config(server)
         case _:
             raise StageError("unrecognized config format")
     if not isinstance(tui, dict) or tui != {"$schema": "https://opencode.ai/v2/cli.json", "plugins": []}:
@@ -185,6 +191,7 @@ def _check_source(root: Path, bundle: Path) -> None:
     expected = exporter._build_files(
         apm.shell, apm.snapshot, apm.source_sha256, apm.v2_config,
         verification_only=apm.verification_only,
+        unified_runtime=apm.unified_runtime,
     )
     if any(_regular_bytes(bundle / name) != content for name, content in expected.items()):
         raise StageError("bundle does not match the current apm.yml SSOT")

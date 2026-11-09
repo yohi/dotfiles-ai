@@ -51,6 +51,7 @@ class NativeConfig:
     agents: tuple[AgentSelection, ...]
     plugins: PluginSelection = PluginSelection(enabled=False, allowlist=())
     mcp: McpSelection = McpSelection(enabled=False, servers=())
+    unified_runtime: bool = False
     phase4_plugins: Phase4PluginSelection = Phase4PluginSelection(
         enabled=False, allowlist=(), artifacts=(),
     )
@@ -183,6 +184,7 @@ def parse_apm_native(
         raise NativeConfigError('apm.yml is empty')
     top = _mapping(root, 'apm.yml')
     phase4_node = top.get('x-oc2-phase4')
+    runtime_node = top.get('x-oc2-runtime')
     agents_node = top.get('x-oc2-agents')
     plugins_node = top.get('x-oc2-plugins')
     assets_node = top.get('x-oc2-assets')
@@ -195,11 +197,9 @@ def parse_apm_native(
     )
     if phase4_node is not None and not all(extension_presence):
         raise NativeConfigError('Phase 4 requires the complete OC2 APM extension set')
-    phase4_selection = parse_phase4_selection(
-        phase4_node,
-        explicit_opt_in=phase4_plugins,
-    )
     if not any(extension_presence):
+        if runtime_node is not None:
+            raise NativeConfigError('Unified Runtime requires the complete OC2 APM extension set')
         if require_oc2_assets:
             raise NativeConfigError('OC2 APM extensions are required')
         return NativeConfig(
@@ -214,6 +214,20 @@ def parse_apm_native(
     if (assets_node is None or agents_node is None or plugins_node is None
             or mcp_node is None):
         raise NativeConfigError('OC2 APM extension state is inconsistent')
+
+    configured_unified_runtime = False
+    if runtime_node is not None:
+        runtime = _mapping(runtime_node, 'x-oc2-runtime')
+        if set(runtime) != {'enabled'}:
+            raise NativeConfigError('x-oc2-runtime fields are invalid')
+        configured_unified_runtime = _boolean(runtime['enabled'], 'x-oc2-runtime.enabled')
+    unified_runtime = (
+        configured_unified_runtime and not verification_only and not phase4_plugins
+    )
+    phase4_selection = parse_phase4_selection(
+        phase4_node,
+        explicit_opt_in=phase4_plugins or unified_runtime,
+    )
 
     assets = tuple(_string(item, 'x-oc2-assets entry') for item in _sequence(
         assets_node, 'x-oc2-assets',
@@ -276,8 +290,7 @@ def parse_apm_native(
     plugins = _mapping(plugins_node, 'x-oc2-plugins')
     if set(plugins) != {'enabled', 'allowlist'}:
         raise NativeConfigError('x-oc2-plugins fields are invalid')
-    if _boolean(plugins['enabled'], 'x-oc2-plugins.enabled'):
-        raise NativeConfigError('x-oc2-plugins must remain disabled in APM')
+    plugins_enabled = _boolean(plugins['enabled'], 'x-oc2-plugins.enabled')
     plugin_ids = tuple(_plugin_id(_string(item, 'x-oc2-plugins.allowlist entry')) for item in
                        _sequence(plugins['allowlist'], 'x-oc2-plugins.allowlist'))
     if len(plugin_ids) != len(set(plugin_ids)):
@@ -286,25 +299,33 @@ def parse_apm_native(
     mcp = _mapping(mcp_node, 'x-oc2-mcp')
     if set(mcp) != {'enabled', 'servers'}:
         raise NativeConfigError('x-oc2-mcp fields are invalid')
-    if _boolean(mcp['enabled'], 'x-oc2-mcp.enabled'):
-        raise NativeConfigError('x-oc2-mcp must remain disabled in APM')
+    mcp_enabled = _boolean(mcp['enabled'], 'x-oc2-mcp.enabled')
     server_ids = tuple(_mcp_server_id(_string(item, 'x-oc2-mcp.servers entry')) for item in
                        _sequence(mcp['servers'], 'x-oc2-mcp.servers'))
     if len(server_ids) != len(set(server_ids)):
         raise NativeConfigError('x-oc2-mcp.servers must be unique')
 
+    runtime_selection = unified_runtime or verification_only
+    if (not verification_only and not phase4_plugins
+            and plugins_enabled != configured_unified_runtime):
+        raise NativeConfigError('x-oc2-plugins.enabled must match unified Runtime selection')
+    if (not verification_only and not phase4_plugins
+            and mcp_enabled != configured_unified_runtime):
+        raise NativeConfigError('x-oc2-mcp.enabled must match unified Runtime selection')
+    selected_plugins = runtime_selection
+    selected_mcp = runtime_selection
+    if selected_plugins and plugin_ids != (PluginId.SUPERPOWERS,):
+        raise NativeConfigError('Runtime requires the Superpowers plugin candidate')
+    if selected_mcp and server_ids != (McpServerId.OC2_STATUS,):
+        raise NativeConfigError('Runtime requires the oc2-status MCP candidate')
     plugin_selection = PluginSelection(
-        enabled=verification_only,
-        allowlist=plugin_ids if verification_only else (),
+        enabled=selected_plugins,
+        allowlist=plugin_ids if selected_plugins else (),
     )
     mcp_selection = McpSelection(
-        enabled=verification_only,
-        servers=server_ids if verification_only else (),
+        enabled=selected_mcp,
+        servers=server_ids if selected_mcp else (),
     )
-    if verification_only and plugin_ids != (PluginId.SUPERPOWERS,):
-        raise NativeConfigError('verification requires the Superpowers plugin candidate')
-    if verification_only and server_ids != (McpServerId.OC2_STATUS,):
-        raise NativeConfigError('verification requires the oc2-status MCP candidate')
     asset_sources = tuple(source for source in ASSET_SOURCE_TO_TARGET if source in assets)
     return NativeConfig(
         hashlib.sha256(raw).hexdigest(),
@@ -312,6 +333,7 @@ def parse_apm_native(
         tuple(selections),
         plugin_selection,
         mcp_selection,
+        unified_runtime,
         phase4_selection,
     )
 

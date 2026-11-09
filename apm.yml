@@ -23,8 +23,11 @@ x-oc2-agents:
     mode: subagent
     model: openai/gpt-6-luna
 
+x-oc2-runtime:
+  enabled: true
+
 x-oc2-plugins:
-  enabled: false
+  enabled: true
   allowlist: [superpowers]
 
 x-oc2-phase4:
@@ -49,7 +52,7 @@ x-oc2-phase4:
       lock_sha256: 71c0d8e7cd1267e0973066d01045a47e266907733d043d79f6ad899043f6e8b7
 
 x-oc2-mcp:
-  enabled: false
+  enabled: true
   servers: [oc2-status]
 
 # CodeRabbit & Greptile Skills

@@ -28,6 +28,30 @@ class FakeRunner:
 
 
 class VerificationRuntimePreparationTest(unittest.TestCase):
+    def test_unified_launch_stages_one_config_assets_and_plugin_bundle(self):
+        runner = FakeRunner()
+        request = oc2.SandboxLaunch(
+            'oc2-unified-test', 'a' * 64, oc2.PINNED[0], '/workspace',
+            pathlib.Path('/tmp/config.json'),
+            assets_file=pathlib.Path('/tmp/assets.json'), assets_sha='b' * 64,
+            bundle=pathlib.Path('/tmp/bundle'), manifest_sha='c' * 64,
+            phase4_plugin_file=pathlib.Path('/tmp/phase4.json'),
+            phase4_plugins_sha='d' * 64,
+        )
+
+        with (
+            patch.object(oc2, 'stage') as stage,
+            patch.object(oc2, 'oauth_helper_source', return_value='helper'),
+        ):
+            oc2.launch(runner, request)
+
+        stage.assert_called_once_with(
+            runner, request.name, request.bundle, request.manifest_sha,
+            oc2.HERE / 'oc2_guest.py', request.assets_file, request.assets_sha,
+            phase4_plugin_file=request.phase4_plugin_file,
+            phase4_plugins_sha=request.phase4_plugins_sha,
+        )
+
     def test_verification_refuses_to_create_or_reuse_an_incompatible_sandbox(self):
         runner = FakeRunner()
         with (patch.object(oc2, 'Runner', return_value=runner),

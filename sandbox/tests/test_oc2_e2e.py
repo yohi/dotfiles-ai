@@ -18,6 +18,8 @@ SCRIPTS = pathlib.Path(__file__).resolve().parents[1] / 'scripts'
 sys.path.insert(0, str(SCRIPTS))
 import oc2  # noqa: E402
 import oc2_assets  # noqa: E402
+import oc2_identity  # noqa: E402
+from sandbox.scripts import oc2_artifacts  # noqa: E402
 
 
 def _oc2_extensions(*, include_agents: bool = True) -> str:
@@ -281,10 +283,138 @@ class LauncherFlowTests(unittest.TestCase):
 
     def _copy_native_asset_sources(self) -> None:
         source_root = pathlib.Path(oc2.__file__).resolve().parents[2]
-        for source in (*oc2_assets.SOURCE_TO_TARGET, oc2_assets.THEME_SOURCE):
+        for source in (
+            *oc2_assets.SOURCE_TO_TARGET,
+            oc2_assets.THEME_SOURCE,
+            oc2_assets.MCP_SERVER_SOURCE,
+        ):
             destination = self.repo / source
             destination.parent.mkdir(parents=True, exist_ok=True)
             destination.write_bytes((source_root / source).read_bytes())
+
+    def test_normal_launcher_projects_apm_selection_to_unified_runtime(self):
+        source_root = pathlib.Path(oc2.__file__).resolve().parents[2]
+        (self.repo / 'apm.yml').write_bytes((source_root / 'apm.yml').read_bytes())
+        (self.repo / 'apm.lock.yaml').write_bytes((source_root / 'apm.lock.yaml').read_bytes())
+        plugin_files = {
+            'index.js': b'export default {}\n',
+            'package.json': b'{"name":"superpowers","version":"6.4.2"}\n',
+            '.opencode/plugins/superpowers.js': b'export default {}\n',
+            'skills/demo/SKILL.md': b'---\nname: demo\n---\n',
+        }
+        artifact = oc2_assets.PluginArtifact(
+            source_commit=oc2_assets.SUPERPOWERS_COMMIT,
+            files=tuple(
+                oc2_assets.PluginFile(name, content, hashlib.sha256(content).hexdigest())
+                for name, content in sorted(plugin_files.items())
+            ),
+            tree_files=tuple(
+                (name, hashlib.sha256(content).hexdigest())
+                for name, content in sorted(plugin_files.items())
+            ),
+        )
+        artifact_root = self.root / 'pinned-artifacts'
+        artifact_root.mkdir()
+        superpowers = artifact_root / 'superpowers'
+        superpowers.mkdir()
+        akane = artifact_root / 'akane.tgz'
+        sibyl = artifact_root / 'sibyl.tgz'
+        akane.write_bytes(b'pinned-akane-test-input')
+        sibyl.write_bytes(b'pinned-sibyl-test-input')
+        paths = oc2_artifacts.ArtifactPaths(artifact_root, superpowers, akane, sibyl)
+        captured: dict[str, str] = {}
+
+        def capture_launch(_runner, request) -> None:
+            bundle = pathlib.Path(request.bundle)
+            manifest = json.loads((bundle / 'export-manifest.json').read_text())
+            config = json.loads((bundle / 'opencode.jsonc').read_text())
+            asset_payload = json.loads(pathlib.Path(request.assets_file).read_text())
+            native = json.loads(asset_payload['files'][oc2_assets.NATIVE_TARGET])
+            captured.update({
+                'format': manifest['config_format'],
+                'model': config['model'],
+                'agent_set': ','.join(sorted(config['agents'])),
+                'provider_set': ','.join(sorted(config['providers'])),
+                'plugin_enabled': str(native['plugins']['enabled']),
+                'mcp_enabled': str(native['mcp']['enabled']),
+                'phase4_hash': str(request.phase4_plugins_sha),
+                'runtime_sha': request.digest,
+                'manifest_sha': str(request.manifest_sha),
+                'asset_sha': str(request.assets_sha),
+            })
+
+        with (
+            patch.object(oc2_assets, 'resolve_superpowers_plugin', return_value=artifact),
+            patch.object(oc2_assets, 'build_phase4_plugins', return_value=(b'pinned-phase4', 'd' * 64)),
+            patch.object(oc2_artifacts, 'artifact_paths', return_value=paths),
+            patch.object(oc2, 'launch', side_effect=capture_launch),
+        ):
+            status, output = self._run('--allow-paid-inference')
+
+        self.assertEqual(status, 0, output)
+        self.assertEqual(captured['format'], 'opencode-v2-unified')
+        self.assertEqual(captured['model'], 'openai/gpt-6-luna')
+        self.assertEqual(captured['agent_set'], 'hephaestus,oracle')
+        self.assertEqual(captured['provider_set'], 'openai')
+        self.assertEqual(captured['plugin_enabled'], 'True')
+        self.assertEqual(captured['mcp_enabled'], 'True')
+        expected = oc2_identity.unified_runtime_identity_sha256(
+            oc2_identity.Phase4RuntimeIdentity(
+                captured['manifest_sha'], captured['asset_sha'],
+                captured['phase4_hash'], oc2_identity.phase4_generator_fingerprint((
+                    oc2.HERE / 'oc2_guest.py',
+                    oc2.HERE / 'oc2_agent_native.py',
+                    oc2.HERE / 'oc2_identity.py',
+                    oc2.HERE / 'oc2_phase4_policy.py',
+                )),
+            ),
+        )
+        self.assertEqual(captured['runtime_sha'], expected)
+
+    def test_artifact_provisioning_dry_run_does_not_write_or_contact_sandbox(self):
+        cache_root = self.root / 'unused-cache'
+
+        status, output = self._run(
+            '--provision-artifacts',
+            '--superpowers-checkout', str(self.root / 'source'),
+            '--akane-artifact', str(self.root / 'akane.tgz'),
+            '--sibyl-artifact', str(self.root / 'sibyl.tgz'),
+            '--dry-run',
+        )
+
+        self.assertEqual(status, 0, output)
+        self.assertFalse(cache_root.exists())
+        self.assertEqual(self.fake.calls, [])
+
+    def test_unified_runtime_dry_run_reports_apm_selection_without_sandbox_calls(self):
+        source_root = pathlib.Path(oc2.__file__).resolve().parents[2]
+        (self.repo / 'apm.yml').write_bytes((source_root / 'apm.yml').read_bytes())
+
+        status, output = self._run('--dry-run')
+
+        self.assertEqual(status, 0, output)
+        self.assertIn('APM Unified Provider, Native Agents, selected assets, Plugins, and MCP', output)
+        self.assertEqual(self.fake.calls, [])
+
+    def test_unified_launch_without_provisioned_artifacts_stops_before_sandbox(self):
+        source_root = pathlib.Path(oc2.__file__).resolve().parents[2]
+        (self.repo / 'apm.yml').write_bytes((source_root / 'apm.yml').read_bytes())
+        (self.repo / 'apm.lock.yaml').write_bytes((source_root / 'apm.lock.yaml').read_bytes())
+
+        with patch.object(
+            oc2_artifacts, 'artifact_paths',
+            return_value=oc2_artifacts.ArtifactPaths(
+                self.root / 'missing-artifacts',
+                self.root / 'missing-artifacts/superpowers',
+                self.root / 'missing-artifacts/akane.tgz',
+                self.root / 'missing-artifacts/sibyl.tgz',
+            ),
+        ):
+            status, output = self._run('--allow-paid-inference')
+
+        self.assertEqual(status, 1)
+        self.assertIn('pinned OC2 artifacts are not provisioned', output)
+        self.assertEqual(self.fake.calls, [])
 
     def test_cloudflare_sandbox_secret_is_checked_before_workspace_and_tui(self):
         status, output = self._run(

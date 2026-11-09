@@ -11,6 +11,8 @@ import unittest
 from pathlib import Path
 
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "prepare_opencode_v2.py"
+sys.path.insert(0, str(SCRIPT.parent))
+import prepare_opencode_v2 as exporter  # noqa: E402
 
 
 class ExportTests(unittest.TestCase):
@@ -67,6 +69,39 @@ class ExportTests(unittest.TestCase):
         self.assertEqual(manifest["mcp_entries_exported"], 0)
         for name, sha in manifest["artifacts_sha256"].items():
             self.assertEqual(sha, hashlib.sha256((self.out / name).read_bytes()).hexdigest())
+
+    def test_manifest_refresh_tracks_a_runtime_provider_selection(self) -> None:
+        self.apm.write_text(
+            "provider:\n  openai: {whitelist: [gpt-6-luna]}\n"
+            "  cloudflare-ai-gateway-custom:\n"
+            "    npm: '@ai-sdk/openai-compatible'\n"
+            "    name: Cloudflare AI Gateway Custom\n"
+            "    options:\n"
+            "      baseURL: 'https://gateway.ai.cloudflare.com/v1/${env:OC_CF_ACCOUNT_ID}/${env:OC_CF_GATEWAY_ID}/compat'\n"
+            "      apiKey: ''\n      headers:\n"
+            "        cf-aig-authorization: 'Bearer ${env:OC_CF_API_TOKEN}'\n"
+            "    models:\n      custom/kimi: {name: Kimi}\n"
+            "opencode_v2:\n  default_model: openai/gpt-6-luna\n"
+            "  deny_provider_fallback: true\n  deny_guest_auth: true\n"
+            "  providers:\n    openai: {enabled: true, auth_method: docker_openai_oauth}\n"
+            "    cloudflare-ai-gateway-custom: {enabled: true, auth_method: docker_custom_secret}\n",
+            encoding="utf-8",
+        )
+        self.assertEqual(self.run_export().returncode, 0)
+        server_path = self.out / "opencode.jsonc"
+        server = json.loads(server_path.read_text())
+        server["providers"].pop("cloudflare-ai-gateway-custom")
+        server["policies"] = [
+            policy for policy in server["policies"]
+            if policy.get("resource") != "cloudflare-ai-gateway-custom"
+        ]
+        server_path.write_text(json.dumps(server, indent=2) + "\n", encoding="utf-8")
+
+        manifest_sha = exporter.refresh_manifest(self.out)
+
+        manifest = json.loads((self.out / "export-manifest.json").read_text())
+        self.assertEqual(manifest_sha, hashlib.sha256((self.out / "export-manifest.json").read_bytes()).hexdigest())
+        self.assertEqual(manifest["artifacts_sha256"]["opencode.jsonc"], hashlib.sha256(server_path.read_bytes()).hexdigest())
 
     def test_verification_export_contains_no_provider_or_credential_configuration(self) -> None:
         self.apm.write_text(
@@ -205,6 +240,23 @@ class ExportTests(unittest.TestCase):
             {"action": "mcp.use", "resource": "*", "effect": "deny"},
             server["policies"],
         )
+
+    def test_unified_runtime_export_keeps_provider_and_agents_without_inline_plugins(self) -> None:
+        source = Path(__file__).resolve().parents[2] / "apm.yml"
+        self.apm.write_bytes(source.read_bytes())
+
+        result = self.run_export()
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        server = json.loads((self.out / "opencode.jsonc").read_text())
+        manifest = json.loads((self.out / "export-manifest.json").read_text())
+        self.assertEqual(manifest["config_format"], "opencode-v2-unified")
+        self.assertEqual(server["model"], "openai/gpt-6-luna")
+        self.assertEqual(set(server["agents"]), {"hephaestus", "oracle"})
+        self.assertNotIn("plugins", server)
+        self.assertNotIn("mcp", server)
+        for generated in self.out.iterdir():
+            self.assertNotIn("TOP_SECRET_DO_NOT_EXPORT", generated.read_text())
 
     def test_v2_provider_config_rejects_unapproved_provider(self) -> None:
         self.apm.write_text(

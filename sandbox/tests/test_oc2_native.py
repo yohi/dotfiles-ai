@@ -5,6 +5,7 @@ import json
 import pathlib
 import sys
 import unittest
+from unittest.mock import patch
 
 SCRIPTS = pathlib.Path(__file__).resolve().parents[1] / 'scripts'
 REPO = pathlib.Path(__file__).resolve().parents[2]
@@ -60,18 +61,51 @@ class NativeApmConfigTest(unittest.TestCase):
         self.assertEqual(set(config.asset_sources), set(oc2_native.ASSET_SOURCES))
         payload = oc2_native.build_native_payload(config)
         self.assertEqual(set(payload['agents']), {'hephaestus', 'oracle'})
-        self.assertEqual(payload['plugins'], {'enabled': False, 'allowlist': []})
-        self.assertEqual(payload['mcp'], {'enabled': False, 'servers': []})
+        self.assertEqual(payload['plugins'], {
+            'enabled': True, 'allowlist': ['superpowers'],
+        })
+        self.assertEqual(payload['mcp'], {
+            'enabled': True, 'servers': ['oc2-status'],
+        })
+        self.assertEqual(
+            tuple(plugin.value for plugin in config.phase4_plugins.allowlist),
+            ('akane', 'sibyl'),
+        )
 
     def test_asset_manifest_carries_the_native_config_and_apm_identity(self):
-        raw, asset_sha = oc2_assets.build(REPO)
+        files = {
+            'index.js': b'export default {}\n',
+            'package.json': b'{"name":"superpowers","version":"6.4.2"}\n',
+            '.opencode/plugins/superpowers.js': b'export default {}\n',
+            'skills/demo/SKILL.md': b'---\nname: demo\n---\n',
+        }
+        artifact = oc2_assets.PluginArtifact(
+            source_commit=oc2_native.SUPERPOWERS_COMMIT,
+            files=tuple(
+                oc2_assets.PluginFile(
+                    name, content, hashlib.sha256(content).hexdigest(),
+                )
+                for name, content in sorted(files.items())
+            ),
+            tree_files=tuple(
+                (name, hashlib.sha256(content).hexdigest())
+                for name, content in sorted(files.items())
+            ),
+        )
+        with patch.object(oc2_assets, 'resolve_superpowers_plugin', return_value=artifact):
+            raw, asset_sha = oc2_assets.build(REPO, plugin_dir=pathlib.Path('/fixture/superpowers'))
         payload = json.loads(raw)
         native = json.loads(payload['files'][oc2_assets.NATIVE_TARGET])
 
         self.assertEqual(asset_sha, hashlib.sha256(raw).hexdigest())
         self.assertEqual(native['source_sha256'], hashlib.sha256((REPO / 'apm.yml').read_bytes()).hexdigest())
         self.assertEqual(set(native['agents']), {'hephaestus', 'oracle'})
-        self.assertEqual(native['mcp'], {'enabled': False, 'servers': []})
+        self.assertEqual(native['mcp'], {
+            'enabled': True, 'servers': ['oc2-status'],
+        })
+        self.assertEqual(native['plugins'], {
+            'enabled': True, 'allowlist': ['superpowers'],
+        })
 
     def test_valid_config_emits_only_two_fixed_native_agents_and_disabled_mcp(self):
         raw = apm_config()
@@ -225,6 +259,12 @@ class NativeApmConfigTest(unittest.TestCase):
         raw = b'name: fixture\nversion: 1\nx-oc2-agents: {}\n'
 
         with self.assertRaisesRegex(ValueError, 'extensions must be declared together'):
+            oc2_native.parse_apm_native(raw)
+
+    def test_runtime_selection_without_complete_oc2_extensions_is_rejected(self):
+        raw = b'name: fixture\nx-oc2-runtime: {enabled: true}\n'
+
+        with self.assertRaisesRegex(ValueError, 'Runtime requires'):
             oc2_native.parse_apm_native(raw)
 
     def test_duplicate_mapping_keys_are_rejected(self):
