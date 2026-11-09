@@ -354,3 +354,22 @@ def write_new(destination: Path, raw: bytes) -> None:
                  | getattr(os, "O_NOFOLLOW", 0), 0o644)
     with os.fdopen(fd, "wb") as stream:
         stream.write(raw)
+
+
+def build_phase4_plugins(
+    repo: Path,
+    artifact_paths: tuple[Path, Path],
+    *,
+    explicit_opt_in: bool,
+) -> tuple[bytes, str]:
+    """Export the APM-pinned Phase 4 package entrypoints for an opt-in runtime."""
+    from oc2_phase4_assets import Phase4AssetError, build_phase4_plugin_bundle
+
+    try:
+        return build_phase4_plugin_bundle(
+            repo,
+            artifact_paths,
+            explicit_opt_in=explicit_opt_in,
+        )
+    except Phase4AssetError as exc:
+        raise AssetError(str(exc)) from exc

@@ -587,7 +587,7 @@ class HostTest(unittest.TestCase):
             link = pathlib.Path(tmp) / 'link'
             link.symlink_to(parent, target_is_directory=True)
             self.assertEqual(check(link / 'target'), 12)
-            self.assertEqual(check(pathlib.Path(tmp) / 'missing' / 'target'), 11)
+            self.assertEqual(check(pathlib.Path(tmp) / 'missing' / 'target'), 0)
             self.assertEqual(check(pathlib.Path('relative')), 12)
 
     def test_destination_guest_permission_error_is_indeterminate(self):
@@ -1589,6 +1589,109 @@ class HostTest(unittest.TestCase):
             self.assertIn('--expected-assets-sha', start[0])
             self.assertIn(asset_sha, start[0])
             self.assertIn('--assets', start[0])
+
+    def test_stage_phase4_copies_policy_and_plugin_asset_with_hashes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            bundle = root / 'bundle'
+            bundle.mkdir()
+            script = SCRIPTS / 'oc2_guest.py'
+            asset = root / 'base-assets.json'
+            phase4_asset = root / 'phase4-assets.json'
+            asset.write_bytes(b'base-assets')
+            phase4_asset.write_bytes(b'phase4-assets')
+            script_sha = hashlib.sha256(script.read_bytes()).hexdigest()
+            native_sha = hashlib.sha256((SCRIPTS / 'oc2_agent_native.py').read_bytes()).hexdigest()
+            identity_sha = hashlib.sha256((SCRIPTS / 'oc2_identity.py').read_bytes()).hexdigest()
+            policy_file = SCRIPTS / 'oc2_phase4_policy.py'
+            policy_sha = hashlib.sha256(policy_file.read_bytes()).hexdigest()
+            base_sha = hashlib.sha256(asset.read_bytes()).hexdigest()
+            phase4_sha = hashlib.sha256(phase4_asset.read_bytes()).hexdigest()
+
+            class Runner:
+                def __init__(self):
+                    self.calls = []
+
+                def destination_status(self, _name, _destination):
+                    return 0
+
+                def sbx(self, *args, **_kwargs):
+                    self.calls.append(args)
+                    if args[:4] == ('exec', 'oc2-dev', 'bash', '-c'):
+                        return 'missing\n'
+                    if args[:3] == ('exec', 'oc2-dev', 'sha256sum'):
+                        path = args[3]
+                        if path.endswith('/oc2_phase4_policy.py'):
+                            digest = policy_sha
+                        elif path.endswith('/oc2_identity.py'):
+                            digest = identity_sha
+                        elif path.endswith('/oc2_agent_native.py'):
+                            digest = native_sha
+                        elif path == oc2.ROOT + '/assets/' + base_sha[:16] + '.json':
+                            digest = base_sha
+                        elif path == oc2.ROOT + '/assets/phase4-' + phase4_sha[:16] + '.json':
+                            digest = phase4_sha
+                        else:
+                            digest = script_sha
+                        return digest + '  verified\n'
+                    return ''
+
+            runner = Runner()
+            oc2.stage(
+                runner,
+                'oc2-dev',
+                bundle,
+                'a' * 64,
+                script,
+                asset,
+                base_sha,
+                phase4_plugin_file=phase4_asset,
+                phase4_plugins_sha=phase4_sha,
+            )
+
+            copies = [call for call in runner.calls if call[0] == 'cp']
+            self.assertEqual(len(copies), 7)
+            self.assertTrue(any(call[2].endswith('/oc2_phase4_policy.py') for call in copies))
+            execute = [call for call in runner.calls if call[:3] == ('exec', 'oc2-dev', 'python3')]
+            self.assertEqual(len(execute), 1)
+            self.assertIn('--phase4-plugin-assets', execute[0])
+            self.assertIn('--expected-phase4-plugin-sha', execute[0])
+            self.assertIn(phase4_sha, execute[0])
+
+    def test_stage_phase4_rejects_symlinked_plugin_asset_before_sandbox_calls(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            bundle = root / 'bundle'
+            bundle.mkdir()
+            script = SCRIPTS / 'oc2_guest.py'
+            target = root / 'phase4-assets.json'
+            target.write_bytes(b'phase4-assets')
+            link = root / 'linked-assets.json'
+            link.symlink_to(target)
+
+            class Runner:
+                def __init__(self):
+                    self.calls = []
+
+                def destination_status(self, _name, _destination):
+                    return 0
+
+                def sbx(self, *args, **_kwargs):
+                    self.calls.append(args)
+                    return ''
+
+            runner = Runner()
+            with self.assertRaisesRegex(oc2.Stop, 'Phase 4 plugin asset must be a regular file'):
+                oc2.stage(
+                    runner,
+                    'oc2-dev',
+                    bundle,
+                    'a' * 64,
+                    script,
+                    phase4_plugin_file=link,
+                    phase4_plugins_sha=hashlib.sha256(target.read_bytes()).hexdigest(),
+                )
+            self.assertEqual(runner.calls, [])
 
     def test_stage_selected_assets_sha_mismatch_stops(self):
         with tempfile.TemporaryDirectory() as tmp:

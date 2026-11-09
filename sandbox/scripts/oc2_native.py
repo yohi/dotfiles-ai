@@ -26,6 +26,7 @@ from oc2_agent_native import (
     build_native_payload as build_native_payload,
     parse_agent_name,
 )
+from oc2_phase4_selection import Phase4PluginSelection, parse_phase4_selection
 
 
 ASSET_SOURCE_TO_TARGET: Final[Mapping[str, str]] = MappingProxyType({
@@ -50,6 +51,9 @@ class NativeConfig:
     agents: tuple[AgentSelection, ...]
     plugins: PluginSelection = PluginSelection(enabled=False, allowlist=())
     mcp: McpSelection = McpSelection(enabled=False, servers=())
+    phase4_plugins: Phase4PluginSelection = Phase4PluginSelection(
+        enabled=False, allowlist=(), artifacts=(),
+    )
 
 
 class SkillFrontmatter(TypedDict):
@@ -169,6 +173,7 @@ def parse_apm_native(
     *,
     require_oc2_assets: bool = False,
     verification_only: bool = False,
+    phase4_plugins: bool = False,
 ) -> NativeConfig:
     try:
         root = yaml.compose(raw, Loader=yaml.SafeLoader)
@@ -177,6 +182,7 @@ def parse_apm_native(
     if root is None:
         raise NativeConfigError('apm.yml is empty')
     top = _mapping(root, 'apm.yml')
+    phase4_node = top.get('x-oc2-phase4')
     agents_node = top.get('x-oc2-agents')
     plugins_node = top.get('x-oc2-plugins')
     assets_node = top.get('x-oc2-assets')
@@ -186,6 +192,12 @@ def parse_apm_native(
         agents_node is not None,
         plugins_node is not None,
         mcp_node is not None,
+    )
+    if phase4_node is not None and not all(extension_presence):
+        raise NativeConfigError('Phase 4 requires the complete OC2 APM extension set')
+    phase4_selection = parse_phase4_selection(
+        phase4_node,
+        explicit_opt_in=phase4_plugins,
     )
     if not any(extension_presence):
         if require_oc2_assets:
@@ -300,6 +312,7 @@ def parse_apm_native(
         tuple(selections),
         plugin_selection,
         mcp_selection,
+        phase4_selection,
     )
 
 
