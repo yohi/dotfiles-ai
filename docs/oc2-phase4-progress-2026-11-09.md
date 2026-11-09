@@ -7,9 +7,10 @@ plugins into an isolated OpenCode `v2.2.5` verification Runtime. The work is on
 branch `feature/oc2-phase4-akane-sibyl-integration-20261108`, based on
 `00a7b8c633686f1584e5932e1393e8f2de29f4f8`.
 
-The implementation and non-inference Runtime preparation are complete. Actual
-Sibyl sidebar rendering has not received visual or Human Owner acceptance. The
-current verdict is therefore `IMPLEMENTED_PENDING_TUI`.
+The implementation, non-inference Runtime preparation, and Human Owner
+non-inference acceptance are complete. The final verdict is
+`PHASE4_NON_INFERENCE_COMPLETE`; `ACCEPTANCE_PASS` applies only to the Phase 4
+non-inference acceptance scope documented here.
 
 ## 2. Pinned Sources and Artifacts
 
@@ -44,16 +45,27 @@ combined Phase 4 plugin asset bundle SHA-256 is
 
 - Sandbox: `oc2-phase4-akane-sibyl-20261109`.
 - Runtime identity: `987f8124dbbe7407`.
-- Guest readback confirmed Akane in the server plugin configuration and Sibyl
-  in the CLI/TUI plugin configuration. `oc2-status` remained present; no model
-  or provider was configured.
-- The Sandbox was created without static MCP mounts and with a deny-all network
-  policy. Policy checks denied `github.com` and `api.openai.com`.
+- Human Owner Runtime readback reported:
+
+  ```text
+  PHASE4_RUNTIME_READBACK_PASS
+  AKANE_SERVER_REGISTERED
+  SIBYL_TUI_REGISTERED
+  RECOVERY_TARGET_RESTRICTED
+  ```
+
+- The Sandbox has no Host Mount or Runtime Mount. The existing Network Deny
+  configuration was not changed; previous policy checks denied `github.com`
+  and `api.openai.com`.
+- Runtime configuration and fixed-asset verification passed. `oc2-status`
+  remained connected and no model provider was configured.
+- Human Owner confirmed Akane's active state and zero Recovery Pings. The exact
+  execution output and evidence attribution are recorded in Section 6. The
+  subsequent `enabled: false` state after shutdown is consistent with Akane's
+  cleanup.
 - A scrubbed, no-inference PTY startup was attempted and then stopped. The
-  Akane state file reported no sessions and `pingsSent=0`; no Recovery Ping,
-  prompt, model inference, or credential transfer was performed.
-- No OpenCode process remained in the Sandbox at the time of final status
-  inspection.
+  previous automated inspection reported no sessions and `pingsSent=0`; no
+  prompt, model inference, or credential transfer was performed in that run.
 
 ## 5. Verification
 
@@ -73,22 +85,68 @@ The focused verification runs recorded for this implementation passed:
 `ruff` was unavailable in the environment. Existing Phase 3 monoliths were not
 refactored; new Phase 4 modules passed the targeted no-excuse audit.
 
-## 6. TUI Acceptance and Remaining Work
+## 6. Human Owner TUI Acceptance and Scope Limits
 
-The TUI launch path was exercised in a scrubbed PTY, but no fresh xterm.js
-browser capture was produced. The visual capture attempt was blocked because
-`@xterm/xterm/lib/xterm.js` was unavailable to the QA harness. As a result,
-Sibyl sidebar rendering and Human Owner visual acceptance remain unverified.
+The earlier automated visual-capture attempt did not produce an xterm.js browser
+capture because `@xterm/xterm/lib/xterm.js` was unavailable to the QA harness.
+This earlier tooling limitation is superseded by the Human Owner's subsequent
+inspection of an actual OpenCode `v2.2.5` TUI screenshot. The screenshot was
+provided in the conversation; no repository screenshot path or separate
+artifact was supplied.
 
-The Human Owner must inspect the prepared Runtime TUI and confirm the sidebar
-appears and cleans up on exit. Until that confirmation is recorded, this report
-does not claim `ACCEPTANCE_PASS`.
+### Facts visible in the Human Owner screenshot
+
+- Parent session: `[phase4] Sibyl parent`.
+- Sibyl sidebar and `Akane Watchdog` panel are rendered.
+- `Plugin: Enabled`, `Active sessions: 0`, `Pings: 0`, and
+  `This session: Not tracked` are displayed.
+- A child session card displays `unknown · UNKNOWN (phase4)`.
+- `oc2-status` displays `Connected`; no model provider is configured.
+- Parent/child session display was checked without model inference. The
+  `unknown · UNKNOWN` child status is consistent with no inference having been
+  run and is not an acceptance failure.
+
+### Previously reported Human Owner execution output
+
+The following Akane active-state values are from the Owner's execution report,
+not inferred from the TUI screenshot:
 
 ```text
+ENABLED: True
+STATE_AGE_MS: 21975
+SESSION_COUNT: 0
+PINGS_SENT: 0
+AKANE_ACTIVE_STATE_PASS
+```
+
+Actual model inference, live Recovery Ping injection, Agent execution, and
+Agent-execution state transitions were not tested.
+
+```text
+PHASE4_STATUS: NON_INFERENCE_COMPLETE
+PHASE4_NON_INFERENCE_ACCEPTANCE: PASS
+
 IMPLEMENTATION: COMPLETE
-ISOLATED_RUNTIME_PREPARATION: PASS
-NETWORK_DENY: PASS
-INFERENCE_OR_RECOVERY_PING: NOT_EXECUTED
-SIBYL_TUI_VISUAL_ACCEPTANCE: PENDING_HUMAN_OWNER
-VERDICT: IMPLEMENTED_PENDING_TUI
+AUTOMATED_TESTS: 275 PASS (PREVIOUSLY RECORDED)
+
+RUNTIME_CONFIGURATION: PASS
+ASSET_VERIFICATION: PASS
+
+AKANE_SERVER_REGISTRATION: PASS
+AKANE_ACTIVE_STATE: PASS
+
+SIBYL_TUI_REGISTRATION: PASS
+SIBYL_VISUAL_RENDERING: PASS
+PARENT_CHILD_DISPLAY: PASS
+
+MCP_CONNECTION: PASS
+RECOVERY_PINGS_OBSERVED: 0
+
+MODEL_PROVIDER: NOT_CONFIGURED
+MODEL_INFERENCE: NOT_EXECUTED
+LIVE_RECOVERY_PING: NOT_EXECUTED
+AGENT_EXECUTION_STATE_TRANSITIONS: NOT_EXECUTED
+
+VERDICT: ACCEPTANCE_PASS
+SCOPE: PHASE4_NON_INFERENCE
 ```
