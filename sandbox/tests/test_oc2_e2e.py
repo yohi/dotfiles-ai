@@ -294,7 +294,18 @@ class LauncherFlowTests(unittest.TestCase):
 
     def test_normal_launcher_projects_apm_selection_to_unified_runtime(self):
         source_root = pathlib.Path(oc2.__file__).resolve().parents[2]
-        (self.repo / 'apm.yml').write_bytes((source_root / 'apm.yml').read_bytes())
+        apm = (source_root / 'apm.yml').read_bytes()
+        apm = apm.replace(
+            b'default_model: openai/gpt-6-luna',
+            b'default_model: openai/gpt-6.1-sol',
+        ).replace(
+            b'    - openai/gpt-6-luna\n    - cloudflare-ai-gateway-custom/',
+            b'    - openai/gpt-6.1-sol\n    - cloudflare-ai-gateway-custom/',
+        ).replace(
+            b'model: openai/gpt-6-luna',
+            b'model: openai/gpt-6.1-sol',
+        ).replace(b'theme: tokyonight', b'theme: nord')
+        (self.repo / 'apm.yml').write_bytes(apm)
         (self.repo / 'apm.lock.yaml').write_bytes((source_root / 'apm.lock.yaml').read_bytes())
         plugin_files = {
             'index.js': b'export default {}\n',
@@ -335,6 +346,8 @@ class LauncherFlowTests(unittest.TestCase):
                 'model': config['model'],
                 'agent_set': ','.join(sorted(config['agents'])),
                 'provider_set': ','.join(sorted(config['providers'])),
+                'agent_model': config['agents']['hephaestus']['model'],
+                'theme': json.loads(asset_payload['files']['theme.json'])['name'],
                 'plugin_enabled': str(native['plugins']['enabled']),
                 'mcp_enabled': str(native['mcp']['enabled']),
                 'phase4_hash': str(request.phase4_plugins_sha),
@@ -353,7 +366,9 @@ class LauncherFlowTests(unittest.TestCase):
 
         self.assertEqual(status, 0, output)
         self.assertEqual(captured['format'], 'opencode-v2-unified')
-        self.assertEqual(captured['model'], 'openai/gpt-6-luna')
+        self.assertEqual(captured['model'], 'openai/gpt-6.1-sol')
+        self.assertEqual(captured['agent_model'], 'openai/gpt-6.1-sol')
+        self.assertEqual(captured['theme'], 'nord')
         self.assertEqual(captured['agent_set'], 'hephaestus,oracle')
         self.assertEqual(captured['provider_set'], 'openai')
         self.assertEqual(captured['plugin_enabled'], 'True')

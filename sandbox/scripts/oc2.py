@@ -408,6 +408,17 @@ def configure_cloudflare_provider(
     if cloudflare_provider is None:
         return False
 
+    agents = config.get('agents', {})
+    if not isinstance(agents, dict):
+        raise Stop('generated OpenCode Native Agent selection is invalid')
+    for agent in agents.values():
+        if not isinstance(agent, dict):
+            raise Stop('generated OpenCode Native Agent selection is invalid')
+        agent_model = agent.get('model')
+        if (isinstance(agent_model, str)
+                and agent_model.partition('/')[0] == CF_GATEWAY_PROVIDER_ID):
+            raise Stop('Agent model requires explicit Cloudflare Gateway selection')
+
     policies = config.get('policies', [])
     if not isinstance(policies, list) or any(not isinstance(policy, dict) for policy in policies):
         raise Stop('generated OpenCode provider policies are invalid')
@@ -1324,10 +1335,6 @@ def launch(runner: Runner, request: SandboxLaunch) -> None:
         f'XDG_STATE_HOME={runtime}/state',
         f'XDG_CACHE_HOME={runtime}/cache',
         f'TMPDIR={runtime}/tmp',
-        'OPENCODE_WATCHDOG_ENABLED=true',
-        'OPENCODE_WATCHDOG_STAGE1_MS=180000',
-        'OPENCODE_WATCHDOG_STAGE2_MS=86400000',
-        'SIBYL_OBSERVER_ENABLED=true',
         'OPENCODE_DISABLE_AUTOUPDATE=1',
         'OPENCODE_DISABLE_MODELS_FETCH=1',
         'OPENCODE_CONFIG_PROJECT_DISABLE=1',

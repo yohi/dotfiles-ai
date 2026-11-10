@@ -1395,19 +1395,14 @@ class HostTest(unittest.TestCase):
         self.assertEqual(command[4:7], ('oc2-dev', 'python3', '-c'))
         self.assertIn(oc2.GUEST_EXEC_WRAPPER, command)
         self.assertEqual(command[-2:], (oc2.PINNED[0], '--standalone'))
-        # Phase 5 explicitly enables Akane state production and
-        # Sibyl Observer while delaying automatic Recovery Ping.
         for setting in (
             'OPENCODE_WATCHDOG_ENABLED=true',
             'OPENCODE_WATCHDOG_STAGE1_MS=180000',
             'OPENCODE_WATCHDOG_STAGE2_MS=86400000',
             'SIBYL_OBSERVER_ENABLED=true',
-        ):
-            self.assertIn(setting, command)
-        self.assertNotIn(
             'OPENCODE_WATCHDOG_ENABLED=false',
-            command,
-        )
+        ):
+            self.assertNotIn(setting, command)
         self.assertNotIn('bash', command)
         self.assertNotIn('--mount', command)
         self.assertFalse(any(argument.startswith('OPENCODE_CONFIG_DIR=') for argument in command))
@@ -1912,6 +1907,24 @@ class HostTest(unittest.TestCase):
             policy.get('resource') == 'cloudflare-ai-gateway-custom'
             for policy in runtime_config['policies']
         ))
+
+    def test_unrequested_cloudflare_agent_model_stops_before_provider_removal(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config = pathlib.Path(tmp) / 'opencode.jsonc'
+            config.write_text(json.dumps({
+                'model': 'openai/gpt-6-luna',
+                'agents': {
+                    'hephaestus': {'model': 'cloudflare-ai-gateway-custom/custom/kimi'},
+                },
+                'providers': {
+                    'openai': {'models': {}},
+                    'cloudflare-ai-gateway-custom': {'models': {'custom/kimi': {}}},
+                },
+                'policies': [],
+            }))
+
+            with self.assertRaisesRegex(oc2.Stop, 'Agent model requires explicit Cloudflare'):
+                oc2.configure_cloudflare_provider(config, include_cloudflare=False)
 
     def test_explicit_cloudflare_mode_keeps_provider_available(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -2940,13 +2953,19 @@ class AssetExporterTest(unittest.TestCase):
             'provider:\n'
             '  openai:\n'
             '    whitelist: [gpt-6-luna]\n'
+            '  cloudflare-ai-gateway-custom:\n'
+            '    models: {custom/test-model: {name: Test}}\n'
             'opencode_v2:\n'
             '  default_model: openai/gpt-6-luna\n'
+            '  deny_provider_fallback: true\n'
+            '  deny_guest_auth: true\n'
             '  providers:\n'
             '    openai:\n'
             '      enabled: true\n'
+            '      auth_method: docker_openai_oauth\n'
             '    cloudflare-ai-gateway-custom:\n'
             '      enabled: true\n'
+            '      auth_method: docker_custom_secret\n'
             'x-oc2-assets:\n' + ''.join(f'  - {source}\n' for source in sources)
             + 'x-oc2-agents:\n'
             '  hephaestus:\n'

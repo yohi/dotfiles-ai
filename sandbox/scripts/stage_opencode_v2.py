@@ -52,7 +52,22 @@ def _verify_v2_config(server: dict[str, JsonValue]) -> None:
     if "agents" in server:
         expected_keys.add("agents")
         try:
-            agent_policy.validate_agent_map(server["agents"])
+            providers = server.get("providers")
+            if not isinstance(providers, dict):
+                raise ValueError("provider models are missing")
+            allowed_agent_models: list[str] = []
+            for provider_id, provider in providers.items():
+                if not isinstance(provider, dict):
+                    continue
+                models = provider.get("models")
+                if not isinstance(models, dict):
+                    continue
+                allowed_agent_models.extend(
+                    f"{provider_id}/{model_id}"
+                    for model_id in models
+                    if isinstance(model_id, str)
+                )
+            agent_policy.validate_agent_map(server["agents"], allowed_agent_models)
         except ValueError as exc:
             raise StageError("unapproved V2 Native Agent configuration") from exc
     if set(server) != expected_keys:

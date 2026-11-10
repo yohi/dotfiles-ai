@@ -196,7 +196,22 @@ def verify_v2_config(server: dict[str, JsonValue]) -> None:
     allowed_fields = {'$schema', 'shell', 'snapshot', 'model', 'providers', 'policies'}
     if 'agents' in server:
         allowed_fields.add('agents')
-        validate_agent_map(server['agents'])
+        providers_for_agents = server.get('providers')
+        if not isinstance(providers_for_agents, dict):
+            fail('Native Agent provider models are missing')
+        allowed_agent_models: list[str] = []
+        for provider_id, provider in providers_for_agents.items():
+            if not isinstance(provider, dict):
+                continue
+            models = provider.get('models')
+            if not isinstance(models, dict):
+                continue
+            allowed_agent_models.extend(
+                f'{provider_id}/{model_id}'
+                for model_id in models
+                if isinstance(model_id, str)
+            )
+        validate_agent_map(server['agents'], allowed_agent_models)
     if set(server) != allowed_fields:
         fail('unexpected V2 server config fields')
     model = server.get('model')
@@ -781,6 +796,12 @@ def prepare(
             fail('verification config must not select a model or Native Agent')
         if not verification_only and server.get('agents', {}) != native_payload['agents']:
             fail('V2 config and Native Agent asset mismatch')
+        runtime_options = native_payload['runtime']
+        if unified_runtime:
+            if not isinstance(runtime_options, dict):
+                fail('unified Runtime options are missing from the APM asset')
+            if json.loads(assets['theme.json']) != {'name': runtime_options['theme']}:
+                fail('TUI theme does not match the APM Runtime options')
         # Instructions are resolved inside the guest, not on the Host.
         rule_names = sorted(p for p in assets if p.startswith('config/opencode/rules/'))
         server['instructions'] = [str(dest / name) for name in rule_names]
@@ -828,7 +849,7 @@ def prepare(
                     fail('Plugin Asset Bundle differs from the pinned source tree')
             plugin_path = dest / 'plugins/superpowers'
             server['plugins'] = [str(plugin_path)]
-            server['mcp'] = {
+            mcp_config: dict[str, JsonValue] = {
                 'servers': {
                     'oc2-status': {
                         'type': 'local',
@@ -840,6 +861,12 @@ def prepare(
                 },
             }
             if unified_runtime:
+                if not isinstance(runtime_options, dict):
+                    fail('unified Runtime options are missing from the APM asset')
+                timeout_ms = runtime_options.get('mcpExecutionTimeoutMs')
+                if type(timeout_ms) is not int or not 1000 <= timeout_ms <= 600000:
+                    fail('MCP execution timeout violates safety bounds')
+                mcp_config['timeout'] = {'execution': timeout_ms}
                 policies = server.get('policies')
                 if not isinstance(policies, list) or not isinstance(server.get('providers'), dict):
                     fail('unified Runtime Provider policy is missing')
@@ -856,12 +883,17 @@ def prepare(
                     {'action': 'mcp.use', 'resource': '*', 'effect': 'deny'},
                     {'action': 'mcp.use', 'resource': 'oc2-status', 'effect': 'allow'},
                 ]
+            server['mcp'] = mcp_config
             if phase4_plugins is not None:
-                akane_path = dest / 'plugins/akane'
-                sibyl_path = dest / 'plugins/sibyl'
-                server['plugins'].append({
-                    'package': str(akane_path),
-                    'options': {
+                if unified_runtime:
+                    if not isinstance(runtime_options, dict):
+                        fail('Phase 5 Runtime options are missing')
+                    watchdog = runtime_options['watchdog']
+                    observer = runtime_options['sibylObserver']
+                    if not isinstance(watchdog, dict) or not isinstance(observer, dict):
+                        fail('Akane/Sibyl Runtime options are invalid')
+                else:
+                    watchdog = {
                         'enabled': True,
                         'stage1Ms': 2_147_483_647,
                         'stage2Ms': 2_147_483_647,
@@ -869,6 +901,21 @@ def prepare(
                         'maxToolGateCycles': 1,
                         'notifierType': 'tmux',
                         'notifyWaiting': False,
+                    }
+                    observer = {
+                        'enabled': True,
+                        'maxVisibleSubagents': 8,
+                        'showModel': False,
+                        'showProvider': False,
+                        'showLatestText': False,
+                        'showReasoningSummary': False,
+                    }
+                akane_path = dest / 'plugins/akane'
+                sibyl_path = dest / 'plugins/sibyl'
+                server['plugins'].append({
+                    'package': str(akane_path),
+                    'options': {
+                        **watchdog,
                         'agents': {
                             'include': (
                                 ['__oc2_phase4_fixture__'] if not unified_runtime
@@ -884,16 +931,7 @@ def prepare(
                 })
                 client['plugins'] = [{
                     'package': str(sibyl_path),
-                    'options': {
-                        'observer': {
-                            'enabled': True,
-                            'maxVisibleSubagents': 8,
-                            'showModel': False,
-                            'showProvider': False,
-                            'showLatestText': False,
-                            'showReasoningSummary': False,
-                        },
-                    },
+                    'options': {'observer': observer},
                 }]
                 for target, content in phase4_plugins.files:
                     if target in asset_files:

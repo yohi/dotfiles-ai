@@ -292,12 +292,15 @@ def build(
             raise AssetError("selected asset appears to contain credential material: " + source)
         files[target] = data
 
-    theme_source = _regular_text(repo, THEME_SOURCE)
-    try:
-        tui = json.loads(theme_source)
-    except ValueError as exc:
-        raise AssetError("invalid source TUI JSON") from exc
-    theme = tui.get("theme") if isinstance(tui, dict) else None
+    if native.runtime is not None:
+        theme = native.runtime.theme
+    else:
+        theme_source = _regular_text(repo, THEME_SOURCE)
+        try:
+            tui = json.loads(theme_source)
+        except ValueError as exc:
+            raise AssetError("invalid source TUI JSON") from exc
+        theme = tui.get("theme") if isinstance(tui, dict) else None
     if not isinstance(theme, str) or not theme.isascii() or not (
             1 <= len(theme) <= 40 and
             all(c.islower() or c.isdigit() or c == "-" for c in theme)):

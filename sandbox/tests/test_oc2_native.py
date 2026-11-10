@@ -33,6 +33,8 @@ def apm_config(
         'provider:\n'
         '  openai:\n'
         '    whitelist: [gpt-6-luna]\n'
+        '  cloudflare-ai-gateway-custom:\n'
+        '    models: {custom/test-model: {name: Test}}\n'
         'opencode_v2:\n'
         '  default_model: openai/gpt-6-luna\n'
         '  deny_provider_fallback: true\n'
@@ -40,8 +42,10 @@ def apm_config(
         '  providers:\n'
         '    openai:\n'
         '      enabled: true\n'
+        '      auth_method: docker_openai_oauth\n'
         '    cloudflare-ai-gateway-custom:\n'
         '      enabled: true\n'
+        '      auth_method: docker_custom_secret\n'
         'x-oc2-assets:\n'
         + assets
         + 'x-oc2-agents:\n'
@@ -201,6 +205,9 @@ class NativeApmConfigTest(unittest.TestCase):
 
     def test_agent_model_is_independent_of_the_approved_v2_default(self):
         raw = apm_config().replace(
+            b'whitelist: [gpt-6-luna]',
+            b'whitelist: [gpt-6-luna, gpt-6.1-sol]',
+        ).replace(
             b'default_model: openai/gpt-6-luna',
             b'default_model: openai/gpt-6.1-sol',
         )
@@ -210,6 +217,63 @@ class NativeApmConfigTest(unittest.TestCase):
 
         self.assertEqual(payload['agents']['hephaestus']['model'], 'openai/gpt-6-luna')
         self.assertEqual(payload['agents']['oracle']['model'], 'openai/gpt-6-luna')
+
+    def test_agent_model_change_is_taken_from_the_apm_provider_catalog(self):
+        raw = apm_config().replace(
+            b'whitelist: [gpt-6-luna]',
+            b'whitelist: [gpt-6-luna, gpt-6.1-sol]',
+        ).replace(
+            b'default_model: openai/gpt-6-luna',
+            b'default_model: openai/gpt-6.1-sol',
+        ).replace(
+            b'model: openai/gpt-6-luna',
+            b'model: openai/gpt-6.1-sol',
+        )
+
+        payload = oc2_native.build_native_payload(oc2_native.parse_apm_native(raw))
+
+        self.assertEqual(payload['agents']['hephaestus']['model'], 'openai/gpt-6.1-sol')
+        self.assertEqual(payload['agents']['oracle']['model'], 'openai/gpt-6.1-sol')
+
+    def test_runtime_options_are_parsed_from_apm_and_preserve_ping_safety(self):
+        raw = (REPO / 'apm.yml').read_bytes().replace(
+            b'stage1Ms: 180000', b'stage1Ms: 240000',
+        )
+
+        config = oc2_native.parse_apm_native(raw, require_oc2_assets=True)
+
+        self.assertEqual(config.runtime.watchdog.stage1_ms, 240000)
+        self.assertGreaterEqual(config.runtime.watchdog.stage2_ms, 86400000)
+        self.assertLessEqual(config.runtime.watchdog.max_pings, 1)
+        self.assertTrue(config.runtime.sibyl_observer.enabled)
+        self.assertEqual(config.runtime.theme, 'tokyonight')
+
+    def test_runtime_rejects_ping_safety_regression_and_unknown_theme(self):
+        source = (REPO / 'apm.yml').read_bytes()
+        for changed in (
+            source.replace(b'stage2Ms: 86400000', b'stage2Ms: 180000'),
+            source.replace(b'theme: tokyonight', b'theme: unapproved-theme'),
+        ):
+            with self.subTest(changed=changed), self.assertRaises(oc2_native.NativeConfigError):
+                oc2_native.parse_apm_native(changed, require_oc2_assets=True)
+
+    def test_mcp_execution_timeout_is_read_from_apm_runtime_source(self):
+        source = (REPO / 'apm.yml').read_bytes().replace(
+            b'mcp_timeout: 120000', b'mcp_timeout: 45000',
+        )
+
+        config = oc2_native.parse_apm_native(source, require_oc2_assets=True)
+
+        self.assertEqual(config.runtime.mcp_execution_timeout_ms, 45000)
+
+    def test_mcp_execution_timeout_rejects_out_of_bounds_values(self):
+        source = (REPO / 'apm.yml').read_bytes()
+        for bad_timeout in (b'0', b'600001'):
+            changed = source.replace(b'mcp_timeout: 120000', b'mcp_timeout: ' + bad_timeout)
+            with self.subTest(bad_timeout=bad_timeout), self.assertRaises(
+                oc2_native.NativeConfigError,
+            ):
+                oc2_native.parse_apm_native(changed, require_oc2_assets=True)
 
     def test_agent_fallback_fields_are_rejected(self):
         raw = apm_config(agents=(

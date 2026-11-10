@@ -214,3 +214,110 @@ history; they are not inferred from plugin registration alone.
   OAuth/model response, Akane plugin, Sibyl plugin, and overall Phase 5
   acceptance must be tracked separately. The Phase 5 implementation and this
   record may be committed without declaring overall acceptance complete.
+
+## APM Full SSOT Integration and R6 Acceptance — 2026-11-10
+
+This update records the subsequent Full SSOT implementation and the Human
+Owner-reported R5/R6 acceptance results. The outcomes below are not claimed as
+independent Sandbox re-tests performed during the Git recording task.
+
+### Full SSOT implementation
+
+`apm.yml` is the source for user-configurable OpenCode v2 Runtime settings.
+The Strict APM Parser produces validated model/provider selections, Agent
+models, selected assets, Theme, Akane/Sibyl options, and MCP Timeout data. The
+Host exports the selected configuration and integrity metadata; the Guest
+validates those assets and generates the final Server/TUI configuration. The
+same selected APM input contributes to the Runtime Manifest and Runtime
+Identity.
+
+Coverage includes:
+
+- Models and Providers: default model, allowlisted models, selected approved
+  Providers, and their existing authentication contracts.
+- Agents: Hephaestus / Oracle model selection; Agent names, roles, system
+  behavior, permissions, and the allowed model domain remain code-constrained.
+- Plugins and MCP: only the fixed Superpowers, Akane, Sibyl, and `oc2-status`
+  selections are supported; standard APM dependencies are not expanded into
+  the Runtime.
+- Skills, Commands, and Rules: only selected local allowlisted assets are
+  exported.
+- Akane / Sibyl: their Runtime Options and display settings are sourced from
+  the validated APM selection; the Guest applies them to the Server and TUI
+  configuration surfaces respectively.
+- Theme: the selected built-in Theme is propagated to the TUI configuration.
+- Runtime Timeout: the existing `experimental.mcp_timeout` value is the single
+  source for OC2 MCP execution Timeout. `120000` milliseconds is applied as
+  `mcp.timeout.execution`. The Parser and Guest reject values outside
+  `1000..600000` milliseconds. A Timeout-only APM change changes Runtime
+  Identity; repeated generation from identical APM input is deterministic.
+
+The existing `experimental.mcp_timeout: 120000` value was retained. Host-side
+Sandbox, Artifact, and OAuth subprocess deadlines remain separate protocol or
+operation bounds in code; they are not the OpenCode MCP execution Timeout.
+OpenCode v2.2.5, artifact versions and hashes, authentication modes, Sandbox
+isolation, Host Credential Proxy, deny-by-default policies, Provider fallback
+denial, and the explicit Cloudflare Gateway selection requirement remain
+code-enforced constraints.
+
+The Akane Stage 2 value of `86400000` milliseconds remains temporary. It does
+not disable Recovery Ping; automatic Ping remains possible during long-running
+sessions. The maximum Ping count and Stage 2 lower bound remain safety limits,
+not user-removable settings.
+
+### Offline validation
+
+The implementation-run results were:
+
+| Check | Result |
+| :--- | :--- |
+| `python3 -m unittest discover -s sandbox/tests -p 'test_oc2*.py'` | **299 passed** |
+| APM: `apm compile --validate --local-only` | **PASS**, with existing preserved `extra` warnings for MCP keys |
+| Python syntax validation for modified scripts/tests | **PASS** |
+| `git diff --check` | **PASS** |
+| Timeout propagation, bounds, determinism, and Identity tests | **PASS** |
+| `basedpyright` on the touched OC2 parser/Guest modules | 8 errors / 177 warnings; existing sibling-script relative imports and the parser import cycle remain |
+| `ruff` / `markdownlint-cli2` | Not available in the environment |
+
+These are the reported implementation-run results, not checks rerun for this
+recording and Git operation.
+
+### R5 / R6 hands-on acceptance
+
+R3 remains recorded as **Sibyl Visual Acceptance FAIL**. The earlier R5
+`PENDING` entry reflects the evidence available at that time and is superseded
+by the subsequent Human Owner report below; no prior failure is removed.
+
+| Run | Human Owner-reported outcome |
+| :--- | :--- |
+| R5 | **PASS** — Sibyl sidebar displayed after the Phase 5 fixes. |
+| R6 | **6/6 PASS** — OpenCode v2.2.5 TUI; Sibyl sidebar rendered; Akane Watchdog visible; MCP Timeout was 120,000 ms; Akane/Sibyl registered; `oc2-status` Connected. |
+
+R6 is recorded as **Visual Acceptance PASS** and **hands-on acceptance PASS**
+based on the Human Owner's report. This Git recording task did not independently
+re-run the R6 Sandbox acceptance.
+
+**Implementation verdict: `COMPLETE_WITH_LIMITATIONS`** — user-configurable OC2
+Runtime settings and the MCP execution Timeout are APM-driven; security and
+artifact-integrity constraints remain code-enforced. **R6 acceptance: `PASS`
+(6/6)** based on the Human Owner report.
+
+### Remaining risks and artifact note
+
+- Recovery Ping may still occur under the temporary 24-hour Stage 2 value; a
+  production value remains a Human Owner decision.
+- The reported basedpyright findings remain; they were not treated as new
+  Runtime failures or expanded into a separate cleanup task.
+- R5's running CLI was reported at `/opt/oc2/bin/opencode`, version v2.2.5,
+  executable and non-symlink, with two running OpenCode processes resolving to
+  the same inode. Its executable SHA-256 was
+  `8d060e1d2fbb9bb44cf09ae6ed1f3f6a7cff070b5227e2f90970132b23a92050`.
+  The code's `09f44302c10fd036912f59c81fd1aef5df45dd06f649197f9dfc9bbe2a79614e`
+  is the distribution archive hash, not an executable hash; these values are
+  not directly comparable. Independent executable-hash verification remains
+  open, and no Artifact was re-fetched for this task.
+
+No Credential, OAuth database, Sandbox runtime state, Artifact Identity, or
+Network Policy change is included in this record. The recorded R6 result does
+not imply that the implementation task performed model inference or Credential
+operations.

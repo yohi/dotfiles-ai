@@ -7,6 +7,9 @@ from enum import StrEnum
 from typing import Final, NotRequired, Protocol, TypedDict, TypeAlias, assert_never
 
 
+JsonValue: TypeAlias = str | int | float | bool | None | list['JsonValue'] | dict[str, 'JsonValue']
+
+
 class AgentName(StrEnum):
     HEPHAESTUS = 'hephaestus'
     ORACLE = 'oracle'
@@ -76,6 +79,8 @@ class NativePayload(TypedDict):
     agents: AgentMap
     plugins: PluginSelectionJSON
     mcp: McpSelectionJSON
+    allowed_models: list[str]
+    runtime: dict[str, JsonValue] | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -104,8 +109,15 @@ class AgentDefinition:
     permissions: tuple[Permission, ...]
 
 
-NATIVE_SCHEMA: Final[str] = 'dotfiles-ai/oc2-native/v2'
-NATIVE_MODEL: Final[str] = 'openai/gpt-6-luna'
+NATIVE_SCHEMA: Final[str] = 'dotfiles-ai/oc2-native/v3'
+RUNTIME_THEMES: Final[frozenset[str]] = frozenset({
+    'aura', 'ayu', 'carbonfox', 'catppuccin', 'catppuccin-frappe',
+    'catppuccin-macchiato', 'cobalt2', 'cursor', 'dracula', 'everforest',
+    'flexoki', 'github', 'gruvbox', 'kanagawa', 'lucent-orng', 'matrix',
+    'material', 'mercury', 'monokai', 'nightowl', 'nord', 'one-dark',
+    'opencode', 'orng', 'osaka-jade', 'palenight', 'rosepine', 'solarized',
+    'system', 'synthwave84', 'tokyonight', 'vercel', 'vesper', 'zenburn',
+})
 SUPERPOWERS_REPOSITORY: Final[str] = 'obra/superpowers'
 SUPERPOWERS_REF: Final[str] = 'v6.4.2'
 SUPERPOWERS_COMMIT: Final[str] = '8ca22dba9a94f28898bbce59f2537ff4d87c747d'
@@ -179,12 +191,12 @@ def _agent_definitions() -> dict[AgentName, AgentDefinition]:
     }
 
 
-def _agent_config(name: AgentName) -> AgentJSON:
+def _agent_config(name: AgentName, model: str) -> AgentJSON:
     definition = _agent_definitions()[name]
     mode = AgentMode.PRIMARY if name is AgentName.HEPHAESTUS else AgentMode.SUBAGENT
     return {
         'mode': mode.value,
-        'model': NATIVE_MODEL,
+        'model': model,
         'description': definition.description,
         'system': definition.system,
         'permissions': [permission.as_json() for permission in definition.permissions],
@@ -204,7 +216,7 @@ def build_native_payload(config: NativeConfigProtocol) -> NativePayload:
         raise ValueError('disabled Plugin/MCP selections must be empty')
     agents: AgentMap = {}
     for selection in config.agents:
-        value = _agent_config(selection.name)
+        value = _agent_config(selection.name, selection.model)
         match selection.name:
             case AgentName.HEPHAESTUS:
                 agents['hephaestus'] = value
@@ -212,6 +224,10 @@ def build_native_payload(config: NativeConfigProtocol) -> NativePayload:
                 agents['oracle'] = value
             case unreachable:
                 assert_never(unreachable)
+    allowed_models = sorted(config.allowed_models or {selection.model for selection in config.agents})
+    if any(selection.model not in allowed_models for selection in config.agents):
+        raise ValueError('Native Agent model is not allowlisted')
+    runtime = config.runtime
     payload: NativePayload = {
         'schema': NATIVE_SCHEMA,
         'source_sha256': config.source_sha256,
@@ -224,8 +240,10 @@ def build_native_payload(config: NativeConfigProtocol) -> NativePayload:
             'enabled': config.mcp.enabled,
             'servers': mcp_servers,
         },
+        'allowed_models': allowed_models,
+        'runtime': runtime.as_json() if runtime is not None else None,
     }
-    payload['agents'] = validate_agent_map(payload['agents'])
+    payload['agents'] = validate_agent_map(payload['agents'], allowed_models)
     return payload
 
 
@@ -242,19 +260,29 @@ class NativeConfigProtocol(Protocol):
     @property
     def mcp(self) -> McpSelection: ...
 
+    @property
+    def allowed_models(self) -> tuple[str, ...]: ...
 
-JsonValue: TypeAlias = str | int | float | bool | None | list['JsonValue'] | dict[str, 'JsonValue']
+    @property
+    def runtime(self) -> NativeRuntimeProtocol | None: ...
 
 
-def validate_agent_map(value: JsonValue | AgentMap) -> AgentMap:
+class NativeRuntimeProtocol(Protocol):
+    def as_json(self) -> dict[str, JsonValue]: ...
+
+
+def validate_agent_map(value: JsonValue | AgentMap, allowed_models: list[str]) -> AgentMap:
     if not isinstance(value, dict) or set(value) - {name.value for name in AgentName}:
         raise ValueError('unapproved Native Agent map')
     result: AgentMap = {}
     for raw_name in value:
         name = parse_agent_name(raw_name)
         raw_agent = value[raw_name]
-        expected = _agent_config(name)
-        if raw_agent != expected:
+        if not isinstance(raw_agent, dict):
+            raise ValueError('Native Agent configuration is not allowlisted')
+        model = raw_agent.get('model')
+        expected = _agent_config(name, model if isinstance(model, str) else '')
+        if raw_agent != expected or model not in allowed_models:
             raise ValueError('Native Agent configuration is not allowlisted')
         match name:
             case AgentName.HEPHAESTUS:
@@ -281,22 +309,81 @@ def validate_native_asset(raw: bytes) -> NativePayload:
     except (ValueError, UnicodeError) as exc:
         raise ValueError('invalid native Agent manifest') from exc
     if not isinstance(decoded, dict) or set(decoded) != {
-            'schema', 'source_sha256', 'agents', 'plugins', 'mcp'}:
+            'schema', 'source_sha256', 'agents', 'plugins', 'mcp', 'allowed_models', 'runtime'}:
         raise ValueError('invalid native Agent manifest fields')
     if decoded['schema'] != NATIVE_SCHEMA:
         raise ValueError('unexpected native Agent manifest schema')
     source_sha = decoded['source_sha256']
     if not isinstance(source_sha, str) or re.fullmatch(r'[0-9a-f]{64}', source_sha) is None:
         raise ValueError('invalid native Agent source SHA-256')
-    agents = validate_agent_map(decoded['agents'])
+    raw_allowed_models = decoded['allowed_models']
+    if not isinstance(raw_allowed_models, list):
+        raise ValueError('invalid Native Agent model allowlist')
+    allowed_models: list[str] = []
+    for model in raw_allowed_models:
+        if (not isinstance(model, str) or re.fullmatch(
+            r'(openai|cloudflare-ai-gateway-custom)/[A-Za-z0-9._/-]+', model,
+        ) is None):
+            raise ValueError('invalid Native Agent model allowlist')
+        allowed_models.append(model)
+    if len(allowed_models) != len(set(allowed_models)):
+        raise ValueError('invalid Native Agent model allowlist')
+    agents = validate_agent_map(decoded['agents'], allowed_models)
     plugins, mcp = validate_component_selection(decoded['plugins'], decoded['mcp'])
+    runtime = validate_runtime_options(decoded['runtime'])
     return NativePayload(
         schema=NATIVE_SCHEMA,
         source_sha256=source_sha,
         agents=agents,
         plugins=plugins,
         mcp=mcp,
+        allowed_models=allowed_models,
+        runtime=runtime,
     )
+
+
+def validate_runtime_options(value: JsonValue) -> dict[str, JsonValue] | None:
+    if value is None:
+        return None
+    if not isinstance(value, dict) or set(value) != {
+        'theme', 'mcpExecutionTimeoutMs', 'watchdog', 'sibylObserver',
+    }:
+        raise ValueError('invalid Runtime option fields')
+    theme = value['theme']
+    if not isinstance(theme, str) or theme not in RUNTIME_THEMES:
+        raise ValueError('invalid Runtime theme')
+    mcp_timeout = value['mcpExecutionTimeoutMs']
+    if type(mcp_timeout) is not int or not 1000 <= mcp_timeout <= 600000:
+        raise ValueError('MCP execution timeout violates safety bounds')
+    watchdog = value['watchdog']
+    if (not isinstance(watchdog, dict) or set(watchdog) != {
+        'enabled', 'stage1Ms', 'stage2Ms', 'maxPings', 'maxToolGateCycles',
+        'notifierType', 'notifyWaiting',
+    }):
+        raise ValueError('invalid Akane Runtime options')
+    if (watchdog['enabled'] is not True or type(watchdog['stage1Ms']) is not int
+            or not 1000 <= watchdog['stage1Ms'] <= 3600000
+            or type(watchdog['stage2Ms']) is not int or watchdog['stage2Ms'] < 86400000
+            or type(watchdog['maxPings']) is not int or watchdog['maxPings'] != 1
+            or type(watchdog['maxToolGateCycles']) is not int
+            or not 1 <= watchdog['maxToolGateCycles'] <= 8
+            or watchdog['notifierType'] != 'tmux'
+            or type(watchdog['notifyWaiting']) is not bool):
+        raise ValueError('Akane Runtime options violate safety bounds')
+    observer = value['sibylObserver']
+    if (not isinstance(observer, dict) or set(observer) != {
+        'enabled', 'maxVisibleSubagents', 'showModel', 'showProvider',
+        'showLatestText', 'showReasoningSummary',
+    }):
+        raise ValueError('invalid Sibyl Runtime options')
+    if (observer['enabled'] is not True
+            or type(observer['maxVisibleSubagents']) is not int
+            or not 1 <= observer['maxVisibleSubagents'] <= 16
+            or any(type(observer[key]) is not bool for key in (
+                'showModel', 'showProvider', 'showLatestText', 'showReasoningSummary',
+            ))):
+        raise ValueError('Sibyl Runtime options violate safety bounds')
+    return value
 
 
 def validate_component_selection(
