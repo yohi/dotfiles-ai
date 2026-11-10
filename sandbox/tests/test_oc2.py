@@ -23,8 +23,9 @@ if str(SCRIPTS) not in sys.path:
 
 def load(name: str):
     spec = importlib.util.spec_from_file_location(name, SCRIPTS / (name + '.py'))
+    if spec is None or spec.loader is None:
+        raise ImportError(f'could not load module: {name}')
     mod = importlib.util.module_from_spec(spec)
-    assert spec and spec.loader
     spec.loader.exec_module(mod)
     return mod
 
@@ -36,6 +37,7 @@ assets = load('oc2_assets')
 
 class FakeRunner:
     def __init__(self, rows=None, inspection=None):
+        self.user = oc2.getpass.getuser()
         self.rows = rows or []
         self.inspection = (
             {'name': 'oc2-dev', 'runtime_mounts': []}

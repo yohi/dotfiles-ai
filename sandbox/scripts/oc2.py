@@ -80,6 +80,7 @@ def _listed_sandbox(runner: Runner, name: str) -> None:
         listing = json.loads(runner.sbx('ls', '--format', 'json', capture=True))
     except (TypeError, ValueError) as exc:
         raise Stop('could not parse existing Sandbox identity') from exc
+    records: list[dict[str, object]] | None
     if isinstance(listing, list):
         records = listing
     elif isinstance(listing, dict):
