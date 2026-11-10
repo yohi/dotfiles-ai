@@ -36,12 +36,6 @@ ASSET_TARGETS = frozenset({
 })
 MAX_ASSETS = 512 * 1024
 
-CLI_CANDIDATES = (
-    '/home/agent/.local/opencode-v2/node_modules/.bin/opencode',
-    '/home/agent/.local/oc2-runtime/node_modules/.bin/opencode',
-)
-
-
 def fail(reason: str) -> None:
     raise ValueError(reason)
 
