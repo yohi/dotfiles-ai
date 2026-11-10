@@ -12,10 +12,15 @@ import os
 import pathlib
 import re
 import sys
+from typing import NoReturn
 
 VERSION = "2.1.4"
 BASE = pathlib.Path('/home/agent/workspace/oc2')
-FILES = ('opencode.jsonc', 'cli.json', 'export-manifest.json')
+SERVER_CONFIG = 'opencode.jsonc'
+CLIENT_CONFIG = 'cli.json'
+EXPORT_MANIFEST = 'export-manifest.json'
+THEME_FILE = 'theme.json'
+FILES = (SERVER_CONFIG, CLIENT_CONFIG, EXPORT_MANIFEST)
 ASSET_SCHEMA = 'dotfiles-ai/oc2-assets/v1'
 ASSET_TARGETS = frozenset({
     'config/opencode/AGENTS.md',
@@ -28,33 +33,30 @@ ASSET_TARGETS = frozenset({
     'config/opencode/commands/build-skill.md',
     'config/opencode/skills/agent-skill-architect/SKILL.md',
     'config/opencode/skills/config-modernizer/SKILL.md',
-    'theme.json',
+    THEME_FILE,
 })
 MAX_ASSETS = 512 * 1024
 
-CLI_CANDIDATES = (
-    '/home/agent/.local/opencode-v2/node_modules/.bin/opencode',
-    '/home/agent/.local/oc2-runtime/node_modules/.bin/opencode',
-)
-
-
-def fail(reason: str) -> None:
+def fail(reason: str) -> NoReturn:
+    """Stop processing the bundle with a validation error."""
     raise ValueError(reason)
 
 
 def regular(path: pathlib.Path, max_bytes: int = 1048576) -> bytes:
+    """Read a bounded regular file, rejecting links and oversized inputs."""
     if path.is_symlink() or not path.is_file() or path.stat().st_size > max_bytes:
         fail('non-regular or oversized file: ' + path.name)
     return path.read_bytes()
 
 
 def verify(bundle: pathlib.Path) -> str:
-    if bundle.is_symlink() or not bundle.is_dir() or set(x.name for x in bundle.iterdir()) != set(FILES):
+    """Verify bundle structure, artifact hashes, and allowed configuration."""
+    if bundle.is_symlink() or not bundle.is_dir() or {x.name for x in bundle.iterdir()} != set(FILES):
         fail('invalid bundle directory or members')
     data = {name: regular(bundle / name) for name in FILES}
-    manifest = json.loads(data['export-manifest.json'])
-    server = json.loads(data['opencode.jsonc'])
-    client = json.loads(data['cli.json'])
+    manifest = json.loads(data[EXPORT_MANIFEST])
+    server = json.loads(data[SERVER_CONFIG])
+    client = json.loads(data[CLIENT_CONFIG])
     if (manifest.get('schema') != 'dotfiles-ai/sandbox-export/v0'
             or manifest.get('generator') != 'v0.1'
             or manifest.get('opencode_version') != VERSION
@@ -67,12 +69,13 @@ def verify(bundle: pathlib.Path) -> str:
     if (not isinstance(server, dict) or server.get('plugins') != [] or server.get('mcp') != {}
             or server.get('shell') not in ('bash', 'sh', 'zsh') or type(server.get('snapshot')) is not bool):
         fail('unsafe server config')
-    if client != {'$schema': 'https://opencode.ai/v2/cli.json', 'plugins': []}:
+    if client != {'$schema': 'https://opencode.ai/v2/' + CLIENT_CONFIG, 'plugins': []}:
         fail('unsafe TUI config')
-    return hashlib.sha256(data['export-manifest.json']).hexdigest()
+    return hashlib.sha256(data[EXPORT_MANIFEST]).hexdigest()
 
 
 def runtime_path(manifest_sha: str, assets_sha: str | None = None) -> pathlib.Path:
+    """Derive the immutable runtime directory from verified content hashes."""
     if assets_sha:
         combined = hashlib.sha256(
             bytes.fromhex(manifest_sha) + bytes.fromhex(assets_sha)
@@ -82,6 +85,7 @@ def runtime_path(manifest_sha: str, assets_sha: str | None = None) -> pathlib.Pa
 
 
 def verify_assets(source: pathlib.Path, expected_sha: str) -> dict[str, bytes]:
+    """Verify selected assets and return their validated byte content."""
     validate_location(source, BASE)
     if re.fullmatch(r'[0-9a-f]{64}', expected_sha) is None:
         fail('invalid asset SHA')
@@ -90,17 +94,9 @@ def verify_assets(source: pathlib.Path, expected_sha: str) -> dict[str, bytes]:
         fail('host/guest asset SHA mismatch')
     try:
         payload = json.loads(raw)
-    except (ValueError, UnicodeError) as exc:
+    except ValueError as exc:
         raise ValueError('invalid asset JSON') from exc
-    if not isinstance(payload, dict) or set(payload) != {'schema', 'files', 'sha256'}:
-        fail('invalid asset manifest')
-    if payload.get('schema') != ASSET_SCHEMA:
-        fail('unexpected asset schema')
-    files = payload['files']
-    hashes = payload['sha256']
-    if (not isinstance(files, dict) or not isinstance(hashes, dict)
-            or set(files) != ASSET_TARGETS or set(hashes) != ASSET_TARGETS):
-        fail('asset path allowlist mismatch')
+    files, hashes = _asset_payload(payload)
     result: dict[str, bytes] = {}
     for name in sorted(ASSET_TARGETS):
         value = files[name]
@@ -110,18 +106,38 @@ def verify_assets(source: pathlib.Path, expected_sha: str) -> dict[str, bytes]:
         if len(encoded) > 65536 or hashlib.sha256(encoded).hexdigest() != hashes[name]:
             fail('asset content SHA mismatch')
         result[name] = encoded
+    _validate_theme(result[THEME_FILE])
+    # No third-party agent metadata or model routing is imported.
+    return result
+
+
+def _asset_payload(payload: dict[str, object]) -> tuple[dict[str, str], dict[str, str]]:
+    """Validate the asset manifest shape and its strict path allowlist."""
+    if not isinstance(payload, dict) or set(payload) != {'schema', 'files', 'sha256'}:
+        fail('invalid asset manifest')
+    if payload.get('schema') != ASSET_SCHEMA:
+        fail('unexpected asset schema')
+    files = payload['files']
+    hashes = payload['sha256']
+    if (not isinstance(files, dict) or not isinstance(hashes, dict)
+            or set(files) != ASSET_TARGETS or set(hashes) != ASSET_TARGETS):
+        fail('asset path allowlist mismatch')
+    return files, hashes
+
+
+def _validate_theme(data: bytes) -> None:
+    """Reject malformed or unapproved theme metadata."""
     try:
-        theme = json.loads(result['theme.json'])
+        theme = json.loads(data)
     except ValueError as exc:
         raise ValueError('invalid theme') from exc
     if (not isinstance(theme, dict) or set(theme) != {'name'}
             or not isinstance(theme['name'], str)
             or not re.fullmatch(r'[a-z0-9-]{1,40}', theme['name'])):
         fail('unsafe TUI theme')
-    # No third-party agent metadata or model routing is imported.
-    return result
 
 def validate_location(path: pathlib.Path, parent: pathlib.Path) -> None:
+    """Require a destination below the runtime root with no symlink parents."""
     if not path.is_relative_to(parent) or path == parent:
         fail('path outside oc2 sandbox area')
     cur = path
@@ -132,6 +148,7 @@ def validate_location(path: pathlib.Path, parent: pathlib.Path) -> None:
 
 
 def write_new(path: pathlib.Path, data: bytes, mode: int = 0o600) -> None:
+    """Create a new file exclusively with the requested restrictive mode."""
     fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, 'O_NOFOLLOW', 0), mode)
     with os.fdopen(fd, 'wb') as out:
         out.write(data)
@@ -143,58 +160,71 @@ def prepare(
     assets: dict[str, bytes] | None = None,
     assets_sha: str | None = None,
 ) -> pathlib.Path:
+    """Materialize verified configuration and assets into a new isolated runtime."""
     if (assets is None) != (assets_sha is None):
         fail('asset content/identity mismatch')
     dest = runtime_path(manifest_sha, assets_sha)
     validate_location(dest, BASE)
 
-    server = json.loads(regular(bundle / 'opencode.jsonc'))
-    client = json.loads(regular(bundle / 'cli.json'))
+    server = json.loads(regular(bundle / SERVER_CONFIG))
+    client = json.loads(regular(bundle / CLIENT_CONFIG))
     asset_files: dict[str, bytes] = {}
     if assets is not None:
         # Instructions are resolved inside the guest, not on the Host.
         rule_names = sorted(p for p in assets if p.startswith('config/opencode/rules/'))
         server['instructions'] = [str(dest / name) for name in rule_names]
-        client['theme'] = json.loads(assets['theme.json'])
+        client['theme'] = json.loads(assets[THEME_FILE])
         asset_files = {name: value for name, value in assets.items()
-                       if name != 'theme.json'}
+                       if name != THEME_FILE}
 
     def encoded(value: object) -> bytes:
+        """Serialize runtime configuration as canonical UTF-8 JSON."""
         return (json.dumps(value, ensure_ascii=False, sort_keys=True,
                            separators=(',', ':')) + '\n').encode('utf-8')
 
     expected = {
-        'config/opencode/opencode.jsonc': encoded(server),
-        'config/opencode/cli.json': encoded(client),
+        f'config/opencode/{SERVER_CONFIG}': encoded(server),
+        f'config/opencode/{CLIENT_CONFIG}': encoded(client),
         **asset_files,
     }
     receipt = {'manifest_sha256': manifest_sha, 'opencode_version': VERSION}
     if assets_sha is not None:
         receipt['assets_sha256'] = assets_sha
     marker = dest / 'receipt.json'
-    if dest.exists():
-        if not dest.is_dir() or dest.is_symlink() or not marker.is_file() or marker.is_symlink():
-            fail('incomplete or untrusted runtime directory; refusing overwrite')
-        if json.loads(regular(marker)) != receipt:
-            fail('runtime receipt mismatch')
-        for name, value in expected.items():
+    if not _verify_existing_runtime(dest, marker, receipt, expected):
+        (dest / 'config/opencode').mkdir(parents=True, mode=0o700)
+        for name in ('home', 'data', 'state', 'cache', 'tmp', 'project'):
+            (dest / name).mkdir(mode=0o700)
+        for name, data in expected.items():
             location = dest / name
-            validate_location(location, BASE)
-            if regular(location) != value:
-                fail('existing runtime asset mismatch')
-        return dest
-
-    (dest / 'config/opencode').mkdir(parents=True, mode=0o700)
-    for name in ('home', 'data', 'state', 'cache', 'tmp', 'project'):
-        (dest / name).mkdir(mode=0o700)
-    for name, data in expected.items():
-        location = dest / name
-        location.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-        write_new(location, data)
-    write_new(marker, encoded(receipt))
+            location.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+            write_new(location, data)
+        write_new(marker, encoded(receipt))
     return dest
 
+
+def _verify_existing_runtime(
+    dest: pathlib.Path,
+    marker: pathlib.Path,
+    receipt: dict[str, str],
+    expected: dict[str, bytes],
+) -> bool:
+    """Check whether an existing runtime exactly matches its receipt and assets."""
+    if not dest.exists():
+        return False
+    if not dest.is_dir() or dest.is_symlink() or not marker.is_file() or marker.is_symlink():
+        fail('incomplete or untrusted runtime directory; refusing overwrite')
+    if json.loads(regular(marker)) != receipt:
+        fail('runtime receipt mismatch')
+    for name, value in expected.items():
+        location = dest / name
+        validate_location(location, BASE)
+        if regular(location) != value:
+            fail('existing runtime asset mismatch')
+    return True
+
 def main(argv: list[str] | None = None) -> int:
+    """Validate staged bundle inputs and prepare the guest runtime."""
     p = argparse.ArgumentParser()
     p.add_argument('--bundle', type=pathlib.Path, required=True)
     p.add_argument('--expected-sha', required=True)
@@ -219,7 +249,7 @@ def main(argv: list[str] | None = None) -> int:
         print('OC2_RUNTIME_PREPARED: ' + str(runtime))
         print('OC2_RUNTIME_VERSION: ' + VERSION)
         return 0
-    except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError) as exc:
+    except (OSError, ValueError, KeyError, TypeError) as exc:
         print('OC2_GUEST_STOP: ' + str(exc), file=sys.stderr)
         return 1
 
