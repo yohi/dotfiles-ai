@@ -31,15 +31,27 @@ PINNED = (
 
 
 class Stop(Exception):
+    """Signal a safe, user-facing stop condition for the launcher."""
+
     pass
 
 
 class Runner:
-    def __init__(self, user: str, *, dry_run: bool = False):
+    """Run Docker Sandbox commands under the configured operator account."""
+
+    def __init__(self, user: str, *, dry_run: bool = False) -> None:
+        """Create an operator-bound Sandbox command runner."""
         self.user = user
         self.dry_run = dry_run
 
-    def sbx(self, *args: str, capture: bool = False, tty: bool = False) -> str:
+    def sbx(
+        self,
+        *args: str,
+        capture: bool = False,
+        tty: bool = False,
+        timeout: float = 180,
+    ) -> str:
+        """Run one sbx command, optionally capturing output or extending its timeout."""
         command = []
         if self.user != getpass.getuser():
             if not shutil.which('sudo'):
@@ -51,7 +63,7 @@ class Runner:
             return ''
         try:
             result = subprocess.run(command, check=False, text=True,
-                                    capture_output=capture, timeout=None if tty else 180)
+                                    capture_output=capture, timeout=None if tty else timeout)
         except (OSError, subprocess.TimeoutExpired) as exc:
             raise Stop('sbx command could not complete') from exc
         if result.returncode != 0:
@@ -63,6 +75,7 @@ class Runner:
 
 
 def is_compatible_sandbox(runner: Runner, name: str) -> bool:
+    """Return whether the named sandbox is a verified mountless shell sandbox."""
     # sbx ls --format json on v0.49.2 gives identity but does not report
     # workspace/mounts. Inspect the exact named sandbox before trusting it.
     raw = runner.sbx('ls', '-q', capture=True)
@@ -76,6 +89,7 @@ def is_compatible_sandbox(runner: Runner, name: str) -> bool:
 
 
 def _listed_sandbox(runner: Runner, name: str) -> None:
+    """Validate the named sandbox's identity and workspace mount metadata."""
     try:
         listing = json.loads(runner.sbx('ls', '--format', 'json', capture=True))
     except (TypeError, ValueError) as exc:
@@ -102,6 +116,7 @@ def _listed_sandbox(runner: Runner, name: str) -> None:
 
 
 def _verify_mountless_sandbox(runner: Runner, name: str) -> None:
+    """Reject a sandbox unless inspection proves it has no runtime mounts."""
     try:
         detail = json.loads(runner.sbx('inspect', name, '--json', capture=True))
     except (TypeError, ValueError) as exc:
@@ -134,13 +149,15 @@ def export_config(repo: pathlib.Path, out: pathlib.Path) -> tuple[pathlib.Path, 
     return out, digest
 
 
-def execute(runner: Runner, name: str, *args: str) -> None:
-    runner.sbx('exec', name, *args)
+def execute(runner: Runner, name: str, *args: str, timeout: float = 180) -> None:
+    """Execute a command in a sandbox using the selected timeout."""
+    runner.sbx('exec', name, *args, timeout=timeout)
 
 
 def stage(runner: Runner, name: str, bundle: pathlib.Path, manifest_sha: str,
           guest_script: pathlib.Path, assets_file: pathlib.Path | None = None,
           assets_sha: str | None = None) -> None:
+    """Stage and verify the selected configuration bundle and guest bootstrap."""
     destination = f'{ROOT}/bundles/{manifest_sha[:16]}'
     script_sha = hashlib.sha256(guest_script.read_bytes()).hexdigest()
     script_dest = f'{ROOT}/scripts/oc2_guest_{script_sha[:16]}.py'
@@ -191,6 +208,7 @@ def stage(runner: Runner, name: str, bundle: pathlib.Path, manifest_sha: str,
 
 
 def cli_path(runner: Runner, name: str) -> str | None:
+    """Find the approved pinned OpenCode executable in the named sandbox."""
     for candidate in PINNED:
         quoted = shlex.quote(candidate)
         result = runner.sbx('exec', name, 'bash', '-c',
@@ -241,11 +259,13 @@ def seed_cli(runner: Runner, name: str, source: str) -> str | None:
     local = pathlib.Path(staging) / 'node_modules'
     try:
         print('OC2: seeding pinned CLI from read-only PoC sandbox ' + source)
-        runner.sbx('cp', f'{source}:/home/agent/.local/opencode-v2/node_modules', str(local))
+        runner.sbx('cp', f'{source}:/home/agent/.local/opencode-v2/node_modules',
+                   str(local), timeout=900)
         runner.sbx('exec', name, 'bash', '-c',
                    'set -eu; mkdir -p /home/agent/.local/opencode-v2; '
                    'test ! -e /home/agent/.local/opencode-v2/node_modules')
-        runner.sbx('cp', str(local), f'{name}:/home/agent/.local/opencode-v2/node_modules')
+        runner.sbx('cp', str(local), f'{name}:/home/agent/.local/opencode-v2/node_modules',
+                   timeout=900)
         if cli_path(runner, name) != binary:
             raise Stop('seeded OpenCode CLI did not verify as v2.1.4')
         return binary
@@ -255,6 +275,7 @@ def seed_cli(runner: Runner, name: str, source: str) -> str | None:
 
 
 def provision_cli(runner: Runner, name: str, seed: str) -> str:
+    """Locate, seed, or install the pinned CLI within the sandbox."""
     found = cli_path(runner, name)
     if found:
         return found
@@ -267,7 +288,7 @@ def provision_cli(runner: Runner, name: str, seed: str) -> str:
             'set -eu; command -v npm >/dev/null; '
             'mkdir -p /home/agent/.local/oc2-runtime; '
             'npm install --prefix /home/agent/.local/oc2-runtime '
-            '--no-audit --no-fund --no-save @opencode/cli@2.1.4')
+            '--no-audit --no-fund --no-save @opencode/cli@2.1.4', timeout=900)
     found = cli_path(runner, name)
     if not found:
         raise Stop('installed CLI is not the pinned v2.1.4')
@@ -275,6 +296,7 @@ def provision_cli(runner: Runner, name: str, seed: str) -> str:
 
 
 def launch(runner: Runner, name: str, digest: str, cli: str) -> None:
+    """Launch the pinned OpenCode CLI with isolated runtime environment."""
     # Use sbx exec's native --workdir and direct argv instead of bash -c
     # positional parameters. The configured runtime is fully sandbox-local.
     if re.fullmatch(r'[0-9a-f]{64}', digest) is None:
@@ -304,6 +326,7 @@ def launch(runner: Runner, name: str, digest: str, cli: str) -> None:
     )
 
 def main(argv: list[str] | None = None) -> int:
+    """Prepare and optionally launch OpenCode in a mountless sandbox."""
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--repo-root', type=pathlib.Path, default=HERE.parents[1])
     p.add_argument('--sandbox', default='oc2-dev')

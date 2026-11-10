@@ -12,6 +12,7 @@ import os
 import pathlib
 import re
 import sys
+from typing import NoReturn
 
 VERSION = "2.1.4"
 BASE = pathlib.Path('/home/agent/workspace/oc2')
@@ -36,17 +37,20 @@ ASSET_TARGETS = frozenset({
 })
 MAX_ASSETS = 512 * 1024
 
-def fail(reason: str) -> None:
+def fail(reason: str) -> NoReturn:
+    """Stop processing the bundle with a validation error."""
     raise ValueError(reason)
 
 
 def regular(path: pathlib.Path, max_bytes: int = 1048576) -> bytes:
+    """Read a bounded regular file, rejecting links and oversized inputs."""
     if path.is_symlink() or not path.is_file() or path.stat().st_size > max_bytes:
         fail('non-regular or oversized file: ' + path.name)
     return path.read_bytes()
 
 
 def verify(bundle: pathlib.Path) -> str:
+    """Verify bundle structure, artifact hashes, and allowed configuration."""
     if bundle.is_symlink() or not bundle.is_dir() or {x.name for x in bundle.iterdir()} != set(FILES):
         fail('invalid bundle directory or members')
     data = {name: regular(bundle / name) for name in FILES}
@@ -71,6 +75,7 @@ def verify(bundle: pathlib.Path) -> str:
 
 
 def runtime_path(manifest_sha: str, assets_sha: str | None = None) -> pathlib.Path:
+    """Derive the immutable runtime directory from verified content hashes."""
     if assets_sha:
         combined = hashlib.sha256(
             bytes.fromhex(manifest_sha) + bytes.fromhex(assets_sha)
@@ -80,6 +85,7 @@ def runtime_path(manifest_sha: str, assets_sha: str | None = None) -> pathlib.Pa
 
 
 def verify_assets(source: pathlib.Path, expected_sha: str) -> dict[str, bytes]:
+    """Verify selected assets and return their validated byte content."""
     validate_location(source, BASE)
     if re.fullmatch(r'[0-9a-f]{64}', expected_sha) is None:
         fail('invalid asset SHA')
@@ -105,7 +111,8 @@ def verify_assets(source: pathlib.Path, expected_sha: str) -> dict[str, bytes]:
     return result
 
 
-def _asset_payload(payload: dict) -> tuple[dict, dict]:
+def _asset_payload(payload: dict[str, object]) -> tuple[dict[str, str], dict[str, str]]:
+    """Validate the asset manifest shape and its strict path allowlist."""
     if not isinstance(payload, dict) or set(payload) != {'schema', 'files', 'sha256'}:
         fail('invalid asset manifest')
     if payload.get('schema') != ASSET_SCHEMA:
@@ -119,6 +126,7 @@ def _asset_payload(payload: dict) -> tuple[dict, dict]:
 
 
 def _validate_theme(data: bytes) -> None:
+    """Reject malformed or unapproved theme metadata."""
     try:
         theme = json.loads(data)
     except ValueError as exc:
@@ -129,6 +137,7 @@ def _validate_theme(data: bytes) -> None:
         fail('unsafe TUI theme')
 
 def validate_location(path: pathlib.Path, parent: pathlib.Path) -> None:
+    """Require a destination below the runtime root with no symlink parents."""
     if not path.is_relative_to(parent) or path == parent:
         fail('path outside oc2 sandbox area')
     cur = path
@@ -139,6 +148,7 @@ def validate_location(path: pathlib.Path, parent: pathlib.Path) -> None:
 
 
 def write_new(path: pathlib.Path, data: bytes, mode: int = 0o600) -> None:
+    """Create a new file exclusively with the requested restrictive mode."""
     fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, 'O_NOFOLLOW', 0), mode)
     with os.fdopen(fd, 'wb') as out:
         out.write(data)
@@ -150,6 +160,7 @@ def prepare(
     assets: dict[str, bytes] | None = None,
     assets_sha: str | None = None,
 ) -> pathlib.Path:
+    """Materialize verified configuration and assets into a new isolated runtime."""
     if (assets is None) != (assets_sha is None):
         fail('asset content/identity mismatch')
     dest = runtime_path(manifest_sha, assets_sha)
@@ -167,6 +178,7 @@ def prepare(
                        if name != THEME_FILE}
 
     def encoded(value: object) -> bytes:
+        """Serialize runtime configuration as canonical UTF-8 JSON."""
         return (json.dumps(value, ensure_ascii=False, sort_keys=True,
                            separators=(',', ':')) + '\n').encode('utf-8')
 
@@ -194,9 +206,10 @@ def prepare(
 def _verify_existing_runtime(
     dest: pathlib.Path,
     marker: pathlib.Path,
-    receipt: dict,
+    receipt: dict[str, str],
     expected: dict[str, bytes],
 ) -> bool:
+    """Check whether an existing runtime exactly matches its receipt and assets."""
     if not dest.exists():
         return False
     if not dest.is_dir() or dest.is_symlink() or not marker.is_file() or marker.is_symlink():
@@ -211,6 +224,7 @@ def _verify_existing_runtime(
     return True
 
 def main(argv: list[str] | None = None) -> int:
+    """Validate staged bundle inputs and prepare the guest runtime."""
     p = argparse.ArgumentParser()
     p.add_argument('--bundle', type=pathlib.Path, required=True)
     p.add_argument('--expected-sha', required=True)

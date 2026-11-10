@@ -36,6 +36,7 @@ class AssetError(ValueError):
 
 
 def _regular_text(repo: Path, name: str) -> str:
+    """Read one allowlisted asset as bounded UTF-8 text."""
     # Every source name comes from the immutable allowlist, never user input.
     source = repo / name
     if source.is_symlink() or not source.is_file() or source.stat().st_size > MAX_FILE:
@@ -61,6 +62,7 @@ def _safe_command(text: str) -> str:
 
 
 def build(repo: Path) -> tuple[bytes, str]:
+    """Build the deterministic, hashed payload for the selected assets."""
     files: dict[str, str] = {}
     for source, target in SOURCE_TO_TARGET.items():
         data = _regular_text(repo, source)
@@ -93,6 +95,7 @@ def build(repo: Path) -> tuple[bytes, str]:
 
 
 def write_new(destination: Path, raw: bytes) -> None:
+    """Create a new asset file without following links or overwriting files."""
     if destination.exists() or destination.is_symlink():
         raise AssetError("asset destination already exists")
     fd = os.open(destination, os.O_CREAT | os.O_EXCL | os.O_WRONLY
