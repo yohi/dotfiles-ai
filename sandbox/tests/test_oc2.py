@@ -499,14 +499,31 @@ class HostTest(unittest.TestCase):
         with patch.object(oc2, 'is_compatible_sandbox', return_value=True), \
                 patch.object(oc2, 'cli_path', return_value=oc2.PINNED[0]), \
                 patch.object(oc2.subprocess, 'run', return_value=created) as run, \
-                patch.object(runner, 'sbx', return_value='opencode v2.2.5\n'):
-            self.assertEqual(oc2.seed_cli(runner, 'oc2-dev', 'oc2-source', pathlib.Path('/tmp')),
-                             oc2.PINNED[0])
+                patch.object(runner, 'sbx', return_value='opencode v2.2.5\n') as sbx:
+            self.assertEqual(
+                oc2.seed_cli(runner, 'oc2-dev', 'oc2-source'), oc2.PINNED[0],
+            )
 
         self.assertEqual(
             run.call_args_list[0].args[0],
             ['sudo', '-i', '-u', 'operator', '--', 'sh', '-c',
              'umask 077; mktemp -d "$HOME/.oc2-seed-XXXXXXXX"'],
+        )
+        copy_calls = [call.args for call in sbx.call_args_list if call.args[0] == 'cp']
+        self.assertIn(
+            ('exec', 'oc2-source', 'bash', '-c',
+             'if test -x /home/agent/.local/opencode-v2/node_modules/.bin/opencode; '
+             'then /home/agent/.local/opencode-v2/node_modules/.bin/opencode --version; fi'),
+            [call.args for call in sbx.call_args_list],
+        )
+        self.assertEqual(
+            copy_calls,
+            [
+                ('cp', 'oc2-source:/home/agent/.local/opencode-v2/node_modules',
+                 '/home/operator/.oc2-seed-12345678/node_modules'),
+                ('cp', '/home/operator/.oc2-seed-12345678/node_modules',
+                 'oc2-dev:/home/agent/.local/oc2-runtime/node_modules'),
+            ],
         )
 
     def test_stage_does_not_depend_on_bash_positional_arguments(self):

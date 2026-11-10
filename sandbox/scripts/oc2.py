@@ -344,7 +344,7 @@ def cli_path(runner: Runner, name: str) -> str | None:
     return None
 
 
-def seed_cli(runner: Runner, name: str, source: str, scratch: pathlib.Path) -> str | None:
+def seed_cli(runner: Runner, name: str, source: str) -> str | None:
     """Copy only a verified CLI package tree from a separate mountless PoC.
 
     This avoids changing network policy. Neither credentials nor XDG data are
@@ -355,7 +355,10 @@ def seed_cli(runner: Runner, name: str, source: str, scratch: pathlib.Path) -> s
     if not is_compatible_sandbox(runner, source):
         return None
     binary = PINNED[0]
-    quoted = shlex.quote(binary)
+    source_modules = '/home/agent/.local/opencode-v2/node_modules'
+    source_binary = source_modules + '/.bin/opencode'
+    target_modules = str(pathlib.PurePosixPath(binary).parent.parent)
+    quoted = shlex.quote(source_binary)
     version = runner.sbx('exec', source, 'bash', '-c',
                          f'if test -x {quoted}; then {quoted} --version; fi',
                          capture=True).strip()
@@ -379,11 +382,11 @@ def seed_cli(runner: Runner, name: str, source: str, scratch: pathlib.Path) -> s
     local = pathlib.Path(staging) / 'node_modules'
     try:
         print('OC2: seeding pinned CLI from read-only PoC sandbox ' + source)
-        runner.sbx('cp', f'{source}:/home/agent/.local/opencode-v2/node_modules', str(local))
+        runner.sbx('cp', f'{source}:{source_modules}', str(local))
         runner.sbx('exec', name, 'bash', '-c',
-                   'set -eu; mkdir -p /home/agent/.local/opencode-v2; '
-                   'test ! -e /home/agent/.local/opencode-v2/node_modules')
-        runner.sbx('cp', str(local), f'{name}:/home/agent/.local/opencode-v2/node_modules')
+                   f'set -eu; mkdir -p {shlex.quote(str(pathlib.PurePosixPath(target_modules).parent))}; '
+                   f'test ! -e {shlex.quote(target_modules)}')
+        runner.sbx('cp', str(local), f'{name}:{target_modules}')
         if cli_path(runner, name) != binary:
             raise Stop('seeded OpenCode CLI did not verify as v2.1.4')
         return binary
