@@ -4,6 +4,7 @@ No sbx, sudo, network, package installation, or OpenCode binary is invoked.
 """
 from __future__ import annotations
 
+import argparse
 import contextlib
 import hashlib
 import importlib.util
@@ -233,6 +234,44 @@ class HostTest(unittest.TestCase):
             ['/usr/bin/setfacl', '-m', 'u:sbx-poc:rwx', '--',
              '/tmp/oc2-collect-x'],
         )
+
+    def test_collection_staging_is_created_in_private_session_directory(self):
+        workspace_ops = load('oc2_workspace')
+        sessions = load('oc2_session')
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            workspace = root / 'workspace'
+            workspace.mkdir()
+            (workspace / 'main.py').write_text('print("safe")\n')
+            state_root = root / 'state'
+            manifest = workspace_ops.snapshot(workspace)
+            session = sessions.create(
+                state_root, 'oc2-dev', oc2.ROOT + '/projects/' + 'a' * 32, manifest,
+            )
+
+            class CollectionRunner:
+                def sbx(self, *args, **kwargs):
+                    if args[0] == 'cp':
+                        incoming = pathlib.Path(args[2])
+                        incoming.mkdir()
+                        (incoming / 'main.py').write_text('print("safe")\n')
+                    return ''
+
+            runner = CollectionRunner()
+            temporary_directory = tempfile.TemporaryDirectory
+            with patch.object(tempfile, 'TemporaryDirectory', wraps=temporary_directory) as temp_dir, \
+                    patch.object(oc2, 'Runner', return_value=runner), \
+                    patch.object(oc2, 'is_compatible_sandbox', return_value=True), \
+                    patch.object(oc2, 'grant_collection_directory_access'), \
+                    patch.object(oc2, 'grant_collected_workspace_access'), \
+                    patch.object(oc2, 'run_operator'):
+                result = oc2._session_action(
+                    argparse.Namespace(sandbox='oc2-dev', sbx_user='sbx-poc'),
+                    workspace, state_root, collect=True,
+                )
+
+        self.assertEqual(result, 0)
+        self.assertEqual(temp_dir.call_args.kwargs['dir'], session.directory)
 
     def test_collection_read_acl_grants_host_user_access_only_to_returned_tree(self):
         with patch.object(oc2.shutil, 'which', side_effect=['/usr/bin/setfacl', '/usr/bin/find']), \

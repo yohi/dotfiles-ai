@@ -469,7 +469,8 @@ def _session_action(args: argparse.Namespace, workspace: pathlib.Path,
         if collected.exists() or collected.is_symlink():
             raise Stop('collection destination already exists')
         try:
-            with tempfile.TemporaryDirectory(prefix='oc2-collect-', dir='/tmp') as temp:
+            with tempfile.TemporaryDirectory(
+                    prefix='oc2-collect-', dir=session.directory) as temp:
                 staging = pathlib.Path(temp)
                 incoming = staging / 'incoming'
                 grant_collection_directory_access(staging, args.sbx_user)
