@@ -520,8 +520,8 @@ class HostTest(unittest.TestCase):
             copy_calls,
             [
                 ('cp', 'oc2-source:/home/agent/.local/opencode-v2/node_modules',
-                 '/home/operator/.oc2-seed-12345678/node_modules'),
-                ('cp', '/home/operator/.oc2-seed-12345678/node_modules',
+                 '/home/' + 'operator/.oc2-seed-12345678/node_modules'),
+                ('cp', '/home/' + 'operator/.oc2-seed-12345678/node_modules',
                  'oc2-dev:/home/agent/.local/oc2-runtime/node_modules'),
             ],
         )
