@@ -53,7 +53,7 @@ class FakeRunner:
             {'name': 'oc2-dev', 'runtime_mounts': []}
             if inspection is None else inspection
         )
-        self.calls = []
+        self.calls: list[tuple[str, ...]] = []
 
     def sbx(self, *args: str, **kwargs: str | float | bool) -> str:
         self.calls.append(args)
@@ -182,7 +182,7 @@ class HostTest(unittest.TestCase):
 
             class StagingRunner:
                 def __init__(self) -> None:
-                    self.calls = []
+                    self.calls: list[tuple[str, ...]] = []
 
                 def sbx(self, *args: str, **kwargs: str | float | bool) -> str:
                     self.calls.append(args)
@@ -223,7 +223,7 @@ class HostTest(unittest.TestCase):
 
             class Runner:
                 def __init__(self) -> None:
-                    self.calls = []
+                    self.calls: list[tuple[str, ...]] = []
 
                 def sbx(self, *args: str, **kwargs: str | float | bool) -> str:
                     self.calls.append(args)
@@ -271,7 +271,7 @@ class HostTest(unittest.TestCase):
     def test_cli_version_probe_avoids_bash_positional_arguments(self) -> None:
         class VersionRunner:
             def __init__(self) -> None:
-                self.calls = []
+                self.calls: list[tuple[str, ...]] = []
 
             def sbx(self, *args: str, **kwargs: str | float | bool) -> str:
                 self.calls.append(args)
@@ -344,8 +344,8 @@ class GuestTest(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.base = pathlib.Path(self.tmp.name) / 'oc2'
         self.base.mkdir()
-        self.orig = guest.BASE
-        guest.BASE = self.base
+        self.orig = guest.__dict__['BASE']
+        guest.__dict__['BASE'] = self.base
         self.bundle = self.base / 'bundles' / 'bundle1'
         self.bundle.mkdir(parents=True)
         self.config = {'$schema': 'https://opencode.ai/config.json', 'shell': 'bash',
@@ -361,7 +361,7 @@ class GuestTest(unittest.TestCase):
         (self.bundle / 'export-manifest.json').write_text(json.dumps(self.manifest))
 
     def tearDown(self) -> None:
-        guest.BASE = self.orig
+        guest.__dict__['BASE'] = self.orig
         self.tmp.cleanup()
 
     def test_materialize_idempotently(self) -> None:
