@@ -414,19 +414,18 @@ def launch(runner: Runner, name: str, digest: str, cli: str,
         raise Stop('unapproved OpenCode executable path')
     runtime = f'{ROOT}/runtime/{digest[:16]}'
     workdir = project or f'{runtime}/project'
-    private_tmp = f'{runtime}/home' + '/tmp'
     workspace_path = pathlib.PurePosixPath(workdir)
     if not workspace_path.is_absolute() or '..' in workspace_path.parts:
         raise Stop('workspace path is not a safe absolute path')
     runner.sbx(
         'exec', name, 'mkdir', '-p', '-m', '700', runtime,
         *(f'{runtime}/{directory}'
-          for directory in ('home', 'home/tmp', 'config', 'data', 'state', 'cache')),
+          for directory in ('home', 'config', 'data', 'state', 'cache')),
     )
     runner.sbx(
         'exec', name, 'chmod', '700', runtime,
         *(f'{runtime}/{directory}'
-          for directory in ('home', 'home/tmp', 'config', 'data', 'state', 'cache')),
+          for directory in ('home', 'config', 'data', 'state', 'cache')),
     )
     runner.sbx(
         'exec', '-it', '-w', workdir, name,
@@ -441,7 +440,6 @@ def launch(runner: Runner, name: str, digest: str, cli: str,
         f'XDG_DATA_HOME={runtime}/data',
         f'XDG_STATE_HOME={runtime}/state',
         f'XDG_CACHE_HOME={runtime}/cache',
-        f'TMPDIR={private_tmp}',
         'OPENCODE_WATCHDOG_ENABLED=false',
         'OPENCODE_DISABLE_AUTOUPDATE=1',
         'OPENCODE_DISABLE_MODELS_FETCH=1',
