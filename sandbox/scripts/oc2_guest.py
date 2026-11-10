@@ -185,17 +185,15 @@ def prepare(
     if assets_sha is not None:
         receipt['assets_sha256'] = assets_sha
     marker = dest / 'receipt.json'
-    if _verify_existing_runtime(dest, marker, receipt, expected):
-        return dest
-
-    (dest / 'config/opencode').mkdir(parents=True, mode=0o700)
-    for name in ('home', 'data', 'state', 'cache', 'tmp', 'project'):
-        (dest / name).mkdir(mode=0o700)
-    for name, data in expected.items():
-        location = dest / name
-        location.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-        write_new(location, data)
-    write_new(marker, encoded(receipt))
+    if not _verify_existing_runtime(dest, marker, receipt, expected):
+        (dest / 'config/opencode').mkdir(parents=True, mode=0o700)
+        for name in ('home', 'data', 'state', 'cache', 'tmp', 'project'):
+            (dest / name).mkdir(mode=0o700)
+        for name, data in expected.items():
+            location = dest / name
+            location.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+            write_new(location, data)
+        write_new(marker, encoded(receipt))
     return dest
 
 

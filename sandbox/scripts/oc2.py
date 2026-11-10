@@ -294,7 +294,8 @@ def launch(runner: Runner, name: str, digest: str, cli: str) -> None:
         f'XDG_DATA_HOME={runtime}/data',
         f'XDG_STATE_HOME={runtime}/state',
         f'XDG_CACHE_HOME={runtime}/cache',
-        f'TMPDIR={runtime}/tmp',  # NOSONAR: guest creates this path mode 0700.
+        # The guest creates runtime/tmp as mode 0700 under its private runtime root.
+        f'TMPDIR={runtime}/tmp',  # NOSONAR
         'OPENCODE_WATCHDOG_ENABLED=false',
         'OPENCODE_DISABLE_AUTOUPDATE=1',
         'OPENCODE_DISABLE_MODELS_FETCH=1',
