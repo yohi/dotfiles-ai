@@ -466,6 +466,9 @@ class HostTest(unittest.TestCase):
         self.assertEqual(command[4:7], ('oc2-dev', 'env', '-i'))
         self.assertEqual(command[-2:], (oc2.PINNED[0], '--standalone'))
         self.assertIn('OPENCODE_WATCHDOG_ENABLED=false', command)
+        self.assertIn(
+            f'TMPDIR={oc2.ROOT}/runtime/aaaaaaaaaaaaaaaa/home' + '/tmp', command,
+        )
         self.assertNotIn('bash', command)
         self.assertNotIn('--mount', command)
 
@@ -479,13 +482,13 @@ class HostTest(unittest.TestCase):
             runner.calls[0],
             ('exec', 'oc2-dev', 'mkdir', '-p', '-m', '700',
              runtime, *(f'{runtime}/{name}' for name in
-                        ('home', 'config', 'data', 'state', 'cache', 'tmp'))),
+                        ('home', 'home/tmp', 'config', 'data', 'state', 'cache'))),
         )
         self.assertEqual(
             runner.calls[1],
             ('exec', 'oc2-dev', 'chmod', '700', runtime,
              *(f'{runtime}/{name}' for name in
-               ('home', 'config', 'data', 'state', 'cache', 'tmp'))),
+               ('home', 'home/tmp', 'config', 'data', 'state', 'cache'))),
         )
         self.assertEqual(runner.calls[2][3], project)
 
