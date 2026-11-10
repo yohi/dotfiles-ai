@@ -87,8 +87,10 @@ def check_path_leak(content: str, candidates: set[str], regex: re.Pattern) -> bo
     if regex.search(clean):
         return True
     for home in candidates:
-        placeholder = home.replace("\\", "/").rsplit("/", 1)[-1]
-        if placeholder in {"agent", "username", "user", "skillport"}:
+        normalized = home.replace("\\", "/").rstrip("/")
+        if normalized in {"/home/agent", "/home/username", "/home/user",
+                          "/home/skillport", "/Users/agent", "/Users/username",
+                          "/Users/user", "/Users/skillport"}:
             continue
         if re.search(re.escape(home) + r'([/\s"\'\\]|$)', clean):
             return True
@@ -157,6 +159,15 @@ class TestConfigIntegrity(unittest.TestCase):
             check_path_leak(
                 "/home/alice/workspace",
                 self.home_candidates,
+                self.HOME_REGEX,
+            )
+        )
+
+    def test_personal_home_with_placeholder_basename_is_not_ignored(self):
+        self.assertTrue(
+            check_path_leak(
+                "/tmp/agent/file",
+                {"/tmp/agent"},
                 self.HOME_REGEX,
             )
         )

@@ -15,13 +15,16 @@ import oc2  # noqa: E402
 
 
 class FakeSbx:
-    def __init__(self):
+    def __init__(self) -> None:
         self.created = False
         self.installed = False
         self.calls: list[tuple[str, ...]] = []
+        self.timeouts: list[int | None] = []
 
-    def sbx(self, *args: str, capture: bool = False, tty: bool = False) -> str:
+    def sbx(self, *args: str, capture: bool = False, tty: bool = False,
+            timeout: int | None = 180) -> str:
         self.calls.append(args)
+        self.timeouts.append(None if tty else timeout)
         if args == ('version',):
             return 'sbx version v0.49.2 test\n'
         if args == ('create', '--help'):
@@ -51,7 +54,7 @@ class FakeSbx:
 
 
 class LauncherFlowTests(unittest.TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
         self.root = pathlib.Path(self.temporary.name)
@@ -88,7 +91,7 @@ class LauncherFlowTests(unittest.TestCase):
             status = oc2.main(args)
         return status, output.getvalue()
 
-    def test_clone_mode_installs_and_launches_only_pinned_v2(self):
+    def test_clone_mode_installs_and_launches_only_pinned_v2(self) -> None:
         status, output = self._run()
         self.assertEqual(status, 0, output)
         create = next(call for call in self.fake.calls if call[0] == 'create' and '--clone' in call)
@@ -100,6 +103,7 @@ class LauncherFlowTests(unittest.TestCase):
             'exec', 'oc2-test', 'npm',
         ))
         self.assertEqual(install[-1], '@opencode/cli@2.2.5')
+        self.assertIn(900, self.fake.timeouts)
         launch = next(call for call in self.fake.calls if call[:2] == ('exec', '-it'))
         self.assertEqual(launch[3], '/home/agent/workspace/synthetic')
         self.assertIn('env', launch)
@@ -108,7 +112,7 @@ class LauncherFlowTests(unittest.TestCase):
         self.assertIn('opencode=v2.2.5', output)
         self.assertFalse(any('--collect' in call or '--apply' in call for call in self.fake.calls))
 
-    def test_clone_mode_refuses_env_file_before_creating_sandbox(self):
+    def test_clone_mode_refuses_env_file_before_creating_sandbox(self) -> None:
         (self.project / '.env').write_text('TOKEN=fixture-only')
         status, output = self._run()
         self.assertEqual(status, 1)
@@ -116,19 +120,29 @@ class LauncherFlowTests(unittest.TestCase):
         self.assertFalse(self.fake.created)
         self.assertFalse(any(call[0] == 'create' and '--clone' in call for call in self.fake.calls))
 
-    def test_clone_mode_refuses_project_opencode_configuration(self):
+    def test_clone_mode_refuses_project_opencode_configuration(self) -> None:
         (self.project / 'opencode.json').write_text('{"mcp":{}}\n')
         status, output = self._run()
         self.assertEqual(status, 1)
         self.assertIn('OpenCode project configuration', output)
         self.assertFalse(self.fake.created)
 
-    def test_existing_sandbox_is_not_reused_or_rebuilt(self):
+    def test_existing_sandbox_is_not_reused_or_rebuilt(self) -> None:
         self.fake.created = True
         status, output = self._run()
         self.assertEqual(status, 1)
         self.assertIn('refusing to reuse or rebuild', output)
         self.assertFalse(any(call[0] == 'create' and '--clone' in call for call in self.fake.calls))
+
+    def test_clone_mode_refuses_credentials_in_git_metadata_before_creation(self) -> None:
+        config = self.project / '.git' / 'config'
+        config.write_text(
+            '[remote "origin"]\nurl = https://user:password@example.invalid/repo.git\n',
+        )
+        status, output = self._run()
+        self.assertEqual(status, 1)
+        self.assertIn('Git metadata contains credential', output)
+        self.assertFalse(self.fake.created)
 
 
 if __name__ == '__main__':

@@ -14,15 +14,18 @@ oc2
 ~~~
 
 - `oc2 --dry-run`: Sandbox操作・ファイル書込みなしで計画を表示
-- `oc2 --prepare-only`: 設定・Sandbox・CLIを準備し、TUIは起動しない
-- `oc2 --sandbox oc2-dev`: Sandbox名を指定する（既定値はoc2-dev）
-- `oc2 --sbx-user sbx-poc`: sbx実行アカウントを指定
-- `oc2 --seed-sandbox oc-v2-poc`: OpenCode v2.1.4導入済みの既存mountless PoCを読み取り専用のseedに使う
-- `oc2 --seed-sandbox ""`: seedを使わない
+- `oc2 --workspace PATH`: Clone modeで使うGit Repositoryのパスを指定（既定値は現在のディレクトリ）
+- `oc2 --repo-root PATH`: dotfiles-aiのルートを指定（既定値はランチャー位置から解決）
+- `oc2 --sandbox NAME`: 新規Sandbox名を指定（既定値は`oc2-v2`）
+- `oc2 --version`: ランチャーと固定OpenCode CLIのバージョンを表示
+
+`--workspace` で指定したGit RepositoryをDocker SandboxesのClone modeでGuestへ公開し、Guest内のCloneを作業場所にします。
+`.git`、`.env`、Git除外ファイルも公開元に含まれるため、機密情報・除外ファイル・symlinkを検査し、
+認証情報や安全に読めないGitメタデータがある場合はSandbox作成前に停止します。
 
 ホスト側PythonにはPyYAMLが必要です（本リポジトリのpyproject.tomlで管理）。依存環境が未準備の場合は先に整備してください。
 
-Host実行ユーザーがsbx-pocと異なる場合はsudoを介してsbxを呼び出します。sudo権限・パスワード入力が必要になる場合があります。sudoersは変更しません。
+Host実行ユーザー自身の権限でsbxを呼び出します。sudoersは変更しません。
 
 ## 処理内容
 
@@ -78,7 +81,7 @@ python3 -m py_compile sandbox/scripts/oc2.py sandbox/scripts/oc2_guest.py
 - TUIを `sbx exec -it -w ... SANDBOX env -i ... opencode --standalone` で直接起動
 - argv形状のオフライン回帰テストを追加
 
-改修後に必要な確認は `python3 -m unittest discover -s sandbox/tests -p 'test_oc2.py' -v` と実機の `oc2 --prepare-only` です。既存のNetwork PolicyやSandboxを削除・初期化しません。オフラインテストと実機確認がPASSするまではワンコマンド構築完了と判定しません。
+改修後に必要な確認は `python3 -m unittest discover -s sandbox/tests -p 'test_oc2.py' -v` と `oc2 --dry-run` です。既存のNetwork PolicyやSandboxを削除・初期化しません。オフラインテストと実機確認がPASSするまではワンコマンド構築完了と判定しません。
 
 ## 2026-11-03 — v0.49.2 mountless再利用判定修正
 
@@ -91,7 +94,7 @@ Host Operatorの実測:
 
 これを受けて既存Sandbox再利用時の判定を`sbx inspect NAME --json`に変更しました。既存の一覧情報による名前・agentの確認も維持し、`runtime_mounts`が空配列のときだけ続行します。既存一覧に`workspace`情報があり、それがマウントを示す場合も拒否します。無条件でmountlessとみなす処理には変更していません。
 
-修正後の実機検証は未実施です。次に新しい修正HEADを一時worktreeへ取り込み、オフラインテスト・`oc2 --prepare-only`の順で実施してください。既存の`oc2-dev`は削除しないでください。
+修正後の実機検証は未実施です。次に新しい修正HEADを一時worktreeへ取り込み、オフラインテスト・`oc2 --dry-run`の順で実施してください。既存の`oc2-dev`は削除しないでください。
 
 ## 2026-11-03 — Settings Migration R1（実機適用前）
 
@@ -117,7 +120,7 @@ JSONに`files`とSHA-256を格納し、Host全体のSHA-256でも固定します
 python3 -m unittest discover -s sandbox/tests -p 'test_oc2.py' -v
 python3 -m py_compile sandbox/scripts/oc2.py sandbox/scripts/oc2_guest.py sandbox/scripts/oc2_assets.py
 ./bin/oc2 --dry-run
-./bin/oc2 --prepare-only
+./bin/oc2
 ```
 
 `OC2_ASSETS_VERIFIED`と`OC2_PREPARED`を確認してから`./bin/oc2`でTUIを起動してください。この段階でモデル推論や外部サービスへの接続は行いません。修正対象はfeatureブランチだけで、Host OpenCode v1や`oc-v2-poc`の既存設定は変更しません。
@@ -146,6 +149,5 @@ python3 -m py_compile sandbox/scripts/oc2.py sandbox/scripts/oc2_assets.py \
 ./bin/oc2 --dry-run
 ~~~
 
-その後、Human Operatorが隔離されたHostで`./bin/oc2 --prepare-only`、
-OpenCode V2.1.4の`debug config`と`debug agents`を実測する。
+その後、Human Operatorが隔離されたHostで`./bin/oc2 --dry-run`と通常起動を確認する。
 CLIによる実機PASS、Cloud LLM通信、完全な新規Sandbox一発構築は未確認。

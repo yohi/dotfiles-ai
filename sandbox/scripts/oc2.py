@@ -61,14 +61,16 @@ class Runner:
         self.user = user
         self.dry_run = dry_run
 
-    def sbx(self, *args: str, capture: bool = False, tty: bool = False) -> str:
+    def sbx(self, *args: str, capture: bool = False, tty: bool = False,
+            timeout: int | None = 180) -> str:
+        """Run an sbx command with an optional subprocess timeout."""
         command = operator_command(self.user, 'sbx', *args)
         if self.dry_run:
             print('PLAN: ' + ' '.join(command[:5]) + ' [...]')
             return ''
         try:
             result = subprocess.run(command, check=False, text=True,
-                                    capture_output=capture, timeout=None if tty else 180)
+                                    capture_output=capture, timeout=None if tty else timeout)
         except (OSError, subprocess.TimeoutExpired) as exc:
             raise Stop('sbx command could not complete') from exc
         if result.returncode != 0:
@@ -105,6 +107,31 @@ def validate_clone_workspace(workspace: pathlib.Path) -> None:
         )
     if exposed != checked:
         raise Stop('clone mode would expose files excluded from the safe workspace scan')
+    git_metadata = workspace / '.git'
+    if git_metadata.is_symlink() or not git_metadata.is_dir():
+        raise Stop('Clone mode requires a real .git directory')
+
+    def fail_walk(error: OSError) -> None:
+        """Fail closed when the Git metadata traversal is incomplete."""
+        raise Stop('Git metadata cannot be safely inspected') from error
+
+    for current, directories, filenames in os.walk(
+            git_metadata, followlinks=False, onerror=fail_walk):
+        current_path = pathlib.Path(current)
+        for name in directories:
+            if (current_path / name).is_symlink():
+                raise Stop('Git metadata contains an unsafe symlink')
+        for name in filenames:
+            candidate = current_path / name
+            if candidate.is_symlink():
+                raise Stop('Git metadata contains an unsafe symlink')
+            try:
+                content = oc2_workspace._read_regular(candidate)
+            except oc2_workspace.WorkspaceError as exc:
+                raise Stop('Git metadata cannot be safely inspected') from exc
+            if (oc2_workspace._contains_credential(content)
+                    or re.search(rb'\b[^/@\s:]+:[^/@\s]+@', content)):
+                raise Stop('Git metadata contains credential material')
 
 
 def is_compatible_sandbox(runner: Runner, name: str) -> bool:
@@ -400,7 +427,7 @@ def provision_cli(runner: Runner, name: str) -> str:
     if found:
         return found
     print(f'OC2: installing @opencode/cli@{VERSION} inside the new Sandbox.')
-    runner.sbx(*install_cli_args(name))
+    runner.sbx(*install_cli_args(name), timeout=900)
     found = cli_path(runner, name)
     if not found:
         raise Stop(f'installed CLI is not the pinned v{VERSION}')
