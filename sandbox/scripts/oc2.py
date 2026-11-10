@@ -18,7 +18,6 @@ import shlex
 import shutil
 import subprocess
 import sys
-import tempfile
 
 HERE = pathlib.Path(__file__).resolve().parent
 VERSION = '2.2.5'
@@ -468,26 +467,28 @@ def _session_action(args: argparse.Namespace, workspace: pathlib.Path,
         collected = session.directory / 'collected'
         if collected.exists() or collected.is_symlink():
             raise Stop('collection destination already exists')
+        staging = session.directory / 'collecting'
+        staging.mkdir(mode=0o700)
         try:
-            with tempfile.TemporaryDirectory(
-                    prefix='oc2-collect-', dir=session.directory) as temp:
-                staging = pathlib.Path(temp)
-                incoming = staging / 'incoming'
-                grant_collection_directory_access(staging, args.sbx_user)
-                try:
-                    runner.sbx('cp', f'{session.sandbox}:{session.remote}', str(incoming))
-                    grant_collected_workspace_access(
-                        incoming, args.sbx_user, getpass.getuser(),
-                    )
-                    candidate = workspaces.snapshot(incoming)
-                    workspaces.materialize(incoming, collected, candidate)
-                finally:
-                    if incoming.exists() or incoming.is_symlink():
-                        run_operator(args.sbx_user, 'rm', '-rf', '--', str(incoming))
+            incoming = staging / 'incoming'
+            grant_collection_directory_access(staging, args.sbx_user)
+            try:
+                runner.sbx('cp', f'{session.sandbox}:{session.remote}', str(incoming))
+                grant_collected_workspace_access(
+                    incoming, args.sbx_user, getpass.getuser(),
+                )
+                candidate = workspaces.snapshot(incoming)
+                workspaces.materialize(incoming, collected, candidate)
+            finally:
+                if incoming.exists() or incoming.is_symlink():
+                    run_operator(args.sbx_user, 'rm', '-rf', '--', str(incoming))
         except BaseException:
             if collected.exists() and not collected.is_symlink():
                 shutil.rmtree(collected, ignore_errors=True)
             raise
+        finally:
+            if staging.exists() and not staging.is_symlink():
+                shutil.rmtree(staging)
         before = {item.path: item for item in session.manifest.files}
         after = {item.path: item for item in candidate.files}
         for relative in sorted(before.keys() | after.keys()):

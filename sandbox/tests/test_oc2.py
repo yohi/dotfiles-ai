@@ -258,11 +258,9 @@ class HostTest(unittest.TestCase):
                     return ''
 
             runner = CollectionRunner()
-            temporary_directory = tempfile.TemporaryDirectory
-            with patch.object(tempfile, 'TemporaryDirectory', wraps=temporary_directory) as temp_dir, \
-                    patch.object(oc2, 'Runner', return_value=runner), \
+            with patch.object(oc2, 'Runner', return_value=runner), \
                     patch.object(oc2, 'is_compatible_sandbox', return_value=True), \
-                    patch.object(oc2, 'grant_collection_directory_access'), \
+                    patch.object(oc2, 'grant_collection_directory_access') as grant_directory, \
                     patch.object(oc2, 'grant_collected_workspace_access'), \
                     patch.object(oc2, 'run_operator'):
                 result = oc2._session_action(
@@ -271,7 +269,8 @@ class HostTest(unittest.TestCase):
                 )
 
         self.assertEqual(result, 0)
-        self.assertEqual(temp_dir.call_args.kwargs['dir'], session.directory)
+        staging = grant_directory.call_args.args[0]
+        self.assertEqual(staging.parent, session.directory)
 
     def test_collection_read_acl_grants_host_user_access_only_to_returned_tree(self):
         with patch.object(oc2.shutil, 'which', side_effect=['/usr/bin/setfacl', '/usr/bin/find']), \
