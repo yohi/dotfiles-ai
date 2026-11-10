@@ -6,7 +6,6 @@ import pathlib
 import shutil
 
 from oc2_workspace import (
-    FileEntry,
     Manifest,
     WorkspaceError,
     _by_path,
@@ -34,7 +33,7 @@ def materialize(source: pathlib.Path, destination: pathlib.Path, manifest: Manif
             if len(data) != entry.size or hashlib.sha256(data).hexdigest() != entry.sha256:
                 raise WorkspaceError('workspace changed while snapshot was copied')
             target = destination.joinpath(*relative.split('/'))
-            _ = target.parent.mkdir(mode=directory_mode, parents=True, exist_ok=True)
+            target.parent.mkdir(mode=directory_mode, parents=True, exist_ok=True)
             descriptor = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL |
                                   getattr(os, 'O_NOFOLLOW', 0), file_mode)
             with os.fdopen(descriptor, 'wb') as stream:
@@ -86,7 +85,7 @@ def apply_changes(host: pathlib.Path, guest: pathlib.Path, baseline: Manifest,
         if relative not in after:
             target.unlink(missing_ok=True)
             continue
-        _ = target.parent.mkdir(parents=True, exist_ok=True)
+        target.parent.mkdir(parents=True, exist_ok=True)
         data = _read_regular(source)
         entry = after[relative]
         if len(data) != entry.size or hashlib.sha256(data).hexdigest() != entry.sha256:

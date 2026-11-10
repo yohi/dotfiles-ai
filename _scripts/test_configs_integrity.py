@@ -87,7 +87,10 @@ def check_path_leak(content: str, candidates: set[str], regex: re.Pattern) -> bo
     if regex.search(clean):
         return True
     for home in candidates:
-        if re.search(re.escape(home) + r'([/\s"\'\\]|$)', content):
+        placeholder = home.replace("\\", "/").rsplit("/", 1)[-1]
+        if placeholder in {"agent", "username", "user", "skillport"}:
+            continue
+        if re.search(re.escape(home) + r'([/\s"\'\\]|$)', clean):
             return True
     return False
 
@@ -136,6 +139,15 @@ class TestConfigIntegrity(unittest.TestCase):
             check_path_leak(
                 "/home/agent/workspace/runtime",
                 self.home_candidates,
+                self.HOME_REGEX,
+            )
+        )
+
+    def test_placeholder_home_is_not_a_personal_path(self):
+        self.assertFalse(
+            check_path_leak(
+                "/home/agent/.local/oc2-runtime",
+                {"/home/agent"},
                 self.HOME_REGEX,
             )
         )

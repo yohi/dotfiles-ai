@@ -122,6 +122,7 @@ def is_compatible_sandbox(runner: Runner, name: str) -> bool:
         listing = json.loads(runner.sbx('ls', '--format', 'json', capture=True))
     except (TypeError, ValueError) as exc:
         raise Stop('could not parse existing Sandbox identity') from exc
+    records: list[object] | None
     if isinstance(listing, list):
         records = listing
     elif isinstance(listing, dict):
@@ -367,12 +368,14 @@ def seed_cli(runner: Runner, name: str, source: str, scratch: pathlib.Path) -> s
     operator = ([] if runner.user == getpass.getuser()
                 else ['sudo', '-i', '-u', runner.user, '--'])
     try:
-        created = subprocess.run([*operator, 'mktemp', '-d', '/tmp/oc2-seed-XXXXXXXX'],
-                                 capture_output=True, text=True, timeout=15, check=True)
+        created = subprocess.run(
+            [*operator, 'sh', '-c', 'umask 077; mktemp -d "$HOME/.oc2-seed-XXXXXXXX"'],
+            capture_output=True, text=True, timeout=15, check=True,
+        )
     except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
         raise Stop('could not create private Sandbox operator staging directory') from exc
     staging = created.stdout.strip()
-    if re.fullmatch(r'/tmp/oc2-seed-[A-Za-z0-9]{8}', staging) is None:
+    if re.fullmatch(r'/(?:[^/]+/)+\.oc2-seed-[A-Za-z0-9]{8}', staging) is None:
         raise Stop('unsafe seed staging path')
     local = pathlib.Path(staging) / 'node_modules'
     try:
@@ -417,6 +420,11 @@ def launch(runner: Runner, name: str, digest: str, cli: str,
         raise Stop('workspace path is not a safe absolute path')
     runner.sbx(
         'exec', name, 'mkdir', '-p', '-m', '700', runtime,
+        *(f'{runtime}/{directory}'
+          for directory in ('home', 'config', 'data', 'state', 'cache', 'tmp')),
+    )
+    runner.sbx(
+        'exec', name, 'chmod', '700', runtime,
         *(f'{runtime}/{directory}'
           for directory in ('home', 'config', 'data', 'state', 'cache', 'tmp')),
     )

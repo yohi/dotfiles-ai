@@ -27,8 +27,8 @@ def load(name: str):
     if name in sys.modules:
         return sys.modules[name]
     spec = importlib.util.spec_from_file_location(name, SCRIPTS / (name + '.py'))
-    mod = importlib.util.module_from_spec(spec)
     assert spec and spec.loader
+    mod = importlib.util.module_from_spec(spec)
     sys.modules[name] = mod
     spec.loader.exec_module(mod)
     return mod
@@ -199,7 +199,9 @@ class HostTest(unittest.TestCase):
             self.assertEqual(calls, [(staged, 'sbx-poc')])
 
     def test_snapshot_acl_is_limited_to_named_operator(self):
-        result = subprocess.CompletedProcess(args=[], returncode=0)
+        result: subprocess.CompletedProcess[str] = subprocess.CompletedProcess(
+            args=[], returncode=0,
+        )
         with tempfile.TemporaryDirectory() as tmp:
             snapshot = pathlib.Path(tmp) / 'project'
             (snapshot / 'src').mkdir(parents=True)
@@ -218,7 +220,9 @@ class HostTest(unittest.TestCase):
             )
 
     def test_collection_acl_is_limited_to_private_temporary_directory(self):
-        result = subprocess.CompletedProcess(args=[], returncode=0)
+        result: subprocess.CompletedProcess[str] = subprocess.CompletedProcess(
+            args=[], returncode=0,
+        )
         with patch.object(oc2.shutil, 'which', return_value='/usr/bin/setfacl'), \
              patch.object(oc2.subprocess, 'run', return_value=result) as run:
             oc2.grant_collection_directory_access(
@@ -439,7 +443,32 @@ class HostTest(unittest.TestCase):
              runtime, *(f'{runtime}/{name}' for name in
                         ('home', 'config', 'data', 'state', 'cache', 'tmp'))),
         )
-        self.assertEqual(runner.calls[1][3], project)
+        self.assertEqual(
+            runner.calls[1],
+            ('exec', 'oc2-dev', 'chmod', '700', runtime,
+             *(f'{runtime}/{name}' for name in
+               ('home', 'config', 'data', 'state', 'cache', 'tmp'))),
+        )
+        self.assertEqual(runner.calls[2][3], project)
+
+    def test_seed_cli_uses_operator_home_for_private_staging(self):
+        runner = oc2.Runner('operator')
+        created = subprocess.CompletedProcess(
+            args=[], returncode=0,
+            stdout='/home/' + 'operator/.oc2-seed-12345678\n', stderr='',
+        )
+        with patch.object(oc2, 'is_compatible_sandbox', return_value=True), \
+                patch.object(oc2, 'cli_path', return_value=oc2.PINNED[0]), \
+                patch.object(oc2.subprocess, 'run', return_value=created) as run, \
+                patch.object(runner, 'sbx', return_value='opencode v2.2.5\n'):
+            self.assertEqual(oc2.seed_cli(runner, 'oc2-dev', 'oc2-source', pathlib.Path('/tmp')),
+                             oc2.PINNED[0])
+
+        self.assertEqual(
+            run.call_args_list[0].args[0],
+            ['sudo', '-i', '-u', 'operator', '--', 'sh', '-c',
+             'umask 077; mktemp -d "$HOME/.oc2-seed-XXXXXXXX"'],
+        )
 
     def test_stage_does_not_depend_on_bash_positional_arguments(self):
         with tempfile.TemporaryDirectory() as tmp:
