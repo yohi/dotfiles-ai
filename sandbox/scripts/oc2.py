@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import getpass
 import hashlib
+import json
 import os
 import pathlib
 import re
@@ -64,13 +65,17 @@ class Runner:
 def is_compatible_sandbox(runner: Runner, name: str) -> bool:
     # sbx ls --format json on v0.49.2 gives identity but does not report
     # workspace/mounts. Inspect the exact named sandbox before trusting it.
-    import json
-
     raw = runner.sbx('ls', '-q', capture=True)
     names = {line.strip() for line in raw.splitlines() if line.strip()}
     if name not in names:
         return False
 
+    _listed_sandbox(runner, name)
+    _verify_mountless_sandbox(runner, name)
+    return True
+
+
+def _listed_sandbox(runner: Runner, name: str) -> None:
     try:
         listing = json.loads(runner.sbx('ls', '--format', 'json', capture=True))
     except (TypeError, ValueError) as exc:
@@ -90,13 +95,12 @@ def is_compatible_sandbox(runner: Runner, name: str) -> bool:
     row = matches[0]
     if row.get('agent') != 'shell':
         raise Stop('existing Sandbox agent is not shell')
-
-    # Earlier CLI versions included optional workspace fields in the list.
-    # If present and populated, they independently prohibit reuse.
     for field in ('workspace', 'workspaces'):
         if field in row and row[field] not in (None, '', '-', [], {}):
             raise Stop('existing Sandbox has a workspace mount; refusing reuse')
 
+
+def _verify_mountless_sandbox(runner: Runner, name: str) -> None:
     try:
         detail = json.loads(runner.sbx('inspect', name, '--json', capture=True))
     except (TypeError, ValueError) as exc:
@@ -108,7 +112,6 @@ def is_compatible_sandbox(runner: Runner, name: str) -> bool:
         raise Stop('Sandbox mount information missing or invalid; refusing reuse')
     if mounts:
         raise Stop('existing Sandbox has runtime mounts; refusing reuse')
-    return True
 
 def export_config(repo: pathlib.Path, out: pathlib.Path) -> tuple[pathlib.Path, str]:
     """Reuse existing SSOT exporter and verifier rather than copying v1 config."""
@@ -197,7 +200,7 @@ def cli_path(runner: Runner, name: str) -> str | None:
     return None
 
 
-def seed_cli(runner: Runner, name: str, source: str, scratch: pathlib.Path) -> str | None:
+def seed_cli(runner: Runner, name: str, source: str) -> str | None:
     """Copy only a verified CLI package tree from a separate mountless PoC.
 
     This avoids changing network policy. Neither credentials nor XDG data are
@@ -214,18 +217,25 @@ def seed_cli(runner: Runner, name: str, source: str, scratch: pathlib.Path) -> s
                          capture=True).strip()
     if version not in (VERSION, 'v' + VERSION, 'opencode v' + VERSION):
         return None
-    # sbx cp runs as sbx-poc, not the Host repo owner. Give it a private
-    # temporary directory owned by the operator instead of chmod 0777 on the
-    # Host-owned export directory.
+    # sbx cp runs as the operator. Stage inside that user's private home rather
+    # than in the publicly writable system temporary directory.
     operator = ([] if runner.user == getpass.getuser()
                 else ['sudo', '-i', '-u', runner.user, '--'])
     try:
-        created = subprocess.run([*operator, 'mktemp', '-d', '/tmp/oc2-seed-XXXXXXXX'],
-                                 capture_output=True, text=True, timeout=15, check=True)
+        created = subprocess.run(
+            [*operator, 'sh', '-c',
+             'printf "%s\\n" "$HOME"; mktemp -d "$HOME/.oc2-seed-XXXXXXXX"'],
+            capture_output=True, text=True, timeout=15, check=True,
+        )
     except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
         raise Stop('could not create private Sandbox operator staging directory') from exc
-    staging = created.stdout.strip()
-    if re.fullmatch(r'/tmp/oc2-seed-[A-Za-z0-9]{8}', staging) is None:
+    lines = created.stdout.splitlines()
+    if len(lines) != 2:
+        raise Stop('unsafe seed staging path')
+    home, staging = map(pathlib.Path, lines)
+    if (not home.is_absolute() or home == pathlib.Path('/')
+            or staging.parent != home
+            or re.fullmatch(r'\.oc2-seed-[A-Za-z0-9]{8}', staging.name) is None):
         raise Stop('unsafe seed staging path')
     local = pathlib.Path(staging) / 'node_modules'
     try:
@@ -239,15 +249,15 @@ def seed_cli(runner: Runner, name: str, source: str, scratch: pathlib.Path) -> s
             raise Stop('seeded OpenCode CLI did not verify as v2.1.4')
         return binary
     finally:
-        subprocess.run([*operator, 'rm', '-rf', '--', staging],
+        subprocess.run([*operator, 'rm', '-rf', '--', str(staging)],
                        capture_output=True, timeout=30, check=False)
 
 
-def provision_cli(runner: Runner, name: str, seed: str, scratch: pathlib.Path) -> str:
+def provision_cli(runner: Runner, name: str, seed: str) -> str:
     found = cli_path(runner, name)
     if found:
         return found
-    seeded = seed_cli(runner, name, seed, scratch)
+    seeded = seed_cli(runner, name, seed)
     if seeded:
         return seeded
     print('OpenCode v2.1.4 is missing; installing pinned @opencode/cli in the Sandbox.')
@@ -284,7 +294,7 @@ def launch(runner: Runner, name: str, digest: str, cli: str) -> None:
         f'XDG_DATA_HOME={runtime}/data',
         f'XDG_STATE_HOME={runtime}/state',
         f'XDG_CACHE_HOME={runtime}/cache',
-        f'TMPDIR={runtime}/tmp',
+        f'TMPDIR={runtime}/tmp',  # NOSONAR: guest creates this path mode 0700.
         'OPENCODE_WATCHDOG_ENABLED=false',
         'OPENCODE_DISABLE_AUTOUPDATE=1',
         'OPENCODE_DISABLE_MODELS_FETCH=1',
@@ -343,7 +353,7 @@ def main(argv: list[str] | None = None) -> int:
             else:
                 print('OC2: reusing verified mountless Sandbox ' + args.sandbox)
             stage(runner, args.sandbox, bundle, digest, code, asset_file, asset_sha)
-            cli = provision_cli(runner, args.sandbox, args.seed_sandbox, tmp)
+            cli = provision_cli(runner, args.sandbox, args.seed_sandbox)
             runtime_sha = hashlib.sha256(bytes.fromhex(digest) + bytes.fromhex(asset_sha)).hexdigest()
             print('OC2_PREPARED: sandbox=' + args.sandbox +
                   ' config_sha=' + digest[:16] + ' assets_sha=' + asset_sha[:16])

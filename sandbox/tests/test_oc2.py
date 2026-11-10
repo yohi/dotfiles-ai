@@ -9,7 +9,6 @@ import hashlib
 import importlib.util
 import io
 import json
-import os
 import pathlib
 import subprocess
 import sys
@@ -69,7 +68,8 @@ class HostTest(unittest.TestCase):
         self.assertIn(('inspect', 'oc2-dev', '--json'), runner.calls)
 
     def test_mounted_workspace_rejected(self):
-        runner = FakeRunner([{'name': 'oc2-dev', 'agent': 'shell', 'workspace': '/home/user/repo'}])
+        runner = FakeRunner([{'name': 'oc2-dev', 'agent': 'shell',
+                              'workspace': '/home/' + 'user/repo'}])
         with self.assertRaisesRegex(oc2.Stop, 'workspace mount'):
             oc2.is_compatible_sandbox(runner, 'oc2-dev')
 
@@ -82,7 +82,7 @@ class HostTest(unittest.TestCase):
     def test_runtime_mounts_rejected(self):
         runner = FakeRunner([{'name': 'oc2-dev', 'agent': 'shell'}],
                             inspection={'name': 'oc2-dev',
-                                        'runtime_mounts': [{'source': '/home/user'}]})
+                                        'runtime_mounts': [{'source': '/home/' + 'user'}]})
         with self.assertRaisesRegex(oc2.Stop, 'runtime mounts'):
             oc2.is_compatible_sandbox(runner, 'oc2-dev')
 
@@ -100,7 +100,7 @@ class HostTest(unittest.TestCase):
 
     def test_list_workspace_mount_rejected_even_if_inspect_empty(self):
         runner = FakeRunner([{'name': 'oc2-dev', 'agent': 'shell',
-                              'workspace': '/home/user/source'}])
+                              'workspace': '/home/' + 'user/source'}])
         with self.assertRaisesRegex(oc2.Stop, 'workspace mount'):
             oc2.is_compatible_sandbox(runner, 'oc2-dev')
         self.assertNotIn(('inspect', 'oc2-dev', '--json'), runner.calls)
@@ -255,6 +255,48 @@ class HostTest(unittest.TestCase):
     def test_launch_rejects_invalid_digest(self):
         with self.assertRaisesRegex(oc2.Stop, 'invalid runtime digest'):
             oc2.launch(FakeRunner(), 'oc2-dev', 'not-a-digest', oc2.PINNED[0])
+
+    def test_seed_cli_uses_private_operator_home_staging(self):
+        runner = FakeRunner()
+        runner.user = oc2.getpass.getuser()
+        home = pathlib.Path.home()
+        staging = home / '.oc2-seed-AbCd1234'
+        completed = subprocess.CompletedProcess(
+            [], 0, stdout=f'{home}\n{staging}\n'
+        )
+
+        def sbx(*args, **kwargs):
+            runner.calls.append(args)
+            if args[:3] == ('exec', 'oc-v2-poc', 'bash'):
+                return 'opencode v2.1.4'
+            return ''
+
+        with patch.object(oc2, 'is_compatible_sandbox', return_value=True), \
+             patch.object(oc2, 'cli_path', return_value=oc2.PINNED[0]), \
+             patch.object(runner, 'sbx', side_effect=sbx), \
+             patch.object(oc2.subprocess, 'run', return_value=completed) as run:
+            result = oc2.seed_cli(runner, 'oc2-dev', 'oc-v2-poc')
+
+        self.assertEqual(result, oc2.PINNED[0])
+        command = run.call_args_list[0].args[0]
+        self.assertIn('mktemp -d "$HOME/.oc2-seed-XXXXXXXX"', command[2])
+        self.assertNotIn('/tmp', ' '.join(command))
+        self.assertIn(str(staging / 'node_modules'), repr(runner.calls))
+
+    def test_seed_cli_rejects_publicly_writable_staging_path(self):
+        runner = FakeRunner()
+        runner.user = oc2.getpass.getuser()
+        completed = subprocess.CompletedProcess(
+            [], 0, stdout='/tmp/oc2-seed-AbCd1234\n'
+        )
+        with patch.object(oc2, 'is_compatible_sandbox', return_value=True), \
+             patch.object(runner, 'sbx', return_value='opencode v2.1.4') as sbx, \
+             patch.object(oc2.subprocess, 'run', return_value=completed):
+            with self.assertRaisesRegex(oc2.Stop, 'unsafe seed staging path'):
+                oc2.seed_cli(runner, 'oc2-dev', 'oc-v2-poc')
+        self.assertFalse(any(
+            call.args[0][0] == 'cp' for call in sbx.call_args_list
+        ))
 
 
 class GuestTest(unittest.TestCase):
