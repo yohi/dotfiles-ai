@@ -213,8 +213,10 @@ class LauncherFlowTests(unittest.TestCase):
         self.assertEqual(status, 1)
         self.assertIn('simulated ambiguous create failure', output)
         self.assertTrue(self.fake.created, (output, self.fake.calls))
-        self.assertIsNotNone(self.fake.clone_source)
-        self.assertTrue(self.fake.clone_source.exists())
+        clone_source = self.fake.clone_source
+        self.assertIsNotNone(clone_source)
+        assert clone_source is not None
+        self.assertTrue(clone_source.exists())
 
     def test_clone_mode_uses_validated_snapshot_after_host_changes(self) -> None:
         validate = oc2.validate_clone_workspace
