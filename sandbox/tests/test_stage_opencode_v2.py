@@ -135,6 +135,13 @@ class StageTests(unittest.TestCase):
         with self.assertRaises(stage.StageError):
             stage.verify_bundle(self.bundle)
 
+    def test_regular_bundle_reader_rejects_symlinked_parent(self) -> None:
+        alias = self.root.parent / "bundle-alias"
+        alias.symlink_to(self.bundle, target_is_directory=True)
+
+        with self.assertRaises(stage.StageError):
+            stage._regular_bytes(alias / "cli.json")
+
     def test_regular_bundle_reader_rejects_path_traversal(self) -> None:
         with self.assertRaises(stage.StageError):
             stage._regular_bytes(self.bundle / "../repo/apm.yml")

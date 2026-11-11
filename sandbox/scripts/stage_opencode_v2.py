@@ -14,6 +14,7 @@ import json
 import os
 import re
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -38,13 +39,41 @@ class StageError(Exception):
 
 
 def _regular_bytes(path: Path) -> bytes:
-    if path.name not in NAMES:
+    if path.name not in NAMES or ".." in path.parts:
         raise StageError("unexpected bundle file name")
-    if path.is_symlink() or not path.is_file():
-        raise StageError("missing, non-regular, or symlinked bundle file: " + path.name)
-    if path.stat().st_size > MAX_BYTES:
-        raise StageError("bundle file exceeds size limit: " + path.name)
-    return path.read_bytes()
+    if any(parent.is_symlink() for parent in path.parents):
+        raise StageError("bundle path contains a symlink")
+    try:
+        directory_fd = os.open(
+            path.parent,
+            os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW,
+        )
+    except OSError as exc:
+        raise StageError("bundle directory is not safe") from exc
+    try:
+        try:
+            file_fd = os.open(
+                path.name,
+                os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK,
+                dir_fd=directory_fd,
+            )
+        except OSError as exc:
+            raise StageError("bundle member is not a safe regular file: " + path.name) from exc
+        try:
+            file_info = os.fstat(file_fd)
+            if not stat.S_ISREG(file_info.st_mode):
+                raise StageError("bundle member is not a regular file: " + path.name)
+            if file_info.st_size > MAX_BYTES:
+                raise StageError("bundle file exceeds size limit: " + path.name)
+            with os.fdopen(file_fd, "rb", closefd=False) as file:
+                content = file.read(MAX_BYTES + 1)
+            if len(content) > MAX_BYTES:
+                raise StageError("bundle file exceeds size limit: " + path.name)
+            return content
+        finally:
+            os.close(file_fd)
+    finally:
+        os.close(directory_fd)
 
 
 def _verify_v2_config(server: dict[str, JsonValue]) -> None:
