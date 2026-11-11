@@ -265,6 +265,74 @@ class HostTest(unittest.TestCase):
             with self.assertRaisesRegex(workspace.WorkspaceError, 'conflict'):
                 workspace.apply_changes(root, sandbox, baseline, approved=True)
 
+    def test_workspace_apply_restores_file_mode_after_replace_failure(self) -> None:
+        workspace = load('oc2_workspace')
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp) / 'host'
+            root.mkdir()
+            first = root / 'a.py'
+            second = root / 'b.py'
+            first.write_text('original a')
+            second.write_text('original b')
+            first.chmod(0o751)
+            second.chmod(0o640)
+            baseline = workspace.snapshot(root)
+            guest = pathlib.Path(tmp) / 'guest'
+            guest.mkdir()
+            (guest / 'a.py').write_text('changed a')
+            (guest / 'b.py').write_text('changed b')
+            real_replace = os.replace
+            calls = 0
+
+            def fail_second_replace(source: pathlib.Path, target: pathlib.Path) -> None:
+                nonlocal calls
+                calls += 1
+                if calls == 2:
+                    raise OSError('injected replace failure')
+                real_replace(source, target)
+
+            with patch.object(workspace.os, 'replace', side_effect=fail_second_replace):
+                with self.assertRaisesRegex(OSError, 'injected replace failure'):
+                    workspace.apply_changes(root, guest, baseline, approved=True)
+
+            self.assertEqual(first.read_text(), 'original a')
+            self.assertEqual(second.read_text(), 'original b')
+            self.assertEqual(stat.S_IMODE(first.stat().st_mode), 0o751)
+            self.assertEqual(stat.S_IMODE(second.stat().st_mode), 0o640)
+
+    def test_workspace_apply_restores_file_mode_after_delete_failure(self) -> None:
+        workspace = load('oc2_workspace')
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp) / 'host'
+            root.mkdir()
+            first = root / 'a.py'
+            deleted = root / 'b.py'
+            first.write_text('original a')
+            deleted.write_text('original b')
+            first.chmod(0o751)
+            deleted.chmod(0o640)
+            baseline = workspace.snapshot(root)
+            guest = pathlib.Path(tmp) / 'guest'
+            guest.mkdir()
+            (guest / 'a.py').write_text('changed a')
+            real_unlink = pathlib.Path.unlink
+
+            def fail_delete(path: pathlib.Path, *, missing_ok: bool = False) -> None:
+                if path == deleted:
+                    raise OSError('injected delete failure')
+                real_unlink(path, missing_ok=missing_ok)
+
+            with patch.object(pathlib.Path, 'unlink', fail_delete):
+                with self.assertRaisesRegex(OSError, 'injected delete failure'):
+                    workspace.apply_changes(
+                        root, guest, baseline, approved=True, allow_deletions=True,
+                    )
+
+            self.assertEqual(first.read_text(), 'original a')
+            self.assertEqual(deleted.read_text(), 'original b')
+            self.assertEqual(stat.S_IMODE(first.stat().st_mode), 0o751)
+            self.assertEqual(stat.S_IMODE(deleted.stat().st_mode), 0o640)
+
     def test_workspace_snapshot_materializes_only_manifest_files(self) -> None:
         workspace = load('oc2_workspace')
         with tempfile.TemporaryDirectory() as tmp:

@@ -18,6 +18,11 @@ class FakeSbx:
     def __init__(self) -> None:
         self.created = False
         self.installed = False
+        self.clone_source: pathlib.Path | None = None
+        self.clone_source_content: str | None = None
+        self.clone_source_remotes: str | None = None
+        self.clone_source_log_subject: str | None = None
+        self.clone_source_has_http_header = False
         self.calls: list[tuple[str, ...]] = []
         self.timeouts: list[int | None] = []
 
@@ -33,6 +38,22 @@ class FakeSbx:
             return 'oc2-test\n' if self.created else ''
         if args[:1] == ('create',):
             self.created = True
+            self.clone_source = pathlib.Path(args[-1])
+            self.clone_source_content = (self.clone_source / 'main.py').read_text()
+            self.clone_source_remotes = subprocess.run(
+                ['git', '-C', str(self.clone_source), 'remote'],
+                capture_output=True, text=True, check=True,
+            ).stdout
+            self.clone_source_log_subject = subprocess.run(
+                ['git', '-C', str(self.clone_source), 'log', '-1', '--format=%s'],
+                capture_output=True, text=True, check=True,
+            ).stdout.strip()
+            header = subprocess.run(
+                ['git', 'config', '--file', str(self.clone_source / '.git' / 'config'),
+                 '--get-regexp', r'^http\..*\.extraheader$'],
+                capture_output=True, text=True, check=False,
+            )
+            self.clone_source_has_http_header = header.returncode == 0
             return ''
         if args[:2] == ('exec', 'oc2-test'):
             command = args[2:]
@@ -63,6 +84,11 @@ class LauncherFlowTests(unittest.TestCase):
         (self.repo / 'apm.yml').write_text('targets: [opencode]\n')
         self.project = self.root / 'synthetic'
         self.project.mkdir()
+        clone_root_patch = patch.object(
+            oc2, 'CLONE_SOURCE_ROOT', self.root / 'oc2-state' / 'clone-sources',
+        )
+        clone_root_patch.start()
+        self.addCleanup(clone_root_patch.stop)
         (self.project / 'main.py').write_text('print("safe")\n')
         subprocess.run(['git', 'init', '-q', str(self.project)], check=True)
         subprocess.run(
@@ -71,6 +97,17 @@ class LauncherFlowTests(unittest.TestCase):
         )
         subprocess.run(
             ['git', '-C', str(self.project), 'config', 'user.name', 'Test Fixture'],
+            check=True,
+        )
+        subprocess.run(
+            ['git', '-C', str(self.project), 'remote', 'add', 'origin',
+             'https://example.invalid/source.git'],
+            check=True,
+        )
+        subprocess.run(
+            ['git', '-C', str(self.project), 'config',
+             'http.https://example.invalid/.extraheader',
+             'AUTHORIZATION: Basic c2VjcmV0LXBsYWNlaG9sZGVy'],
             check=True,
         )
         subprocess.run(['git', '-C', str(self.project), 'add', 'main.py'], check=True)
@@ -95,10 +132,13 @@ class LauncherFlowTests(unittest.TestCase):
         status, output = self._run()
         self.assertEqual(status, 0, output)
         create = next(call for call in self.fake.calls if call[0] == 'create' and '--clone' in call)
-        self.assertEqual(
-            create,
-            ('create', '--clone', '--name', 'oc2-test', 'shell', str(self.project)),
-        )
+        self.assertEqual(create[:-1], ('create', '--clone', '--name', 'oc2-test', 'shell'))
+        self.assertNotEqual(pathlib.Path(create[-1]), self.project)
+        self.assertEqual(self.fake.clone_source_content, 'print("safe")\n')
+        self.assertEqual(self.fake.clone_source_remotes, 'origin\n')
+        self.assertEqual(self.fake.clone_source_log_subject, 'OC2 sanitized workspace snapshot')
+        self.assertFalse(self.fake.clone_source_has_http_header)
+        self.assertTrue(pathlib.Path(create[-1]).exists())
         install = next(call for call in self.fake.calls if call[:3] == (
             'exec', 'oc2-test', 'npm',
         ))
@@ -143,6 +183,63 @@ class LauncherFlowTests(unittest.TestCase):
         self.assertEqual(status, 1)
         self.assertIn('Git metadata contains credential', output)
         self.assertFalse(self.fake.created)
+
+    def test_clone_mode_refuses_credentials_in_remote_query_before_creation(self) -> None:
+        subprocess.run(
+            ['git', '-C', str(self.project), 'remote', 'set-url', 'origin',
+             'https://example.invalid/source.git?access_token=fixture-token-material-123456'],
+            check=True,
+        )
+
+        status, output = self._run()
+
+        self.assertEqual(status, 1)
+        self.assertIn('Git remote contains credential', output)
+        self.assertFalse(self.fake.created)
+
+    def test_clone_source_survives_ambiguous_sandbox_creation_failure(self) -> None:
+        original_sbx = self.fake.sbx
+
+        def fail_after_create(*args: str, capture: bool = False, tty: bool = False,
+                              timeout: int | None = 180) -> str:
+            result = original_sbx(*args, capture=capture, tty=tty, timeout=timeout)
+            if args[0] == 'create' and '--clone' in args:
+                raise oc2.Stop('simulated ambiguous create failure')
+            return result
+
+        with patch.object(self.fake, 'sbx', side_effect=fail_after_create):
+            status, output = self._run()
+
+        self.assertEqual(status, 1)
+        self.assertIn('simulated ambiguous create failure', output)
+        self.assertTrue(self.fake.created, (output, self.fake.calls))
+        self.assertIsNotNone(self.fake.clone_source)
+        self.assertTrue(self.fake.clone_source.exists())
+
+    def test_clone_mode_uses_validated_snapshot_after_host_changes(self) -> None:
+        validate = oc2.validate_clone_workspace
+
+        def validate_then_mutate(snapshot: pathlib.Path) -> None:
+            validate(snapshot)
+            if snapshot != self.project:
+                (self.project / 'main.py').write_text('print("changed after inspection")\n')
+
+        with patch.object(oc2, 'validate_clone_workspace', side_effect=validate_then_mutate):
+            status, output = self._run()
+
+        self.assertEqual(status, 0, output)
+        create = next(
+            call for call in self.fake.calls if call[0] == 'create' and '--clone' in call
+        )
+        clone_source = pathlib.Path(create[-1])
+        self.assertNotEqual(clone_source, self.project)
+        self.assertTrue(clone_source.exists())
+        self.assertEqual(self.fake.clone_source_content, 'print("safe")\n')
+        self.assertEqual(self.fake.clone_source_remotes, 'origin\n')
+        self.assertEqual(self.fake.clone_source_log_subject, 'OC2 sanitized workspace snapshot')
+        self.assertFalse(self.fake.clone_source_has_http_header)
+        self.assertEqual((self.project / 'main.py').read_text(),
+                         'print("changed after inspection")\n')
 
 
 if __name__ == '__main__':
