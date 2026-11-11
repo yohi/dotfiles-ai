@@ -1945,13 +1945,15 @@ class OAuthTest(unittest.TestCase):
         self.assertIsNone(captured)
         self.assertEqual(target.read_bytes(), b'protected')
 
-    def test_refuses_capture_outside_runtime_directory(self):
+    def test_ignores_external_tmpdir_and_uses_private_runtime_directory(self):
         elsewhere = self.root / 'elsewhere'
         elsewhere.mkdir(mode=0o700)
         with patch.dict(os.environ, {'TMPDIR': str(elsewhere)}):
             captured = bootstrap.capture_import_stderr(self.db, b'secret')
 
-        self.assertIsNone(captured)
+        self.assertEqual(captured.parent, self.runtime_tmp)
+        self.assertEqual(captured.read_bytes(), b'secret')
+        self.assertEqual(list(elsewhere.iterdir()), [])
 
     def test_refuses_runtime_tmp_with_broad_permissions(self):
         self.runtime_tmp.chmod(0o755)

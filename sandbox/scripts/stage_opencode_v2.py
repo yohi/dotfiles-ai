@@ -93,8 +93,29 @@ def _verify_v2_config(server: dict[str, JsonValue]) -> None:
             raise StageError("V2 provider request settings are not approved") from exc
 
 
-def verify_bundle(directory: Path) -> str:
+def _validated_bundle_directory(directory: Path, trusted_root: Path) -> Path:
+    root = trusted_root.absolute()
+    candidate = directory if directory.is_absolute() else Path.cwd() / directory
+    candidate = candidate.absolute()
+    if candidate == root or not candidate.is_relative_to(root):
+        raise StageError("bundle directory is outside the approved staging root")
+    current = candidate
+    while current != root:
+        if current.is_symlink():
+            raise StageError("bundle directory path contains a symlink")
+        current = current.parent
+    resolved_root = root.resolve(strict=True)
+    resolved = candidate.resolve(strict=True)
+    if resolved == resolved_root or not resolved.is_relative_to(resolved_root):
+        raise StageError("bundle directory resolves outside the approved staging root")
+    return resolved
+
+
+def verify_bundle(directory: Path, *, trusted_root: Path | None = None) -> str:
     """Validate content and hashes, without executing any exported config."""
+    directory = _validated_bundle_directory(
+        directory, trusted_root or Path(tempfile.gettempdir()),
+    )
     if directory.is_symlink() or not directory.is_dir():
         raise StageError("bundle directory must be a regular directory")
     if {item.name for item in directory.iterdir()} != NAMES:
@@ -165,7 +186,7 @@ def verify_guest_bundle(directory: Path) -> str:
         raise StageError("guest bundle must be an approved staging directory")
     if any(parent.is_symlink() for parent in (expected_parent, *expected_parent.parents)):
         raise StageError("guest bundle path contains a symlink")
-    return verify_bundle(directory)
+    return verify_bundle(directory, trusted_root=expected_parent)
 
 
 def _run(command: list[str]) -> None:

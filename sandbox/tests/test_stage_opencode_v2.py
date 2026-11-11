@@ -139,6 +139,10 @@ class StageTests(unittest.TestCase):
         with self.assertRaises(stage.StageError):
             stage.verify_bundle(self.bundle)
 
+    def test_verify_bundle_rejects_paths_outside_temporary_staging(self) -> None:
+        with self.assertRaisesRegex(stage.StageError, "outside the approved staging root"):
+            stage.verify_bundle(Path("/etc"))
+
     def test_rejects_symlinked_member(self) -> None:
         member = self.bundle / "cli.json"
         member.unlink()
