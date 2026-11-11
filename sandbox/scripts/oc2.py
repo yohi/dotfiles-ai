@@ -49,6 +49,49 @@ CLONE_SOURCE_ROOT = pathlib.Path(
 PINNED = (
     '/home/agent/.local/oc2-runtime/node_modules/.bin/opencode',
 )
+RUNTIME_DIRECTORY_SETUP_SCRIPT = '''
+import os, stat, sys
+
+base = os.path.normpath(sys.argv[1])
+flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+paths = sys.argv[2:]
+if not base.startswith('/') or '..' in base.split('/'):
+    raise SystemExit('unsafe runtime root')
+uid = os.geteuid()
+
+for path in paths:
+    if not path.startswith('/') or '..' in path.split('/'):
+        raise SystemExit('runtime directory escaped its root')
+    target = os.path.normpath(path)
+    if target != base and not target.startswith(base + '/'):
+        raise SystemExit('runtime directory escaped its root')
+    descriptor = os.open('/', flags)
+    current = ''
+    try:
+        for component in target.split('/')[1:]:
+            current += '/' + component
+            try:
+                child = os.open(component, flags, dir_fd=descriptor)
+            except FileNotFoundError:
+                try:
+                    os.mkdir(component, 0o700, dir_fd=descriptor)
+                except FileExistsError:
+                    pass
+                child = os.open(component, flags, dir_fd=descriptor)
+            if current == base or current.startswith(base + '/'):
+                info = os.fstat(child)
+                if not stat.S_ISDIR(info.st_mode) or info.st_uid != uid:
+                    os.close(child)
+                    raise SystemExit('runtime directory has an unsafe owner or type')
+                os.fchmod(child, 0o700)
+                if stat.S_IMODE(os.fstat(child).st_mode) != 0o700:
+                    os.close(child)
+                    raise SystemExit('runtime directory is not private')
+            os.close(descriptor)
+            descriptor = child
+    finally:
+        os.close(descriptor)
+'''
 
 
 @dataclass(frozen=True, slots=True)
@@ -834,14 +877,7 @@ def _runtime_directory_setup_command(root: str, runtime: str) -> list[str]:
         runtime + '/config', runtime + '/config/opencode', runtime + '/state',
         runtime + '/cache', runtime + '/tmp',
     )
-    script_path = HERE / 'oc2_runtime_dirs.py'
-    if script_path.is_symlink() or not script_path.is_file():
-        raise Stop('private runtime directory helper is unavailable')
-    try:
-        script = script_path.read_text(encoding='utf-8')
-    except OSError as error:
-        raise Stop('private runtime directory helper is unavailable') from error
-    return ['python3', '-c', script, root, *directories]
+    return ['python3', '-c', RUNTIME_DIRECTORY_SETUP_SCRIPT, root, *directories]
 
 
 def launch(runner: Runner, request: SandboxLaunch) -> None:

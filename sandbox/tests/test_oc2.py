@@ -842,13 +842,34 @@ class HostTest(unittest.TestCase):
             runtime = root / 'runtime' / ('c' * 16)
 
             result = subprocess.run(
-                [sys.executable, str(SCRIPTS / 'oc2_runtime_dirs.py'),
+                [sys.executable, '-c', oc2.RUNTIME_DIRECTORY_SETUP_SCRIPT,
                  str(root), str(root), str(root / 'runtime'), str(runtime)],
                 capture_output=True, text=True, check=False,
             )
 
             self.assertNotEqual(result.returncode, 0)
             self.assertFalse((parent / 'escaped').exists())
+
+    def test_runtime_directory_setup_does_not_execute_replaceable_helper(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            parent = pathlib.Path(tmp)
+            source = parent / 'source'
+            source.mkdir(mode=0o700)
+            marker = parent / 'modified-helper-ran'
+            (source / 'oc2_runtime_dirs.py').write_text(
+                f'from pathlib import Path; Path({str(marker)!r}).touch()\n',
+            )
+            root = parent / 'oc2'
+            runtime = root / 'runtime' / ('d' * 16)
+            with patch.object(oc2, 'HERE', source):
+                command = oc2._runtime_directory_setup_command(str(root), str(runtime))
+                result = subprocess.run(
+                    command,
+                    capture_output=True, text=True, check=False,
+                )
+                self.assertFalse(marker.exists())
+
+        self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_seed_cli_uses_operator_home_for_private_staging(self) -> None:
         runner = oc2.Runner('operator')
