@@ -41,6 +41,12 @@ CF_CUSTOM_HEADERS: Final[tuple[tuple[str, str], ...]] = (
     ("cf-aig-max-attempts", "1"),
     ("cf-aig-skip-cache", "true"),
 )
+REASONING_EFFORTS: Final[frozenset[str]] = frozenset(
+    {"minimal", "low", "medium", "high", "xhigh", "max"},
+)
+REASONING_SUMMARIES: Final[frozenset[str]] = frozenset(
+    {"auto", "concise", "detailed"},
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -83,7 +89,7 @@ def _unique_json_object(pairs: list[tuple[str, JsonValue]]) -> dict[str, JsonVal
 def _yaml_string_key(node: Node) -> str | None:
     match node:
         case ScalarNode(tag="tag:yaml.org,2002:str", value=value):
-            return value
+            return str(value)
         case ScalarNode() | SequenceNode() | MappingNode():
             return None
         case Node():
@@ -170,10 +176,10 @@ def _model_ids(provider_id: str, source: dict[str, JsonValue]) -> tuple[str, ...
             raise ExportError("provider.openai.whitelist contains an invalid model ID")
         return models
 
-    models = _mapping(source.get("models"), f"provider.{provider_id}.models")
-    if not models:
+    model_catalog = _mapping(source.get("models"), f"provider.{provider_id}.models")
+    if not model_catalog:
         raise ExportError(f"provider.{provider_id}.models must not be empty")
-    return tuple(models)
+    return tuple(model_catalog)
 
 
 def _parse_v2_settings(
@@ -222,16 +228,17 @@ def _parse_v2_settings(
             )
         )
 
-    enabled = tuple(provider for provider in selections if provider.enabled)
-    enabled_ids = {provider.provider_id for provider in enabled}
-    if enabled_ids != {"openai", "cloudflare-ai-gateway-custom"} or len(enabled) != 2:
+    enabled_providers = tuple(provider for provider in selections if provider.enabled)
+    enabled_ids = {provider.provider_id for provider in enabled_providers}
+    if enabled_ids != {"openai", "cloudflare-ai-gateway-custom"} or len(enabled_providers) != 2:
         raise ExportError("opencode_v2 must enable OpenAI and Cloudflare Custom")
     provider_id, separator, model_id = default_model.partition("/")
-    selected_provider = next(
-        (provider for provider in enabled if provider.provider_id == provider_id), None,
+    matching_providers = tuple(
+        provider for provider in enabled_providers if provider.provider_id == provider_id
     )
-    if not separator or not model_id or selected_provider is None:
+    if not separator or not model_id or len(matching_providers) != 1:
         raise ExportError("opencode_v2.default_model must use an enabled provider")
+    selected_provider = matching_providers[0]
     if model_id not in selected_provider.model_ids:
         raise ExportError("opencode_v2.default_model is not declared in apm.yml")
     return V2Settings(
@@ -285,12 +292,45 @@ def _v2_variant(value: JsonValue, label: str) -> dict[str, JsonValue]:
             settings[key] = item
         elif key in {"settings", "headers", "body"}:
             nested = _mapping(item, f"{label}.{key}")
+            if key == "settings":
+                _validate_reasoning_settings(nested, f"{label}.settings")
+            else:
+                _validate_variant_options(key, nested, f"{label}.{key}")
             result[key] = nested
         else:
             raise ExportError(f"unsupported V1 variant field: {label}.{key}")
     if settings:
+        _validate_reasoning_settings(settings, f"{label}.settings")
         result["settings"] = settings
     return result
+
+
+def _validate_reasoning_settings(settings: dict[str, JsonValue], label: str) -> None:
+    """Allow only the supported reasoning controls and their documented values."""
+    for key, value in settings.items():
+        allowed = {
+            "reasoningEffort": REASONING_EFFORTS,
+            "reasoningSummary": REASONING_SUMMARIES,
+        }.get(key)
+        if allowed is None or not isinstance(value, str) or value not in allowed:
+            raise ExportError(f"unsupported reasoning setting: {label}.{key}")
+
+
+def _validate_variant_options(key: str, options: dict[str, JsonValue], label: str) -> None:
+    """Allow only empty model headers and the supported thinking body control."""
+    if key == "headers":
+        if options:
+            raise ExportError(f"model headers are not supported: {label}")
+        return
+    if set(options) - {"thinking"}:
+        raise ExportError(f"unsupported model body field: {label}")
+    thinking = options.get("thinking")
+    if thinking is None and "thinking" not in options:
+        return
+    if (not isinstance(thinking, dict) or set(thinking) != {"type"}
+            or not isinstance(thinking["type"], str)
+            or thinking["type"] not in {"enabled", "disabled"}):
+        raise ExportError(f"unsupported model thinking option: {label}.thinking")
 
 
 def _v2_model(model_id: str, value: JsonValue) -> dict[str, JsonValue]:
@@ -313,7 +353,36 @@ def _v2_model(model_id: str, value: JsonValue) -> dict[str, JsonValue]:
             variants_out.append({"id": variant_id, **converted})
     if variants_out:
         model["variants"] = variants_out
+    _validate_v2_model_options(model, f"provider model {model_id}")
     return model
+
+
+def _validate_v2_model_options(model: dict[str, JsonValue], label: str) -> None:
+    """Validate settings and request payloads after default-variant expansion."""
+    settings = model.get("settings", {})
+    if not isinstance(settings, dict):
+        raise ExportError(f"invalid model settings: {label}")
+    _validate_reasoning_settings(settings, f"{label}.settings")
+    for key in ("headers", "body"):
+        value = model.get(key, {})
+        if not isinstance(value, dict):
+            raise ExportError(f"invalid model {key}: {label}")
+        _validate_variant_options(key, value, f"{label}.{key}")
+    variants = model.get("variants", [])
+    if not isinstance(variants, list):
+        raise ExportError(f"invalid model variants: {label}")
+    for variant in variants:
+        if not isinstance(variant, dict):
+            raise ExportError(f"invalid model variant: {label}")
+        settings = variant.get("settings", {})
+        if not isinstance(settings, dict):
+            raise ExportError(f"invalid model variant settings: {label}")
+        _validate_reasoning_settings(settings, f"{label}.variant.settings")
+        for key in ("headers", "body"):
+            value = variant.get(key, {})
+            if not isinstance(value, dict):
+                raise ExportError(f"invalid model variant {key}: {label}")
+            _validate_variant_options(key, value, f"{label}.variant.{key}")
 
 
 def _v2_provider(provider_id: str, source: dict[str, JsonValue], model_ids: tuple[str, ...]) -> dict[str, JsonValue]:
@@ -379,14 +448,18 @@ def _build_v2_config(
         )
     policies: list[JsonValue] = [
         {"action": "provider.use", "resource": "*", "effect": "deny"},
-        *(
-            {"action": "provider.use", "resource": selection.provider_id, "effect": "allow"}
-            for selection in enabled
-        ),
+    ]
+    enabled_ids = {selection.provider_id for selection in enabled}
+    policies.extend(
+        {"action": "provider.use", "resource": provider_id, "effect": "allow"}
+        for provider_id in ("openai", "cloudflare-ai-gateway-custom")
+        if provider_id in enabled_ids
+    )
+    policies.extend([
         {"action": "integration.connect", "resource": "*", "effect": "deny"},
         {"action": "plugin.use", "resource": "*", "effect": "deny"},
         {"action": "mcp.use", "resource": "*", "effect": "deny"},
-    ]
+    ])
     return {"model": settings.default_model, "providers": providers, "policies": policies}
 
 

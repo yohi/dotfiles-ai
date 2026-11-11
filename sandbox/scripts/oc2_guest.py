@@ -48,13 +48,14 @@ ASSET_TARGETS = frozenset({
     THEME_FILE,
 })
 MAX_ASSETS = 512 * 1024
-
-CLI_CANDIDATES = (
-    '/home/agent/.local/oc2-runtime/node_modules/.bin/opencode',
-)
+REASONING_VALUES = {
+    'reasoningEffort': frozenset({'minimal', 'low', 'medium', 'high', 'xhigh', 'max'}),
+    'reasoningSummary': frozenset({'auto', 'concise', 'detailed'}),
+}
 
 
 def fail(reason: str) -> NoReturn:
+    """Stop processing the bundle with a validation error."""
     raise ValueError(reason)
 
 
@@ -65,6 +66,71 @@ def _unique_json_object(pairs: list[tuple[str, JsonValue]]) -> dict[str, JsonVal
             fail('duplicate JSON object key')
         result[key] = value
     return result
+
+
+def _verify_model_settings(value: JsonValue, label: str) -> None:
+    """Require only supported reasoning settings and values."""
+    if not isinstance(value, dict):
+        fail('invalid V2 model reasoning settings')
+    for key, item in value.items():
+        allowed = REASONING_VALUES.get(key)
+        if allowed is None or not isinstance(item, str) or item not in allowed:
+            fail('unapproved V2 model reasoning setting: ' + label)
+
+
+def _verify_model_options(key: str, options: dict[str, JsonValue], label: str) -> None:
+    """Allow only empty model headers and the supported thinking body control."""
+    if key == 'headers':
+        if options:
+            fail('unsupported model headers: ' + label)
+        return
+    if set(options) - {'thinking'}:
+        fail('unsupported model body field: ' + label)
+    thinking = options.get('thinking')
+    if thinking is None and 'thinking' not in options:
+        return
+    if (not isinstance(thinking, dict) or set(thinking) != {'type'}
+            or not isinstance(thinking['type'], str)
+            or thinking['type'] not in {'enabled', 'disabled'}):
+        fail('unsupported model thinking option: ' + label)
+
+
+def _verify_model_catalog(models: JsonValue) -> None:
+    """Validate model identities, variants, and credential-free options."""
+    if not isinstance(models, dict):
+        fail('invalid V2 model catalog')
+    for model_id, value in models.items():
+        if not isinstance(value, dict) or set(value) - {
+            'modelID', 'name', 'settings', 'headers', 'body', 'variants',
+        }:
+            fail('invalid V2 model configuration')
+        if value.get('modelID') != model_id or not isinstance(value.get('name'), str):
+            fail('V2 model identity does not match its catalog')
+        _verify_model_settings(value.get('settings', {}), model_id)
+        for key in ('headers', 'body'):
+            options = value.get(key, {})
+            if not isinstance(options, dict):
+                fail('invalid V2 model ' + key)
+            _verify_model_options(key, options, model_id + '.' + key)
+        variants = value.get('variants', [])
+        if not isinstance(variants, list):
+            fail('invalid V2 model variants')
+        seen: set[str] = set()
+        for variant in variants:
+            if not isinstance(variant, dict):
+                fail('invalid V2 model variant')
+            variant_id = variant.get('id')
+            if not isinstance(variant_id, str):
+                fail('invalid V2 model variant')
+            if variant_id in seen or set(variant) - {'id', 'settings', 'headers', 'body'}:
+                fail('invalid V2 model variant')
+            seen.add(variant_id)
+            _verify_model_settings(variant.get('settings', {}), model_id + '.' + variant_id)
+            for key in ('headers', 'body'):
+                options = variant.get(key, {})
+                if not isinstance(options, dict):
+                    fail('invalid V2 model variant ' + key)
+                _verify_model_options(key, options, model_id + '.' + variant_id)
 
 
 def regular(path: pathlib.Path, max_bytes: int = 1048576) -> bytes:
@@ -94,6 +160,10 @@ def verify_v2_config(server: dict[str, JsonValue]) -> None:
     models = provider.get('models')
     if not isinstance(models, dict) or model_id not in models:
         fail('V2 default model is not in the provider catalog')
+    for provider_config in providers.values():
+        if not isinstance(provider_config, dict):
+            fail('invalid V2 provider configuration')
+        _verify_model_catalog(provider_config.get('models'))
     expected_policies: list[JsonValue] = [
         {'action': 'provider.use', 'resource': '*', 'effect': 'deny'},
         {'action': 'provider.use', 'resource': 'openai', 'effect': 'allow'},
@@ -184,7 +254,7 @@ def verify(bundle: pathlib.Path) -> str:
             verify_v2_config(server)
         case _:
             fail('unrecognized config format')
-    if client != {'$schema': 'https://opencode.ai/v2/cli.json', 'plugins': []}:
+    if client != {'$schema': 'https://opencode.ai/v2/' + CLIENT_CONFIG, 'plugins': []}:
         fail('unsafe TUI config')
     return hashlib.sha256(data[EXPORT_MANIFEST]).hexdigest()
 

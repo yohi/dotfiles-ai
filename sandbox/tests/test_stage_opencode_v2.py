@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
+import io
 import json
 import subprocess
 import sys
@@ -23,7 +25,7 @@ class StageTests(unittest.TestCase):
         self.addCleanup(temporary.cleanup)
         self.root = Path(temporary.name) / "repo"
         self.root.mkdir()
-        self.bundle = Path(temporary.name) / "bundle"
+        self.bundle = Path(temporary.name) / "sbx-config-0123456789abcdef-0123456789ab"
         self.bundle.mkdir()
         self.apm = self.root / "apm.yml"
         self.apm.write_text("shell: bash\nsnapshot: true\n", encoding="utf-8")
@@ -54,7 +56,6 @@ class StageTests(unittest.TestCase):
             digest,
             hashlib.sha256((self.bundle / "export-manifest.json").read_bytes()).hexdigest(),
         )
-
     def test_guest_cli_only_accepts_the_fixed_staging_path(self) -> None:
         staged = self.root / "sbx-config-0123456789abcdef-aabbccddeeff"
         staged.mkdir()
@@ -62,8 +63,43 @@ class StageTests(unittest.TestCase):
             (staged / entry.name).write_bytes(entry.read_bytes())
 
         with patch.object(stage, "REMOTE_PARENT", str(self.root)):
-            self.assertEqual(stage.main(["--verify-bundle", str(staged)]), 0)
-            self.assertEqual(stage.main(["--verify-bundle", str(self.bundle)]), 1)
+            self.assertEqual(stage.main(["--verify-bundle", staged.name]), 0)
+            self.assertEqual(stage.main(["--verify-bundle", self.bundle.name]), 1)
+
+    def test_guest_verifier_imports_without_site_packages_or_repository(self) -> None:
+        result = subprocess.run(
+            [sys.executable, "-S", "-c",
+             f"import sys; sys.path.insert(0, {str(SCRIPT.parent)!r}); "
+             "import stage_opencode_v2"],
+            capture_output=True, text=True, check=False,
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_guest_verify_rejects_path_in_cli_argument(self) -> None:
+        with patch.object(stage, "REMOTE_PARENT", str(self.bundle.parent)):
+            status = stage.main(["--verify-bundle", str(self.bundle)])
+        self.assertEqual(status, 1)
+
+    def test_host_stage_resolves_bundle_identifier_under_temp_root(self) -> None:
+        bundle_name = "opencode-v2-export-20261111"
+        bundle = self.root.parent / bundle_name
+        bundle.mkdir(mode=0o700)
+        output = io.StringIO()
+        with patch.object(stage, "BUNDLE_ROOT", self.root.parent, create=True), \
+                patch.object(stage, "stage") as stage_bundle, \
+                contextlib.redirect_stdout(output):
+            status = stage.main(["--bundle", bundle_name, "--repo-root", str(self.root)])
+
+        self.assertEqual(status, 0, output.getvalue())
+        self.assertEqual(stage_bundle.call_args.args[0], bundle)
+
+    def test_host_stage_rejects_path_in_bundle_argument(self) -> None:
+        with patch.object(stage, "stage") as stage_bundle:
+            status = stage.main(["--bundle", str(self.bundle), "--repo-root", str(self.root)])
+
+        self.assertEqual(status, 1)
+        stage_bundle.assert_not_called()
 
     def _make_v2_bundle(self) -> Path:
         self.apm.write_text(
@@ -157,6 +193,17 @@ class StageTests(unittest.TestCase):
         with self.assertRaises(stage.StageError):
             stage._read_bundle_files(self.root, ["../opencode.jsonc"])
 
+    def test_bundle_verifier_rejects_symlinked_parent(self) -> None:
+        alias = self.root.parent / "parent-alias"
+        alias.symlink_to(self.bundle.parent, target_is_directory=True)
+
+        with self.assertRaises(stage.StageError):
+            stage.verify_bundle(alias / self.bundle.name)
+
+    def test_bundle_verifier_rejects_path_traversal(self) -> None:
+        with self.assertRaises(stage.StageError):
+            stage.verify_bundle(self.bundle.parent / ".." / self.bundle.name)
+
     def test_rejects_plugin_or_mcp_config_even_with_updated_hash(self) -> None:
         manifest_file = self.bundle / "export-manifest.json"
         config_file = self.bundle / "opencode.jsonc"
@@ -193,7 +240,7 @@ class StageTests(unittest.TestCase):
             stage.stage(self.bundle, self.root, sandbox="oc-v2-poc", apply=True)
         self.assertEqual(len(commands), 4)
         self.assertEqual([command[1] for command in commands], ["exec", "cp", "cp", "exec"])
-        remote = commands[-1][-1]
+        remote = stage.REMOTE_PARENT + "/" + commands[-1][-1]
         self.assertTrue(remote.startswith(stage.REMOTE_PARENT + "/sbx-config-"))
         self.assertNotIn(".config/opencode", repr(commands))
         self.assertNotIn("--privileged", repr(commands))

@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-import importlib
 import json
 import os
 import re
@@ -25,13 +24,110 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-exporter = importlib.import_module("sandbox.scripts.prepare_opencode_v2")
-
 NAMES = frozenset({"opencode.jsonc", "cli.json", "export-manifest.json"})
 MAX_BYTES = 1024 * 1024
+SECRET_PATTERNS = tuple(re.compile(pattern) for pattern in (
+    rb"-----BEGIN (?:OPENSSH |RSA |EC )?PRIVATE KEY-----",
+    rb"\bAKIA[0-9A-Z]{16}\b",
+    rb"\bgh[pousr]_[A-Za-z0-9]{20,}\b",
+    rb"\bsk-[A-Za-z0-9]{24,}\b",
+    rb"(?i)\b(?:api[_-]?key|access[_-]?key|secret|password|token)\s*[:=]\s*['\"]?[A-Za-z0-9_./+=-]{16,}",
+))
+SECRET_PLACEHOLDERS = (b"DO_NOT_EXPORT", b"EXAMPLE", b"PLACEHOLDER", b"DUMMY", b"FIXTURE")
 SANDBOX_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9.-]{0,61}[a-zA-Z0-9]$")
+BUNDLE_DIRECTORY_RE = re.compile(r"^sbx-config-[a-f0-9]{16}-[a-f0-9]{12}$")
+HOST_BUNDLE_RE = re.compile(r"^opencode-v2-export-[a-zA-Z0-9][a-zA-Z0-9-]{0,63}$")
 REMOTE_PARENT = str(Path("/home") / "agent" / "workspace")  # guest-only mountless path
+BUNDLE_ROOT = Path(tempfile.gettempdir())
 JsonValue: TypeAlias = str | int | float | bool | None | list["JsonValue"] | dict[str, "JsonValue"]
+REASONING_VALUES = {
+    "reasoningEffort": frozenset({"minimal", "low", "medium", "high", "xhigh", "max"}),
+    "reasoningSummary": frozenset({"auto", "concise", "detailed"}),
+}
+
+
+def _unique_json_object(pairs: list[tuple[str, JsonValue]]) -> dict[str, JsonValue]:
+    """Parse a JSON object while rejecting duplicate keys."""
+    result: dict[str, JsonValue] = {}
+    for key, value in pairs:
+        if key in result:
+            raise StageError("duplicate JSON object key")
+        result[key] = value
+    return result
+
+
+def _contains_credential_material(data: bytes) -> bool:
+    for pattern in SECRET_PATTERNS:
+        for match in pattern.finditer(data):
+            value = match.group().upper()
+            if not any(placeholder in value for placeholder in SECRET_PLACEHOLDERS):
+                return True
+    return False
+
+
+def _verify_model_settings(value: JsonValue, label: str) -> None:
+    """Require only supported reasoning settings and values."""
+    if not isinstance(value, dict):
+        raise StageError("invalid model reasoning settings: " + label)
+    for key, item in value.items():
+        allowed = REASONING_VALUES.get(key)
+        if allowed is None or not isinstance(item, str) or item not in allowed:
+            raise StageError("unapproved model reasoning setting: " + label)
+
+
+def _verify_model_options(key: str, options: dict[str, JsonValue], label: str) -> None:
+    """Allow only empty model headers and the supported thinking body control."""
+    if key == "headers":
+        if options:
+            raise StageError("unsupported model headers: " + label)
+        return
+    if set(options) - {"thinking"}:
+        raise StageError("unsupported model body field: " + label)
+    thinking = options.get("thinking")
+    if thinking is None and "thinking" not in options:
+        return
+    if (not isinstance(thinking, dict) or set(thinking) != {"type"}
+            or not isinstance(thinking["type"], str)
+            or thinking["type"] not in {"enabled", "disabled"}):
+        raise StageError("unsupported model thinking option: " + label)
+
+
+def _verify_model_catalog(models: JsonValue) -> None:
+    """Validate model identities, variants, and credential-free options."""
+    if not isinstance(models, dict):
+        raise StageError("invalid V2 model catalog")
+    for model_id, value in models.items():
+        if not isinstance(value, dict) or set(value) - {
+            "modelID", "name", "settings", "headers", "body", "variants",
+        }:
+            raise StageError("invalid V2 model configuration")
+        if value.get("modelID") != model_id or not isinstance(value.get("name"), str):
+            raise StageError("V2 model identity does not match its catalog")
+        _verify_model_settings(value.get("settings", {}), model_id)
+        for key in ("headers", "body"):
+            options = value.get(key, {})
+            if not isinstance(options, dict):
+                raise StageError("invalid V2 model " + key)
+            _verify_model_options(key, options, model_id + "." + key)
+        variants = value.get("variants", [])
+        if not isinstance(variants, list):
+            raise StageError("invalid V2 model variants")
+        seen: set[str] = set()
+        for variant in variants:
+            if not isinstance(variant, dict):
+                raise StageError("invalid V2 model variant")
+            variant_id = variant.get("id")
+            if not isinstance(variant_id, str):
+                raise StageError("invalid V2 model variant")
+            if variant_id in seen or set(variant) - {"id", "settings", "headers", "body"}:
+                raise StageError("invalid V2 model variant")
+            seen.add(variant_id)
+            _verify_model_settings(variant.get("settings", {}), model_id + "." + variant_id)
+            for key in ("headers", "body"):
+                options = variant.get(key, {})
+                if not isinstance(options, dict):
+                    raise StageError("invalid V2 model variant " + key)
+                _verify_model_options(key, options, model_id + "." + variant_id)
 
 
 class StageError(Exception):
@@ -64,15 +160,44 @@ def _regular_bytes(directory_fd: int, name: str) -> bytes:
         os.close(descriptor)
 
 
+def _host_bundle_path(name: str) -> Path:
+    if HOST_BUNDLE_RE.fullmatch(name) is None:
+        raise StageError("bundle must be identified by its generated directory name")
+    if (not BUNDLE_ROOT.is_absolute()
+            or any(parent.is_symlink() for parent in (BUNDLE_ROOT, *BUNDLE_ROOT.parents))):
+        raise StageError("temporary bundle root is not safe")
+    bundle = BUNDLE_ROOT / name
+    try:
+        info = bundle.lstat()
+    except OSError as exc:
+        raise StageError("bundle directory is missing or unsafe") from exc
+    if (not stat.S_ISDIR(info.st_mode) or info.st_uid != os.geteuid()
+            or stat.S_IMODE(info.st_mode) != 0o700):
+        raise StageError("bundle directory must be private and owned by the current user")
+    return bundle
+
+
+def _open_bundle_directory(directory: Path) -> int:
+    if ".." in directory.parts or any(parent.is_symlink() for parent in directory.parents):
+        raise StageError("bundle path contains traversal or a symlink")
+    try:
+        directory_fd = os.open(
+            directory,
+            os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW,
+        )
+    except OSError as exc:
+        raise StageError("bundle directory is not safe") from exc
+    if not stat.S_ISDIR(os.fstat(directory_fd).st_mode):
+        os.close(directory_fd)
+        raise StageError("bundle directory is not a regular directory")
+    return directory_fd
+
+
 def _read_bundle_files(directory: Path, names: Iterable[str]) -> dict[str, bytes]:
     requested = tuple(names)
     if not requested or not set(requested) <= NAMES:
         raise StageError("bundle file is not in the allowlist")
-    flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
-    try:
-        directory_fd = os.open(directory, flags)
-    except OSError as exc:
-        raise StageError("bundle directory could not be opened safely") from exc
+    directory_fd = _open_bundle_directory(directory)
     try:
         return {name: _regular_bytes(directory_fd, name) for name in requested}
     finally:
@@ -101,6 +226,10 @@ def _verify_v2_config(server: dict[str, JsonValue]) -> None:
     models = provider.get("models")
     if not isinstance(models, dict) or model_id not in models:
         raise StageError("V2 default model is not in the provider catalog")
+    for provider_config in providers.values():
+        if not isinstance(provider_config, dict):
+            raise StageError("invalid V2 provider configuration")
+        _verify_model_catalog(provider_config.get("models"))
     expected_policies: list[JsonValue] = [
         {"action": "provider.use", "resource": "*", "effect": "deny"},
         {"action": "provider.use", "resource": "openai", "effect": "allow"},
@@ -118,16 +247,52 @@ def _verify_v2_config(server: dict[str, JsonValue]) -> None:
         headers = provider_config.get("headers", {})
         if not isinstance(settings, dict) or not isinstance(headers, dict):
             raise StageError("invalid V2 provider request settings")
-        try:
-            exporter.validate_v2_provider_options(provider_name, settings, headers)
-        except exporter.ExportError as exc:
-            raise StageError("V2 provider request settings are not approved") from exc
+        if provider_name == "openai":
+            if settings or headers:
+                raise StageError("OpenAI V2 configuration must not contain Guest credentials")
+        elif provider_name == "cloudflare-ai-gateway-custom":
+            if settings != {"baseURL": CF_CUSTOM_BASE_URL}:
+                raise StageError("Cloudflare Custom baseURL is not approved")
+            _verify_custom_headers(headers)
+        else:
+            raise StageError("unsupported V2 provider options")
+
+
+CF_CUSTOM_BASE_URL = (
+    "https://gateway.ai.cloudflare.com/v1/"
+    "{env:OC_CF_ACCOUNT_ID}/{env:OC_CF_GATEWAY_ID}/compat"
+)
+CF_CUSTOM_HEADERS = {
+    "Authorization": "",
+    "cf-aig-authorization": "Bearer {env:OC_CF_API_TOKEN}",
+    "cf-aig-collect-log-payload": "true",
+    "cf-aig-max-attempts": "1",
+    "cf-aig-skip-cache": "true",
+}
+
+
+def _verify_custom_headers(headers: dict[str, JsonValue]) -> None:
+    """Require the exact approved Cloudflare proxy headers."""
+    allowed = {name.casefold(): (name, value) for name, value in CF_CUSTOM_HEADERS.items()}
+    seen: set[str] = set()
+    for name, value in headers.items():
+        if not isinstance(name, str) or not isinstance(value, str):
+            raise StageError("Cloudflare Custom header names and values must be strings")
+        folded = name.casefold()
+        approved = allowed.get(folded)
+        if folded in seen or approved != (name, value):
+            raise StageError("Cloudflare Custom header is not approved")
+        seen.add(folded)
+    if headers.get("cf-aig-authorization") != CF_CUSTOM_HEADERS["cf-aig-authorization"]:
+        raise StageError("Cloudflare Custom proxy authorization header is required")
 
 
 def _validated_bundle_directory(directory: Path, trusted_root: Path) -> Path:
     root = trusted_root.absolute()
     candidate = directory if directory.is_absolute() else Path.cwd() / directory
     candidate = candidate.absolute()
+    if ".." in candidate.parts:
+        raise StageError("bundle directory contains traversal")
     if candidate == root or not candidate.is_relative_to(root):
         raise StageError("bundle directory is outside the approved staging root")
     current = candidate
@@ -147,12 +312,14 @@ def verify_bundle(directory: Path, *, trusted_root: Path | None = None) -> str:
     directory = _validated_bundle_directory(
         directory, trusted_root or Path(tempfile.gettempdir()),
     )
-    if directory.is_symlink() or not directory.is_dir():
-        raise StageError("bundle directory must be a regular directory")
-    if {item.name for item in directory.iterdir()} != NAMES:
-        raise StageError("unexpected bundle file set")
-    manifest, server, tui, data = _load_bundle(directory)
-    if any(exporter.contains_credential_material(content) for content in data.values()):
+    directory_fd = _open_bundle_directory(directory)
+    try:
+        if set(os.listdir(directory_fd)) != NAMES:
+            raise StageError("unexpected bundle file set")
+        manifest, server, tui, data = _load_bundle(directory_fd)
+    finally:
+        os.close(directory_fd)
+    if any(_contains_credential_material(content) for content in data.values()):
         raise StageError("bundle contains credential material")
 
     digest = _validate_manifest(manifest, data)
@@ -161,18 +328,20 @@ def verify_bundle(directory: Path, *, trusted_root: Path | None = None) -> str:
     return digest
 
 
+
+
 def _load_bundle(
-    directory: Path,
+    directory_fd: int,
 ) -> tuple[dict[str, JsonValue], dict[str, JsonValue], dict[str, JsonValue], dict[str, bytes]]:
-    data = _read_bundle_files(directory, NAMES)
+    data = {name: _regular_bytes(directory_fd, name) for name in NAMES}
     try:
         manifest = json.loads(
-            data["export-manifest.json"], object_pairs_hook=exporter._unique_json_object,
+            data["export-manifest.json"], object_pairs_hook=_unique_json_object,
         )
         server = json.loads(
-            data["opencode.jsonc"], object_pairs_hook=exporter._unique_json_object,
+            data["opencode.jsonc"], object_pairs_hook=_unique_json_object,
         )
-        tui = json.loads(data["cli.json"], object_pairs_hook=exporter._unique_json_object)
+        tui = json.loads(data["cli.json"], object_pairs_hook=_unique_json_object)
     except (ValueError, UnicodeDecodeError) as exc:
         raise StageError("bundle is not valid UTF-8 JSON") from exc
     if not isinstance(manifest, dict) or not isinstance(server, dict) or not isinstance(tui, dict):
@@ -232,14 +401,13 @@ def _validate_tui_config(tui: dict[str, JsonValue]) -> None:
         raise StageError("unexpected TUI config")
 
 
-def verify_guest_bundle(directory: Path) -> str:
+def verify_guest_bundle(bundle_name: str) -> str:
     expected_parent = Path(REMOTE_PARENT)
-    if (not directory.is_absolute() or directory.parent != expected_parent
-            or re.fullmatch(r"sbx-config-[a-f0-9]{16}-[a-f0-9]{12}", directory.name) is None):
+    if BUNDLE_DIRECTORY_RE.fullmatch(bundle_name) is None:
         raise StageError("guest bundle must be an approved staging directory")
     if any(parent.is_symlink() for parent in (expected_parent, *expected_parent.parents)):
         raise StageError("guest bundle path contains a symlink")
-    return verify_bundle(directory, trusted_root=expected_parent)
+    return verify_bundle(expected_parent / bundle_name, trusted_root=expected_parent)
 
 
 def _run(command: list[str]) -> None:
@@ -254,15 +422,25 @@ def _run(command: list[str]) -> None:
 def _check_source(root: Path, bundle: Path) -> None:
     bundle = _validated_bundle_directory(bundle, Path(tempfile.gettempdir()))
     try:
+        import importlib
+
+        exporter = importlib.import_module("sandbox.scripts.prepare_opencode_v2")
+    except ImportError as exc:
+        raise StageError("export provenance check could not complete") from exc
+    try:
         apm = exporter._read_apm_source(root)
     except (OSError, exporter.ExportError) as exc:
         raise StageError("export provenance check could not complete") from exc
     expected = exporter._build_files(
         apm.shell, apm.snapshot, apm.source_sha256, apm.v2_config,
     )
-    actual = _read_bundle_files(bundle, expected)
-    if any(actual[name] != content for name, content in expected.items()):
-        raise StageError("bundle does not match the current apm.yml SSOT")
+    directory_fd = _open_bundle_directory(bundle)
+    try:
+        if any(_regular_bytes(directory_fd, name) != content
+               for name, content in expected.items()):
+            raise StageError("bundle does not match the current apm.yml SSOT")
+    finally:
+        os.close(directory_fd)
 
 
 def stage(bundle: Path, repo_root: Path, sandbox: str | None, apply: bool) -> None:
@@ -297,15 +475,15 @@ def stage(bundle: Path, repo_root: Path, sandbox: str | None, apply: bool) -> No
         # Transfer separately to avoid smuggling a script in a supposedly data-only bundle.
         _run(["sbx", "cp", str(verifier), f"{sandbox}:{remote_verifier}"])
         _run(["sbx", "exec", sandbox, "python3", remote_verifier,
-              "--verify-bundle", remote])
+              "--verify-bundle", folder.name])
         print("STAGED_AND_VERIFIED: " + sandbox + ":" + remote)
         print("NOT_ACTIVATED: OpenCode settings were not modified")
 
 
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("--verify-bundle", type=Path, help="verify a staged bundle (guest operation)")
-    p.add_argument("--bundle", type=Path, help="existing output from prepare_opencode_v2.py")
+    p.add_argument("--verify-bundle", help="verify a staged bundle by its generated directory name")
+    p.add_argument("--bundle", help="generated bundle directory name under the temporary directory")
     p.add_argument("--repo-root", type=Path, default=Path(__file__).resolve().parents[2])
     p.add_argument("--sandbox", help="local Docker Sandbox name (used only with --apply)")
     p.add_argument("--apply", action="store_true", help="explicitly copy and verify; never activate")
@@ -317,7 +495,7 @@ def main(argv: list[str] | None = None) -> int:
         else:
             if args.bundle is None:
                 raise StageError("--bundle is required")
-            stage(args.bundle, args.repo_root, args.sandbox, args.apply)
+            stage(_host_bundle_path(args.bundle), args.repo_root, args.sandbox, args.apply)
         return 0
     except (StageError, OSError) as exc:
         msg = str(exc) if isinstance(exc, StageError) else "filesystem operation failed"
