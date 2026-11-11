@@ -57,8 +57,8 @@ def capture_import_stderr(db_path: pathlib.Path, stderr: bytes) -> pathlib.Path 
     runtime_dir = db_path.parents[4]
     tmp_dir = runtime_dir / 'tmp'
     expected_db = runtime_dir / 'home/.local/share/opencode/oc2.db'
-    configured_tmp = pathlib.Path(os.environ.get('TMPDIR', ''))
-    if (db_path != expected_db or configured_tmp != tmp_dir
+    configured_tmp = os.environ.get('TMPDIR', '')
+    if (db_path != expected_db or configured_tmp != os.fspath(tmp_dir)
             or not hasattr(os, 'O_NOFOLLOW') or not hasattr(os, 'O_DIRECTORY')):
         return None
     if any(path.is_symlink() for path in (tmp_dir, *tmp_dir.parents)):

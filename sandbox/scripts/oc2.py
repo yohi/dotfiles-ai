@@ -40,6 +40,7 @@ REPO_ROOT = HERE.parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 VERSION = '2.2.5'
+V2_CONFIG_NAME = 'opencode.jsonc'
 ROOT = '/home/agent/workspace/oc2'
 SHELL_WORKLOAD: Final[str] = 'docker.io/docker/sbx-kit-shell:1.0.0'
 CLI_ASSET_URL: Final[str] = (
@@ -248,33 +249,13 @@ def _download_cli_archive(archive_path: pathlib.Path) -> None:
         '\nOC2_HTTP_STATUS=%{http_code}\nOC2_FINAL_URL=%{url_effective}\n',
         CLI_ASSET_URL,
     ]
-    try:
-        result = subprocess.run(
-            command, capture_output=True, text=True, check=False, timeout=300,
-        )
-    except subprocess.TimeoutExpired as exc:
-        raise Stop('official OpenCode release download timed out') from exc
-    except OSError as exc:
-        raise Stop('official OpenCode release download could not run') from exc
-    fields = {
-        key: value
-        for key, value in (
-            line.split('=', 1) for line in result.stdout.splitlines()
-            if line.startswith(('OC2_HTTP_STATUS=', 'OC2_FINAL_URL='))
-        )
-    }
+    result = _run_cli_download(command)
+    fields = dict(
+        line.split('=', 1) for line in result.stdout.splitlines()
+        if line.startswith(('OC2_HTTP_STATUS=', 'OC2_FINAL_URL='))
+    )
     if result.returncode != 0:
-        messages = {
-            6: 'Host DNS resolution failed',
-            7: 'Host connection failed',
-            28: 'official OpenCode release download timed out',
-        }
-        if result.returncode in messages:
-            detail = messages[result.returncode]
-            if result.returncode == 28:
-                raise Stop(detail)
-            raise Stop('official OpenCode release download failed: ' + detail)
-        raise Stop(f'official OpenCode release download failed (curl exit {result.returncode})')
+        raise _curl_failure(result.returncode)
     if fields.get('OC2_HTTP_STATUS') != '200':
         raise Stop('official OpenCode release returned an unexpected HTTP status')
     final_url = urlsplit(fields.get('OC2_FINAL_URL', ''))
@@ -289,6 +270,29 @@ def _download_cli_archive(archive_path: pathlib.Path) -> None:
             digest.update(chunk)
     if digest.hexdigest() != CLI_ASSET_SHA256:
         raise Stop('official OpenCode release integrity verification failed')
+
+
+def _run_cli_download(command: list[str]) -> subprocess.CompletedProcess[str]:
+    try:
+        return subprocess.run(
+            command, capture_output=True, text=True, check=False, timeout=300,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise Stop('official OpenCode release download timed out') from exc
+    except OSError as exc:
+        raise Stop('official OpenCode release download could not run') from exc
+
+
+def _curl_failure(exit_code: int) -> Stop:
+    messages = {
+        6: 'official OpenCode release download failed: Host DNS resolution failed',
+        7: 'official OpenCode release download failed: Host connection failed',
+        28: 'official OpenCode release download timed out',
+    }
+    message = messages.get(exit_code)
+    if message is not None:
+        return Stop(message)
+    return Stop(f'official OpenCode release download failed (curl exit {exit_code})')
 
 
 def _extract_verified_cli(archive_path: pathlib.Path, binary_path: pathlib.Path) -> None:
@@ -344,7 +348,7 @@ def _trusted_v2_config(repo: pathlib.Path) -> dict[str, object]:
     generated = exporter._build_files(
         source.shell, source.snapshot, source.source_sha256, source.v2_config,
     )
-    config = json.loads(generated['opencode.jsonc'])
+    config = json.loads(generated[V2_CONFIG_NAME])
     if not isinstance(config, dict):
         raise Stop('APM V2 config generator returned an invalid document')
     return config
@@ -431,7 +435,7 @@ def _remove_cloudflare_provider(
 
 
 def _write_generated_config(config_file: pathlib.Path, config: dict[str, object]) -> None:
-    if config_file.name != 'opencode.jsonc':
+    if config_file.name != V2_CONFIG_NAME:
         raise OSError('unsafe generated config destination')
     parent_fd = os.open(
         config_file.parent,
@@ -683,7 +687,7 @@ def export_v2_config(repo: pathlib.Path, output: pathlib.Path) -> pathlib.Path:
         verify_bundle(output)
     except StageError as exc:
         raise Stop('APM V2 config bundle failed verification') from exc
-    config = output / 'opencode.jsonc'
+    config = output / V2_CONFIG_NAME
     if config.is_symlink() or not config.is_file():
         raise Stop('generated V2 config is missing or unsafe')
     return config

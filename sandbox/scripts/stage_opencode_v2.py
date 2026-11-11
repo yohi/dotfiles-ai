@@ -158,6 +158,16 @@ def verify_bundle(directory: Path) -> str:
     return hashlib.sha256(data["export-manifest.json"]).hexdigest()
 
 
+def verify_guest_bundle(directory: Path) -> str:
+    expected_parent = Path(REMOTE_PARENT)
+    if (not directory.is_absolute() or directory.parent != expected_parent
+            or re.fullmatch(r"sbx-config-[a-f0-9]{16}-[a-f0-9]{12}", directory.name) is None):
+        raise StageError("guest bundle must be an approved staging directory")
+    if any(parent.is_symlink() for parent in (expected_parent, *expected_parent.parents)):
+        raise StageError("guest bundle path contains a symlink")
+    return verify_bundle(directory)
+
+
 def _run(command: list[str]) -> None:
     try:
         proc = subprocess.run(command, capture_output=True, timeout=120, check=False)
@@ -226,7 +236,7 @@ def main(argv: list[str] | None = None) -> int:
     args = p.parse_args(argv)
     try:
         if args.verify_bundle is not None:
-            digest = verify_bundle(args.verify_bundle)
+            digest = verify_guest_bundle(args.verify_bundle)
             print("VERIFY_OK: " + digest)
         else:
             if args.bundle is None:

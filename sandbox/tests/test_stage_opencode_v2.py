@@ -49,10 +49,21 @@ class StageTests(unittest.TestCase):
         (self.bundle / "export-manifest.json").write_text(json.dumps(manifest) + "\n")
 
     def test_guest_verify_valid_bundle(self) -> None:
-        process = subprocess.run([sys.executable, str(SCRIPT), "--verify-bundle", str(self.bundle)],
-                                 capture_output=True, text=True, check=False)
-        self.assertEqual(process.returncode, 0, process.stderr)
-        self.assertIn("VERIFY_OK", process.stdout)
+        digest = stage.verify_bundle(self.bundle)
+        self.assertEqual(
+            digest,
+            hashlib.sha256((self.bundle / "export-manifest.json").read_bytes()).hexdigest(),
+        )
+
+    def test_guest_cli_only_accepts_the_fixed_staging_path(self) -> None:
+        staged = self.root / "sbx-config-0123456789abcdef-aabbccddeeff"
+        staged.mkdir()
+        for entry in self.bundle.iterdir():
+            (staged / entry.name).write_bytes(entry.read_bytes())
+
+        with patch.object(stage, "REMOTE_PARENT", str(self.root)):
+            self.assertEqual(stage.main(["--verify-bundle", str(staged)]), 0)
+            self.assertEqual(stage.main(["--verify-bundle", str(self.bundle)]), 1)
 
     def _make_v2_bundle(self) -> Path:
         self.apm.write_text(
