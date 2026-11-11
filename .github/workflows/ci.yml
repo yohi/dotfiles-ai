@@ -41,6 +41,7 @@ jobs:
         apm install --force
         apm compile
         apm compile --target antigravity
+        make setup-skill-adapters
 
     - name: Run Integrity Tests
       run: |

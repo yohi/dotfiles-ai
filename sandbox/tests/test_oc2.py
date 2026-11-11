@@ -4,18 +4,20 @@ No sbx, sudo, network, package installation, or OpenCode binary is invoked.
 """
 from __future__ import annotations
 
+import argparse
 import contextlib
 import hashlib
 import importlib.util
 import io
 import json
+import os
 import pathlib
+import stat
 import subprocess
 import sys
 import tempfile
+import types
 import unittest
-from collections.abc import Mapping
-from types import ModuleType
 from unittest.mock import patch
 
 SCRIPTS = pathlib.Path(__file__).resolve().parents[1] / 'scripts'
@@ -23,12 +25,13 @@ if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
 
-def load(name: str) -> ModuleType:
-    """Load a sandbox script from its source path for offline testing."""
+def load(name: str) -> types.ModuleType:
+    if name in sys.modules:
+        return sys.modules[name]
     spec = importlib.util.spec_from_file_location(name, SCRIPTS / (name + '.py'))
-    if spec is None or spec.loader is None:
-        raise ImportError(f'could not load module: {name}')
+    assert spec and spec.loader
     mod = importlib.util.module_from_spec(spec)
+    sys.modules[name] = mod
     spec.loader.exec_module(mod)
     return mod
 
@@ -39,59 +42,565 @@ assets = load('oc2_assets')
 
 
 class FakeRunner:
-    def __init__(
-        self,
-        rows: list[Mapping[str, str]] | None = None,
-        inspection: Mapping[
-            str,
-            str | list[Mapping[str, str]] | Mapping[str, str],
-        ] | None = None,
-    ) -> None:
-        self.user = oc2.getpass.getuser()
+    def __init__(self, rows: list[dict[str, object]] | None = None,
+                 inspection: dict[str, object] | None = None) -> None:
         self.rows = rows or []
         self.inspection = (
             {'name': 'oc2-dev', 'runtime_mounts': []}
             if inspection is None else inspection
         )
         self.calls: list[tuple[str, ...]] = []
+        self.workspace_copies: list[tuple[pathlib.Path, str]] = []
+        self.remote_files: dict[str, bytes] = {}
 
-    def sbx(self, *args: str, **kwargs: str | float | bool) -> str:
+    def sbx(self, *args: str, capture: bool = False, tty: bool = False,
+            timeout: int | None = 180) -> str:
         self.calls.append(args)
         if args == ('ls', '-q'):
-            return '\n'.join(row['name'] for row in self.rows)
+            return '\n'.join(str(row['name']) for row in self.rows)
         if args == ('ls', '--format', 'json'):
             return json.dumps(self.rows)
         if args == ('inspect', 'oc2-dev', '--json'):
             return json.dumps(self.inspection)
-        if args[:2] == ('exec', 'oc2-dev') and 'sha256sum' in args:
+        if args[:3] == ('exec', 'oc2-dev', 'sha256sum'):
+            remote_file = args[3]
+            for source, destination in self.workspace_copies:
+                prefix = destination.split(':', 1)[1] + '/'
+                if remote_file.startswith(prefix):
+                    relative = remote_file[len(prefix):]
+                    data = (source / relative).read_bytes()
+                    return hashlib.sha256(data).hexdigest() + '  ' + relative + '\n'
             return '0' * 64 + ' /tmp/file\n'
+        if args[:4] == ('exec', 'oc2-dev', 'bash', '-c'):
+            return 'missing\n'
+        if args[0] == 'cp' and len(args) == 3:
+            self.workspace_copies.append((pathlib.Path(args[1]), args[2]))
         return ''
+
+class RunnerTimeoutTest(unittest.TestCase):
+    def test_cli_install_uses_extended_timeout(self) -> None:
+        runner = oc2.Runner('operator')
+        completed = subprocess.CompletedProcess([], 0, '')
+        with patch.object(oc2.subprocess, 'run', return_value=completed) as run:
+            runner.sbx(*oc2.install_cli_args('oc2-dev'), timeout=900)
+        self.assertEqual(run.call_args.kwargs['timeout'], 900)
+
+    def test_tty_remains_unbounded_and_default_timeout_remains_180_seconds(self) -> None:
+        runner = oc2.Runner('operator')
+        results = [subprocess.CompletedProcess([], 0, ''), subprocess.CompletedProcess([], 0, '')]
+        with patch.object(oc2.subprocess, 'run', side_effect=results) as run:
+            runner.sbx('exec', '-it', tty=True)
+            runner.sbx('version')
+        self.assertIsNone(run.call_args_list[0].kwargs['timeout'])
+        self.assertEqual(run.call_args_list[1].kwargs['timeout'], 180)
 
 
 class HostTest(unittest.TestCase):
-    def test_sbx_uses_requested_timeout_and_preserves_default_and_tty(self) -> None:
-        runner = oc2.Runner(oc2.getpass.getuser())
-        completed = subprocess.CompletedProcess([], 0, stdout='', stderr='')
-        with patch.object(oc2.subprocess, 'run', return_value=completed) as run:
-            runner.sbx('list')
-            runner.sbx('list', timeout=900)
-            oc2.execute(runner, 'oc2-dev', 'npm', 'install', timeout=720)
-            runner.sbx('exec', '-it', 'oc2-dev', tty=True, timeout=900)
+    def test_clone_mode_rejects_credentials_in_git_metadata_before_publication(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            metadata = root / '.git'
+            metadata.mkdir()
+            (metadata / 'config').write_text(
+                '[remote "origin"]\nurl = https://user:password@example.invalid/repo.git\n',
+            )
+            with self.assertRaisesRegex(oc2.Stop, 'Git metadata contains credential'):
+                oc2.validate_clone_workspace(root)
 
-        self.assertEqual(run.call_args_list[0].kwargs['timeout'], 180)
-        self.assertEqual(run.call_args_list[1].kwargs['timeout'], 900)
-        self.assertEqual(run.call_args_list[2].kwargs['timeout'], 720)
-        self.assertIsNone(run.call_args_list[3].kwargs['timeout'])
+    def test_clone_mode_command_requires_a_workspace_path(self) -> None:
+        workspace = pathlib.Path('/tmp/oc2-safe-repository')
+        self.assertEqual(
+            oc2.clone_create_args('oc2-safe', workspace),
+            ['create', '--clone', '--name', 'oc2-safe', 'shell', str(workspace)],
+        )
 
-    def test_provision_cli_uses_extended_install_timeout(self) -> None:
-        runner = FakeRunner()
-        with patch.object(oc2, 'cli_path', side_effect=[None, oc2.PINNED[0]]), \
-             patch.object(oc2, 'seed_cli', return_value=None), \
-             patch.object(oc2, 'execute') as execute:
-            result = oc2.provision_cli(runner, 'oc2-dev', 'oc-v2-poc')
+    def test_clone_mode_refuses_excluded_files_that_docker_would_expose(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            (root / 'main.py').write_text('print("safe")\n')
+            (root / '.env').write_text('TOKEN=fixture-value')
+            with self.assertRaisesRegex(oc2.Stop, 'clone mode would expose'):
+                oc2.validate_clone_workspace(root)
 
-        self.assertEqual(result, oc2.PINNED[0])
-        self.assertEqual(execute.call_args.kwargs['timeout'], 900)
+    def test_clone_mode_fails_closed_when_excluded_directory_cannot_be_walked(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            (root / '.git').mkdir()
+            original_walk = oc2.os.walk
+            calls = 0
+
+            def fail_second_walk(path: str | os.PathLike[str], *args: object,
+                                 **kwargs: object) -> object:
+                nonlocal calls
+                calls += 1
+                if calls == 1:
+                    return original_walk(path, *args, **kwargs)
+                onerror = kwargs['onerror']
+                assert callable(onerror)
+
+                def walk_with_error() -> object:
+                    yield str(root), ['.ssh'], []
+                    onerror(PermissionError('simulated excluded-directory failure'))
+
+                return walk_with_error()
+
+            with patch.object(oc2.os, 'walk', side_effect=fail_second_walk):
+                with self.assertRaisesRegex(oc2.Stop, 'workspace cannot be safely inspected'):
+                    oc2.validate_clone_workspace(root)
+
+    def test_clone_mode_rejects_nested_git_metadata(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            (root / '.git').mkdir()
+            nested_git = root / 'vendor' / '.git'
+            nested_git.mkdir(parents=True)
+            (nested_git / 'HEAD').write_text('ref: refs/heads/main\n')
+
+            with self.assertRaisesRegex(oc2.Stop, 'nested Git metadata'):
+                oc2.validate_clone_workspace(root)
+
+    def test_clone_mode_rejects_symlinked_directory_inside_excluded_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            (root / '.git').mkdir()
+            hidden = root / '.ssh'
+            hidden.mkdir()
+            target = root / 'outside'
+            target.mkdir()
+            (hidden / 'linked').symlink_to(target, target_is_directory=True)
+
+            with self.assertRaisesRegex(oc2.Stop, 'symlink'):
+                oc2.validate_clone_workspace(root)
+
+    def test_clone_mode_checks_compressed_git_object_contents(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            subprocess.run(['git', 'init', '-q', str(root)], check=True)
+            object_content = b'https://user:password@example.invalid/repo.git'
+            subprocess.run(
+                ['git', '-C', str(root), 'hash-object', '-w', '--stdin'],
+                input=object_content, check=True, capture_output=True,
+            )
+
+            with self.assertRaisesRegex(oc2.Stop, 'Git metadata contains credential'):
+                oc2.validate_clone_workspace(root)
+
+    def test_clone_mode_accepts_clean_repository_with_packed_metadata(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            subprocess.run(['git', 'init', '-q', str(root)], check=True)
+            (root / 'main.py').write_text('print("safe")\n')
+            subprocess.run(['git', '-C', str(root), 'add', 'main.py'], check=True)
+            subprocess.run(
+                ['git', '-C', str(root), '-c', 'user.name=OC2 Test',
+                 '-c', 'user.email=oc2-test@example.invalid', 'commit', '-qm', 'fixture'],
+                check=True,
+            )
+            subprocess.run(['git', '-C', str(root), 'repack', '-adq'], check=True)
+
+            oc2.validate_clone_workspace(root)
+
+    def test_opencode_cli_install_is_pinned_to_v225(self) -> None:
+        self.assertEqual(oc2.VERSION, '2.2.5')
+        self.assertEqual(
+            oc2.install_cli_args('oc2-safe'),
+            ['exec', 'oc2-safe', 'npm', 'install', '--prefix',
+             '/home/agent/.local/oc2-runtime', '--no-audit', '--no-fund',
+             '--no-save', '@opencode/cli@2.2.5'],
+        )
+
+    def test_workspace_snapshot_excludes_secrets_and_symlinks(self) -> None:
+        workspace = load('oc2_workspace')
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            (root / 'src').mkdir()
+            (root / 'src' / 'main.py').write_text('print(1)\n')
+            (root / '.env').write_text('TOKEN=not-for-sandbox')
+            manifest = workspace.snapshot(root)
+            self.assertEqual([entry.path for entry in manifest.files], ['src/main.py'])
+            self.assertNotIn('not-for-sandbox', repr(manifest))
+            (root / 'linked').symlink_to(root / 'src' / 'main.py')
+            with self.assertRaises(workspace.WorkspaceError):
+                workspace.snapshot(root)
+
+    def test_workspace_snapshot_rejects_embedded_credential_material(self) -> None:
+        workspace = load('oc2_workspace')
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            (root / 'settings.py').write_text(
+                'api_key = "' + '0123456789abcdef' * 2 + '"\n'
+            )
+            with self.assertRaisesRegex(workspace.WorkspaceError, 'credential material') as error:
+                workspace.snapshot(root)
+            self.assertEqual(
+                str(error.exception),
+                'workspace file appears to contain credential material',
+            )
+            (root / 'settings.py').write_text('api_key = "TOP_SECRET_DO_NOT_EXPORT"\n')
+            manifest = workspace.snapshot(root)
+            self.assertEqual([entry.path for entry in manifest.files], ['settings.py'])
+
+    def test_workspace_snapshot_rejects_special_files(self) -> None:
+        workspace = load('oc2_workspace')
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            os.mkfifo(root / 'pipe')
+            with self.assertRaisesRegex(workspace.WorkspaceError, 'special'):
+                workspace.snapshot(root)
+
+    def test_workspace_collect_rejects_host_conflicts_and_unapproved_apply(self) -> None:
+        workspace = load('oc2_workspace')
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp) / 'host'
+            root.mkdir()
+            source = root / 'note.txt'
+            source.write_text('original')
+            baseline = workspace.snapshot(root)
+            sandbox = pathlib.Path(tmp) / 'guest'
+            sandbox.mkdir()
+            (sandbox / 'note.txt').write_text('sandbox change')
+            with self.assertRaises(workspace.WorkspaceError):
+                workspace.apply_changes(root, sandbox, baseline, approved=False)
+            source.write_text('host concurrent change')
+            with self.assertRaisesRegex(workspace.WorkspaceError, 'conflict'):
+                workspace.apply_changes(root, sandbox, baseline, approved=True)
+
+    def test_workspace_apply_restores_file_mode_after_replace_failure(self) -> None:
+        workspace = load('oc2_workspace')
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp) / 'host'
+            root.mkdir()
+            first = root / 'a.py'
+            second = root / 'b.py'
+            first.write_text('original a')
+            second.write_text('original b')
+            first.chmod(0o6751)
+            second.chmod(0o640)
+            baseline = workspace.snapshot(root)
+            guest = pathlib.Path(tmp) / 'guest'
+            guest.mkdir()
+            (guest / 'a.py').write_text('changed a')
+            (guest / 'b.py').write_text('changed b')
+            real_replace = os.replace
+            calls = 0
+
+            def fail_second_replace(source: pathlib.Path, target: pathlib.Path) -> None:
+                nonlocal calls
+                calls += 1
+                if calls == 2:
+                    raise OSError('injected replace failure')
+                real_replace(source, target)
+
+            with patch.object(workspace.os, 'replace', side_effect=fail_second_replace):
+                with self.assertRaisesRegex(OSError, 'injected replace failure'):
+                    workspace.apply_changes(root, guest, baseline, approved=True)
+
+            self.assertEqual(first.read_text(), 'original a')
+            self.assertEqual(second.read_text(), 'original b')
+            self.assertEqual(stat.S_IMODE(first.stat().st_mode), 0o6751)
+            self.assertEqual(stat.S_IMODE(second.stat().st_mode), 0o640)
+
+    def test_workspace_apply_restores_file_mode_after_delete_failure(self) -> None:
+        workspace = load('oc2_workspace')
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp) / 'host'
+            root.mkdir()
+            first = root / 'a.py'
+            deleted = root / 'b.py'
+            first.write_text('original a')
+            deleted.write_text('original b')
+            first.chmod(0o6751)
+            deleted.chmod(0o640)
+            baseline = workspace.snapshot(root)
+            guest = pathlib.Path(tmp) / 'guest'
+            guest.mkdir()
+            (guest / 'a.py').write_text('changed a')
+            real_unlink = pathlib.Path.unlink
+
+            def fail_delete(path: pathlib.Path, *, missing_ok: bool = False) -> None:
+                if path == deleted:
+                    raise OSError('injected delete failure')
+                real_unlink(path, missing_ok=missing_ok)
+
+            with patch.object(pathlib.Path, 'unlink', fail_delete):
+                with self.assertRaisesRegex(OSError, 'injected delete failure'):
+                    workspace.apply_changes(
+                        root, guest, baseline, approved=True, allow_deletions=True,
+                    )
+
+            self.assertEqual(first.read_text(), 'original a')
+            self.assertEqual(deleted.read_text(), 'original b')
+            self.assertEqual(stat.S_IMODE(first.stat().st_mode), 0o6751)
+            self.assertEqual(stat.S_IMODE(deleted.stat().st_mode), 0o640)
+
+    def test_workspace_snapshot_materializes_only_manifest_files(self) -> None:
+        workspace = load('oc2_workspace')
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp) / 'source'
+            root.mkdir()
+            (root / 'app.py').write_text('print("safe")\n')
+            (root / '.env.production').write_text('SECRET=value')
+            manifest = workspace.snapshot(root)
+            stage = pathlib.Path(tmp) / 'stage'
+            workspace.materialize(root, stage, manifest)
+            self.assertEqual(sorted(item.name for item in stage.iterdir()), ['app.py'])
+            self.assertEqual((stage / 'app.py').read_text(), 'print("safe")\n')
+
+    def test_guest_snapshot_keeps_files_private_before_operator_acl(self) -> None:
+        workspace = load('oc2_workspace')
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp) / 'source'
+            root.mkdir()
+            source = root / 'app.py'
+            source.write_text('print("safe")\n')
+            manifest = workspace.snapshot(root)
+            stage = pathlib.Path(tmp) / 'stage'
+            workspace.materialize(root, stage, manifest, for_guest=True)
+            self.assertEqual(stat.S_IMODE((stage / 'app.py').stat().st_mode), 0o600)
+
+    def test_workspace_transfer_grants_only_operator_read_access(self) -> None:
+        workspace = load('oc2_workspace')
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp) / 'host'
+            root.mkdir()
+            (root / 'main.py').write_text('print("safe")\n')
+            manifest = workspace.snapshot(root)
+            staged = pathlib.Path(tmp) / 'snapshot'
+            runner = FakeRunner()
+            calls = []
+            with patch.object(
+                oc2, 'grant_snapshot_access',
+                side_effect=lambda path, user: calls.append((path, user)),
+                create=True,
+            ):
+                oc2.transfer_workspace(runner, 'oc2-dev', staged, manifest, 'sbx-poc')
+            self.assertEqual(calls, [(staged, 'sbx-poc')])
+
+    def test_snapshot_acl_is_limited_to_named_operator(self) -> None:
+        result: subprocess.CompletedProcess[str] = subprocess.CompletedProcess(
+            args=[], returncode=0,
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            snapshot = pathlib.Path(tmp) / 'project'
+            (snapshot / 'src').mkdir(parents=True)
+            (snapshot / 'src' / 'main.py').write_text('print(1)\n')
+            with patch.object(oc2.shutil, 'which', return_value='/usr/bin/setfacl'), \
+                 patch.object(oc2.subprocess, 'run', return_value=result) as run:
+                oc2.grant_snapshot_access(snapshot, 'sbx-poc')
+            self.assertEqual(
+                run.call_args_list[0].args[0],
+                ['/usr/bin/setfacl', '-R', '-m', 'u:sbx-poc:r--', '--', str(snapshot)],
+            )
+            self.assertEqual(
+                run.call_args_list[1].args[0],
+                ['/usr/bin/setfacl', '-m', 'u:sbx-poc:r-x', '--',
+                 str(snapshot), str(snapshot / 'src')],
+            )
+
+    def test_collection_acl_grants_operator_traversal_and_staging_access(self) -> None:
+        result: subprocess.CompletedProcess[str] = subprocess.CompletedProcess(
+            args=[], returncode=0,
+        )
+        with patch.object(oc2.shutil, 'which', return_value='/usr/bin/setfacl'), \
+             patch.object(oc2.subprocess, 'run', return_value=result) as run:
+            oc2.grant_collection_directory_access(
+                pathlib.Path('/tmp/oc2-state/session/collecting'), 'sbx-poc',
+            )
+        self.assertEqual(
+            run.call_args_list[0].args[0],
+            ['/usr/bin/setfacl', '-m', 'u:sbx-poc:--x', '--',
+             '/tmp/oc2-state/session', '/tmp/oc2-state'],
+        )
+        self.assertEqual(
+            run.call_args_list[1].args[0],
+            ['/usr/bin/setfacl', '-m', 'u:sbx-poc:rwx', '--',
+             '/tmp/oc2-state/session/collecting'],
+        )
+
+    def test_collection_staging_is_created_in_private_session_directory(self) -> None:
+        workspace_ops = load('oc2_workspace')
+        sessions = load('oc2_session')
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            workspace = root / 'workspace'
+            workspace.mkdir()
+            (workspace / 'main.py').write_text('print("safe")\n')
+            state_root = root / 'state'
+            manifest = workspace_ops.snapshot(workspace)
+            session = sessions.create(
+                state_root, 'oc2-dev', oc2.ROOT + '/projects/' + 'a' * 32, manifest,
+            )
+
+            class CollectionRunner:
+                def sbx(self, *args: str, capture: bool = False, tty: bool = False,
+                        timeout: int | None = 180) -> str:
+                    if args[0] == 'cp':
+                        incoming = pathlib.Path(args[2])
+                        incoming.mkdir()
+                        (incoming / 'main.py').write_text('print("safe")\n')
+                    return ''
+
+            runner = CollectionRunner()
+            with patch.object(oc2, 'Runner', return_value=runner), \
+                    patch.object(oc2, 'is_compatible_sandbox', return_value=True), \
+                    patch.object(oc2, 'grant_collection_directory_access') as grant_directory, \
+                    patch.object(oc2, 'grant_collected_workspace_access'), \
+                    patch.object(oc2, 'run_operator'):
+                result = oc2._session_action(
+                    argparse.Namespace(sandbox='oc2-dev', sbx_user='sbx-poc'),
+                    workspace, state_root, collect=True,
+                )
+
+        self.assertEqual(result, 0)
+        staging = grant_directory.call_args.args[0]
+        self.assertEqual(staging.parent, session.directory)
+
+    def test_collection_read_acl_grants_host_user_access_only_to_returned_tree(self) -> None:
+        with patch.object(oc2.shutil, 'which', side_effect=['/usr/bin/setfacl', '/usr/bin/find']), \
+             patch.object(oc2, 'run_operator', return_value='') as run:
+            oc2.grant_collected_workspace_access(
+                pathlib.Path('/tmp/oc2-collect-x/incoming'),
+                'sbx-poc',
+                'y_ohi',
+            )
+        self.assertEqual(
+            run.call_args_list[0].args,
+            ('sbx-poc', '/usr/bin/setfacl', '-m', 'u:y_ohi:r-x', '--',
+             '/tmp/oc2-collect-x/incoming'),
+        )
+        self.assertEqual(
+            run.call_args_list[1].args,
+            ('sbx-poc', '/usr/bin/find', '/tmp/oc2-collect-x/incoming',
+             '-type', 'd', '-exec', '/usr/bin/setfacl', '-m', 'u:y_ohi:r-x',
+             '--', '{}', '+'),
+        )
+        self.assertEqual(
+            run.call_args_list[2].args,
+            ('sbx-poc', '/usr/bin/find', '/tmp/oc2-collect-x/incoming',
+             '-type', 'f', '-exec', '/usr/bin/setfacl', '-m', 'u:y_ohi:r--',
+             '--', '{}', '+'),
+        )
+
+    def test_snapshot_acl_fails_closed_when_setfacl_is_missing(self) -> None:
+        with patch.object(oc2.shutil, 'which', return_value=None):
+            with self.assertRaisesRegex(oc2.Stop, 'setfacl is required'):
+                oc2.grant_snapshot_access(pathlib.Path('/tmp/oc2-stage/project'), 'sbx-poc')
+
+    def test_workspace_transfer_stops_before_copy_if_private_acl_fails(self) -> None:
+        workspace = load('oc2_workspace')
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp) / 'host'
+            root.mkdir()
+            (root / 'main.py').write_text('print("safe")\n')
+            manifest = workspace.snapshot(root)
+            staged = pathlib.Path(tmp) / 'snapshot'
+            runner = FakeRunner()
+            with patch.object(oc2, 'grant_snapshot_access', side_effect=oc2.Stop('ACL denied')):
+                with self.assertRaisesRegex(oc2.Stop, 'ACL denied'):
+                    oc2.transfer_workspace(runner, 'oc2-dev', staged, manifest, 'sbx-poc')
+            self.assertFalse(any(call[0] == 'cp' for call in runner.calls))
+
+    def test_collection_acl_failure_stops_before_sandbox_copy(self) -> None:
+        with patch.object(oc2.shutil, 'which', return_value=None):
+            with self.assertRaisesRegex(oc2.Stop, 'setfacl is required'):
+                oc2.grant_collection_directory_access(
+                    pathlib.Path('/tmp/oc2-collect-x'), 'sbx-poc',
+                )
+
+    def test_workspace_changes_apply_add_modify_and_require_delete_approval(self) -> None:
+        workspace = load('oc2_workspace')
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp) / 'host'
+            root.mkdir()
+            (root / 'keep.txt').write_text('old')
+            (root / 'remove.txt').write_text('remove')
+            baseline = workspace.snapshot(root)
+            guest = pathlib.Path(tmp) / 'guest'
+            workspace.materialize(root, guest, baseline)
+            (guest / 'keep.txt').write_text('new')
+            (guest / 'added.txt').write_text('added')
+            (guest / 'remove.txt').unlink()
+            with self.assertRaisesRegex(workspace.WorkspaceError, 'deletion approval'):
+                workspace.apply_changes(root, guest, baseline, approved=True)
+            result = workspace.apply_changes(
+                root, guest, baseline, approved=True, allow_deletions=True,
+            )
+            self.assertEqual(result, ('added.txt', 'keep.txt', 'remove.txt'))
+            self.assertEqual((root / 'keep.txt').read_text(), 'new')
+            self.assertEqual((root / 'added.txt').read_text(), 'added')
+            self.assertFalse((root / 'remove.txt').exists())
+
+    def test_workspace_apply_rolls_back_when_a_replacement_fails(self) -> None:
+        workspace = load('oc2_workspace')
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp) / 'host'
+            root.mkdir()
+            (root / 'a.txt').write_text('host-a')
+            (root / 'b.txt').write_text('host-b')
+            baseline = workspace.snapshot(root)
+            guest = pathlib.Path(tmp) / 'guest'
+            workspace.materialize(root, guest, baseline)
+            (guest / 'a.txt').write_text('guest-a')
+            (guest / 'b.txt').write_text('guest-b')
+            real_replace = os.replace
+            calls = 0
+
+            def fail_second_replace(source, target):
+                nonlocal calls
+                calls += 1
+                if calls == 2:
+                    raise OSError('injected replace failure')
+                real_replace(source, target)
+
+            ops = sys.modules['oc2_workspace_ops']
+            with patch.object(ops.os, 'replace', side_effect=fail_second_replace):
+                with self.assertRaisesRegex(OSError, 'injected replace failure'):
+                    workspace.apply_changes(root, guest, baseline, approved=True)
+            self.assertEqual((root / 'a.txt').read_text(), 'host-a')
+            self.assertEqual((root / 'b.txt').read_text(), 'host-b')
+
+    def test_workspace_manifest_rejects_path_traversal(self) -> None:
+        workspace = load('oc2_workspace')
+        with self.assertRaisesRegex(workspace.WorkspaceError, 'manifest path'):
+            workspace.decode_manifest(
+                b'{"schema":"dotfiles-ai/oc2-workspace/v1","files":'
+                b'[{"path":"../outside","size":0,"sha256":"' + b'0' * 64 + b'"}]}',
+                pathlib.Path('/tmp/workspace'),
+            )
+
+    def test_workspace_launcher_transfers_and_launches_in_project_directory(self) -> None:
+        workspace = load('oc2_workspace')
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp) / 'host'
+            root.mkdir()
+            (root / 'main.py').write_text('print("original")\n')
+            manifest = workspace.snapshot(root)
+            staged = pathlib.Path(tmp) / 'snapshot'
+            workspace.materialize(root, staged, manifest)
+            runner = FakeRunner()
+            with patch.object(oc2, 'grant_snapshot_access'):
+                remote = oc2.transfer_workspace(
+                    runner, 'oc2-dev', staged, manifest, 'sbx-poc',
+                )
+            self.assertEqual(remote, oc2.ROOT + '/projects/' + remote.rsplit('/', 1)[-1])
+            self.assertEqual(runner.workspace_copies[0], (staged, 'oc2-dev:' + remote))
+            oc2.launch(runner, 'oc2-dev', 'a' * 64, oc2.PINNED[0], remote)
+            self.assertEqual(runner.calls[-1][3], remote)
+
+    def test_oc2_help_and_version_are_local(self) -> None:
+        help_result = subprocess.run(
+            [sys.executable, str(SCRIPTS / 'oc2.py'), '--help'],
+            capture_output=True, text=True, check=False,
+        )
+        self.assertEqual(help_result.returncode, 0)
+        version_result = subprocess.run(
+            [sys.executable, str(SCRIPTS / 'oc2.py'), '--version'],
+            capture_output=True, text=True, check=False,
+        )
+        self.assertEqual(version_result.returncode, 0)
+        self.assertIn(oc2.VERSION, version_result.stdout)
+        self.assertEqual(oc2.VERSION, '2.2.5')
+        self.assertNotIn('--collect', help_result.stdout)
 
     def test_missing_sandbox(self) -> None:
         runner = FakeRunner()
@@ -104,8 +613,7 @@ class HostTest(unittest.TestCase):
         self.assertIn(('inspect', 'oc2-dev', '--json'), runner.calls)
 
     def test_mounted_workspace_rejected(self) -> None:
-        runner = FakeRunner([{'name': 'oc2-dev', 'agent': 'shell',
-                              'workspace': '/home/' + 'user/repo'}])
+        runner = FakeRunner([{'name': 'oc2-dev', 'agent': 'shell', 'workspace': '/home/user/repo'}])
         with self.assertRaisesRegex(oc2.Stop, 'workspace mount'):
             oc2.is_compatible_sandbox(runner, 'oc2-dev')
 
@@ -118,7 +626,7 @@ class HostTest(unittest.TestCase):
     def test_runtime_mounts_rejected(self) -> None:
         runner = FakeRunner([{'name': 'oc2-dev', 'agent': 'shell'}],
                             inspection={'name': 'oc2-dev',
-                                        'runtime_mounts': [{'source': '/home/' + 'user'}]})
+                                        'runtime_mounts': [{'source': '/home/user'}]})
         with self.assertRaisesRegex(oc2.Stop, 'runtime mounts'):
             oc2.is_compatible_sandbox(runner, 'oc2-dev')
 
@@ -136,7 +644,7 @@ class HostTest(unittest.TestCase):
 
     def test_list_workspace_mount_rejected_even_if_inspect_empty(self) -> None:
         runner = FakeRunner([{'name': 'oc2-dev', 'agent': 'shell',
-                              'workspace': '/home/' + 'user/source'}])
+                              'workspace': '/home/user/source'}])
         with self.assertRaisesRegex(oc2.Stop, 'workspace mount'):
             oc2.is_compatible_sandbox(runner, 'oc2-dev')
         self.assertNotIn(('inspect', 'oc2-dev', '--json'), runner.calls)
@@ -152,8 +660,9 @@ class HostTest(unittest.TestCase):
             with patch.object(oc2, 'Runner', side_effect=AssertionError('must not call sbx')):
                 out = io.StringIO()
                 with contextlib.redirect_stdout(out):
-                    self.assertEqual(oc2.main(['--repo-root', tmp, '--dry-run']), 0)
-                self.assertIn('mountless sandbox', out.getvalue())
+                    self.assertEqual(oc2.main(['--repo-root', tmp, '--workspace', tmp,
+                                               '--dry-run']), 0)
+                self.assertIn('no Sandbox commands executed', out.getvalue())
 
     def test_invalid_sandbox_name_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -169,8 +678,65 @@ class HostTest(unittest.TestCase):
         self.assertEqual(command[4:7], ('oc2-dev', 'env', '-i'))
         self.assertEqual(command[-2:], (oc2.PINNED[0], '--standalone'))
         self.assertIn('OPENCODE_WATCHDOG_ENABLED=false', command)
+        self.assertFalse(any(value.startswith('TMPDIR=') for value in command))
         self.assertNotIn('bash', command)
         self.assertNotIn('--mount', command)
+
+    def test_launch_prepares_isolated_runtime_for_clone_workspace(self) -> None:
+        runner = FakeRunner()
+        digest = 'b' * 64
+        project = '/clone/workspaces/synthetic'
+        runtime = f'{oc2.ROOT}/runtime/{digest[:16]}'
+        oc2.launch(runner, 'oc2-dev', digest, oc2.PINNED[0], project)
+        self.assertEqual(
+            runner.calls[0],
+            ('exec', 'oc2-dev', 'mkdir', '-p', '-m', '700',
+             runtime, *(f'{runtime}/{name}' for name in
+                        ('home', 'config', 'data', 'state', 'cache'))),
+        )
+        self.assertEqual(
+            runner.calls[1],
+            ('exec', 'oc2-dev', 'chmod', '700', runtime,
+             *(f'{runtime}/{name}' for name in
+               ('home', 'config', 'data', 'state', 'cache'))),
+        )
+        self.assertEqual(runner.calls[2][3], project)
+
+    def test_seed_cli_uses_operator_home_for_private_staging(self) -> None:
+        runner = oc2.Runner('operator')
+        created = subprocess.CompletedProcess(
+            args=[], returncode=0,
+            stdout='/home/' + 'operator/.oc2-seed-12345678\n', stderr='',
+        )
+        with patch.object(oc2, 'is_compatible_sandbox', return_value=True), \
+                patch.object(oc2, 'cli_path', return_value=oc2.PINNED[0]), \
+                patch.object(oc2.subprocess, 'run', return_value=created) as run, \
+                patch.object(runner, 'sbx', return_value='opencode v2.2.5\n') as sbx:
+            self.assertEqual(
+                oc2.seed_cli(runner, 'oc2-dev', 'oc2-source'), oc2.PINNED[0],
+            )
+
+        self.assertEqual(
+            run.call_args_list[0].args[0],
+            ['sudo', '-i', '-u', 'operator', '--', 'sh', '-c',
+             'umask 077; mktemp -d "$HOME/.oc2-seed-XXXXXXXX"'],
+        )
+        copy_calls = [call.args for call in sbx.call_args_list if call.args[0] == 'cp']
+        self.assertIn(
+            ('exec', 'oc2-source', 'bash', '-c',
+             'if test -x /home/agent/.local/opencode-v2/node_modules/.bin/opencode; '
+             'then /home/agent/.local/opencode-v2/node_modules/.bin/opencode --version; fi'),
+            [call.args for call in sbx.call_args_list],
+        )
+        self.assertEqual(
+            copy_calls,
+            [
+                ('cp', 'oc2-source:/home/agent/.local/opencode-v2/node_modules',
+                 '/home/' + 'operator/.oc2-seed-12345678/node_modules'),
+                ('cp', '/home/' + 'operator/.oc2-seed-12345678/node_modules',
+                 'oc2-dev:/home/agent/.local/oc2-runtime/node_modules'),
+            ],
+        )
 
     def test_stage_does_not_depend_on_bash_positional_arguments(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -184,7 +750,8 @@ class HostTest(unittest.TestCase):
                 def __init__(self) -> None:
                     self.calls: list[tuple[str, ...]] = []
 
-                def sbx(self, *args: str, **kwargs: str | float | bool) -> str:
+                def sbx(self, *args: str, capture: bool = False, tty: bool = False,
+                        timeout: int | None = 180) -> str:
                     self.calls.append(args)
                     if args[:4] == ('exec', 'oc2-dev', 'bash', '-c'):
                         # No synthetic $0/$1/$2 follows the bash code.
@@ -225,7 +792,8 @@ class HostTest(unittest.TestCase):
                 def __init__(self) -> None:
                     self.calls: list[tuple[str, ...]] = []
 
-                def sbx(self, *args: str, **kwargs: str | float | bool) -> str:
+                def sbx(self, *args: str, capture: bool = False, tty: bool = False,
+                        timeout: int | None = 180) -> str:
                     self.calls.append(args)
                     if args[:4] == ('exec', 'oc2-dev', 'bash', '-c'):
                         return 'missing\n'
@@ -257,7 +825,8 @@ class HostTest(unittest.TestCase):
             script_sha = hashlib.sha256(script.read_bytes()).hexdigest()
 
             class Runner:
-                def sbx(self, *args: str, **kwargs: str | float | bool) -> str:
+                def sbx(self, *args: str, capture: bool = False, tty: bool = False,
+                        timeout: int | None = 180) -> str:
                     if args[:4] == ('exec', 'oc2-dev', 'bash', '-c'):
                         return 'missing\n'
                     if args[:3] == ('exec', 'oc2-dev', 'sha256sum'):
@@ -268,20 +837,39 @@ class HostTest(unittest.TestCase):
             with self.assertRaisesRegex(oc2.Stop, 'asset bundle SHA mismatch'):
                 oc2.stage(Runner(), 'oc2-dev', bundle, 'a' * 64, script, asset, expected)
 
-    def test_cli_version_probe_avoids_bash_positional_arguments(self) -> None:
+    def test_cli_version_probe_uses_shell_parameter_for_binary_path(self) -> None:
         class VersionRunner:
             def __init__(self) -> None:
                 self.calls: list[tuple[str, ...]] = []
 
-            def sbx(self, *args: str, **kwargs: str | float | bool) -> str:
+            def sbx(self, *args: str, capture: bool = False, tty: bool = False,
+                    timeout: int | None = 180) -> str:
                 self.calls.append(args)
-                assert args[:4] == ('exec', 'oc2-dev', 'bash', '-c')
-                assert len(args) == 5
-                assert '$1' not in args[4]
-                return 'opencode v2.1.4\n'
+                assert args == (
+                    'exec', 'oc2-dev', 'sh', '-c',
+                    'if test -x "$1"; then "$1" --version; fi',
+                    'oc2-version-probe', oc2.PINNED[0],
+                )
+                return 'opencode v2.2.5\n'
 
         runner = VersionRunner()
         self.assertEqual(oc2.cli_path(runner, 'oc2-dev'), oc2.PINNED[0])
+        self.assertEqual(len(runner.calls), 1)
+
+    def test_cli_path_returns_none_when_pinned_binary_is_missing(self) -> None:
+        class MissingBinaryRunner:
+            def __init__(self) -> None:
+                self.calls: list[tuple[str, ...]] = []
+
+            def sbx(self, *args: str, capture: bool = False, tty: bool = False,
+                    timeout: int | None = 180) -> str:
+                self.calls.append(args)
+                if args[:4] == ('exec', 'oc2-dev', 'sh', '-c'):
+                    return ''
+                raise oc2.Stop('sbx command failed (exit 127)')
+
+        runner = MissingBinaryRunner()
+        self.assertIsNone(oc2.cli_path(runner, 'oc2-dev'))
         self.assertEqual(len(runner.calls), 1)
 
     def test_launch_rejects_unapproved_binary(self) -> None:
@@ -291,52 +879,6 @@ class HostTest(unittest.TestCase):
     def test_launch_rejects_invalid_digest(self) -> None:
         with self.assertRaisesRegex(oc2.Stop, 'invalid runtime digest'):
             oc2.launch(FakeRunner(), 'oc2-dev', 'not-a-digest', oc2.PINNED[0])
-
-    def test_seed_cli_uses_private_operator_home_staging(self) -> None:
-        runner = FakeRunner()
-        runner.user = oc2.getpass.getuser()
-        home = pathlib.Path.home()
-        staging = home / '.oc2-seed-AbCd1234'
-        completed = subprocess.CompletedProcess(
-            [], 0, stdout=f'{home}\n{staging}\n'
-        )
-
-        def sbx(*args: str, **kwargs: str | float | bool) -> str:
-            runner.calls.append(args)
-            if args[:3] == ('exec', 'oc-v2-poc', 'bash'):
-                return 'opencode v2.1.4'
-            return ''
-
-        with patch.object(oc2, 'is_compatible_sandbox', return_value=True), \
-             patch.object(oc2, 'cli_path', return_value=oc2.PINNED[0]), \
-             patch.object(runner, 'sbx', side_effect=sbx) as sbx_mock, \
-             patch.object(oc2.subprocess, 'run', return_value=completed) as run:
-            result = oc2.seed_cli(runner, 'oc2-dev', 'oc-v2-poc')
-
-        self.assertEqual(result, oc2.PINNED[0])
-        command = run.call_args_list[0].args[0]
-        self.assertIn('mktemp -d "$HOME/.oc2-seed-XXXXXXXX"', command[2])
-        self.assertNotIn('/tmp', ' '.join(command))
-        self.assertIn(str(staging / 'node_modules'), repr(runner.calls))
-        copy_calls = [call for call in sbx_mock.call_args_list
-                      if call.args[0] == 'cp']
-        self.assertEqual(len(copy_calls), 2)
-        self.assertTrue(all(call.kwargs['timeout'] == 900 for call in copy_calls))
-
-    def test_seed_cli_rejects_publicly_writable_staging_path(self) -> None:
-        runner = FakeRunner()
-        runner.user = oc2.getpass.getuser()
-        completed = subprocess.CompletedProcess(
-            [], 0, stdout='/tmp/oc2-seed-AbCd1234\n'
-        )
-        with patch.object(oc2, 'is_compatible_sandbox', return_value=True), \
-             patch.object(runner, 'sbx', return_value='opencode v2.1.4') as sbx, \
-             patch.object(oc2.subprocess, 'run', return_value=completed):
-            with self.assertRaisesRegex(oc2.Stop, 'unsafe seed staging path'):
-                oc2.seed_cli(runner, 'oc2-dev', 'oc-v2-poc')
-        self.assertFalse(any(
-            call.args[0][0] == 'cp' for call in sbx.call_args_list
-        ))
 
 
 class GuestTest(unittest.TestCase):
@@ -389,7 +931,7 @@ class GuestTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'non-regular'):
             guest.verify(self.bundle)
 
-    def _assets(self) -> tuple[pathlib.Path, str]:
+    def _assets(self):
         names = sorted(guest.ASSET_TARGETS)
         contents = {name: ('# selected text\n' if name != 'theme.json'
                            else '{"name":"tokyonight"}')
@@ -423,7 +965,7 @@ class GuestTest(unittest.TestCase):
         tui = json.loads((target / 'config/opencode/cli.json').read_text())
         self.assertEqual(tui['theme'], {'name': 'tokyonight'})
 
-    def _assert_unapproved_asset_rejected(self, name: str) -> None:
+    def _assert_unapproved_asset_rejected(self, name):
         path, _ = self._assets()
         payload = json.loads(path.read_bytes())
         payload['files'][name] = '{"source":"third-party"}'
