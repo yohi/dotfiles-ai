@@ -1132,7 +1132,7 @@ class OAuthBootstrapConfigTest(unittest.TestCase):
         config_dir = self.runtime / 'config' / 'opencode'
         config_dir.mkdir(parents=True, mode=0o700)
         self.base_file = config_dir / 'opencode.jsonc'
-        self.policies = [
+        self.policies: list[dict[str, str]] = [
             {'action': 'provider.use', 'resource': '*', 'effect': 'deny'},
             {'action': 'provider.use', 'resource': 'openai', 'effect': 'allow'},
             {'action': 'integration.connect', 'resource': '*', 'effect': 'deny'},
@@ -1178,7 +1178,7 @@ class OAuthBootstrapConfigTest(unittest.TestCase):
         self.assertFalse((self.runtime / 'oauth-bootstrap').exists())
 
     def test_bootstrap_refuses_preexisting_allow_policy(self):
-        self.config['policies'].append(
+        self.policies.append(
             {'action': 'integration.connect', 'resource': 'openai', 'effect': 'allow'},
         )
         self.base_file.write_text(json.dumps(self.config))
@@ -1276,7 +1276,7 @@ class OAuthTest(unittest.TestCase):
             return bootstrap.capture_import_stderr(self.db, stderr)
 
     def run_sync(self, before, after, fail=None):
-        calls = []
+        calls: list[tuple[str, str | bytes | None]] = []
         self.last_calls = calls
         self.last_envs = []
         exports = iter([before, after])

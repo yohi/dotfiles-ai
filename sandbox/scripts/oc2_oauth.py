@@ -27,18 +27,20 @@ class Stage(Enum):
 
 class Progress:
     def __init__(self):
-        self.stage = None
+        self.stage: Stage | None = None
         self.completed = True
 
-    def start(self, stage):
+    def start(self, stage: Stage) -> None:
         if self.stage is not None and not self.completed:
             self.emit('PASS')
         self.stage = stage
         self.completed = False
         self.emit('START')
 
-    def emit(self, outcome, stage=None):
-        current = self.stage if stage is None else stage
+    def emit(self, outcome: str, stage: Stage | None = None) -> None:
+        current = stage if stage is not None else self.stage
+        if current is None:
+            return
         print(f'OC2_OAUTH {current.value} {outcome}', file=sys.stderr, flush=True)
         if current is self.stage and outcome in ('PASS', 'FAIL'):
             self.completed = True

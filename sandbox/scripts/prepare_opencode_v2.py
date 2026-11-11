@@ -82,7 +82,7 @@ def _unique_json_object(pairs: list[tuple[str, JsonValue]]) -> dict[str, JsonVal
 def _yaml_string_key(node: Node) -> str | None:
     match node:
         case ScalarNode(tag="tag:yaml.org,2002:str", value=value):
-            return value
+            return str(value)
         case ScalarNode() | SequenceNode() | MappingNode():
             return None
         case Node():
@@ -169,10 +169,10 @@ def _model_ids(provider_id: str, source: dict[str, JsonValue]) -> tuple[str, ...
             raise ExportError("provider.openai.whitelist contains an invalid model ID")
         return models
 
-    models = _mapping(source.get("models"), f"provider.{provider_id}.models")
-    if not models:
+    model_catalog = _mapping(source.get("models"), f"provider.{provider_id}.models")
+    if not model_catalog:
         raise ExportError(f"provider.{provider_id}.models must not be empty")
-    return tuple(models)
+    return tuple(model_catalog)
 
 
 def _parse_v2_settings(
@@ -221,16 +221,17 @@ def _parse_v2_settings(
             )
         )
 
-    enabled = tuple(provider for provider in selections if provider.enabled)
-    enabled_ids = {provider.provider_id for provider in enabled}
-    if enabled_ids != {"openai", "cloudflare-ai-gateway-custom"} or len(enabled) != 2:
+    enabled_providers = tuple(provider for provider in selections if provider.enabled)
+    enabled_ids = {provider.provider_id for provider in enabled_providers}
+    if enabled_ids != {"openai", "cloudflare-ai-gateway-custom"} or len(enabled_providers) != 2:
         raise ExportError("opencode_v2 must enable OpenAI and Cloudflare Custom")
     provider_id, separator, model_id = default_model.partition("/")
-    selected_provider = next(
-        (provider for provider in enabled if provider.provider_id == provider_id), None,
+    matching_providers = tuple(
+        provider for provider in enabled_providers if provider.provider_id == provider_id
     )
-    if not separator or not model_id or selected_provider is None:
+    if not separator or not model_id or len(matching_providers) != 1:
         raise ExportError("opencode_v2.default_model must use an enabled provider")
+    selected_provider = matching_providers[0]
     if model_id not in selected_provider.model_ids:
         raise ExportError("opencode_v2.default_model is not declared in apm.yml")
     return V2Settings(
@@ -378,14 +379,16 @@ def _build_v2_config(
         )
     policies: list[JsonValue] = [
         {"action": "provider.use", "resource": "*", "effect": "deny"},
-        *(
-            {"action": "provider.use", "resource": selection.provider_id, "effect": "allow"}
-            for selection in enabled
-        ),
+    ]
+    policies.extend([
+        {"action": "provider.use", "resource": selection.provider_id, "effect": "allow"}
+        for selection in enabled
+    ])
+    policies.extend([
         {"action": "integration.connect", "resource": "*", "effect": "deny"},
         {"action": "plugin.use", "resource": "*", "effect": "deny"},
         {"action": "mcp.use", "resource": "*", "effect": "deny"},
-    ]
+    ])
     return {"model": settings.default_model, "providers": providers, "policies": policies}
 
 

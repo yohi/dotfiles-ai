@@ -71,7 +71,7 @@ def _cf_provider(
     base_url: str = SAFE_BASE_URL,
     headers: dict[str, str] | None = None,
     settings_extra: dict[str, str] | None = None,
-) -> dict[str, object]:
+) -> dict[str, exporter.JsonValue]:
     settings: dict[str, object] = {"baseURL": base_url}
     settings.update(settings_extra or {})
     return {
@@ -92,7 +92,7 @@ def _server_config(
     base_url: str = SAFE_BASE_URL,
     headers: dict[str, str] | None = None,
     settings_extra: dict[str, str] | None = None,
-) -> dict[str, object]:
+) -> dict[str, exporter.JsonValue]:
     return {
         "$schema": "https://opencode.ai/config.json",
         "shell": "bash",

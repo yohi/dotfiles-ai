@@ -163,7 +163,7 @@ class LauncherFlowTests(unittest.TestCase):
                 try:
                     status = oc2.main(args)
                 except SystemExit as exc:
-                    status = int(exc.code)
+                    status = int(exc.code) if exc.code is not None else 0
         return status, output.getvalue()
 
     def _write_cloudflare_apm(self) -> None:
@@ -318,9 +318,11 @@ class LauncherFlowTests(unittest.TestCase):
         self.assertFalse(mixin_path.exists())
         self.assertIsNotNone(self.fake.created_mixin_spec)
         self.assertFalse(self.fake.mixin_exists_at_launch)
-        mixin_spec = yaml.safe_load(self.fake.created_mixin_spec)
+        mixin_spec_text = self.fake.created_mixin_spec
+        assert mixin_spec_text is not None
+        mixin_spec = yaml.safe_load(mixin_spec_text)
         self.assertFalse(any(
-            value in self.fake.created_mixin_spec for value in poison.values()
+            value in mixin_spec_text for value in poison.values()
         ))
         self.assertEqual(mixin_spec['kind'], 'mixin')
         self.assertEqual(mixin_spec['schemaVersion'], '3')
