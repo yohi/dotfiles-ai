@@ -120,9 +120,20 @@ def verify_bundle(directory: Path, *, trusted_root: Path | None = None) -> str:
         raise StageError("bundle directory must be a regular directory")
     if {item.name for item in directory.iterdir()} != NAMES:
         raise StageError("unexpected bundle file set")
-    data = {name: _regular_bytes(directory, name) for name in NAMES}
+    manifest, server, tui, data = _load_bundle(directory)
     if any(exporter.contains_credential_material(content) for content in data.values()):
         raise StageError("bundle contains credential material")
+
+    digest = _validate_manifest(manifest, data)
+    _validate_server_config(server, manifest)
+    _validate_tui_config(tui)
+    return digest
+
+
+def _load_bundle(
+    directory: Path,
+) -> tuple[dict[str, JsonValue], dict[str, JsonValue], dict[str, JsonValue], dict[str, bytes]]:
+    data = {name: _regular_bytes(directory, name) for name in NAMES}
     try:
         manifest = json.loads(
             data["export-manifest.json"], object_pairs_hook=exporter._unique_json_object,
@@ -133,8 +144,12 @@ def verify_bundle(directory: Path, *, trusted_root: Path | None = None) -> str:
         tui = json.loads(data["cli.json"], object_pairs_hook=exporter._unique_json_object)
     except (ValueError, UnicodeDecodeError) as exc:
         raise StageError("bundle is not valid UTF-8 JSON") from exc
-    if not isinstance(manifest, dict):
-        raise StageError("invalid manifest")
+    if not isinstance(manifest, dict) or not isinstance(server, dict) or not isinstance(tui, dict):
+        raise StageError("bundle JSON roots must be objects")
+    return manifest, server, tui, data
+
+
+def _validate_manifest(manifest: dict[str, JsonValue], data: dict[str, bytes]) -> str:
     expected_keys = {"schema", "generator", "source", "config_format", "source_sha256",
                      "opencode_version", "plugins_exported", "mcp_entries_exported",
                      "artifacts_sha256"}
@@ -149,21 +164,26 @@ def verify_bundle(directory: Path, *, trusted_root: Path | None = None) -> str:
     source_hash = manifest.get("source_sha256")
     if not isinstance(source_hash, str) or re.fullmatch(r"[a-f0-9]{64}", source_hash) is None:
         raise StageError("invalid source digest")
-    expected = {
+    expected_hashes = {
         name: hashlib.sha256(data[name]).hexdigest()
         for name in ("opencode.jsonc", "cli.json")
     }
-    if manifest.get("artifacts_sha256") != expected:
+    if manifest.get("artifacts_sha256") != expected_hashes:
         raise StageError("artifact checksum mismatch")
     if manifest.get("plugins_exported") != 0 or manifest.get("mcp_entries_exported") != 0:
         raise StageError("exported plugins or MCP entries are forbidden")
-    if not isinstance(server, dict):
-        raise StageError("unexpected server config fields")
-    if server["$schema"] != "https://opencode.ai/config.json":
+    return hashlib.sha256(data["export-manifest.json"]).hexdigest()
+
+
+def _validate_server_config(
+    server: dict[str, JsonValue],
+    manifest: dict[str, JsonValue],
+) -> None:
+    if server.get("$schema") != "https://opencode.ai/config.json":
         raise StageError("unexpected server config schema")
-    if server["shell"] not in ("bash", "sh", "zsh") or type(server["shell"]) is not str:
+    if server.get("shell") not in ("bash", "sh", "zsh") or type(server.get("shell")) is not str:
         raise StageError("unapproved shell")
-    if type(server["snapshot"]) is not bool:
+    if type(server.get("snapshot")) is not bool:
         raise StageError("unapproved server config values")
     match manifest["config_format"]:
         case "legacy-minimal":
@@ -174,9 +194,11 @@ def verify_bundle(directory: Path, *, trusted_root: Path | None = None) -> str:
             _verify_v2_config(server)
         case _:
             raise StageError("unrecognized config format")
-    if not isinstance(tui, dict) or tui != {"$schema": "https://opencode.ai/v2/cli.json", "plugins": []}:
+
+
+def _validate_tui_config(tui: dict[str, JsonValue]) -> None:
+    if tui != {"$schema": "https://opencode.ai/v2/cli.json", "plugins": []}:
         raise StageError("unexpected TUI config")
-    return hashlib.sha256(data["export-manifest.json"]).hexdigest()
 
 
 def verify_guest_bundle(directory: Path) -> str:
