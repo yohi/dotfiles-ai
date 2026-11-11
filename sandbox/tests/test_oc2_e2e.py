@@ -197,6 +197,19 @@ class LauncherFlowTests(unittest.TestCase):
         self.assertIn('Git remote contains credential', output)
         self.assertFalse(self.fake.created)
 
+    def test_clone_mode_refuses_signed_remote_url_before_creation(self) -> None:
+        subprocess.run(
+            ['git', '-C', str(self.project), 'remote', 'set-url', 'origin',
+             'https://example.invalid/source.git?sig=Ab12Cd34Ef56Gh78'],
+            check=True,
+        )
+
+        status, output = self._run()
+
+        self.assertEqual(status, 1)
+        self.assertIn('Git remote contains credential', output)
+        self.assertFalse(self.fake.created)
+
     def test_clone_source_survives_ambiguous_sandbox_creation_failure(self) -> None:
         original_sbx = self.fake.sbx
 

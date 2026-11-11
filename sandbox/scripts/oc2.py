@@ -138,7 +138,7 @@ def _safe_clone_remotes(workspace: pathlib.Path) -> tuple[CloneRemote, ...]:
 
 
 def _remote_url_has_credentials(url: str) -> bool:
-    """Reject credentials and sensitive query parameters embedded in a remote URL."""
+    """Reject credentials and query strings embedded in a remote URL."""
     if any(character.isspace() or ord(character) < 0x20 for character in url):
         return True
     parsed = urllib.parse.urlsplit(url)
@@ -147,11 +147,7 @@ def _remote_url_has_credentials(url: str) -> bool:
         return True
     if parsed.scheme.lower() in {'http', 'https'} and parsed.username is not None:
         return True
-    sensitive_terms = ('auth', 'credential', 'key', 'password', 'secret', 'token')
-    return any(
-        any(term in key.lower() for term in sensitive_terms)
-        for key, _ in urllib.parse.parse_qsl(parsed.query, keep_blank_values=True)
-    )
+    return bool(parsed.query)
 
 
 def _new_clone_source_directory(name: str) -> pathlib.Path:

@@ -274,7 +274,7 @@ class HostTest(unittest.TestCase):
             second = root / 'b.py'
             first.write_text('original a')
             second.write_text('original b')
-            first.chmod(0o751)
+            first.chmod(0o6751)
             second.chmod(0o640)
             baseline = workspace.snapshot(root)
             guest = pathlib.Path(tmp) / 'guest'
@@ -297,7 +297,7 @@ class HostTest(unittest.TestCase):
 
             self.assertEqual(first.read_text(), 'original a')
             self.assertEqual(second.read_text(), 'original b')
-            self.assertEqual(stat.S_IMODE(first.stat().st_mode), 0o751)
+            self.assertEqual(stat.S_IMODE(first.stat().st_mode), 0o6751)
             self.assertEqual(stat.S_IMODE(second.stat().st_mode), 0o640)
 
     def test_workspace_apply_restores_file_mode_after_delete_failure(self) -> None:
@@ -309,7 +309,7 @@ class HostTest(unittest.TestCase):
             deleted = root / 'b.py'
             first.write_text('original a')
             deleted.write_text('original b')
-            first.chmod(0o751)
+            first.chmod(0o6751)
             deleted.chmod(0o640)
             baseline = workspace.snapshot(root)
             guest = pathlib.Path(tmp) / 'guest'
@@ -330,7 +330,7 @@ class HostTest(unittest.TestCase):
 
             self.assertEqual(first.read_text(), 'original a')
             self.assertEqual(deleted.read_text(), 'original b')
-            self.assertEqual(stat.S_IMODE(first.stat().st_mode), 0o751)
+            self.assertEqual(stat.S_IMODE(first.stat().st_mode), 0o6751)
             self.assertEqual(stat.S_IMODE(deleted.stat().st_mode), 0o640)
 
     def test_workspace_snapshot_materializes_only_manifest_files(self) -> None:
