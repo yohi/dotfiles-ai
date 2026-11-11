@@ -135,6 +135,10 @@ class StageTests(unittest.TestCase):
         with self.assertRaises(stage.StageError):
             stage.verify_bundle(self.bundle)
 
+    def test_regular_bundle_reader_rejects_path_traversal(self) -> None:
+        with self.assertRaises(stage.StageError):
+            stage._regular_bytes(self.bundle / "../repo/apm.yml")
+
     def test_rejects_plugin_or_mcp_config_even_with_updated_hash(self) -> None:
         manifest_file = self.bundle / "export-manifest.json"
         config_file = self.bundle / "opencode.jsonc"

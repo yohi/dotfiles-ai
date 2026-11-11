@@ -38,6 +38,8 @@ class StageError(Exception):
 
 
 def _regular_bytes(path: Path) -> bytes:
+    if path.name not in NAMES:
+        raise StageError("unexpected bundle file name")
     if path.is_symlink() or not path.is_file():
         raise StageError("missing, non-regular, or symlinked bundle file: " + path.name)
     if path.stat().st_size > MAX_BYTES:
