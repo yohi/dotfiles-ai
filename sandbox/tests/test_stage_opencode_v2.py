@@ -135,6 +135,13 @@ class StageTests(unittest.TestCase):
         with self.assertRaises(stage.StageError):
             stage.verify_bundle(self.bundle)
 
+    def test_regular_bytes_rejects_paths_outside_the_bundle_allowlist(self) -> None:
+        outside = self.root / "opencode.jsonc"
+        outside.write_text("must not be read", encoding="utf-8")
+
+        with self.assertRaises(stage.StageError):
+            stage._regular_bytes(self.root, "../opencode.jsonc")
+
     def test_rejects_plugin_or_mcp_config_even_with_updated_hash(self) -> None:
         manifest_file = self.bundle / "export-manifest.json"
         config_file = self.bundle / "opencode.jsonc"

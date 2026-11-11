@@ -639,9 +639,10 @@ class HostTest(unittest.TestCase):
                 'sha256': hashlib.sha256(b'').hexdigest(),
             })
             payload['files'].sort(key=lambda entry: entry['path'])
+            encoded = json.dumps(payload).encode()
 
             with self.assertRaisesRegex(workspace.WorkspaceError, 'unsafe or excluded'):
-                workspace.decode_manifest(json.dumps(payload).encode(), root)
+                workspace.decode_manifest(encoded, root)
 
     def test_workspace_profile_omits_new_apm_from_guest_changes_and_apply(self):
         workspace = load('oc2_workspace')
@@ -1512,7 +1513,7 @@ class HostTest(unittest.TestCase):
     def test_unrequested_cloudflare_provider_is_removed_from_runtime_config(self):
         with tempfile.TemporaryDirectory() as tmp:
             config = pathlib.Path(tmp) / 'opencode.jsonc'
-            config.write_text(json.dumps({
+            generated = {
                 'model': 'openai/gpt-6-luna',
                 'providers': {
                     'openai': {'models': {}},
@@ -1527,9 +1528,12 @@ class HostTest(unittest.TestCase):
                         'effect': 'allow',
                     },
                 ],
-            }))
+            }
+            config.write_text(json.dumps(generated))
 
-            selected = oc2.configure_cloudflare_provider(config, include_cloudflare=False)
+            selected = oc2.configure_cloudflare_provider(
+                config, include_cloudflare=False, generated_config=generated,
+            )
 
             runtime_config = json.loads(config.read_text())
 
@@ -1539,6 +1543,34 @@ class HostTest(unittest.TestCase):
             policy.get('resource') == 'cloudflare-ai-gateway-custom'
             for policy in runtime_config['policies']
         ))
+
+    def test_generated_config_writer_rejects_noncanonical_destination(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            destination = pathlib.Path(tmp) / 'outside.json'
+            destination.write_text('unchanged')
+
+            with self.assertRaisesRegex(OSError, 'unsafe generated config destination'):
+                oc2._write_generated_config(destination, {'model': 'openai/model'})
+
+            self.assertEqual(destination.read_text(), 'unchanged')
+
+    def test_cloudflare_config_rejects_tampered_generated_input(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config = pathlib.Path(tmp) / 'opencode.jsonc'
+            generated = {'model': 'openai/model', 'providers': {'openai': {}}}
+            config.write_text(json.dumps({
+                **generated,
+                'instructions': ['../../outside.md'],
+            }))
+
+            with self.assertRaisesRegex(oc2.Stop, 'differs from the validated APM source'):
+                oc2.configure_cloudflare_provider(
+                    config,
+                    include_cloudflare=False,
+                    generated_config=generated,
+                )
+
+            self.assertIn('../../outside.md', config.read_text())
 
     def test_explicit_cloudflare_mode_keeps_provider_available(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -1553,7 +1585,9 @@ class HostTest(unittest.TestCase):
             }
             config.write_text(json.dumps(original))
 
-            selected = oc2.configure_cloudflare_provider(config, include_cloudflare=True)
+            selected = oc2.configure_cloudflare_provider(
+                config, include_cloudflare=True, generated_config=original,
+            )
 
             self.assertTrue(selected)
             self.assertEqual(json.loads(config.read_text()), original)
@@ -1561,30 +1595,36 @@ class HostTest(unittest.TestCase):
     def test_cloudflare_default_model_requires_provider_even_without_flag(self):
         with tempfile.TemporaryDirectory() as tmp:
             config = pathlib.Path(tmp) / 'opencode.jsonc'
-            config.write_text(json.dumps({
+            generated = {
                 'model': 'cloudflare-ai-gateway-custom/secret-model',
                 'providers': {
                     'openai': {'models': {}},
                     'cloudflare-ai-gateway-custom': {'models': {'secret-model': {}}},
                 },
                 'policies': [],
-            }))
+            }
+            config.write_text(json.dumps(generated))
 
-            selected = oc2.configure_cloudflare_provider(config, include_cloudflare=False)
+            selected = oc2.configure_cloudflare_provider(
+                config, include_cloudflare=False, generated_config=generated,
+            )
 
         self.assertTrue(selected)
 
     def test_cloudflare_mode_without_provider_configuration_fails_closed(self):
         with tempfile.TemporaryDirectory() as tmp:
             config = pathlib.Path(tmp) / 'opencode.jsonc'
-            config.write_text(json.dumps({
+            generated = {
                 'model': 'openai/gpt-6-luna',
                 'providers': {'openai': {'models': {}}},
                 'policies': [],
-            }))
+            }
+            config.write_text(json.dumps(generated))
 
             with self.assertRaisesRegex(oc2.Stop, 'no configured provider'):
-                oc2.configure_cloudflare_provider(config, include_cloudflare=True)
+                oc2.configure_cloudflare_provider(
+                    config, include_cloudflare=True, generated_config=generated,
+                )
 
     def test_credential_mixin_spec_declares_proxy_bindings(self):
         spec = yaml.safe_load(oc2.credential_mixin_spec('oc2-credentials-a1b2c3'))

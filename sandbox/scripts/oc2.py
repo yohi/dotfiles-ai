@@ -8,6 +8,7 @@ not requested. Existing unrelated sandboxes are never modified.
 from __future__ import annotations
 
 import argparse
+import copy
 from dataclasses import dataclass
 import getpass
 import hashlib
@@ -20,6 +21,7 @@ import re
 import secrets
 import shlex
 import shutil
+import stat
 import subprocess
 import sys
 import tarfile
@@ -215,12 +217,28 @@ def download_verified_cli(destination: pathlib.Path) -> pathlib.Path:
         raise Stop('official CLI download requires a private temporary directory')
     if any(destination.iterdir()):
         raise Stop('official CLI temporary directory must be empty')
+    archive_path = destination / 'opencode-linux-x64.tar.gz'
+    binary_path = destination / 'opencode'
+    try:
+        _download_cli_archive(archive_path)
+        _extract_verified_cli(archive_path, binary_path)
+        archive_path.unlink()
+        return binary_path
+    except Stop:
+        archive_path.unlink(missing_ok=True)
+        binary_path.unlink(missing_ok=True)
+        raise
+    except (OSError, tarfile.TarError, ValueError) as exc:
+        archive_path.unlink(missing_ok=True)
+        if binary_path.exists():
+            binary_path.unlink(missing_ok=True)
+        raise Stop('official OpenCode release artifact could not be validated') from exc
+
+
+def _download_cli_archive(archive_path: pathlib.Path) -> None:
     curl = shutil.which('curl')
     if curl is None:
         raise Stop('curl is required to download the official OpenCode release')
-
-    archive_path = destination / 'opencode-linux-x64.tar.gz'
-    binary_path = destination / 'opencode'
     command = [
         curl, '--disable', '--fail', '--location', '--max-redirs', '5',
         '--proto', '=https', '--proto-redir', '=https', '--tlsv1.2',
@@ -230,85 +248,106 @@ def download_verified_cli(destination: pathlib.Path) -> pathlib.Path:
         '\nOC2_HTTP_STATUS=%{http_code}\nOC2_FINAL_URL=%{url_effective}\n',
         CLI_ASSET_URL,
     ]
-    binary_created = False
     try:
-        try:
-            result = subprocess.run(
-                command, capture_output=True, text=True, check=False, timeout=300,
-            )
-        except subprocess.TimeoutExpired as exc:
-            raise Stop('official OpenCode release download timed out') from exc
-        except OSError as exc:
-            raise Stop('official OpenCode release download could not run') from exc
-
-        fields = dict(
+        result = subprocess.run(
+            command, capture_output=True, text=True, check=False, timeout=300,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise Stop('official OpenCode release download timed out') from exc
+    except OSError as exc:
+        raise Stop('official OpenCode release download could not run') from exc
+    fields = {
+        key: value
+        for key, value in (
             line.split('=', 1) for line in result.stdout.splitlines()
             if line.startswith(('OC2_HTTP_STATUS=', 'OC2_FINAL_URL='))
         )
-        if result.returncode != 0:
-            if result.returncode == 6:
-                raise Stop('official OpenCode release download failed: Host DNS resolution failed')
-            if result.returncode == 7:
-                raise Stop('official OpenCode release download failed: Host connection failed')
+    }
+    if result.returncode != 0:
+        messages = {
+            6: 'Host DNS resolution failed',
+            7: 'Host connection failed',
+            28: 'official OpenCode release download timed out',
+        }
+        if result.returncode in messages:
+            detail = messages[result.returncode]
             if result.returncode == 28:
-                raise Stop('official OpenCode release download timed out')
-            raise Stop(f'official OpenCode release download failed (curl exit {result.returncode})')
-        if fields.get('OC2_HTTP_STATUS') != '200':
-            raise Stop('official OpenCode release returned an unexpected HTTP status')
-        final_url = urlsplit(fields.get('OC2_FINAL_URL', ''))
-        if (final_url.scheme != 'https'
-                or (final_url.hostname or '').lower() not in CLI_REDIRECT_HOSTS):
-            raise Stop('official OpenCode release redirected to an untrusted host')
-        if archive_path.stat().st_size != CLI_ASSET_SIZE:
-            raise Stop('official OpenCode release asset size mismatch')
+                raise Stop(detail)
+            raise Stop('official OpenCode release download failed: ' + detail)
+        raise Stop(f'official OpenCode release download failed (curl exit {result.returncode})')
+    if fields.get('OC2_HTTP_STATUS') != '200':
+        raise Stop('official OpenCode release returned an unexpected HTTP status')
+    final_url = urlsplit(fields.get('OC2_FINAL_URL', ''))
+    if (final_url.scheme != 'https'
+            or (final_url.hostname or '').lower() not in CLI_REDIRECT_HOSTS):
+        raise Stop('official OpenCode release redirected to an untrusted host')
+    if archive_path.stat().st_size != CLI_ASSET_SIZE:
+        raise Stop('official OpenCode release asset size mismatch')
+    digest = hashlib.sha256()
+    with archive_path.open('rb') as archive:
+        for chunk in iter(lambda: archive.read(1024 * 1024), b''):
+            digest.update(chunk)
+    if digest.hexdigest() != CLI_ASSET_SHA256:
+        raise Stop('official OpenCode release integrity verification failed')
 
-        archive_hash = hashlib.sha256()
-        with archive_path.open('rb') as archive_file:
-            for chunk in iter(lambda: archive_file.read(1024 * 1024), b''):
-                archive_hash.update(chunk)
-        if archive_hash.hexdigest() != CLI_ASSET_SHA256:
-            raise Stop('official OpenCode release integrity verification failed')
 
-        with tarfile.open(archive_path, 'r:gz') as archive:
-            members = archive.getmembers()
-            if len(members) != 1:
-                raise Stop('official OpenCode archive contents are invalid')
-            member = members[0]
-            member_path = pathlib.PurePosixPath(member.name)
-            if (member.name != 'opencode' or member_path.is_absolute()
-                    or '..' in member_path.parts or not member.isfile()
-                    or not (member.mode & 0o111)
-                    or member.size != CLI_BINARY_SIZE):
-                raise Stop('official OpenCode archive contents are invalid')
-            source = archive.extractfile(member)
-            if source is None:
-                raise Stop('official OpenCode executable is missing from its archive')
-            flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
-            if hasattr(os, 'O_NOFOLLOW'):
-                flags |= os.O_NOFOLLOW
-            fd = os.open(binary_path, flags, 0o600)
-            binary_created = True
-            with os.fdopen(fd, 'wb') as binary_file:
-                extracted = 0
-                while chunk := source.read(1024 * 1024):
-                    extracted += len(chunk)
-                    if extracted > member.size:
-                        raise Stop('official OpenCode executable exceeds its archive size')
-                    binary_file.write(chunk)
-                if extracted != member.size:
-                    raise Stop('official OpenCode executable is truncated')
-        archive_path.unlink()
-        return binary_path
-    except Stop:
-        archive_path.unlink(missing_ok=True)
-        if binary_created:
-            binary_path.unlink(missing_ok=True)
-        raise
-    except (OSError, tarfile.TarError, ValueError) as exc:
-        archive_path.unlink(missing_ok=True)
-        if binary_created:
-            binary_path.unlink(missing_ok=True)
-        raise Stop('official OpenCode release artifact could not be validated') from exc
+def _extract_verified_cli(archive_path: pathlib.Path, binary_path: pathlib.Path) -> None:
+    with tarfile.open(archive_path, 'r:gz') as archive:
+        members = archive.getmembers()
+        if len(members) != 1:
+            raise Stop('official OpenCode archive contents are invalid')
+        member = members[0]
+        member_path = pathlib.PurePosixPath(member.name)
+        if (member.name != 'opencode' or member_path.is_absolute()
+                or '..' in member_path.parts or not member.isfile()
+                or not (member.mode & 0o111)
+                or member.size != CLI_BINARY_SIZE):
+            raise Stop('official OpenCode archive contents are invalid')
+        source = archive.extractfile(member)
+        if source is None:
+            raise Stop('official OpenCode executable is missing from its archive')
+        flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, 'O_NOFOLLOW', 0)
+        fd = os.open(binary_path, flags, 0o600)
+        with os.fdopen(fd, 'wb') as binary_file:
+            extracted = 0
+            while chunk := source.read(1024 * 1024):
+                extracted += len(chunk)
+                if extracted > member.size:
+                    raise Stop('official OpenCode executable exceeds its archive size')
+                binary_file.write(chunk)
+            if extracted != member.size:
+                raise Stop('official OpenCode executable is truncated')
+
+
+GENERATED_CONFIG_UNSAFE = 'generated OpenCode config is missing or unsafe'
+GENERATED_CONFIG_READ_FAILED = 'generated OpenCode config could not be read'
+GENERATED_CONFIG_NOT_OBJECT = 'generated OpenCode config is not an object'
+GENERATED_PROVIDER_INVALID = 'generated OpenCode provider selection is invalid'
+
+
+def _read_generated_config(config_file: pathlib.Path) -> dict[str, object]:
+    if config_file.is_symlink() or not config_file.is_file():
+        raise Stop(GENERATED_CONFIG_UNSAFE)
+    try:
+        config = json.loads(config_file.read_text(encoding='utf-8'))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise Stop(GENERATED_CONFIG_READ_FAILED) from exc
+    if not isinstance(config, dict):
+        raise Stop(GENERATED_CONFIG_NOT_OBJECT)
+    return config
+
+
+def _trusted_v2_config(repo: pathlib.Path) -> dict[str, object]:
+    import prepare_opencode_v2 as exporter
+
+    source = exporter._read_apm_source(repo)
+    generated = exporter._build_files(
+        source.shell, source.snapshot, source.source_sha256, source.v2_config,
+    )
+    config = json.loads(generated['opencode.jsonc'])
+    if not isinstance(config, dict):
+        raise Stop('APM V2 config generator returned an invalid document')
+    return config
 
 
 def cloudflare_gateway_runtime(
@@ -317,17 +356,10 @@ def cloudflare_gateway_runtime(
     gateway_id: str | None,
 ) -> CloudflareGatewayRuntime | None:
     """Return validated Cloudflare IDs when the Custom Gateway provider is selected."""
-    if config_file.is_symlink() or not config_file.is_file():
-        raise Stop('generated OpenCode config is missing or unsafe')
-    try:
-        config = json.loads(config_file.read_text(encoding='utf-8'))
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise Stop('generated OpenCode config could not be read') from exc
-    if not isinstance(config, dict):
-        raise Stop('generated OpenCode config is not an object')
+    config = _read_generated_config(config_file)
     providers = config.get('providers', {})
     if not isinstance(providers, dict):
-        raise Stop('generated OpenCode provider selection is invalid')
+        raise Stop(GENERATED_PROVIDER_INVALID)
     if CF_GATEWAY_PROVIDER_ID not in providers:
         return None
     if not isinstance(providers[CF_GATEWAY_PROVIDER_ID], dict):
@@ -344,35 +376,42 @@ def configure_cloudflare_provider(
     config_file: pathlib.Path,
     *,
     include_cloudflare: bool,
+    generated_config: dict[str, object],
 ) -> bool:
     """Expose the Gateway provider only when explicitly requested or defaulted."""
-    if config_file.is_symlink() or not config_file.is_file():
-        raise Stop('generated OpenCode config is missing or unsafe')
-    try:
-        config = json.loads(config_file.read_text(encoding='utf-8'))
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise Stop('generated OpenCode config could not be read') from exc
-    if not isinstance(config, dict):
-        raise Stop('generated OpenCode config is not an object')
+    if _read_generated_config(config_file) != generated_config:
+        raise Stop('generated OpenCode config differs from the validated APM source')
+    config = copy.deepcopy(generated_config)
     providers = config.get('providers', {})
     if not isinstance(providers, dict):
-        raise Stop('generated OpenCode provider selection is invalid')
+        raise Stop(GENERATED_PROVIDER_INVALID)
     cloudflare_provider = providers.get(CF_GATEWAY_PROVIDER_ID)
     if cloudflare_provider is not None and not isinstance(cloudflare_provider, dict):
         raise Stop('generated Cloudflare provider selection is invalid')
-
-    default_model = config.get('model')
-    default_uses_cloudflare = (
-        isinstance(default_model, str)
-        and default_model.partition('/')[0] == CF_GATEWAY_PROVIDER_ID
-    )
-    if include_cloudflare or default_uses_cloudflare:
+    if _cloudflare_provider_required(config, include_cloudflare):
         if cloudflare_provider is None:
             raise Stop('Cloudflare Gateway mode has no configured provider')
         return True
     if cloudflare_provider is None:
         return False
+    _remove_cloudflare_provider(config_file, config, providers)
+    return False
 
+
+def _cloudflare_provider_required(config: dict[str, object], explicit: bool) -> bool:
+    default_model = config.get('model')
+    selected_by_default = (
+        isinstance(default_model, str)
+        and default_model.partition('/')[0] == CF_GATEWAY_PROVIDER_ID
+    )
+    return explicit or selected_by_default
+
+
+def _remove_cloudflare_provider(
+    config_file: pathlib.Path,
+    config: dict[str, object],
+    providers: dict[str, object],
+) -> None:
     policies = config.get('policies', [])
     if not isinstance(policies, list) or any(not isinstance(policy, dict) for policy in policies):
         raise Stop('generated OpenCode provider policies are invalid')
@@ -386,13 +425,60 @@ def configure_cloudflare_provider(
         if policy.get('resource') != CF_GATEWAY_PROVIDER_ID
     ]
     try:
-        config_file.write_text(
-            json.dumps(config, ensure_ascii=False, indent=2) + '\n',
-            encoding='utf-8',
-        )
+        _write_generated_config(config_file, config)
     except OSError as exc:
         raise Stop('generated OpenCode config could not be prepared') from exc
-    return False
+
+
+def _write_generated_config(config_file: pathlib.Path, config: dict[str, object]) -> None:
+    if config_file.name != 'opencode.jsonc':
+        raise OSError('unsafe generated config destination')
+    parent_fd = os.open(
+        config_file.parent,
+        os.O_RDONLY | getattr(os, 'O_DIRECTORY', 0) | getattr(os, 'O_NOFOLLOW', 0),
+    )
+    try:
+        parent_info = os.fstat(parent_fd)
+        if (not stat.S_ISDIR(parent_info.st_mode) or parent_info.st_uid != os.geteuid()
+                or stat.S_IMODE(parent_info.st_mode) & 0o077):
+            raise OSError('unsafe generated config directory')
+        flags = os.O_WRONLY | os.O_TRUNC | getattr(os, 'O_NOFOLLOW', 0)
+        descriptor = os.open(config_file.name, flags, dir_fd=parent_fd)
+        try:
+            target_info = os.fstat(descriptor)
+            if (not stat.S_ISREG(target_info.st_mode)
+                    or target_info.st_uid != os.geteuid() or target_info.st_nlink != 1):
+                raise OSError('unsafe generated config file')
+            with os.fdopen(descriptor, 'w', encoding='utf-8', closefd=False) as output:
+                output.write(json.dumps(config, ensure_ascii=False, indent=2) + '\n')
+                output.flush()
+                os.fsync(descriptor)
+        finally:
+            os.close(descriptor)
+    finally:
+        os.close(parent_fd)
+
+
+def _cloudflare_secret_entry_scope(
+    entry: object,
+    sandbox_name: str,
+) -> Literal['sandbox', 'global'] | None:
+    expected_fields = {'name', 'scope', 'secret', 'type'}
+    if not isinstance(entry, dict) or set(entry) != expected_fields:
+        raise Stop('Cloudflare credential entry schema is unsupported')
+    name, scope, secret_type = entry['name'], entry['scope'], entry['type']
+    if (not isinstance(name, str) or not isinstance(scope, str)
+            or not isinstance(entry['secret'], str) or not isinstance(secret_type, str)):
+        raise Stop('Cloudflare credential entry schema is invalid')
+    if name != CLOUDFLARE_SECRET_NAME:
+        return None
+    if secret_type != 'service':
+        raise Stop('Cloudflare credential type is unexpected')
+    if scope == sandbox_name:
+        return 'sandbox'
+    if scope in ('(global)', 'global'):
+        return 'global'
+    raise Stop('Cloudflare credential scope is unexpected')
 
 
 def _cloudflare_secret_scope(
@@ -402,37 +488,17 @@ def _cloudflare_secret_scope(
     """Parse only scope metadata for the Cloudflare service secret."""
     try:
         document = json.loads(listing)
-    except json.JSONDecodeError as exc:
+    except json.JSONDecodeError:
         raise Stop('Cloudflare credential listing JSON is invalid') from None
     if not isinstance(document, dict) or set(document) != {'secrets'}:
         raise Stop('Cloudflare credential listing JSON schema is unsupported')
     entries = document['secrets']
     if not isinstance(entries, list):
         raise Stop('Cloudflare credential listing JSON schema is invalid')
-
-    scopes: set[Literal['sandbox', 'global']] = set()
-    expected_fields = {'name', 'scope', 'secret', 'type'}
-    for entry in entries:
-        if not isinstance(entry, dict) or set(entry) != expected_fields:
-            raise Stop('Cloudflare credential entry schema is unsupported')
-        name = entry['name']
-        scope = entry['scope']
-        secret_type = entry['type']
-        if (not isinstance(name, str) or not isinstance(scope, str)
-                or not isinstance(entry['secret'], str)
-                or not isinstance(secret_type, str)):
-            raise Stop('Cloudflare credential entry schema is invalid')
-        if name != CLOUDFLARE_SECRET_NAME:
-            continue
-        if secret_type != 'service':
-            raise Stop('Cloudflare credential type is unexpected')
-        if scope == sandbox_name:
-            scopes.add('sandbox')
-        elif scope in ('(global)', 'global'):
-            scopes.add('global')
-        else:
-            raise Stop('Cloudflare credential scope is unexpected')
-
+    scopes = {
+        scope for entry in entries
+        if (scope := _cloudflare_secret_entry_scope(entry, sandbox_name)) is not None
+    }
     if 'sandbox' in scopes:
         return 'sandbox'
     if 'global' in scopes:
@@ -1139,6 +1205,7 @@ def main(argv: list[str] | None = None) -> int:
             configure_cloudflare_provider(
                 config_file,
                 include_cloudflare=args.use_cloudflare_ai_gateway,
+                generated_config=_trusted_v2_config(repo),
             )
             if (requires_external_inference(config_file)
                     and not args.allow_paid_inference):

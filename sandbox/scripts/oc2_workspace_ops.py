@@ -6,7 +6,6 @@ import pathlib
 import shutil
 
 from oc2_workspace import (
-    FileEntry,
     Manifest,
     WorkspaceError,
     _by_path,

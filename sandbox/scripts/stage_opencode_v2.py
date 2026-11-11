@@ -37,7 +37,10 @@ class StageError(Exception):
     """Expected failure without exposing file contents or CLI stderr."""
 
 
-def _regular_bytes(path: Path) -> bytes:
+def _regular_bytes(directory: Path, name: str) -> bytes:
+    if name not in NAMES:
+        raise StageError("bundle file is not in the allowlist")
+    path = directory / name
     if path.is_symlink() or not path.is_file():
         raise StageError("missing, non-regular, or symlinked bundle file: " + path.name)
     if path.stat().st_size > MAX_BYTES:
@@ -96,7 +99,7 @@ def verify_bundle(directory: Path) -> str:
         raise StageError("bundle directory must be a regular directory")
     if {item.name for item in directory.iterdir()} != NAMES:
         raise StageError("unexpected bundle file set")
-    data = {name: _regular_bytes(directory / name) for name in NAMES}
+    data = {name: _regular_bytes(directory, name) for name in NAMES}
     if any(exporter.contains_credential_material(content) for content in data.values()):
         raise StageError("bundle contains credential material")
     try:
@@ -172,7 +175,7 @@ def _check_source(root: Path, bundle: Path) -> None:
     expected = exporter._build_files(
         apm.shell, apm.snapshot, apm.source_sha256, apm.v2_config,
     )
-    if any(_regular_bytes(bundle / name) != content for name, content in expected.items()):
+    if any(_regular_bytes(bundle, name) != content for name, content in expected.items()):
         raise StageError("bundle does not match the current apm.yml SSOT")
 
 
