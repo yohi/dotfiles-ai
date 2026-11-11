@@ -5,6 +5,7 @@ No sbx, sudo, network, package installation, or OpenCode binary is invoked.
 from __future__ import annotations
 
 import argparse
+import ast
 import contextlib
 import hashlib
 import importlib.util
@@ -163,6 +164,18 @@ class CloudflareCredentialProvisioningTest(unittest.TestCase):
 
 
 class HostTest(unittest.TestCase):
+    def test_guest_exec_wrapper_has_one_module_assignment(self):
+        source = (SCRIPTS / 'oc2.py').read_text(encoding='utf-8')
+        module = ast.parse(source)
+        assignments = [
+            node for node in ast.walk(module)
+            if isinstance(node, ast.Assign)
+            and any(isinstance(target, ast.Name) and target.id == 'GUEST_EXEC_WRAPPER'
+                    for target in node.targets)
+        ]
+
+        self.assertEqual(len(assignments), 1)
+
     def test_inline_module_source_loads_embedded_python_module(self):
         loader = oauth_bundle.inline_python_module('oc2_embedded_fixture', 'value = 42\n')
         program = loader + '\nimport oc2_embedded_fixture\nprint(oc2_embedded_fixture.value)\n'
