@@ -14,11 +14,12 @@ import json
 import os
 import re
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
-from typing import TypeAlias
+from typing import Iterable, TypeAlias
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
@@ -37,15 +38,45 @@ class StageError(Exception):
     """Expected failure without exposing file contents or CLI stderr."""
 
 
-def _regular_bytes(directory: Path, name: str) -> bytes:
+def _regular_bytes(directory_fd: int, name: str) -> bytes:
     if name not in NAMES:
         raise StageError("bundle file is not in the allowlist")
-    path = directory / name
-    if path.is_symlink() or not path.is_file():
-        raise StageError("missing, non-regular, or symlinked bundle file: " + path.name)
-    if path.stat().st_size > MAX_BYTES:
-        raise StageError("bundle file exceeds size limit: " + path.name)
-    return path.read_bytes()
+    flags = os.O_RDONLY | os.O_NONBLOCK | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        descriptor = os.open(name, flags, dir_fd=directory_fd)
+    except OSError as exc:
+        raise StageError("bundle file could not be opened safely: " + name) from exc
+    try:
+        info = os.fstat(descriptor)
+        if not stat.S_ISREG(info.st_mode):
+            raise StageError("missing, non-regular, or symlinked bundle file: " + name)
+        if info.st_size > MAX_BYTES:
+            raise StageError("bundle file exceeds size limit: " + name)
+        chunks: list[bytes] = []
+        size = 0
+        while chunk := os.read(descriptor, min(MAX_BYTES + 1 - size, 65536)):
+            chunks.append(chunk)
+            size += len(chunk)
+            if size > MAX_BYTES:
+                raise StageError("bundle file exceeds size limit: " + name)
+        return b"".join(chunks)
+    finally:
+        os.close(descriptor)
+
+
+def _read_bundle_files(directory: Path, names: Iterable[str]) -> dict[str, bytes]:
+    requested = tuple(names)
+    if not requested or not set(requested) <= NAMES:
+        raise StageError("bundle file is not in the allowlist")
+    flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        directory_fd = os.open(directory, flags)
+    except OSError as exc:
+        raise StageError("bundle directory could not be opened safely") from exc
+    try:
+        return {name: _regular_bytes(directory_fd, name) for name in requested}
+    finally:
+        os.close(directory_fd)
 
 
 def _verify_v2_config(server: dict[str, JsonValue]) -> None:
@@ -133,7 +164,7 @@ def verify_bundle(directory: Path, *, trusted_root: Path | None = None) -> str:
 def _load_bundle(
     directory: Path,
 ) -> tuple[dict[str, JsonValue], dict[str, JsonValue], dict[str, JsonValue], dict[str, bytes]]:
-    data = {name: _regular_bytes(directory, name) for name in NAMES}
+    data = _read_bundle_files(directory, NAMES)
     try:
         manifest = json.loads(
             data["export-manifest.json"], object_pairs_hook=exporter._unique_json_object,
@@ -221,6 +252,7 @@ def _run(command: list[str]) -> None:
 
 
 def _check_source(root: Path, bundle: Path) -> None:
+    bundle = _validated_bundle_directory(bundle, Path(tempfile.gettempdir()))
     try:
         apm = exporter._read_apm_source(root)
     except (OSError, exporter.ExportError) as exc:
@@ -228,7 +260,8 @@ def _check_source(root: Path, bundle: Path) -> None:
     expected = exporter._build_files(
         apm.shell, apm.snapshot, apm.source_sha256, apm.v2_config,
     )
-    if any(_regular_bytes(bundle, name) != content for name, content in expected.items()):
+    actual = _read_bundle_files(bundle, expected)
+    if any(actual[name] != content for name, content in expected.items()):
         raise StageError("bundle does not match the current apm.yml SSOT")
 
 
