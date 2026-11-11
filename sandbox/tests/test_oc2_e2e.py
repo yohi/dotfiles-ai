@@ -350,7 +350,6 @@ class LauncherFlowTests(unittest.TestCase):
                 'refresh': 'test-refresh', 'expires': 123,
             },
         }))
-        helper_namespace = {'__name__': '__main__'}
         previous_bootstrap = sys.modules.get('oc2_oauth_bootstrap')
         observed_auth = []
 
