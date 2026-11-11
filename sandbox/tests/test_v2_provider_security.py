@@ -187,6 +187,24 @@ class ProviderSecurityContractTests(unittest.TestCase):
         with self.assertRaises(exporter.ExportError):
             exporter._v2_variant({"reasoningEffort": "unbounded"}, "model.variant")
 
+    def test_max_reasoning_effort_passes_all_validation_layers(self) -> None:
+        source_model: dict[str, exporter.JsonValue] = {
+            "name": "Kimi K3",
+            "variants": {
+                "default": {"body": {"thinking": {"type": "enabled"}}},
+                "max": {"reasoningEffort": "max"},
+            },
+        }
+        model = exporter._v2_model("custom-ollama-cloud/kimi-k3", source_model)
+        config = _server_config()
+        config["providers"][CF_PROVIDER]["models"]["custom-ollama-cloud/kimi-k3"] = model
+
+        stage._verify_v2_config(config)
+        guest.verify_v2_config(config)
+
+        self.assertEqual(model["body"]["thinking"]["type"], "enabled")
+        self.assertEqual(model["variants"][0]["settings"]["reasoningEffort"], "max")
+
     def test_exporter_rejects_credentials_in_variant_settings_headers_and_body(self) -> None:
         for variant in (
             {"settings": {"apiKey": "not-a-real-secret"}},

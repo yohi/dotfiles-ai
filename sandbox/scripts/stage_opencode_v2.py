@@ -31,7 +31,7 @@ REMOTE_PARENT = str(Path("/home") / "agent" / "workspace")  # guest-only mountle
 BUNDLE_ROOT = Path(tempfile.gettempdir())
 JsonValue: TypeAlias = str | int | float | bool | None | list["JsonValue"] | dict[str, "JsonValue"]
 REASONING_VALUES = {
-    "reasoningEffort": frozenset({"minimal", "low", "medium", "high", "xhigh"}),
+    "reasoningEffort": frozenset({"minimal", "low", "medium", "high", "xhigh", "max"}),
     "reasoningSummary": frozenset({"auto", "concise", "detailed"}),
 }
 SENSITIVE_FIELD_MARKERS = ("apikey", "authorization", "credential", "password", "secret", "token")

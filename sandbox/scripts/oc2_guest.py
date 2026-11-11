@@ -49,7 +49,7 @@ ASSET_TARGETS = frozenset({
 })
 MAX_ASSETS = 512 * 1024
 REASONING_VALUES = {
-    'reasoningEffort': frozenset({'minimal', 'low', 'medium', 'high', 'xhigh'}),
+    'reasoningEffort': frozenset({'minimal', 'low', 'medium', 'high', 'xhigh', 'max'}),
     'reasoningSummary': frozenset({'auto', 'concise', 'detailed'}),
 }
 SENSITIVE_FIELD_MARKERS = ('apikey', 'authorization', 'credential', 'password', 'secret', 'token')

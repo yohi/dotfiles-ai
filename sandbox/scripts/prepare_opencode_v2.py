@@ -41,7 +41,7 @@ CF_CUSTOM_HEADERS: Final[tuple[tuple[str, str], ...]] = (
     ("cf-aig-skip-cache", "true"),
 )
 REASONING_EFFORTS: Final[frozenset[str]] = frozenset(
-    {"minimal", "low", "medium", "high", "xhigh"},
+    {"minimal", "low", "medium", "high", "xhigh", "max"},
 )
 REASONING_SUMMARIES: Final[frozenset[str]] = frozenset(
     {"auto", "concise", "detailed"},
