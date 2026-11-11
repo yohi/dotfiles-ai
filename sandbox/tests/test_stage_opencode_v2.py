@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
+import io
 import json
 import subprocess
 import sys
@@ -23,7 +25,7 @@ class StageTests(unittest.TestCase):
         self.addCleanup(temporary.cleanup)
         self.root = Path(temporary.name) / "repo"
         self.root.mkdir()
-        self.bundle = Path(temporary.name) / "bundle"
+        self.bundle = Path(temporary.name) / "sbx-config-0123456789abcdef-0123456789ab"
         self.bundle.mkdir()
         self.apm = self.root / "apm.yml"
         self.apm.write_text("shell: bash\nsnapshot: true\n", encoding="utf-8")
@@ -49,10 +51,17 @@ class StageTests(unittest.TestCase):
         (self.bundle / "export-manifest.json").write_text(json.dumps(manifest) + "\n")
 
     def test_guest_verify_valid_bundle(self) -> None:
-        process = subprocess.run([sys.executable, str(SCRIPT), "--verify-bundle", str(self.bundle)],
-                                 capture_output=True, text=True, check=False)
-        self.assertEqual(process.returncode, 0, process.stderr)
-        self.assertIn("VERIFY_OK", process.stdout)
+        output = io.StringIO()
+        with patch.object(stage, "REMOTE_PARENT", str(self.bundle.parent)), \
+                contextlib.redirect_stdout(output):
+            status = stage.main(["--verify-bundle", self.bundle.name])
+        self.assertEqual(status, 0, output.getvalue())
+        self.assertIn("VERIFY_OK", output.getvalue())
+
+    def test_guest_verify_rejects_path_in_cli_argument(self) -> None:
+        with patch.object(stage, "REMOTE_PARENT", str(self.bundle.parent)):
+            status = stage.main(["--verify-bundle", str(self.bundle)])
+        self.assertEqual(status, 1)
 
     def _make_v2_bundle(self) -> Path:
         self.apm.write_text(
@@ -182,7 +191,7 @@ class StageTests(unittest.TestCase):
             stage.stage(self.bundle, self.root, sandbox="oc-v2-poc", apply=True)
         self.assertEqual(len(commands), 4)
         self.assertEqual([command[1] for command in commands], ["exec", "cp", "cp", "exec"])
-        remote = commands[-1][-1]
+        remote = stage.REMOTE_PARENT + "/" + commands[-1][-1]
         self.assertTrue(remote.startswith(stage.REMOTE_PARENT + "/sbx-config-"))
         self.assertNotIn(".config/opencode", repr(commands))
         self.assertNotIn("--privileged", repr(commands))

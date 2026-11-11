@@ -30,6 +30,7 @@ exporter = importlib.import_module("sandbox.scripts.prepare_opencode_v2")
 NAMES = frozenset({"opencode.jsonc", "cli.json", "export-manifest.json"})
 MAX_BYTES = 1024 * 1024
 SANDBOX_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9.-]{0,61}[a-zA-Z0-9]$")
+BUNDLE_DIRECTORY_RE = re.compile(r"^sbx-config-[a-f0-9]{16}-[a-f0-9]{12}$")
 REMOTE_PARENT = str(Path("/home") / "agent" / "workspace")  # guest-only mountless path
 JsonValue: TypeAlias = str | int | float | bool | None | list["JsonValue"] | dict[str, "JsonValue"]
 
@@ -237,14 +238,14 @@ def stage(bundle: Path, repo_root: Path, sandbox: str | None, apply: bool) -> No
         # Transfer separately to avoid smuggling a script in a supposedly data-only bundle.
         _run(["sbx", "cp", str(verifier), f"{sandbox}:{remote_verifier}"])
         _run(["sbx", "exec", sandbox, "python3", remote_verifier,
-              "--verify-bundle", remote])
+              "--verify-bundle", folder.name])
         print("STAGED_AND_VERIFIED: " + sandbox + ":" + remote)
         print("NOT_ACTIVATED: OpenCode settings were not modified")
 
 
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("--verify-bundle", type=Path, help="verify a staged bundle (guest operation)")
+    p.add_argument("--verify-bundle", help="verify a staged bundle by its generated directory name")
     p.add_argument("--bundle", type=Path, help="existing output from prepare_opencode_v2.py")
     p.add_argument("--repo-root", type=Path, default=Path(__file__).resolve().parents[2])
     p.add_argument("--sandbox", help="local Docker Sandbox name (used only with --apply)")
@@ -252,7 +253,9 @@ def main(argv: list[str] | None = None) -> int:
     args = p.parse_args(argv)
     try:
         if args.verify_bundle is not None:
-            digest = verify_bundle(args.verify_bundle)
+            if not BUNDLE_DIRECTORY_RE.fullmatch(args.verify_bundle):
+                raise StageError("invalid staged bundle directory name")
+            digest = verify_bundle(Path(REMOTE_PARENT) / args.verify_bundle)
             print("VERIFY_OK: " + digest)
         else:
             if args.bundle is None:
