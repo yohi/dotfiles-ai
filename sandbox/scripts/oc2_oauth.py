@@ -237,7 +237,8 @@ def _synchronize(cli, source_path, db_path, progress):
 
 if __name__ == '__main__':
     try:
-        synchronize(sys.argv[1], pathlib.Path('/home/agent/.local/share/opencode/auth.json'),
+        source_path = pathlib.Path(os.environ['XDG_DATA_HOME']) / 'opencode/auth.json'
+        synchronize(sys.argv[1], source_path,
                     pathlib.Path(os.environ['OPENCODE_DB']))
     except (OSError, ValueError, TypeError, KeyError, IndexError, subprocess.SubprocessError):
         print('OC2_OAUTH_STOP', file=sys.stderr)

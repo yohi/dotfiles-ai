@@ -183,6 +183,31 @@ class ProviderSecurityContractTests(unittest.TestCase):
         stage._verify_v2_config(config)
         guest.verify_v2_config(config)
 
+    def test_exporter_rejects_variant_reasoning_values_outside_allowlist(self) -> None:
+        with self.assertRaises(exporter.ExportError):
+            exporter._v2_variant({"reasoningEffort": "unbounded"}, "model.variant")
+
+    def test_exporter_rejects_credentials_in_variant_settings_headers_and_body(self) -> None:
+        for variant in (
+            {"settings": {"apiKey": "not-a-real-secret"}},
+            {"headers": {"Authorization": "Bearer not-a-real-secret"}},
+            {"body": {"options": {"apiKey": "not-a-real-secret"}}},
+        ):
+            with self.subTest(variant=variant), self.assertRaises(exporter.ExportError):
+                exporter._v2_variant(variant, "model.variant")
+
+    def test_stage_and_guest_reject_credentials_in_model_variants(self) -> None:
+        config = _server_config()
+        config["providers"]["openai"]["models"]["gpt-6-luna"]["variants"] = [
+            {"id": "unsafe", "body": {"options": {"apiKey": "not-a-real-secret"}}},
+        ]
+
+        with self.assertRaises(stage.StageError):
+            stage._verify_v2_config(config)
+
+        with self.assertRaises(ValueError):
+            guest.verify_v2_config(config)
+
     def test_rejects_unsafe_base_urls_in_all_layers(self) -> None:
         for url in BAD_BASE_URLS:
             with self.subTest(url=url):

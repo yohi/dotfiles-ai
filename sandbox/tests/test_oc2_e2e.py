@@ -3,6 +3,7 @@ from __future__ import annotations
 import contextlib
 import io
 import json
+import os
 import pathlib
 import subprocess
 import sys
@@ -300,12 +301,13 @@ class LauncherFlowTests(unittest.TestCase):
             'OPENAI_ACCESS_TOKEN': 'host-access-token-poison',
             'OPENAI_REFRESH_TOKEN': 'host-refresh-token-poison',
         }
-        status, output = self._run('--allow-paid-inference', host_env={
-                'OC_CF_ACCOUNT_ID': 'a' * 32,
-                'OC_CF_GATEWAY_ID': 'gateway-1',
-                **poison,
-            },
-        )
+        with patch.object(oc2, 'ROOT', str(self.root / 'guest-root')):
+            status, output = self._run('--allow-paid-inference', host_env={
+                    'OC_CF_ACCOUNT_ID': 'a' * 32,
+                    'OC_CF_GATEWAY_ID': 'gateway-1',
+                    **poison,
+                },
+            )
 
         self.assertEqual(status, 0, output)
         create = next(
@@ -339,7 +341,43 @@ class LauncherFlowTests(unittest.TestCase):
         )
         self.assertEqual(credential_path, '~/.local/share/opencode/auth.json')
         self.assertEqual(xdg_data_home, f'{home}/.local/share')
-        self.assertEqual(f'{xdg_data_home}/opencode/auth.json', f'{home}{credential_path[1:]}')
+        oauth_auth_path = pathlib.Path(xdg_data_home) / 'opencode/auth.json'
+        self.assertEqual(oauth_auth_path, pathlib.Path(home + credential_path[1:]))
+        oauth_auth_path.parent.mkdir(parents=True)
+        oauth_auth_path.write_text(json.dumps({
+            'openai': {
+                'type': 'oauth', 'access': 'test-access',
+                'refresh': 'test-refresh', 'expires': 123,
+            },
+        }))
+        helper_namespace = {'__name__': '__main__'}
+        previous_bootstrap = sys.modules.get('oc2_oauth_bootstrap')
+        observed_auth = []
+
+        def capture_auth(auth):
+            observed_auth.append(auth)
+            raise ValueError('credential file observed')
+
+        helper_source = oc2.oauth_helper_source(SCRIPTS)
+        helper_source = helper_source.replace(
+            "if __name__ == '__main__':\n    try:",
+            "if __name__ == '__main__':\n    validate_db = lambda _: None\n"
+            "    record_from_auth = capture_auth\n    try:",
+            1,
+        )
+        try:
+            with patch.dict(os.environ, {
+                'XDG_DATA_HOME': xdg_data_home,
+                'OPENCODE_DB': str(pathlib.Path(home) / 'a/b/c/d/opencode.db'),
+            }), patch.object(sys, 'argv', ['oc2_oauth.py', 'opencode']), \
+                    self.assertRaises(SystemExit):
+                exec(helper_source, {'__name__': '__main__', 'capture_auth': capture_auth})
+        finally:
+            if previous_bootstrap is None:
+                sys.modules.pop('oc2_oauth_bootstrap', None)
+            else:
+                sys.modules['oc2_oauth_bootstrap'] = previous_bootstrap
+        self.assertEqual(observed_auth[0]['openai']['access'], 'test-access')
         self.assertNotIn('OPENAI_API_KEY', launch)
         self.assertFalse(any(value in repr(self.fake.calls) for value in poison.values()))
         self.assertNotIn('auth.json', self.fake.copied_files)

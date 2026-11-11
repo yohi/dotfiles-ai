@@ -40,6 +40,15 @@ CF_CUSTOM_HEADERS: Final[tuple[tuple[str, str], ...]] = (
     ("cf-aig-max-attempts", "1"),
     ("cf-aig-skip-cache", "true"),
 )
+REASONING_EFFORTS: Final[frozenset[str]] = frozenset(
+    {"minimal", "low", "medium", "high", "xhigh"},
+)
+REASONING_SUMMARIES: Final[frozenset[str]] = frozenset(
+    {"auto", "concise", "detailed"},
+)
+SENSITIVE_FIELD_MARKERS: Final[tuple[str, ...]] = (
+    "apikey", "authorization", "credential", "password", "secret", "token",
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -285,12 +294,43 @@ def _v2_variant(value: JsonValue, label: str) -> dict[str, JsonValue]:
             settings[key] = item
         elif key in {"settings", "headers", "body"}:
             nested = _mapping(item, f"{label}.{key}")
+            if key == "settings":
+                _validate_reasoning_settings(nested, f"{label}.settings")
+            else:
+                _reject_variant_credentials(nested, f"{label}.{key}")
             result[key] = nested
         else:
             raise ExportError(f"unsupported V1 variant field: {label}.{key}")
     if settings:
+        _validate_reasoning_settings(settings, f"{label}.settings")
         result["settings"] = settings
     return result
+
+
+def _validate_reasoning_settings(settings: dict[str, JsonValue], label: str) -> None:
+    """Allow only the supported reasoning controls and their documented values."""
+    for key, value in settings.items():
+        allowed = {
+            "reasoningEffort": REASONING_EFFORTS,
+            "reasoningSummary": REASONING_SUMMARIES,
+        }.get(key)
+        if allowed is None or not isinstance(value, str) or value not in allowed:
+            raise ExportError(f"unsupported reasoning setting: {label}.{key}")
+
+
+def _reject_variant_credentials(value: JsonValue, label: str) -> None:
+    """Reject credential-bearing fields and bearer values in variant options."""
+    if isinstance(value, dict):
+        for key, item in value.items():
+            normalized = "".join(char for char in key.casefold() if char.isalnum())
+            if any(marker in normalized for marker in SENSITIVE_FIELD_MARKERS):
+                raise ExportError(f"credentials are forbidden in variant options: {label}.{key}")
+            _reject_variant_credentials(item, f"{label}.{key}")
+    elif isinstance(value, list):
+        for index, item in enumerate(value):
+            _reject_variant_credentials(item, f"{label}[{index}]")
+    elif isinstance(value, str) and value.casefold().startswith("bearer "):
+        raise ExportError(f"credentials are forbidden in variant options: {label}")
 
 
 def _v2_model(model_id: str, value: JsonValue) -> dict[str, JsonValue]:
@@ -313,7 +353,36 @@ def _v2_model(model_id: str, value: JsonValue) -> dict[str, JsonValue]:
             variants_out.append({"id": variant_id, **converted})
     if variants_out:
         model["variants"] = variants_out
+    _validate_v2_model_options(model, f"provider model {model_id}")
     return model
+
+
+def _validate_v2_model_options(model: dict[str, JsonValue], label: str) -> None:
+    """Validate settings and request payloads after default-variant expansion."""
+    settings = model.get("settings", {})
+    if not isinstance(settings, dict):
+        raise ExportError(f"invalid model settings: {label}")
+    _validate_reasoning_settings(settings, f"{label}.settings")
+    for key in ("headers", "body"):
+        value = model.get(key, {})
+        if not isinstance(value, dict):
+            raise ExportError(f"invalid model {key}: {label}")
+        _reject_variant_credentials(value, f"{label}.{key}")
+    variants = model.get("variants", [])
+    if not isinstance(variants, list):
+        raise ExportError(f"invalid model variants: {label}")
+    for variant in variants:
+        if not isinstance(variant, dict):
+            raise ExportError(f"invalid model variant: {label}")
+        settings = variant.get("settings", {})
+        if not isinstance(settings, dict):
+            raise ExportError(f"invalid model variant settings: {label}")
+        _validate_reasoning_settings(settings, f"{label}.variant.settings")
+        for key in ("headers", "body"):
+            value = variant.get(key, {})
+            if not isinstance(value, dict):
+                raise ExportError(f"invalid model variant {key}: {label}")
+            _reject_variant_credentials(value, f"{label}.variant.{key}")
 
 
 def _v2_provider(provider_id: str, source: dict[str, JsonValue], model_ids: tuple[str, ...]) -> dict[str, JsonValue]:
@@ -380,10 +449,12 @@ def _build_v2_config(
     policies: list[JsonValue] = [
         {"action": "provider.use", "resource": "*", "effect": "deny"},
     ]
-    policies.extend([
-        {"action": "provider.use", "resource": selection.provider_id, "effect": "allow"}
-        for selection in enabled
-    ])
+    enabled_ids = {selection.provider_id for selection in enabled}
+    policies.extend(
+        {"action": "provider.use", "resource": provider_id, "effect": "allow"}
+        for provider_id in ("openai", "cloudflare-ai-gateway-custom")
+        if provider_id in enabled_ids
+    )
     policies.extend([
         {"action": "integration.connect", "resource": "*", "effect": "deny"},
         {"action": "plugin.use", "resource": "*", "effect": "deny"},

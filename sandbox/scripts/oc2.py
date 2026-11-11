@@ -202,7 +202,7 @@ def cloudflare_gateway_runtime(
         raise Stop('generated OpenCode config could not be read') from exc
     if not isinstance(config, dict):
         raise Stop('generated OpenCode config is not an object')
-    providers = config.get('providers')
+    providers = config.get('providers', {})
     if not isinstance(providers, dict):
         raise Stop('generated OpenCode provider selection is invalid')
     if CF_GATEWAY_PROVIDER_ID not in providers:

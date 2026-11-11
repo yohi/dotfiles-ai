@@ -58,6 +58,16 @@ class StageTests(unittest.TestCase):
         self.assertEqual(status, 0, output.getvalue())
         self.assertIn("VERIFY_OK", output.getvalue())
 
+    def test_guest_verifier_imports_without_site_packages_or_repository(self) -> None:
+        result = subprocess.run(
+            [sys.executable, "-S", "-c",
+             f"import sys; sys.path.insert(0, {str(SCRIPT.parent)!r}); "
+             "import stage_opencode_v2"],
+            capture_output=True, text=True, check=False,
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+
     def test_guest_verify_rejects_path_in_cli_argument(self) -> None:
         with patch.object(stage, "REMOTE_PARENT", str(self.bundle.parent)):
             status = stage.main(["--verify-bundle", str(self.bundle)])

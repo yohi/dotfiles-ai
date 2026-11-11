@@ -1069,6 +1069,12 @@ class HostTest(unittest.TestCase):
             }))
             self.assertIsNone(oc2.cloudflare_gateway_runtime(config, None, None))
 
+    def test_cloudflare_gateway_runtime_accepts_legacy_config_without_providers(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config = pathlib.Path(tmp) / 'opencode.jsonc'
+            config.write_text(json.dumps({'shell': 'bash', 'snapshot': True}))
+            self.assertIsNone(oc2.cloudflare_gateway_runtime(config, None, None))
+
     def test_cloudflare_gateway_runtime_requires_valid_ids(self):
         with tempfile.TemporaryDirectory() as tmp:
             config = pathlib.Path(tmp) / 'opencode.jsonc'

@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-import importlib
 import json
 import os
 import re
@@ -22,10 +21,6 @@ from pathlib import Path
 from typing import TypeAlias
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
-
-exporter = importlib.import_module("sandbox.scripts.prepare_opencode_v2")
 
 NAMES = frozenset({"opencode.jsonc", "cli.json", "export-manifest.json"})
 MAX_BYTES = 1024 * 1024
@@ -35,6 +30,84 @@ HOST_BUNDLE_RE = re.compile(r"^opencode-v2-export-[a-zA-Z0-9][a-zA-Z0-9-]{0,63}$
 REMOTE_PARENT = str(Path("/home") / "agent" / "workspace")  # guest-only mountless path
 BUNDLE_ROOT = Path(tempfile.gettempdir())
 JsonValue: TypeAlias = str | int | float | bool | None | list["JsonValue"] | dict[str, "JsonValue"]
+REASONING_VALUES = {
+    "reasoningEffort": frozenset({"minimal", "low", "medium", "high", "xhigh"}),
+    "reasoningSummary": frozenset({"auto", "concise", "detailed"}),
+}
+SENSITIVE_FIELD_MARKERS = ("apikey", "authorization", "credential", "password", "secret", "token")
+
+
+def _unique_json_object(pairs: list[tuple[str, JsonValue]]) -> dict[str, JsonValue]:
+    """Parse a JSON object while rejecting duplicate keys."""
+    result: dict[str, JsonValue] = {}
+    for key, value in pairs:
+        if key in result:
+            raise StageError("duplicate JSON object key")
+        result[key] = value
+    return result
+
+
+def _verify_no_variant_credentials(value: JsonValue, label: str) -> None:
+    """Reject credential-bearing keys and bearer values in model options."""
+    if isinstance(value, dict):
+        for key, item in value.items():
+            normalized = "".join(char for char in key.casefold() if char.isalnum())
+            if any(marker in normalized for marker in SENSITIVE_FIELD_MARKERS):
+                raise StageError("credentials are forbidden in model options: " + label)
+            _verify_no_variant_credentials(item, label + "." + key)
+    elif isinstance(value, list):
+        for item in value:
+            _verify_no_variant_credentials(item, label)
+    elif isinstance(value, str) and value.casefold().startswith("bearer "):
+        raise StageError("credentials are forbidden in model options: " + label)
+
+
+def _verify_model_settings(value: JsonValue, label: str) -> None:
+    """Require only supported reasoning settings and values."""
+    if not isinstance(value, dict):
+        raise StageError("invalid model reasoning settings: " + label)
+    for key, item in value.items():
+        allowed = REASONING_VALUES.get(key)
+        if allowed is None or not isinstance(item, str) or item not in allowed:
+            raise StageError("unapproved model reasoning setting: " + label)
+
+
+def _verify_model_catalog(models: JsonValue) -> None:
+    """Validate model identities, variants, and credential-free options."""
+    if not isinstance(models, dict):
+        raise StageError("invalid V2 model catalog")
+    for model_id, value in models.items():
+        if not isinstance(value, dict) or set(value) - {
+            "modelID", "name", "settings", "headers", "body", "variants",
+        }:
+            raise StageError("invalid V2 model configuration")
+        if value.get("modelID") != model_id or not isinstance(value.get("name"), str):
+            raise StageError("V2 model identity does not match its catalog")
+        _verify_model_settings(value.get("settings", {}), model_id)
+        for key in ("headers", "body"):
+            options = value.get(key, {})
+            if not isinstance(options, dict):
+                raise StageError("invalid V2 model " + key)
+            _verify_no_variant_credentials(options, model_id + "." + key)
+        variants = value.get("variants", [])
+        if not isinstance(variants, list):
+            raise StageError("invalid V2 model variants")
+        seen: set[str] = set()
+        for variant in variants:
+            if not isinstance(variant, dict):
+                raise StageError("invalid V2 model variant")
+            variant_id = variant.get("id")
+            if not isinstance(variant_id, str):
+                raise StageError("invalid V2 model variant")
+            if variant_id in seen or set(variant) - {"id", "settings", "headers", "body"}:
+                raise StageError("invalid V2 model variant")
+            seen.add(variant_id)
+            _verify_model_settings(variant.get("settings", {}), model_id + "." + variant_id)
+            for key in ("headers", "body"):
+                options = variant.get(key, {})
+                if not isinstance(options, dict):
+                    raise StageError("invalid V2 model variant " + key)
+                _verify_no_variant_credentials(options, model_id + "." + variant_id)
 
 
 class StageError(Exception):
@@ -122,6 +195,10 @@ def _verify_v2_config(server: dict[str, JsonValue]) -> None:
     models = provider.get("models")
     if not isinstance(models, dict) or model_id not in models:
         raise StageError("V2 default model is not in the provider catalog")
+    for provider_config in providers.values():
+        if not isinstance(provider_config, dict):
+            raise StageError("invalid V2 provider configuration")
+        _verify_model_catalog(provider_config.get("models"))
     expected_policies: list[JsonValue] = [
         {"action": "provider.use", "resource": "*", "effect": "deny"},
         {"action": "provider.use", "resource": "openai", "effect": "allow"},
@@ -139,10 +216,44 @@ def _verify_v2_config(server: dict[str, JsonValue]) -> None:
         headers = provider_config.get("headers", {})
         if not isinstance(settings, dict) or not isinstance(headers, dict):
             raise StageError("invalid V2 provider request settings")
-        try:
-            exporter.validate_v2_provider_options(provider_name, settings, headers)
-        except exporter.ExportError as exc:
-            raise StageError("V2 provider request settings are not approved") from exc
+        if provider_name == "openai":
+            if settings or headers:
+                raise StageError("OpenAI V2 configuration must not contain Guest credentials")
+        elif provider_name == "cloudflare-ai-gateway-custom":
+            if settings != {"baseURL": CF_CUSTOM_BASE_URL}:
+                raise StageError("Cloudflare Custom baseURL is not approved")
+            _verify_custom_headers(headers)
+        else:
+            raise StageError("unsupported V2 provider options")
+
+
+CF_CUSTOM_BASE_URL = (
+    "https://gateway.ai.cloudflare.com/v1/"
+    "{env:OC_CF_ACCOUNT_ID}/{env:OC_CF_GATEWAY_ID}/compat"
+)
+CF_CUSTOM_HEADERS = {
+    "Authorization": "",
+    "cf-aig-authorization": "Bearer {env:OC_CF_API_TOKEN}",
+    "cf-aig-collect-log-payload": "true",
+    "cf-aig-max-attempts": "1",
+    "cf-aig-skip-cache": "true",
+}
+
+
+def _verify_custom_headers(headers: dict[str, JsonValue]) -> None:
+    """Require the exact approved Cloudflare proxy headers."""
+    allowed = {name.casefold(): (name, value) for name, value in CF_CUSTOM_HEADERS.items()}
+    seen: set[str] = set()
+    for name, value in headers.items():
+        if not isinstance(name, str) or not isinstance(value, str):
+            raise StageError("Cloudflare Custom header names and values must be strings")
+        folded = name.casefold()
+        approved = allowed.get(folded)
+        if folded in seen or approved != (name, value):
+            raise StageError("Cloudflare Custom header is not approved")
+        seen.add(folded)
+    if headers.get("cf-aig-authorization") != CF_CUSTOM_HEADERS["cf-aig-authorization"]:
+        raise StageError("Cloudflare Custom proxy authorization header is required")
 
 
 def verify_bundle(directory: Path) -> str:
@@ -158,12 +269,12 @@ def verify_bundle(directory: Path) -> str:
         os.close(directory_fd)
     try:
         manifest = json.loads(
-            data["export-manifest.json"], object_pairs_hook=exporter._unique_json_object,
+            data["export-manifest.json"], object_pairs_hook=_unique_json_object,
         )
         server = json.loads(
-            data["opencode.jsonc"], object_pairs_hook=exporter._unique_json_object,
+            data["opencode.jsonc"], object_pairs_hook=_unique_json_object,
         )
-        tui = json.loads(data["cli.json"], object_pairs_hook=exporter._unique_json_object)
+        tui = json.loads(data["cli.json"], object_pairs_hook=_unique_json_object)
     except (ValueError, UnicodeDecodeError) as exc:
         raise StageError("bundle is not valid UTF-8 JSON") from exc
     if not isinstance(manifest, dict):
@@ -222,6 +333,14 @@ def _run(command: list[str]) -> None:
 
 
 def _check_source(root: Path, bundle: Path) -> None:
+    if str(PROJECT_ROOT) not in sys.path:
+        sys.path.insert(0, str(PROJECT_ROOT))
+    try:
+        import importlib
+
+        exporter = importlib.import_module("sandbox.scripts.prepare_opencode_v2")
+    except ImportError as exc:
+        raise StageError("export provenance check could not complete") from exc
     try:
         apm = exporter._read_apm_source(root)
     except (OSError, exporter.ExportError) as exc:
