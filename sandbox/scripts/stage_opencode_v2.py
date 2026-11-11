@@ -57,6 +57,7 @@ def _unique_json_object(pairs: list[tuple[str, JsonValue]]) -> dict[str, JsonVal
 
 
 def _contains_credential_material(data: bytes) -> bool:
+    """Detect configured credential signatures, ignoring recognized fixture placeholders."""
     for pattern in SECRET_PATTERNS:
         for match in pattern.finditer(data):
             value = match.group().upper()
@@ -135,6 +136,7 @@ class StageError(Exception):
 
 
 def _regular_bytes(directory_fd: int, name: str) -> bytes:
+    """Read an allowlisted regular bundle file without following symlinks or exceeding MAX_BYTES."""
     if name not in NAMES:
         raise StageError("bundle file is not in the allowlist")
     flags = os.O_RDONLY | os.O_NONBLOCK | getattr(os, "O_NOFOLLOW", 0)
@@ -288,6 +290,7 @@ def _verify_custom_headers(headers: dict[str, JsonValue]) -> None:
 
 
 def _validated_bundle_directory(directory: Path, trusted_root: Path) -> Path:
+    """Resolve a bundle strictly beneath the trusted root, rejecting traversal and symlink paths."""
     root = trusted_root.absolute()
     candidate = directory if directory.is_absolute() else Path.cwd() / directory
     candidate = candidate.absolute()
@@ -307,11 +310,9 @@ def _validated_bundle_directory(directory: Path, trusted_root: Path) -> Path:
     return resolved
 
 
-def verify_bundle(directory: Path, *, trusted_root: Path | None = None) -> str:
+def verify_bundle(directory: Path, *, trusted_root: Path) -> str:
     """Validate content and hashes, without executing any exported config."""
-    directory = _validated_bundle_directory(
-        directory, trusted_root or Path(tempfile.gettempdir()),
-    )
+    directory = _validated_bundle_directory(directory, trusted_root)
     directory_fd = _open_bundle_directory(directory)
     try:
         if set(os.listdir(directory_fd)) != NAMES:
@@ -333,6 +334,7 @@ def verify_bundle(directory: Path, *, trusted_root: Path | None = None) -> str:
 def _load_bundle(
     directory_fd: int,
 ) -> tuple[dict[str, JsonValue], dict[str, JsonValue], dict[str, JsonValue], dict[str, bytes]]:
+    """Read the allowlisted bundle files and parse the three JSON documents as objects."""
     data = {name: _regular_bytes(directory_fd, name) for name in NAMES}
     try:
         manifest = json.loads(
@@ -420,7 +422,7 @@ def _run(command: list[str]) -> None:
 
 
 def _check_source(root: Path, bundle: Path) -> None:
-    bundle = _validated_bundle_directory(bundle, Path(tempfile.gettempdir()))
+    bundle = _validated_bundle_directory(bundle, BUNDLE_ROOT)
     try:
         import importlib
 
@@ -447,7 +449,7 @@ def stage(bundle: Path, repo_root: Path, sandbox: str | None, apply: bool) -> No
     if bundle.is_symlink():
         raise StageError("bundle path must not be a symlink")
     root = repo_root.resolve(strict=True)
-    digest = verify_bundle(bundle)
+    digest = verify_bundle(bundle, trusted_root=BUNDLE_ROOT)
     _check_source(root, bundle)
     if not apply:
         print("DRY_RUN_OK: verified source and snapshot; nothing transferred")

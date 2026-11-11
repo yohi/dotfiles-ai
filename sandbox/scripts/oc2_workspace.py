@@ -50,7 +50,6 @@ DOTFILES_AI_PROFILE_ID: Final[str] = 'dotfiles-ai/workspace-safe-transfer/r1'
 DOTFILES_AI_PROFILE = WorkspaceProfile(
     profile_id=DOTFILES_AI_PROFILE_ID,
     excluded_paths=frozenset({
-        'apm.yml',
         '_docs/aws-resource-inventory.md',
         '_scripts/generate_atlassian_auth.py',
         '.agents/skills/claude-api/csharp/claude-api/README.md',
@@ -123,6 +122,7 @@ def _excluded(
     relative: pathlib.PurePosixPath,
     profile: WorkspaceProfile | None = None,
 ) -> bool:
+    """Return whether a relative workspace path matches built-in or selected profile exclusions."""
     relative_name = relative.as_posix()
     return ((len(relative.parts) == 1
              and relative.name in ROOT_PROJECT_CONFIG_NAMES | ROOT_GENERATED_DIRECTORY_NAMES)
@@ -226,6 +226,7 @@ def _decode_manifest_entries(
     raw_entries: object,
     profile: WorkspaceProfile | None,
 ) -> tuple[FileEntry, ...]:
+    """Decode sorted manifest entries, rejecting malformed, duplicate, oversized, or excluded paths."""
     if not isinstance(raw_entries, list):
         _fail('workspace manifest schema is invalid')
     entries: list[FileEntry] = []
@@ -280,6 +281,7 @@ def _snapshot_entries(
     base: pathlib.Path,
     profile: WorkspaceProfile | None,
 ) -> list[FileEntry]:
+    """Collect included regular files beneath a validated root; fail when traversal is incomplete."""
     entries: list[FileEntry] = []
 
     def fail_walk(error: OSError) -> None:
@@ -298,6 +300,7 @@ def _snapshot_directory(
     profile: WorkspaceProfile | None,
     entries: list[FileEntry],
 ) -> None:
+    """Filter one walked directory and reject included symlinks and unsafe file entries."""
     retained: list[str] = []
     for name in directories:
         candidate = current_path / name

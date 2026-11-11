@@ -124,7 +124,7 @@ ln -s "$PWD/sandbox/scripts/oc2.py" "$HOME/.local/bin/oc2"
 ```
 
 `$HOME/.local/bin` がPATHに含まれていることを確認してください。起動前にDocker Sandboxes CLIの
-インストール済みバージョンと `sbx create --help` の `--clone` 対応を確認します。
+インストール済みバージョンと `sbx create --help` の `--kit` 対応を確認します。
 Sandbox名が既に存在する場合は、再利用・再構築せず停止します。
 
 通常起動はHost Workspaceをmountせず、検査済みSnapshotだけをGuestへコピーします。
@@ -132,9 +132,9 @@ Sandbox名が既に存在する場合は、再利用・再構築せず停止し�
 残ったファイルにCredential検出が一致した場合はSandbox作成前に停止します。
 
 Workspace originが正確に `yohi/dotfiles-ai` の場合だけ、Workspace Safe Transfer Profile R1を適用します。
-他のRepositoryの `apm.yml` にはこの除外を適用しません。
+R1の除外は他のRepositoryには適用されません。一般的な秘密ファイル・Credential検査は全Repositoryで実施します。
 
-- `apm.yml`はHost側SSOTとして読み込み、HostでOpenCode V2設定を生成します。原本はGuestへ転送しません。
+- 検査を通過した`apm.yml`はSnapshotに含まれ、Guestへ転送されます。OpenCode V2設定の生成にはHost側SSOTも使用します。
 - Guestでの`apm.yml`編集・新規作成はサポート対象外です。Guestで作った`apm.yml`はcollect/apply対象になりません。
 - `_docs/aws-resource-inventory.md`、`_scripts/generate_atlassian_auth.py`、
   `.agents/skills/claude-api/csharp/claude-api/README.md`、
@@ -184,12 +184,13 @@ printf 'print("safe sandbox fixture")\n' > "$test_repo/main.py"
 git -C "$test_repo" add main.py
 git -C "$test_repo" -c user.name='OC2 Test' -c user.email='oc2-test@example.invalid' commit -m fixture
 cd "$test_repo"
-oc2 --repo-root "$HOME/dotfiles/components/dotfiles-ai" --sandbox oc2-phase1-test
+oc2 --repo-root "$HOME/dotfiles/components/dotfiles-ai" --sandbox oc2-phase1-test \
+  --allow-paid-inference
 ```
 
 TUIの操作確認後は `Ctrl+C` で終了します。Sandboxは残ります。既存Sandboxの再利用・削除が必要な場合は、
 対象を確認したうえでHuman Ownerが別途判断してください。この実機テストはDocker Sandboxes `v0.49.2`の
-Clone modeとOpenCode `v2.2.5`の起動だけを確認し、実プロジェクトでの機密ファイル非露出を保証しません。
+検査済みSnapshotの転送とOpenCode `v2.2.5`の起動を確認し、実プロジェクトでの機密ファイル非露出を保証しません。
 
 `sbx diagnose` が `/dev/kvm: permission denied` を示した場合は、起動を迂回せず停止します。
 Human Ownerが権限変更を承認した場合に限り、管理者が `sudo usermod -aG kvm "$USER"` を実行し、

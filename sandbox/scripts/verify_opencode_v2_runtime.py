@@ -92,7 +92,7 @@ def _pinned_plugin(entry: str, kind: str) -> bool:
 def verify(bundle: Path, runtime: Path) -> dict[str, object]:
     source = _workspace_dir(bundle)
     target = _workspace_dir(runtime)
-    source_hash = verify_bundle(source)
+    source_hash = verify_bundle(source, trusted_root=WORKSPACE)
     config = target / "xdg-config" / "opencode"
     _workspace_dir(config)
     server_file = config / "opencode.jsonc"

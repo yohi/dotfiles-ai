@@ -51,12 +51,14 @@ class StageTests(unittest.TestCase):
         (self.bundle / "export-manifest.json").write_text(json.dumps(manifest) + "\n")
 
     def test_guest_verify_valid_bundle(self) -> None:
-        digest = stage.verify_bundle(self.bundle)
+        """Verify the fixed Guest bundle directory beneath its separate trusted root."""
+        digest = stage.verify_bundle(self.bundle, trusted_root=stage.BUNDLE_ROOT)
         self.assertEqual(
             digest,
             hashlib.sha256((self.bundle / "export-manifest.json").read_bytes()).hexdigest(),
         )
     def test_guest_cli_only_accepts_the_fixed_staging_path(self) -> None:
+        """Distinguish the Guest staging path from the trusted root used for validation."""
         staged = self.root / "sbx-config-0123456789abcdef-aabbccddeeff"
         staged.mkdir()
         for entry in self.bundle.iterdir():
@@ -67,6 +69,7 @@ class StageTests(unittest.TestCase):
             self.assertEqual(stage.main(["--verify-bundle", self.bundle.name]), 1)
 
     def test_guest_verifier_imports_without_site_packages_or_repository(self) -> None:
+        """Verify the Guest verifier runs from its fixed path without Host repository imports."""
         result = subprocess.run(
             [sys.executable, "-S", "-c",
              f"import sys; sys.path.insert(0, {str(SCRIPT.parent)!r}); "
@@ -77,11 +80,13 @@ class StageTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_guest_verify_rejects_path_in_cli_argument(self) -> None:
+        """Reject a caller-selected Guest bundle path outside the fixed staging location."""
         with patch.object(stage, "REMOTE_PARENT", str(self.bundle.parent)):
             status = stage.main(["--verify-bundle", str(self.bundle)])
         self.assertEqual(status, 1)
 
     def test_host_stage_resolves_bundle_identifier_under_temp_root(self) -> None:
+        """Resolve a generated bundle name beneath the Host temporary trusted root."""
         bundle_name = "opencode-v2-export-20261111"
         bundle = self.root.parent / bundle_name
         bundle.mkdir(mode=0o700)
@@ -95,6 +100,7 @@ class StageTests(unittest.TestCase):
         self.assertEqual(stage_bundle.call_args.args[0], bundle)
 
     def test_host_stage_rejects_path_in_bundle_argument(self) -> None:
+        """Reject path syntax where the CLI contract accepts only a generated bundle name."""
         with patch.object(stage, "stage") as stage_bundle:
             status = stage.main(["--bundle", str(self.bundle), "--repo-root", str(self.root)])
 
@@ -142,7 +148,7 @@ class StageTests(unittest.TestCase):
     def test_v2_multi_provider_bundle_passes_stage_validation(self) -> None:
         bundle = self._make_v2_bundle()
         self.assertEqual(
-            stage.verify_bundle(bundle),
+            stage.verify_bundle(bundle, trusted_root=stage.BUNDLE_ROOT),
             hashlib.sha256((bundle / "export-manifest.json").read_bytes()).hexdigest(),
         )
         stage._check_source(self.root, bundle)
@@ -163,28 +169,29 @@ class StageTests(unittest.TestCase):
         manifest_path.write_text(json.dumps(manifest) + "\n", encoding="utf-8")
 
         with self.assertRaises(stage.StageError):
-            stage.verify_bundle(bundle)
+            stage.verify_bundle(bundle, trusted_root=stage.BUNDLE_ROOT)
 
     def test_rejects_changed_config_and_extra_files(self) -> None:
         config = self.bundle / "cli.json"
         config.write_text("{}\n")
         with self.assertRaises(stage.StageError):
-            stage.verify_bundle(self.bundle)
+            stage.verify_bundle(self.bundle, trusted_root=stage.BUNDLE_ROOT)
         config.unlink()
         (self.bundle / "extra.txt").write_text("unknown")
         with self.assertRaises(stage.StageError):
-            stage.verify_bundle(self.bundle)
+            stage.verify_bundle(self.bundle, trusted_root=stage.BUNDLE_ROOT)
 
     def test_verify_bundle_rejects_paths_outside_temporary_staging(self) -> None:
+        """Reject Host bundle paths outside the configured trusted staging root."""
         with self.assertRaisesRegex(stage.StageError, "outside the approved staging root"):
-            stage.verify_bundle(Path("/etc"))
+            stage.verify_bundle(Path("/etc"), trusted_root=stage.BUNDLE_ROOT)
 
     def test_rejects_symlinked_member(self) -> None:
         member = self.bundle / "cli.json"
         member.unlink()
         member.symlink_to(self.apm)
         with self.assertRaises(stage.StageError):
-            stage.verify_bundle(self.bundle)
+            stage.verify_bundle(self.bundle, trusted_root=stage.BUNDLE_ROOT)
 
     def test_regular_bytes_rejects_paths_outside_the_bundle_allowlist(self) -> None:
         outside = self.root / "opencode.jsonc"
@@ -194,15 +201,18 @@ class StageTests(unittest.TestCase):
             stage._read_bundle_files(self.root, ["../opencode.jsonc"])
 
     def test_bundle_verifier_rejects_symlinked_parent(self) -> None:
+        """Reject a bundle whose parent path traverses a symlink within the trusted root."""
         alias = self.root.parent / "parent-alias"
         alias.symlink_to(self.bundle.parent, target_is_directory=True)
 
         with self.assertRaises(stage.StageError):
-            stage.verify_bundle(alias / self.bundle.name)
+            stage.verify_bundle(alias / self.bundle.name, trusted_root=stage.BUNDLE_ROOT)
 
     def test_bundle_verifier_rejects_path_traversal(self) -> None:
+        """Reject a Guest bundle path that traverses outside the approved Guest workspace root."""
         with self.assertRaises(stage.StageError):
-            stage.verify_bundle(self.bundle.parent / ".." / self.bundle.name)
+            stage.verify_bundle(self.bundle.parent / ".." / self.bundle.name,
+                                trusted_root=stage.BUNDLE_ROOT)
 
     def test_rejects_plugin_or_mcp_config_even_with_updated_hash(self) -> None:
         manifest_file = self.bundle / "export-manifest.json"
@@ -214,7 +224,7 @@ class StageTests(unittest.TestCase):
         manifest["artifacts_sha256"]["opencode.jsonc"] = hashlib.sha256(config_file.read_bytes()).hexdigest()
         manifest_file.write_text(json.dumps(manifest))
         with self.assertRaises(stage.StageError):
-            stage.verify_bundle(self.bundle)
+            stage.verify_bundle(self.bundle, trusted_root=stage.BUNDLE_ROOT)
 
     def test_dry_run_does_not_invoke_sbx(self) -> None:
         with patch.object(stage, "_check_source"), patch.object(stage, "_run") as run:

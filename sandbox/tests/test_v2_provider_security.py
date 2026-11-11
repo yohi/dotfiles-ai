@@ -333,11 +333,12 @@ class ProviderSecurityContractTests(unittest.TestCase):
             (bundle / "export-manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
 
             with self.assertRaises((ValueError, stage.StageError)):
-                stage.verify_bundle(bundle)
+                stage.verify_bundle(bundle, trusted_root=stage.BUNDLE_ROOT)
             with self.assertRaises(ValueError):
                 guest.verify(bundle)
 
     def test_host_export_rejects_credential_material_in_generated_bundle(self) -> None:
+        """Reject credentials at Host bundle generation, including after hash regeneration."""
         config = _server_config()
         config["providers"][CF_PROVIDER]["models"][
             "custom-ollama-cloud/kimi-k2.7-code"
@@ -350,6 +351,7 @@ class ProviderSecurityContractTests(unittest.TestCase):
             exporter._build_files("bash", True, "a" * 64, v2_config)
 
     def test_stage_rejects_credential_material_in_hash_valid_bundle(self) -> None:
+        """Reject credentials at Stage validation even when the bundle hash is updated."""
         config = _server_config()
         v2_config = {
             key: config[key] for key in ("model", "providers", "policies")
@@ -374,7 +376,7 @@ class ProviderSecurityContractTests(unittest.TestCase):
             manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
 
             with self.assertRaises(stage.StageError):
-                stage.verify_bundle(bundle)
+                stage.verify_bundle(bundle, trusted_root=stage.BUNDLE_ROOT)
 
 
 if __name__ == "__main__":

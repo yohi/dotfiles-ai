@@ -34,7 +34,7 @@ def materialize(source: pathlib.Path, destination: pathlib.Path, manifest: Manif
             if len(data) != entry.size or hashlib.sha256(data).hexdigest() != entry.sha256:
                 raise WorkspaceError('workspace changed while snapshot was copied')
             target = destination.joinpath(*relative.split('/'))
-            _ = target.parent.mkdir(mode=directory_mode, parents=True, exist_ok=True)
+            target.parent.mkdir(mode=directory_mode, parents=True, exist_ok=True)
             descriptor = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL |
                                   getattr(os, 'O_NOFOLLOW', 0), file_mode)
             with os.fdopen(descriptor, 'wb') as stream:
@@ -107,6 +107,12 @@ def apply_changes(host: pathlib.Path, guest: pathlib.Path, baseline: Manifest,
             raise WorkspaceError('temporary apply destination already exists')
         contents[relative] = data
         prepared[relative] = temporary
+
+    for relative in changed:
+        target = host.joinpath(*relative.split('/'))
+        rollback = target.with_name(target.name + '.oc2-rollback')
+        if rollback.exists() or rollback.is_symlink():
+            raise WorkspaceError('temporary rollback destination already exists')
 
     applied: list[str] = []
     try:

@@ -428,6 +428,7 @@ def _create_runtime(
     receipt: dict[str, str],
     expected: dict[str, bytes],
 ) -> None:
+    """Create the previously absent runtime tree and write its expected files exclusively."""
     (dest / 'config/opencode').mkdir(parents=True, mode=0o700)
     for name in ('home', 'data', 'state', 'cache', 'tmp', 'project'):
         (dest / name).mkdir(mode=0o700)
@@ -452,6 +453,7 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _run_guest(args: argparse.Namespace) -> int:
+    """Validate bundle, optional assets, and runtime identity before preparing the Guest runtime."""
     if re.fullmatch('[0-9a-f]{64}', args.expected_sha) is None:
         fail('invalid expected SHA')
     bundle = args.bundle

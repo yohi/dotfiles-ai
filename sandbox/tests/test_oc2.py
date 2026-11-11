@@ -103,13 +103,19 @@ class RunnerTimeoutTest(unittest.TestCase):
 
 class CloudflareCredentialProvisioningTest(unittest.TestCase):
     class Runner:
-        def __init__(self, *, sandbox_scope=None, global_scope=None, store=True):
+        """Fake secret listing and set operations used by provisioning tests."""
+
+        def __init__(self, *, sandbox_scope: str | None = None,
+                     global_scope: str | None = None, store: bool = True) -> None:
+            """Initialize configured secret scopes and whether setting persists a credential."""
             self.sandbox_scope = sandbox_scope
             self.global_scope = global_scope
             self.store = store
-            self.calls = []
+            self.calls: list[tuple[tuple[str, ...], bool]] = []
 
-        def sbx(self, *args, capture=False, tty=False, timeout=180):
+        def sbx(self, *args: str, capture: bool = False, tty: bool = False,
+                timeout: int | None = 180) -> str:
+            """Return fake secret listings or record a credential set operation."""
             self.calls.append((args, tty))
             if args[:2] == ('secret', 'ls'):
                 scope = self.global_scope if '--global' in args else self.sandbox_scope
@@ -126,7 +132,8 @@ class CloudflareCredentialProvisioningTest(unittest.TestCase):
                 return ''
             raise AssertionError(f'unexpected command: {args!r}')
 
-    def test_existing_sandbox_secret_is_reused_without_mutation(self):
+    def test_existing_sandbox_secret_is_reused_without_mutation(self) -> None:
+        """Reuse a matching Sandbox credential without setting a new one."""
         runner = self.Runner(sandbox_scope='oc2-dev')
 
         scope = oc2.ensure_cloudflare_credential(runner, 'oc2-dev', interactive=False)
@@ -134,7 +141,8 @@ class CloudflareCredentialProvisioningTest(unittest.TestCase):
         self.assertEqual(scope, 'sandbox')
         self.assertEqual(len(runner.calls), 1)
 
-    def test_missing_secret_requires_interactive_terminal(self):
+    def test_missing_secret_requires_interactive_terminal(self) -> None:
+        """Stop before setting a credential when no interactive terminal is available."""
         runner = self.Runner()
 
         with self.assertRaisesRegex(oc2.Stop, 'interactive terminal'):
@@ -142,7 +150,8 @@ class CloudflareCredentialProvisioningTest(unittest.TestCase):
 
         self.assertEqual(len(runner.calls), 2)
 
-    def test_interactive_secret_creation_is_verified_before_return(self):
+    def test_interactive_secret_creation_is_verified_before_return(self) -> None:
+        """Return Sandbox scope only after the new credential is listed and verified."""
         runner = self.Runner()
 
         scope = oc2.ensure_cloudflare_credential(runner, 'oc2-dev', interactive=True)
@@ -152,10 +161,12 @@ class CloudflareCredentialProvisioningTest(unittest.TestCase):
         self.assertTrue(runner.calls[2][1])
         self.assertEqual(runner.calls[3][0][:2], ('secret', 'ls'))
 
-    def test_malformed_secret_listing_fails_closed(self):
-        class MalformedRunner(self.Runner):
-            def sbx(self, *args, **kwargs):
-                self.calls.append((args, kwargs.get('tty', False)))
+    def test_malformed_secret_listing_fails_closed(self) -> None:
+        """Reject credential listings that do not match the supported schema."""
+        class MalformedRunner(CloudflareCredentialProvisioningTest.Runner):
+            def sbx(self, *args: str, capture: bool = False, tty: bool = False,
+                    timeout: int | None = 180) -> str:
+                self.calls.append((args, tty))
                 return '{"secrets":[{"name":"cloudflare-ai-gateway","scope":"oc2-dev"}]}'
 
         runner = MalformedRunner()
@@ -164,7 +175,8 @@ class CloudflareCredentialProvisioningTest(unittest.TestCase):
 
 
 class HostTest(unittest.TestCase):
-    def test_guest_exec_wrapper_has_one_module_assignment(self):
+    def test_guest_exec_wrapper_has_one_module_assignment(self) -> None:
+        """Keep the inline Guest wrapper defined exactly once in the launcher."""
         source = (SCRIPTS / 'oc2.py').read_text(encoding='utf-8')
         module = ast.parse(source)
         assignments = [
@@ -176,7 +188,38 @@ class HostTest(unittest.TestCase):
 
         self.assertEqual(len(assignments), 1)
 
-    def test_inline_module_source_loads_embedded_python_module(self):
+    def test_guest_exec_wrapper_validates_and_passes_controlled_environment(self) -> None:
+        """Validate proxy inputs and pass only the approved proxy and runtime variables to a child."""
+        command = [
+            sys.executable, '-c', oc2.GUEST_EXEC_WRAPPER, '--', 'HOME=/tmp/oc2-test', '--',
+            sys.executable, '-c',
+            'import os; print(os.environ["HOME"] + "|" + os.environ["HTTPS_PROXY"] + "|" + os.environ["NO_PROXY"])',
+        ]
+        cases: tuple[tuple[dict[str, str], int, str], ...] = (
+            ({}, 125, 'required HTTPS proxy'),
+            ({'HTTPS_PROXY': 'http://proxy.example:8080',
+              'https_proxy': 'http://other.example:8080'}, 125, 'conflicting proxy'),
+            ({'HTTPS_PROXY': 'http://proxy.example:8080',
+              'NO_PROXY': 'example.com'}, 125, 'unsafe NO_PROXY'),
+        )
+        for environment, status, message in cases:
+            with self.subTest(environment=environment):
+                result = subprocess.run(command, env=environment, capture_output=True,
+                                        text=True, check=False)
+                self.assertEqual(result.returncode, status)
+                self.assertIn(message, result.stderr)
+
+        result = subprocess.run(
+            command,
+            env={'HTTPS_PROXY': 'http://proxy.example:8080', 'NO_PROXY': 'localhost'},
+            capture_output=True, text=True, check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(),
+                         ' /tmp/oc2-test|http://proxy.example:8080|localhost'.strip())
+
+    def test_inline_module_source_loads_embedded_python_module(self) -> None:
+        """Load an embedded helper module in a fresh Python child process."""
         loader = oauth_bundle.inline_python_module('oc2_embedded_fixture', 'value = 42\n')
         program = loader + '\nimport oc2_embedded_fixture\nprint(oc2_embedded_fixture.value)\n'
         result = subprocess.run([sys.executable, '-c', program], capture_output=True,
@@ -207,7 +250,8 @@ class HostTest(unittest.TestCase):
 
     def test_clone_mode_rejects_credentials_in_git_metadata_before_publication(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            root = pathlib.Path(tmp)
+            root = pathlib.Path(tmp) / 'host'
+            root.mkdir()
             metadata = root / '.git'
             metadata.mkdir()
             (metadata / 'config').write_text(
@@ -216,23 +260,30 @@ class HostTest(unittest.TestCase):
             with self.assertRaisesRegex(oc2.Stop, 'Git metadata contains credential'):
                 oc2.validate_clone_workspace(root)
 
-    def test_clone_mode_command_requires_a_workspace_path(self) -> None:
-        workspace = pathlib.Path('/tmp/oc2-safe-repository')
+    def test_workspace_create_args_make_mountless_shell_with_mixin(self) -> None:
         self.assertEqual(
-            oc2.clone_create_args(
-                'oc2-safe', workspace, pathlib.Path('/tmp/oc2-credential-mixin'),
+            oc2.workspace_create_args(
+                'oc2-safe', pathlib.Path('/tmp/oc2-credential-mixin'),
             ),
-            ['create', '--clone', '--name', 'oc2-safe', '--kit',
-             '/tmp/oc2-credential-mixin', 'shell', str(workspace)],
+            ['create', '--name', 'oc2-safe', '--kit', '/tmp/oc2-credential-mixin', 'shell'],
         )
 
-    def test_clone_mode_refuses_excluded_files_that_docker_would_expose(self) -> None:
+    def test_mountless_snapshot_omits_excluded_files_from_the_guest_source(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            root = pathlib.Path(tmp)
+            root = pathlib.Path(tmp) / 'host'
+            root.mkdir()
             (root / 'main.py').write_text('print("safe")\n')
             (root / '.env').write_text('TOKEN=fixture-value')
-            with self.assertRaisesRegex(oc2.Stop, 'clone mode would expose'):
-                oc2.validate_clone_workspace(root)
+            subprocess.run(['git', 'init', '-q', str(root)], check=True)
+
+            oc2.validate_clone_workspace(root)
+            workspace = load('oc2_workspace')
+            manifest = workspace.snapshot(root)
+            snapshot = pathlib.Path(tmp) / 'snapshot'
+            workspace.materialize(root, snapshot, manifest)
+
+            self.assertNotIn('.env', {entry.path for entry in manifest.files})
+            self.assertFalse((snapshot / '.env').exists())
 
     def test_clone_mode_fails_closed_when_excluded_directory_cannot_be_walked(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -668,6 +719,26 @@ class HostTest(unittest.TestCase):
             with patch.object(ops.os, 'replace', side_effect=fail_second_replace):
                 with self.assertRaisesRegex(OSError, 'injected replace failure'):
                     workspace.apply_changes(root, guest, baseline, approved=True)
+            self.assertEqual((root / 'a.txt').read_text(), 'host-a')
+            self.assertEqual((root / 'b.txt').read_text(), 'host-b')
+
+    def test_workspace_apply_checks_all_rollback_paths_before_replacing_files(self) -> None:
+        """Reject any existing rollback path before replacing the first Host file."""
+        workspace = load('oc2_workspace')
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp) / 'host'
+            root.mkdir()
+            (root / 'a.txt').write_text('host-a')
+            (root / 'b.txt').write_text('host-b')
+            (root / 'b.txt.oc2-rollback').write_text('reserved')
+            baseline = workspace.snapshot(root)
+            guest = pathlib.Path(tmp) / 'guest'
+            workspace.materialize(root, guest, baseline)
+            (guest / 'a.txt').write_text('guest-a')
+            (guest / 'b.txt').write_text('guest-b')
+            with self.assertRaisesRegex(workspace.WorkspaceError, 'rollback destination'):
+                workspace.apply_changes(root, guest, baseline, approved=True)
+
             self.assertEqual((root / 'a.txt').read_text(), 'host-a')
             self.assertEqual((root / 'b.txt').read_text(), 'host-b')
 
@@ -1238,17 +1309,6 @@ class HostTest(unittest.TestCase):
             ['auth.openai.com', 'chatgpt.com', 'gateway.ai.cloudflare.com'],
         )
         self.assertNotIn('secret-value', str(spec))
-
-    def test_clone_create_args_attaches_mixin(self):
-        args = oc2.clone_create_args(
-            'oc2-v2', pathlib.Path('/tmp/workspace'), pathlib.Path('/tmp/mixin'),
-        )
-
-        self.assertEqual(
-            args,
-            ['create', '--clone', '--name', 'oc2-v2', '--kit', '/tmp/mixin',
-             'shell', '/tmp/workspace'],
-        )
 
     def test_requires_external_inference_when_v2_provider_is_selected(self):
         with tempfile.TemporaryDirectory() as tmp:

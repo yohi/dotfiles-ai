@@ -21,7 +21,9 @@ import oc2  # noqa: E402
 
 
 class FakeSbx:
-    def __init__(self):
+    """Simulate Sandbox CLI operations while recording copied files and calls."""
+
+    def __init__(self) -> None:
         self.created = False
         self.installed = False
         self.kit_supported = True
@@ -47,7 +49,7 @@ class FakeSbx:
         self.clone_source_log_subject: str | None = None
         self.clone_source_has_http_header = False
         self.calls: list[tuple[str, ...]] = []
-        self.timeouts: list[int] = []
+        self.timeouts: list[int | None] = []
         self.user = oc2.getpass.getuser()
 
     @staticmethod
@@ -71,8 +73,9 @@ class FakeSbx:
         *args: str,
         capture: bool = False,
         tty: bool = False,
-        timeout: int = 180,
+        timeout: int | None = 180,
     ) -> str:
+        """Emulate supported Sandbox commands and retain their observable side effects."""
         self.calls.append(args)
         self.timeouts.append(timeout)
         if args == (
@@ -99,7 +102,7 @@ class FakeSbx:
         if args == ('version',):
             return 'sbx version v0.49.2 test\n'
         if args == ('create', '--help'):
-            capabilities = '  --clone  create from a Git repository\n'
+            capabilities = ''
             if self.kit_supported:
                 capabilities += '  --kit  compose a Mixin\n'
             return capabilities
@@ -125,19 +128,6 @@ class FakeSbx:
                     'opencode-cli@2.2.5' in self.created_runtime_mixin_spec
                     and self.created_cli_binary is not None
                 )
-            if '--clone' in args:
-                self.clone_source = pathlib.Path(args[-1])
-                self.clone_source_content = (self.clone_source / 'main.py').read_text()
-                self.clone_source_remotes = subprocess.run(
-                    ['git', '-C', str(self.clone_source), 'remote'],
-                    check=True, capture_output=True, text=True,
-                ).stdout
-                self.clone_source_log_subject = subprocess.run(
-                    ['git', '-C', str(self.clone_source), 'log', '-1', '--format=%s'],
-                    check=True, capture_output=True, text=True,
-                ).stdout.strip()
-                config = (self.clone_source / '.git' / 'config').read_text()
-                self.clone_source_has_http_header = 'extraheader' in config.lower()
             self.created = True
             return ''
         if args[:1] == ('cp',):
@@ -146,6 +136,8 @@ class FakeSbx:
             remote_destination = destination.split(':', 1)[1]
             if source.is_dir():
                 self.workspace_destination = remote_destination
+                self.clone_source = source
+                self.clone_source_content = (source / 'main.py').read_text()
                 for path in source.rglob('*'):
                     if path.is_file() and not path.is_symlink():
                         relative = path.relative_to(source).as_posix()
@@ -164,9 +156,9 @@ class FakeSbx:
             if command[:2] == ('bash', '-c'):
                 return 'missing\n'
             if command[:1] == ('sha256sum',):
-                data = self.remote_files.get(command[1])
-                return (hashlib.sha256(data).hexdigest() + '  ' + command[1] + '\n'
-                        if data is not None else '')
+                remote_data = self.remote_files.get(command[1])
+                return (hashlib.sha256(remote_data).hexdigest() + '  ' + command[1] + '\n'
+                        if remote_data is not None else '')
             if (command[:2] == ('sh', '-c')
                     and command[4] == oc2.PINNED[0]):
                 return 'opencode v2.2.5\n' if self.installed else ''
@@ -298,7 +290,7 @@ class LauncherFlowTests(unittest.TestCase):
         check_index = self.fake.calls.index(sandbox_check)
         create_index = next(
             index for index, call in enumerate(self.fake.calls)
-            if call[:2] == ('create', '--clone')
+            if call[:1] == ('create',)
         )
         launch_index = next(
             index for index, call in enumerate(self.fake.calls)
@@ -402,16 +394,18 @@ class LauncherFlowTests(unittest.TestCase):
     def test_clone_mode_installs_and_launches_only_pinned_v2(self) -> None:
         status, output = self._run('--allow-paid-inference')
         self.assertEqual(status, 0, output)
-        create = next(call for call in self.fake.calls if call[0] == 'create' and '--clone' in call)
-        self.assertEqual(create[:4], ('create', '--clone', '--name', 'oc2-test'))
+        create = next(call for call in self.fake.calls
+                      if call[0] == 'create' and '--name' in call)
+        self.assertNotIn('--clone', create)
+        self.assertEqual(create[:3], ('create', '--name', 'oc2-test'))
         self.assertIn('--kit', create)
-        self.assertEqual(create[-2], 'shell')
-        self.assertNotEqual(pathlib.Path(create[-1]), self.project)
+        self.assertEqual(create[-1], 'shell')
+        self.assertTrue(self.fake.workspace_files)
         self.assertEqual(self.fake.clone_source_content, 'print("safe")\n')
-        self.assertEqual(self.fake.clone_source_remotes, 'origin\n')
-        self.assertEqual(self.fake.clone_source_log_subject, 'OC2 sanitized workspace snapshot')
         self.assertFalse(self.fake.clone_source_has_http_header)
-        self.assertTrue(pathlib.Path(create[-1]).exists())
+        self.assertIsNotNone(self.fake.clone_source)
+        assert self.fake.clone_source is not None
+        self.assertTrue(self.fake.clone_source.exists())
         self.assertIsNotNone(self.fake.created_mixin_spec)
         install = next(call for call in self.fake.calls if call[:3] == (
             'exec', 'oc2-test', 'npm',
@@ -427,7 +421,7 @@ class LauncherFlowTests(unittest.TestCase):
         self.assertNotIn('mcp', copied_config)
         self.assertIn(900, self.fake.timeouts)
         launch = next(call for call in self.fake.calls if call[:2] == ('exec', '-it'))
-        self.assertEqual(launch[3], '/home/agent/workspace/synthetic')
+        self.assertEqual(launch[3], self.fake.workspace_destination)
         self.assertIn(oc2.GUEST_EXEC_WRAPPER, launch)
         self.assertNotIn('-i', launch)
         self.assertIn('OPENCODE_CONFIG_PROJECT_DISABLE=1', launch)
@@ -435,22 +429,25 @@ class LauncherFlowTests(unittest.TestCase):
         self.assertIn('opencode=v2.2.5', output)
         self.assertFalse(any('--collect' in call or '--apply' in call for call in self.fake.calls))
 
-    def test_openai_mode_hides_cloudflare_without_secret_or_terminal(self):
+    def test_openai_mode_hides_cloudflare_without_secret_or_terminal(self) -> None:
+        """Launch OpenAI mode without Cloudflare credentials or an interactive terminal."""
         self.fake.sandbox_cloudflare_secret = False
         status, output = self._run('--allow-paid-inference', stdin_tty=False)
 
         self.assertEqual(status, 0, output)
+        if self.fake.copied_config is None:
+            self.fail('V2 config was not copied into the Sandbox')
         copied_config = json.loads(self.fake.copied_config)
         self.assertEqual(copied_config['model'], 'openai/gpt-6-luna')
         self.assertNotIn('cloudflare-ai-gateway-custom', copied_config['providers'])
         self.assertFalse(self.fake.secret_calls)
 
-    def test_clone_mode_rejects_env_file_before_sandbox_creation(self):
+    def test_mountless_snapshot_omits_env_file_before_sandbox_creation(self) -> None:
         (self.project / '.env').write_text('TOKEN=fixture-only')
-        status, output = self._run()
-        self.assertEqual(status, 1)
-        self.assertIn('clone mode would expose', output)
-        self.assertFalse(self.fake.created)
+        status, output = self._run('--allow-paid-inference')
+        self.assertEqual(status, 0, output)
+        self.assertTrue(self.fake.created)
+        self.assertNotIn('.env', self.fake.workspace_files)
 
     def test_clone_mode_rejects_project_opencode_configuration(self):
         (self.project / 'opencode.json').write_text('{"mcp":{}}\n')
@@ -459,7 +456,25 @@ class LauncherFlowTests(unittest.TestCase):
         self.assertIn('OpenCode project configuration', output)
         self.assertFalse(self.fake.created)
 
-    def test_dotfiles_ai_profile_excludes_workspace_apm_but_exports_host_apm(self):
+    def test_dotfiles_ai_profile_transfers_verified_apm_and_excludes_r1_paths(self) -> None:
+        """Apply R1 only for the exact origin while transferring a verified apm.yml."""
+        subprocess.run(
+            ['git', '-C', str(self.project), 'remote', 'set-url', 'origin',
+             'git@github.com:yohi/dotfiles-ai.git'],
+            check=True,
+        )
+        (self.project / 'apm.yml').write_text('shell: bash\nsnapshot: true\n')
+        (self.project / '_docs').mkdir()
+        (self.project / '_docs/aws-resource-inventory.md').write_text('local inventory\n')
+
+        status, output = self._run('--allow-paid-inference')
+
+        self.assertEqual(status, 0, output)
+        self.assertIn('apm.yml', self.fake.workspace_files)
+        self.assertNotIn('_docs/aws-resource-inventory.md', self.fake.workspace_files)
+
+    def test_dotfiles_ai_profile_does_not_hide_credentials_in_apm(self) -> None:
+        """Reject credential material in apm.yml even when the repository origin selects R1."""
         subprocess.run(
             ['git', '-C', str(self.project), 'remote', 'set-url', 'origin',
              'git@github.com:yohi/dotfiles-ai.git'],
@@ -467,7 +482,7 @@ class LauncherFlowTests(unittest.TestCase):
         )
         (self.project / 'apm.yml').write_text('apiKey: ' + 'C' * 32 + '\n')
 
-        status, output = self._run()
+        status, output = self._run('--allow-paid-inference')
 
         self.assertEqual(status, 1)
         self.assertIn('credential', output.lower())
@@ -544,7 +559,7 @@ class LauncherFlowTests(unittest.TestCase):
             call for call in self.fake.calls
             if call[:1] == ('create',) and '--kit' in call
         )
-        self.assertIn('--clone', create)
+        self.assertNotIn('--clone', create)
         self.assertNotEqual(pathlib.Path(create[-1]), self.project)
         self.assertIn('--kit', create)
         mixin_path = pathlib.Path(create[create.index('--kit') + 1])
@@ -647,7 +662,7 @@ class LauncherFlowTests(unittest.TestCase):
         def fail_after_create(*args: str, capture: bool = False, tty: bool = False,
                               timeout: int | None = 180) -> str:
             result = original_sbx(*args, capture=capture, tty=tty, timeout=timeout)
-            if args[0] == 'create' and '--clone' in args:
+            if args[0] == 'create' and '--name' in args:
                 raise oc2.Stop('simulated ambiguous create failure')
             return result
 
@@ -657,39 +672,49 @@ class LauncherFlowTests(unittest.TestCase):
         self.assertEqual(status, 1)
         self.assertIn('simulated ambiguous create failure', output)
         self.assertTrue(self.fake.created, (output, self.fake.calls))
-        clone_source = self.fake.clone_source
-        self.assertIsNotNone(clone_source)
-        assert clone_source is not None
+        clone_source = oc2.CLONE_SOURCE_ROOT / 'oc2-test' / 'workspace'
         self.assertTrue(clone_source.exists())
 
     def test_clone_mode_uses_validated_snapshot_after_host_changes(self) -> None:
         validate = oc2.validate_clone_workspace
 
-        def validate_then_mutate(snapshot: pathlib.Path) -> None:
-            validate(snapshot)
-            if snapshot != self.project:
-                (self.project / 'main.py').write_text('print("changed after inspection")\n')
+        def validate_then_mutate(snapshot: pathlib.Path, *, profile=None, manifest=None) -> None:
+            validate(snapshot, profile=profile, manifest=manifest)
+            (self.project / 'main.py').write_text('print("changed after inspection")\n')
 
         with patch.object(oc2, 'validate_clone_workspace', side_effect=validate_then_mutate):
             status, output = self._run('--allow-paid-inference')
 
-        self.assertEqual(status, 0, output)
-        create = next(
-            call for call in self.fake.calls if call[0] == 'create' and '--clone' in call
-        )
-        clone_source = pathlib.Path(create[-1])
-        self.assertNotEqual(clone_source, self.project)
-        self.assertTrue(clone_source.exists())
-        self.assertEqual(self.fake.clone_source_content, 'print("safe")\n')
-        self.assertEqual(self.fake.clone_source_remotes, 'origin\n')
-        self.assertEqual(self.fake.clone_source_log_subject, 'OC2 sanitized workspace snapshot')
-        self.assertFalse(self.fake.clone_source_has_http_header)
+        self.assertEqual(status, 1, output)
+        self.assertFalse(self.fake.created)
         self.assertEqual((self.project / 'main.py').read_text(),
                          'print("changed after inspection")\n')
 
+    def test_resume_retries_cloudflare_credential_after_snapshot_transfer(self) -> None:
+        """Resume a created Sandbox from its retained transfer receipt after credential setup fails."""
+        self.fake.sandbox_cloudflare_secret = False
+        self.fake.secret_set_fails = True
+        status, output = self._run(
+            '--allow-paid-inference', '--use-cloudflare-ai-gateway', stdin_tty=True,
+        )
+        self.assertNotEqual(status, 0)
+        self.assertTrue(self.fake.created)
+
+        self.fake.secret_set_fails = False
+        status, output = self._run(
+            '--allow-paid-inference', '--use-cloudflare-ai-gateway', '--resume', stdin_tty=True,
+        )
+
+        self.assertEqual(status, 0, output)
+        creates = [call for call in self.fake.calls if call[0] == 'create' and '--name' in call]
+        self.assertEqual(len(creates), 1)
+        self.assertTrue(any(call[:2] == ('exec', '-it') for call in self.fake.calls))
+
 
 class FakeInput:
-    def __init__(self, is_tty: bool):
+    """Provide a controllable stdin TTY state for credential provisioning tests."""
+
+    def __init__(self, is_tty: bool) -> None:
         self._is_tty = is_tty
 
     def isatty(self) -> bool:
