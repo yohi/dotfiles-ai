@@ -16,13 +16,16 @@ import importlib
 import json
 import os
 import pathlib
+import platform
 import re
 import secrets
 import shlex
 import shutil
+import socket
 import stat
 import subprocess
 import sys
+import tarfile
 import tempfile
 import urllib.parse
 from typing import TYPE_CHECKING, Final, Literal
@@ -43,6 +46,17 @@ VERSION = '2.2.5'
 ROOT = '/home/agent/workspace/oc2'
 V2_CONFIG_NAME = 'opencode.jsonc'
 NAME_RE = re.compile(r'^[A-Za-z0-9][A-Za-z0-9.-]{0,61}[A-Za-z0-9]$')
+CLI_ASSET_NAME: Final[str] = 'opencode-linux-x64.tar.gz'
+CLI_ASSET_URL: Final[str] = (
+    'https://github.com/anomalyco/opencode/releases/download/v2.2.5/' + CLI_ASSET_NAME
+)
+CLI_RELEASE_API_URL: Final[str] = (
+    'https://api.github.com/repos/anomalyco/opencode/releases/tags/v2.2.5'
+)
+CLI_ASSET_SHA256: Final[str] = (
+    '09f44302c10fd036912f59c81fd1aef5df45dd06f649197f9dfc9bbe2a79614e'
+)
+MAX_CLI_ASSET_BYTES: Final[int] = 150 * 1024 * 1024
 CF_GATEWAY_PROVIDER_ID: Final[str] = 'cloudflare-ai-gateway-custom'
 CLOUDFLARE_SECRET_NAME: Final[str] = 'cloudflare-ai-gateway'
 CLOUDFLARE_TOKEN_PLACEHOLDER: Final[str] = 'proxy-managed'
@@ -52,7 +66,7 @@ CLONE_SOURCE_ROOT = pathlib.Path(
     os.environ.get('XDG_STATE_HOME', str(pathlib.Path.home() / '.local' / 'state')),
 ) / 'oc2' / 'clone-sources'
 PINNED = (
-    '/home/agent/.local/oc2-runtime/node_modules/.bin/opencode',
+    '/home/agent/.local/oc2-runtime/opencode',
 )
 RUNTIME_DIRECTORY_SETUP_SCRIPT = '''
 import os, stat, sys
@@ -191,8 +205,137 @@ class SandboxLaunch:
     cloudflare: CloudflareGatewayRuntime | None = None
 
 
+@dataclass(frozen=True, slots=True)
+class CliReleaseAsset:
+    version: str
+    url: str
+    size: int
+    sha256: str
+
+
 class Stop(Exception):
     pass
+
+
+def _parse_cli_release_asset(raw: bytes) -> CliReleaseAsset:
+    """Parse GitHub release metadata and accept only the pinned Linux x64 asset."""
+    try:
+        payload = json.loads(raw)
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise Stop('OpenCode release metadata is invalid') from exc
+    if (not isinstance(payload, dict) or payload.get('tag_name') != 'v' + VERSION
+            or payload.get('immutable') is not True):
+        raise Stop('OpenCode release metadata tag is not approved')
+    assets = payload.get('assets')
+    if not isinstance(assets, list):
+        raise Stop('OpenCode release metadata asset list is invalid')
+    matches = [item for item in assets
+               if isinstance(item, dict) and item.get('name') == CLI_ASSET_NAME]
+    if len(matches) != 1:
+        raise Stop('OpenCode release metadata asset is missing or duplicated')
+    asset = matches[0]
+    size = asset.get('size')
+    digest = asset.get('digest')
+    url = asset.get('browser_download_url')
+    if (type(size) is not int or not 0 < size <= MAX_CLI_ASSET_BYTES
+            or digest != 'sha256:' + CLI_ASSET_SHA256 or url != CLI_ASSET_URL):
+        raise Stop('OpenCode release asset metadata does not match the pinned asset')
+    return CliReleaseAsset(VERSION, CLI_ASSET_URL, size, CLI_ASSET_SHA256)
+
+
+def download_cli_binary(directory: pathlib.Path) -> pathlib.Path:
+    """Fetch and verify the pinned standalone CLI in a private Host directory."""
+    if sys.platform != 'linux' or platform.machine().lower() not in ('x86_64', 'amd64'):
+        raise Stop('the pinned OpenCode asset supports Linux x64 Hosts only')
+    if directory.is_symlink() or not directory.is_dir():
+        raise Stop('OpenCode asset destination is not a private directory')
+    if stat.S_IMODE(directory.stat().st_mode) & 0o077:
+        raise Stop('OpenCode asset destination is not private')
+    try:
+        import httpx2
+    except ImportError as exc:
+        raise Stop('httpx2 is required to download the pinned OpenCode release') from exc
+    try:
+        transport = httpx2.HTTPTransport(
+            http2=True,
+            retries=3,
+            limits=httpx2.Limits(
+                max_connections=4, max_keepalive_connections=2, keepalive_expiry=30.0,
+            ),
+            socket_options=[(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)],
+        )
+        timeout = httpx2.Timeout(connect=10.0, read=30.0, write=30.0, pool=10.0)
+        archive_path = directory / CLI_ASSET_NAME
+        binary_path = directory / 'opencode'
+        digest = hashlib.sha256()
+        total = 0
+        with httpx2.Client(
+                transport=transport, timeout=timeout, follow_redirects=True) as client:
+            metadata_response = client.get(
+                CLI_RELEASE_API_URL,
+                headers={'Accept': 'application/vnd.github+json',
+                         'X-GitHub-Api-Version': '2022-11-28'},
+            )
+            metadata_response.raise_for_status()
+            if len(metadata_response.content) > 4 * 1024 * 1024:
+                raise Stop('OpenCode release metadata exceeds the size limit')
+            asset = _parse_cli_release_asset(metadata_response.content)
+            with client.stream('GET', asset.url) as response:
+                response.raise_for_status()
+                content_length = response.headers.get('content-length')
+                if content_length is not None and content_length != str(asset.size):
+                    raise Stop('OpenCode asset size differs from release metadata')
+                with archive_path.open('xb') as archive:
+                    for chunk in response.iter_bytes():
+                        total += len(chunk)
+                        if total > asset.size or total > MAX_CLI_ASSET_BYTES:
+                            raise Stop('OpenCode asset exceeds its declared size')
+                        digest.update(chunk)
+                        archive.write(chunk)
+                    archive.flush()
+                    os.fsync(archive.fileno())
+        if total != asset.size or digest.hexdigest() != asset.sha256:
+            raise Stop('OpenCode asset size or SHA-256 does not match the release')
+        _extract_cli_binary(archive_path, binary_path)
+        version = subprocess.run(
+            [str(binary_path), '--version'], capture_output=True, text=True,
+            check=False, timeout=30,
+        )
+        if (version.returncode != 0 or version.stdout.strip() not in
+                (VERSION, 'v' + VERSION, 'opencode v' + VERSION)):
+            raise Stop('Host OpenCode binary did not verify at the pinned version')
+        return binary_path
+    except httpx2.HTTPError as exc:
+        raise Stop('OpenCode release download failed') from exc
+    except (OSError, tarfile.TarError, subprocess.TimeoutExpired) as exc:
+        raise Stop('OpenCode release asset could not be prepared safely') from exc
+
+
+def _extract_cli_binary(archive_path: pathlib.Path, binary_path: pathlib.Path) -> None:
+    """Extract exactly one regular opencode executable without trusting archive paths."""
+    with tarfile.open(archive_path, mode='r:gz') as archive:
+        members = archive.getmembers()
+        for member in members:
+            member_path = pathlib.PurePosixPath(member.name)
+            if (member_path.is_absolute() or '..' in member_path.parts
+                    or not (member.isfile() or member.isdir())):
+                raise Stop('OpenCode archive contains an unsafe member')
+        binaries = [member for member in members
+                    if member.isfile() and pathlib.PurePosixPath(member.name).name == 'opencode']
+        if len(binaries) != 1 or binaries[0].size > 300 * 1024 * 1024:
+            raise Stop('OpenCode archive does not contain one approved executable')
+        stream = archive.extractfile(binaries[0])
+        if stream is None:
+            raise Stop('OpenCode executable could not be read from the archive')
+        descriptor = os.open(
+            binary_path,
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, 'O_NOFOLLOW', 0),
+            0o700,
+        )
+        with stream, os.fdopen(descriptor, 'wb') as executable:
+            shutil.copyfileobj(stream, executable, 1024 * 1024)
+            executable.flush()
+            os.fsync(executable.fileno())
 
 
 GENERATED_CONFIG_UNSAFE = 'generated OpenCode config is missing or unsafe'
@@ -685,13 +828,6 @@ def _run_git(workspace: pathlib.Path, *args: str) -> None:
         raise Stop('could not prepare sanitized clone workspace')
 
 
-def install_cli_args(name: str) -> list[str]:
-    return [
-        'exec', name, 'npm', 'install', '--prefix', '/home/agent/.local/oc2-runtime',
-        '--no-audit', '--no-fund', '--no-save', f'@opencode/cli@{VERSION}',
-    ]
-
-
 def export_v2_config(repo: pathlib.Path, output: pathlib.Path) -> pathlib.Path:
     script = HERE / 'prepare_opencode_v2.py'
     try:
@@ -1094,66 +1230,19 @@ def cli_path(runner: Runner, name: str) -> str | None:
     return None
 
 
-def seed_cli(runner: Runner, name: str, source: str) -> str | None:
-    """Copy only a verified CLI package tree from a separate mountless PoC.
-
-    This avoids changing network policy. Neither credentials nor XDG data are
-    read from the source Sandbox. No existing target installation is overwritten.
-    """
-    if not source or source == name:
-        return None
-    if not is_compatible_sandbox(runner, source):
-        return None
-    binary = PINNED[0]
-    source_modules = '/home/agent/.local/opencode-v2/node_modules'
-    source_binary = source_modules + '/.bin/opencode'
-    target_modules = str(pathlib.PurePosixPath(binary).parent.parent)
-    quoted = shlex.quote(source_binary)
-    version = runner.sbx('exec', source, 'bash', '-c',
-                         f'if test -x {quoted}; then {quoted} --version; fi',
-                         capture=True).strip()
-    if version not in (VERSION, 'v' + VERSION, 'opencode v' + VERSION):
-        return None
-    # sbx cp runs as sbx-poc, not the Host repo owner. Give it a private
-    # temporary directory owned by the operator instead of chmod 0777 on the
-    # Host-owned export directory.
-    operator = ([] if runner.user == getpass.getuser()
-                else ['sudo', '-i', '-u', runner.user, '--'])
-    try:
-        created = subprocess.run(
-            [*operator, 'sh', '-c', 'umask 077; mktemp -d "$HOME/.oc2-seed-XXXXXXXX"'],
-            capture_output=True, text=True, timeout=15, check=True,
-        )
-    except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
-        raise Stop('could not create private Sandbox operator staging directory') from exc
-    staging = created.stdout.strip()
-    if re.fullmatch(r'/(?:[^/]+/)+\.oc2-seed-[A-Za-z0-9]{8}', staging) is None:
-        raise Stop('unsafe seed staging path')
-    local = pathlib.Path(staging) / 'node_modules'
-    try:
-        print('OC2: seeding pinned CLI from read-only PoC sandbox ' + source)
-        runner.sbx('cp', f'{source}:{source_modules}', str(local))
-        runner.sbx('exec', name, 'bash', '-c',
-                   f'set -eu; mkdir -p {shlex.quote(str(pathlib.PurePosixPath(target_modules).parent))}; '
-                   f'test ! -e {shlex.quote(target_modules)}')
-        runner.sbx('cp', str(local), f'{name}:{target_modules}')
-        if cli_path(runner, name) != binary:
-            raise Stop(f'seeded OpenCode CLI did not verify as v{VERSION}')
-        return binary
-    finally:
-        subprocess.run([*operator, 'rm', '-rf', '--', staging],
-                       capture_output=True, timeout=30, check=False)
-
-
-def provision_cli(runner: Runner, name: str) -> str:
+def provision_cli(runner: Runner, name: str, host_binary: pathlib.Path) -> str:
     found = cli_path(runner, name)
     if found:
         return found
-    print(f'OC2: installing @opencode/cli@{VERSION} inside the new Sandbox.')
-    runner.sbx(*install_cli_args(name), timeout=900)
+    if host_binary.is_symlink() or not host_binary.is_file():
+        raise Stop('Host OpenCode binary is missing or unsafe')
+    print(f'OC2: copying the verified Host OpenCode v{VERSION} binary.')
+    runner.sbx('exec', name, 'mkdir', '-p', str(pathlib.PurePosixPath(PINNED[0]).parent))
+    runner.sbx('cp', str(host_binary), f'{name}:{PINNED[0]}')
+    runner.sbx('exec', name, 'chmod', '700', PINNED[0])
     found = cli_path(runner, name)
     if not found:
-        raise Stop(f'installed CLI is not the pinned v{VERSION}')
+        raise Stop(f'copied OpenCode binary is not the pinned v{VERSION}')
     return found
 
 
@@ -1406,7 +1495,8 @@ def main(argv: list[str] | None = None) -> int:
                         runner, args.sandbox, interactive=sys.stdin.isatty(),
                     )
                     print('OC2_CLOUDFLARE_CREDENTIAL: available (' + credential_scope + ' scope)')
-                cli = provision_cli(runner, args.sandbox)
+                host_binary = download_cli_binary(temporary_path)
+                cli = provision_cli(runner, args.sandbox, host_binary)
                 workdir = session.remote
                 clone_root = runner.sbx(
                     'exec', args.sandbox, 'git', '-C', workdir,
@@ -1422,6 +1512,7 @@ def main(argv: list[str] | None = None) -> int:
                     SandboxLaunch(args.sandbox, runtime_sha, cli, workdir, config_file, cloudflare),
                 )
                 return 0
+            host_binary = download_cli_binary(temporary_path)
             clone_source_directory = _new_clone_source_directory(args.sandbox)
             retained_source = False
             try:
@@ -1463,7 +1554,7 @@ def main(argv: list[str] | None = None) -> int:
                     interactive=sys.stdin.isatty(),
                 )
                 print('OC2_CLOUDFLARE_CREDENTIAL: available (' + credential_scope + ' scope)')
-            cli = provision_cli(runner, args.sandbox)
+            cli = provision_cli(runner, args.sandbox, host_binary)
             clone_root = runner.sbx(
                 'exec', args.sandbox, 'git', '-C', workdir,
                 'rev-parse', '--show-toplevel', capture=True,

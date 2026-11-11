@@ -37,11 +37,11 @@ Sandbox名がすでに存在する場合、通常起動では再利用・再構�
 2. WorkspaceがGit Repositoryのルートであること、Docker Sandboxes CLIのバージョンと`--kit`対応、Sandbox名の未使用、Git remote URLに資格情報が含まれないことを確認します。
 3. `apm.yml` から OpenCode V2 設定を生成・検証します。外部 Provider を選択している場合、`--allow-paid-inference` による明示的承認を求めます。Cloudflare Custom Gateway は`--use-cloudflare-ai-gateway`を指定した場合だけ有効にし、Host 側の検証済み識別子を使います。
 4. WorkspaceをprivateなSnapshotへmaterializeします。originが正確に`yohi/dotfiles-ai`の場合はR1を選択し、その検査済みファイルだけを含めます。検査を通過した`apm.yml`はSnapshotに含まれます。
-5. `sbx create --name NAME --kit MIXIN shell`でmountless Sandboxを作成し、`sbx cp`でSnapshotを専用Workspaceへ転送します。ManifestのSHA-256を照合した後、Guest内でGit Repositoryを初期化し、安全なremote URLを設定します。Credential MixinはHost側Proxyを使用し、実CredentialをGuestへコピーしません。
-6. 転送SnapshotとSession receiptを保持します。Cloudflare Credential確認が失敗した場合、`--resume`はreceiptとSandbox名を照合したうえで作成後の処理を再開します。
-7. Sandbox内の固定CLIを確認し、存在しなければ`@opencode/cli@2.2.5`を導入してバージョンを再確認します。
-8. Cloudflareが有効な場合は既存Sandbox/global Secretを確認します。なければ対話端末が必要です。Sandbox scopeに登録し、登録後もscopeを検証します。
-9. Guest作業ディレクトリが転送Workspaceであることを確認し、Sandbox専用Home/XDG領域を設定します。TUI起動の直前にGuest内でOAuth仲介ヘルパーを実行し、その後OpenCodeを起動します。
+5. HostでGitHub Release APIからOpenCode v2.2.5 Linux x64 assetを取得します。Release APIのassetサイズ、固定SHA-256、Archive内の唯一の実行ファイルを検証し、private temporary directoryに展開します。
+6. `sbx create --name NAME --kit MIXIN shell`でmountless Sandboxを作成し、`sbx cp`でSnapshotを専用Workspaceへ転送します。ManifestのSHA-256を照合した後、Guest内でGit Repositoryを初期化し、安全なremote URLを設定します。Credential MixinはHost側Proxyを使用し、実CredentialをGuestへコピーしません。
+7. 転送SnapshotとSession receiptを保持します。Cloudflare Credential確認が失敗した場合、`--resume`はreceiptとSandbox名を照合したうえで作成後の処理を再開します。
+8. Cloudflareが有効な場合は既存Sandbox/global Secretを確認します。なければ対話端末が必要です。Sandbox scopeに登録し、登録後もscopeを検証します。検証成功後、Hostで検証済みのStandalone Binaryを`sbx cp`で固定Guest pathへコピーし、versionを確認します。
+9. Guest作業ディレクトリが転送Workspaceであることを確認し、Sandbox専用Home/XDG領域を設定します。TUI起動の直前にGuest内でOAuth仲介ヘルパーを実行し、その後OpenCodeを起動します。Guest内の`npm install`は実行しません。
 
 Sandbox 作成後に失敗しても、自動削除しません。Host の環境変数、Provider 認証、MCP、Plugin 設定は渡しません。
 

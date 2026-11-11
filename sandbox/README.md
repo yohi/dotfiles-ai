@@ -3,7 +3,7 @@
 > **Status: PHASE1_LIVE_PASS**
 >
 > このディレクトリは、ホスト管理・Sandbox実行に向けた設定雛形と、読み取り主体の限定的な設定エクスポーターです。
-> `oc2`実行時は新しいClone-mode Sandboxを作成します。既存Sandboxの再構築・削除、`sbx policy`変更、
+> `oc2`実行時は検査済みSnapshotだけを転送する新しいmountless Sandboxを作成します。既存Sandboxの再構築・削除、`sbx policy`変更、
 > ホストOpenCode v1の更新、認証情報の転送は自動で行いません。
 > `sandbox/` 配下のYAMLは、Docker Sandboxes公式スキーマではなく独自の設計用メタデータです。
 
@@ -125,7 +125,7 @@ ln -s "$PWD/sandbox/scripts/oc2.py" "$HOME/.local/bin/oc2"
 
 `$HOME/.local/bin` がPATHに含まれていることを確認してください。起動前にDocker Sandboxes CLIの
 インストール済みバージョンと `sbx create --help` の `--kit` 対応を確認します。
-Sandbox名が既に存在する場合は、再利用・再構築せず停止します。
+Sandbox名が既に存在する場合は、通常起動では再利用・再構築せず停止します。Cloudflare credential確認に失敗した作成済みSandboxは、同じWorkspaceとSandbox名で`--resume`を指定するとSession receiptを照合して再開できます。
 
 通常起動はHost Workspaceをmountせず、検査済みSnapshotだけをGuestへコピーします。
 `.git`、認証情報を含むファイル、symlink、特殊ファイル、未承認のOpenCode設定は転送しません。
@@ -157,9 +157,9 @@ oc2 --allow-paid-inference
 `--allow-paid-inference`による起動ごとの明示承認が必要です。
 未指定の場合はSandbox作成前に停止します。
 
-通常起動はDockerのv3 shell workloadと2つのMixinを合成し、新規のmountless Sandboxを作成します。
-Credential MixinはHost側の認証仲介を担当します。CLI MixinはHostが公式GitHub Releaseから取得し、
-サイズ・SHA-256・Archive構造を検証したOpenCode v2.2.5 standalone BinaryをローカルCOPYします。
+通常起動はDockerのv3 shell workloadとCredential Mixinを使って、新規のmountless Sandboxを作成します。
+Credential MixinはHost側の認証仲介を担当します。OpenCode v2.2.5 standalone BinaryはHostが公式GitHub Release APIから取得し、
+APIのサイズ・固定SHA-256・Archive構造を検証した後に`sbx cp`でGuestへコピーします。
 Host PATHへはインストールせず、Guest内の`npm install`やKit build時のnpm Registry接続も行いません。
 新しいSandboxを作るたびに約119 MBの公式AssetをHostから取得します。Docker Hubのshell workload取得は別途必要です。
 Hostの環境変数は継承せず、Sandbox専用のHome/XDG領域を使います。Provider設定と一時

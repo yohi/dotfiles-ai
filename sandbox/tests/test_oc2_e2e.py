@@ -34,7 +34,6 @@ class FakeSbx:
         self.remote_files: dict[str, bytes] = {}
         self.created_mixin_spec: str | None = None
         self.created_mixin_path: pathlib.Path | None = None
-        self.created_runtime_mixin_spec: str | None = None
         self.created_cli_binary: bytes | None = None
         self.mixin_exists_at_launch: bool | None = None
         self.sandbox_cloudflare_secret = True
@@ -117,17 +116,6 @@ class FakeSbx:
             if kit_paths:
                 self.created_mixin_path = kit_paths[0]
                 self.created_mixin_spec = (kit_paths[0] / 'spec.yaml').read_text()
-            if len(kit_paths) > 1:
-                self.created_runtime_mixin_spec = (
-                    kit_paths[1] / 'spec.yaml'
-                ).read_text()
-                binary = kit_paths[1] / 'opencode'
-                if binary.is_file() and not binary.is_symlink():
-                    self.created_cli_binary = binary.read_bytes()
-                self.installed = (
-                    'opencode-cli@2.2.5' in self.created_runtime_mixin_spec
-                    and self.created_cli_binary is not None
-                )
             self.created = True
             return ''
         if args[:1] == ('cp',):
@@ -145,9 +133,14 @@ class FakeSbx:
                         self.workspace_files[relative] = data
                         self.remote_files[remote_destination + '/' + relative] = data
                 return ''
-            contents = source.read_text()
+            remote_data = source.read_bytes()
+            self.remote_files[remote_destination] = remote_data
+            if remote_destination == oc2.PINNED[0]:
+                self.created_cli_binary = remote_data
+                self.installed = True
+                return ''
+            contents = remote_data.decode('utf-8')
             self.copied_files[destination] = contents
-            self.remote_files[remote_destination] = source.read_bytes()
             if destination.endswith('/config/opencode/opencode.jsonc'):
                 self.copied_config = contents
             return ''
@@ -156,9 +149,9 @@ class FakeSbx:
             if command[:2] == ('bash', '-c'):
                 return 'missing\n'
             if command[:1] == ('sha256sum',):
-                remote_data = self.remote_files.get(command[1])
-                return (hashlib.sha256(remote_data).hexdigest() + '  ' + command[1] + '\n'
-                        if remote_data is not None else '')
+                remote_hash_data = self.remote_files.get(command[1])
+                return (hashlib.sha256(remote_hash_data).hexdigest() + '  ' + command[1] + '\n'
+                        if remote_hash_data is not None else '')
             if (command[:2] == ('sh', '-c')
                     and command[4] == oc2.PINNED[0]):
                 return 'opencode v2.2.5\n' if self.installed else ''
@@ -167,9 +160,6 @@ class FakeSbx:
             if (command[:2] == ('git', '-C')
                     and command[3:] == ('rev-parse', '--show-toplevel')):
                 return command[2] + '\n'
-            if command[:2] == ('npm', 'install'):
-                self.installed = True
-                return ''
             return ''
         if args[:2] == ('exec', '-it'):
             self.mixin_exists_at_launch = (
@@ -213,6 +203,8 @@ class LauncherFlowTests(unittest.TestCase):
             check=True,
         )
         self.fake = FakeSbx()
+        self.cli_binary = self.root / 'host-opencode'
+        self.cli_binary.write_bytes(b'host-verified-opencode-fixture')
 
     def _run(
         self,
@@ -237,6 +229,7 @@ class LauncherFlowTests(unittest.TestCase):
                 oc2.os.environ.pop(name, None)
             oc2.os.environ.update(env)
             with patch.object(oc2, 'Runner', return_value=self.fake), \
+                    patch.object(oc2, 'download_cli_binary', return_value=self.cli_binary), \
                     patch.object(oc2.shutil, 'which', return_value='/fake/sbx'), \
                     contextlib.redirect_stdout(output), contextlib.redirect_stderr(output):
                 try:
@@ -407,10 +400,12 @@ class LauncherFlowTests(unittest.TestCase):
         assert self.fake.clone_source is not None
         self.assertTrue(self.fake.clone_source.exists())
         self.assertIsNotNone(self.fake.created_mixin_spec)
-        install = next(call for call in self.fake.calls if call[:3] == (
-            'exec', 'oc2-test', 'npm',
-        ))
-        self.assertEqual(install[-1], '@opencode/cli@2.2.5')
+        self.assertIn(self.fake.created_cli_binary, (b'host-verified-opencode-fixture',))
+        self.assertIn(
+            ('cp', str(self.cli_binary), f'oc2-test:{oc2.PINNED[0]}'),
+            self.fake.calls,
+        )
+        self.assertFalse(any('npm' in call for call in self.fake.calls))
         if self.fake.copied_config is None:
             self.fail('V2 config was not copied into the Sandbox')
         copied_config = json.loads(self.fake.copied_config)
@@ -419,7 +414,6 @@ class LauncherFlowTests(unittest.TestCase):
         self.assertIn('policies', copied_config)
         self.assertNotIn('plugin', copied_config)
         self.assertNotIn('mcp', copied_config)
-        self.assertIn(900, self.fake.timeouts)
         launch = next(call for call in self.fake.calls if call[:2] == ('exec', '-it'))
         self.assertEqual(launch[3], self.fake.workspace_destination)
         self.assertIn(oc2.GUEST_EXEC_WRAPPER, launch)

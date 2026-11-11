@@ -16,6 +16,7 @@ import pathlib
 import stat
 import subprocess
 import sys
+import tarfile
 import tempfile
 import types
 import unittest
@@ -84,12 +85,19 @@ class FakeRunner:
         return ''
 
 class RunnerTimeoutTest(unittest.TestCase):
-    def test_cli_install_uses_extended_timeout(self) -> None:
-        runner = oc2.Runner('operator')
-        completed = subprocess.CompletedProcess([], 0, '')
-        with patch.object(oc2.subprocess, 'run', return_value=completed) as run:
-            runner.sbx(*oc2.install_cli_args('oc2-dev'), timeout=900)
-        self.assertEqual(run.call_args.kwargs['timeout'], 900)
+    def test_cli_provision_copies_host_binary_without_guest_npm(self) -> None:
+        """Transfer the Host-verified executable into the Sandbox without invoking npm."""
+        with tempfile.TemporaryDirectory() as tmp:
+            binary = pathlib.Path(tmp) / 'opencode'
+            binary.write_bytes(b'verified executable fixture')
+            runner = FakeRunner()
+            with patch.object(oc2, 'cli_path', side_effect=(None, oc2.PINNED[0])):
+                result = oc2.provision_cli(runner, 'oc2-dev', binary)
+
+        self.assertEqual(result, oc2.PINNED[0])
+        self.assertIn(('cp', str(binary), 'oc2-dev:' + oc2.PINNED[0]), runner.calls)
+        self.assertIn(('exec', 'oc2-dev', 'chmod', '700', oc2.PINNED[0]), runner.calls)
+        self.assertFalse(any('npm' in call for call in runner.calls))
 
     def test_tty_remains_unbounded_and_default_timeout_remains_180_seconds(self) -> None:
         runner = oc2.Runner('operator')
@@ -363,14 +371,112 @@ class HostTest(unittest.TestCase):
 
             oc2.validate_clone_workspace(root)
 
-    def test_opencode_cli_install_is_pinned_to_v225(self) -> None:
-        self.assertEqual(oc2.VERSION, '2.2.5')
-        self.assertEqual(
-            oc2.install_cli_args('oc2-safe'),
-            ['exec', 'oc2-safe', 'npm', 'install', '--prefix',
-             '/home/agent/.local/oc2-runtime', '--no-audit', '--no-fund',
-             '--no-save', '@opencode/cli@2.2.5'],
+    def test_cli_release_metadata_accepts_only_the_pinned_host_asset(self) -> None:
+        """Parse the exact v2.2.5 Linux x64 release asset before downloading it."""
+        digest = '09f44302c10fd036912f59c81fd1aef5df45dd06f649197f9dfc9bbe2a79614e'
+        document = json.dumps({
+            'tag_name': 'v2.2.5',
+            'immutable': True,
+            'assets': [{
+                'name': 'opencode-linux-x64.tar.gz',
+                'size': 119_200_000,
+                'digest': 'sha256:' + digest,
+                'browser_download_url': (
+                    'https://github.com/anomalyco/opencode/releases/download/v2.2.5/'
+                    'opencode-linux-x64.tar.gz'
+                ),
+            }],
+        }).encode()
+
+        asset = oc2._parse_cli_release_asset(document)
+
+        self.assertEqual(asset.version, '2.2.5')
+        self.assertEqual(asset.size, 119_200_000)
+        self.assertEqual(asset.sha256, digest)
+
+    def test_cli_release_metadata_rejects_unpinned_asset_digest(self) -> None:
+        """Reject a release asset whose digest differs from the pinned v2.2.5 checksum."""
+        document = json.dumps({
+            'tag_name': 'v2.2.5',
+            'immutable': True,
+            'assets': [{
+                'name': 'opencode-linux-x64.tar.gz',
+                'size': 1,
+                'digest': 'sha256:' + '0' * 64,
+                'browser_download_url': (
+                    'https://github.com/anomalyco/opencode/releases/download/v2.2.5/'
+                    'opencode-linux-x64.tar.gz'
+                ),
+            }],
+        }).encode()
+
+        with self.assertRaisesRegex(oc2.Stop, 'asset metadata'):
+            oc2._parse_cli_release_asset(document)
+
+    def test_cli_archive_extracts_only_the_regular_opencode_binary(self) -> None:
+        """Extract the single regular executable from the checksum-verified archive."""
+        content = b'verified standalone binary fixture'
+        with tempfile.TemporaryDirectory() as tmp:
+            archive_path = pathlib.Path(tmp) / 'release.tar.gz'
+            binary_path = pathlib.Path(tmp) / 'opencode'
+            with tarfile.open(archive_path, mode='w:gz') as archive:
+                member = tarfile.TarInfo('opencode')
+                member.size = len(content)
+                archive.addfile(member, io.BytesIO(content))
+
+            oc2._extract_cli_binary(archive_path, binary_path)
+
+            self.assertEqual(binary_path.read_bytes(), content)
+            self.assertEqual(stat.S_IMODE(binary_path.stat().st_mode), 0o700)
+
+    def test_cli_archive_rejects_traversal_members(self) -> None:
+        """Reject path traversal in a release archive instead of extracting it."""
+        content = b'not extracted'
+        with tempfile.TemporaryDirectory() as tmp:
+            archive_path = pathlib.Path(tmp) / 'release.tar.gz'
+            binary_path = pathlib.Path(tmp) / 'opencode'
+            with tarfile.open(archive_path, mode='w:gz') as archive:
+                member = tarfile.TarInfo('../opencode')
+                member.size = len(content)
+                archive.addfile(member, io.BytesIO(content))
+
+            with self.assertRaisesRegex(oc2.Stop, 'unsafe member'):
+                oc2._extract_cli_binary(archive_path, binary_path)
+
+    def test_cli_download_checks_api_size_and_hash_before_extracting(self) -> None:
+        """Download the bounded archive, verify its digest, and run the extracted pinned binary."""
+        binary_content = b'verified opencode executable'
+        archive_buffer = io.BytesIO()
+        with tarfile.open(fileobj=archive_buffer, mode='w:gz') as archive:
+            member = tarfile.TarInfo('opencode')
+            member.size = len(binary_content)
+            archive.addfile(member, io.BytesIO(binary_content))
+        archive_data = archive_buffer.getvalue()
+        digest = hashlib.sha256(archive_data).hexdigest()
+        asset = oc2.CliReleaseAsset(
+            oc2.VERSION, oc2.CLI_ASSET_URL, len(archive_data), digest,
         )
+        response = types.SimpleNamespace(
+            headers={'content-length': str(len(archive_data))},
+            iter_bytes=lambda: iter((archive_data,)),
+            raise_for_status=lambda: None,
+        )
+        client = unittest.mock.MagicMock()
+        client.__enter__.return_value = client
+        client.get.return_value = types.SimpleNamespace(
+            content=b'{}', raise_for_status=lambda: None,
+        )
+        client.stream.return_value = contextlib.nullcontext(response)
+        completed = subprocess.CompletedProcess([], 0, 'opencode v2.2.5\n')
+
+        with tempfile.TemporaryDirectory() as tmp, \
+                patch('httpx2.Client', return_value=client), \
+                patch.object(oc2, '_parse_cli_release_asset', return_value=asset), \
+                patch.object(oc2.subprocess, 'run', return_value=completed):
+            binary = oc2.download_cli_binary(pathlib.Path(tmp))
+            self.assertEqual(binary.read_bytes(), binary_content)
+            self.assertEqual(client.get.call_args.args[0], oc2.CLI_RELEASE_API_URL)
+            self.assertEqual(client.stream.call_args.args[:2], ('GET', oc2.CLI_ASSET_URL))
 
     def test_workspace_snapshot_excludes_secrets_and_symlinks(self) -> None:
         workspace = load('oc2_workspace')
@@ -1016,42 +1122,6 @@ class HostTest(unittest.TestCase):
                 self.assertFalse(marker.exists())
 
         self.assertEqual(result.returncode, 0, result.stderr)
-
-    def test_seed_cli_uses_operator_home_for_private_staging(self) -> None:
-        runner = oc2.Runner('operator')
-        created = subprocess.CompletedProcess(
-            args=[], returncode=0,
-            stdout='/home/' + 'operator/.oc2-seed-12345678\n', stderr='',
-        )
-        with patch.object(oc2, 'is_compatible_sandbox', return_value=True), \
-                patch.object(oc2, 'cli_path', return_value=oc2.PINNED[0]), \
-                patch.object(oc2.subprocess, 'run', return_value=created) as run, \
-                patch.object(runner, 'sbx', return_value='opencode v2.2.5\n') as sbx:
-            self.assertEqual(
-                oc2.seed_cli(runner, 'oc2-dev', 'oc2-source'), oc2.PINNED[0],
-            )
-
-        self.assertEqual(
-            run.call_args_list[0].args[0],
-            ['sudo', '-i', '-u', 'operator', '--', 'sh', '-c',
-             'umask 077; mktemp -d "$HOME/.oc2-seed-XXXXXXXX"'],
-        )
-        copy_calls = [call.args for call in sbx.call_args_list if call.args[0] == 'cp']
-        self.assertIn(
-            ('exec', 'oc2-source', 'bash', '-c',
-             'if test -x /home/agent/.local/opencode-v2/node_modules/.bin/opencode; '
-             'then /home/agent/.local/opencode-v2/node_modules/.bin/opencode --version; fi'),
-            [call.args for call in sbx.call_args_list],
-        )
-        self.assertEqual(
-            copy_calls,
-            [
-                ('cp', 'oc2-source:/home/agent/.local/opencode-v2/node_modules',
-                 '/home/' + 'operator/.oc2-seed-12345678/node_modules'),
-                ('cp', '/home/' + 'operator/.oc2-seed-12345678/node_modules',
-                 'oc2-dev:/home/agent/.local/oc2-runtime/node_modules'),
-            ],
-        )
 
     def test_stage_does_not_depend_on_bash_positional_arguments(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
