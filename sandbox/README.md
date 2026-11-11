@@ -10,7 +10,8 @@
 ## 責務と正本
 
 - **Host**: `dotfiles-ai` の `apm.yml` を設定SSOTとし、プロジェクトのGitリポジトリを正本として保持する。
-- **Sandbox**: Phase 1の`oc2`はOpenCode v2.2.5のTUI起動だけを行う。Provider認証、MCP、Pluginは扱わない。
+- **Sandbox**: `oc2`はOpenCode v2.2.5のTUIと、APMから選別したProvider設定を
+  扱う。Docker Credential MixinでHost側Provider認証を仲介する。MCPとPluginは扱わない。
 - **受渡し**: 選別済み設定とレビュー済みソースのみを渡し、変更結果はホストでレビュー後に明示的に採用する。
 
 既存の `make setup`、`make sync-opencode`、`make sync-mcp` には接続しません。
@@ -28,22 +29,29 @@
 
 ## エクスポーター（限定実装）
 
-`sandbox/scripts/prepare_opencode_v2.py` は `apm.yml` を読み取り、**固定の許可リスト**から`shell`（bash/sh/zsh）と`snapshot`（boolean）のみを選びます。それ以外の設定値は一切出力しません。
+`sandbox/scripts/prepare_opencode_v2.py` は `apm.yml` の `opencode_v2` と
+Provider定義を読み取り、許可された OpenAI と Cloudflare Custom Provider の設定だけを
+OpenCode V2用に変換します。OpenAIを既定Providerとし、Cloudflareは既存の`/compat`
+経路を使います。baseURL、Header、Guest auth、Provider policyはExporter、Stage、Guestの
+各検証層で照合します。資格情報となる値は出力せず、Host側Docker Credential Proxyが
+管理する固定placeholderだけを参照します。
 
 生成ファイル：
 
-- `opencode.jsonc`: 2.1.4用の最小Server設定、`plugins: []`、`mcp: {}`
+- `opencode.jsonc`: OpenAIとCloudflare Custom Providerを含むOpenCode V2.2.5設定、deny-first Provider policy
 - `cli.json`: 最小TUI設定、`plugins: []`
 - `export-manifest.json`: ソース・出力ファイルのSHA-256、OpenCode固定バージョン
 
-**未実装:** Plugin登録、設定選別YAMLの動的解釈、MCP移植、Secrets Broker、Sandboxへのコピー、通常のPlugin登録や自律開発タスク。設定生成結果の実OpenCode v2での動作確認も未実施です。
+**対象外・未検証:** Plugin登録、MCP移植、Secrets Broker、Claude Agent。OpenAI ChatGPT OAuthの
+Docker Sandbox上での交換・更新と、Provider設定の実OpenCode V2実行は未検証です。
 
 外部の一時ディレクトリへ手動で出力する場合：
 
 ```sh
 python3 -m pip show PyYAML  # 依存が既存環境にあることを確認（インストールしない）
-python3 sandbox/scripts/prepare_opencode_v2.py --out /tmp/opencode-v2-export-20261030
-python3 sandbox/scripts/prepare_opencode_v2.py --out /tmp/opencode-v2-export-20261030 --check
+OUT="${TMPDIR:-/tmp}/opencode-v2-export-20261030"
+python3 sandbox/scripts/prepare_opencode_v2.py --out "$OUT"
+python3 sandbox/scripts/prepare_opencode_v2.py --out "$OUT" --check
 python3 -m unittest discover -s sandbox/tests -p 'test_*.py' -v
 ```
 
@@ -59,11 +67,12 @@ python3 -m unittest discover -s sandbox/tests -p 'test_*.py' -v
 
 ```sh
 # 第2段で作成したスナップショットを検証（sbxを起動・呼び出ししない）
-python3 sandbox/scripts/stage_opencode_v2.py --bundle /tmp/opencode-v2-export-20261030
+# --bundle には一時ディレクトリ内の生成名だけを指定する
+python3 sandbox/scripts/stage_opencode_v2.py --bundle opencode-v2-export-20261030
 
 # 既存のmountless Sandboxにだけ、明示的な適用オプションで転送（この例は実行しない）
 python3 sandbox/scripts/stage_opencode_v2.py \
-  --bundle /tmp/opencode-v2-export-20261030 \
+  --bundle opencode-v2-export-20261030 \
   --sandbox oc-v2-poc --apply
 
 # CI/ローカルの模擬テスト。実際のsbxは呼び出さない
@@ -78,7 +87,8 @@ python3 -m unittest discover -s sandbox/tests -p 'test_*.py' -v
 - 検証用Pythonスクリプトは設定スナップショットの**隣接ファイル**に配置し、3ファイルの厳格な整合性検査を維持します。ゲスト内の既存プロセスが悪意を持ってステージング内容を置換するような脅威に対する完全な耐改ざん性は証明していません。
 - ゲスト検証に失敗した場合、配置済みの一時ディレクトリは自動削除しません。作業者が確認するまで保持してください。
 
-これまでと同様、ホスト設定・ソースの正本を変更せず、ネットワークポリシー、MCP、有料Providerの設定も変更しません。
+これまでと同様、ホスト設定・ソースの正本、MCP設定、CloudflareのCustom Provider定義は
+変更しません。Provider設定は`apm.yml`から選別してGuestへ配置します。
 OpenCode起動時の設定読み込みとPlugin実動作は後続の検証対象です。
 
 ## 第4段：隔離XDG設定によるOpenCode v2実行構成
@@ -105,6 +115,7 @@ OpenCode起動時の設定読み込みとPlugin実動作は後続の検証対象
 ## Host `oc2` workflow
 
 `sandbox/scripts/oc2.py` はHost側ランチャーです。PATHへの登録は自動では行いません。
+[OpenCode V2のProvider導線に関する英語の正本](../docs/opencode-v2-provider-routing.md)を使う場合は参照してください。
 初回だけ、リポジトリのルートでリンクしてください。
 
 ```sh
@@ -131,8 +142,11 @@ oc2 --workspace "$HOME/path/to/oc2-safe-test-repo" --sandbox oc2-phase1-test
 ```
 
 通常起動は新規のClone-mode shell Sandboxを作成し、Sandbox内へ `@opencode/cli@2.2.5`を導入します。
-Hostの環境変数は継承せず、Sandbox専用のHome/XDG領域を使います。Provider、認証、MCP、Plugin設定は
-渡しません。Workspace Snapshot、Manifest、ACL、Seed、collect/applyは実行経路に含めません。
+Hostの環境変数は継承せず、Sandbox専用のHome/XDG領域を使います。Provider設定と一時
+Docker Credential Mixinを配置します。実CredentialはGuestへコピーせず、DockerのHost側
+Proxyと対話型Credential Bindingで扱います。OpenAI ChatGPT OAuthの実Sandbox上の交換・
+更新は未検証です。実行前に案内を確認してください。MCP、Plugin設定は渡しません。
+Workspace Snapshot、Manifest、ACL、Seed、collect/applyは実行経路に含めません。
 Sandbox作成後に失敗しても、自動削除しません。
 
 Docker Sandboxes `v0.49.2`はClone modeを提供することを確認済みです。`v0.50.1`も公式リリースですが、

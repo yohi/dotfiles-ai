@@ -12,9 +12,9 @@ import os
 import pathlib
 import re
 import sys
-from typing import NoReturn
+from typing import Final, NoReturn, TypeAlias
 
-VERSION = "2.1.4"
+VERSION = "2.2.5"
 BASE = pathlib.Path('/home/agent/workspace/oc2')
 SERVER_CONFIG = 'opencode.jsonc'
 CLIENT_CONFIG = 'cli.json'
@@ -22,6 +22,18 @@ EXPORT_MANIFEST = 'export-manifest.json'
 THEME_FILE = 'theme.json'
 FILES = (SERVER_CONFIG, CLIENT_CONFIG, EXPORT_MANIFEST)
 ASSET_SCHEMA = 'dotfiles-ai/oc2-assets/v1'
+JsonValue: TypeAlias = str | int | float | bool | None | list['JsonValue'] | dict[str, 'JsonValue']
+CF_CUSTOM_BASE_URL: Final[str] = (
+    'https://gateway.ai.cloudflare.com/v1/'
+    '{env:OC_CF_ACCOUNT_ID}/{env:OC_CF_GATEWAY_ID}/compat'
+)
+CF_CUSTOM_HEADERS: Final[tuple[tuple[str, str], ...]] = (
+    ('Authorization', ''),
+    ('cf-aig-authorization', 'Bearer {env:OC_CF_API_TOKEN}'),
+    ('cf-aig-collect-log-payload', 'true'),
+    ('cf-aig-max-attempts', '1'),
+    ('cf-aig-skip-cache', 'true'),
+)
 ASSET_TARGETS = frozenset({
     'config/opencode/AGENTS.md',
     'config/opencode/rules/DOCS_STYLE.md',
@@ -36,10 +48,89 @@ ASSET_TARGETS = frozenset({
     THEME_FILE,
 })
 MAX_ASSETS = 512 * 1024
+REASONING_VALUES = {
+    'reasoningEffort': frozenset({'minimal', 'low', 'medium', 'high', 'xhigh', 'max'}),
+    'reasoningSummary': frozenset({'auto', 'concise', 'detailed'}),
+}
+
 
 def fail(reason: str) -> NoReturn:
     """Stop processing the bundle with a validation error."""
     raise ValueError(reason)
+
+
+def _unique_json_object(pairs: list[tuple[str, JsonValue]]) -> dict[str, JsonValue]:
+    result: dict[str, JsonValue] = {}
+    for key, value in pairs:
+        if key in result:
+            fail('duplicate JSON object key')
+        result[key] = value
+    return result
+
+
+def _verify_model_settings(value: JsonValue, label: str) -> None:
+    """Require only supported reasoning settings and values."""
+    if not isinstance(value, dict):
+        fail('invalid V2 model reasoning settings')
+    for key, item in value.items():
+        allowed = REASONING_VALUES.get(key)
+        if allowed is None or not isinstance(item, str) or item not in allowed:
+            fail('unapproved V2 model reasoning setting: ' + label)
+
+
+def _verify_model_options(key: str, options: dict[str, JsonValue], label: str) -> None:
+    """Allow only empty model headers and the supported thinking body control."""
+    if key == 'headers':
+        if options:
+            fail('unsupported model headers: ' + label)
+        return
+    if set(options) - {'thinking'}:
+        fail('unsupported model body field: ' + label)
+    thinking = options.get('thinking')
+    if thinking is None and 'thinking' not in options:
+        return
+    if (not isinstance(thinking, dict) or set(thinking) != {'type'}
+            or not isinstance(thinking['type'], str)
+            or thinking['type'] not in {'enabled', 'disabled'}):
+        fail('unsupported model thinking option: ' + label)
+
+
+def _verify_model_catalog(models: JsonValue) -> None:
+    """Validate model identities, variants, and credential-free options."""
+    if not isinstance(models, dict):
+        fail('invalid V2 model catalog')
+    for model_id, value in models.items():
+        if not isinstance(value, dict) or set(value) - {
+            'modelID', 'name', 'settings', 'headers', 'body', 'variants',
+        }:
+            fail('invalid V2 model configuration')
+        if value.get('modelID') != model_id or not isinstance(value.get('name'), str):
+            fail('V2 model identity does not match its catalog')
+        _verify_model_settings(value.get('settings', {}), model_id)
+        for key in ('headers', 'body'):
+            options = value.get(key, {})
+            if not isinstance(options, dict):
+                fail('invalid V2 model ' + key)
+            _verify_model_options(key, options, model_id + '.' + key)
+        variants = value.get('variants', [])
+        if not isinstance(variants, list):
+            fail('invalid V2 model variants')
+        seen: set[str] = set()
+        for variant in variants:
+            if not isinstance(variant, dict):
+                fail('invalid V2 model variant')
+            variant_id = variant.get('id')
+            if not isinstance(variant_id, str):
+                fail('invalid V2 model variant')
+            if variant_id in seen or set(variant) - {'id', 'settings', 'headers', 'body'}:
+                fail('invalid V2 model variant')
+            seen.add(variant_id)
+            _verify_model_settings(variant.get('settings', {}), model_id + '.' + variant_id)
+            for key in ('headers', 'body'):
+                options = variant.get(key, {})
+                if not isinstance(options, dict):
+                    fail('invalid V2 model variant ' + key)
+                _verify_model_options(key, options, model_id + '.' + variant_id)
 
 
 def regular(path: pathlib.Path, max_bytes: int = 1048576) -> bytes:
@@ -49,26 +140,122 @@ def regular(path: pathlib.Path, max_bytes: int = 1048576) -> bytes:
     return path.read_bytes()
 
 
+def verify_v2_config(server: dict[str, JsonValue]) -> None:
+    """Reject provider fallback, Guest auth, and literal credentials at activation."""
+    if set(server) != {'$schema', 'shell', 'snapshot', 'model', 'providers', 'policies'}:
+        fail('unexpected V2 server config fields')
+    model = server.get('model')
+    providers = server.get('providers')
+    policies = server.get('policies')
+    allowed_providers = {'openai', 'cloudflare-ai-gateway-custom'}
+    if (not isinstance(model, str) or '/' not in model
+            or not isinstance(providers, dict) or set(providers) != allowed_providers
+            or not isinstance(policies, list)):
+        fail('invalid V2 provider selection')
+    provider_id, model_id = model.split('/', 1)
+    if not model_id or provider_id not in providers:
+        fail('V2 model does not match the selected provider')
+    provider = providers[provider_id]
+    if not isinstance(provider, dict):
+        fail('invalid V2 provider configuration')
+    models = provider.get('models')
+    if not isinstance(models, dict) or model_id not in models:
+        fail('V2 default model is not in the provider catalog')
+    for provider_config in providers.values():
+        if not isinstance(provider_config, dict):
+            fail('invalid V2 provider configuration')
+        _verify_model_catalog(provider_config.get('models'))
+    expected_policies: list[JsonValue] = [
+        {'action': 'provider.use', 'resource': '*', 'effect': 'deny'},
+        {'action': 'provider.use', 'resource': 'openai', 'effect': 'allow'},
+        {'action': 'provider.use', 'resource': 'cloudflare-ai-gateway-custom', 'effect': 'allow'},
+        {'action': 'integration.connect', 'resource': '*', 'effect': 'deny'},
+        {'action': 'plugin.use', 'resource': '*', 'effect': 'deny'},
+        {'action': 'mcp.use', 'resource': '*', 'effect': 'deny'},
+    ]
+    if policies != expected_policies:
+        fail('V2 fallback or Guest authentication policy is not fail-closed')
+    for provider_name, provider_config in providers.items():
+        if not isinstance(provider_name, str) or not isinstance(provider_config, dict):
+            fail('invalid V2 provider configuration')
+        settings = provider_config.get('settings', {})
+        headers = provider_config.get('headers', {})
+        if not isinstance(settings, dict) or not isinstance(headers, dict):
+            fail('invalid V2 provider request settings')
+        _verify_v2_provider_options(provider_name, settings, headers)
+
+
+def _verify_v2_provider_options(
+    provider_id: str,
+    settings: dict[str, JsonValue],
+    headers: dict[str, JsonValue],
+) -> None:
+    if provider_id == 'openai':
+        if settings or headers:
+            fail('OpenAI V2 configuration must not contain Guest credentials')
+        return
+    if provider_id != 'cloudflare-ai-gateway-custom':
+        fail('unsupported V2 provider options')
+    if settings != {'baseURL': CF_CUSTOM_BASE_URL}:
+        fail('Cloudflare Custom baseURL is not the approved /compat endpoint')
+
+    allowed_headers = {name.casefold(): (name, value) for name, value in CF_CUSTOM_HEADERS}
+    seen: set[str] = set()
+    for name, value in headers.items():
+        if not isinstance(name, str) or not isinstance(value, str):
+            fail('Cloudflare Custom header names and values must be strings')
+        folded_name = name.casefold()
+        if folded_name in seen:
+            fail('duplicate Cloudflare Custom header')
+        seen.add(folded_name)
+        allowed = allowed_headers.get(folded_name)
+        if allowed is None or name != allowed[0] or value != allowed[1]:
+            fail('Cloudflare Custom header is not approved')
+    if headers.get('cf-aig-authorization') != 'Bearer {env:OC_CF_API_TOKEN}':
+        fail('Cloudflare Custom proxy authorization header is required')
+
+
 def verify(bundle: pathlib.Path) -> str:
     """Verify bundle structure, artifact hashes, and allowed configuration."""
     if bundle.is_symlink() or not bundle.is_dir() or {x.name for x in bundle.iterdir()} != set(FILES):
         fail('invalid bundle directory or members')
     data = {name: regular(bundle / name) for name in FILES}
-    manifest = json.loads(data[EXPORT_MANIFEST])
-    server = json.loads(data[SERVER_CONFIG])
-    client = json.loads(data[CLIENT_CONFIG])
+    manifest = json.loads(
+        data[EXPORT_MANIFEST], object_pairs_hook=_unique_json_object,
+    )
+    server = json.loads(data[SERVER_CONFIG], object_pairs_hook=_unique_json_object)
+    client = json.loads(data[CLIENT_CONFIG], object_pairs_hook=_unique_json_object)
     if (manifest.get('schema') != 'dotfiles-ai/sandbox-export/v0'
-            or manifest.get('generator') != 'v0.1'
+            or manifest.get('generator') != 'v0.2'
             or manifest.get('opencode_version') != VERSION
             or manifest.get('plugins_exported') != 0
             or manifest.get('mcp_entries_exported') != 0):
         fail('unrecognized exporter manifest')
+    if set(manifest) != {
+        'schema', 'generator', 'source', 'config_format', 'source_sha256',
+        'opencode_version', 'plugins_exported', 'mcp_entries_exported',
+        'artifacts_sha256',
+    } or manifest.get('source') != 'apm.yml':
+        fail('unexpected exporter manifest fields')
+    if re.fullmatch(r'[0-9a-f]{64}', manifest.get('source_sha256', '')) is None:
+        fail('invalid source SHA-256')
     hashes = {k: hashlib.sha256(data[k]).hexdigest() for k in FILES[:2]}
     if manifest.get('artifacts_sha256') != hashes:
         fail('bundle SHA-256 mismatch')
-    if (not isinstance(server, dict) or server.get('plugins') != [] or server.get('mcp') != {}
-            or server.get('shell') not in ('bash', 'sh', 'zsh') or type(server.get('snapshot')) is not bool):
+    if (not isinstance(server, dict)
+            or server.get('$schema') != 'https://opencode.ai/config.json'
+            or server.get('shell') not in ('bash', 'sh', 'zsh')
+            or type(server.get('snapshot')) is not bool):
         fail('unsafe server config')
+    match manifest['config_format']:
+        case 'legacy-minimal':
+            if (set(server) != {'$schema', 'shell', 'snapshot', 'plugins', 'mcp'}
+                    or server.get('plugins') != [] or server.get('mcp') != {}):
+                fail('unsafe legacy server config')
+        case 'opencode-v2':
+            verify_v2_config(server)
+        case _:
+            fail('unrecognized config format')
     if client != {'$schema': 'https://opencode.ai/v2/' + CLIENT_CONFIG, 'plugins': []}:
         fail('unsafe TUI config')
     return hashlib.sha256(data[EXPORT_MANIFEST]).hexdigest()

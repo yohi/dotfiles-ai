@@ -42,10 +42,11 @@ class RuntimePreparationTests(unittest.TestCase):
             (self.bundle / name).write_text(json.dumps(data), encoding="utf-8")
         manifest = {
             "schema": "dotfiles-ai/sandbox-export/v0",
-            "generator": "v0.1",
+            "generator": "v0.2",
             "source": "apm.yml",
+            "config_format": "legacy-minimal",
             "source_sha256": "a" * 64,
-            "opencode_version": "2.1.4",
+            "opencode_version": "2.2.5",
             "plugins_exported": 0,
             "mcp_entries_exported": 0,
             "artifacts_sha256": {

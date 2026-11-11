@@ -99,3 +99,19 @@ def test_build_config_uses_native_superpowers_plugin() -> None:
 
     assert "superpowers@git+https://github.com/obra/superpowers.git#v6.4.2" in config["plugin"]
     assert config["instructions"] == ["global-rules/AGENTS.global.md"]
+
+
+def test_v1_generator_ignores_opencode_v2_settings() -> None:
+    config = generate_opencode_jsonc.build_config(
+        {
+            "opencode_v2": {
+                "default_model": "openai/gpt-6-luna",
+                "providers": {"openai": {"enabled": True}},
+            },
+            "provider": {"openai": {"whitelist": ["gpt-6-luna"]}},
+        }
+    )
+
+    assert "opencode_v2" not in config
+    assert "providers" not in config
+    assert config["provider"]["openai"]["whitelist"] == ["gpt-6-luna"]

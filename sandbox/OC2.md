@@ -1,7 +1,11 @@
 # oc2 — Host から Docker Sandbox 内の OpenCode v2.2.5 を起動
 
-`oc2` は Host 側のランチャーです。Clone mode の Git 検査を通過した Workspace
-から新しい shell Sandbox を作り、OpenCode v2.2.5 を起動します。
+**Status: ONE_COMMAND_TUI_LIVE_PASS (historical) / OMO_REMOVAL_PATCH_READY / LIVE_RETEST_PENDING**
+
+`oc2` は Host 側のランチャーです。Clone mode の Git 検査を通過した Workspace を
+衛生化したスナップショット経由で新しい shell Sandbox に見せ、OpenCode v2.2.5 を起動します。
+現行の OpenCode v2.2.5 Provider 経路と Credential Mixin の手順は
+[Provider運用ガイド](../docs/opencode-v2-provider-routing.md)を参照してください。
 
 ## 起動
 
@@ -16,6 +20,8 @@ oc2 --workspace "$HOME/path/to/oc2-safe-test-repo" --sandbox oc2-phase1-test
 - `--sandbox NAME`: 作成する Sandbox 名
 - `--dry-run`: Sandbox コマンドを実行せず、予定を表示
 - `--version`: ランチャーと固定 OpenCode CLI のバージョンを表示
+- `--prepare-only`: APM V2 設定の生成と検証のみを行い、Sandbox コマンドを実行しない
+- `--allow-paid-inference`: 外部 Provider への推論をこの起動に限り明示的に承認する（未指定で Provider 設定がある場合は停止）
 
 Sandbox 名がすでに存在する場合、再利用・再構築せず停止します。
 
@@ -24,10 +30,12 @@ Sandbox 名がすでに存在する場合、再利用・再構築せず停止し
 通常起動は次の順で行います。
 
 1. Workspace の安全走査を行います。安全走査で除外されるファイルやディレクトリ、特殊ファイル、シンボリックリンク、認証情報らしい内容、OpenCode プロジェクト設定を検出した場合は停止します。`.git` 内のテキストメタデータと展開した Git オブジェクトも検査します。
-2. Workspace が Git Repository のルートであること、Docker Sandboxes CLI のバージョンと `--clone` 対応、Sandbox 名の未使用を確認します。
-3. `sbx create --clone --name NAME shell WORKSPACE` で新しい Clone-mode Sandbox を作成します。
-4. Sandbox 内の固定 CLI を確認し、存在しなければ `@opencode/cli@2.2.5` を導入してバージョンを再確認します。
-5. Guest の作業ディレクトリが Clone のルートであることを確認し、Sandbox 専用 Home/XDG 領域から OpenCode を起動します。
+2. Workspace が Git Repository のルートであること、Docker Sandboxes CLI のバージョン、`--clone` と `--kit`（credential Mixin）対応、Sandbox 名の未使用、Git リモート URL に資格情報が含まれないことを確認します。
+3. `apm.yml` から OpenCode V2 設定を生成・検証します。外部 Provider を選択している場合、`--allow-paid-inference` による明示的承認を求めます。Cloudflare Custom Gateway を選択している場合は Host 側の検証済み識別子だけを確認し、実トークンは渡しません。
+4. Workspace の内容を `XDG_STATE_HOME/oc2/clone-sources` 配下の専用ディレクトリへ、実行中の変更を追跡する安全なコピーとして取り込み、衛生化したスナップショットとして Git commit します。Sandbox 作成が不確定に失敗した場合でもスナップショットは保持されます。
+5. `sbx create --clone --name NAME --kit MIXIN shell CLONE_SOURCE` で新しい Clone-mode Sandbox を作成します。MIXIN は Host 側 Proxy 経由の Credential バインディングを宣言し、実 Credential は Guest にコピーしません。作成後、一時 Mixin ディレクトリは削除されます。
+6. Sandbox 内の固定 CLI を確認し、存在しなければ `@opencode/cli@2.2.5` を導入してバージョンを再確認します。
+7. Guest の作業ディレクトリが Clone のルートであることを確認し、Sandbox 専用 Home/XDG 領域から OpenCode を起動します。起動前に Guest 内で OAuth 仲介ヘルパーを実行します。
 
 Sandbox 作成後に失敗しても、自動削除しません。Host の環境変数、Provider 認証、MCP、Plugin 設定は渡しません。
 
@@ -52,7 +60,7 @@ Docker Sandboxes `v0.49.2` の Clone mode と OpenCode `v2.2.5` の起動を確�
 ## テスト
 
 ```sh
-python3 -m unittest discover -s sandbox/tests -p 'test_oc2.py' -v
+python3 -m unittest discover -s sandbox/tests -p 'test_oc2*.py' -v
 python3 -m py_compile sandbox/scripts/oc2.py \
   sandbox/scripts/oc2_workspace.py sandbox/scripts/oc2_workspace_ops.py \
   sandbox/scripts/oc2_session.py sandbox/scripts/oc2_guest.py

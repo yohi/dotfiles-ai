@@ -44,9 +44,10 @@ class VerifyRuntimeTests(unittest.TestCase):
             (self.bundle / name).write_text(json.dumps(value))
         manifest = {
             "schema": "dotfiles-ai/sandbox-export/v0",
-            "generator": "v0.1", "source": "apm.yml",
+            "generator": "v0.2", "source": "apm.yml",
+            "config_format": "legacy-minimal",
             "source_sha256": "b" * 64,
-            "opencode_version": "2.1.4",
+            "opencode_version": "2.2.5",
             "plugins_exported": 0, "mcp_entries_exported": 0,
             "artifacts_sha256": {
                 name: hashlib.sha256((self.bundle / name).read_bytes()).hexdigest()
@@ -57,7 +58,7 @@ class VerifyRuntimeTests(unittest.TestCase):
 
         self.runtime = self.space / "isolated-runtime"
         self.bin = self.space / "opencode-stub"
-        self.bin.write_text("#!/bin/sh\nprintf 'opencode v2.1.4\\n'\n")
+        self.bin.write_text("#!/bin/sh\nprintf 'opencode v2.2.5\\n'\n")
         self.bin.chmod(0o700)
         self.akane = self._plugin("akane")
         self.sibyl = self._plugin("sibyl")
