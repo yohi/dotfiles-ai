@@ -4,6 +4,7 @@ import hashlib
 import os
 import pathlib
 import shutil
+import stat
 
 from oc2_workspace import (
     Manifest,
@@ -83,13 +84,18 @@ def apply_changes(host: pathlib.Path, guest: pathlib.Path, baseline: Manifest,
         if relative in before and _by_path(snapshot(host)).get(relative) != before[relative]:
             raise WorkspaceError('host workspace conflict; no files applied')
     originals: dict[str, bytes | None] = {}
+    original_modes: dict[str, int] = {}
     prepared: dict[str, pathlib.Path] = {}
     contents: dict[str, bytes] = {}
     created_directories: set[pathlib.Path] = set()
     for relative in changed:
         target = host.joinpath(*relative.split('/'))
         source = guest.joinpath(*relative.split('/'))
-        originals[relative] = _read_regular(target) if relative in before else None
+        if relative in before:
+            originals[relative] = _read_regular(target)
+            original_modes[relative] = stat.S_IMODE(target.stat().st_mode)
+        else:
+            originals[relative] = None
         rollback = target.with_name(target.name + '.oc2-rollback')
         if rollback.exists() or rollback.is_symlink():
             raise WorkspaceError('temporary rollback destination already exists')
@@ -136,6 +142,7 @@ def apply_changes(host: pathlib.Path, guest: pathlib.Path, baseline: Manifest,
                     descriptor = os.open(rollback, os.O_WRONLY | os.O_CREAT | os.O_EXCL |
                                          getattr(os, 'O_NOFOLLOW', 0), 0o600)
                     with os.fdopen(descriptor, 'wb') as stream:
+                        os.fchmod(stream.fileno(), original_modes[relative])
                         _ = stream.write(original_bytes)
                     os.replace(rollback, target)
             for temporary in prepared.values():

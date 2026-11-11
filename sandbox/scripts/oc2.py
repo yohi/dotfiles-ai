@@ -16,13 +16,20 @@ import re
 import secrets
 import shlex
 import shutil
+import stat
 import subprocess
 import sys
+import tempfile
+import urllib.parse
+from dataclasses import dataclass
 
 HERE = pathlib.Path(__file__).resolve().parent
 VERSION = '2.2.5'
 ROOT = '/home/agent/workspace/oc2'
 NAME_RE = re.compile(r'^[A-Za-z0-9][A-Za-z0-9.-]{0,61}[A-Za-z0-9]$')
+CLONE_SOURCE_ROOT = pathlib.Path(
+    os.environ.get('XDG_STATE_HOME', str(pathlib.Path.home() / '.local' / 'state')),
+) / 'oc2' / 'clone-sources'
 PINNED = (
     '/home/agent/.local/oc2-runtime/node_modules/.bin/opencode',
 )
@@ -30,6 +37,13 @@ PINNED = (
 
 class Stop(Exception):
     pass
+
+
+@dataclass(frozen=True, slots=True)
+class CloneRemote:
+    name: str
+    fetch_urls: tuple[str, ...]
+    push_urls: tuple[str, ...]
 
 
 def operator_command(user: str, *args: str) -> list[str]:
@@ -80,6 +94,119 @@ class Runner:
 
 def clone_create_args(name: str, workspace: pathlib.Path) -> list[str]:
     return ['create', '--clone', '--name', name, 'shell', str(workspace)]
+
+
+def _safe_clone_remotes(workspace: pathlib.Path) -> tuple[CloneRemote, ...]:
+    """Return network remotes without credential-bearing URLs."""
+    listed = subprocess.run(
+        ['git', '-C', str(workspace), 'remote'],
+        capture_output=True, text=True, check=False, timeout=10,
+    )
+    if listed.returncode != 0:
+        raise Stop('could not inspect Git remotes')
+
+    remotes: list[CloneRemote] = []
+    for name in listed.stdout.splitlines():
+        if re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._-]*', name) is None:
+            raise Stop('Git remote name is not safe to copy')
+        urls: list[list[str]] = []
+        for push in (False, True):
+            command = ['git', '-C', str(workspace), 'remote', 'get-url', '--all']
+            if push:
+                command.append('--push')
+            command.append(name)
+            result = subprocess.run(
+                command, capture_output=True, text=True, check=False, timeout=10,
+            )
+            if result.returncode != 0:
+                raise Stop('could not inspect Git remote URLs')
+            safe_urls: list[str] = []
+            for url in result.stdout.splitlines():
+                if _remote_url_has_credentials(url):
+                    raise Stop('Git remote contains credential material')
+                parsed = urllib.parse.urlsplit(url)
+                network_url = parsed.scheme.lower() in {'https', 'http', 'ssh', 'git'}
+                scp_url = re.fullmatch(
+                    r'(?:[^@\s/:]+@)?(?:\[[0-9A-Fa-f:]+\]|[A-Za-z0-9][A-Za-z0-9.-]*):[^:\s].+',
+                    url,
+                ) is not None
+                if network_url or scp_url:
+                    safe_urls.append(url)
+            urls.append(safe_urls)
+        if urls[0]:
+            remotes.append(CloneRemote(name, tuple(urls[0]), tuple(urls[1])))
+    return tuple(remotes)
+
+
+def _remote_url_has_credentials(url: str) -> bool:
+    """Reject credentials and sensitive query parameters embedded in a remote URL."""
+    if any(character.isspace() or ord(character) < 0x20 for character in url):
+        return True
+    parsed = urllib.parse.urlsplit(url)
+    if (parsed.password is not None
+            or re.search(r'[^/@\s:]+:[^/@\s]+@', url) is not None):
+        return True
+    if parsed.scheme.lower() in {'http', 'https'} and parsed.username is not None:
+        return True
+    sensitive_terms = ('auth', 'credential', 'key', 'password', 'secret', 'token')
+    return any(
+        any(term in key.lower() for term in sensitive_terms)
+        for key, _ in urllib.parse.parse_qsl(parsed.query, keep_blank_values=True)
+    )
+
+
+def _new_clone_source_directory(name: str) -> pathlib.Path:
+    """Create a private persistent source directory for Docker's read-only mount."""
+    root = CLONE_SOURCE_ROOT
+    if not root.is_absolute():
+        raise Stop('clone source state directory must be absolute')
+    if root.is_symlink():
+        raise Stop('clone source state directory must not be a symlink')
+    root.mkdir(parents=True, exist_ok=True, mode=0o700)
+    root.chmod(0o700)
+    destination = root / name
+    if destination.exists() or destination.is_symlink():
+        raise Stop('a retained clone source already exists for this Sandbox name')
+    destination.mkdir(mode=0o700)
+    return destination
+
+
+def _copy_regular_workspace_file(source: str, destination: str) -> str:
+    """Copy a stable regular file without following links or blocking on special files."""
+    import oc2_workspace
+
+    flags = os.O_RDONLY | os.O_NONBLOCK | getattr(os, 'O_NOFOLLOW', 0)
+    with os.fdopen(os.open(source, flags), 'rb') as source_stream:
+        before = os.fstat(source_stream.fileno())
+        if not stat.S_ISREG(before.st_mode) or before.st_size > oc2_workspace.MAX_FILE_BYTES:
+            raise Stop('workspace changed to an unsafe file during snapshot')
+        destination_flags = (os.O_WRONLY | os.O_CREAT | os.O_EXCL
+                             | getattr(os, 'O_NOFOLLOW', 0))
+        with os.fdopen(os.open(destination, destination_flags, 0o600), 'wb') as output:
+            total = 0
+            while chunk := source_stream.read(1024 * 1024):
+                total += len(chunk)
+                if total > oc2_workspace.MAX_FILE_BYTES:
+                    raise Stop('workspace file exceeds the snapshot size limit')
+                _ = output.write(chunk)
+        after = os.fstat(source_stream.fileno())
+        if (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns) != (
+                after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns):
+            raise Stop('workspace file changed during snapshot')
+    return destination
+
+
+def _run_git(workspace: pathlib.Path, *args: str) -> None:
+    """Run a Git operation without exposing its output or credential values."""
+    try:
+        result = subprocess.run(
+            ['git', '-C', str(workspace), *args],
+            capture_output=True, text=True, check=False, timeout=60,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise Stop('could not prepare sanitized clone workspace') from exc
+    if result.returncode != 0:
+        raise Stop('could not prepare sanitized clone workspace')
 
 
 def install_cli_args(name: str) -> list[str]:
@@ -669,6 +796,7 @@ def main(argv: list[str] | None = None) -> int:
         )
         if git_root.returncode != 0 or pathlib.Path(git_root.stdout.strip()) != workspace:
             raise Stop('workspace must be the root of a Git repository for Clone mode')
+        clone_remotes = _safe_clone_remotes(workspace)
         if not shutil.which('sbx'):
             raise Stop('Docker Sandboxes CLI was not found')
         runner = Runner(getpass.getuser())
@@ -681,8 +809,54 @@ def main(argv: list[str] | None = None) -> int:
         existing = {line.strip() for line in runner.sbx('ls', '-q', capture=True).splitlines()}
         if args.sandbox in existing:
             raise Stop('Sandbox name already exists; refusing to reuse or rebuild it')
-        print('OC2: creating clone-mode shell Sandbox ' + args.sandbox)
-        runner.sbx(*clone_create_args(args.sandbox, workspace))
+
+        clone_source_directory = _new_clone_source_directory(args.sandbox)
+        retained_source = False
+        try:
+            def ignore_source_git(directory: str, names: list[str]) -> set[str]:
+                """Omit source metadata while retaining nested Git paths for rejection."""
+                return ({'.git'} if pathlib.Path(directory) == workspace and '.git' in names
+                        else set())
+
+            clone_workspace = clone_source_directory / 'workspace'
+            shutil.copytree(workspace, clone_workspace, symlinks=True,
+                            copy_function=_copy_regular_workspace_file,
+                            ignore=ignore_source_git)
+            _run_git(clone_workspace, 'init', '--quiet', '--template=')
+            validate_clone_workspace(clone_workspace)
+            _run_git(clone_workspace, 'add', '--all', '--force')
+            _run_git(
+                clone_workspace,
+                '-c', 'user.name=OC2 Sanitized Workspace',
+                '-c', 'user.email=oc2-snapshot@example.invalid',
+                '-c', 'core.hooksPath=/dev/null', '-c', 'commit.gpgsign=false',
+                'commit', '--quiet', '--allow-empty',
+                '-m', 'OC2 sanitized workspace snapshot',
+            )
+            for remote in clone_remotes:
+                _run_git(clone_workspace, 'remote', 'add', remote.name, remote.fetch_urls[0])
+                for url in remote.fetch_urls[1:]:
+                    _run_git(clone_workspace, 'remote', 'set-url', '--add', remote.name, url)
+                for url in remote.push_urls:
+                    _run_git(
+                        clone_workspace, 'remote', 'set-url', '--add', '--push',
+                        remote.name, url,
+                    )
+            validate_clone_workspace(clone_workspace)
+            git_root = subprocess.run(
+                ['git', '-C', str(clone_workspace), 'rev-parse', '--show-toplevel'],
+                capture_output=True, text=True, check=False, timeout=10,
+            )
+            if (git_root.returncode != 0
+                    or pathlib.Path(git_root.stdout.strip()) != clone_workspace):
+                raise Stop('workspace must be the root of a Git repository for Clone mode')
+            print('OC2: creating clone-mode shell Sandbox ' + args.sandbox)
+            retained_source = True
+            print('OC2_CLONE_SOURCE: ' + str(clone_source_directory))
+            runner.sbx(*clone_create_args(args.sandbox, clone_workspace))
+        finally:
+            if not retained_source:
+                shutil.rmtree(clone_source_directory, ignore_errors=True)
         cli = provision_cli(runner, args.sandbox)
         workdir = runner.sbx('exec', args.sandbox, 'pwd', capture=True).strip()
         if not workdir.startswith('/') or '..' in pathlib.PurePosixPath(workdir).parts:
