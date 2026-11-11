@@ -250,10 +250,13 @@ def _download_cli_archive(archive_path: pathlib.Path) -> None:
         CLI_ASSET_URL,
     ]
     result = _run_cli_download(command)
-    fields = dict(
-        line.split('=', 1) for line in result.stdout.splitlines()
-        if line.startswith(('OC2_HTTP_STATUS=', 'OC2_FINAL_URL='))
-    )
+    fields = {
+        key: value
+        for key, value in (
+            line.split('=', 1) for line in result.stdout.splitlines()
+            if line.startswith(('OC2_HTTP_STATUS=', 'OC2_FINAL_URL='))
+        )
+    }
     if result.returncode != 0:
         raise _curl_failure(result.returncode)
     if fields.get('OC2_HTTP_STATUS') != '200':
