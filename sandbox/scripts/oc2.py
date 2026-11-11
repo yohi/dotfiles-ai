@@ -765,7 +765,7 @@ def export_v2_config(repo: pathlib.Path, output: pathlib.Path) -> pathlib.Path:
         verify_bundle(output)
     except StageError as exc:
         raise Stop('APM V2 config bundle failed verification') from exc
-    config = output / 'opencode.jsonc'
+    config = output / V2_CONFIG_NAME
     if config.is_symlink() or not config.is_file():
         raise Stop('generated V2 config is missing or unsafe')
     return config
@@ -775,7 +775,8 @@ def validate_clone_workspace(workspace: pathlib.Path) -> None:
     """Refuse Clone mode if it would expose files omitted by the safety scan."""
     oc2_workspace = importlib.import_module('oc2_workspace')
 
-    if any((workspace / name).exists() for name in ('opencode.json', 'opencode.jsonc', 'cli.json')):
+    if any((workspace / name).exists()
+           for name in ('opencode.json', V2_CONFIG_NAME, 'cli.json')):
         raise Stop('workspace contains OpenCode project configuration')
     manifest = oc2_workspace.snapshot(workspace)
     checked = {entry.path for entry in manifest.files}

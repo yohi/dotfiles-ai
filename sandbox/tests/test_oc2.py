@@ -157,8 +157,9 @@ class CloudflareCredentialProvisioningTest(unittest.TestCase):
                 self.calls.append((args, kwargs.get('tty', False)))
                 return '{"secrets":[{"name":"cloudflare-ai-gateway","scope":"oc2-dev"}]}'
 
+        runner = MalformedRunner()
         with self.assertRaisesRegex(oc2.Stop, 'schema'):
-            oc2.ensure_cloudflare_credential(MalformedRunner(), 'oc2-dev', interactive=True)
+            oc2.ensure_cloudflare_credential(runner, 'oc2-dev', interactive=True)
 
 
 class HostTest(unittest.TestCase):
