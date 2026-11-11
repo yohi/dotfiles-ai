@@ -126,17 +126,17 @@ ln -s "$PWD/sandbox/scripts/oc2.py" "$HOME/.local/bin/oc2"
 Sandbox名が既に存在する場合は、再利用・再構築せず停止します。
 
 Clone modeはホストのGit RepositoryをRead-onlyでGuestから見える状態にし、Guest内の別Cloneで
-作業します。Dockerの仕様上、`.env`やGit除外ファイルもRead-only sourceに含まれます。
+作業します。Dockerの仕様上、`.git`、`.env`やGit除外ファイルもRead-only sourceに含まれます。
 そのため `oc2` は安全走査から除外されるファイル、特殊ファイル、symlink、認証情報らしい内容が
-あるWorkspaceをSandbox作成前に拒否します。`opencode.json`、`opencode.jsonc`、`cli.json`も拒否します。
+あるWorkspaceをSandbox作成前に拒否します。`.git`内も認証情報、symlink、安全に読めないファイルを走査し、
+該当時はSandbox作成前に停止します。`opencode.json`、`opencode.jsonc`、`cli.json`も拒否します。
 Phase 1の実機確認では、**新規の無害なテスト用Git Repositoryだけ**を使ってください。
 実プロジェクトには適用しないでください。
 
 ```sh
 oc2 --version
 oc2 --dry-run --workspace "$HOME/path/to/oc2-safe-test-repo"
-cd "$HOME/path/to/oc2-safe-test-repo"
-oc2
+oc2 --workspace "$HOME/path/to/oc2-safe-test-repo" --sandbox oc2-phase1-test
 ```
 
 通常起動は新規のClone-mode shell Sandboxを作成し、Sandbox内へ `@opencode/cli@2.2.5`を導入します。
@@ -160,8 +160,8 @@ git -C "$test_repo" init
 printf 'print("safe sandbox fixture")\n' > "$test_repo/main.py"
 git -C "$test_repo" add main.py
 git -C "$test_repo" -c user.name='OC2 Test' -c user.email='oc2-test@example.invalid' commit -m fixture
-cd "$test_repo"
-oc2 --repo-root "$HOME/dotfiles/components/dotfiles-ai" --sandbox oc2-phase1-test
+oc2 --repo-root "$HOME/dotfiles/components/dotfiles-ai" \
+  --workspace "$test_repo" --sandbox oc2-phase1-test
 ```
 
 TUIの操作確認後は `Ctrl+C` で終了します。Sandboxは残ります。既存Sandboxの再利用・削除が必要な場合は、
