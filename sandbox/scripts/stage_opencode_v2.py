@@ -34,7 +34,6 @@ REASONING_VALUES = {
     "reasoningEffort": frozenset({"minimal", "low", "medium", "high", "xhigh", "max"}),
     "reasoningSummary": frozenset({"auto", "concise", "detailed"}),
 }
-SENSITIVE_FIELD_MARKERS = ("apikey", "authorization", "credential", "password", "secret", "token")
 
 
 def _unique_json_object(pairs: list[tuple[str, JsonValue]]) -> dict[str, JsonValue]:
@@ -47,21 +46,6 @@ def _unique_json_object(pairs: list[tuple[str, JsonValue]]) -> dict[str, JsonVal
     return result
 
 
-def _verify_no_variant_credentials(value: JsonValue, label: str) -> None:
-    """Reject credential-bearing keys and bearer values in model options."""
-    if isinstance(value, dict):
-        for key, item in value.items():
-            normalized = "".join(char for char in key.casefold() if char.isalnum())
-            if any(marker in normalized for marker in SENSITIVE_FIELD_MARKERS):
-                raise StageError("credentials are forbidden in model options: " + label)
-            _verify_no_variant_credentials(item, label + "." + key)
-    elif isinstance(value, list):
-        for item in value:
-            _verify_no_variant_credentials(item, label)
-    elif isinstance(value, str) and value.casefold().startswith("bearer "):
-        raise StageError("credentials are forbidden in model options: " + label)
-
-
 def _verify_model_settings(value: JsonValue, label: str) -> None:
     """Require only supported reasoning settings and values."""
     if not isinstance(value, dict):
@@ -70,6 +54,23 @@ def _verify_model_settings(value: JsonValue, label: str) -> None:
         allowed = REASONING_VALUES.get(key)
         if allowed is None or not isinstance(item, str) or item not in allowed:
             raise StageError("unapproved model reasoning setting: " + label)
+
+
+def _verify_model_options(key: str, options: dict[str, JsonValue], label: str) -> None:
+    """Allow only empty model headers and the supported thinking body control."""
+    if key == "headers":
+        if options:
+            raise StageError("unsupported model headers: " + label)
+        return
+    if set(options) - {"thinking"}:
+        raise StageError("unsupported model body field: " + label)
+    thinking = options.get("thinking")
+    if thinking is None and "thinking" not in options:
+        return
+    if (not isinstance(thinking, dict) or set(thinking) != {"type"}
+            or not isinstance(thinking["type"], str)
+            or thinking["type"] not in {"enabled", "disabled"}):
+        raise StageError("unsupported model thinking option: " + label)
 
 
 def _verify_model_catalog(models: JsonValue) -> None:
@@ -88,7 +89,7 @@ def _verify_model_catalog(models: JsonValue) -> None:
             options = value.get(key, {})
             if not isinstance(options, dict):
                 raise StageError("invalid V2 model " + key)
-            _verify_no_variant_credentials(options, model_id + "." + key)
+            _verify_model_options(key, options, model_id + "." + key)
         variants = value.get("variants", [])
         if not isinstance(variants, list):
             raise StageError("invalid V2 model variants")
@@ -107,7 +108,7 @@ def _verify_model_catalog(models: JsonValue) -> None:
                 options = variant.get(key, {})
                 if not isinstance(options, dict):
                     raise StageError("invalid V2 model variant " + key)
-                _verify_no_variant_credentials(options, model_id + "." + variant_id)
+                _verify_model_options(key, options, model_id + "." + variant_id)
 
 
 class StageError(Exception):

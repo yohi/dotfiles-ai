@@ -214,6 +214,39 @@ class ProviderSecurityContractTests(unittest.TestCase):
             with self.subTest(variant=variant), self.assertRaises(exporter.ExportError):
                 exporter._v2_variant(variant, "model.variant")
 
+    def test_all_layers_reject_unapproved_model_headers_and_body_fields(self) -> None:
+        for options in (
+            {"headers": {"X-Auth": "sk-example"}},
+            {"body": {"temperature": 0.5}},
+            {"body": {"thinking": {"type": "unapproved"}}},
+            {"body": {"thinking": None}},
+            {"body": {"thinking": {"type": ["enabled"]}}},
+        ):
+            with self.subTest(options=options):
+                with self.assertRaises(exporter.ExportError):
+                    exporter._v2_variant(options, "model.variant")
+                with self.assertRaises(exporter.ExportError):
+                    exporter._v2_model(
+                        "custom-ollama-cloud/test",
+                        {"name": "Test", "variants": {"default": options}},
+                    )
+
+                config = _server_config()
+                config["providers"]["openai"]["models"]["gpt-6-luna"].update(options)
+                with self.assertRaises(stage.StageError):
+                    stage._verify_v2_config(config)
+                with self.assertRaises(ValueError):
+                    guest.verify_v2_config(config)
+
+                config = _server_config()
+                config["providers"]["openai"]["models"]["gpt-6-luna"]["variants"] = [
+                    {"id": "unsafe", **options},
+                ]
+                with self.assertRaises(stage.StageError):
+                    stage._verify_v2_config(config)
+                with self.assertRaises(ValueError):
+                    guest.verify_v2_config(config)
+
     def test_stage_and_guest_reject_credentials_in_model_variants(self) -> None:
         config = _server_config()
         config["providers"]["openai"]["models"]["gpt-6-luna"]["variants"] = [

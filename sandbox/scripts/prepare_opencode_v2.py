@@ -46,9 +46,6 @@ REASONING_EFFORTS: Final[frozenset[str]] = frozenset(
 REASONING_SUMMARIES: Final[frozenset[str]] = frozenset(
     {"auto", "concise", "detailed"},
 )
-SENSITIVE_FIELD_MARKERS: Final[tuple[str, ...]] = (
-    "apikey", "authorization", "credential", "password", "secret", "token",
-)
 
 
 @dataclass(frozen=True, slots=True)
@@ -297,7 +294,7 @@ def _v2_variant(value: JsonValue, label: str) -> dict[str, JsonValue]:
             if key == "settings":
                 _validate_reasoning_settings(nested, f"{label}.settings")
             else:
-                _reject_variant_credentials(nested, f"{label}.{key}")
+                _validate_variant_options(key, nested, f"{label}.{key}")
             result[key] = nested
         else:
             raise ExportError(f"unsupported V1 variant field: {label}.{key}")
@@ -318,19 +315,21 @@ def _validate_reasoning_settings(settings: dict[str, JsonValue], label: str) -> 
             raise ExportError(f"unsupported reasoning setting: {label}.{key}")
 
 
-def _reject_variant_credentials(value: JsonValue, label: str) -> None:
-    """Reject credential-bearing fields and bearer values in variant options."""
-    if isinstance(value, dict):
-        for key, item in value.items():
-            normalized = "".join(char for char in key.casefold() if char.isalnum())
-            if any(marker in normalized for marker in SENSITIVE_FIELD_MARKERS):
-                raise ExportError(f"credentials are forbidden in variant options: {label}.{key}")
-            _reject_variant_credentials(item, f"{label}.{key}")
-    elif isinstance(value, list):
-        for index, item in enumerate(value):
-            _reject_variant_credentials(item, f"{label}[{index}]")
-    elif isinstance(value, str) and value.casefold().startswith("bearer "):
-        raise ExportError(f"credentials are forbidden in variant options: {label}")
+def _validate_variant_options(key: str, options: dict[str, JsonValue], label: str) -> None:
+    """Allow only empty model headers and the supported thinking body control."""
+    if key == "headers":
+        if options:
+            raise ExportError(f"model headers are not supported: {label}")
+        return
+    if set(options) - {"thinking"}:
+        raise ExportError(f"unsupported model body field: {label}")
+    thinking = options.get("thinking")
+    if thinking is None and "thinking" not in options:
+        return
+    if (not isinstance(thinking, dict) or set(thinking) != {"type"}
+            or not isinstance(thinking["type"], str)
+            or thinking["type"] not in {"enabled", "disabled"}):
+        raise ExportError(f"unsupported model thinking option: {label}.thinking")
 
 
 def _v2_model(model_id: str, value: JsonValue) -> dict[str, JsonValue]:
@@ -367,7 +366,7 @@ def _validate_v2_model_options(model: dict[str, JsonValue], label: str) -> None:
         value = model.get(key, {})
         if not isinstance(value, dict):
             raise ExportError(f"invalid model {key}: {label}")
-        _reject_variant_credentials(value, f"{label}.{key}")
+        _validate_variant_options(key, value, f"{label}.{key}")
     variants = model.get("variants", [])
     if not isinstance(variants, list):
         raise ExportError(f"invalid model variants: {label}")
@@ -382,7 +381,7 @@ def _validate_v2_model_options(model: dict[str, JsonValue], label: str) -> None:
             value = variant.get(key, {})
             if not isinstance(value, dict):
                 raise ExportError(f"invalid model variant {key}: {label}")
-            _reject_variant_credentials(value, f"{label}.variant.{key}")
+            _validate_variant_options(key, value, f"{label}.variant.{key}")
 
 
 def _v2_provider(provider_id: str, source: dict[str, JsonValue], model_ids: tuple[str, ...]) -> dict[str, JsonValue]:
