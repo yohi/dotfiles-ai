@@ -31,12 +31,31 @@ NAMES = frozenset({"opencode.jsonc", "cli.json", "export-manifest.json"})
 MAX_BYTES = 1024 * 1024
 SANDBOX_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9.-]{0,61}[a-zA-Z0-9]$")
 BUNDLE_DIRECTORY_RE = re.compile(r"^sbx-config-[a-f0-9]{16}-[a-f0-9]{12}$")
+HOST_BUNDLE_RE = re.compile(r"^opencode-v2-export-[a-zA-Z0-9][a-zA-Z0-9-]{0,63}$")
 REMOTE_PARENT = str(Path("/home") / "agent" / "workspace")  # guest-only mountless path
+BUNDLE_ROOT = Path(tempfile.gettempdir())
 JsonValue: TypeAlias = str | int | float | bool | None | list["JsonValue"] | dict[str, "JsonValue"]
 
 
 class StageError(Exception):
     """Expected failure without exposing file contents or CLI stderr."""
+
+
+def _host_bundle_path(name: str) -> Path:
+    if HOST_BUNDLE_RE.fullmatch(name) is None:
+        raise StageError("bundle must be identified by its generated directory name")
+    if (not BUNDLE_ROOT.is_absolute()
+            or any(parent.is_symlink() for parent in (BUNDLE_ROOT, *BUNDLE_ROOT.parents))):
+        raise StageError("temporary bundle root is not safe")
+    bundle = BUNDLE_ROOT / name
+    try:
+        info = bundle.lstat()
+    except OSError as exc:
+        raise StageError("bundle directory is missing or unsafe") from exc
+    if (not stat.S_ISDIR(info.st_mode) or info.st_uid != os.geteuid()
+            or stat.S_IMODE(info.st_mode) != 0o700):
+        raise StageError("bundle directory must be private and owned by the current user")
+    return bundle
 
 
 def _open_bundle_directory(directory: Path) -> int:
@@ -259,7 +278,7 @@ def stage(bundle: Path, repo_root: Path, sandbox: str | None, apply: bool) -> No
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--verify-bundle", help="verify a staged bundle by its generated directory name")
-    p.add_argument("--bundle", type=Path, help="existing output from prepare_opencode_v2.py")
+    p.add_argument("--bundle", help="generated bundle directory name under the temporary directory")
     p.add_argument("--repo-root", type=Path, default=Path(__file__).resolve().parents[2])
     p.add_argument("--sandbox", help="local Docker Sandbox name (used only with --apply)")
     p.add_argument("--apply", action="store_true", help="explicitly copy and verify; never activate")
@@ -273,7 +292,7 @@ def main(argv: list[str] | None = None) -> int:
         else:
             if args.bundle is None:
                 raise StageError("--bundle is required")
-            stage(args.bundle, args.repo_root, args.sandbox, args.apply)
+            stage(_host_bundle_path(args.bundle), args.repo_root, args.sandbox, args.apply)
         return 0
     except (StageError, OSError) as exc:
         msg = str(exc) if isinstance(exc, StageError) else "filesystem operation failed"

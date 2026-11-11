@@ -49,8 +49,9 @@ Docker Sandbox上での交換・更新と、Provider設定の実OpenCode V2実�
 
 ```sh
 python3 -m pip show PyYAML  # 依存が既存環境にあることを確認（インストールしない）
-python3 sandbox/scripts/prepare_opencode_v2.py --out /tmp/opencode-v2-export-20261030
-python3 sandbox/scripts/prepare_opencode_v2.py --out /tmp/opencode-v2-export-20261030 --check
+OUT="${TMPDIR:-/tmp}/opencode-v2-export-20261030"
+python3 sandbox/scripts/prepare_opencode_v2.py --out "$OUT"
+python3 sandbox/scripts/prepare_opencode_v2.py --out "$OUT" --check
 python3 -m unittest discover -s sandbox/tests -p 'test_*.py' -v
 ```
 
@@ -66,11 +67,12 @@ python3 -m unittest discover -s sandbox/tests -p 'test_*.py' -v
 
 ```sh
 # 第2段で作成したスナップショットを検証（sbxを起動・呼び出ししない）
-python3 sandbox/scripts/stage_opencode_v2.py --bundle /tmp/opencode-v2-export-20261030
+# --bundle には一時ディレクトリ内の生成名だけを指定する
+python3 sandbox/scripts/stage_opencode_v2.py --bundle opencode-v2-export-20261030
 
 # 既存のmountless Sandboxにだけ、明示的な適用オプションで転送（この例は実行しない）
 python3 sandbox/scripts/stage_opencode_v2.py \
-  --bundle /tmp/opencode-v2-export-20261030 \
+  --bundle opencode-v2-export-20261030 \
   --sandbox oc-v2-poc --apply
 
 # CI/ローカルの模擬テスト。実際のsbxは呼び出さない

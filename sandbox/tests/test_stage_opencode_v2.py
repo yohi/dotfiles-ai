@@ -63,6 +63,26 @@ class StageTests(unittest.TestCase):
             status = stage.main(["--verify-bundle", str(self.bundle)])
         self.assertEqual(status, 1)
 
+    def test_host_stage_resolves_bundle_identifier_under_temp_root(self) -> None:
+        bundle_name = "opencode-v2-export-20261111"
+        bundle = self.root.parent / bundle_name
+        bundle.mkdir(mode=0o700)
+        output = io.StringIO()
+        with patch.object(stage, "BUNDLE_ROOT", self.root.parent, create=True), \
+                patch.object(stage, "stage") as stage_bundle, \
+                contextlib.redirect_stdout(output):
+            status = stage.main(["--bundle", bundle_name, "--repo-root", str(self.root)])
+
+        self.assertEqual(status, 0, output.getvalue())
+        self.assertEqual(stage_bundle.call_args.args[0], bundle)
+
+    def test_host_stage_rejects_path_in_bundle_argument(self) -> None:
+        with patch.object(stage, "stage") as stage_bundle:
+            status = stage.main(["--bundle", str(self.bundle), "--repo-root", str(self.root)])
+
+        self.assertEqual(status, 1)
+        stage_bundle.assert_not_called()
+
     def _make_v2_bundle(self) -> Path:
         self.apm.write_text(
             "provider:\n"
