@@ -144,16 +144,16 @@ class StageTests(unittest.TestCase):
         with self.assertRaises(stage.StageError):
             stage.verify_bundle(self.bundle)
 
-    def test_regular_bundle_reader_rejects_symlinked_parent(self) -> None:
-        alias = self.root.parent / "bundle-alias"
-        alias.symlink_to(self.bundle, target_is_directory=True)
+    def test_bundle_verifier_rejects_symlinked_parent(self) -> None:
+        alias = self.root.parent / "parent-alias"
+        alias.symlink_to(self.bundle.parent, target_is_directory=True)
 
         with self.assertRaises(stage.StageError):
-            stage._regular_bytes(alias / "cli.json")
+            stage.verify_bundle(alias / self.bundle.name)
 
-    def test_regular_bundle_reader_rejects_path_traversal(self) -> None:
+    def test_bundle_verifier_rejects_path_traversal(self) -> None:
         with self.assertRaises(stage.StageError):
-            stage._regular_bytes(self.bundle / "../repo/apm.yml")
+            stage.verify_bundle(self.bundle.parent / ".." / self.bundle.name)
 
     def test_rejects_plugin_or_mcp_config_even_with_updated_hash(self) -> None:
         manifest_file = self.bundle / "export-manifest.json"

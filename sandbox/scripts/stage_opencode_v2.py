@@ -39,42 +39,46 @@ class StageError(Exception):
     """Expected failure without exposing file contents or CLI stderr."""
 
 
-def _regular_bytes(path: Path) -> bytes:
-    if path.name not in NAMES or ".." in path.parts:
-        raise StageError("unexpected bundle file name")
-    if any(parent.is_symlink() for parent in path.parents):
-        raise StageError("bundle path contains a symlink")
+def _open_bundle_directory(directory: Path) -> int:
+    if ".." in directory.parts or any(parent.is_symlink() for parent in directory.parents):
+        raise StageError("bundle path contains traversal or a symlink")
     try:
         directory_fd = os.open(
-            path.parent,
+            directory,
             os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW,
         )
     except OSError as exc:
         raise StageError("bundle directory is not safe") from exc
-    try:
-        try:
-            file_fd = os.open(
-                path.name,
-                os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK,
-                dir_fd=directory_fd,
-            )
-        except OSError as exc:
-            raise StageError("bundle member is not a safe regular file: " + path.name) from exc
-        try:
-            file_info = os.fstat(file_fd)
-            if not stat.S_ISREG(file_info.st_mode):
-                raise StageError("bundle member is not a regular file: " + path.name)
-            if file_info.st_size > MAX_BYTES:
-                raise StageError("bundle file exceeds size limit: " + path.name)
-            with os.fdopen(file_fd, "rb", closefd=False) as file:
-                content = file.read(MAX_BYTES + 1)
-            if len(content) > MAX_BYTES:
-                raise StageError("bundle file exceeds size limit: " + path.name)
-            return content
-        finally:
-            os.close(file_fd)
-    finally:
+    if not stat.S_ISDIR(os.fstat(directory_fd).st_mode):
         os.close(directory_fd)
+        raise StageError("bundle directory is not a regular directory")
+    return directory_fd
+
+
+def _regular_bytes(directory_fd: int, name: str) -> bytes:
+    if name not in NAMES:
+        raise StageError("unexpected bundle file name")
+    try:
+        file_fd = os.open(
+            name,
+            os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK,
+            dir_fd=directory_fd,
+        )
+    except OSError as exc:
+        raise StageError("bundle member is not a safe regular file: " + name) from exc
+    try:
+        file_info = os.fstat(file_fd)
+        if not stat.S_ISREG(file_info.st_mode):
+            raise StageError("bundle member is not a regular file: " + name)
+        if file_info.st_size > MAX_BYTES:
+            raise StageError("bundle file exceeds size limit: " + name)
+        with os.fdopen(file_fd, "rb", closefd=False) as file:
+            content = file.read(MAX_BYTES + 1)
+        if len(content) > MAX_BYTES:
+            raise StageError("bundle file exceeds size limit: " + name)
+        return content
+    finally:
+        os.close(file_fd)
 
 
 def _verify_v2_config(server: dict[str, JsonValue]) -> None:
@@ -126,9 +130,13 @@ def verify_bundle(directory: Path) -> str:
     """Validate content and hashes, without executing any exported config."""
     if directory.is_symlink() or not directory.is_dir():
         raise StageError("bundle directory must be a regular directory")
-    if {item.name for item in directory.iterdir()} != NAMES:
-        raise StageError("unexpected bundle file set")
-    data = {name: _regular_bytes(directory / name) for name in NAMES}
+    directory_fd = _open_bundle_directory(directory)
+    try:
+        if set(os.listdir(directory_fd)) != NAMES:
+            raise StageError("unexpected bundle file set")
+        data = {name: _regular_bytes(directory_fd, name) for name in NAMES}
+    finally:
+        os.close(directory_fd)
     try:
         manifest = json.loads(
             data["export-manifest.json"], object_pairs_hook=exporter._unique_json_object,
@@ -202,8 +210,13 @@ def _check_source(root: Path, bundle: Path) -> None:
     expected = exporter._build_files(
         apm.shell, apm.snapshot, apm.source_sha256, apm.v2_config,
     )
-    if any(_regular_bytes(bundle / name) != content for name, content in expected.items()):
-        raise StageError("bundle does not match the current apm.yml SSOT")
+    directory_fd = _open_bundle_directory(bundle)
+    try:
+        if any(_regular_bytes(directory_fd, name) != content
+               for name, content in expected.items()):
+            raise StageError("bundle does not match the current apm.yml SSOT")
+    finally:
+        os.close(directory_fd)
 
 
 def stage(bundle: Path, repo_root: Path, sandbox: str | None, apply: bool) -> None:
