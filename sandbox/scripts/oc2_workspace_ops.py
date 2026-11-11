@@ -128,15 +128,15 @@ def apply_changes(host: pathlib.Path, guest: pathlib.Path, baseline: Manifest,
         try:
             for relative in reversed(applied):
                 target = host.joinpath(*relative.split('/'))
-                original = originals[relative]
-                if original is None:
+                original_bytes = originals[relative]
+                if original_bytes is None:
                     target.unlink(missing_ok=True)
                 else:
                     rollback = target.with_name(target.name + '.oc2-rollback')
                     descriptor = os.open(rollback, os.O_WRONLY | os.O_CREAT | os.O_EXCL |
                                          getattr(os, 'O_NOFOLLOW', 0), 0o600)
                     with os.fdopen(descriptor, 'wb') as stream:
-                        _ = stream.write(original)
+                        _ = stream.write(original_bytes)
                     os.replace(rollback, target)
             for temporary in prepared.values():
                 if temporary.exists() or temporary.is_symlink():

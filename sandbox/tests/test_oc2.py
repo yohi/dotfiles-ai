@@ -42,22 +42,22 @@ assets = load('oc2_assets')
 
 
 class FakeRunner:
-    def __init__(self, rows: list[dict[str, str | list[str]]] | None = None,
-                 inspection: dict[str, str | list[str]] | None = None) -> None:
+    def __init__(self, rows: list[dict[str, object]] | None = None,
+                 inspection: dict[str, object] | None = None) -> None:
         self.rows = rows or []
         self.inspection = (
             {'name': 'oc2-dev', 'runtime_mounts': []}
             if inspection is None else inspection
         )
-        self.calls = []
-        self.workspace_copies = []
-        self.remote_files = {}
+        self.calls: list[tuple[str, ...]] = []
+        self.workspace_copies: list[tuple[pathlib.Path, str]] = []
+        self.remote_files: dict[str, bytes] = {}
 
     def sbx(self, *args: str, capture: bool = False, tty: bool = False,
             timeout: int | None = 180) -> str:
         self.calls.append(args)
         if args == ('ls', '-q'):
-            return '\n'.join(row['name'] for row in self.rows)
+            return '\n'.join(str(row['name']) for row in self.rows)
         if args == ('ls', '--format', 'json'):
             return json.dumps(self.rows)
         if args == ('inspect', 'oc2-dev', '--json'):
@@ -121,6 +121,84 @@ class HostTest(unittest.TestCase):
             (root / '.env').write_text('TOKEN=fixture-value')
             with self.assertRaisesRegex(oc2.Stop, 'clone mode would expose'):
                 oc2.validate_clone_workspace(root)
+
+    def test_clone_mode_fails_closed_when_excluded_directory_cannot_be_walked(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            (root / '.git').mkdir()
+            original_walk = oc2.os.walk
+            calls = 0
+
+            def fail_second_walk(path: str | os.PathLike[str], *args: object,
+                                 **kwargs: object) -> object:
+                nonlocal calls
+                calls += 1
+                if calls == 1:
+                    return original_walk(path, *args, **kwargs)
+                onerror = kwargs['onerror']
+                assert callable(onerror)
+
+                def walk_with_error() -> object:
+                    yield str(root), ['.ssh'], []
+                    onerror(PermissionError('simulated excluded-directory failure'))
+
+                return walk_with_error()
+
+            with patch.object(oc2.os, 'walk', side_effect=fail_second_walk):
+                with self.assertRaisesRegex(oc2.Stop, 'workspace cannot be safely inspected'):
+                    oc2.validate_clone_workspace(root)
+
+    def test_clone_mode_rejects_nested_git_metadata(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            (root / '.git').mkdir()
+            nested_git = root / 'vendor' / '.git'
+            nested_git.mkdir(parents=True)
+            (nested_git / 'HEAD').write_text('ref: refs/heads/main\n')
+
+            with self.assertRaisesRegex(oc2.Stop, 'nested Git metadata'):
+                oc2.validate_clone_workspace(root)
+
+    def test_clone_mode_rejects_symlinked_directory_inside_excluded_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            (root / '.git').mkdir()
+            hidden = root / '.ssh'
+            hidden.mkdir()
+            target = root / 'outside'
+            target.mkdir()
+            (hidden / 'linked').symlink_to(target, target_is_directory=True)
+
+            with self.assertRaisesRegex(oc2.Stop, 'symlink'):
+                oc2.validate_clone_workspace(root)
+
+    def test_clone_mode_checks_compressed_git_object_contents(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            subprocess.run(['git', 'init', '-q', str(root)], check=True)
+            object_content = b'https://user:password@example.invalid/repo.git'
+            subprocess.run(
+                ['git', '-C', str(root), 'hash-object', '-w', '--stdin'],
+                input=object_content, check=True, capture_output=True,
+            )
+
+            with self.assertRaisesRegex(oc2.Stop, 'Git metadata contains credential'):
+                oc2.validate_clone_workspace(root)
+
+    def test_clone_mode_accepts_clean_repository_with_packed_metadata(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            subprocess.run(['git', 'init', '-q', str(root)], check=True)
+            (root / 'main.py').write_text('print("safe")\n')
+            subprocess.run(['git', '-C', str(root), 'add', 'main.py'], check=True)
+            subprocess.run(
+                ['git', '-C', str(root), '-c', 'user.name=OC2 Test',
+                 '-c', 'user.email=oc2-test@example.invalid', 'commit', '-qm', 'fixture'],
+                check=True,
+            )
+            subprocess.run(['git', '-C', str(root), 'repack', '-adq'], check=True)
+
+            oc2.validate_clone_workspace(root)
 
     def test_opencode_cli_install_is_pinned_to_v225(self) -> None:
         self.assertEqual(oc2.VERSION, '2.2.5')
@@ -251,19 +329,24 @@ class HostTest(unittest.TestCase):
                  str(snapshot), str(snapshot / 'src')],
             )
 
-    def test_collection_acl_is_limited_to_private_temporary_directory(self) -> None:
+    def test_collection_acl_grants_operator_traversal_and_staging_access(self) -> None:
         result: subprocess.CompletedProcess[str] = subprocess.CompletedProcess(
             args=[], returncode=0,
         )
         with patch.object(oc2.shutil, 'which', return_value='/usr/bin/setfacl'), \
              patch.object(oc2.subprocess, 'run', return_value=result) as run:
             oc2.grant_collection_directory_access(
-                pathlib.Path('/tmp/oc2-collect-x'), 'sbx-poc',
+                pathlib.Path('/tmp/oc2-state/session/collecting'), 'sbx-poc',
             )
         self.assertEqual(
-            run.call_args.args[0],
+            run.call_args_list[0].args[0],
+            ['/usr/bin/setfacl', '-m', 'u:sbx-poc:--x', '--',
+             '/tmp/oc2-state/session', '/tmp/oc2-state'],
+        )
+        self.assertEqual(
+            run.call_args_list[1].args[0],
             ['/usr/bin/setfacl', '-m', 'u:sbx-poc:rwx', '--',
-             '/tmp/oc2-collect-x'],
+             '/tmp/oc2-state/session/collecting'],
         )
 
     def test_collection_staging_is_created_in_private_session_directory(self) -> None:
@@ -597,7 +680,7 @@ class HostTest(unittest.TestCase):
 
             class StagingRunner:
                 def __init__(self) -> None:
-                    self.calls = []
+                    self.calls: list[tuple[str, ...]] = []
 
                 def sbx(self, *args: str, capture: bool = False, tty: bool = False,
                         timeout: int | None = 180) -> str:
@@ -639,7 +722,7 @@ class HostTest(unittest.TestCase):
 
             class Runner:
                 def __init__(self) -> None:
-                    self.calls = []
+                    self.calls: list[tuple[str, ...]] = []
 
                 def sbx(self, *args: str, capture: bool = False, tty: bool = False,
                         timeout: int | None = 180) -> str:
@@ -689,7 +772,7 @@ class HostTest(unittest.TestCase):
     def test_cli_version_probe_uses_shell_parameter_for_binary_path(self) -> None:
         class VersionRunner:
             def __init__(self) -> None:
-                self.calls = []
+                self.calls: list[tuple[str, ...]] = []
 
             def sbx(self, *args: str, capture: bool = False, tty: bool = False,
                     timeout: int | None = 180) -> str:
@@ -708,7 +791,7 @@ class HostTest(unittest.TestCase):
     def test_cli_path_returns_none_when_pinned_binary_is_missing(self) -> None:
         class MissingBinaryRunner:
             def __init__(self) -> None:
-                self.calls = []
+                self.calls: list[tuple[str, ...]] = []
 
             def sbx(self, *args: str, capture: bool = False, tty: bool = False,
                     timeout: int | None = 180) -> str:
@@ -735,8 +818,8 @@ class GuestTest(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.base = pathlib.Path(self.tmp.name) / 'oc2'
         self.base.mkdir()
-        self.orig = guest.BASE
-        guest.BASE = self.base
+        self.orig = guest.__dict__['BASE']
+        guest.__dict__['BASE'] = self.base
         self.bundle = self.base / 'bundles' / 'bundle1'
         self.bundle.mkdir(parents=True)
         self.config = {'$schema': 'https://opencode.ai/config.json', 'shell': 'bash',
@@ -752,7 +835,7 @@ class GuestTest(unittest.TestCase):
         (self.bundle / 'export-manifest.json').write_text(json.dumps(self.manifest))
 
     def tearDown(self) -> None:
-        guest.BASE = self.orig
+        guest.__dict__['BASE'] = self.orig
         self.tmp.cleanup()
 
     def test_materialize_idempotently(self) -> None:

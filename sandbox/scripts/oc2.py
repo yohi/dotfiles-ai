@@ -98,9 +98,28 @@ def validate_clone_workspace(workspace: pathlib.Path) -> None:
     manifest = oc2_workspace.snapshot(workspace)
     checked = {entry.path for entry in manifest.files}
     exposed: set[str] = set()
-    for current, directories, filenames in os.walk(workspace, followlinks=False):
-        directories[:] = [name for name in directories if name != '.git']
+    def fail_workspace_walk(error: OSError) -> None:
+        """Fail closed when any workspace directory cannot be traversed."""
+        raise Stop('workspace cannot be safely inspected') from error
+
+    for current, directories, filenames in os.walk(
+            workspace, followlinks=False, onerror=fail_workspace_walk):
         current_path = pathlib.Path(current)
+        retained: list[str] = []
+        for name in directories:
+            candidate = current_path / name
+            relative = candidate.relative_to(workspace).as_posix()
+            if candidate.is_symlink():
+                raise Stop('workspace contains a symlink')
+            if name == '.git':
+                if relative != '.git':
+                    raise Stop('workspace contains nested Git metadata')
+                continue
+            retained.append(name)
+        directories[:] = retained
+        for name in filenames:
+            if name == '.git' and (current_path / name).relative_to(workspace).as_posix() != '.git':
+                raise Stop('workspace contains nested Git metadata')
         exposed.update(
             (current_path / name).relative_to(workspace).as_posix()
             for name in filenames
@@ -115,6 +134,7 @@ def validate_clone_workspace(workspace: pathlib.Path) -> None:
         """Fail closed when the Git metadata traversal is incomplete."""
         raise Stop('Git metadata cannot be safely inspected') from error
 
+    object_store = git_metadata / 'objects'
     for current, directories, filenames in os.walk(
             git_metadata, followlinks=False, onerror=fail_walk):
         current_path = pathlib.Path(current)
@@ -125,6 +145,8 @@ def validate_clone_workspace(workspace: pathlib.Path) -> None:
             candidate = current_path / name
             if candidate.is_symlink():
                 raise Stop('Git metadata contains an unsafe symlink')
+            if candidate.is_relative_to(object_store):
+                continue
             try:
                 content = oc2_workspace._read_regular(candidate)
             except oc2_workspace.WorkspaceError as exc:
@@ -132,6 +154,67 @@ def validate_clone_workspace(workspace: pathlib.Path) -> None:
             if (oc2_workspace._contains_credential(content)
                     or re.search(rb'\b[^/@\s:]+:[^/@\s]+@', content)):
                 raise Stop('Git metadata contains credential material')
+
+    if object_store.is_dir():
+        _inspect_git_objects(workspace)
+
+
+def _inspect_git_objects(workspace: pathlib.Path) -> None:
+    """Inspect decompressed Git object contents without scanning compressed bytes."""
+    import oc2_workspace
+
+    try:
+        process = subprocess.Popen(
+            ['git', '-C', str(workspace), 'cat-file', '--batch-all-objects', '--batch'],
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+        )
+    except OSError as exc:
+        raise Stop('Git objects cannot be safely inspected') from exc
+    if process.stdout is None:
+        process.kill()
+        process.wait()
+        raise Stop('Git objects cannot be safely inspected')
+
+    with process.stdout:
+        for header in iter(process.stdout.readline, b''):
+            fields = header.rstrip(b'\n').split(b' ')
+            if len(fields) != 3 or fields[1] not in (b'blob', b'commit', b'tag', b'tree'):
+                process.kill()
+                process.wait()
+                raise Stop('Git object metadata is invalid')
+            try:
+                size = int(fields[2])
+            except ValueError as exc:
+                process.kill()
+                process.wait()
+                raise Stop('Git object metadata is invalid') from exc
+            if not 0 <= size <= oc2_workspace.MAX_FILE_BYTES:
+                process.kill()
+                process.wait()
+                raise Stop('Git object exceeds the inspection size limit')
+            chunks: list[bytes] = []
+            remaining = size
+            while remaining:
+                chunk = process.stdout.read(min(remaining, 1024 * 1024))
+                if not chunk:
+                    process.kill()
+                    process.wait()
+                    raise Stop('Git object data is incomplete')
+                chunks.append(chunk)
+                remaining -= len(chunk)
+            if process.stdout.read(1) != b'\n':
+                process.kill()
+                process.wait()
+                raise Stop('Git object data is malformed')
+            content = b''.join(chunks)
+            if fields[1] != b'tree' and (
+                    oc2_workspace._contains_credential(content)
+                    or re.search(rb'\b[^/@\s:]+:[^/@\s]+@', content)):
+                process.kill()
+                process.wait()
+                raise Stop('Git metadata contains credential material')
+    if process.wait() != 0:
+        raise Stop('Git objects cannot be safely inspected')
 
 
 def is_compatible_sandbox(runner: Runner, name: str) -> bool:
@@ -247,10 +330,13 @@ def grant_snapshot_access(snapshot: pathlib.Path, operator: str) -> None:
 
 
 def grant_collection_directory_access(directory: pathlib.Path, operator: str) -> None:
+    """Grant an operator traversal through private parents and access to staging."""
     if operator == getpass.getuser():
         return
     if re.fullmatch(r'[a-z_][a-z0-9_-]*', operator) is None:
         raise Stop('invalid Sandbox operator user')
+    _set_acl((directory.parent, directory.parent.parent),
+             '-m', f'u:{operator}:--x')
     _set_acl((directory,), '-m', f'u:{operator}:rwx')
 
 
