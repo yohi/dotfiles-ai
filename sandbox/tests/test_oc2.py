@@ -778,28 +778,14 @@ class HostTest(unittest.TestCase):
         oc2.launch(runner, oc2.SandboxLaunch('oc2-dev', digest, oc2.PINNED[0], project, config_file))
         self.assertEqual(
             runner.calls[0],
-            ('exec', 'oc2-dev', 'mkdir', '-p', '-m', '700',
-             runtime, *(f'{runtime}/{name}' for name in
-                        ('home', 'home/.local/share', 'config', 'config/opencode',
-                         'state', 'cache', 'tmp'))),
+            ('exec', 'oc2-dev',
+             *oc2._runtime_directory_setup_command(oc2.ROOT, runtime)),
         )
         self.assertEqual(
             runner.calls[1],
-            ('exec', 'oc2-dev', 'chmod', '700', runtime,
-             *(f'{runtime}/{name}' for name in
-               ('home', 'home/.local/share', 'config', 'config/opencode',
-                'state', 'cache', 'tmp'))),
-        )
-        self.assertEqual(
-            runner.calls[2],
-            ('exec', 'oc2-dev', 'mkdir', '-p', '-m', '700',
-             f'{runtime}/home/.local/share/opencode'),
-        )
-        self.assertEqual(
-            runner.calls[3],
             ('cp', str(config_file), f'oc2-dev:{runtime}/config/opencode/opencode.jsonc'),
         )
-        auth, tui = runner.calls[4:6]
+        auth, tui = runner.calls[2:4]
         self.assertEqual(tui[3], project)
         compile(auth[auth.index('-c') + 1], '<oc2-inline-helper>', 'exec')
         for variable in ('HOME=', 'XDG_DATA_HOME=', 'OPENCODE_DB=', 'XDG_CONFIG_HOME=',
@@ -808,6 +794,61 @@ class HostTest(unittest.TestCase):
                              [arg for arg in tui if arg.startswith(variable)])
         self.assertIn(f'OPENCODE_DB={runtime}/home/.local/share/opencode/oc2.db', tui)
         self.assertFalse(any(arg.startswith('OPENCODE_CONFIG_DIR=') for arg in tui))
+
+    def test_runtime_directory_setup_rejects_symlinked_component(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            parent = pathlib.Path(tmp)
+            root = parent / 'oc2'
+            root.mkdir(mode=0o700)
+            outside = parent / 'outside'
+            outside.mkdir(mode=0o700)
+            (root / 'runtime').symlink_to(outside, target_is_directory=True)
+            runtime = root / 'runtime' / ('a' * 16)
+
+            result = subprocess.run(
+                oc2._runtime_directory_setup_command(str(root), str(runtime)),
+                capture_output=True, text=True, check=False,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse((outside / ('a' * 16)).exists())
+
+    def test_runtime_directory_setup_creates_private_tree(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp) / 'oc2'
+            runtime = root / 'runtime' / ('b' * 16)
+
+            result = subprocess.run(
+                oc2._runtime_directory_setup_command(str(root), str(runtime)),
+                capture_output=True, text=True, check=False,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            directories = (
+                root, root / 'runtime', runtime, runtime / 'home',
+                runtime / 'home/.local/share', runtime / 'home/.local/share/opencode',
+                runtime / 'config', runtime / 'config/opencode', runtime / 'state',
+                runtime / 'cache', runtime / 'tmp',
+            )
+            for directory in directories:
+                info = directory.stat()
+                self.assertEqual(info.st_uid, os.geteuid())
+                self.assertEqual(stat.S_IMODE(info.st_mode), 0o700)
+
+    def test_runtime_directory_setup_rejects_dotdot_root(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            parent = pathlib.Path(tmp)
+            root = parent / 'oc2' / '..' / 'escaped'
+            runtime = root / 'runtime' / ('c' * 16)
+
+            result = subprocess.run(
+                [sys.executable, str(SCRIPTS / 'oc2_runtime_dirs.py'),
+                 str(root), str(root), str(root / 'runtime'), str(runtime)],
+                capture_output=True, text=True, check=False,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertFalse((parent / 'escaped').exists())
 
     def test_seed_cli_uses_operator_home_for_private_staging(self) -> None:
         runner = oc2.Runner('operator')
@@ -1272,8 +1313,7 @@ class OAuthTest(unittest.TestCase):
         self.last_calls = []
 
     def capture_stderr(self, stderr):
-        with patch.dict(os.environ, {'TMPDIR': str(self.runtime_tmp)}):
-            return bootstrap.capture_import_stderr(self.db, stderr)
+        return bootstrap.capture_import_stderr(self.runtime, self.db, stderr)
 
     def run_sync(self, before, after, fail=None):
         calls: list[tuple[str, str | bytes | None]] = []
@@ -1355,13 +1395,15 @@ class OAuthTest(unittest.TestCase):
         self.assertIsNone(captured)
         self.assertEqual(target.read_bytes(), b'protected')
 
-    def test_refuses_capture_outside_runtime_directory(self):
+    def test_capture_uses_runtime_tmp_instead_of_external_tmpdir(self):
         elsewhere = self.root / 'elsewhere'
         elsewhere.mkdir(mode=0o700)
         with patch.dict(os.environ, {'TMPDIR': str(elsewhere)}):
-            captured = bootstrap.capture_import_stderr(self.db, b'secret')
+            captured = bootstrap.capture_import_stderr(self.runtime, self.db, b'secret')
 
-        self.assertIsNone(captured)
+        self.assertEqual(captured.parent, self.runtime_tmp)
+        self.assertEqual(captured.read_bytes(), b'secret')
+        self.assertEqual(list(elsewhere.iterdir()), [])
 
     def test_refuses_runtime_tmp_with_broad_permissions(self):
         self.runtime_tmp.chmod(0o755)

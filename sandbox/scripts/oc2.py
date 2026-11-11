@@ -820,6 +820,30 @@ def provision_cli(runner: Runner, name: str) -> str:
     return found
 
 
+def _runtime_directory_setup_command(root: str, runtime: str) -> list[str]:
+    root_path = pathlib.PurePosixPath(root)
+    runtime_path = pathlib.PurePosixPath(runtime)
+    if (not root_path.is_absolute() or '..' in root_path.parts
+            or runtime_path.parent != root_path / 'runtime'
+            or re.fullmatch(r'[0-9a-f]{16}', runtime_path.name) is None):
+        raise Stop('invalid private runtime directory')
+
+    directories = (
+        root, root + '/runtime', runtime, runtime + '/home',
+        runtime + '/home/.local/share', runtime + '/home/.local/share/opencode',
+        runtime + '/config', runtime + '/config/opencode', runtime + '/state',
+        runtime + '/cache', runtime + '/tmp',
+    )
+    script_path = HERE / 'oc2_runtime_dirs.py'
+    if script_path.is_symlink() or not script_path.is_file():
+        raise Stop('private runtime directory helper is unavailable')
+    try:
+        script = script_path.read_text(encoding='utf-8')
+    except OSError as error:
+        raise Stop('private runtime directory helper is unavailable') from error
+    return ['python3', '-c', script, root, *directories]
+
+
 def launch(runner: Runner, request: SandboxLaunch) -> None:
     # Use sbx exec's native --workdir and direct argv instead of bash -c
     # positional parameters. The configured runtime is fully sandbox-local.
@@ -841,19 +865,9 @@ def launch(runner: Runner, request: SandboxLaunch) -> None:
         )
     )
     runner.sbx(
-        'exec', request.name, 'mkdir', '-p', '-m', '700', runtime,
-        *(f'{runtime}/{directory}' for directory in
-          ('home', 'home/.local/share', 'config', 'config/opencode',
-           'state', 'cache', 'tmp')),
+        'exec', request.name,
+        *_runtime_directory_setup_command(ROOT, runtime),
     )
-    runner.sbx(
-        'exec', request.name, 'chmod', '700', runtime,
-        *(f'{runtime}/{directory}' for directory in
-          ('home', 'home/.local/share', 'config', 'config/opencode',
-           'state', 'cache', 'tmp')),
-    )
-    runner.sbx('exec', request.name, 'mkdir', '-p', '-m', '700',
-               f'{runtime}/home/.local/share/opencode')
     runner.sbx(
         'cp', str(request.config_file),
         f'{request.name}:{config_dir}/opencode.jsonc',

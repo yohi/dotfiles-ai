@@ -91,6 +91,10 @@ def synchronize(cli, source_path, db_path):
 def _synchronize(cli, source_path, db_path, progress):
     progress.start(Stage.INITIAL_DB_CHECK)
     validate_db(db_path)
+    try:
+        runtime_dir = db_path.parents[4]
+    except IndexError as error:
+        raise ValueError('unsafe database path') from error
     original = (db_path.stat().st_dev, db_path.stat().st_ino) if db_path.exists() else None
     progress.start(Stage.SENTINEL_VALIDATE)
     if source_path.is_symlink() or not source_path.is_file():
@@ -103,7 +107,7 @@ def _synchronize(cli, source_path, db_path, progress):
         ) -> None:
             if isinstance(stderr, str):
                 stderr = stderr.encode('utf-8', errors='replace')
-            captured = capture_import_stderr(db_path, stderr)
+            captured = capture_import_stderr(runtime_dir, db_path, stderr)
             print(f'OC2_OAUTH {code}', file=sys.stderr, flush=True)
             print(f'IMPORT_EXIT_CODE={exit_code}', file=sys.stderr, flush=True)
             print(f'IMPORT_STDERR_CAPTURED={str(captured is not None).lower()}',
@@ -160,7 +164,6 @@ def _synchronize(cli, source_path, db_path, progress):
         return
     inode = (db_path.stat().st_dev, db_path.stat().st_ino) if db_path.exists() else None
     progress.start(Stage.BOOTSTRAP_CONFIG)
-    runtime_dir = db_path.parents[4]
     base_config = pathlib.Path(os.environ['XDG_CONFIG_HOME']) / 'opencode/opencode.jsonc'
     bootstrap_dir = create_bootstrap_config(base_config, runtime_dir)
     progress.start(Stage.IMPORT)

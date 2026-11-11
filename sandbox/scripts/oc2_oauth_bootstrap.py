@@ -51,26 +51,39 @@ def validate_db(path: pathlib.Path) -> None:
             raise ValueError('unsafe database sidecar')
 
 
-def capture_import_stderr(db_path: pathlib.Path, stderr: bytes) -> pathlib.Path | None:
-    tmp_dir = pathlib.Path(os.environ.get('TMPDIR', ''))
-    runtime_dir = tmp_dir.parent
+def capture_import_stderr(
+    runtime_dir: pathlib.Path, db_path: pathlib.Path, stderr: bytes,
+) -> pathlib.Path | None:
+    tmp_dir = runtime_dir / 'tmp'
     expected_db = runtime_dir / 'home/.local/share/opencode/oc2.db'
-    if (not tmp_dir.is_absolute() or tmp_dir != runtime_dir / 'tmp'
+    if (not runtime_dir.is_absolute() or '..' in runtime_dir.parts
             or db_path != expected_db or not hasattr(os, 'O_NOFOLLOW')):
         return None
-    if any(path.is_symlink() for path in (tmp_dir, *tmp_dir.parents)):
+    if any(path.is_symlink() for path in (runtime_dir, *runtime_dir.parents)):
         return None
     try:
+        runtime = runtime_dir.stat()
         directory = tmp_dir.stat()
-        if (not stat.S_ISDIR(directory.st_mode) or directory.st_uid != os.geteuid()
+        if (not stat.S_ISDIR(runtime.st_mode) or runtime.st_uid != os.geteuid()
+                or stat.S_IMODE(runtime.st_mode) != 0o700
+                or not stat.S_ISDIR(directory.st_mode) or directory.st_uid != os.geteuid()
                 or stat.S_IMODE(directory.st_mode) != 0o700):
             return None
-        destination = tmp_dir / f'oc2-oauth-import-{secrets.token_hex(8)}.stderr'
-        descriptor = os.open(
-            destination,
-            os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
-            0o600,
+        directory_fd = os.open(
+            tmp_dir,
+            os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW,
         )
+        destination_name = f'oc2-oauth-import-{secrets.token_hex(8)}.stderr'
+        destination = tmp_dir / destination_name
+        try:
+            descriptor = os.open(
+                destination_name,
+                os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+                0o600,
+                dir_fd=directory_fd,
+            )
+        finally:
+            os.close(directory_fd)
         try:
             os.fchmod(descriptor, 0o600)
             file_info = os.fstat(descriptor)
