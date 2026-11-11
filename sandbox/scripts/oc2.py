@@ -19,7 +19,6 @@ import shutil
 import stat
 import subprocess
 import sys
-import tempfile
 import urllib.parse
 from dataclasses import dataclass
 
