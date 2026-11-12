@@ -12,6 +12,7 @@ from pathlib import Path
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 import oc2_guest as guest  # noqa: E402
+import oc2_native as native  # noqa: E402
 import prepare_opencode_v2 as exporter  # noqa: E402
 import stage_opencode_v2 as stage  # noqa: E402
 
@@ -114,6 +115,27 @@ def _server_config(
 
 
 class ProviderSecurityContractTests(unittest.TestCase):
+    def test_native_agents_pass_export_boundary_with_explicit_modes(self) -> None:
+        """Accept only the fixed Native Agent map with explicit approved modes."""
+        native_config = native.parse_apm_native((SCRIPTS.parents[1] / 'apm.yml').read_bytes())
+        config = _server_config()
+        config['agents'] = native.build_native_payload(native_config)['agents']
+
+        stage._verify_v2_config(config)
+        guest.verify_v2_config(config)
+
+    def test_native_agent_fallback_fields_fail_export_validation(self) -> None:
+        """Reject fallback_models when it crosses the provider export boundary."""
+        native_config = native.parse_apm_native((SCRIPTS.parents[1] / 'apm.yml').read_bytes())
+        config = _server_config()
+        config['agents'] = native.build_native_payload(native_config)['agents']
+        config['agents']['oracle']['fallback_models'] = ['openai/not-approved']
+
+        with self.assertRaises(stage.StageError):
+            stage._verify_v2_config(config)
+        with self.assertRaises(ValueError):
+            guest.verify_v2_config(config)
+
     def _assert_exporter_rejects(
         self,
         base_url: str,

@@ -8,7 +8,6 @@ not requested. Existing unrelated sandboxes are never modified.
 from __future__ import annotations
 
 import argparse
-import copy
 from dataclasses import dataclass
 import getpass
 import hashlib
@@ -21,22 +20,19 @@ import re
 import secrets
 import shlex
 import shutil
-import socket
-import stat
 import subprocess
 import sys
 import tarfile
 import tempfile
-import urllib.parse
 from typing import TYPE_CHECKING, Final, Literal
+from urllib.parse import urlsplit
 
 import yaml
 from oc2_oauth_bundle import oauth_helper_source
-from oc2_workspace import DOTFILES_AI_PROFILE
+from oc2_identity import runtime_identity_sha256, verification_generator_fingerprint
 
 if TYPE_CHECKING:
     from sandbox.scripts.oc2_workspace import Manifest as WorkspaceManifest
-    from sandbox.scripts.oc2_workspace import WorkspaceProfile
 
 HERE = pathlib.Path(__file__).resolve().parent
 REPO_ROOT = HERE.parents[1]
@@ -44,148 +40,86 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 VERSION = '2.2.5'
 ROOT = '/home/agent/workspace/oc2'
-V2_CONFIG_NAME = 'opencode.jsonc'
-NAME_RE = re.compile(r'^[A-Za-z0-9][A-Za-z0-9.-]{0,61}[A-Za-z0-9]$')
-CLI_ASSET_NAME: Final[str] = 'opencode-linux-x64.tar.gz'
+SHELL_WORKLOAD: Final[str] = 'docker.io/docker/sbx-kit-shell:1.0.0'
 CLI_ASSET_URL: Final[str] = (
-    'https://github.com/anomalyco/opencode/releases/download/v2.2.5/' + CLI_ASSET_NAME
+    'https://github.com/anomalyco/opencode/releases/download/v2.2.5/'
+    'opencode-linux-x64.tar.gz'
 )
-CLI_RELEASE_API_URL: Final[str] = (
-    'https://api.github.com/repos/anomalyco/opencode/releases/tags/v2.2.5'
-)
-CLI_ASSET_SHA256: Final[str] = (
-    '09f44302c10fd036912f59c81fd1aef5df45dd06f649197f9dfc9bbe2a79614e'
-)
-MAX_CLI_ASSET_BYTES: Final[int] = 150 * 1024 * 1024
+CLI_ASSET_SIZE: Final[int] = 119_196_162
+CLI_ASSET_SHA256: Final[str] = '09f44302c10fd036912f59c81fd1aef5df45dd06f649197f9dfc9bbe2a79614e'
+CLI_BINARY_SIZE: Final[int] = 252_713_136
+CLI_REDIRECT_HOSTS: Final[frozenset[str]] = frozenset({
+    'github.com',
+    'release-assets.githubusercontent.com',
+    'objects.githubusercontent.com',
+})
+NAME_RE = re.compile(r'^[A-Za-z0-9][A-Za-z0-9.-]{0,61}[A-Za-z0-9]$')
 CF_GATEWAY_PROVIDER_ID: Final[str] = 'cloudflare-ai-gateway-custom'
 CLOUDFLARE_SECRET_NAME: Final[str] = 'cloudflare-ai-gateway'
 CLOUDFLARE_TOKEN_PLACEHOLDER: Final[str] = 'proxy-managed'
 OPENAI_ACCESS_TOKEN_SENTINEL: Final[str] = 'oai-oat01-proxy-managed'
 OPENAI_REFRESH_TOKEN_SENTINEL: Final[str] = 'oai-ort01-proxy-managed'
-CLONE_SOURCE_ROOT = pathlib.Path(
-    os.environ.get('XDG_STATE_HOME', str(pathlib.Path.home() / '.local' / 'state')),
-) / 'oc2' / 'clone-sources'
 PINNED = (
-    '/home/agent/.local/oc2-runtime/opencode',
+    '/opt/oc2/bin/opencode',
 )
-RUNTIME_DIRECTORY_SETUP_SCRIPT = '''
-import os, stat, sys
 
-base = os.path.normpath(sys.argv[1])
-flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
-paths = sys.argv[2:]
-if not base.startswith('/') or '..' in base.split('/'):
-    raise SystemExit('unsafe runtime root')
-uid = os.geteuid()
-
-for path in paths:
-    if not path.startswith('/') or '..' in path.split('/'):
-        raise SystemExit('runtime directory escaped its root')
-    target = os.path.normpath(path)
-    if target != base and not target.startswith(base + '/'):
-        raise SystemExit('runtime directory escaped its root')
-    descriptor = os.open('/', flags)
-    current = ''
-    try:
-        for component in target.split('/')[1:]:
-            current += '/' + component
-            try:
-                child = os.open(component, flags, dir_fd=descriptor)
-            except FileNotFoundError:
-                try:
-                    os.mkdir(component, 0o700, dir_fd=descriptor)
-                except FileExistsError:
-                    pass
-                child = os.open(component, flags, dir_fd=descriptor)
-            if current == base or current.startswith(base + '/'):
-                info = os.fstat(child)
-                if not stat.S_ISDIR(info.st_mode) or info.st_uid != uid:
-                    os.close(child)
-                    raise SystemExit('runtime directory has an unsafe owner or type')
-                os.fchmod(child, 0o700)
-                if stat.S_IMODE(os.fstat(child).st_mode) != 0o700:
-                    os.close(child)
-                    raise SystemExit('runtime directory is not private')
-            os.close(descriptor)
-            descriptor = child
-    finally:
-        os.close(descriptor)
-'''
-
-GUEST_EXEC_WRAPPER = r'''import os
-import re
-import sys
-import urllib.parse
-
-PROXY_NAMES = ('HTTP_PROXY', 'HTTPS_PROXY', 'NO_PROXY')
-
-
-def stop(message):
-    print('OC2_PROXY_STOP: ' + message, file=sys.stderr)
-    raise SystemExit(125)
-
-
-arguments = sys.argv[2:]
+DESTINATION_CHECK_SCRIPT = '''import errno, os, stat, sys
+path = sys.argv[1] if len(sys.argv) == 2 else ""
+parts = path.split("/")
+if not path.startswith("/") or len(parts) < 3 or any(p in ("", ".", "..") for p in parts[1:]):
+    sys.exit(12)
+fd = None
 try:
-    separator = arguments.index('--')
-except ValueError:
-    stop('invalid runtime wrapper arguments')
-runtime_entries = arguments[:separator]
-target = arguments[separator + 1:]
-if not target:
-    stop('missing target process')
-
-child_environment = {}
-for entry in runtime_entries:
-    key, delimiter, value = entry.partition('=')
-    if (not delimiter or re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]*', key) is None
-            or key in child_environment or key.upper() in PROXY_NAMES):
-        stop('invalid fixed runtime environment')
-    child_environment[key] = value
-
-proxy_environment = {}
-for name in PROXY_NAMES:
-    variants = [os.environ[key] for key in (name, name.lower()) if key in os.environ]
-    if len(variants) == 2 and variants[0] != variants[1]:
-        stop('conflicting proxy environment variables')
-    if variants:
-        proxy_environment[name] = variants[0]
-
-if 'HTTPS_PROXY' not in proxy_environment:
-    stop('required HTTPS proxy configuration is missing or unsafe')
-for proxy in (proxy_environment[name] for name in ('HTTP_PROXY', 'HTTPS_PROXY')
-              if name in proxy_environment):
-    if any(ord(character) < 32 or ord(character) == 127 for character in proxy):
-        stop('unsafe proxy URL')
+    flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+    fd = os.open("/", flags)
+    for part in parts[1:-1]:
+        try:
+            child = os.open(part, flags, dir_fd=fd)
+        except FileNotFoundError as exc:
+            sys.exit(0 if exc.errno == errno.ENOENT else 11)
+        os.close(fd)
+        fd = child
     try:
-        parsed = urllib.parse.urlsplit(proxy)
-        valid_proxy = (
-            parsed.scheme in ('http', 'https')
-            and bool(parsed.hostname)
-            and parsed.username is None
-            and parsed.password is None
-            and parsed.path in ('', '/')
-            and not parsed.query
-            and not parsed.fragment
-        )
-        parsed.port
-    except ValueError:
-        stop('unsafe proxy URL')
-    if not valid_proxy:
-        stop('unsafe proxy URL')
-
-bypasses = proxy_environment.get('NO_PROXY', '')
-if bypasses:
-    entries = [entry.strip().lower() for entry in bypasses.split(',')]
-    allowed_no_proxy = (
-        'localhost', '127.0.0.1', '::1', 'gateway.docker.internal',
-    )
-    if any(entry not in allowed_no_proxy for entry in entries):
-        stop('unsafe NO_PROXY entries')
-
-child_environment.update(proxy_environment)
-os.execvpe(target[0], target, child_environment)
+        mode = os.stat(parts[-1], dir_fd=fd, follow_symlinks=False).st_mode
+    except FileNotFoundError as exc:
+        sys.exit(0 if exc.errno == errno.ENOENT else 11)
+    sys.exit(10 if stat.S_ISREG(mode) else 12)
+except OSError as exc:
+    sys.exit(12 if exc.errno in (errno.ELOOP, errno.ENOTDIR) else 11)
+finally:
+    if fd is not None:
+        os.close(fd)
 '''
+
+DIRECTORY_DESTINATION_CHECK_SCRIPT = '''import errno, os, stat, sys
+path = sys.argv[1] if len(sys.argv) == 2 else ""
+parts = path.split("/")
+if not path.startswith("/") or len(parts) < 3 or any(p in ("", ".", "..") for p in parts[1:]):
+    sys.exit(12)
+fd = None
+try:
+    flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+    fd = os.open("/", flags)
+    for part in parts[1:-1]:
+        try:
+            child = os.open(part, flags, dir_fd=fd)
+        except FileNotFoundError as exc:
+            sys.exit(0 if exc.errno == errno.ENOENT else 11)
+        os.close(fd)
+        fd = child
+    try:
+        mode = os.stat(parts[-1], dir_fd=fd, follow_symlinks=False).st_mode
+    except FileNotFoundError as exc:
+        sys.exit(0 if exc.errno == errno.ENOENT else 11)
+    sys.exit(10 if stat.S_ISDIR(mode) else 12)
+except OSError as exc:
+    sys.exit(12 if exc.errno in (errno.ELOOP, errno.ENOTDIR) else 11)
+finally:
+    if fd is not None:
+        os.close(fd)
+'''
+
+
 
 @dataclass(frozen=True, slots=True)
 class CloudflareGatewayRuntime:
@@ -203,157 +137,28 @@ class SandboxLaunch:
     workspace: str
     config_file: pathlib.Path
     cloudflare: CloudflareGatewayRuntime | None = None
+    assets_file: pathlib.Path | None = None
+    assets_sha: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
-class CliReleaseAsset:
-    version: str
-    url: str
-    size: int
+class VerifiedFileTransfer:
+    """Describe a Guest file copy whose destination and content must be verified."""
+
+    source: pathlib.Path
+    destination: str
     sha256: str
+    unsafe_message: str
+    unknown_status_message: str
+    mismatch_message: str
 
 
 class Stop(Exception):
     pass
 
 
-def _parse_cli_release_asset(raw: bytes) -> CliReleaseAsset:
-    """Parse GitHub release metadata and accept only the pinned Linux x64 asset."""
-    try:
-        payload = json.loads(raw)
-    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise Stop('OpenCode release metadata is invalid') from exc
-    if (not isinstance(payload, dict) or payload.get('tag_name') != 'v' + VERSION
-            or payload.get('immutable') is not True):
-        raise Stop('OpenCode release metadata tag is not approved')
-    assets = payload.get('assets')
-    if not isinstance(assets, list):
-        raise Stop('OpenCode release metadata asset list is invalid')
-    matches = [item for item in assets
-               if isinstance(item, dict) and item.get('name') == CLI_ASSET_NAME]
-    if len(matches) != 1:
-        raise Stop('OpenCode release metadata asset is missing or duplicated')
-    asset = matches[0]
-    size = asset.get('size')
-    digest = asset.get('digest')
-    url = asset.get('browser_download_url')
-    if (type(size) is not int or not 0 < size <= MAX_CLI_ASSET_BYTES
-            or digest != 'sha256:' + CLI_ASSET_SHA256 or url != CLI_ASSET_URL):
-        raise Stop('OpenCode release asset metadata does not match the pinned asset')
-    return CliReleaseAsset(VERSION, CLI_ASSET_URL, size, CLI_ASSET_SHA256)
-
-
-def download_cli_binary(directory: pathlib.Path) -> pathlib.Path:
-    """Fetch and verify the pinned standalone CLI in a private Host directory."""
-    if sys.platform != 'linux' or platform.machine().lower() not in ('x86_64', 'amd64'):
-        raise Stop('the pinned OpenCode asset supports Linux x64 Hosts only')
-    if directory.is_symlink() or not directory.is_dir():
-        raise Stop('OpenCode asset destination is not a private directory')
-    if stat.S_IMODE(directory.stat().st_mode) & 0o077:
-        raise Stop('OpenCode asset destination is not private')
-    try:
-        import httpx2
-    except ImportError as exc:
-        raise Stop('httpx2 is required to download the pinned OpenCode release') from exc
-    try:
-        transport = httpx2.HTTPTransport(
-            http2=True,
-            retries=3,
-            limits=httpx2.Limits(
-                max_connections=4, max_keepalive_connections=2, keepalive_expiry=30.0,
-            ),
-            socket_options=[(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)],
-        )
-        timeout = httpx2.Timeout(connect=10.0, read=30.0, write=30.0, pool=10.0)
-        archive_path = directory / CLI_ASSET_NAME
-        binary_path = directory / 'opencode'
-        digest = hashlib.sha256()
-        total = 0
-        with httpx2.Client(
-                transport=transport, timeout=timeout, follow_redirects=True) as client:
-            metadata_response = client.get(
-                CLI_RELEASE_API_URL,
-                headers={'Accept': 'application/vnd.github+json',
-                         'X-GitHub-Api-Version': '2022-11-28'},
-            )
-            metadata_response.raise_for_status()
-            if len(metadata_response.content) > 4 * 1024 * 1024:
-                raise Stop('OpenCode release metadata exceeds the size limit')
-            asset = _parse_cli_release_asset(metadata_response.content)
-            with client.stream('GET', asset.url) as response:
-                response.raise_for_status()
-                content_length = response.headers.get('content-length')
-                if content_length is not None and content_length != str(asset.size):
-                    raise Stop('OpenCode asset size differs from release metadata')
-                with archive_path.open('xb') as archive:
-                    for chunk in response.iter_bytes():
-                        total += len(chunk)
-                        if total > asset.size or total > MAX_CLI_ASSET_BYTES:
-                            raise Stop('OpenCode asset exceeds its declared size')
-                        digest.update(chunk)
-                        archive.write(chunk)
-                    archive.flush()
-                    os.fsync(archive.fileno())
-        if total != asset.size or digest.hexdigest() != asset.sha256:
-            raise Stop('OpenCode asset size or SHA-256 does not match the release')
-        _extract_cli_binary(archive_path, binary_path)
-        version = subprocess.run(
-            [str(binary_path), '--version'], capture_output=True, text=True,
-            check=False, timeout=30,
-        )
-        if (version.returncode != 0 or version.stdout.strip() not in
-                (VERSION, 'v' + VERSION, 'opencode v' + VERSION)):
-            raise Stop('Host OpenCode binary did not verify at the pinned version')
-        return binary_path
-    except httpx2.HTTPError as exc:
-        raise Stop('OpenCode release download failed') from exc
-    except (OSError, tarfile.TarError, subprocess.TimeoutExpired) as exc:
-        raise Stop('OpenCode release asset could not be prepared safely') from exc
-
-
-def _extract_cli_binary(archive_path: pathlib.Path, binary_path: pathlib.Path) -> None:
-    """Extract exactly one regular opencode executable without trusting archive paths."""
-    with tarfile.open(archive_path, mode='r:gz') as archive:
-        members = archive.getmembers()
-        for member in members:
-            member_path = pathlib.PurePosixPath(member.name)
-            if (member_path.is_absolute() or '..' in member_path.parts
-                    or not (member.isfile() or member.isdir())):
-                raise Stop('OpenCode archive contains an unsafe member')
-        binaries = [member for member in members
-                    if member.isfile() and pathlib.PurePosixPath(member.name).name == 'opencode']
-        if len(binaries) != 1 or binaries[0].size > 300 * 1024 * 1024:
-            raise Stop('OpenCode archive does not contain one approved executable')
-        stream = archive.extractfile(binaries[0])
-        if stream is None:
-            raise Stop('OpenCode executable could not be read from the archive')
-        descriptor = os.open(
-            binary_path,
-            os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, 'O_NOFOLLOW', 0),
-            0o700,
-        )
-        with stream, os.fdopen(descriptor, 'wb') as executable:
-            shutil.copyfileobj(stream, executable, 1024 * 1024)
-            executable.flush()
-            os.fsync(executable.fileno())
-
-
-GENERATED_CONFIG_UNSAFE = 'generated OpenCode config is missing or unsafe'
-GENERATED_CONFIG_READ_FAILED = 'generated OpenCode config could not be read'
-GENERATED_CONFIG_NOT_OBJECT = 'generated OpenCode config is not an object'
-GENERATED_PROVIDER_INVALID = 'generated OpenCode provider selection is invalid'
-
-
-def _read_generated_config(config_file: pathlib.Path) -> dict[str, object]:
-    if config_file.is_symlink() or not config_file.is_file():
-        raise Stop(GENERATED_CONFIG_UNSAFE)
-    try:
-        config = json.loads(config_file.read_text(encoding='utf-8'))
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise Stop(GENERATED_CONFIG_READ_FAILED) from exc
-    if not isinstance(config, dict):
-        raise Stop(GENERATED_CONFIG_NOT_OBJECT)
-    return config
+class SandboxCommandTimeout(Stop):
+    pass
 
 
 def credential_mixin_spec(name: str) -> bytes:
@@ -425,10 +230,132 @@ def credential_mixin_spec(name: str) -> bytes:
             },
         ],
     }
-    rendered = yaml.safe_dump(spec, sort_keys=False)
-    if not isinstance(rendered, str):
-        raise Stop('credential Mixin specification could not be serialized')
-    return b'# syntax=docker/sandbox-kit:3\n' + rendered.encode('utf-8')
+    return b'# syntax=docker/sandbox-kit:3\n' + yaml.safe_dump(spec, sort_keys=False).encode('utf-8')
+
+
+def opencode_cli_mixin_spec() -> bytes:
+    """Copy the verified standalone CLI into the Kit without network installs."""
+    build = (
+        'FROM scratch\n'
+        'COPY --chmod=0755 opencode '
+        '/opt/oc2/bin/opencode\n'
+    )
+    spec = {
+        'schemaVersion': '3',
+        'kind': 'mixin',
+        'displayName': 'oc2-opencode-cli-2.2.5',
+        'provides': [f'opencode-cli@{VERSION}'],
+        'build': build,
+    }
+    return b'# syntax=docker/sandbox-kit:3\n' + yaml.safe_dump(
+        spec, sort_keys=False,
+    ).encode('utf-8')
+
+
+def download_verified_cli(destination: pathlib.Path) -> pathlib.Path:
+    """Download, authenticate, and safely extract the pinned official CLI."""
+    if (sys.platform != 'linux' or platform.machine().lower() not in
+            ('x86_64', 'amd64')):
+        raise Stop('pinned OpenCode release asset requires Linux x86-64')
+    if (destination.is_symlink() or not destination.is_dir()
+            or destination.stat().st_mode & 0o077):
+        raise Stop('official CLI download requires a private temporary directory')
+    if any(destination.iterdir()):
+        raise Stop('official CLI temporary directory must be empty')
+    curl = shutil.which('curl')
+    if curl is None:
+        raise Stop('curl is required to download the official OpenCode release')
+
+    archive_path = destination / 'opencode-linux-x64.tar.gz'
+    binary_path = destination / 'opencode'
+    command = [
+        curl, '--disable', '--fail', '--location', '--max-redirs', '5',
+        '--proto', '=https', '--proto-redir', '=https', '--tlsv1.2',
+        '--connect-timeout', '20', '--max-time', '240', '--max-filesize',
+        str(CLI_ASSET_SIZE), '--silent', '--show-error', '--output',
+        str(archive_path), '--write-out',
+        '\nOC2_HTTP_STATUS=%{http_code}\nOC2_FINAL_URL=%{url_effective}\n',
+        CLI_ASSET_URL,
+    ]
+    binary_created = False
+    try:
+        try:
+            result = subprocess.run(
+                command, capture_output=True, text=True, check=False, timeout=300,
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise Stop('official OpenCode release download timed out') from exc
+        except OSError as exc:
+            raise Stop('official OpenCode release download could not run') from exc
+
+        fields = dict(
+            line.split('=', 1) for line in result.stdout.splitlines()
+            if line.startswith(('OC2_HTTP_STATUS=', 'OC2_FINAL_URL='))
+        )
+        if result.returncode != 0:
+            if result.returncode == 6:
+                raise Stop('official OpenCode release download failed: Host DNS resolution failed')
+            if result.returncode == 7:
+                raise Stop('official OpenCode release download failed: Host connection failed')
+            if result.returncode == 28:
+                raise Stop('official OpenCode release download timed out')
+            raise Stop(f'official OpenCode release download failed (curl exit {result.returncode})')
+        if fields.get('OC2_HTTP_STATUS') != '200':
+            raise Stop('official OpenCode release returned an unexpected HTTP status')
+        final_url = urlsplit(fields.get('OC2_FINAL_URL', ''))
+        if (final_url.scheme != 'https'
+                or (final_url.hostname or '').lower() not in CLI_REDIRECT_HOSTS):
+            raise Stop('official OpenCode release redirected to an untrusted host')
+        if archive_path.stat().st_size != CLI_ASSET_SIZE:
+            raise Stop('official OpenCode release asset size mismatch')
+
+        archive_hash = hashlib.sha256()
+        with archive_path.open('rb') as archive_file:
+            for chunk in iter(lambda: archive_file.read(1024 * 1024), b''):
+                archive_hash.update(chunk)
+        if archive_hash.hexdigest() != CLI_ASSET_SHA256:
+            raise Stop('official OpenCode release integrity verification failed')
+
+        with tarfile.open(archive_path, 'r:gz') as archive:
+            members = archive.getmembers()
+            if len(members) != 1:
+                raise Stop('official OpenCode archive contents are invalid')
+            member = members[0]
+            member_path = pathlib.PurePosixPath(member.name)
+            if (member.name != 'opencode' or member_path.is_absolute()
+                    or '..' in member_path.parts or not member.isfile()
+                    or not (member.mode & 0o111)
+                    or member.size != CLI_BINARY_SIZE):
+                raise Stop('official OpenCode archive contents are invalid')
+            source = archive.extractfile(member)
+            if source is None:
+                raise Stop('official OpenCode executable is missing from its archive')
+            flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+            if hasattr(os, 'O_NOFOLLOW'):
+                flags |= os.O_NOFOLLOW
+            fd = os.open(binary_path, flags, 0o600)
+            binary_created = True
+            with os.fdopen(fd, 'wb') as binary_file:
+                extracted = 0
+                while chunk := source.read(1024 * 1024):
+                    extracted += len(chunk)
+                    if extracted > member.size:
+                        raise Stop('official OpenCode executable exceeds its archive size')
+                    binary_file.write(chunk)
+                if extracted != member.size:
+                    raise Stop('official OpenCode executable is truncated')
+        archive_path.unlink()
+        return binary_path
+    except Stop:
+        archive_path.unlink(missing_ok=True)
+        if binary_created:
+            binary_path.unlink(missing_ok=True)
+        raise
+    except (OSError, tarfile.TarError, ValueError) as exc:
+        archive_path.unlink(missing_ok=True)
+        if binary_created:
+            binary_path.unlink(missing_ok=True)
+        raise Stop('official OpenCode release artifact could not be validated') from exc
 
 
 def cloudflare_gateway_runtime(
@@ -437,10 +364,17 @@ def cloudflare_gateway_runtime(
     gateway_id: str | None,
 ) -> CloudflareGatewayRuntime | None:
     """Return validated Cloudflare IDs when the Custom Gateway provider is selected."""
-    config = _read_generated_config(config_file)
+    if config_file.is_symlink() or not config_file.is_file():
+        raise Stop('generated OpenCode config is missing or unsafe')
+    try:
+        config = json.loads(config_file.read_text(encoding='utf-8'))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise Stop('generated OpenCode config could not be read') from exc
+    if not isinstance(config, dict):
+        raise Stop('generated OpenCode config is not an object')
     providers = config.get('providers', {})
     if not isinstance(providers, dict):
-        raise Stop(GENERATED_PROVIDER_INVALID)
+        raise Stop('generated OpenCode provider selection is invalid')
     if CF_GATEWAY_PROVIDER_ID not in providers:
         return None
     if not isinstance(providers[CF_GATEWAY_PROVIDER_ID], dict):
@@ -453,55 +387,39 @@ def cloudflare_gateway_runtime(
     return CloudflareGatewayRuntime(account_id=account_id, gateway_id=gateway_id)
 
 
-def requires_external_inference(config_file: pathlib.Path) -> bool:
-    """Return whether the exported OpenCode config selects an external provider."""
-    config = _read_generated_config(config_file)
-    providers = config.get('providers', {})
-    if not isinstance(providers, dict):
-        raise Stop(GENERATED_PROVIDER_INVALID)
-    return bool(providers)
-
-
-def _trusted_v2_config(repo: pathlib.Path) -> dict[str, object]:
-    import prepare_opencode_v2 as exporter
-
-    source = exporter._read_apm_source(repo)
-    generated = exporter._build_files(
-        source.shell, source.snapshot, source.source_sha256, source.v2_config,
-    )
-    config = json.loads(generated[V2_CONFIG_NAME])
-    if not isinstance(config, dict):
-        raise Stop('APM V2 config generator returned an invalid document')
-    return config
-
-
 def configure_cloudflare_provider(
     config_file: pathlib.Path,
     *,
     include_cloudflare: bool,
-    generated_config: dict[str, object],
 ) -> bool:
-    """Keep Cloudflare selected only when requested or used as the default model."""
-    if _read_generated_config(config_file) != generated_config:
-        raise Stop('generated OpenCode config differs from the validated APM source')
-    config = copy.deepcopy(generated_config)
+    """Expose the Gateway provider only when explicitly requested or defaulted."""
+    if config_file.is_symlink() or not config_file.is_file():
+        raise Stop('generated OpenCode config is missing or unsafe')
+    try:
+        config = json.loads(config_file.read_text(encoding='utf-8'))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise Stop('generated OpenCode config could not be read') from exc
+    if not isinstance(config, dict):
+        raise Stop('generated OpenCode config is not an object')
     providers = config.get('providers', {})
     if not isinstance(providers, dict):
         raise Stop('generated OpenCode provider selection is invalid')
     cloudflare_provider = providers.get(CF_GATEWAY_PROVIDER_ID)
     if cloudflare_provider is not None and not isinstance(cloudflare_provider, dict):
         raise Stop('generated Cloudflare provider selection is invalid')
+
     default_model = config.get('model')
-    selected_by_default = (
+    default_uses_cloudflare = (
         isinstance(default_model, str)
         and default_model.partition('/')[0] == CF_GATEWAY_PROVIDER_ID
     )
-    if include_cloudflare or selected_by_default:
+    if include_cloudflare or default_uses_cloudflare:
         if cloudflare_provider is None:
             raise Stop('Cloudflare Gateway mode has no configured provider')
         return True
     if cloudflare_provider is None:
         return False
+
     policies = config.get('policies', [])
     if not isinstance(policies, list) or any(not isinstance(policy, dict) for policy in policies):
         raise Stop('generated OpenCode provider policies are invalid')
@@ -515,71 +433,20 @@ def configure_cloudflare_provider(
         if policy.get('resource') != CF_GATEWAY_PROVIDER_ID
     ]
     try:
-        _write_generated_config(config_file, config)
+        config_file.write_text(
+            json.dumps(config, ensure_ascii=False, indent=2) + '\n',
+            encoding='utf-8',
+        )
     except OSError as exc:
         raise Stop('generated OpenCode config could not be prepared') from exc
     return False
-
-
-def _write_generated_config(config_file: pathlib.Path, config: dict[str, object]) -> None:
-    if config_file.name != V2_CONFIG_NAME:
-        raise OSError('unsafe generated config destination')
-    parent_fd = os.open(
-        config_file.parent,
-        os.O_RDONLY | getattr(os, 'O_DIRECTORY', 0) | getattr(os, 'O_NOFOLLOW', 0),
-    )
-    try:
-        parent_info = os.fstat(parent_fd)
-        if (not stat.S_ISDIR(parent_info.st_mode) or parent_info.st_uid != os.geteuid()
-                or stat.S_IMODE(parent_info.st_mode) & 0o077):
-            raise OSError('unsafe generated config directory')
-        descriptor = os.open(
-            config_file.name,
-            os.O_WRONLY | os.O_TRUNC | getattr(os, 'O_NOFOLLOW', 0),
-            dir_fd=parent_fd,
-        )
-        try:
-            file_info = os.fstat(descriptor)
-            if (not stat.S_ISREG(file_info.st_mode) or file_info.st_uid != os.geteuid()
-                    or file_info.st_nlink != 1):
-                raise OSError('unsafe generated config file')
-            with os.fdopen(descriptor, 'w', encoding='utf-8', closefd=False) as output:
-                output.write(json.dumps(config, ensure_ascii=False, indent=2) + '\n')
-                output.flush()
-                os.fsync(descriptor)
-        finally:
-            os.close(descriptor)
-    finally:
-        os.close(parent_fd)
-
-
-def _cloudflare_secret_entry_scope(
-    entry: object,
-    sandbox_name: str,
-) -> Literal['sandbox', 'global'] | None:
-    """Accept the named service credential only in this Sandbox or global scope."""
-    expected_fields = {'name', 'scope', 'secret', 'type'}
-    if not isinstance(entry, dict) or set(entry) != expected_fields:
-        raise Stop('Cloudflare credential entry schema is unsupported')
-    name, scope, secret_type = entry['name'], entry['scope'], entry['type']
-    if (not isinstance(name, str) or not isinstance(scope, str)
-            or not isinstance(entry['secret'], str) or not isinstance(secret_type, str)):
-        raise Stop('Cloudflare credential entry schema is invalid')
-    if name != CLOUDFLARE_SECRET_NAME:
-        return None
-    if secret_type != 'service':
-        raise Stop('Cloudflare credential type is unexpected')
-    if scope == sandbox_name:
-        return 'sandbox'
-    if scope in ('(global)', 'global'):
-        return 'global'
-    raise Stop('Cloudflare credential scope is unexpected')
 
 
 def _cloudflare_secret_scope(
     listing: str,
     sandbox_name: str,
 ) -> Literal['sandbox', 'global'] | None:
+    """Parse only scope metadata for the Cloudflare service secret."""
     try:
         document = json.loads(listing)
     except json.JSONDecodeError:
@@ -589,10 +456,30 @@ def _cloudflare_secret_scope(
     entries = document['secrets']
     if not isinstance(entries, list):
         raise Stop('Cloudflare credential listing JSON schema is invalid')
-    scopes = {
-        scope for entry in entries
-        if (scope := _cloudflare_secret_entry_scope(entry, sandbox_name)) is not None
-    }
+
+    scopes: set[Literal['sandbox', 'global']] = set()
+    expected_fields = {'name', 'scope', 'secret', 'type'}
+    for entry in entries:
+        if not isinstance(entry, dict) or set(entry) != expected_fields:
+            raise Stop('Cloudflare credential entry schema is unsupported')
+        name = entry['name']
+        scope = entry['scope']
+        secret_type = entry['type']
+        if (not isinstance(name, str) or not isinstance(scope, str)
+                or not isinstance(entry['secret'], str)
+                or not isinstance(secret_type, str)):
+            raise Stop('Cloudflare credential entry schema is invalid')
+        if name != CLOUDFLARE_SECRET_NAME:
+            continue
+        if secret_type != 'service':
+            raise Stop('Cloudflare credential type is unexpected')
+        if scope == sandbox_name:
+            scopes.add('sandbox')
+        elif scope in ('(global)', 'global'):
+            scopes.add('global')
+        else:
+            raise Stop('Cloudflare credential scope is unexpected')
+
     if 'sandbox' in scopes:
         return 'sandbox'
     if 'global' in scopes:
@@ -609,8 +496,10 @@ def _read_cloudflare_secret_scope(
     command = (
         ('secret', 'ls', '--global', '--service', CLOUDFLARE_SECRET_NAME, '--json')
         if global_scope
-        else ('secret', 'ls', '--sandbox', sandbox_name,
-              '--service', CLOUDFLARE_SECRET_NAME, '--json')
+        else (
+            'secret', 'ls', '--sandbox', sandbox_name,
+            '--service', CLOUDFLARE_SECRET_NAME, '--json',
+        )
     )
     try:
         listing = runner.sbx(*command, capture=True)
@@ -629,27 +518,41 @@ def ensure_cloudflare_credential(
     *,
     interactive: bool,
 ) -> Literal['sandbox', 'global']:
-    """Prefer Sandbox then global credentials; create and verify a Sandbox credential interactively."""
     scope = _read_cloudflare_secret_scope(runner, sandbox_name, global_scope=False)
     if scope is not None:
         return scope
+
     scope = _read_cloudflare_secret_scope(runner, sandbox_name, global_scope=True)
     if scope == 'global':
         return scope
+
     if not interactive:
         raise Stop('Cloudflare credential is missing; an interactive terminal is required')
-    runner.sbx('secret', 'set', CLOUDFLARE_SECRET_NAME, '--sandbox', sandbox_name, tty=True)
+
+    runner.sbx(
+        'secret', 'set', CLOUDFLARE_SECRET_NAME, '--sandbox', sandbox_name,
+        tty=True,
+    )
     scope = _read_cloudflare_secret_scope(runner, sandbox_name, global_scope=False)
     if scope != 'sandbox':
         raise Stop('Cloudflare sandbox-scoped credential was not verified')
     return scope
 
 
-@dataclass(frozen=True, slots=True)
-class CloneRemote:
-    name: str
-    fetch_urls: tuple[str, ...]
-    push_urls: tuple[str, ...]
+def requires_external_inference(config_file: pathlib.Path) -> bool:
+    """Return whether the exported OpenCode config selects an external provider."""
+    if config_file.is_symlink() or not config_file.is_file():
+        raise Stop('generated OpenCode config is missing or unsafe')
+    try:
+        config = json.loads(config_file.read_text(encoding='utf-8'))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise Stop('generated OpenCode config could not be read') from exc
+    if not isinstance(config, dict):
+        raise Stop('generated OpenCode config is not an object')
+    providers = config.get('providers', {})
+    if not isinstance(providers, dict):
+        raise Stop('generated OpenCode provider selection is invalid')
+    return bool(providers)
 
 
 def operator_command(user: str, *args: str) -> list[str]:
@@ -681,158 +584,98 @@ class Runner:
         self.user = user
         self.dry_run = dry_run
 
-    def sbx(self, *args: str, capture: bool = False, tty: bool = False,
-            timeout: int | None = 180) -> str:
-        """Run an sbx command with an optional subprocess timeout."""
+    def destination_status(self, name: str, destination: str) -> int:
+        command = operator_command(self.user, 'sbx', 'exec', name, 'python3', '-c',
+                                   DESTINATION_CHECK_SCRIPT, destination)
+        if self.dry_run:
+            raise Stop('DESTINATION_CHECK_COMMAND_FAILED')
+        try:
+            result = subprocess.run(command, check=False, capture_output=True, timeout=180)
+        except subprocess.TimeoutExpired as exc:
+            raise Stop('DESTINATION_CHECK_TIMEOUT') from exc
+        except OSError as exc:
+            raise Stop('DESTINATION_CHECK_COMMAND_FAILED') from exc
+        return result.returncode
+
+    def directory_status(self, name: str, destination: str) -> int:
+        """Check whether a remote path is absent or an existing real directory."""
+        command = operator_command(
+            self.user, 'sbx', 'exec', name, 'python3', '-c',
+            DIRECTORY_DESTINATION_CHECK_SCRIPT, destination,
+        )
+        if self.dry_run:
+            raise Stop('DESTINATION_CHECK_COMMAND_FAILED')
+        try:
+            result = subprocess.run(command, check=False, capture_output=True, timeout=180)
+        except subprocess.TimeoutExpired as exc:
+            raise Stop('DESTINATION_CHECK_TIMEOUT') from exc
+        except OSError as exc:
+            raise Stop('DESTINATION_CHECK_COMMAND_FAILED') from exc
+        return result.returncode
+
+    def sbx(self, *args: str, capture: bool = False, tty: bool = False) -> str:
         command = operator_command(self.user, 'sbx', *args)
         if self.dry_run:
             print('PLAN: ' + ' '.join(command[:5]) + ' [...]')
             return ''
         try:
             result = subprocess.run(command, check=False, text=True,
-                                    capture_output=capture, timeout=None if tty else timeout)
-        except (OSError, subprocess.TimeoutExpired) as exc:
+                                    capture_output=capture, timeout=None if tty else 180)
+        except subprocess.TimeoutExpired as exc:
+            raise SandboxCommandTimeout('sbx command could not complete') from exc
+        except OSError as exc:
             raise Stop('sbx command could not complete') from exc
         if result.returncode != 0:
             raise Stop(f'sbx command failed (exit {result.returncode})')
         return result.stdout if capture else ''
 
 
-def workspace_create_args(name: str, mixin_path: pathlib.Path) -> list[str]:
-    """Create a new shell Sandbox with its credential Mixin and no Host workspace mount."""
-    return ['create', '--name', name, '--kit', str(mixin_path), 'shell']
+def mountless_create_args(
+    name: str,
+    credential_mixin_path: pathlib.Path,
+    cli_mixin_path: pathlib.Path,
+) -> list[str]:
+    return [
+        'create', '--name', name,
+        '--kit', str(credential_mixin_path),
+        '--kit', str(cli_mixin_path),
+        SHELL_WORKLOAD,
+    ]
 
 
-def _safe_clone_remotes(workspace: pathlib.Path) -> tuple[CloneRemote, ...]:
-    """Return network remotes without credential-bearing URLs."""
-    listed = subprocess.run(
-        ['git', '-C', str(workspace), 'remote'],
-        capture_output=True, text=True, check=False, timeout=10,
+def workspace_transfer_profile(workspace: pathlib.Path) -> str | None:
+    try:
+        origin = subprocess.run(
+            ['git', '-C', str(workspace), 'remote', 'get-url', 'origin'],
+            capture_output=True, text=True, check=False, timeout=10,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if origin.returncode != 0:
+        return None
+    approved_origins = (
+        r'git@github\.com:yohi/dotfiles-ai(?:\.git)?',
+        r'ssh://git@github\.com/yohi/dotfiles-ai(?:\.git)?',
+        r'https://github\.com/yohi/dotfiles-ai(?:\.git)?',
     )
-    if listed.returncode != 0:
-        raise Stop('could not inspect Git remotes')
-
-    remotes: list[CloneRemote] = []
-    for name in listed.stdout.splitlines():
-        if re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._-]*', name) is None:
-            raise Stop('Git remote name is not safe to copy')
-        urls: list[list[str]] = []
-        for push in (False, True):
-            command = ['git', '-C', str(workspace), 'remote', 'get-url', '--all']
-            if push:
-                command.append('--push')
-            command.append(name)
-            result = subprocess.run(
-                command, capture_output=True, text=True, check=False, timeout=10,
-            )
-            if result.returncode != 0:
-                raise Stop('could not inspect Git remote URLs')
-            safe_urls: list[str] = []
-            for url in result.stdout.splitlines():
-                if _remote_url_has_credentials(url):
-                    raise Stop('Git remote contains credential material')
-                parsed = urllib.parse.urlsplit(url)
-                network_url = parsed.scheme.lower() in {'https', 'http', 'ssh', 'git'}
-                scp_url = re.fullmatch(
-                    r'(?:[^@\s/:]+@)?(?:\[[0-9A-Fa-f:]+\]|[A-Za-z0-9][A-Za-z0-9.-]*):[^:\s].+',
-                    url,
-                ) is not None
-                if network_url or scp_url:
-                    safe_urls.append(url)
-            urls.append(safe_urls)
-        if urls[0]:
-            remotes.append(CloneRemote(name, tuple(urls[0]), tuple(urls[1])))
-    return tuple(remotes)
-
-
-def _workspace_profile(workspace: pathlib.Path) -> WorkspaceProfile | None:
-    """Select R1 only when origin identifies the exact yohi/dotfiles-ai repository."""
-    result = subprocess.run(
-        ['git', '-C', str(workspace), 'remote', 'get-url', 'origin'],
-        capture_output=True, text=True, check=False, timeout=10,
-    )
-    remote = result.stdout.strip()
-    if result.returncode == 0 and re.fullmatch(
-        r'(?:https?://github\.com/|git@github\.com:|ssh://git@github\.com/)'
-        r'yohi/dotfiles-ai(?:\.git)?', remote, re.IGNORECASE,
-    ):
-        selected_profile: WorkspaceProfile = DOTFILES_AI_PROFILE
-        return selected_profile
+    if any(re.fullmatch(pattern, origin.stdout.strip()) for pattern in approved_origins):
+        return 'dotfiles-ai/workspace-safe-transfer/r1'
     return None
 
 
-def _remote_url_has_credentials(url: str) -> bool:
-    """Reject credentials and query strings embedded in a remote URL."""
-    if any(character.isspace() or ord(character) < 0x20 for character in url):
-        return True
-    parsed = urllib.parse.urlsplit(url)
-    if (parsed.password is not None
-            or re.search(r'[^/@\s:]+:[^/@\s]+@', url) is not None):
-        return True
-    if parsed.scheme.lower() in {'http', 'https'} and parsed.username is not None:
-        return True
-    return bool(parsed.query)
-
-
-def _new_clone_source_directory(name: str) -> pathlib.Path:
-    """Create a private persistent source directory for Docker's read-only mount."""
-    root = CLONE_SOURCE_ROOT
-    if not root.is_absolute():
-        raise Stop('clone source state directory must be absolute')
-    if root.is_symlink():
-        raise Stop('clone source state directory must not be a symlink')
-    root.mkdir(parents=True, exist_ok=True, mode=0o700)
-    root.chmod(0o700)
-    destination = root / name
-    if destination.exists() or destination.is_symlink():
-        raise Stop('a retained clone source already exists for this Sandbox name')
-    destination.mkdir(mode=0o700)
-    return destination
-
-
-def _copy_regular_workspace_file(source: str, destination: str) -> str:
-    """Copy a stable regular file without following links or blocking on special files."""
-    import oc2_workspace
-
-    flags = os.O_RDONLY | os.O_NONBLOCK | getattr(os, 'O_NOFOLLOW', 0)
-    with os.fdopen(os.open(source, flags), 'rb') as source_stream:
-        before = os.fstat(source_stream.fileno())
-        if not stat.S_ISREG(before.st_mode) or before.st_size > oc2_workspace.MAX_FILE_BYTES:
-            raise Stop('workspace changed to an unsafe file during snapshot')
-        destination_flags = (os.O_WRONLY | os.O_CREAT | os.O_EXCL
-                             | getattr(os, 'O_NOFOLLOW', 0))
-        with os.fdopen(os.open(destination, destination_flags, 0o600), 'wb') as output:
-            total = 0
-            while chunk := source_stream.read(1024 * 1024):
-                total += len(chunk)
-                if total > oc2_workspace.MAX_FILE_BYTES:
-                    raise Stop('workspace file exceeds the snapshot size limit')
-                _ = output.write(chunk)
-        after = os.fstat(source_stream.fileno())
-        if (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns) != (
-                after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns):
-            raise Stop('workspace file changed during snapshot')
-    return destination
-
-
-def _run_git(workspace: pathlib.Path, *args: str) -> None:
-    """Run a Git operation without exposing its output or credential values."""
-    try:
-        result = subprocess.run(
-            ['git', '-C', str(workspace), *args],
-            capture_output=True, text=True, check=False, timeout=60,
-        )
-    except (OSError, subprocess.TimeoutExpired) as exc:
-        raise Stop('could not prepare sanitized clone workspace') from exc
-    if result.returncode != 0:
-        raise Stop('could not prepare sanitized clone workspace')
-
-
-def export_v2_config(repo: pathlib.Path, output: pathlib.Path) -> pathlib.Path:
+def export_v2_config(
+    repo: pathlib.Path,
+    output: pathlib.Path,
+    *,
+    verification_only: bool = False,
+) -> pathlib.Path:
     script = HERE / 'prepare_opencode_v2.py'
     try:
+        command = [sys.executable, str(script), '--repo-root', str(repo), '--out', str(output)]
+        if verification_only:
+            command.append('--verification-only')
         result = subprocess.run(
-            [sys.executable, str(script), '--repo-root', str(repo), '--out', str(output)],
+            command,
             check=False, capture_output=True, text=True, timeout=40,
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
@@ -845,153 +688,25 @@ def export_v2_config(repo: pathlib.Path, output: pathlib.Path) -> pathlib.Path:
         verify_bundle(output, trusted_root=output.parent)
     except StageError as exc:
         raise Stop('APM V2 config bundle failed verification') from exc
-    config = output / V2_CONFIG_NAME
+    config = output / 'opencode.jsonc'
     if config.is_symlink() or not config.is_file():
         raise Stop('generated V2 config is missing or unsafe')
     return config
 
 
-def validate_clone_workspace(
-    workspace: pathlib.Path,
-    *,
-    profile: WorkspaceProfile | None = None,
-    manifest: WorkspaceManifest | None = None,
-) -> None:
-    """Reject unsafe Git metadata and files omitted by the selected transfer scan."""
-    oc2_workspace = importlib.import_module('oc2_workspace')
-
-    if any((workspace / name).exists()
-           for name in ('opencode.json', V2_CONFIG_NAME, 'cli.json')):
-        raise Stop('workspace contains OpenCode project configuration')
-    manifest = manifest or oc2_workspace.snapshot(workspace, profile=profile)
-    def fail_workspace_walk(error: OSError) -> None:
-        """Fail closed when any workspace directory cannot be traversed."""
-        raise Stop('workspace cannot be safely inspected') from error
-
-    for current, directories, filenames in os.walk(
-            workspace, followlinks=False, onerror=fail_workspace_walk):
-        current_path = pathlib.Path(current)
-        retained: list[str] = []
-        for name in directories:
-            candidate = current_path / name
-            relative = candidate.relative_to(workspace).as_posix()
-            if candidate.is_symlink():
-                raise Stop('workspace contains a symlink')
-            if name == '.git':
-                if relative != '.git':
-                    raise Stop('workspace contains nested Git metadata')
-                continue
-            retained.append(name)
-        directories[:] = retained
-        for name in filenames:
-            candidate = current_path / name
-            relative_path = pathlib.PurePosixPath(
-                candidate.relative_to(workspace).as_posix(),
-            )
-            if name == '.git' and relative_path.as_posix() != '.git':
-                raise Stop('workspace contains nested Git metadata')
-            if candidate.is_symlink():
-                raise Stop('workspace contains a symlink')
-            if oc2_workspace._excluded(relative_path, manifest.profile):
-                try:
-                    excluded_content = oc2_workspace._read_regular(candidate)
-                except oc2_workspace.WorkspaceError as exc:
-                    raise Stop('excluded workspace file cannot be safely inspected') from exc
-                if oc2_workspace.contains_credential_material(excluded_content):
-                    raise Stop('workspace file appears to contain credential material')
-    git_metadata = workspace / '.git'
-    if git_metadata.is_symlink() or not git_metadata.is_dir():
-        raise Stop('workspace requires a real .git directory')
-
-    def fail_walk(error: OSError) -> None:
-        """Fail closed when the Git metadata traversal is incomplete."""
-        raise Stop('Git metadata cannot be safely inspected') from error
-
-    object_store = git_metadata / 'objects'
-    for current, directories, filenames in os.walk(
-            git_metadata, followlinks=False, onerror=fail_walk):
-        current_path = pathlib.Path(current)
-        for name in directories:
-            if (current_path / name).is_symlink():
-                raise Stop('Git metadata contains an unsafe symlink')
-        for name in filenames:
-            candidate = current_path / name
-            if candidate.is_symlink():
-                raise Stop('Git metadata contains an unsafe symlink')
-            if candidate.is_relative_to(object_store):
-                continue
-            try:
-                content = oc2_workspace._read_regular(candidate)
-            except oc2_workspace.WorkspaceError as exc:
-                raise Stop('Git metadata cannot be safely inspected') from exc
-            if (oc2_workspace.contains_credential_material(content)
-                    or re.search(rb'\b[^/@\s:]+:[^/@\s]+@', content)):
-                raise Stop('Git metadata contains credential material')
-
-    if object_store.is_dir():
-        _inspect_git_objects(workspace)
-
-
-def _inspect_git_objects(workspace: pathlib.Path) -> None:
-    """Inspect decompressed Git object contents without scanning compressed bytes."""
-    import oc2_workspace
-
-    try:
-        process = subprocess.Popen(
-            ['git', '-C', str(workspace), 'cat-file', '--batch-all-objects', '--batch'],
-            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-        )
-    except OSError as exc:
-        raise Stop('Git objects cannot be safely inspected') from exc
-    if process.stdout is None:
-        process.kill()
-        process.wait()
-        raise Stop('Git objects cannot be safely inspected')
-
-    with process.stdout:
-        for header in iter(process.stdout.readline, b''):
-            fields = header.rstrip(b'\n').split(b' ')
-            if len(fields) != 3 or fields[1] not in (b'blob', b'commit', b'tag', b'tree'):
-                process.kill()
-                process.wait()
-                raise Stop('Git object metadata is invalid')
-            try:
-                size = int(fields[2])
-            except ValueError as exc:
-                process.kill()
-                process.wait()
-                raise Stop('Git object metadata is invalid') from exc
-            if not 0 <= size <= oc2_workspace.MAX_FILE_BYTES:
-                process.kill()
-                process.wait()
-                raise Stop('Git object exceeds the inspection size limit')
-            chunks: list[bytes] = []
-            remaining = size
-            while remaining:
-                chunk = process.stdout.read(min(remaining, 1024 * 1024))
-                if not chunk:
-                    process.kill()
-                    process.wait()
-                    raise Stop('Git object data is incomplete')
-                chunks.append(chunk)
-                remaining -= len(chunk)
-            if process.stdout.read(1) != b'\n':
-                process.kill()
-                process.wait()
-                raise Stop('Git object data is malformed')
-            content = b''.join(chunks)
-            if fields[1] != b'tree' and (
-                    oc2_workspace.contains_credential_material(content)
-                    or re.search(rb'\b[^/@\s:]+:[^/@\s]+@', content)):
-                process.kill()
-                process.wait()
-                raise Stop('Git metadata contains credential material')
-    if process.wait() != 0:
-        raise Stop('Git objects cannot be safely inspected')
-
-
-def _sandbox_record(runner: Runner, name: str) -> tuple[dict[str, object], str]:
+def is_compatible_sandbox(
+    runner: Runner,
+    name: str,
+    expected_id: str | None = None,
+) -> bool:
+    # sbx ls --format json on v0.49.2 gives identity but does not report
+    # workspace/mounts. Inspect the exact named sandbox before trusting it.
     import json
+
+    raw = runner.sbx('ls', '-q', capture=True)
+    names = {line.strip() for line in raw.splitlines() if line.strip()}
+    if name not in names:
+        return False
 
     try:
         listing = json.loads(runner.sbx('ls', '--format', 'json', capture=True))
@@ -1005,34 +720,17 @@ def _sandbox_record(runner: Runner, name: str) -> tuple[dict[str, object], str]:
         records = candidate if isinstance(candidate, list) else None
     else:
         records = None
-    if records is None:
+    if not isinstance(records, list):
         raise Stop('could not establish existing Sandbox identity')
-    matches = [row for row in records if isinstance(row, dict) and row.get('name') == name]
+    matches = [row for row in records if isinstance(row, dict)
+               and row.get('name') == name]
     if len(matches) != 1:
         raise Stop('could not establish existing Sandbox identity')
-    record = matches[0]
-    sandbox_id = record.get('id')
-    if not isinstance(sandbox_id, str) or re.fullmatch(
-            r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}',
-            sandbox_id) is None:
-        raise Stop('existing Sandbox has no valid stable identifier')
-    return record, sandbox_id
-
-
-def sandbox_id(runner: Runner, name: str) -> str:
-    return _sandbox_record(runner, name)[1]
-
-
-def is_compatible_sandbox(runner: Runner, name: str, expected_id: str) -> bool:
-    # sbx ls --format json on v0.49.2 gives identity but does not report
-    # workspace/mounts. Inspect the exact named sandbox before trusting it.
-    raw = runner.sbx('ls', '-q', capture=True)
-    names = {line.strip() for line in raw.splitlines() if line.strip()}
-    if name not in names:
-        return False
-    row, actual_id = _sandbox_record(runner, name)
-    if actual_id != expected_id:
-        raise Stop('Sandbox identity mismatch; refusing reuse')
+    row = matches[0]
+    if expected_id is not None:
+        actual_id = row.get('id')
+        if not isinstance(actual_id, str) or actual_id != expected_id:
+            raise Stop('Sandbox identity mismatch; refusing reuse')
     if row.get('agent') not in ('shell', 'sbx-kit-shell'):
         raise Stop('existing Sandbox agent is not shell')
 
@@ -1118,13 +816,10 @@ def grant_snapshot_access(snapshot: pathlib.Path, operator: str) -> None:
 
 
 def grant_collection_directory_access(directory: pathlib.Path, operator: str) -> None:
-    """Grant an operator traversal through private parents and access to staging."""
     if operator == getpass.getuser():
         return
     if re.fullmatch(r'[a-z_][a-z0-9_-]*', operator) is None:
         raise Stop('invalid Sandbox operator user')
-    _set_acl((directory.parent, directory.parent.parent),
-             '-m', f'u:{operator}:--x')
     _set_acl((directory,), '-m', f'u:{operator}:rwx')
 
 
@@ -1158,13 +853,13 @@ def transfer_workspace(runner: Runner, name: str, snapshot: pathlib.Path,
     parent = f'{ROOT}/projects'
     destination = parent + '/' + secrets.token_hex(16)
     execute(runner, name, 'mkdir', '-p', parent)
-    state = runner.sbx(
-        'exec', name, 'bash', '-c',
-        f'if test -e {shlex.quote(destination)} || test -L {shlex.quote(destination)}; '
-        'then echo exists; else echo missing; fi', capture=True,
-    ).strip()
-    if state != 'missing':
-        raise Stop('workspace destination already exists or could not be checked')
+    status = runner.destination_status(name, destination)
+    if status in (10, 12):
+        raise Stop('DESTINATION_EXISTS')
+    if status == 11:
+        raise Stop('DESTINATION_CHECK_INDETERMINATE')
+    if status != 0:
+        raise Stop('DESTINATION_CHECK_COMMAND_FAILED')
     checked = snapshot.parent / (snapshot.name + '-verified')
     oc2_workspace.materialize(pathlib.Path(manifest.root), checked, manifest, for_guest=True)
     if snapshot.exists():
@@ -1181,16 +876,61 @@ def transfer_workspace(runner: Runner, name: str, snapshot: pathlib.Path,
     return destination
 
 
+def _transfer_verified_file(
+    runner: Runner,
+    name: str,
+    transfer: VerifiedFileTransfer,
+) -> None:
+    """Copy or reuse one Guest file only after matching its expected SHA-256."""
+    status = runner.destination_status(name, transfer.destination)
+    if status == 0:
+        runner.sbx('cp', str(transfer.source), f'{name}:{transfer.destination}')
+    elif status == 10:
+        pass
+    elif status == 12:
+        raise Stop(transfer.unsafe_message)
+    else:
+        raise Stop(transfer.unknown_status_message)
+    output = runner.sbx(
+        'exec', name, 'sha256sum', transfer.destination, capture=True,
+    ).split()
+    if not output or output[0] != transfer.sha256:
+        raise Stop(transfer.mismatch_message)
+
+
 def stage(runner: Runner, name: str, bundle: pathlib.Path, manifest_sha: str,
           guest_script: pathlib.Path, assets_file: pathlib.Path | None = None,
-          assets_sha: str | None = None) -> None:
+          assets_sha: str | None = None, *,
+          superpowers_source: pathlib.Path | None = None) -> None:
     destination = f'{ROOT}/bundles/{manifest_sha[:16]}'
     script_sha = hashlib.sha256(guest_script.read_bytes()).hexdigest()
-    script_dest = f'{ROOT}/scripts/oc2_guest_{script_sha[:16]}.py'
+    native_helper = HERE / 'oc2_agent_native.py'
+    native_helper_sha = hashlib.sha256(native_helper.read_bytes()).hexdigest()
+    identity_helper = HERE / 'oc2_identity.py'
+    identity_helper_sha = hashlib.sha256(identity_helper.read_bytes()).hexdigest()
+    verifier_dir = (
+        f'{ROOT}/scripts/oc2_guest_{script_sha[:16]}_{native_helper_sha[:16]}_'
+        f'{identity_helper_sha[:16]}'
+    )
+    script_dest = f'{verifier_dir}/oc2_guest.py'
+    native_helper_dest = f'{verifier_dir}/oc2_agent_native.py'
+    identity_helper_dest = f'{verifier_dir}/oc2_identity.py'
+    superpowers_destination: str | None = None
+    superpowers_parent: str | None = None
+    if superpowers_source is not None:
+        from oc2_agent_native import SUPERPOWERS_TREE_PATH
+
+        if superpowers_source.is_symlink() or not superpowers_source.is_dir():
+            raise Stop('verified Superpowers source directory is missing or linked')
+        superpowers_destination = f'{ROOT}/{SUPERPOWERS_TREE_PATH}'
+        superpowers_parent = str(pathlib.PurePosixPath(superpowers_destination).parent)
     # sbx exec v0.49.2 was observed invoking bash -c without the expected
     # trailing positional parameters. Use direct argv for filesystem operations.
-    execute(runner, name, 'mkdir', '-p', ROOT, f'{ROOT}/bundles', f'{ROOT}/scripts')
-    execute(runner, name, 'chmod', '700', ROOT, f'{ROOT}/bundles', f'{ROOT}/scripts')
+    directories = [ROOT, f'{ROOT}/bundles', f'{ROOT}/scripts', verifier_dir]
+    if superpowers_parent is not None:
+        directories.append(superpowers_parent)
+    execute(runner, name, 'mkdir', '-p', *directories)
+    execute(runner, name, 'chmod', '700', *directories)
     # Never overwrite an existing bundle or bootstrap script. Reuse is allowed
     # only after the guest validates their content and hash.
     exists = runner.sbx('exec', name, 'bash', '-c',
@@ -1200,16 +940,37 @@ def stage(runner: Runner, name: str, bundle: pathlib.Path, manifest_sha: str,
         runner.sbx('cp', str(bundle), f'{name}:{destination}')
     elif exists != 'exists':
         raise Stop('cannot determine remote bundle state')
-    script_exists = runner.sbx('exec', name, 'bash', '-c',
-                               f'if test -e {shlex.quote(script_dest)}; then echo exists; else echo missing; fi',
-                               capture=True).strip()
-    if script_exists == 'missing':
-        runner.sbx('cp', str(guest_script), f'{name}:{script_dest}')
-    elif script_exists != 'exists':
-        raise Stop('cannot determine remote bootstrap script state')
-    remote_sha = runner.sbx('exec', name, 'sha256sum', script_dest, capture=True).split()[0]
-    if remote_sha != script_sha:
-        raise Stop('guest bootstrap code SHA mismatch')
+    for transfer in (
+        VerifiedFileTransfer(
+            guest_script, script_dest, script_sha,
+            'unsafe guest asset verifier path',
+            'cannot determine remote bootstrap script state',
+            'guest bootstrap code SHA mismatch',
+        ),
+        VerifiedFileTransfer(
+            native_helper, native_helper_dest, native_helper_sha,
+            'unsafe guest native verifier path',
+            'cannot determine remote native verifier state',
+            'guest native verifier SHA mismatch',
+        ),
+        VerifiedFileTransfer(
+            identity_helper, identity_helper_dest, identity_helper_sha,
+            'unsafe guest identity verifier path',
+            'cannot determine guest identity verifier state',
+            'guest identity verifier SHA mismatch',
+        ),
+    ):
+        _transfer_verified_file(runner, name, transfer)
+    if superpowers_source is not None and superpowers_destination is not None:
+        source_status = runner.directory_status(name, superpowers_destination)
+        if source_status == 0:
+            runner.sbx('cp', str(superpowers_source), f'{name}:{superpowers_destination}')
+        elif source_status == 10:
+            pass
+        elif source_status == 12:
+            raise Stop('unsafe guest Superpowers source path')
+        else:
+            raise Stop('cannot determine guest Superpowers source state')
     args = ['--bundle', destination, '--expected-sha', manifest_sha]
     if (assets_file is None) != (assets_sha is None):
         raise Stop('asset file and hash must be supplied together')
@@ -1218,19 +979,73 @@ def stage(runner: Runner, name: str, bundle: pathlib.Path, manifest_sha: str,
             raise Stop('invalid asset hash')
         remote_assets = f'{ROOT}/assets/{assets_sha[:16]}.json'
         execute(runner, name, 'mkdir', '-p', f'{ROOT}/assets')
-        check = runner.sbx('exec', name, 'bash', '-c',
-                           f'if test -e {shlex.quote(remote_assets)}; then echo exists; else echo missing; fi',
-                           capture=True).strip()
-        if check == 'missing':
-            runner.sbx('cp', str(assets_file), f'{name}:{remote_assets}')
-        elif check != 'exists':
-            raise Stop('cannot establish guest asset state')
-        actual = runner.sbx('exec', name, 'sha256sum',
-                            remote_assets, capture=True).split()[0]
-        if actual != assets_sha:
-            raise Stop('guest asset bundle SHA mismatch')
+        _transfer_verified_file(
+            runner, name,
+            VerifiedFileTransfer(
+                assets_file, remote_assets, assets_sha,
+                'unsafe guest asset bundle path',
+                'cannot establish guest asset state',
+                'guest asset bundle SHA mismatch',
+            ),
+        )
         args.extend(['--assets', remote_assets, '--expected-assets-sha', assets_sha])
     execute(runner, name, 'python3', script_dest, *args)
+
+
+def prepare_verification_runtime(
+    repo: pathlib.Path,
+    sandbox: str,
+    plugin_dir: pathlib.Path,
+) -> str:
+    runner = Runner(getpass.getuser())
+    if not is_compatible_sandbox(runner, sandbox):
+        raise Stop('verification mode requires an existing compatible mountless Sandbox')
+    if cli_path(runner, sandbox) is None:
+        raise Stop('verification mode requires the pinned OpenCode CLI to be present')
+    from sandbox.scripts.stage_opencode_v2 import verify_bundle
+
+    with tempfile.TemporaryDirectory(prefix='oc2-plugin-mcp-') as temporary:
+        temporary_path = pathlib.Path(temporary)
+        bundle = temporary_path / 'bundle'
+        export_v2_config(repo, bundle, verification_only=True)
+        config_sha = verify_bundle(bundle, trusted_root=bundle.parent)
+        from oc2_assets import (
+            AssetError,
+            build as build_assets,
+            export_superpowers_tree,
+            write_new,
+        )
+
+        try:
+            asset_raw, asset_sha = build_assets(
+                repo, verification_only=True, plugin_dir=plugin_dir,
+            )
+            superpowers_source = temporary_path / 'verification-superpowers'
+            export_superpowers_tree(repo, plugin_dir, superpowers_source)
+        except AssetError as exc:
+            raise Stop('verification Plugin/MCP asset export failed: ' + str(exc)) from exc
+        asset_file = temporary_path / 'assets.json'
+        write_new(asset_file, asset_raw)
+        generator_fingerprint = verification_generator_fingerprint(
+            HERE / 'oc2_guest.py', HERE / 'oc2_agent_native.py', HERE / 'oc2_identity.py',
+        )
+        runtime_sha: str = runtime_identity_sha256(
+            config_sha, asset_sha, generator_fingerprint,
+        )
+        runtime_destination = f'{ROOT}/runtime/{runtime_sha[:16]}'
+        destination_status = runner.destination_status(sandbox, runtime_destination)
+        if destination_status == 10:
+            raise Stop('verification Runtime identity already exists; refusing reuse')
+        if destination_status == 12:
+            raise Stop('verification Runtime destination is unsafe')
+        if destination_status != 0:
+            raise Stop('could not establish verification Runtime identity availability')
+        stage(
+            runner, sandbox, bundle, config_sha, HERE / 'oc2_guest.py',
+            asset_file, asset_sha, superpowers_source=superpowers_source,
+        )
+        print('OC2_VERIFICATION_PREPARED: sandbox=' + sandbox + ' runtime=' + runtime_sha[:16])
+        return str(runtime_sha)
 
 
 def cli_path(runner: Runner, name: str) -> str | None:
@@ -1245,37 +1060,87 @@ def cli_path(runner: Runner, name: str) -> str | None:
     return None
 
 
-def provision_cli(runner: Runner, name: str, host_binary: pathlib.Path) -> str:
+def provision_cli(runner: Runner, name: str) -> str:
     found = cli_path(runner, name)
-    if found:
-        return found
-    if host_binary.is_symlink() or not host_binary.is_file():
-        raise Stop('Host OpenCode binary is missing or unsafe')
-    print(f'OC2: copying the verified Host OpenCode v{VERSION} binary.')
-    runner.sbx('exec', name, 'mkdir', '-p', str(pathlib.PurePosixPath(PINNED[0]).parent))
-    runner.sbx('cp', str(host_binary), f'{name}:{PINNED[0]}')
-    runner.sbx('exec', name, 'chmod', '700', PINNED[0])
-    found = cli_path(runner, name)
-    if not found:
-        raise Stop(f'copied OpenCode binary is not the pinned v{VERSION}')
+    if found is None:
+        raise Stop('pinned OpenCode CLI is not present in the Sandbox kit')
     return found
 
 
-def _runtime_directory_setup_command(root: str, runtime: str) -> list[str]:
-    root_path = pathlib.PurePosixPath(root)
-    runtime_path = pathlib.PurePosixPath(runtime)
-    if (not root_path.is_absolute() or '..' in root_path.parts
-            or runtime_path.parent != root_path / 'runtime'
-            or re.fullmatch(r'[0-9a-f]{16}', runtime_path.name) is None):
-        raise Stop('invalid private runtime directory')
+GUEST_EXEC_WRAPPER = r'''import os
+import re
+import sys
+from urllib.parse import urlsplit
 
-    directories = (
-        root, root + '/runtime', runtime, runtime + '/home',
-        runtime + '/home/.local/share', runtime + '/home/.local/share/opencode',
-        runtime + '/config', runtime + '/config/opencode', runtime + '/state',
-        runtime + '/cache', runtime + '/tmp',
+PROXY_NAMES = ('HTTP_PROXY', 'HTTPS_PROXY', 'NO_PROXY')
+
+
+def stop(message):
+    print('OC2_PROXY_STOP: ' + message, file=sys.stderr)
+    raise SystemExit(125)
+
+
+arguments = sys.argv[2:]
+try:
+    separator = arguments.index('--')
+except ValueError:
+    stop('invalid runtime wrapper arguments')
+runtime_entries = arguments[:separator]
+target = arguments[separator + 1:]
+if not target:
+    stop('missing target process')
+
+child_environment = {}
+for entry in runtime_entries:
+    key, delimiter, value = entry.partition('=')
+    if (not delimiter or re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]*', key) is None
+            or key in child_environment or key.upper() in PROXY_NAMES):
+        stop('invalid fixed runtime environment')
+    child_environment[key] = value
+
+proxy_environment = {}
+for name in PROXY_NAMES:
+    variants = [os.environ[key] for key in (name, name.lower()) if key in os.environ]
+    if len(variants) == 2 and variants[0] != variants[1]:
+        stop('conflicting proxy environment variables')
+    if variants:
+        proxy_environment[name] = variants[0]
+
+if 'HTTPS_PROXY' not in proxy_environment:
+    stop('required HTTPS proxy configuration is missing or unsafe')
+for proxy in (proxy_environment[name] for name in ('HTTP_PROXY', 'HTTPS_PROXY')
+              if name in proxy_environment):
+    if any(ord(character) < 32 or ord(character) == 127 for character in proxy):
+        stop('unsafe proxy URL')
+    try:
+        parsed = urlsplit(proxy)
+        valid_proxy = (
+            parsed.scheme in ('http', 'https')
+            and bool(parsed.hostname)
+            and parsed.username is None
+            and parsed.password is None
+            and parsed.path in ('', '/')
+            and not parsed.query
+            and not parsed.fragment
+        )
+        parsed.port
+    except ValueError:
+        stop('unsafe proxy URL')
+    if not valid_proxy:
+        stop('unsafe proxy URL')
+
+bypasses = proxy_environment.get('NO_PROXY', '')
+if bypasses:
+    entries = [entry.strip().lower() for entry in bypasses.split(',')]
+    allowed_no_proxy = (
+        'localhost', '127.0.0.1', '::1', 'gateway.docker.internal',
     )
-    return ['python3', '-c', RUNTIME_DIRECTORY_SETUP_SCRIPT, root, *directories]
+    if any(entry not in allowed_no_proxy for entry in entries):
+        stop('unsafe NO_PROXY entries')
+
+child_environment.update(proxy_environment)
+os.execvpe(target[0], target, child_environment)
+'''
 
 
 def launch(runner: Runner, request: SandboxLaunch) -> None:
@@ -1286,6 +1151,50 @@ def launch(runner: Runner, request: SandboxLaunch) -> None:
     if request.cli not in PINNED:
         raise Stop('unapproved OpenCode executable path')
     runtime = f'{ROOT}/runtime/{request.digest[:16]}'
+    if (request.assets_file is None) != (request.assets_sha is None):
+        raise Stop('asset file and hash must be supplied together')
+    if request.assets_file is not None and request.assets_sha is not None:
+        if re.fullmatch(r'[0-9a-f]{64}', request.assets_sha) is None:
+            raise Stop('invalid asset hash')
+        remote_assets = f'{ROOT}/assets/{request.assets_sha[:16]}.json'
+        guest_script = HERE / 'oc2_guest.py'
+        guest_script_sha = hashlib.sha256(guest_script.read_bytes()).hexdigest()
+        native_helper = HERE / 'oc2_agent_native.py'
+        native_helper_sha = hashlib.sha256(native_helper.read_bytes()).hexdigest()
+        identity_helper = HERE / 'oc2_identity.py'
+        identity_helper_sha = hashlib.sha256(identity_helper.read_bytes()).hexdigest()
+        verifier_dir = (
+            f'{ROOT}/scripts/oc2_guest_{guest_script_sha[:16]}_{native_helper_sha[:16]}_'
+            f'{identity_helper_sha[:16]}'
+        )
+        remote_script = f'{verifier_dir}/oc2_guest.py'
+        remote_helper = f'{verifier_dir}/oc2_agent_native.py'
+        remote_identity_helper = f'{verifier_dir}/oc2_identity.py'
+        runner.sbx(
+            'exec', request.name, 'mkdir', '-p',
+            f'{ROOT}/assets', f'{ROOT}/scripts', verifier_dir,
+        )
+        for source, remote, expected_sha, label in (
+            (request.assets_file, remote_assets, request.assets_sha, 'asset bundle'),
+            (guest_script, remote_script, guest_script_sha, 'asset verifier'),
+            (native_helper, remote_helper, native_helper_sha, 'native verifier'),
+            (identity_helper, remote_identity_helper, identity_helper_sha, 'identity verifier'),
+        ):
+            _transfer_verified_file(
+                runner,
+                request.name,
+                VerifiedFileTransfer(
+                    source, remote, expected_sha,
+                    'unsafe guest ' + label + ' path',
+                    'cannot establish guest ' + label + ' state',
+                    'guest ' + label + ' SHA mismatch',
+                ),
+            )
+        runner.sbx(
+            'exec', request.name, 'python3', remote_script,
+            '--assets', remote_assets, '--expected-assets-sha', request.assets_sha,
+            '--install-assets-runtime', request.digest,
+        )
     workdir = request.workspace
     workspace_path = pathlib.PurePosixPath(workdir)
     if not workspace_path.is_absolute() or '..' in workspace_path.parts:
@@ -1299,9 +1208,13 @@ def launch(runner: Runner, request: SandboxLaunch) -> None:
         )
     )
     runner.sbx(
-        'exec', request.name,
-        *_runtime_directory_setup_command(ROOT, runtime),
+        'exec', request.name, 'mkdir', '-p', '-m', '700', runtime,
+        *(f'{runtime}/{directory}' for directory in
+          ('home', 'home/.local/share', 'config', 'config/opencode',
+           'state', 'cache', 'tmp')),
     )
+    runner.sbx('exec', request.name, 'mkdir', '-p', '-m', '700',
+               f'{runtime}/home/.local/share/opencode')
     runner.sbx(
         'cp', str(request.config_file),
         f'{request.name}:{config_dir}/opencode.jsonc',
@@ -1320,21 +1233,21 @@ def launch(runner: Runner, request: SandboxLaunch) -> None:
         f'XDG_CACHE_HOME={runtime}/cache',
         f'TMPDIR={runtime}/tmp',
         'OPENCODE_WATCHDOG_ENABLED=false',
-        'OPENCODE_CONFIG_PROJECT_DISABLE=1',
         'OPENCODE_DISABLE_AUTOUPDATE=1',
         'OPENCODE_DISABLE_MODELS_FETCH=1',
+        'OPENCODE_CONFIG_PROJECT_DISABLE=1',
         *cloudflare_environment,
     )
     helper = oauth_helper_source(HERE)
     runner.sbx(
-        'exec', '-w', workdir, request.name, 'python3', '-c', GUEST_EXEC_WRAPPER,
-        '--', *runtime_environment, '--', 'python3', '-c', helper,
-        request.cli, 'oc2_oauth.py',
+        'exec', '-w', workdir, request.name,
+        'python3', '-c', GUEST_EXEC_WRAPPER, '--', *runtime_environment, '--',
+        'python3', '-c', helper, request.cli, 'oc2_oauth.py',
     )
     runner.sbx(
         'exec', '-it', '-w', workdir, request.name,
-        'python3', '-c', GUEST_EXEC_WRAPPER, '--',
-        *runtime_environment, '--', request.cli, '--standalone', tty=True,
+        'python3', '-c', GUEST_EXEC_WRAPPER, '--', *runtime_environment, '--',
+        request.cli, '--standalone', tty=True,
     )
 
 
@@ -1357,28 +1270,27 @@ def _session_action(args: argparse.Namespace, workspace: pathlib.Path,
         collected = session.directory / 'collected'
         if collected.exists() or collected.is_symlink():
             raise Stop('collection destination already exists')
-        staging = session.directory / 'collecting'
-        staging.mkdir(mode=0o700)
         try:
-            incoming = staging / 'incoming'
-            grant_collection_directory_access(staging, args.sbx_user)
-            try:
-                runner.sbx('cp', f'{session.sandbox}:{session.remote}', str(incoming))
-                grant_collected_workspace_access(
-                    incoming, args.sbx_user, getpass.getuser(),
-                )
-                candidate = workspaces.snapshot(incoming)
-                workspaces.materialize(incoming, collected, candidate)
-            finally:
-                if incoming.exists() or incoming.is_symlink():
-                    run_operator(args.sbx_user, 'rm', '-rf', '--', str(incoming))
+            with tempfile.TemporaryDirectory(prefix='oc2-collect-', dir='/tmp') as temp:
+                staging = pathlib.Path(temp)
+                incoming = staging / 'incoming'
+                grant_collection_directory_access(staging, args.sbx_user)
+                try:
+                    runner.sbx('cp', f'{session.sandbox}:{session.remote}', str(incoming))
+                    grant_collected_workspace_access(
+                        incoming, args.sbx_user, getpass.getuser(),
+                    )
+                    candidate = workspaces.snapshot(
+                        incoming, profile=session.manifest.profile,
+                    )
+                    workspaces.materialize(incoming, collected, candidate)
+                finally:
+                    if incoming.exists() or incoming.is_symlink():
+                        run_operator(args.sbx_user, 'rm', '-rf', '--', str(incoming))
         except BaseException:
             if collected.exists() and not collected.is_symlink():
                 shutil.rmtree(collected, ignore_errors=True)
             raise
-        finally:
-            if staging.exists() and not staging.is_symlink():
-                shutil.rmtree(staging)
         before = {item.path: item for item in session.manifest.files}
         after = {item.path: item for item in candidate.files}
         for relative in sorted(before.keys() | after.keys()):
@@ -1416,9 +1328,11 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument('--sandbox', default='oc2-v2')
     p.add_argument('--dry-run', action='store_true', help='show planned actions without calling sbx')
     p.add_argument('--prepare-only', action='store_true',
-                   help='export and verify APM config without Sandbox commands')
-    p.add_argument('--resume', action='store_true',
-                   help='resume post-create provisioning for a Sandbox with a retained source')
+                   help='prepare config without launching OpenCode')
+    p.add_argument('--verification-only', action='store_true',
+                   help='prepare the fixed Plugin/MCP Runtime without launching OpenCode')
+    p.add_argument('--plugin-dir', type=pathlib.Path,
+                   help='clean local Git checkout for the pinned Superpowers Plugin')
     p.add_argument('--allow-paid-inference', action='store_true',
                    help='authorize external inference for this interactive launch')
     p.add_argument('--use-cloudflare-ai-gateway', action='store_true',
@@ -1427,7 +1341,26 @@ def main(argv: list[str] | None = None) -> int:
     oc2_workspace = importlib.import_module('oc2_workspace')
 
     try:
+        if args.verification_only:
+            if not args.prepare_only:
+                raise Stop('--verification-only requires --prepare-only')
+            if args.plugin_dir is None:
+                raise Stop('--verification-only requires --plugin-dir')
+            if args.use_cloudflare_ai_gateway or args.allow_paid_inference:
+                raise Stop('verification mode does not permit provider credentials or inference')
+        elif args.plugin_dir is not None:
+            raise Stop('--plugin-dir is only valid with --verification-only')
         if args.dry_run:
+            if args.verification_only:
+                if not NAME_RE.fullmatch(args.sandbox):
+                    raise Stop('invalid Sandbox name')
+                print('OC2 PLAN: verification-only Sandbox=' + args.sandbox)
+                print('OC2 PLAN: require an existing compatible mountless Sandbox and pinned CLI')
+                print('OC2 PLAN: verify the pinned local Superpowers Git checkout')
+                print('OC2 PLAN: select pinned Superpowers Git package and oc2-status MCP')
+                print('OC2 PLAN: no Sandbox creation, credential provisioning, CLI install, or TUI launch')
+                print('OC2 PLAN: no Sandbox commands executed')
+                return 0
             workspace = args.workspace.resolve(strict=True)
             if not workspace.is_dir():
                 raise Stop('workspace is not a directory')
@@ -1435,13 +1368,22 @@ def main(argv: list[str] | None = None) -> int:
                 raise Stop('invalid Sandbox name')
             print('OC2 PLAN: mountless shell Sandbox=' + args.sandbox)
             print('OC2 PLAN: workspace=' + str(workspace))
-            print(f'OC2 PLAN: transfer a verified workspace snapshot and launch OpenCode v{VERSION}')
+            print('OC2 PLAN: transfer only the verified Workspace Snapshot; no .git or OpenCode project config')
+            print(
+                f'OC2 PLAN: download and SHA-256 verify @opencode/cli@{VERSION} on the Host; '
+                'bake it into the Sandbox Kit at /opt/oc2/bin/opencode'
+            )
             print('OC2 PLAN: no credentials, provider settings, MCP, plugins, or host config')
             print('OC2 PLAN: no Sandbox commands executed')
             return 0
         repo = args.repo_root.resolve(strict=True)
         if not (repo / 'apm.yml').is_file():
             raise Stop('dotfiles-ai apm.yml not found')
+        if args.verification_only:
+            if args.plugin_dir is None:
+                raise Stop('plugin directory is required for verification-only mode')
+            prepare_verification_runtime(repo, args.sandbox, args.plugin_dir)
+            return 0
         if args.prepare_only:
             with tempfile.TemporaryDirectory(prefix='oc2-v2-config-') as temporary:
                 export_v2_config(repo, pathlib.Path(temporary) / 'export')
@@ -1456,23 +1398,29 @@ def main(argv: list[str] | None = None) -> int:
             raise Stop('workspace is not a directory')
         if not NAME_RE.fullmatch(args.sandbox):
             raise Stop('invalid Sandbox name')
-        profile = _workspace_profile(workspace)
-        workspace_manifest = oc2_workspace.snapshot(workspace, profile=profile)
-        validate_clone_workspace(workspace, profile=profile, manifest=workspace_manifest)
         git_root = subprocess.run(
             ['git', '-C', str(workspace), 'rev-parse', '--show-toplevel'],
             capture_output=True, text=True, check=False, timeout=10,
         )
         if git_root.returncode != 0 or pathlib.Path(git_root.stdout.strip()) != workspace:
             raise Stop('workspace must be the root of a Git repository')
-        clone_remotes = _safe_clone_remotes(workspace)
+        profile_id = workspace_transfer_profile(workspace)
+        workspace_profile = oc2_workspace.profile_by_id(profile_id)
+        workspace_manifest = oc2_workspace.snapshot(
+            workspace, profile=workspace_profile,
+        )
         with tempfile.TemporaryDirectory(prefix='oc2-v2-config-') as temporary:
             temporary_path = pathlib.Path(temporary)
             config_file = export_v2_config(repo, temporary_path / 'export')
+            from oc2_assets import build as build_assets
+
+            asset_raw, asset_sha = build_assets(repo)
+            asset_payload = json.loads(asset_raw)
+            asset_file = temporary_path / 'assets.json'
+            asset_file.write_bytes(asset_raw)
             configure_cloudflare_provider(
                 config_file,
                 include_cloudflare=args.use_cloudflare_ai_gateway,
-                generated_config=_trusted_v2_config(repo),
             )
             if (requires_external_inference(config_file)
                     and not args.allow_paid_inference):
@@ -1494,78 +1442,31 @@ def main(argv: list[str] | None = None) -> int:
             print('OC2_DOCKER_SANDBOXES: ' + sandbox_version)
             existing = {line.strip() for line in runner.sbx('ls', '-q', capture=True).splitlines()}
             if args.sandbox in existing:
-                if not args.resume:
-                    raise Stop('Sandbox name already exists; refusing to reuse or rebuild it')
-                retained = CLONE_SOURCE_ROOT / args.sandbox / 'workspace'
-                if retained.is_symlink() or not retained.is_dir():
-                    raise Stop('--resume requires the retained workspace source for this Sandbox')
-                sessions = importlib.import_module('oc2_session')
-                session = sessions.load(CLONE_SOURCE_ROOT / 'sessions', workspace)
-                if session.sandbox != args.sandbox:
-                    raise Stop('--resume Sandbox does not match the retained transfer receipt')
-                if session.manifest != workspace_manifest:
-                    raise Stop('--resume Workspace differs from the retained transfer snapshot')
-                if not is_compatible_sandbox(runner, args.sandbox, session.sandbox_id):
-                    raise Stop('--resume Sandbox identity or mount state could not be verified')
-                if cloudflare is not None:
-                    credential_scope = ensure_cloudflare_credential(
-                        runner, args.sandbox, interactive=sys.stdin.isatty(),
-                    )
-                    print('OC2_CLOUDFLARE_CREDENTIAL: available (' + credential_scope + ' scope)')
-                host_binary = download_cli_binary(temporary_path)
-                cli = provision_cli(runner, args.sandbox, host_binary)
-                workdir = session.remote
-                clone_root = runner.sbx(
-                    'exec', args.sandbox, 'git', '-C', workdir,
-                    'rev-parse', '--show-toplevel', capture=True,
-                ).strip()
-                if clone_root != workdir:
-                    raise Stop('Sandbox working directory is not the Clone-mode Git root')
-                runtime_sha = hashlib.sha256(
-                    (str(workspace) + '\0' + VERSION).encode(),
-                ).hexdigest()
-                launch(
-                    runner,
-                    SandboxLaunch(args.sandbox, runtime_sha, cli, workdir, config_file, cloudflare),
-                )
-                return 0
-            host_binary = download_cli_binary(temporary_path)
-            clone_source_directory = _new_clone_source_directory(args.sandbox)
-            retained_source = False
-            try:
-                snapshot_directory = clone_source_directory / 'workspace'
-                oc2_workspace.materialize(workspace, snapshot_directory, workspace_manifest)
+                raise Stop('Sandbox name already exists; refusing to reuse or rebuild it')
+            mixin_name = 'oc2-credentials-' + secrets.token_hex(6)
+            print('OC2: verifying official OpenCode v2.2.5 Linux x64 artifact')
+            with tempfile.TemporaryDirectory(prefix='oc2-cli-artifact-') as artifact_temporary:
+                cli_binary = download_verified_cli(pathlib.Path(artifact_temporary))
+                print('OC2_CLI_ARTIFACT_VERIFIED: v2.2.5 sha256=' + CLI_ASSET_SHA256)
                 print('OC2: creating mountless shell Sandbox ' + args.sandbox)
-                mixin_name = 'oc2-credentials-' + secrets.token_hex(6)
-                with tempfile.TemporaryDirectory(prefix='oc2-credential-mixin-') as mixin_temporary:
-                    mixin_path = pathlib.Path(mixin_temporary)
-                    mixin_spec_path = mixin_path / 'spec.yaml'
-                    mixin_spec_path.write_bytes(credential_mixin_spec(mixin_name))
-                    os.chmod(mixin_spec_path, 0o600)
-                    retained_source = True
-                    print('OC2_WORKSPACE_SNAPSHOT: ' + str(snapshot_directory))
-                    runner.sbx(*workspace_create_args(args.sandbox, mixin_path))
-                workdir = transfer_workspace(
-                    runner, args.sandbox, snapshot_directory, workspace_manifest, runner.user,
-                )
-                runner.sbx('exec', args.sandbox, 'git', '-C', workdir, 'init', '--quiet')
-                for remote in clone_remotes:
-                    runner.sbx('exec', args.sandbox, 'git', '-C', workdir,
-                               'remote', 'add', remote.name, remote.fetch_urls[0])
-                    for url in remote.fetch_urls[1:]:
-                        runner.sbx('exec', args.sandbox, 'git', '-C', workdir,
-                                   'remote', 'set-url', '--add', remote.name, url)
-                    for url in remote.push_urls:
-                        runner.sbx('exec', args.sandbox, 'git', '-C', workdir,
-                                   'remote', 'set-url', '--add', '--push', remote.name, url)
-                sessions = importlib.import_module('oc2_session')
-                sessions.create(
-                    CLONE_SOURCE_ROOT / 'sessions', args.sandbox, workdir,
-                    workspace_manifest, sandbox_id=sandbox_id(runner, args.sandbox),
-                )
-            finally:
-                if not retained_source:
-                    shutil.rmtree(clone_source_directory, ignore_errors=True)
+                with tempfile.TemporaryDirectory(prefix='oc2-kits-') as kits_temporary:
+                    kits_root = pathlib.Path(kits_temporary)
+                    credential_mixin = kits_root / 'oc2-credentials'
+                    cli_mixin = kits_root / 'oc2-opencode-cli'
+                    credential_mixin.mkdir()
+                    cli_mixin.mkdir()
+                    credential_spec = credential_mixin / 'spec.yaml'
+                    credential_spec.write_bytes(credential_mixin_spec(mixin_name))
+                    os.chmod(credential_spec, 0o600)
+                    cli_spec = cli_mixin / 'spec.yaml'
+                    cli_spec.write_bytes(opencode_cli_mixin_spec())
+                    os.chmod(cli_spec, 0o600)
+                    staged_cli = cli_mixin / 'opencode'
+                    shutil.copyfile(cli_binary, staged_cli)
+                    os.chmod(staged_cli, 0o600)
+                    runner.sbx(*mountless_create_args(
+                        args.sandbox, credential_mixin, cli_mixin,
+                    ))
             if cloudflare is not None:
                 credential_scope = ensure_cloudflare_credential(
                     runner,
@@ -1573,20 +1474,29 @@ def main(argv: list[str] | None = None) -> int:
                     interactive=sys.stdin.isatty(),
                 )
                 print('OC2_CLOUDFLARE_CREDENTIAL: available (' + credential_scope + ' scope)')
-            cli = provision_cli(runner, args.sandbox, host_binary)
-            clone_root = runner.sbx(
-                'exec', args.sandbox, 'git', '-C', workdir,
-                'rev-parse', '--show-toplevel', capture=True,
-            ).strip()
-            if clone_root != workdir:
-                raise Stop('Sandbox working directory is not the transferred workspace root')
+            cli = provision_cli(runner, args.sandbox)
+            snapshot_path = temporary_path / 'workspace-snapshot'
+            workdir = transfer_workspace(
+                runner, args.sandbox, snapshot_path, workspace_manifest, runner.user,
+            )
             runtime_sha = hashlib.sha256(
-                (str(workspace) + '\0' + VERSION).encode(),
+                (str(workspace) + '\0' + VERSION + '\0' + asset_sha).encode(),
             ).hexdigest()
+            config = json.loads(config_file.read_text(encoding='utf-8'))
+            config['instructions'] = [
+                f'{ROOT}/runtime/{runtime_sha[:16]}/{name}'
+                for name in sorted(asset_payload['files'])
+                if name == 'config/opencode/AGENTS.md'
+                or name.startswith('config/opencode/rules/')
+            ]
+            config_file.write_text(
+                json.dumps(config, ensure_ascii=False, indent=2) + '\n', encoding='utf-8',
+            )
             print(f'OC2_READY: sandbox={args.sandbox} opencode=v{VERSION}')
             launch(
                 runner,
-                SandboxLaunch(args.sandbox, runtime_sha, cli, workdir, config_file, cloudflare),
+                SandboxLaunch(args.sandbox, runtime_sha, cli, workdir, config_file,
+                              cloudflare, asset_file, asset_sha),
             )
             return 0
     except (Stop, OSError, ValueError, subprocess.TimeoutExpired,

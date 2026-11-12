@@ -21,6 +21,7 @@ from typing import Final, Literal, TypeAlias
 import yaml
 from yaml.nodes import MappingNode, Node, ScalarNode, SequenceNode
 from oc2_workspace import contains_credential_material
+from oc2_native import NativeConfigError, build_native_payload, parse_apm_native
 
 
 VERSION = "v0.2"
@@ -63,6 +64,7 @@ class APMConfig:
     snapshot: bool
     source_sha256: str
     v2_config: dict[str, JsonValue] | None
+    verification_only: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -463,7 +465,14 @@ def _build_v2_config(
     return {"model": settings.default_model, "providers": providers, "policies": policies}
 
 
-def _read_apm_source(root: Path) -> APMConfig:
+def _read_apm_source(root: Path, *, verification_only: bool = False) -> APMConfig:
+    """Read and validate the APM source, selecting provider parsing by export mode.
+
+    Verification-only mode validates OC2 native selections and omits V2 provider
+    settings; normal mode selects only approved V2 providers when configured.
+    Reject linked or oversized sources, invalid APM structure, and disallowed
+    shell, snapshot, native, provider, or credential values.
+    """
     source = root / "apm.yml"
     if source.is_symlink() or not source.is_file():
         raise ExportError("apm.yml must be a regular, non-symlink file")
@@ -482,6 +491,10 @@ def _read_apm_source(root: Path) -> APMConfig:
     normalized = _normalize_yaml(loaded)
     if not isinstance(normalized, dict):
         raise ExportError("apm.yml must contain a string-keyed mapping")
+    try:
+        native_config = parse_apm_native(raw, verification_only=verification_only)
+    except NativeConfigError as exc:
+        raise ExportError("invalid OC2 native configuration") from exc
     shell = normalized.get("shell", "bash")
     snapshot = normalized.get("snapshot", True)
     if type(shell) is not str or shell not in {"bash", "sh", "zsh"}:
@@ -489,16 +502,16 @@ def _read_apm_source(root: Path) -> APMConfig:
     if type(snapshot) is not bool:
         raise ExportError("apm.yml snapshot must be a boolean")
     provider_catalog = _mapping(normalized.get("provider", {}), "provider")
-    v2_settings = _parse_v2_settings(normalized, provider_catalog)
-    v2_config = (
-        _build_v2_config(v2_settings, provider_catalog)
-        if v2_settings is not None else None
-    )
+    v2_settings = None if verification_only else _parse_v2_settings(normalized, provider_catalog)
+    v2_config = _build_v2_config(v2_settings, provider_catalog) if v2_settings is not None else None
+    if v2_config is not None and native_config.agents:
+        v2_config["agents"] = build_native_payload(native_config)["agents"]
     return APMConfig(
         shell=shell,
         snapshot=snapshot,
         source_sha256=hashlib.sha256(raw).hexdigest(),
         v2_config=v2_config,
+        verification_only=verification_only,
     )
 
 
@@ -510,7 +523,14 @@ def _read_apm(root: Path) -> tuple[str, bool, str]:
 def _build_files(
     shell: str, snapshot: bool, apm_sha: str,
     v2_config: dict[str, JsonValue] | None = None,
+    *, verification_only: bool = False,
 ) -> dict[str, bytes]:
+    """Build server, TUI, and manifest files for normal or verification-only export.
+
+    Verification-only output uses ``oc2-verification`` format and contains no
+    V2 model, provider, or provider policy configuration. Normal output uses V2
+    provider settings only when an approved configuration is selected.
+    """
     # Strict positive selection: none of the other apm.yml values is serialized.
     server: dict[str, JsonValue] = {
         "$schema": "https://opencode.ai/config.json",
@@ -534,7 +554,10 @@ def _build_files(
         "schema": "dotfiles-ai/sandbox-export/v0",
         "generator": VERSION,
         "source": "apm.yml",
-        "config_format": "opencode-v2" if v2_config is not None else "legacy-minimal",
+        "config_format": (
+            "oc2-verification" if verification_only else
+            "opencode-v2" if v2_config is not None else "legacy-minimal"
+        ),
         "source_sha256": apm_sha,
         "opencode_version": OPENCODE_VERSION,
         "plugins_exported": 0,
@@ -606,6 +629,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--repo-root", type=Path, default=Path(__file__).resolve().parents[2])
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--check", action="store_true", help="verify existing snapshot, never write")
+    parser.add_argument("--verification-only", action="store_true")
     args = parser.parse_args(argv)
 
     try:
@@ -613,9 +637,10 @@ def main(argv: list[str] | None = None) -> int:
             raise ExportError("repository root must not be a symlink")
         root = args.repo_root.resolve(strict=True)
         output = _validate_destination(root, args.out)
-        apm = _read_apm_source(root)
+        apm = _read_apm_source(root, verification_only=args.verification_only)
         generated = _build_files(
             apm.shell, apm.snapshot, apm.source_sha256, apm.v2_config,
+            verification_only=apm.verification_only,
         )
         if args.check:
             _check(output, generated)

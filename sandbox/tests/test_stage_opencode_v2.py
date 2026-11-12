@@ -69,15 +69,63 @@ class StageTests(unittest.TestCase):
             self.assertEqual(stage.main(["--verify-bundle", self.bundle.name]), 1)
 
     def test_guest_verifier_imports_without_site_packages_or_repository(self) -> None:
-        """Verify the Guest verifier runs from its fixed path without Host repository imports."""
-        result = subprocess.run(
-            [sys.executable, "-S", "-c",
-             f"import sys; sys.path.insert(0, {str(SCRIPT.parent)!r}); "
-             "import stage_opencode_v2"],
-            capture_output=True, text=True, check=False,
-        )
+        """Verify the isolated Guest script and its sibling helper validate a bundle."""
+        with tempfile.TemporaryDirectory() as temporary:
+            guest_root = Path(temporary)
+            guest_script = guest_root / 'stage_guest.py'
+            guest_script.write_bytes(SCRIPT.read_bytes())
+            Path(str(guest_script) + '.native.py').write_bytes(
+                SCRIPT.with_name('oc2_agent_native.py').read_bytes(),
+            )
+            bundle_name = 'sbx-config-0123456789abcdef-0123456789ab'
+            staged = guest_root / bundle_name
+            staged.mkdir()
+            for entry in self.bundle.iterdir():
+                (staged / entry.name).write_bytes(entry.read_bytes())
+            guest_code = (
+                'import importlib.util, pathlib, sys; '
+                'path = pathlib.Path(sys.argv[1]); '
+                'spec = importlib.util.spec_from_file_location("guest_stage", path); '
+                'module = importlib.util.module_from_spec(spec); '
+                'spec.loader.exec_module(module); '
+                'module.REMOTE_PARENT = sys.argv[2]; '
+                'raise SystemExit(module.main(["--verify-bundle", sys.argv[3]]))'
+            )
+            result = subprocess.run(
+                [sys.executable, '-S', '-c', guest_code,
+                 str(guest_script), str(guest_root), bundle_name],
+                capture_output=True, text=True, check=False, cwd=guest_root, env={'PATH': ''},
+            )
 
-        self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn('VERIFY_OK:', result.stdout)
+            self.assertEqual(result.stderr, '')
+
+    def test_guest_verifier_refuses_unverified_repository_helper_without_sidecar(self) -> None:
+        """Reject an ambient Native helper when the staged SHA-verified sidecar is absent."""
+        with tempfile.TemporaryDirectory() as temporary:
+            guest_root = Path(temporary)
+            scripts = guest_root / 'sandbox' / 'scripts'
+            scripts.mkdir(parents=True)
+            guest_script = scripts / 'stage_guest.py'
+            guest_script.write_bytes(SCRIPT.read_bytes())
+            (scripts / 'oc2_agent_native.py').write_text(
+                'unverified_ambient_helper = True\n', encoding='utf-8',
+            )
+            import_code = (
+                'import importlib.util, pathlib, sys; '
+                'path = pathlib.Path(sys.argv[1]); '
+                'spec = importlib.util.spec_from_file_location("guest_stage", path); '
+                'module = importlib.util.module_from_spec(spec); '
+                'spec.loader.exec_module(module)'
+            )
+            result = subprocess.run(
+                [sys.executable, '-S', '-c', import_code, str(guest_script)],
+                capture_output=True, text=True, check=False, cwd=guest_root, env={'PATH': ''},
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('SHA-verified Native Agent policy sidecar is missing', result.stderr)
 
     def test_guest_verify_rejects_path_in_cli_argument(self) -> None:
         """Reject a caller-selected Guest bundle path outside the fixed staging location."""
@@ -144,6 +192,32 @@ class StageTests(unittest.TestCase):
         )
         self.assertEqual(process.returncode, 0, process.stderr)
         return bundle
+
+    def test_verification_bundle_is_minimal_and_bound_to_apm_mode(self) -> None:
+        """Verify the verification config_format and exact APM-derived bundle output."""
+        self.apm.write_text(
+            "shell: bash\nsnapshot: true\n"
+            "x-oc2-assets: [global-rules/AGENTS.global.md]\n"
+            "x-oc2-agents: {}\n"
+            "x-oc2-plugins: {enabled: false, allowlist: [superpowers]}\n"
+            "x-oc2-mcp: {enabled: false, servers: [oc2-status]}\n",
+            encoding="utf-8",
+        )
+        bundle = self.root.parent / 'verification-bundle'
+        process = subprocess.run(
+            [sys.executable, str(SCRIPT.parent / 'prepare_opencode_v2.py'),
+             '--repo-root', str(self.root), '--out', str(bundle), '--verification-only'],
+            capture_output=True, text=True, check=False,
+        )
+
+        self.assertEqual(process.returncode, 0, process.stderr)
+        self.assertEqual(stage.verify_bundle(bundle, trusted_root=bundle.parent), hashlib.sha256(
+            (bundle / 'export-manifest.json').read_bytes(),
+        ).hexdigest())
+        self.assertEqual(json.loads((bundle / 'export-manifest.json').read_text())[
+            'config_format'], 'oc2-verification')
+        self.assertEqual(json.loads((bundle / 'opencode.jsonc').read_text())['plugins'], [])
+        stage._check_source(self.root, bundle)
 
     def test_v2_multi_provider_bundle_passes_stage_validation(self) -> None:
         bundle = self._make_v2_bundle()
@@ -240,16 +314,25 @@ class StageTests(unittest.TestCase):
 
     def test_apply_stages_and_verifies_without_activation(self) -> None:
         commands = []
-        def capture(argv: list[str]) -> None:
+        def capture(argv: list[str]) -> bytes:
             commands.append(argv)
             if argv[1] == "cp":
                 self.assertTrue(Path(argv[2]).exists())
+            if argv[1:4] == ["exec", "oc-v2-poc", "sha256sum"]:
+                helper_sha = hashlib.sha256(
+                    SCRIPT.with_name('oc2_agent_native.py').read_bytes(),
+                ).hexdigest()
+                return helper_sha.encode('ascii') + b'  helper.py\n'
+            return b''
         with patch.object(stage, "_check_source"), \
              patch.object(stage.shutil, "which", return_value="/usr/bin/sbx"), \
              patch.object(stage, "_run", side_effect=capture):
             stage.stage(self.bundle, self.root, sandbox="oc-v2-poc", apply=True)
-        self.assertEqual(len(commands), 4)
-        self.assertEqual([command[1] for command in commands], ["exec", "cp", "cp", "exec"])
+        self.assertEqual(len(commands), 6)
+        self.assertEqual(
+            [command[1] for command in commands],
+            ["exec", "cp", "cp", "cp", "exec", "exec"],
+        )
         remote = stage.REMOTE_PARENT + "/" + commands[-1][-1]
         self.assertTrue(remote.startswith(stage.REMOTE_PARENT + "/sbx-config-"))
         self.assertNotIn(".config/opencode", repr(commands))
@@ -257,8 +340,15 @@ class StageTests(unittest.TestCase):
         self.assertNotIn("-u", [argument for command in commands for argument in command])
         self.assertEqual(commands[-1][3], "python3")
         self.assertEqual(commands[2][-1], "oc-v2-poc:" + commands[-1][4])
+        self.assertEqual(
+            commands[3][-1],
+            commands[2][-1] + '.native.py',
+        )
+        self.assertEqual(commands[4][1:4], ["exec", "oc-v2-poc", "sha256sum"])
+        self.assertEqual(commands[4][-1], commands[3][-1].split(':', 1)[1])
         self.assertFalse(commands[-1][4].startswith(remote + "/"))
-        self.assertEqual(commands[0][-1], commands[-1][4])
+        self.assertEqual(commands[0][-2], commands[-1][4])
+        self.assertEqual(commands[0][-1], commands[3][-1].split(':', 1)[1])
 
     def test_apply_requires_valid_sandbox_name(self) -> None:
         with patch.object(stage, "_check_source"), patch.object(stage, "_run") as run:

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.util
 import json
 import os
 import re
@@ -18,11 +19,31 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
+from types import ModuleType
 from typing import Iterable, TypeAlias
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
+
+def _load_agent_policy() -> ModuleType:
+    """Load the verified sibling policy helper without importing a Host package."""
+    sidecar = Path(str(__file__) + '.native.py')
+    if sidecar.exists() or sidecar.is_symlink():
+        helper = sidecar
+    elif Path(__file__).name == 'stage_opencode_v2.py':
+        helper = Path(__file__).with_name('oc2_agent_native.py')
+    else:
+        raise ImportError('SHA-verified Native Agent policy sidecar is missing')
+    if helper.is_symlink() or not helper.is_file():
+        raise ImportError('Native Agent policy helper is missing or linked')
+    spec = importlib.util.spec_from_file_location('oc2_agent_native_guest', helper)
+    if spec is None or spec.loader is None:
+        raise ImportError('Native Agent policy helper cannot be loaded')
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+agent_policy = _load_agent_policy()
 
 NAMES = frozenset({"opencode.jsonc", "cli.json", "export-manifest.json"})
 MAX_BYTES = 1024 * 1024
@@ -209,6 +230,12 @@ def _read_bundle_files(directory: Path, names: Iterable[str]) -> dict[str, bytes
 def _verify_v2_config(server: dict[str, JsonValue]) -> None:
     """Reject V2 bundles that can activate other providers or Guest auth."""
     expected_keys = {"$schema", "shell", "snapshot", "model", "providers", "policies"}
+    if "agents" in server:
+        expected_keys.add("agents")
+        try:
+            agent_policy.validate_agent_map(server["agents"])
+        except ValueError as exc:
+            raise StageError("unapproved V2 Native Agent configuration") from exc
     if set(server) != expected_keys:
         raise StageError("unexpected V2 server config fields")
     model = server.get("model")
@@ -392,6 +419,10 @@ def _validate_server_config(
             if (set(server) != {"$schema", "shell", "snapshot", "plugins", "mcp"}
                     or server["plugins"] != [] or server["mcp"] != {}):
                 raise StageError("unapproved legacy server config values")
+        case "oc2-verification":
+            if (set(server) != {"$schema", "shell", "snapshot", "plugins", "mcp"}
+                    or server["plugins"] != [] or server["mcp"] != {}):
+                raise StageError("unapproved verification server config values")
         case "opencode-v2":
             _verify_v2_config(server)
         case _:
@@ -412,13 +443,15 @@ def verify_guest_bundle(bundle_name: str) -> str:
     return verify_bundle(expected_parent / bundle_name, trusted_root=expected_parent)
 
 
-def _run(command: list[str]) -> None:
+def _run(command: list[str]) -> bytes:
+    """Run a Sandbox command and return stdout after checking its exit status."""
     try:
         proc = subprocess.run(command, capture_output=True, timeout=120, check=False)
     except (OSError, subprocess.TimeoutExpired) as exc:
         raise StageError("sandbox command could not complete") from exc
     if proc.returncode != 0:
         raise StageError("sandbox command failed (no config activated)")
+    return proc.stdout
 
 
 def _check_source(root: Path, bundle: Path) -> None:
@@ -430,11 +463,20 @@ def _check_source(root: Path, bundle: Path) -> None:
     except ImportError as exc:
         raise StageError("export provenance check could not complete") from exc
     try:
-        apm = exporter._read_apm_source(root)
-    except (OSError, exporter.ExportError) as exc:
+        manifest_data = _read_bundle_files(bundle, ("export-manifest.json",))[
+            "export-manifest.json"
+        ]
+        manifest = json.loads(manifest_data)
+        verification_only = (
+            isinstance(manifest, dict)
+            and manifest.get("config_format") == "oc2-verification"
+        )
+        apm = exporter._read_apm_source(root, verification_only=verification_only)
+    except (OSError, ValueError, UnicodeDecodeError, exporter.ExportError) as exc:
         raise StageError("export provenance check could not complete") from exc
     expected = exporter._build_files(
         apm.shell, apm.snapshot, apm.source_sha256, apm.v2_config,
+        verification_only=apm.verification_only,
     )
     directory_fd = _open_bundle_directory(bundle)
     try:
@@ -467,15 +509,28 @@ def stage(bundle: Path, repo_root: Path, sandbox: str | None, apply: bool) -> No
         remote = REMOTE_PARENT + "/" + folder.name
         # The VM owns this path, never a host mount in the intended configuration.
         remote_verifier = REMOTE_PARENT + "/." + folder.name + ".verify.py"
+        native_helper = Path(__file__).with_name('oc2_agent_native.py')
+        if native_helper.is_symlink() or not native_helper.is_file():
+            raise StageError('Native Agent policy helper is missing or linked')
+        native_helper = native_helper.resolve(strict=True)
+        native_helper_sha = hashlib.sha256(native_helper.read_bytes()).hexdigest()
+        remote_native_helper = remote_verifier + '.native.py'
         _run(["sbx", "exec", sandbox, "sh", "-c",
               'test -d "$1" && test ! -L "$1" && test ! -e "$2" && test ! -L "$2"'
-              ' && test ! -e "$3" && test ! -L "$3"',
-              "sh", REMOTE_PARENT, remote, remote_verifier])
+              ' && test ! -e "$3" && test ! -L "$3"'
+              ' && test ! -e "$4" && test ! -L "$4"',
+              "sh", REMOTE_PARENT, remote, remote_verifier, remote_native_helper])
         _run(["sbx", "cp", str(folder), f"{sandbox}:{remote}"])
         verifier = Path(__file__).resolve(strict=True)
         # Verifier is executed from the sandbox agent's local Python interpreter.
         # Transfer separately to avoid smuggling a script in a supposedly data-only bundle.
         _run(["sbx", "cp", str(verifier), f"{sandbox}:{remote_verifier}"])
+        _run(["sbx", "cp", str(native_helper), f"{sandbox}:{remote_native_helper}"])
+        helper_sha = _run(
+            ["sbx", "exec", sandbox, "sha256sum", remote_native_helper],
+        ).split()
+        if not helper_sha or helper_sha[0] != native_helper_sha.encode("ascii"):
+            raise StageError("Guest Native Agent policy helper SHA mismatch")
         _run(["sbx", "exec", sandbox, "python3", remote_verifier,
               "--verify-bundle", folder.name])
         print("STAGED_AND_VERIFIED: " + sandbox + ":" + remote)

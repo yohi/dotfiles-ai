@@ -11,10 +11,7 @@ import math
 import os
 import re
 import sys
-try:
-    import tomllib
-except ImportError:
-    import tomli as tomllib
+import tomllib
 from pathlib import Path
 from typing import Any
 
