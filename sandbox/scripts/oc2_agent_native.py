@@ -252,7 +252,7 @@ def validate_agent_map(value: JsonValue | AgentMap) -> AgentMap:
     result: AgentMap = {}
     for raw_name in value:
         name = parse_agent_name(raw_name)
-        raw_agent = value[raw_name]
+        raw_agent = value.get(raw_name)
         expected = _agent_config(name)
         if raw_agent != expected:
             raise ValueError('Native Agent configuration is not allowlisted')

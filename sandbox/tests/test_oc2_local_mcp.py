@@ -7,7 +7,7 @@ import subprocess
 import sys
 import unittest
 from pathlib import Path
-from typing import TypeAlias
+from typing import Any, TypeAlias
 
 SCRIPTS = Path(__file__).resolve().parents[1] / 'scripts'
 SERVER = SCRIPTS / 'oc2_local_mcp.py'
@@ -38,7 +38,7 @@ def initialized_input() -> str:
 
 
 class LocalMcpProtocolTest(unittest.TestCase):
-    def _serve(self, payload: str) -> tuple[int, list[dict[str, object]]]:
+    def _serve(self, payload: str) -> tuple[int, list[dict[str, Any]]]:
         output = io.StringIO()
         status = oc2_local_mcp.serve(io.StringIO(payload), output)
         return status, [json.loads(line) for line in output.getvalue().splitlines()]

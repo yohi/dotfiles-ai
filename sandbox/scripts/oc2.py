@@ -648,10 +648,12 @@ def is_compatible_sandbox(runner: Runner, name: str) -> bool:
         listing = json.loads(runner.sbx('ls', '--format', 'json', capture=True))
     except (TypeError, ValueError) as exc:
         raise Stop('could not parse existing Sandbox identity') from exc
+    records: list[object] | None
     if isinstance(listing, list):
         records = listing
     elif isinstance(listing, dict):
-        records = listing.get('sandboxes')
+        candidate = listing.get('sandboxes')
+        records = candidate if isinstance(candidate, list) else None
     else:
         records = None
     if not isinstance(records, list):
@@ -930,7 +932,7 @@ def prepare_verification_runtime(
         generator_fingerprint = verification_generator_fingerprint(
             HERE / 'oc2_guest.py', HERE / 'oc2_agent_native.py', HERE / 'oc2_identity.py',
         )
-        runtime_sha = runtime_identity_sha256(
+        runtime_sha: str = runtime_identity_sha256(
             config_sha, asset_sha, generator_fingerprint,
         )
         runtime_destination = f'{ROOT}/runtime/{runtime_sha[:16]}'
@@ -946,7 +948,7 @@ def prepare_verification_runtime(
             asset_file, asset_sha,
         )
         print('OC2_VERIFICATION_PREPARED: sandbox=' + sandbox + ' runtime=' + runtime_sha[:16])
-        return runtime_sha
+        return str(runtime_sha)
 
 
 def cli_path(runner: Runner, name: str) -> str | None:
@@ -1280,6 +1282,8 @@ def main(argv: list[str] | None = None) -> int:
         if not (repo / 'apm.yml').is_file():
             raise Stop('dotfiles-ai apm.yml not found')
         if args.verification_only:
+            if args.plugin_dir is None:
+                raise Stop('plugin directory is required for verification-only mode')
             prepare_verification_runtime(repo, args.sandbox, args.plugin_dir)
             return 0
         if args.prepare_only:

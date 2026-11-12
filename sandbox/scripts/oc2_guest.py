@@ -400,11 +400,14 @@ def _verify_plugin_source_metadata(raw: bytes) -> dict[str, JsonValue]:
             or any(metadata.get(key) != value for key, value in expected.items())):
         fail('Superpowers source metadata is not allowlisted')
     plugin_files = metadata.get('plugin_files')
-    if (not isinstance(plugin_files, list)
-            or any(not isinstance(name, str) for name in plugin_files)
-            or plugin_files != sorted(set(plugin_files))):
+    if not isinstance(plugin_files, list):
         fail('Superpowers Plugin file manifest is invalid')
-    names = set(plugin_files)
+    if any(not isinstance(name, str) for name in plugin_files):
+        fail('Superpowers Plugin file manifest is invalid')
+    file_names = [name for name in plugin_files if isinstance(name, str)]
+    if file_names != sorted(set(file_names)):
+        fail('Superpowers Plugin file manifest is invalid')
+    names = set(file_names)
     if not {
         'index.js',
         'package.json',
@@ -414,13 +417,13 @@ def _verify_plugin_source_metadata(raw: bytes) -> dict[str, JsonValue]:
     if not any(
         name.startswith('skills/') and name.endswith('/SKILL.md')
         and len(name.split('/')) == 3
-        for name in plugin_files
+        for name in file_names
     ):
         fail('Superpowers Native Skill assets are missing')
     if any(
         name.startswith('/') or '\\' in name
         or any(part in ('', '.', '..') for part in name.split('/'))
-        for name in plugin_files
+        for name in file_names
     ):
         fail('Superpowers Plugin file path is unsafe')
     return metadata

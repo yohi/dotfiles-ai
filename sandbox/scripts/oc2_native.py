@@ -85,7 +85,7 @@ def _mapping(node: Node, label: str) -> dict[str, Node]:
 def _string(node: Node, label: str) -> str:
     match node:
         case ScalarNode(tag='tag:yaml.org,2002:str', value=value) if value:
-            return value
+            return str(value)
         case _:
             raise NativeConfigError(f'{label} must be a non-empty string')
 
@@ -135,7 +135,7 @@ def parse_superpowers_lock(raw: bytes) -> str:
         node = entry.get(key)
         if node is None or _string(node, 'Superpowers lock ' + key) != value:
             raise NativeConfigError('APM lock Superpowers identity mismatch')
-    return SUPERPOWERS_COMMIT
+    return str(SUPERPOWERS_COMMIT)
 
 
 def _boolean(node: Node, label: str) -> bool:

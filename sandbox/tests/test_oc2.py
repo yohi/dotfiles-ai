@@ -17,6 +17,7 @@ import sys
 import tarfile
 import tempfile
 import unittest
+from typing import Any
 from unittest.mock import patch
 
 import yaml
@@ -30,8 +31,9 @@ def load(name: str):
     if name in sys.modules:
         return sys.modules[name]
     spec = importlib.util.spec_from_file_location(name, SCRIPTS / (name + '.py'))
+    if spec is None or spec.loader is None:
+        raise ImportError(f'could not load module: {name}')
     mod = importlib.util.module_from_spec(spec)
-    assert spec and spec.loader
     sys.modules[name] = mod
     spec.loader.exec_module(mod)
     return mod
@@ -1125,7 +1127,7 @@ class HostTest(unittest.TestCase):
             self.assertEqual(calls, [(staged, 'sbx-poc')])
 
     def test_snapshot_acl_is_limited_to_named_operator(self):
-        result = subprocess.CompletedProcess(args=[], returncode=0)
+        result: subprocess.CompletedProcess[str] = subprocess.CompletedProcess(args=[], returncode=0)
         with tempfile.TemporaryDirectory() as tmp:
             snapshot = pathlib.Path(tmp) / 'project'
             (snapshot / 'src').mkdir(parents=True)
@@ -1144,7 +1146,7 @@ class HostTest(unittest.TestCase):
             )
 
     def test_collection_acl_is_limited_to_private_temporary_directory(self):
-        result = subprocess.CompletedProcess(args=[], returncode=0)
+        result: subprocess.CompletedProcess[str] = subprocess.CompletedProcess(args=[], returncode=0)
         with patch.object(oc2.shutil, 'which', return_value='/usr/bin/setfacl'), \
              patch.object(oc2.subprocess, 'run', return_value=result) as run:
             oc2.grant_collection_directory_access(
@@ -1921,14 +1923,14 @@ class OAuthBootstrapConfigTest(unittest.TestCase):
         config_dir = self.runtime / 'config' / 'opencode'
         config_dir.mkdir(parents=True, mode=0o700)
         self.base_file = config_dir / 'opencode.jsonc'
-        self.policies = [
+        self.policies: list[dict[str, str]] = [
             {'action': 'provider.use', 'resource': '*', 'effect': 'deny'},
             {'action': 'provider.use', 'resource': 'openai', 'effect': 'allow'},
             {'action': 'integration.connect', 'resource': '*', 'effect': 'deny'},
             {'action': 'plugin.use', 'resource': '*', 'effect': 'deny'},
             {'action': 'mcp.use', 'resource': '*', 'effect': 'deny'},
         ]
-        self.config = {
+        self.config: dict[str, Any] = {
             '$schema': 'https://opencode.ai/config.json',
             'model': 'openai/gpt-6-luna',
             'providers': {'openai': {'models': {'gpt-6-luna': {}}}},
@@ -2065,7 +2067,7 @@ class OAuthTest(unittest.TestCase):
             return bootstrap.capture_import_stderr(self.runtime, self.db, stderr)
 
     def run_sync(self, before, after, fail=None):
-        calls = []
+        calls: list[tuple[Any, Any]] = []
         self.last_calls = calls
         self.last_envs = []
         exports = iter([before, after])

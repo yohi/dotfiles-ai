@@ -158,9 +158,9 @@ class FakeSbx:
             if command[:2] == ('bash', '-c'):
                 return 'missing\n'
             if command[:1] == ('sha256sum',):
-                data = self.remote_files.get(command[1])
-                return (hashlib.sha256(data).hexdigest() + '  ' + command[1] + '\n'
-                        if data is not None else '')
+                remote_data = self.remote_files.get(command[1])
+                return (hashlib.sha256(remote_data).hexdigest() + '  ' + command[1] + '\n'
+                        if remote_data is not None else '')
             if (command[:2] == ('sh', '-c')
                     and command[4] == oc2.PINNED[0]):
                 return 'opencode v2.2.5\n' if self.installed else ''
@@ -245,7 +245,7 @@ class LauncherFlowTests(unittest.TestCase):
                 try:
                     status = oc2.main(args)
                 except SystemExit as exc:
-                    status = int(exc.code)
+                    status = 0 if exc.code is None else int(exc.code)
                 return status, output.getvalue()
 
     def _write_cloudflare_apm(self) -> None:
@@ -425,6 +425,7 @@ class LauncherFlowTests(unittest.TestCase):
                              for call in self.fake.calls))
         if self.fake.copied_config is None:
             self.fail('V2 config was not copied into the Sandbox')
+        assert self.fake.copied_config is not None
         copied_config = json.loads(self.fake.copied_config)
         self.assertEqual(copied_config['model'], 'openai/gpt-6-luna')
         self.assertNotIn('cloudflare-ai-gateway-custom', copied_config['providers'])
@@ -449,6 +450,7 @@ class LauncherFlowTests(unittest.TestCase):
         status, output = self._run('--allow-paid-inference', stdin_tty=False)
 
         self.assertEqual(status, 0, output)
+        assert self.fake.copied_config is not None
         copied_config = json.loads(self.fake.copied_config)
         self.assertEqual(copied_config['model'], 'openai/gpt-6-luna')
         self.assertNotIn('cloudflare-ai-gateway-custom', copied_config['providers'])
@@ -575,6 +577,7 @@ class LauncherFlowTests(unittest.TestCase):
         self.assertFalse(mixin_path.exists())
         self.assertIsNotNone(self.fake.created_mixin_spec)
         self.assertFalse(self.fake.mixin_exists_at_launch)
+        assert self.fake.created_mixin_spec is not None
         mixin_spec = yaml.safe_load(self.fake.created_mixin_spec)
         self.assertFalse(any(
             value in self.fake.created_mixin_spec for value in poison.values()
