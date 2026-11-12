@@ -18,12 +18,22 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
-from typing import TypeAlias
+from typing import Iterable, TypeAlias
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
 NAMES = frozenset({"opencode.jsonc", "cli.json", "export-manifest.json"})
 MAX_BYTES = 1024 * 1024
+SECRET_PATTERNS = tuple(re.compile(pattern) for pattern in (
+    rb"-----BEGIN (?:OPENSSH |RSA |EC )?PRIVATE KEY-----",
+    rb"\bAKIA[0-9A-Z]{16}\b",
+    rb"\bgh[pousr]_[A-Za-z0-9]{20,}\b",
+    rb"\bsk-[A-Za-z0-9]{24,}\b",
+    rb"(?i)\b(?:api[_-]?key|access[_-]?key|secret|password|token)\s*[:=]\s*['\"]?[A-Za-z0-9_./+=-]{16,}",
+))
+SECRET_PLACEHOLDERS = (b"DO_NOT_EXPORT", b"EXAMPLE", b"PLACEHOLDER", b"DUMMY", b"FIXTURE")
 SANDBOX_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9.-]{0,61}[a-zA-Z0-9]$")
 BUNDLE_DIRECTORY_RE = re.compile(r"^sbx-config-[a-f0-9]{16}-[a-f0-9]{12}$")
 HOST_BUNDLE_RE = re.compile(r"^opencode-v2-export-[a-zA-Z0-9][a-zA-Z0-9-]{0,63}$")
@@ -44,6 +54,16 @@ def _unique_json_object(pairs: list[tuple[str, JsonValue]]) -> dict[str, JsonVal
             raise StageError("duplicate JSON object key")
         result[key] = value
     return result
+
+
+def _contains_credential_material(data: bytes) -> bool:
+    """Detect configured credential signatures, ignoring recognized fixture placeholders."""
+    for pattern in SECRET_PATTERNS:
+        for match in pattern.finditer(data):
+            value = match.group().upper()
+            if not any(placeholder in value for placeholder in SECRET_PLACEHOLDERS):
+                return True
+    return False
 
 
 def _verify_model_settings(value: JsonValue, label: str) -> None:
@@ -115,6 +135,33 @@ class StageError(Exception):
     """Expected failure without exposing file contents or CLI stderr."""
 
 
+def _regular_bytes(directory_fd: int, name: str) -> bytes:
+    """Read an allowlisted regular bundle file without following symlinks or exceeding MAX_BYTES."""
+    if name not in NAMES:
+        raise StageError("bundle file is not in the allowlist")
+    flags = os.O_RDONLY | os.O_NONBLOCK | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        descriptor = os.open(name, flags, dir_fd=directory_fd)
+    except OSError as exc:
+        raise StageError("bundle file could not be opened safely: " + name) from exc
+    try:
+        info = os.fstat(descriptor)
+        if not stat.S_ISREG(info.st_mode):
+            raise StageError("missing, non-regular, or symlinked bundle file: " + name)
+        if info.st_size > MAX_BYTES:
+            raise StageError("bundle file exceeds size limit: " + name)
+        chunks: list[bytes] = []
+        size = 0
+        while chunk := os.read(descriptor, min(MAX_BYTES + 1 - size, 65536)):
+            chunks.append(chunk)
+            size += len(chunk)
+            if size > MAX_BYTES:
+                raise StageError("bundle file exceeds size limit: " + name)
+        return b"".join(chunks)
+    finally:
+        os.close(descriptor)
+
+
 def _host_bundle_path(name: str) -> Path:
     if HOST_BUNDLE_RE.fullmatch(name) is None:
         raise StageError("bundle must be identified by its generated directory name")
@@ -148,30 +195,15 @@ def _open_bundle_directory(directory: Path) -> int:
     return directory_fd
 
 
-def _regular_bytes(directory_fd: int, name: str) -> bytes:
-    if name not in NAMES:
-        raise StageError("unexpected bundle file name")
+def _read_bundle_files(directory: Path, names: Iterable[str]) -> dict[str, bytes]:
+    requested = tuple(names)
+    if not requested or not set(requested) <= NAMES:
+        raise StageError("bundle file is not in the allowlist")
+    directory_fd = _open_bundle_directory(directory)
     try:
-        file_fd = os.open(
-            name,
-            os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK,
-            dir_fd=directory_fd,
-        )
-    except OSError as exc:
-        raise StageError("bundle member is not a safe regular file: " + name) from exc
-    try:
-        file_info = os.fstat(file_fd)
-        if not stat.S_ISREG(file_info.st_mode):
-            raise StageError("bundle member is not a regular file: " + name)
-        if file_info.st_size > MAX_BYTES:
-            raise StageError("bundle file exceeds size limit: " + name)
-        with os.fdopen(file_fd, "rb", closefd=False) as file:
-            content = file.read(MAX_BYTES + 1)
-        if len(content) > MAX_BYTES:
-            raise StageError("bundle file exceeds size limit: " + name)
-        return content
+        return {name: _regular_bytes(directory_fd, name) for name in requested}
     finally:
-        os.close(file_fd)
+        os.close(directory_fd)
 
 
 def _verify_v2_config(server: dict[str, JsonValue]) -> None:
@@ -257,17 +289,53 @@ def _verify_custom_headers(headers: dict[str, JsonValue]) -> None:
         raise StageError("Cloudflare Custom proxy authorization header is required")
 
 
-def verify_bundle(directory: Path) -> str:
+def _validated_bundle_directory(directory: Path, trusted_root: Path) -> Path:
+    """Resolve a bundle strictly beneath the trusted root, rejecting traversal and symlink paths."""
+    root = trusted_root.absolute()
+    candidate = directory if directory.is_absolute() else Path.cwd() / directory
+    candidate = candidate.absolute()
+    if ".." in candidate.parts:
+        raise StageError("bundle directory contains traversal")
+    if candidate == root or not candidate.is_relative_to(root):
+        raise StageError("bundle directory is outside the approved staging root")
+    current = candidate
+    while current != root:
+        if current.is_symlink():
+            raise StageError("bundle directory path contains a symlink")
+        current = current.parent
+    resolved_root = root.resolve(strict=True)
+    resolved = candidate.resolve(strict=True)
+    if resolved == resolved_root or not resolved.is_relative_to(resolved_root):
+        raise StageError("bundle directory resolves outside the approved staging root")
+    return resolved
+
+
+def verify_bundle(directory: Path, *, trusted_root: Path) -> str:
     """Validate content and hashes, without executing any exported config."""
-    if directory.is_symlink() or not directory.is_dir():
-        raise StageError("bundle directory must be a regular directory")
+    directory = _validated_bundle_directory(directory, trusted_root)
     directory_fd = _open_bundle_directory(directory)
     try:
         if set(os.listdir(directory_fd)) != NAMES:
             raise StageError("unexpected bundle file set")
-        data = {name: _regular_bytes(directory_fd, name) for name in NAMES}
+        manifest, server, tui, data = _load_bundle(directory_fd)
     finally:
         os.close(directory_fd)
+    if any(_contains_credential_material(content) for content in data.values()):
+        raise StageError("bundle contains credential material")
+
+    digest = _validate_manifest(manifest, data)
+    _validate_server_config(server, manifest)
+    _validate_tui_config(tui)
+    return digest
+
+
+
+
+def _load_bundle(
+    directory_fd: int,
+) -> tuple[dict[str, JsonValue], dict[str, JsonValue], dict[str, JsonValue], dict[str, bytes]]:
+    """Read the allowlisted bundle files and parse the three JSON documents as objects."""
+    data = {name: _regular_bytes(directory_fd, name) for name in NAMES}
     try:
         manifest = json.loads(
             data["export-manifest.json"], object_pairs_hook=_unique_json_object,
@@ -278,8 +346,12 @@ def verify_bundle(directory: Path) -> str:
         tui = json.loads(data["cli.json"], object_pairs_hook=_unique_json_object)
     except (ValueError, UnicodeDecodeError) as exc:
         raise StageError("bundle is not valid UTF-8 JSON") from exc
-    if not isinstance(manifest, dict):
-        raise StageError("invalid manifest")
+    if not isinstance(manifest, dict) or not isinstance(server, dict) or not isinstance(tui, dict):
+        raise StageError("bundle JSON roots must be objects")
+    return manifest, server, tui, data
+
+
+def _validate_manifest(manifest: dict[str, JsonValue], data: dict[str, bytes]) -> str:
     expected_keys = {"schema", "generator", "source", "config_format", "source_sha256",
                      "opencode_version", "plugins_exported", "mcp_entries_exported",
                      "artifacts_sha256"}
@@ -294,21 +366,26 @@ def verify_bundle(directory: Path) -> str:
     source_hash = manifest.get("source_sha256")
     if not isinstance(source_hash, str) or re.fullmatch(r"[a-f0-9]{64}", source_hash) is None:
         raise StageError("invalid source digest")
-    expected = {
+    expected_hashes = {
         name: hashlib.sha256(data[name]).hexdigest()
         for name in ("opencode.jsonc", "cli.json")
     }
-    if manifest.get("artifacts_sha256") != expected:
+    if manifest.get("artifacts_sha256") != expected_hashes:
         raise StageError("artifact checksum mismatch")
     if manifest.get("plugins_exported") != 0 or manifest.get("mcp_entries_exported") != 0:
         raise StageError("exported plugins or MCP entries are forbidden")
-    if not isinstance(server, dict):
-        raise StageError("unexpected server config fields")
-    if server["$schema"] != "https://opencode.ai/config.json":
+    return hashlib.sha256(data["export-manifest.json"]).hexdigest()
+
+
+def _validate_server_config(
+    server: dict[str, JsonValue],
+    manifest: dict[str, JsonValue],
+) -> None:
+    if server.get("$schema") != "https://opencode.ai/config.json":
         raise StageError("unexpected server config schema")
-    if server["shell"] not in ("bash", "sh", "zsh") or type(server["shell"]) is not str:
+    if server.get("shell") not in ("bash", "sh", "zsh") or type(server.get("shell")) is not str:
         raise StageError("unapproved shell")
-    if type(server["snapshot"]) is not bool:
+    if type(server.get("snapshot")) is not bool:
         raise StageError("unapproved server config values")
     match manifest["config_format"]:
         case "legacy-minimal":
@@ -319,9 +396,20 @@ def verify_bundle(directory: Path) -> str:
             _verify_v2_config(server)
         case _:
             raise StageError("unrecognized config format")
-    if not isinstance(tui, dict) or tui != {"$schema": "https://opencode.ai/v2/cli.json", "plugins": []}:
+
+
+def _validate_tui_config(tui: dict[str, JsonValue]) -> None:
+    if tui != {"$schema": "https://opencode.ai/v2/cli.json", "plugins": []}:
         raise StageError("unexpected TUI config")
-    return hashlib.sha256(data["export-manifest.json"]).hexdigest()
+
+
+def verify_guest_bundle(bundle_name: str) -> str:
+    expected_parent = Path(REMOTE_PARENT)
+    if BUNDLE_DIRECTORY_RE.fullmatch(bundle_name) is None:
+        raise StageError("guest bundle must be an approved staging directory")
+    if any(parent.is_symlink() for parent in (expected_parent, *expected_parent.parents)):
+        raise StageError("guest bundle path contains a symlink")
+    return verify_bundle(expected_parent / bundle_name, trusted_root=expected_parent)
 
 
 def _run(command: list[str]) -> None:
@@ -334,8 +422,7 @@ def _run(command: list[str]) -> None:
 
 
 def _check_source(root: Path, bundle: Path) -> None:
-    if str(PROJECT_ROOT) not in sys.path:
-        sys.path.insert(0, str(PROJECT_ROOT))
+    bundle = _validated_bundle_directory(bundle, BUNDLE_ROOT)
     try:
         import importlib
 
@@ -362,7 +449,7 @@ def stage(bundle: Path, repo_root: Path, sandbox: str | None, apply: bool) -> No
     if bundle.is_symlink():
         raise StageError("bundle path must not be a symlink")
     root = repo_root.resolve(strict=True)
-    digest = verify_bundle(bundle)
+    digest = verify_bundle(bundle, trusted_root=BUNDLE_ROOT)
     _check_source(root, bundle)
     if not apply:
         print("DRY_RUN_OK: verified source and snapshot; nothing transferred")
@@ -405,9 +492,7 @@ def main(argv: list[str] | None = None) -> int:
     args = p.parse_args(argv)
     try:
         if args.verify_bundle is not None:
-            if not BUNDLE_DIRECTORY_RE.fullmatch(args.verify_bundle):
-                raise StageError("invalid staged bundle directory name")
-            digest = verify_bundle(Path(REMOTE_PARENT) / args.verify_bundle)
+            digest = verify_guest_bundle(args.verify_bundle)
             print("VERIFY_OK: " + digest)
         else:
             if args.bundle is None:

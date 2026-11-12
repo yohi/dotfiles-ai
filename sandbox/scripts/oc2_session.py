@@ -19,6 +19,7 @@ MAX_RECEIPT_BYTES = 16 * 1024
 class Session:
     directory: pathlib.Path
     sandbox: str
+    sandbox_id: str
     remote: str
     manifest: Manifest
     collected: bool
@@ -40,13 +41,17 @@ def session_directory(state_root: pathlib.Path, workspace: pathlib.Path) -> path
 
 
 def create(state_root: pathlib.Path, sandbox: str, remote: str,
-           manifest: Manifest) -> Session:
+           manifest: Manifest, *, sandbox_id: str) -> Session:
+    if re.fullmatch(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}',
+                    sandbox_id) is None:
+        raise WorkspaceError('OC2 Sandbox identifier is invalid')
     directory = session_directory(state_root, pathlib.Path(manifest.root))
     directory.mkdir(mode=0o700)
     receipt = {
-        'schema': 'dotfiles-ai/oc2-session/v1',
+        'schema': 'dotfiles-ai/oc2-session/v2',
         'workspace': manifest.root,
         'sandbox': sandbox,
+        'sandbox_id': sandbox_id,
         'remote': remote,
         'manifest_sha256': hashlib.sha256(manifest.encode()).hexdigest(),
         'collected': False,
@@ -54,7 +59,7 @@ def create(state_root: pathlib.Path, sandbox: str, remote: str,
     }
     _write_new(directory / 'baseline.json', manifest.encode())
     _write_new(directory / 'receipt.json', _encoded(receipt))
-    return Session(directory, sandbox, remote, manifest, False, False)
+    return Session(directory, sandbox, sandbox_id, remote, manifest, False, False)
 
 
 def load(state_root: pathlib.Path, workspace: pathlib.Path) -> Session:
@@ -65,10 +70,10 @@ def load(state_root: pathlib.Path, workspace: pathlib.Path) -> Session:
         receipt = json.loads(receipt_file)
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise WorkspaceError('OC2 transfer receipt is invalid') from exc
-    expected = {'schema', 'workspace', 'sandbox', 'remote', 'manifest_sha256',
+    expected = {'schema', 'workspace', 'sandbox', 'sandbox_id', 'remote', 'manifest_sha256',
                 'collected', 'applied'}
     if not isinstance(receipt, dict) or set(receipt) != expected or \
-            receipt.get('schema') != 'dotfiles-ai/oc2-session/v1':
+            receipt.get('schema') != 'dotfiles-ai/oc2-session/v2':
         raise WorkspaceError('OC2 transfer receipt schema is invalid')
     root = workspace.resolve(strict=True)
     if receipt['workspace'] != str(root):
@@ -76,6 +81,10 @@ def load(state_root: pathlib.Path, workspace: pathlib.Path) -> Session:
     if not isinstance(receipt['sandbox'], str) or \
             re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9.-]{0,61}[A-Za-z0-9]', receipt['sandbox']) is None:
         raise WorkspaceError('OC2 receipt Sandbox identity is invalid')
+    if not isinstance(receipt['sandbox_id'], str) or \
+            re.fullmatch(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}',
+                         receipt['sandbox_id']) is None:
+        raise WorkspaceError('OC2 receipt Sandbox identifier is invalid')
     if not isinstance(receipt['remote'], str) or \
             re.fullmatch(r'/home/agent/workspace/oc2/projects/[a-f0-9]{32}', receipt['remote']) is None:
         raise WorkspaceError('OC2 receipt project path is invalid')
@@ -86,7 +95,7 @@ def load(state_root: pathlib.Path, workspace: pathlib.Path) -> Session:
         raise WorkspaceError('OC2 baseline manifest digest mismatch')
     if receipt['collected'] and not (directory / 'collected').is_dir():
         raise WorkspaceError('OC2 collection is missing')
-    return Session(directory, receipt['sandbox'], receipt['remote'], manifest,
+    return Session(directory, receipt['sandbox'], receipt['sandbox_id'], receipt['remote'], manifest,
                    receipt['collected'], receipt['applied'])
 
 
@@ -104,7 +113,7 @@ def update(session: Session, *, collected: bool | None = None,
     temp = session.directory / 'receipt.json.new'
     _write_new(temp, _encoded(data))
     os.replace(temp, receipt_path)
-    return Session(session.directory, session.sandbox, session.remote,
+    return Session(session.directory, session.sandbox, session.sandbox_id, session.remote,
                    session.manifest,
                    data['collected'], data['applied'])
 

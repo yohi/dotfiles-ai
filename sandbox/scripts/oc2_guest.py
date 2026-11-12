@@ -134,7 +134,6 @@ def _verify_model_catalog(models: JsonValue) -> None:
 
 
 def regular(path: pathlib.Path, max_bytes: int = 1048576) -> bytes:
-    """Read a bounded regular file, rejecting links and oversized inputs."""
     if path.is_symlink() or not path.is_file() or path.stat().st_size > max_bytes:
         fail('non-regular or oversized file: ' + path.name)
     return path.read_bytes()
@@ -216,7 +215,6 @@ def _verify_v2_provider_options(
 
 
 def verify(bundle: pathlib.Path) -> str:
-    """Verify bundle structure, artifact hashes, and allowed configuration."""
     if bundle.is_symlink() or not bundle.is_dir() or {x.name for x in bundle.iterdir()} != set(FILES):
         fail('invalid bundle directory or members')
     data = {name: regular(bundle / name) for name in FILES}
@@ -262,7 +260,6 @@ def verify(bundle: pathlib.Path) -> str:
 
 
 def runtime_path(manifest_sha: str, assets_sha: str | None = None) -> pathlib.Path:
-    """Derive the immutable runtime directory from verified content hashes."""
     if assets_sha:
         combined = hashlib.sha256(
             bytes.fromhex(manifest_sha) + bytes.fromhex(assets_sha)
@@ -272,34 +269,24 @@ def runtime_path(manifest_sha: str, assets_sha: str | None = None) -> pathlib.Pa
 
 
 def verify_assets(source: pathlib.Path, expected_sha: str) -> dict[str, bytes]:
-    """Verify selected assets and return their validated byte content."""
     validate_location(source, BASE)
     if re.fullmatch(r'[0-9a-f]{64}', expected_sha) is None:
         fail('invalid asset SHA')
     raw = regular(source, MAX_ASSETS)
     if hashlib.sha256(raw).hexdigest() != expected_sha:
         fail('host/guest asset SHA mismatch')
-    try:
-        payload = json.loads(raw)
-    except ValueError as exc:
-        raise ValueError('invalid asset JSON') from exc
-    files, hashes = _asset_payload(payload)
-    result: dict[str, bytes] = {}
-    for name in sorted(ASSET_TARGETS):
-        value = files[name]
-        if not isinstance(value, str):
-            fail('non-text asset')
-        encoded = value.encode('utf-8')
-        if len(encoded) > 65536 or hashlib.sha256(encoded).hexdigest() != hashes[name]:
-            fail('asset content SHA mismatch')
-        result[name] = encoded
-    _validate_theme(result[THEME_FILE])
+    files, hashes = _decode_asset_manifest(raw)
+    result = _verify_asset_files(files, hashes)
+    _validate_theme_asset(result[THEME_FILE])
     # No third-party agent metadata or model routing is imported.
     return result
 
 
-def _asset_payload(payload: dict[str, object]) -> tuple[dict[str, str], dict[str, str]]:
-    """Validate the asset manifest shape and its strict path allowlist."""
+def _decode_asset_manifest(raw: bytes) -> tuple[dict[str, object], dict[str, object]]:
+    try:
+        payload = json.loads(raw)
+    except ValueError as exc:
+        raise ValueError('invalid asset JSON') from exc
     if not isinstance(payload, dict) or set(payload) != {'schema', 'files', 'sha256'}:
         fail('invalid asset manifest')
     if payload.get('schema') != ASSET_SCHEMA:
@@ -312,8 +299,27 @@ def _asset_payload(payload: dict[str, object]) -> tuple[dict[str, str], dict[str
     return files, hashes
 
 
-def _validate_theme(data: bytes) -> None:
-    """Reject malformed or unapproved theme metadata."""
+def _verify_asset_files(
+    files: dict[str, object],
+    hashes: dict[str, object],
+) -> dict[str, bytes]:
+    result: dict[str, bytes] = {}
+    for name in sorted(ASSET_TARGETS):
+        value = files[name]
+        if not isinstance(value, str):
+            fail('non-text asset')
+        encoded = value.encode('utf-8')
+        digest = hashes[name]
+        if (len(encoded) > 65536 or not isinstance(digest, str)
+                or hashlib.sha256(encoded).hexdigest() != digest):
+            fail('asset content SHA mismatch')
+        result[name] = encoded
+
+
+    return result
+
+
+def _validate_theme_asset(data: bytes) -> None:
     try:
         theme = json.loads(data)
     except ValueError as exc:
@@ -324,7 +330,6 @@ def _validate_theme(data: bytes) -> None:
         fail('unsafe TUI theme')
 
 def validate_location(path: pathlib.Path, parent: pathlib.Path) -> None:
-    """Require a destination below the runtime root with no symlink parents."""
     if not path.is_relative_to(parent) or path == parent:
         fail('path outside oc2 sandbox area')
     cur = path
@@ -335,10 +340,14 @@ def validate_location(path: pathlib.Path, parent: pathlib.Path) -> None:
 
 
 def write_new(path: pathlib.Path, data: bytes, mode: int = 0o600) -> None:
-    """Create a new file exclusively with the requested restrictive mode."""
     fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, 'O_NOFOLLOW', 0), mode)
     with os.fdopen(fd, 'wb') as out:
         out.write(data)
+
+
+def _encoded(value: object) -> bytes:
+    return (json.dumps(value, ensure_ascii=False, sort_keys=True,
+                       separators=(',', ':')) + '\n').encode('utf-8')
 
 
 def prepare(
@@ -347,7 +356,6 @@ def prepare(
     assets: dict[str, bytes] | None = None,
     assets_sha: str | None = None,
 ) -> pathlib.Path:
-    """Materialize verified configuration and assets into a new isolated runtime."""
     if (assets is None) != (assets_sha is None):
         fail('asset content/identity mismatch')
     dest = runtime_path(manifest_sha, assets_sha)
@@ -355,39 +363,46 @@ def prepare(
 
     server = json.loads(regular(bundle / SERVER_CONFIG))
     client = json.loads(regular(bundle / CLIENT_CONFIG))
-    asset_files: dict[str, bytes] = {}
     if assets is not None:
-        # Instructions are resolved inside the guest, not on the Host.
-        rule_names = sorted(p for p in assets if p.startswith('config/opencode/rules/'))
-        server['instructions'] = [str(dest / name) for name in rule_names]
-        client['theme'] = json.loads(assets[THEME_FILE])
-        asset_files = {name: value for name, value in assets.items()
-                       if name != THEME_FILE}
+        _apply_asset_config(dest, server, client, assets)
 
-    def encoded(value: object) -> bytes:
-        """Serialize runtime configuration as canonical UTF-8 JSON."""
-        return (json.dumps(value, ensure_ascii=False, sort_keys=True,
-                           separators=(',', ':')) + '\n').encode('utf-8')
+    expected = _runtime_files(server, client, assets)
 
-    expected = {
-        f'config/opencode/{SERVER_CONFIG}': encoded(server),
-        f'config/opencode/{CLIENT_CONFIG}': encoded(client),
-        **asset_files,
-    }
     receipt = {'manifest_sha256': manifest_sha, 'opencode_version': VERSION}
     if assets_sha is not None:
         receipt['assets_sha256'] = assets_sha
     marker = dest / 'receipt.json'
-    if not _verify_existing_runtime(dest, marker, receipt, expected):
-        (dest / 'config/opencode').mkdir(parents=True, mode=0o700)
-        for name in ('home', 'data', 'state', 'cache', 'tmp', 'project'):
-            (dest / name).mkdir(mode=0o700)
-        for name, data in expected.items():
-            location = dest / name
-            location.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-            write_new(location, data)
-        write_new(marker, encoded(receipt))
+    if dest.exists():
+        _verify_existing_runtime(dest, marker, receipt, expected)
+        return dest
+    _create_runtime(dest, marker, receipt, expected)
     return dest
+
+
+def _apply_asset_config(
+    dest: pathlib.Path,
+    server: dict[str, JsonValue],
+    client: dict[str, JsonValue],
+    assets: dict[str, bytes],
+) -> None:
+    # Instructions are resolved inside the guest, not on the Host.
+    rule_names = sorted(name for name in assets if name.startswith('config/opencode/rules/'))
+    server['instructions'] = [str(dest / name) for name in rule_names]
+    client['theme'] = json.loads(assets[THEME_FILE])
+
+
+def _runtime_files(
+    server: dict[str, JsonValue],
+    client: dict[str, JsonValue],
+    assets: dict[str, bytes] | None,
+) -> dict[str, bytes]:
+    asset_files = ({name: value for name, value in assets.items() if name != THEME_FILE}
+                   if assets is not None else {})
+    return {
+        'config/opencode/opencode.jsonc': _encoded(server),
+        'config/opencode/cli.json': _encoded(client),
+        **asset_files,
+    }
 
 
 def _verify_existing_runtime(
@@ -395,10 +410,7 @@ def _verify_existing_runtime(
     marker: pathlib.Path,
     receipt: dict[str, str],
     expected: dict[str, bytes],
-) -> bool:
-    """Check whether an existing runtime exactly matches its receipt and assets."""
-    if not dest.exists():
-        return False
+) -> None:
     if not dest.is_dir() or dest.is_symlink() or not marker.is_file() or marker.is_symlink():
         fail('incomplete or untrusted runtime directory; refusing overwrite')
     if json.loads(regular(marker)) != receipt:
@@ -408,10 +420,25 @@ def _verify_existing_runtime(
         validate_location(location, BASE)
         if regular(location) != value:
             fail('existing runtime asset mismatch')
-    return True
+
+
+def _create_runtime(
+    dest: pathlib.Path,
+    marker: pathlib.Path,
+    receipt: dict[str, str],
+    expected: dict[str, bytes],
+) -> None:
+    """Create the previously absent runtime tree and write its expected files exclusively."""
+    (dest / 'config/opencode').mkdir(parents=True, mode=0o700)
+    for name in ('home', 'data', 'state', 'cache', 'tmp', 'project'):
+        (dest / name).mkdir(mode=0o700)
+    for name, data in expected.items():
+        location = dest / name
+        location.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        write_new(location, data)
+    write_new(marker, _encoded(receipt))
 
 def main(argv: list[str] | None = None) -> int:
-    """Validate staged bundle inputs and prepare the guest runtime."""
     p = argparse.ArgumentParser()
     p.add_argument('--bundle', type=pathlib.Path, required=True)
     p.add_argument('--expected-sha', required=True)
@@ -419,26 +446,31 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument('--expected-assets-sha')
     args = p.parse_args(argv)
     try:
-        if re.fullmatch('[0-9a-f]{64}', args.expected_sha) is None:
-            fail('invalid expected SHA')
-        bundle = args.bundle
-        validate_location(bundle, BASE)
-        digest = verify(bundle)
-        if digest != args.expected_sha:
-            fail('host/guest manifest SHA mismatch')
-        if (args.assets is None) != (args.expected_assets_sha is None):
-            fail('asset arguments must be provided together')
-        assets = verify_assets(args.assets, args.expected_assets_sha) if args.assets else None
-        runtime = prepare(bundle, digest, assets, args.expected_assets_sha)
-        print('OC2_GUEST_CONFIG_VERIFIED')
-        if assets is not None:
-            print('OC2_ASSETS_VERIFIED: rules=7 commands=1 skills=2 theme=1 custom_agents=0 routing=none')
-        print('OC2_RUNTIME_PREPARED: ' + str(runtime))
-        print('OC2_RUNTIME_VERSION: ' + VERSION)
-        return 0
+        return _run_guest(args)
     except (OSError, ValueError, KeyError, TypeError) as exc:
         print('OC2_GUEST_STOP: ' + str(exc), file=sys.stderr)
         return 1
+
+
+def _run_guest(args: argparse.Namespace) -> int:
+    """Validate bundle, optional assets, and runtime identity before preparing the Guest runtime."""
+    if re.fullmatch('[0-9a-f]{64}', args.expected_sha) is None:
+        fail('invalid expected SHA')
+    bundle = args.bundle
+    validate_location(bundle, BASE)
+    digest = verify(bundle)
+    if digest != args.expected_sha:
+        fail('host/guest manifest SHA mismatch')
+    if (args.assets is None) != (args.expected_assets_sha is None):
+        fail('asset arguments must be provided together')
+    assets = verify_assets(args.assets, args.expected_assets_sha) if args.assets else None
+    runtime = prepare(bundle, digest, assets, args.expected_assets_sha)
+    print('OC2_GUEST_CONFIG_VERIFIED')
+    if assets is not None:
+        print('OC2_ASSETS_VERIFIED: rules=7 commands=1 skills=2 theme=1 custom_agents=0 routing=none')
+    print('OC2_RUNTIME_PREPARED: ' + str(runtime))
+    print('OC2_RUNTIME_VERSION: ' + VERSION)
+    return 0
 
 
 if __name__ == '__main__':

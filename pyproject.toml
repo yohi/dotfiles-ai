@@ -13,6 +13,7 @@ dependencies = [
     "json5>=0.9.22",
     "pytest>=8.0.0",
     "typeguard>=4.0.0",
+    "httpx2[http2,brotli,zstd]>=2.14.0,<2.16.0",
 ]
 
 [tool.ruff]
@@ -55,6 +56,6 @@ ignore_missing_imports = true
 
 [dependency-groups]
 dev = [
-    "pylint>=4.0.6",
+    "pylint>=4.0.9",
     "radon>=6.0.1",
 ]

@@ -18,10 +18,9 @@ from oc2_workspace import (
 
 def materialize(source: pathlib.Path, destination: pathlib.Path, manifest: Manifest,
                 *, for_guest: bool = False) -> None:
-    """Copy manifest-verified files into a new private snapshot directory."""
     if source.resolve(strict=True) != pathlib.Path(manifest.root):
         raise WorkspaceError('workspace manifest root mismatch')
-    if _by_path(snapshot(source)) != _by_path(manifest):
+    if _by_path(snapshot(source, profile=manifest.profile)) != _by_path(manifest):
         raise WorkspaceError('workspace changed after snapshot')
     if destination.exists() or destination.is_symlink() or not destination.parent.is_dir():
         raise WorkspaceError('snapshot destination is not new and safe')
@@ -30,7 +29,7 @@ def materialize(source: pathlib.Path, destination: pathlib.Path, manifest: Manif
     destination.mkdir(mode=directory_mode)
     try:
         for entry in manifest.files:
-            relative = _validate_relative(entry.path)
+            relative = _validate_relative(entry.path, manifest.profile)
             data = _read_regular(source.joinpath(*relative.split('/')))
             if len(data) != entry.size or hashlib.sha256(data).hexdigest() != entry.sha256:
                 raise WorkspaceError('workspace changed while snapshot was copied')
@@ -46,8 +45,7 @@ def materialize(source: pathlib.Path, destination: pathlib.Path, manifest: Manif
 
 
 def changes(baseline: Manifest, guest: pathlib.Path) -> tuple[str, ...]:
-    """Return sorted paths whose guest content differs from the baseline."""
-    after = _by_path(snapshot(guest))
+    after = _by_path(snapshot(guest, profile=baseline.profile))
     before = _by_path(baseline)
     return tuple(sorted(path for path in before.keys() | after.keys()
                         if before.get(path) != after.get(path)))
@@ -55,22 +53,21 @@ def changes(baseline: Manifest, guest: pathlib.Path) -> tuple[str, ...]:
 
 def apply_changes(host: pathlib.Path, guest: pathlib.Path, baseline: Manifest,
                   *, approved: bool, allow_deletions: bool = False) -> tuple[str, ...]:
-    """Apply reviewed guest changes atomically, restoring Host files on failure."""
     if not approved:
         raise WorkspaceError('explicit --apply is required')
     original = pathlib.Path(baseline.root)
     if host.resolve(strict=True) != original:
         raise WorkspaceError('host workspace identity mismatch')
-    current = snapshot(host)
+    current = snapshot(host, profile=baseline.profile)
     if _by_path(current) != _by_path(baseline):
         raise WorkspaceError('host workspace conflict; no files applied')
-    guest_manifest = snapshot(guest)
+    guest_manifest = snapshot(guest, profile=baseline.profile)
     before = _by_path(baseline)
     after = _by_path(guest_manifest)
     changed = tuple(sorted(path for path in before.keys() | after.keys()
                            if before.get(path) != after.get(path)))
     for relative in changed:
-        _validate_relative(relative)
+        _validate_relative(relative, baseline.profile)
     deleted = tuple(path for path in changed if path not in after)
     if deleted and not allow_deletions:
         raise WorkspaceError('deletion approval is required')
@@ -81,8 +78,11 @@ def apply_changes(host: pathlib.Path, guest: pathlib.Path, baseline: Manifest,
                 break
             if parent.is_symlink():
                 raise WorkspaceError('host destination contains a symlink')
-        if relative in before and _by_path(snapshot(host)).get(relative) != before[relative]:
+        if relative in before and _by_path(
+            snapshot(host, profile=baseline.profile),
+        ).get(relative) != before[relative]:
             raise WorkspaceError('host workspace conflict; no files applied')
+
     originals: dict[str, bytes | None] = {}
     original_modes: dict[str, int] = {}
     prepared: dict[str, pathlib.Path] = {}
@@ -96,9 +96,6 @@ def apply_changes(host: pathlib.Path, guest: pathlib.Path, baseline: Manifest,
             original_modes[relative] = stat.S_IMODE(target.stat().st_mode)
         else:
             originals[relative] = None
-        rollback = target.with_name(target.name + '.oc2-rollback')
-        if rollback.exists() or rollback.is_symlink():
-            raise WorkspaceError('temporary rollback destination already exists')
         if relative not in after:
             continue
         data = _read_regular(source)
@@ -111,6 +108,12 @@ def apply_changes(host: pathlib.Path, guest: pathlib.Path, baseline: Manifest,
         contents[relative] = data
         prepared[relative] = temporary
 
+    for relative in changed:
+        target = host.joinpath(*relative.split('/'))
+        rollback = target.with_name(target.name + '.oc2-rollback')
+        if rollback.exists() or rollback.is_symlink():
+            raise WorkspaceError('temporary rollback destination already exists')
+
     applied: list[str] = []
     try:
         for relative, temporary in prepared.items():
@@ -119,8 +122,11 @@ def apply_changes(host: pathlib.Path, guest: pathlib.Path, baseline: Manifest,
                        if parent != host and not parent.exists()]
             target.parent.mkdir(parents=True, exist_ok=True)
             created_directories.update(missing)
-            descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL |
-                                 getattr(os, 'O_NOFOLLOW', 0), 0o600)
+            descriptor = os.open(
+                temporary,
+                os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, 'O_NOFOLLOW', 0),
+                0o600,
+            )
             with os.fdopen(descriptor, 'wb') as stream:
                 _ = stream.write(contents[relative])
         for relative in changed:
@@ -139,8 +145,11 @@ def apply_changes(host: pathlib.Path, guest: pathlib.Path, baseline: Manifest,
                     target.unlink(missing_ok=True)
                 else:
                     rollback = target.with_name(target.name + '.oc2-rollback')
-                    descriptor = os.open(rollback, os.O_WRONLY | os.O_CREAT | os.O_EXCL |
-                                         getattr(os, 'O_NOFOLLOW', 0), 0o600)
+                    descriptor = os.open(
+                        rollback,
+                        os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, 'O_NOFOLLOW', 0),
+                        0o600,
+                    )
                     with os.fdopen(descriptor, 'wb') as stream:
                         _ = stream.write(original_bytes)
                         stream.flush()

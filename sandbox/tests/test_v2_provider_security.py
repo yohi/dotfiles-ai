@@ -333,9 +333,50 @@ class ProviderSecurityContractTests(unittest.TestCase):
             (bundle / "export-manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
 
             with self.assertRaises((ValueError, stage.StageError)):
-                stage.verify_bundle(bundle)
+                stage.verify_bundle(bundle, trusted_root=stage.BUNDLE_ROOT)
             with self.assertRaises(ValueError):
                 guest.verify(bundle)
+
+    def test_host_export_rejects_credential_material_in_generated_bundle(self) -> None:
+        """Reject credentials at Host bundle generation, including after hash regeneration."""
+        config = _server_config()
+        config["providers"][CF_PROVIDER]["models"][
+            "custom-ollama-cloud/kimi-k2.7-code"
+        ]["name"] = "apiKey: " + "A" * 32
+        v2_config = {
+            key: config[key] for key in ("model", "providers", "policies")
+        }
+
+        with self.assertRaises(exporter.ExportError):
+            exporter._build_files("bash", True, "a" * 64, v2_config)
+
+    def test_stage_rejects_credential_material_in_hash_valid_bundle(self) -> None:
+        """Reject credentials at Stage validation even when the bundle hash is updated."""
+        config = _server_config()
+        v2_config = {
+            key: config[key] for key in ("model", "providers", "policies")
+        }
+        generated = exporter._build_files("bash", True, "a" * 64, v2_config)
+        with tempfile.TemporaryDirectory() as temporary:
+            bundle = Path(temporary)
+            for name, content in generated.items():
+                (bundle / name).write_bytes(content)
+            server_path = bundle / "opencode.jsonc"
+            server = json.loads(server_path.read_bytes())
+            server["providers"][CF_PROVIDER]["models"][
+                "custom-ollama-cloud/kimi-k2.7-code"
+            ]["name"] = "apiKey: " + "B" * 32
+            server_raw = json.dumps(server, sort_keys=True, separators=(",", ":")).encode()
+            server_path.write_bytes(server_raw)
+            manifest_path = bundle / "export-manifest.json"
+            manifest = json.loads(manifest_path.read_bytes())
+            manifest["artifacts_sha256"]["opencode.jsonc"] = hashlib.sha256(
+                server_raw,
+            ).hexdigest()
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+            with self.assertRaises(stage.StageError):
+                stage.verify_bundle(bundle, trusted_root=stage.BUNDLE_ROOT)
 
 
 if __name__ == "__main__":

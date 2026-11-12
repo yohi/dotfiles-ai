@@ -5,6 +5,7 @@ No sbx, sudo, network, package installation, or OpenCode binary is invoked.
 from __future__ import annotations
 
 import argparse
+import ast
 import contextlib
 import hashlib
 import importlib.util
@@ -15,6 +16,7 @@ import pathlib
 import stat
 import subprocess
 import sys
+import tarfile
 import tempfile
 import types
 import unittest
@@ -23,6 +25,7 @@ from unittest.mock import patch
 import yaml
 
 SCRIPTS = pathlib.Path(__file__).resolve().parents[1] / 'scripts'
+SANDBOX_ID = 'bae976ce-7d1b-4bfd-9ffd-af5fa71a3548'
 if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
@@ -83,12 +86,19 @@ class FakeRunner:
         return ''
 
 class RunnerTimeoutTest(unittest.TestCase):
-    def test_cli_install_uses_extended_timeout(self) -> None:
-        runner = oc2.Runner('operator')
-        completed = subprocess.CompletedProcess([], 0, '')
-        with patch.object(oc2.subprocess, 'run', return_value=completed) as run:
-            runner.sbx(*oc2.install_cli_args('oc2-dev'), timeout=900)
-        self.assertEqual(run.call_args.kwargs['timeout'], 900)
+    def test_cli_provision_copies_host_binary_without_guest_npm(self) -> None:
+        """Transfer the Host-verified executable into the Sandbox without invoking npm."""
+        with tempfile.TemporaryDirectory() as tmp:
+            binary = pathlib.Path(tmp) / 'opencode'
+            binary.write_bytes(b'verified executable fixture')
+            runner = FakeRunner()
+            with patch.object(oc2, 'cli_path', side_effect=(None, oc2.PINNED[0])):
+                result = oc2.provision_cli(runner, 'oc2-dev', binary)
+
+        self.assertEqual(result, oc2.PINNED[0])
+        self.assertIn(('cp', str(binary), 'oc2-dev:' + oc2.PINNED[0]), runner.calls)
+        self.assertIn(('exec', 'oc2-dev', 'chmod', '700', oc2.PINNED[0]), runner.calls)
+        self.assertFalse(any('npm' in call for call in runner.calls))
 
     def test_tty_remains_unbounded_and_default_timeout_remains_180_seconds(self) -> None:
         runner = oc2.Runner('operator')
@@ -100,8 +110,125 @@ class RunnerTimeoutTest(unittest.TestCase):
         self.assertEqual(run.call_args_list[1].kwargs['timeout'], 180)
 
 
+class CloudflareCredentialProvisioningTest(unittest.TestCase):
+    class Runner:
+        """Fake secret listing and set operations used by provisioning tests."""
+
+        def __init__(self, *, sandbox_scope: str | None = None,
+                     global_scope: str | None = None, store: bool = True) -> None:
+            """Initialize configured secret scopes and whether setting persists a credential."""
+            self.sandbox_scope = sandbox_scope
+            self.global_scope = global_scope
+            self.store = store
+            self.calls: list[tuple[tuple[str, ...], bool]] = []
+
+        def sbx(self, *args: str, capture: bool = False, tty: bool = False,
+                timeout: int | None = 180) -> str:
+            """Return fake secret listings or record a credential set operation."""
+            self.calls.append((args, tty))
+            if args[:2] == ('secret', 'ls'):
+                scope = self.global_scope if '--global' in args else self.sandbox_scope
+                entries = [] if scope is None else [{
+                    'name': 'cloudflare-ai-gateway',
+                    'scope': scope,
+                    'secret': '(stored)',
+                    'type': 'service',
+                }]
+                return json.dumps({'secrets': entries})
+            if args[:2] == ('secret', 'set'):
+                if self.store:
+                    self.sandbox_scope = 'oc2-dev'
+                return ''
+            raise AssertionError(f'unexpected command: {args!r}')
+
+    def test_existing_sandbox_secret_is_reused_without_mutation(self) -> None:
+        """Reuse a matching Sandbox credential without setting a new one."""
+        runner = self.Runner(sandbox_scope='oc2-dev')
+
+        scope = oc2.ensure_cloudflare_credential(runner, 'oc2-dev', interactive=False)
+
+        self.assertEqual(scope, 'sandbox')
+        self.assertEqual(len(runner.calls), 1)
+
+    def test_missing_secret_requires_interactive_terminal(self) -> None:
+        """Stop before setting a credential when no interactive terminal is available."""
+        runner = self.Runner()
+
+        with self.assertRaisesRegex(oc2.Stop, 'interactive terminal'):
+            oc2.ensure_cloudflare_credential(runner, 'oc2-dev', interactive=False)
+
+        self.assertEqual(len(runner.calls), 2)
+
+    def test_interactive_secret_creation_is_verified_before_return(self) -> None:
+        """Return Sandbox scope only after the new credential is listed and verified."""
+        runner = self.Runner()
+
+        scope = oc2.ensure_cloudflare_credential(runner, 'oc2-dev', interactive=True)
+
+        self.assertEqual(scope, 'sandbox')
+        self.assertEqual(runner.calls[2][0][:2], ('secret', 'set'))
+        self.assertTrue(runner.calls[2][1])
+        self.assertEqual(runner.calls[3][0][:2], ('secret', 'ls'))
+
+    def test_malformed_secret_listing_fails_closed(self) -> None:
+        """Reject credential listings that do not match the supported schema."""
+        class MalformedRunner(CloudflareCredentialProvisioningTest.Runner):
+            def sbx(self, *args: str, capture: bool = False, tty: bool = False,
+                    timeout: int | None = 180) -> str:
+                self.calls.append((args, tty))
+                return '{"secrets":[{"name":"cloudflare-ai-gateway","scope":"oc2-dev"}]}'
+
+        runner = MalformedRunner()
+        with self.assertRaisesRegex(oc2.Stop, 'schema'):
+            oc2.ensure_cloudflare_credential(runner, 'oc2-dev', interactive=True)
+
+
 class HostTest(unittest.TestCase):
-    def test_inline_module_source_loads_embedded_python_module(self):
+    def test_guest_exec_wrapper_has_one_module_assignment(self) -> None:
+        """Keep the inline Guest wrapper defined exactly once in the launcher."""
+        source = (SCRIPTS / 'oc2.py').read_text(encoding='utf-8')
+        module = ast.parse(source)
+        assignments = [
+            node for node in ast.walk(module)
+            if isinstance(node, ast.Assign)
+            and any(isinstance(target, ast.Name) and target.id == 'GUEST_EXEC_WRAPPER'
+                    for target in node.targets)
+        ]
+
+        self.assertEqual(len(assignments), 1)
+
+    def test_guest_exec_wrapper_validates_and_passes_controlled_environment(self) -> None:
+        """Validate proxy inputs and pass only the approved proxy and runtime variables to a child."""
+        command = [
+            sys.executable, '-c', oc2.GUEST_EXEC_WRAPPER, '--', 'HOME=/tmp/oc2-test', '--',
+            sys.executable, '-c',
+            'import os; print(os.environ["HOME"] + "|" + os.environ["HTTPS_PROXY"] + "|" + os.environ["NO_PROXY"])',
+        ]
+        cases: tuple[tuple[dict[str, str], int, str], ...] = (
+            ({}, 125, 'required HTTPS proxy'),
+            ({'HTTPS_PROXY': 'http://proxy.example:8080',
+              'https_proxy': 'http://other.example:8080'}, 125, 'conflicting proxy'),
+            ({'HTTPS_PROXY': 'http://proxy.example:8080',
+              'NO_PROXY': 'example.com'}, 125, 'unsafe NO_PROXY'),
+        )
+        for environment, status, message in cases:
+            with self.subTest(environment=environment):
+                result = subprocess.run(command, env=environment, capture_output=True,
+                                        text=True, check=False)
+                self.assertEqual(result.returncode, status)
+                self.assertIn(message, result.stderr)
+
+        result = subprocess.run(
+            command,
+            env={'HTTPS_PROXY': 'http://proxy.example:8080', 'NO_PROXY': 'localhost'},
+            capture_output=True, text=True, check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(),
+                         ' /tmp/oc2-test|http://proxy.example:8080|localhost'.strip())
+
+    def test_inline_module_source_loads_embedded_python_module(self) -> None:
+        """Load an embedded helper module in a fresh Python child process."""
         loader = oauth_bundle.inline_python_module('oc2_embedded_fixture', 'value = 42\n')
         program = loader + '\nimport oc2_embedded_fixture\nprint(oc2_embedded_fixture.value)\n'
         result = subprocess.run([sys.executable, '-c', program], capture_output=True,
@@ -132,7 +259,8 @@ class HostTest(unittest.TestCase):
 
     def test_clone_mode_rejects_credentials_in_git_metadata_before_publication(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            root = pathlib.Path(tmp)
+            root = pathlib.Path(tmp) / 'host'
+            root.mkdir()
             metadata = root / '.git'
             metadata.mkdir()
             (metadata / 'config').write_text(
@@ -141,23 +269,30 @@ class HostTest(unittest.TestCase):
             with self.assertRaisesRegex(oc2.Stop, 'Git metadata contains credential'):
                 oc2.validate_clone_workspace(root)
 
-    def test_clone_mode_command_requires_a_workspace_path(self) -> None:
-        workspace = pathlib.Path('/tmp/oc2-safe-repository')
+    def test_workspace_create_args_make_mountless_shell_with_mixin(self) -> None:
         self.assertEqual(
-            oc2.clone_create_args(
-                'oc2-safe', workspace, pathlib.Path('/tmp/oc2-credential-mixin'),
+            oc2.workspace_create_args(
+                'oc2-safe', pathlib.Path('/tmp/oc2-credential-mixin'),
             ),
-            ['create', '--clone', '--name', 'oc2-safe', '--kit',
-             '/tmp/oc2-credential-mixin', 'shell', str(workspace)],
+            ['create', '--name', 'oc2-safe', '--kit', '/tmp/oc2-credential-mixin', 'shell'],
         )
 
-    def test_clone_mode_refuses_excluded_files_that_docker_would_expose(self) -> None:
+    def test_mountless_snapshot_omits_excluded_files_from_the_guest_source(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            root = pathlib.Path(tmp)
+            root = pathlib.Path(tmp) / 'host'
+            root.mkdir()
             (root / 'main.py').write_text('print("safe")\n')
             (root / '.env').write_text('TOKEN=fixture-value')
-            with self.assertRaisesRegex(oc2.Stop, 'clone mode would expose'):
-                oc2.validate_clone_workspace(root)
+            subprocess.run(['git', 'init', '-q', str(root)], check=True)
+
+            oc2.validate_clone_workspace(root)
+            workspace = load('oc2_workspace')
+            manifest = workspace.snapshot(root)
+            snapshot = pathlib.Path(tmp) / 'snapshot'
+            workspace.materialize(root, snapshot, manifest)
+
+            self.assertNotIn('.env', {entry.path for entry in manifest.files})
+            self.assertFalse((snapshot / '.env').exists())
 
     def test_clone_mode_fails_closed_when_excluded_directory_cannot_be_walked(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -237,14 +372,112 @@ class HostTest(unittest.TestCase):
 
             oc2.validate_clone_workspace(root)
 
-    def test_opencode_cli_install_is_pinned_to_v225(self) -> None:
-        self.assertEqual(oc2.VERSION, '2.2.5')
-        self.assertEqual(
-            oc2.install_cli_args('oc2-safe'),
-            ['exec', 'oc2-safe', 'npm', 'install', '--prefix',
-             '/home/agent/.local/oc2-runtime', '--no-audit', '--no-fund',
-             '--no-save', '@opencode/cli@2.2.5'],
+    def test_cli_release_metadata_accepts_only_the_pinned_host_asset(self) -> None:
+        """Parse the exact v2.2.5 Linux x64 release asset before downloading it."""
+        digest = '09f44302c10fd036912f59c81fd1aef5df45dd06f649197f9dfc9bbe2a79614e'
+        document = json.dumps({
+            'tag_name': 'v2.2.5',
+            'immutable': True,
+            'assets': [{
+                'name': 'opencode-linux-x64.tar.gz',
+                'size': 119_200_000,
+                'digest': 'sha256:' + digest,
+                'browser_download_url': (
+                    'https://github.com/anomalyco/opencode/releases/download/v2.2.5/'
+                    'opencode-linux-x64.tar.gz'
+                ),
+            }],
+        }).encode()
+
+        asset = oc2._parse_cli_release_asset(document)
+
+        self.assertEqual(asset.version, '2.2.5')
+        self.assertEqual(asset.size, 119_200_000)
+        self.assertEqual(asset.sha256, digest)
+
+    def test_cli_release_metadata_rejects_unpinned_asset_digest(self) -> None:
+        """Reject a release asset whose digest differs from the pinned v2.2.5 checksum."""
+        document = json.dumps({
+            'tag_name': 'v2.2.5',
+            'immutable': True,
+            'assets': [{
+                'name': 'opencode-linux-x64.tar.gz',
+                'size': 1,
+                'digest': 'sha256:' + '0' * 64,
+                'browser_download_url': (
+                    'https://github.com/anomalyco/opencode/releases/download/v2.2.5/'
+                    'opencode-linux-x64.tar.gz'
+                ),
+            }],
+        }).encode()
+
+        with self.assertRaisesRegex(oc2.Stop, 'asset metadata'):
+            oc2._parse_cli_release_asset(document)
+
+    def test_cli_archive_extracts_only_the_regular_opencode_binary(self) -> None:
+        """Extract the single regular executable from the checksum-verified archive."""
+        content = b'verified standalone binary fixture'
+        with tempfile.TemporaryDirectory() as tmp:
+            archive_path = pathlib.Path(tmp) / 'release.tar.gz'
+            binary_path = pathlib.Path(tmp) / 'opencode'
+            with tarfile.open(archive_path, mode='w:gz') as archive:
+                member = tarfile.TarInfo('opencode')
+                member.size = len(content)
+                archive.addfile(member, io.BytesIO(content))
+
+            oc2._extract_cli_binary(archive_path, binary_path)
+
+            self.assertEqual(binary_path.read_bytes(), content)
+            self.assertEqual(stat.S_IMODE(binary_path.stat().st_mode), 0o700)
+
+    def test_cli_archive_rejects_traversal_members(self) -> None:
+        """Reject path traversal in a release archive instead of extracting it."""
+        content = b'not extracted'
+        with tempfile.TemporaryDirectory() as tmp:
+            archive_path = pathlib.Path(tmp) / 'release.tar.gz'
+            binary_path = pathlib.Path(tmp) / 'opencode'
+            with tarfile.open(archive_path, mode='w:gz') as archive:
+                member = tarfile.TarInfo('../opencode')
+                member.size = len(content)
+                archive.addfile(member, io.BytesIO(content))
+
+            with self.assertRaisesRegex(oc2.Stop, 'unsafe member'):
+                oc2._extract_cli_binary(archive_path, binary_path)
+
+    def test_cli_download_checks_api_size_and_hash_before_extracting(self) -> None:
+        """Download the bounded archive, verify its digest, and run the extracted pinned binary."""
+        binary_content = b'verified opencode executable'
+        archive_buffer = io.BytesIO()
+        with tarfile.open(fileobj=archive_buffer, mode='w:gz') as archive:
+            member = tarfile.TarInfo('opencode')
+            member.size = len(binary_content)
+            archive.addfile(member, io.BytesIO(binary_content))
+        archive_data = archive_buffer.getvalue()
+        digest = hashlib.sha256(archive_data).hexdigest()
+        asset = oc2.CliReleaseAsset(
+            oc2.VERSION, oc2.CLI_ASSET_URL, len(archive_data), digest,
         )
+        response = types.SimpleNamespace(
+            headers={'content-length': str(len(archive_data))},
+            iter_bytes=lambda: iter((archive_data,)),
+            raise_for_status=lambda: None,
+        )
+        client = unittest.mock.MagicMock()
+        client.__enter__.return_value = client
+        client.get.return_value = types.SimpleNamespace(
+            content=b'{}', raise_for_status=lambda: None,
+        )
+        client.stream.return_value = contextlib.nullcontext(response)
+        completed = subprocess.CompletedProcess([], 0, 'opencode v2.2.5\n')
+
+        with tempfile.TemporaryDirectory() as tmp, \
+                patch('httpx2.Client', return_value=client), \
+                patch.object(oc2, '_parse_cli_release_asset', return_value=asset), \
+                patch.object(oc2.subprocess, 'run', return_value=completed):
+            binary = oc2.download_cli_binary(pathlib.Path(tmp))
+            self.assertEqual(binary.read_bytes(), binary_content)
+            self.assertEqual(client.get.call_args.args[0], oc2.CLI_RELEASE_API_URL)
+            self.assertEqual(client.stream.call_args.args[:2], ('GET', oc2.CLI_ASSET_URL))
 
     def test_workspace_snapshot_excludes_secrets_and_symlinks(self) -> None:
         workspace = load('oc2_workspace')
@@ -466,6 +699,7 @@ class HostTest(unittest.TestCase):
             manifest = workspace_ops.snapshot(workspace)
             session = sessions.create(
                 state_root, 'oc2-dev', oc2.ROOT + '/projects/' + 'a' * 32, manifest,
+                sandbox_id=SANDBOX_ID,
             )
 
             class CollectionRunner:
@@ -596,6 +830,26 @@ class HostTest(unittest.TestCase):
             self.assertEqual((root / 'a.txt').read_text(), 'host-a')
             self.assertEqual((root / 'b.txt').read_text(), 'host-b')
 
+    def test_workspace_apply_checks_all_rollback_paths_before_replacing_files(self) -> None:
+        """Reject any existing rollback path before replacing the first Host file."""
+        workspace = load('oc2_workspace')
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp) / 'host'
+            root.mkdir()
+            (root / 'a.txt').write_text('host-a')
+            (root / 'b.txt').write_text('host-b')
+            (root / 'b.txt.oc2-rollback').write_text('reserved')
+            baseline = workspace.snapshot(root)
+            guest = pathlib.Path(tmp) / 'guest'
+            workspace.materialize(root, guest, baseline)
+            (guest / 'a.txt').write_text('guest-a')
+            (guest / 'b.txt').write_text('guest-b')
+            with self.assertRaisesRegex(workspace.WorkspaceError, 'rollback destination'):
+                workspace.apply_changes(root, guest, baseline, approved=True)
+
+            self.assertEqual((root / 'a.txt').read_text(), 'host-a')
+            self.assertEqual((root / 'b.txt').read_text(), 'host-b')
+
     def test_workspace_manifest_rejects_path_traversal(self) -> None:
         workspace = load('oc2_workspace')
         with self.assertRaisesRegex(workspace.WorkspaceError, 'manifest path'):
@@ -647,55 +901,64 @@ class HostTest(unittest.TestCase):
 
     def test_missing_sandbox(self) -> None:
         runner = FakeRunner()
-        self.assertFalse(oc2.is_compatible_sandbox(runner, 'oc2-dev'))
+        self.assertFalse(oc2.is_compatible_sandbox(runner, 'oc2-dev', SANDBOX_ID))
 
     def test_mountless_sandbox_reused(self) -> None:
         # sbx v0.49.2 omits mount-related fields from ls --format json.
-        runner = FakeRunner([{'name': 'oc2-dev', 'agent': 'shell'}])
-        self.assertTrue(oc2.is_compatible_sandbox(runner, 'oc2-dev'))
+        runner = FakeRunner([{'name': 'oc2-dev', 'id': SANDBOX_ID, 'agent': 'shell'}])
+        self.assertTrue(oc2.is_compatible_sandbox(runner, 'oc2-dev', SANDBOX_ID))
         self.assertIn(('inspect', 'oc2-dev', '--json'), runner.calls)
 
+    def test_mountless_kit_shell_sandbox_reused(self) -> None:
+        runner = FakeRunner([{'name': 'oc2-dev', 'id': SANDBOX_ID, 'agent': 'sbx-kit-shell'}])
+        self.assertTrue(oc2.is_compatible_sandbox(runner, 'oc2-dev', SANDBOX_ID))
+
+    def test_missing_stable_sandbox_id_is_rejected(self) -> None:
+        runner = FakeRunner([{'name': 'oc2-dev', 'agent': 'shell'}])
+        with self.assertRaisesRegex(oc2.Stop, 'no valid stable identifier'):
+            oc2.is_compatible_sandbox(runner, 'oc2-dev', SANDBOX_ID)
+
     def test_mounted_workspace_rejected(self) -> None:
-        runner = FakeRunner([{'name': 'oc2-dev', 'agent': 'shell', 'workspace': '/home/user/repo'}])
+        runner = FakeRunner([{'name': 'oc2-dev', 'id': SANDBOX_ID, 'agent': 'shell', 'workspace': '/home/user/repo'}])
         with self.assertRaisesRegex(oc2.Stop, 'workspace mount'):
-            oc2.is_compatible_sandbox(runner, 'oc2-dev')
+            oc2.is_compatible_sandbox(runner, 'oc2-dev', SANDBOX_ID)
 
     def test_missing_runtime_mounts_evidence_rejected(self) -> None:
-        runner = FakeRunner([{'name': 'oc2-dev', 'agent': 'shell'}],
+        runner = FakeRunner([{'name': 'oc2-dev', 'id': SANDBOX_ID, 'agent': 'shell'}],
                             inspection={'name': 'oc2-dev'})
         with self.assertRaisesRegex(oc2.Stop, 'mount information missing'):
-            oc2.is_compatible_sandbox(runner, 'oc2-dev')
+            oc2.is_compatible_sandbox(runner, 'oc2-dev', SANDBOX_ID)
 
     def test_runtime_mounts_rejected(self) -> None:
-        runner = FakeRunner([{'name': 'oc2-dev', 'agent': 'shell'}],
+        runner = FakeRunner([{'name': 'oc2-dev', 'id': SANDBOX_ID, 'agent': 'shell'}],
                             inspection={'name': 'oc2-dev',
                                         'runtime_mounts': [{'source': '/home/user'}]})
         with self.assertRaisesRegex(oc2.Stop, 'runtime mounts'):
-            oc2.is_compatible_sandbox(runner, 'oc2-dev')
+            oc2.is_compatible_sandbox(runner, 'oc2-dev', SANDBOX_ID)
 
     def test_inspect_name_mismatch_rejected(self) -> None:
-        runner = FakeRunner([{'name': 'oc2-dev', 'agent': 'shell'}],
+        runner = FakeRunner([{'name': 'oc2-dev', 'id': SANDBOX_ID, 'agent': 'shell'}],
                             inspection={'name': 'other-sandbox', 'runtime_mounts': []})
         with self.assertRaisesRegex(oc2.Stop, 'identity mismatch'):
-            oc2.is_compatible_sandbox(runner, 'oc2-dev')
+            oc2.is_compatible_sandbox(runner, 'oc2-dev', SANDBOX_ID)
 
     def test_invalid_runtime_mounts_type_rejected(self) -> None:
-        runner = FakeRunner([{'name': 'oc2-dev', 'agent': 'shell'}],
+        runner = FakeRunner([{'name': 'oc2-dev', 'id': SANDBOX_ID, 'agent': 'shell'}],
                             inspection={'name': 'oc2-dev', 'runtime_mounts': {}})
         with self.assertRaisesRegex(oc2.Stop, 'mount information missing'):
-            oc2.is_compatible_sandbox(runner, 'oc2-dev')
+            oc2.is_compatible_sandbox(runner, 'oc2-dev', SANDBOX_ID)
 
     def test_list_workspace_mount_rejected_even_if_inspect_empty(self) -> None:
-        runner = FakeRunner([{'name': 'oc2-dev', 'agent': 'shell',
+        runner = FakeRunner([{'name': 'oc2-dev', 'id': SANDBOX_ID, 'agent': 'shell',
                               'workspace': '/home/user/source'}])
         with self.assertRaisesRegex(oc2.Stop, 'workspace mount'):
-            oc2.is_compatible_sandbox(runner, 'oc2-dev')
+            oc2.is_compatible_sandbox(runner, 'oc2-dev', SANDBOX_ID)
         self.assertNotIn(('inspect', 'oc2-dev', '--json'), runner.calls)
 
     def test_wrong_agent_rejected(self) -> None:
-        runner = FakeRunner([{'name': 'oc2-dev', 'agent': 'opencode', 'workspace': '-'}])
+        runner = FakeRunner([{'name': 'oc2-dev', 'id': SANDBOX_ID, 'agent': 'opencode', 'workspace': '-'}])
         with self.assertRaisesRegex(oc2.Stop, 'not shell'):
-            oc2.is_compatible_sandbox(runner, 'oc2-dev')
+            oc2.is_compatible_sandbox(runner, 'oc2-dev', SANDBOX_ID)
 
     def test_dry_run_no_subprocess(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -725,16 +988,16 @@ class HostTest(unittest.TestCase):
         command = runner.calls[-1]
         self.assertEqual(command[:3], ('exec', '-it', '-w'))
         self.assertEqual(command[3], runtime + '/project')
-        self.assertEqual(command[4:7], ('oc2-dev', 'env', '-i'))
+        self.assertEqual(command[4:7], ('oc2-dev', 'python3', '-c'))
+        self.assertIn(oc2.GUEST_EXEC_WRAPPER, command)
+        self.assertNotIn('-i', command)
         self.assertEqual(command[-2:], (oc2.PINNED[0], '--standalone'))
         self.assertIn('OPENCODE_WATCHDOG_ENABLED=false', command)
         self.assertIn(f'TMPDIR={runtime}/tmp', command)
         self.assertNotIn('bash', command)
         self.assertNotIn('--mount', command)
         self.assertFalse(any(argument.startswith('OPENCODE_CONFIG_DIR=') for argument in command))
-        self.assertFalse(any(
-            argument.startswith('OPENCODE_CONFIG_PROJECT_DISABLE=') for argument in command
-        ))
+        self.assertIn('OPENCODE_CONFIG_PROJECT_DISABLE=1', command)
 
     def test_launch_passes_gateway_token_placeholder_not_host_token(self):
         runner = FakeRunner()
@@ -870,42 +1133,6 @@ class HostTest(unittest.TestCase):
                 self.assertFalse(marker.exists())
 
         self.assertEqual(result.returncode, 0, result.stderr)
-
-    def test_seed_cli_uses_operator_home_for_private_staging(self) -> None:
-        runner = oc2.Runner('operator')
-        created = subprocess.CompletedProcess(
-            args=[], returncode=0,
-            stdout='/home/' + 'operator/.oc2-seed-12345678\n', stderr='',
-        )
-        with patch.object(oc2, 'is_compatible_sandbox', return_value=True), \
-                patch.object(oc2, 'cli_path', return_value=oc2.PINNED[0]), \
-                patch.object(oc2.subprocess, 'run', return_value=created) as run, \
-                patch.object(runner, 'sbx', return_value='opencode v2.2.5\n') as sbx:
-            self.assertEqual(
-                oc2.seed_cli(runner, 'oc2-dev', 'oc2-source'), oc2.PINNED[0],
-            )
-
-        self.assertEqual(
-            run.call_args_list[0].args[0],
-            ['sudo', '-i', '-u', 'operator', '--', 'sh', '-c',
-             'umask 077; mktemp -d "$HOME/.oc2-seed-XXXXXXXX"'],
-        )
-        copy_calls = [call.args for call in sbx.call_args_list if call.args[0] == 'cp']
-        self.assertIn(
-            ('exec', 'oc2-source', 'bash', '-c',
-             'if test -x /home/agent/.local/opencode-v2/node_modules/.bin/opencode; '
-             'then /home/agent/.local/opencode-v2/node_modules/.bin/opencode --version; fi'),
-            [call.args for call in sbx.call_args_list],
-        )
-        self.assertEqual(
-            copy_calls,
-            [
-                ('cp', 'oc2-source:/home/agent/.local/opencode-v2/node_modules',
-                 '/home/' + 'operator/.oc2-seed-12345678/node_modules'),
-                ('cp', '/home/' + 'operator/.oc2-seed-12345678/node_modules',
-                 'oc2-dev:/home/agent/.local/oc2-runtime/node_modules'),
-            ],
-        )
 
     def test_stage_does_not_depend_on_bash_positional_arguments(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1163,17 +1390,6 @@ class HostTest(unittest.TestCase):
             ['auth.openai.com', 'chatgpt.com', 'gateway.ai.cloudflare.com'],
         )
         self.assertNotIn('secret-value', str(spec))
-
-    def test_clone_create_args_attaches_mixin(self):
-        args = oc2.clone_create_args(
-            'oc2-v2', pathlib.Path('/tmp/workspace'), pathlib.Path('/tmp/mixin'),
-        )
-
-        self.assertEqual(
-            args,
-            ['create', '--clone', '--name', 'oc2-v2', '--kit', '/tmp/mixin',
-             'shell', '/tmp/workspace'],
-        )
 
     def test_requires_external_inference_when_v2_provider_is_selected(self):
         with tempfile.TemporaryDirectory() as tmp:
