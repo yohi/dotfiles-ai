@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import hashlib
+import io
 import json
 import shutil
 import sys
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
 
@@ -32,7 +34,7 @@ class VerificationGuestMaterializationTest(unittest.TestCase):
         self.base_patcher = patch.object(oc2_guest, 'BASE', self.base)
         self.base_patcher.start()
         self.addCleanup(self.base_patcher.stop)
-        self.plugin_source = self.base / 'verification-superpowers'
+        self.plugin_source = self.base / 'source-fixture'
         self.plugin_source.mkdir()
         files = {
             'index.js': b'export const plugin = true;\n',
@@ -63,15 +65,69 @@ class VerificationGuestMaterializationTest(unittest.TestCase):
             for relative in sorted(file_hashes)
         ).encode('utf-8')
         self.plugin_tree_sha = hashlib.sha256(tree_content).hexdigest()
+        source = self.base / 'verification-superpowers' / self.plugin_tree_sha
+        source.parent.mkdir()
+        self.plugin_source.rename(source)
+        self.plugin_source = source
         for module in (oc2_assets, oc2_guest):
             for name, value in (
                 ('SUPERPOWERS_FILE_COUNT', len(files)),
                 ('SUPERPOWERS_TOTAL_BYTES', self.plugin_bytes),
                 ('SUPERPOWERS_TREE_SHA256', self.plugin_tree_sha),
+                ('SUPERPOWERS_TREE_PATH', f'verification-superpowers/{self.plugin_tree_sha}'),
             ):
                 patcher = patch.object(module, name, value, create=True)
                 patcher.start()
                 self.addCleanup(patcher.stop)
+
+    def _selected_asset_files(self) -> dict[str, bytes]:
+        return {
+            'config/opencode/rules/custom.md': b'rule\n',
+            'config/opencode/commands/custom.md': b'command\n',
+            'config/opencode/skills/demo/SKILL.md': b'skill\n',
+            'config/opencode/agents/custom.md': b'agent\n',
+            'metadata/agent-routes.json': b'{}\n',
+            'theme.json': b'{"name":"tokyonight"}\n',
+        }
+
+    def test_install_assets_output_counts_selected_file_keys(self) -> None:
+        """Report installed asset counts from the verified files mapping."""
+        files = self._selected_asset_files()
+        output = io.StringIO()
+        with patch.object(oc2_guest, 'verify_assets', return_value=files.copy()):
+            with redirect_stdout(output):
+                status = oc2_guest.main([
+                    '--assets', str(self.base / 'assets.json'),
+                    '--expected-assets-sha', 'b' * 64,
+                    '--install-assets-runtime', 'a' * 64,
+                ])
+
+        self.assertEqual(status, 0)
+        self.assertIn(
+            'OC2_ASSETS_VERIFIED: rules=1 commands=1 skills=1 theme=1 custom_agents=1 routing=1',
+            output.getvalue(),
+        )
+
+    def test_verification_output_counts_selected_file_keys(self) -> None:
+        """Report verification asset counts from the same selected file categories."""
+        output = io.StringIO()
+        with (
+            patch.object(oc2_guest, 'validate_location'),
+            patch.object(oc2_guest, 'verify', return_value='a' * 64),
+            patch.object(oc2_guest, 'verify_assets', return_value=self._selected_asset_files()),
+            patch.object(oc2_guest, 'prepare', return_value=self.base / 'runtime'),
+            redirect_stdout(output),
+        ):
+            status = oc2_guest.main([
+                '--bundle', str(self.base / 'bundle'), '--expected-sha', 'a' * 64,
+                '--assets', str(self.base / 'assets.json'), '--expected-assets-sha', 'b' * 64,
+            ])
+
+        self.assertEqual(status, 0)
+        self.assertIn(
+            'OC2_ASSETS_VERIFIED: rules=1 commands=1 skills=1 theme=1 custom_agents=1 routing=1',
+            output.getvalue(),
+        )
 
     def _provider_bundle(self, verification_only: bool) -> Path:
         apm = prepare_opencode_v2._read_apm_source(
@@ -315,6 +371,26 @@ class VerificationGuestMaterializationTest(unittest.TestCase):
         )
 
         with self.assertRaisesRegex(ValueError, 'tree SHA-256'):
+            oc2_guest.prepare(bundle, oc2_guest.verify(bundle), assets, assets_sha)
+
+    def test_verification_rejects_missing_pinned_plugin_source(self) -> None:
+        """Stop verification when the pinned source tree was not staged."""
+        bundle = self._provider_bundle(verification_only=True)
+        assets_path, assets_sha = self._asset_file(verification_only=True)
+        assets = oc2_guest.verify_assets(assets_path, assets_sha)
+        shutil.rmtree(self.plugin_source)
+
+        with self.assertRaisesRegex(ValueError, 'source directory is missing'):
+            oc2_guest.prepare(bundle, oc2_guest.verify(bundle), assets, assets_sha)
+
+    def test_verification_rejects_plugin_source_file_count_mismatch(self) -> None:
+        """Stop verification when the staged tree omits a pinned file."""
+        bundle = self._provider_bundle(verification_only=True)
+        assets_path, assets_sha = self._asset_file(verification_only=True)
+        assets = oc2_guest.verify_assets(assets_path, assets_sha)
+        (self.plugin_source / 'support' / 'file-000.js').unlink()
+
+        with self.assertRaisesRegex(ValueError, 'file count mismatch'):
             oc2_guest.prepare(bundle, oc2_guest.verify(bundle), assets, assets_sha)
 
     def test_verification_rejects_plugin_source_symlink(self):

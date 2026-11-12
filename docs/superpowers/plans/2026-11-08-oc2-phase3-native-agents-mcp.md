@@ -8,7 +8,7 @@
 
 **Tech Stack:** Python 3.14, PyYAML, OpenCode v2.2.5 config schema, unittest.
 
-**Spec:** User-provided “OC2 Phase 3 — Remaining Work Implementation Instruction” and the follow-up approval in this conversation; frozen baseline `2ebcc963ea53f792b88d99f285d7eb75ff96171e`.
+**Spec:** [OC2 Phase 3 Native Agents and MCP Design Specification](../specs/2026-11-08-oc2-phase3-native-agents-mcp-design.md); frozen baseline `2ebcc963ea53f792b88d99f285d7eb75ff96171e`.
 
 ## Global Constraints
 
@@ -32,28 +32,30 @@
 ### Task 1: Parse and constrain OC2 native declarations
 
 **Files:**
-- Create: `sandbox/scripts/oc2_native.py`
+- Modify: `sandbox/scripts/oc2_native.py`
+- Modify: `sandbox/scripts/oc2_agent_native.py`
 - Modify: `apm.yml`
 - Test: `sandbox/tests/test_oc2_native.py`
 
 **Interfaces:**
 - Produces `NativeConfig` containing the validated Agent map, disabled MCP state, and selected Asset source paths.
 - Agent IDs are restricted to `hephaestus` and `oracle`; model is fixed to `openai/gpt-6-luna` and must remain in the enabled OpenAI APM whitelist, independently of the global V2 default.
-- MCP accepts only `enabled: false` and an empty `servers` list until a safe local candidate is established.
+- `oc2_agent_native.py` owns the stdlib-only native payload schema and shared Agent/Plugin/MCP identifiers and validation contracts used by Host and Guest. Keep its `AgentName`, `AgentMode`, `Permission`, `build_native_payload`, `validate_agent_map`, `validate_native_asset`, and `validate_component_selection` interfaces aligned with `oc2_native.py` parsing and serialization.
+- The APM extension contract includes fixed disabled candidate declarations: `x-oc2-plugins: {enabled: false, allowlist: [superpowers]}` and `x-oc2-mcp: {enabled: false, servers: [oc2-status]}`. These lists identify candidates only; they do not enable or select them. Native Agents/MCP defaults remain disabled/empty unless an explicit verification selection is specified. Reject unknown fields, candidate IDs, and enabled values.
 
 - [x] Add failing tests for valid declarations, unknown/duplicate names, unauthorized model/permission fields, and enabled/unknown MCP entries.
 - [x] Run `python3 -m unittest sandbox.tests.test_oc2_native -v` and confirm the expected failures.
-- [x] Add the APM `x-oc2-assets`, `x-oc2-agents`, and `x-oc2-mcp` extensions; migrate the existing asset declaration without changing its selected paths.
+- [x] Add the APM `x-oc2-assets`, `x-oc2-agents`, `x-oc2-plugins`, and `x-oc2-mcp` extensions with fixed disabled candidate lists; migrate the existing asset declaration without changing its selected paths.
 - [x] Implement typed parsing and exact allowlist checks in `oc2_native.py`; pass focused tests.
 
 ### Task 2: Bind Native Agents to the existing asset/config/runtime flow
 
 **Files:**
-- Modify: `sandbox/scripts/oc2_assets.py`, `sandbox/scripts/prepare_opencode_v2.py`, `sandbox/scripts/oc2_guest.py`, `sandbox/scripts/oc2.py`
+- Modify: `sandbox/scripts/oc2_assets.py`, `sandbox/scripts/oc2_native.py`, `sandbox/scripts/oc2_agent_native.py`, `sandbox/scripts/prepare_opencode_v2.py`, `sandbox/scripts/oc2_guest.py`, `sandbox/scripts/oc2.py`
 - Test: `sandbox/tests/test_oc2_native.py`, `sandbox/tests/test_oc2.py`, `sandbox/tests/test_oc2_e2e.py`
 
 **Interfaces:**
-- Asset manifest adds a deterministic native-config artifact with the validated Agent map and MCP-disabled state.
+- Asset manifest adds a deterministic native-config artifact with the validated Agent map and disabled Plugin/MCP candidate selections as represented by `oc2_agent_native.py`; the disabled candidate allowlists in `apm.yml` are not active selections.
 - The V2 config exporter emits the same Agent map using the OpenCode v2.2.5 `agents` object schema.
 - Guest validation compares the config Agent map to the verified native-config artifact; the existing asset SHA remains in Runtime Identity.
 

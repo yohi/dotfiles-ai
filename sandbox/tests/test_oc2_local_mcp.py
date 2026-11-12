@@ -7,7 +7,7 @@ import subprocess
 import sys
 import unittest
 from pathlib import Path
-from typing import TypeAlias
+from typing import Any, TypeAlias
 
 SCRIPTS = Path(__file__).resolve().parents[1] / 'scripts'
 SERVER = SCRIPTS / 'oc2_local_mcp.py'
@@ -38,7 +38,7 @@ def initialized_input() -> str:
 
 
 class LocalMcpProtocolTest(unittest.TestCase):
-    def _serve(self, payload: str) -> tuple[int, list[dict[str, object]]]:
+    def _serve(self, payload: str) -> tuple[int, list[dict[str, Any]]]:
         output = io.StringIO()
         status = oc2_local_mcp.serve(io.StringIO(payload), output)
         return status, [json.loads(line) for line in output.getvalue().splitlines()]
@@ -59,6 +59,40 @@ class LocalMcpProtocolTest(unittest.TestCase):
         self.assertEqual(status, 0)
         self.assertEqual(responses[1]['result']['tools'][0]['name'], 'oc2_status')
         self.assertEqual(len(responses[1]['result']['tools']), 1)
+
+    def test_tools_list_accepts_protocol_meta(self) -> None:
+        """Accept `_meta` while retaining the fixed tools/list response."""
+        status, responses = self._serve(
+            initialized_input() + message('tools/list', 2, {'_meta': {'cursor': 'fixture'}}),
+        )
+
+        self.assertEqual(status, 0)
+        self.assertEqual(responses[1]['result']['tools'][0]['name'], 'oc2_status')
+
+    def test_tools_call_accepts_protocol_meta(self) -> None:
+        """Accept `_meta` without changing fixed tool name or arguments validation."""
+        status, responses = self._serve(initialized_input() + message(
+            'tools/call', 3, {
+                'name': 'oc2_status', 'arguments': {}, '_meta': {'progressToken': 1},
+            },
+        ))
+
+        self.assertEqual(status, 0)
+        self.assertIn('result', responses[1])
+
+    def test_tools_reject_unknown_top_level_params_with_protocol_meta(self) -> None:
+        """Reject unknown params keys even when protocol metadata is present."""
+        status, responses = self._serve(
+            initialized_input()
+            + message('tools/list', 2, {'_meta': {}, 'unexpected': True})
+            + message('tools/call', 4, {
+                'name': 'oc2_status', 'arguments': {}, '_meta': {}, 'unexpected': True,
+            }),
+        )
+
+        self.assertEqual(status, 0)
+        self.assertEqual(responses[1]['error']['code'], -32602)
+        self.assertEqual(responses[2]['error']['code'], -32602)
 
     def test_tools_are_rejected_until_initialized_notification(self):
         status, responses = self._serve(

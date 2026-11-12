@@ -97,6 +97,35 @@ finally:
         os.close(fd)
 '''
 
+DIRECTORY_DESTINATION_CHECK_SCRIPT = '''import errno, os, stat, sys
+path = sys.argv[1] if len(sys.argv) == 2 else ""
+parts = path.split("/")
+if not path.startswith("/") or len(parts) < 3 or any(p in ("", ".", "..") for p in parts[1:]):
+    sys.exit(12)
+fd = None
+try:
+    flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+    fd = os.open("/", flags)
+    for part in parts[1:-1]:
+        try:
+            child = os.open(part, flags, dir_fd=fd)
+        except FileNotFoundError as exc:
+            sys.exit(0 if exc.errno == errno.ENOENT else 11)
+        os.close(fd)
+        fd = child
+    try:
+        mode = os.stat(parts[-1], dir_fd=fd, follow_symlinks=False).st_mode
+    except FileNotFoundError as exc:
+        sys.exit(0 if exc.errno == errno.ENOENT else 11)
+    sys.exit(10 if stat.S_ISDIR(mode) else 12)
+except OSError as exc:
+    sys.exit(12 if exc.errno in (errno.ELOOP, errno.ENOTDIR) else 11)
+finally:
+    if fd is not None:
+        os.close(fd)
+'''
+
+
 
 @dataclass(frozen=True, slots=True)
 class CloudflareGatewayRuntime:
@@ -129,6 +158,18 @@ class Phase4RuntimeRequest:
     sandbox: str
     superpowers_plugin_dir: pathlib.Path
     artifacts: Phase4ArtifactPaths
+
+
+@dataclass(frozen=True, slots=True)
+class VerifiedFileTransfer:
+    """Describe a Guest file copy whose destination and content must be verified."""
+
+    source: pathlib.Path
+    destination: str
+    sha256: str
+    unsafe_message: str
+    unknown_status_message: str
+    mismatch_message: str
 
 
 class Stop(Exception):
@@ -427,7 +468,7 @@ def _cloudflare_secret_scope(
     """Parse only scope metadata for the Cloudflare service secret."""
     try:
         document = json.loads(listing)
-    except json.JSONDecodeError as exc:
+    except json.JSONDecodeError:
         raise Stop('Cloudflare credential listing JSON is invalid') from None
     if not isinstance(document, dict) or set(document) != {'secrets'}:
         raise Stop('Cloudflare credential listing JSON schema is unsupported')
@@ -575,6 +616,22 @@ class Runner:
             raise Stop('DESTINATION_CHECK_COMMAND_FAILED') from exc
         return result.returncode
 
+    def directory_status(self, name: str, destination: str) -> int:
+        """Check whether a remote path is absent or an existing real directory."""
+        command = operator_command(
+            self.user, 'sbx', 'exec', name, 'python3', '-c',
+            DIRECTORY_DESTINATION_CHECK_SCRIPT, destination,
+        )
+        if self.dry_run:
+            raise Stop('DESTINATION_CHECK_COMMAND_FAILED')
+        try:
+            result = subprocess.run(command, check=False, capture_output=True, timeout=180)
+        except subprocess.TimeoutExpired as exc:
+            raise Stop('DESTINATION_CHECK_TIMEOUT') from exc
+        except OSError as exc:
+            raise Stop('DESTINATION_CHECK_COMMAND_FAILED') from exc
+        return result.returncode
+
     def sbx(self, *args: str, capture: bool = False, tty: bool = False) -> str:
         command = operator_command(self.user, 'sbx', *args)
         if self.dry_run:
@@ -647,7 +704,7 @@ def export_v2_config(
     from sandbox.scripts.stage_opencode_v2 import StageError, verify_bundle
 
     try:
-        verify_bundle(output)
+        verify_bundle(output, trusted_root=output.parent)
     except StageError as exc:
         raise Stop('APM V2 config bundle failed verification') from exc
     config = output / 'opencode.jsonc'
@@ -656,7 +713,11 @@ def export_v2_config(
     return config
 
 
-def is_compatible_sandbox(runner: Runner, name: str) -> bool:
+def is_compatible_sandbox(
+    runner: Runner,
+    name: str,
+    expected_id: str | None = None,
+) -> bool:
     # sbx ls --format json on v0.49.2 gives identity but does not report
     # workspace/mounts. Inspect the exact named sandbox before trusting it.
     import json
@@ -670,10 +731,12 @@ def is_compatible_sandbox(runner: Runner, name: str) -> bool:
         listing = json.loads(runner.sbx('ls', '--format', 'json', capture=True))
     except (TypeError, ValueError) as exc:
         raise Stop('could not parse existing Sandbox identity') from exc
+    records: list[object] | None
     if isinstance(listing, list):
         records = listing
     elif isinstance(listing, dict):
-        records = listing.get('sandboxes')
+        candidate = listing.get('sandboxes')
+        records = candidate if isinstance(candidate, list) else None
     else:
         records = None
     if not isinstance(records, list):
@@ -683,6 +746,10 @@ def is_compatible_sandbox(runner: Runner, name: str) -> bool:
     if len(matches) != 1:
         raise Stop('could not establish existing Sandbox identity')
     row = matches[0]
+    if expected_id is not None:
+        actual_id = row.get('id')
+        if not isinstance(actual_id, str) or actual_id != expected_id:
+            raise Stop('Sandbox identity mismatch; refusing reuse')
     if row.get('agent') not in ('shell', 'sbx-kit-shell'):
         raise Stop('existing Sandbox agent is not shell')
 
@@ -714,7 +781,7 @@ def export_config(repo: pathlib.Path, out: pathlib.Path) -> tuple[pathlib.Path, 
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=40)
     if result.returncode:
         raise Stop('apm.yml configuration export failed; existing settings untouched')
-    digest = verify_bundle(out)
+    digest = verify_bundle(out, trusted_root=out.parent)
     # Source export is scalar-only; files are explicitly safe for a different
     # UID to read. A dedicated temp directory is used, not the repo itself.
     out.chmod(0o755)
@@ -828,11 +895,34 @@ def transfer_workspace(runner: Runner, name: str, snapshot: pathlib.Path,
     return destination
 
 
+def _transfer_verified_file(
+    runner: Runner,
+    name: str,
+    transfer: VerifiedFileTransfer,
+) -> None:
+    """Copy or reuse one Guest file only after matching its expected SHA-256."""
+    status = runner.destination_status(name, transfer.destination)
+    if status == 0:
+        runner.sbx('cp', str(transfer.source), f'{name}:{transfer.destination}')
+    elif status == 10:
+        pass
+    elif status == 12:
+        raise Stop(transfer.unsafe_message)
+    else:
+        raise Stop(transfer.unknown_status_message)
+    output = runner.sbx(
+        'exec', name, 'sha256sum', transfer.destination, capture=True,
+    ).split()
+    if not output or output[0] != transfer.sha256:
+        raise Stop(transfer.mismatch_message)
+
+
 def stage(runner: Runner, name: str, bundle: pathlib.Path, manifest_sha: str,
           guest_script: pathlib.Path, assets_file: pathlib.Path | None = None,
           assets_sha: str | None = None,
           phase4_plugin_file: pathlib.Path | None = None,
-          phase4_plugins_sha: str | None = None) -> None:
+          phase4_plugins_sha: str | None = None, *,
+          superpowers_source: pathlib.Path | None = None) -> None:
     if (phase4_plugin_file is None) != (phase4_plugins_sha is None):
         raise Stop('Phase 4 plugin asset file and hash must be supplied together')
     if phase4_plugin_file is not None and phase4_plugins_sha is not None:
@@ -868,10 +958,22 @@ def stage(runner: Runner, name: str, bundle: pathlib.Path, manifest_sha: str,
     script_dest = f'{verifier_dir}/oc2_guest.py'
     native_helper_dest = f'{verifier_dir}/oc2_agent_native.py'
     identity_helper_dest = f'{verifier_dir}/oc2_identity.py'
+    superpowers_destination: str | None = None
+    superpowers_parent: str | None = None
+    if superpowers_source is not None:
+        from oc2_agent_native import SUPERPOWERS_TREE_PATH
+
+        if superpowers_source.is_symlink() or not superpowers_source.is_dir():
+            raise Stop('verified Superpowers source directory is missing or linked')
+        superpowers_destination = f'{ROOT}/{SUPERPOWERS_TREE_PATH}'
+        superpowers_parent = str(pathlib.PurePosixPath(superpowers_destination).parent)
     # sbx exec v0.49.2 was observed invoking bash -c without the expected
     # trailing positional parameters. Use direct argv for filesystem operations.
-    execute(runner, name, 'mkdir', '-p', ROOT, f'{ROOT}/bundles', f'{ROOT}/scripts', verifier_dir)
-    execute(runner, name, 'chmod', '700', ROOT, f'{ROOT}/bundles', f'{ROOT}/scripts', verifier_dir)
+    directories = [ROOT, f'{ROOT}/bundles', f'{ROOT}/scripts', verifier_dir]
+    if superpowers_parent is not None:
+        directories.append(superpowers_parent)
+    execute(runner, name, 'mkdir', '-p', *directories)
+    execute(runner, name, 'chmod', '700', *directories)
     # Never overwrite an existing bundle or bootstrap script. Reuse is allowed
     # only after the guest validates their content and hash.
     exists = runner.sbx('exec', name, 'bash', '-c',
@@ -881,63 +983,41 @@ def stage(runner: Runner, name: str, bundle: pathlib.Path, manifest_sha: str,
         runner.sbx('cp', str(bundle), f'{name}:{destination}')
     elif exists != 'exists':
         raise Stop('cannot determine remote bundle state')
-    script_status = runner.destination_status(name, script_dest)
-    if script_status == 0:
-        runner.sbx('cp', str(guest_script), f'{name}:{script_dest}')
-    elif script_status == 10:
-        pass
-    elif script_status == 12:
-        raise Stop('unsafe guest asset verifier path')
-    else:
-        raise Stop('cannot determine remote bootstrap script state')
-    remote_sha = runner.sbx('exec', name, 'sha256sum', script_dest, capture=True).split()[0]
-    if remote_sha != script_sha:
-        raise Stop('guest bootstrap code SHA mismatch')
-    helper_status = runner.destination_status(name, native_helper_dest)
-    if helper_status == 0:
-        runner.sbx('cp', str(native_helper), f'{name}:{native_helper_dest}')
-    elif helper_status == 10:
-        pass
-    elif helper_status == 12:
-        raise Stop('unsafe guest native verifier path')
-    else:
-        raise Stop('cannot determine remote native verifier state')
-    helper_sha = runner.sbx(
-        'exec', name, 'sha256sum', native_helper_dest, capture=True,
-    ).split()[0]
-    if helper_sha != native_helper_sha:
-        raise Stop('guest native verifier SHA mismatch')
-    identity_status = runner.destination_status(name, identity_helper_dest)
-    if identity_status == 0:
-        runner.sbx('cp', str(identity_helper), f'{name}:{identity_helper_dest}')
-    elif identity_status == 10:
-        pass
-    elif identity_status == 12:
-        raise Stop('unsafe guest identity verifier path')
-    else:
-        raise Stop('cannot determine guest identity verifier state')
-    identity_sha = runner.sbx(
-        'exec', name, 'sha256sum', identity_helper_dest, capture=True,
-    ).split()[0]
-    if identity_sha != identity_helper_sha:
-        raise Stop('guest identity verifier SHA mismatch')
+    for transfer in (
+        VerifiedFileTransfer(guest_script, script_dest, script_sha,
+                             'unsafe guest asset verifier path',
+                             'cannot determine remote bootstrap script state',
+                             'guest bootstrap code SHA mismatch'),
+        VerifiedFileTransfer(native_helper, native_helper_dest, native_helper_sha,
+                             'unsafe guest native verifier path',
+                             'cannot determine remote native verifier state',
+                             'guest native verifier SHA mismatch'),
+        VerifiedFileTransfer(identity_helper, identity_helper_dest, identity_helper_sha,
+                             'unsafe guest identity verifier path',
+                             'cannot determine guest identity verifier state',
+                             'guest identity verifier SHA mismatch'),
+    ):
+        _transfer_verified_file(runner, name, transfer)
     phase4_policy_dest: str | None = None
     if phase4_policy is not None and phase4_policy_sha is not None:
         phase4_policy_dest = f'{verifier_dir}/oc2_phase4_policy.py'
-        policy_status = runner.destination_status(name, phase4_policy_dest)
-        if policy_status == 0:
-            runner.sbx('cp', str(phase4_policy), f'{name}:{phase4_policy_dest}')
-        elif policy_status == 10:
+        _transfer_verified_file(
+            runner, name,
+            VerifiedFileTransfer(phase4_policy, phase4_policy_dest, phase4_policy_sha,
+                                 'unsafe guest Phase 4 policy path',
+                                 'cannot determine guest Phase 4 policy state',
+                                 'guest Phase 4 policy SHA mismatch'),
+        )
+    if superpowers_source is not None and superpowers_destination is not None:
+        source_status = runner.directory_status(name, superpowers_destination)
+        if source_status == 0:
+            runner.sbx('cp', str(superpowers_source), f'{name}:{superpowers_destination}')
+        elif source_status == 10:
             pass
-        elif policy_status == 12:
-            raise Stop('unsafe guest Phase 4 policy path')
+        elif source_status == 12:
+            raise Stop('unsafe guest Superpowers source path')
         else:
-            raise Stop('cannot determine guest Phase 4 policy state')
-        actual_policy_sha = runner.sbx(
-            'exec', name, 'sha256sum', phase4_policy_dest, capture=True,
-        ).split()[0]
-        if actual_policy_sha != phase4_policy_sha:
-            raise Stop('guest Phase 4 policy SHA mismatch')
+            raise Stop('cannot determine guest Superpowers source state')
     args = ['--bundle', destination, '--expected-sha', manifest_sha]
     if (assets_file is None) != (assets_sha is None):
         raise Stop('asset file and hash must be supplied together')
@@ -946,19 +1026,15 @@ def stage(runner: Runner, name: str, bundle: pathlib.Path, manifest_sha: str,
             raise Stop('invalid asset hash')
         remote_assets = f'{ROOT}/assets/{assets_sha[:16]}.json'
         execute(runner, name, 'mkdir', '-p', f'{ROOT}/assets')
-        status = runner.destination_status(name, remote_assets)
-        if status == 0:
-            runner.sbx('cp', str(assets_file), f'{name}:{remote_assets}')
-        elif status == 10:
-            pass
-        elif status == 12:
-            raise Stop('unsafe guest asset bundle path')
-        else:
-            raise Stop('cannot establish guest asset state')
-        actual = runner.sbx('exec', name, 'sha256sum',
-                            remote_assets, capture=True).split()[0]
-        if actual != assets_sha:
-            raise Stop('guest asset bundle SHA mismatch')
+        _transfer_verified_file(
+            runner, name,
+            VerifiedFileTransfer(
+                assets_file, remote_assets, assets_sha,
+                'unsafe guest asset bundle path',
+                'cannot establish guest asset state',
+                'guest asset bundle SHA mismatch',
+            ),
+        )
         args.extend(['--assets', remote_assets, '--expected-assets-sha', assets_sha])
     if phase4_plugin_file is not None and phase4_plugins_sha is not None:
         if re.fullmatch(r'[0-9a-f]{64}', phase4_plugins_sha) is None:
@@ -1001,13 +1077,20 @@ def prepare_verification_runtime(
         temporary_path = pathlib.Path(temporary)
         bundle = temporary_path / 'bundle'
         export_v2_config(repo, bundle, verification_only=True)
-        config_sha = verify_bundle(bundle)
-        from oc2_assets import AssetError, build as build_assets, write_new
+        config_sha = verify_bundle(bundle, trusted_root=bundle.parent)
+        from oc2_assets import (
+            AssetError,
+            build as build_assets,
+            export_superpowers_tree,
+            write_new,
+        )
 
         try:
             asset_raw, asset_sha = build_assets(
                 repo, verification_only=True, plugin_dir=plugin_dir,
             )
+            superpowers_source = temporary_path / 'verification-superpowers'
+            export_superpowers_tree(repo, plugin_dir, superpowers_source)
         except AssetError as exc:
             raise Stop('verification Plugin/MCP asset export failed: ' + str(exc)) from exc
         asset_file = temporary_path / 'assets.json'
@@ -1015,7 +1098,7 @@ def prepare_verification_runtime(
         generator_fingerprint = verification_generator_fingerprint(
             HERE / 'oc2_guest.py', HERE / 'oc2_agent_native.py', HERE / 'oc2_identity.py',
         )
-        runtime_sha = runtime_identity_sha256(
+        runtime_sha: str = runtime_identity_sha256(
             config_sha, asset_sha, generator_fingerprint,
         )
         runtime_destination = f'{ROOT}/runtime/{runtime_sha[:16]}'
@@ -1028,10 +1111,10 @@ def prepare_verification_runtime(
             raise Stop('could not establish verification Runtime identity availability')
         stage(
             runner, sandbox, bundle, config_sha, HERE / 'oc2_guest.py',
-            asset_file, asset_sha,
+            asset_file, asset_sha, superpowers_source=superpowers_source,
         )
         print('OC2_VERIFICATION_PREPARED: sandbox=' + sandbox + ' runtime=' + runtime_sha[:16])
-        return runtime_sha
+        return str(runtime_sha)
 
 
 def prepare_phase4_runtime(
@@ -1222,37 +1305,35 @@ def launch(runner: Runner, request: SandboxLaunch) -> None:
         guest_script_sha = hashlib.sha256(guest_script.read_bytes()).hexdigest()
         native_helper = HERE / 'oc2_agent_native.py'
         native_helper_sha = hashlib.sha256(native_helper.read_bytes()).hexdigest()
+        identity_helper = HERE / 'oc2_identity.py'
+        identity_helper_sha = hashlib.sha256(identity_helper.read_bytes()).hexdigest()
         verifier_dir = (
-            f'{ROOT}/scripts/oc2_guest_{guest_script_sha[:16]}_{native_helper_sha[:16]}'
+            f'{ROOT}/scripts/oc2_guest_{guest_script_sha[:16]}_{native_helper_sha[:16]}_'
+            f'{identity_helper_sha[:16]}'
         )
         remote_script = f'{verifier_dir}/oc2_guest.py'
         remote_helper = f'{verifier_dir}/oc2_agent_native.py'
+        remote_identity_helper = f'{verifier_dir}/oc2_identity.py'
         runner.sbx(
             'exec', request.name, 'mkdir', '-p',
             f'{ROOT}/assets', f'{ROOT}/scripts', verifier_dir,
         )
-        for local, remote, label in (
-            (request.assets_file, remote_assets, 'asset bundle'),
-            (guest_script, remote_script, 'asset verifier'),
-            (native_helper, remote_helper, 'native verifier'),
+        for source, remote, expected_sha, label in (
+            (request.assets_file, remote_assets, request.assets_sha, 'asset bundle'),
+            (guest_script, remote_script, guest_script_sha, 'asset verifier'),
+            (native_helper, remote_helper, native_helper_sha, 'native verifier'),
+            (identity_helper, remote_identity_helper, identity_helper_sha, 'identity verifier'),
         ):
-            state = runner.destination_status(request.name, remote)
-            if state == 0:
-                runner.sbx('cp', str(local), f'{request.name}:{remote}')
-            elif state == 10:
-                pass
-            elif state == 12:
-                raise Stop('unsafe guest ' + label + ' path')
-            else:
-                raise Stop('cannot establish guest ' + label + ' state')
-            expected = (
-                request.assets_sha if label == 'asset bundle'
-                else guest_script_sha if label == 'asset verifier'
-                else native_helper_sha
+            _transfer_verified_file(
+                runner,
+                request.name,
+                VerifiedFileTransfer(
+                    source, remote, expected_sha,
+                    'unsafe guest ' + label + ' path',
+                    'cannot establish guest ' + label + ' state',
+                    'guest ' + label + ' SHA mismatch',
+                ),
             )
-            actual = runner.sbx('exec', request.name, 'sha256sum', remote, capture=True).split()
-            if not actual or actual[0] != expected:
-                raise Stop('guest ' + label + ' SHA mismatch')
         runner.sbx(
             'exec', request.name, 'python3', remote_script,
             '--assets', remote_assets, '--expected-assets-sha', request.assets_sha,
@@ -1328,7 +1409,7 @@ def _session_action(args: argparse.Namespace, workspace: pathlib.Path,
         if session.collected:
             raise Stop('changes have already been collected for this transfer')
         runner = Runner(args.sbx_user)
-        if not is_compatible_sandbox(runner, session.sandbox):
+        if not is_compatible_sandbox(runner, session.sandbox, session.sandbox_id):
             raise Stop('the recorded Sandbox no longer exists')
         collected = session.directory / 'collected'
         if collected.exists() or collected.is_symlink():
@@ -1460,7 +1541,10 @@ def main(argv: list[str] | None = None) -> int:
             print('OC2 PLAN: mountless shell Sandbox=' + args.sandbox)
             print('OC2 PLAN: workspace=' + str(workspace))
             print('OC2 PLAN: transfer only the verified Workspace Snapshot; no .git or OpenCode project config')
-            print(f'OC2 PLAN: install and verify @opencode/cli@{VERSION} inside the Sandbox')
+            print(
+                f'OC2 PLAN: download and SHA-256 verify @opencode/cli@{VERSION} on the Host; '
+                'bake it into the Sandbox Kit at /opt/oc2/bin/opencode'
+            )
             print('OC2 PLAN: no credentials, provider settings, MCP, plugins, or host config')
             print('OC2 PLAN: no Sandbox commands executed')
             return 0
@@ -1478,6 +1562,8 @@ def main(argv: list[str] | None = None) -> int:
             )
             return 0
         if args.verification_only:
+            if args.plugin_dir is None:
+                raise Stop('plugin directory is required for verification-only mode')
             prepare_verification_runtime(repo, args.sandbox, args.plugin_dir)
             return 0
         if args.prepare_only:

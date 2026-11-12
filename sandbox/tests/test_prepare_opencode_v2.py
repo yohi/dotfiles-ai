@@ -69,6 +69,7 @@ class ExportTests(unittest.TestCase):
             self.assertEqual(sha, hashlib.sha256((self.out / name).read_bytes()).hexdigest())
 
     def test_verification_export_contains_no_provider_or_credential_configuration(self) -> None:
+        """Require verification-only output to omit all provider and credential settings."""
         self.apm.write_text(
             "shell: bash\nsnapshot: true\n"
             "x-oc2-assets: [global-rules/AGENTS.global.md]\n"
@@ -114,12 +115,12 @@ class ExportTests(unittest.TestCase):
             "  deny_provider_fallback: true\n"
             "  deny_guest_auth: true\n"
             "  providers:\n"
-            "    openai:\n"
-            "      enabled: true\n"
-            "      auth_method: docker_openai_oauth\n"
             "    cloudflare-ai-gateway-custom:\n"
             "      enabled: true\n"
-            "      auth_method: docker_custom_secret\n",
+            "      auth_method: docker_custom_secret\n"
+            "    openai:\n"
+            "      enabled: true\n"
+            "      auth_method: docker_openai_oauth\n",
             encoding="utf-8",
         )
 
@@ -155,6 +156,7 @@ class ExportTests(unittest.TestCase):
             self.assertNotIn("OC_CF_REST_API_TOKEN", generated.read_text())
 
     def test_v2_native_agents_use_only_apm_selected_fixed_config(self) -> None:
+        """Allow only the Native Agent map selected by APM in normal V2 output."""
         self.apm.write_text(
             "provider:\n"
             "  openai:\n"

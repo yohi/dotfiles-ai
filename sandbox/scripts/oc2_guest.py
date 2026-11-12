@@ -21,7 +21,7 @@ from oc2_agent_native import (
     SUPERPOWERS_COMMIT,
     SUPERPOWERS_FILE_COUNT,
     SUPERPOWERS_REPOSITORY,
-    SUPERPOWERS_SOURCE_PATH,
+    SUPERPOWERS_TREE_PATH,
     SUPERPOWERS_TOTAL_BYTES,
     SUPERPOWERS_TREE_SHA256,
     SUPERPOWERS_VERSION,
@@ -125,7 +125,7 @@ class VerifiedPhase4PluginBundle:
 
 
 def verify_superpowers_source() -> VerifiedSuperpowersSource:
-    source = BASE / SUPERPOWERS_SOURCE_PATH
+    source = BASE / SUPERPOWERS_TREE_PATH
     validate_location(source, BASE)
     if source.is_symlink() or not source.is_dir():
         fail('verified Superpowers source directory is missing or linked')
@@ -191,6 +191,71 @@ def regular(path: pathlib.Path, max_bytes: int = 1048576) -> bytes:
     return path.read_bytes()
 
 
+def _verify_model_settings(value: JsonValue, label: str) -> None:
+    if not isinstance(value, dict):
+        fail('invalid model reasoning settings: ' + label)
+    allowed = {
+        'reasoningEffort': {'minimal', 'low', 'medium', 'high', 'xhigh', 'max'},
+        'reasoningSummary': {'auto', 'concise', 'detailed'},
+    }
+    for key, item in value.items():
+        if key not in allowed or not isinstance(item, str) or item not in allowed[key]:
+            fail('unapproved model reasoning setting: ' + label)
+
+
+def _verify_model_options(key: str, options: dict[str, JsonValue], label: str) -> None:
+    if key == 'headers':
+        if options:
+            fail('unsupported model headers: ' + label)
+        return
+    if set(options) - {'thinking'}:
+        fail('unsupported model body field: ' + label)
+    thinking = options.get('thinking')
+    if thinking is None and 'thinking' not in options:
+        return
+    if (not isinstance(thinking, dict) or set(thinking) != {'type'}
+            or not isinstance(thinking['type'], str)
+            or thinking['type'] not in {'enabled', 'disabled'}):
+        fail('unsupported model thinking option: ' + label)
+
+
+def _verify_model_catalog(models: JsonValue) -> None:
+    if not isinstance(models, dict):
+        fail('invalid V2 model catalog')
+    for model_id, value in models.items():
+        if not isinstance(value, dict) or set(value) - {
+            'modelID', 'name', 'settings', 'headers', 'body', 'variants',
+        }:
+            fail('invalid V2 model configuration')
+        if value.get('modelID') != model_id or not isinstance(value.get('name'), str):
+            fail('V2 model identity does not match its catalog')
+        _verify_model_settings(value.get('settings', {}), model_id)
+        for key in ('headers', 'body'):
+            options = value.get(key, {})
+            if not isinstance(options, dict):
+                fail('invalid V2 model ' + key)
+            _verify_model_options(key, options, model_id + '.' + key)
+        variants = value.get('variants', [])
+        if not isinstance(variants, list):
+            fail('invalid V2 model variants')
+        seen: set[str] = set()
+        for variant in variants:
+            if not isinstance(variant, dict):
+                fail('invalid V2 model variant')
+            variant_id = variant.get('id')
+            if not isinstance(variant_id, str):
+                fail('invalid V2 model variant')
+            if variant_id in seen or set(variant) - {'id', 'settings', 'headers', 'body'}:
+                fail('invalid V2 model variant')
+            seen.add(variant_id)
+            _verify_model_settings(variant.get('settings', {}), model_id + '.' + variant_id)
+            for key in ('headers', 'body'):
+                options = variant.get(key, {})
+                if not isinstance(options, dict):
+                    fail('invalid V2 model variant ' + key)
+                _verify_model_options(key, options, model_id + '.' + variant_id)
+
+
 def verify_v2_config(server: dict[str, JsonValue]) -> None:
     """Reject provider fallback, Guest auth, and literal credentials at activation."""
     allowed_fields = {'$schema', 'shell', 'snapshot', 'model', 'providers', 'policies'}
@@ -216,6 +281,10 @@ def verify_v2_config(server: dict[str, JsonValue]) -> None:
     models = provider.get('models')
     if not isinstance(models, dict) or model_id not in models:
         fail('V2 default model is not in the provider catalog')
+    for provider_config in providers.values():
+        if not isinstance(provider_config, dict):
+            fail('invalid V2 provider configuration')
+        _verify_model_catalog(provider_config.get('models'))
     expected_policies: list[JsonValue] = [
         {'action': 'provider.use', 'resource': '*', 'effect': 'deny'},
         {'action': 'provider.use', 'resource': 'openai', 'effect': 'allow'},
@@ -349,7 +418,7 @@ def _verify_plugin_source_metadata(raw: bytes) -> dict[str, JsonValue]:
         'source': SUPERPOWERS_REPOSITORY,
         'version': SUPERPOWERS_VERSION,
         'commit': SUPERPOWERS_COMMIT,
-        'source_path': SUPERPOWERS_SOURCE_PATH,
+        'source_path': SUPERPOWERS_TREE_PATH,
         'entrypoint': '.opencode/plugins/superpowers.js',
         'skills_directory': 'skills',
         'file_count': SUPERPOWERS_FILE_COUNT,
@@ -360,11 +429,14 @@ def _verify_plugin_source_metadata(raw: bytes) -> dict[str, JsonValue]:
             or any(metadata.get(key) != value for key, value in expected.items())):
         fail('Superpowers source metadata is not allowlisted')
     plugin_files = metadata.get('plugin_files')
-    if (not isinstance(plugin_files, list)
-            or any(not isinstance(name, str) for name in plugin_files)
-            or plugin_files != sorted(set(plugin_files))):
+    if not isinstance(plugin_files, list):
         fail('Superpowers Plugin file manifest is invalid')
-    names = set(plugin_files)
+    if any(not isinstance(name, str) for name in plugin_files):
+        fail('Superpowers Plugin file manifest is invalid')
+    file_names = [name for name in plugin_files if isinstance(name, str)]
+    if file_names != sorted(set(file_names)):
+        fail('Superpowers Plugin file manifest is invalid')
+    names = set(file_names)
     if not {
         'index.js',
         'package.json',
@@ -374,13 +446,13 @@ def _verify_plugin_source_metadata(raw: bytes) -> dict[str, JsonValue]:
     if not any(
         name.startswith('skills/') and name.endswith('/SKILL.md')
         and len(name.split('/')) == 3
-        for name in plugin_files
+        for name in file_names
     ):
         fail('Superpowers Native Skill assets are missing')
     if any(
         name.startswith('/') or '\\' in name
         or any(part in ('', '.', '..') for part in name.split('/'))
-        for name in plugin_files
+        for name in file_names
     ):
         fail('Superpowers Plugin file path is unsafe')
     return metadata
@@ -604,10 +676,36 @@ def verify_phase4_plugin_assets(
     )
 
 
+def _asset_count_summary(files: dict[str, bytes]) -> str:
+    """Summarize selected asset categories using the verified file keys."""
+    rules = sum(name.startswith('config/opencode/rules/') for name in files)
+    commands = sum(name.startswith('config/opencode/commands/') for name in files)
+    skills = sum(
+        name.startswith('config/opencode/skills/') and name.endswith('/SKILL.md')
+        for name in files
+    )
+    theme = int('theme.json' in files)
+    custom_agents = sum(name.startswith('config/opencode/agents/') for name in files)
+    routing_count = sum(name.startswith('metadata/agent-routes') for name in files)
+    routing = str(routing_count) if routing_count else 'none'
+    return (
+        f'rules={rules} commands={commands} skills={skills} theme={theme} '
+        f'custom_agents={custom_agents} routing={routing}'
+    )
+
+
 def install_assets(source: pathlib.Path, expected_sha: str, runtime_id: str) -> pathlib.Path:
+    """Verify an asset file and install its selected contents into a new runtime."""
     if re.fullmatch(r'[0-9a-f]{64}', runtime_id) is None:
         fail('invalid asset runtime identity')
     files = verify_assets(source, expected_sha)
+    return _install_verified_assets(files, expected_sha, runtime_id)
+
+
+def _install_verified_assets(
+    files: dict[str, bytes], expected_sha: str, runtime_id: str,
+) -> pathlib.Path:
+    """Materialize already-verified files under a unique asset runtime identity."""
     runtime_root = BASE / 'runtime'
     if not runtime_root.exists():
         runtime_root.mkdir(mode=0o700)
@@ -860,7 +958,7 @@ def prepare(
             receipt['plugin_source'] = {
                 'repository': SUPERPOWERS_REPOSITORY,
                 'commit': SUPERPOWERS_COMMIT,
-                'path': SUPERPOWERS_SOURCE_PATH,
+                'path': SUPERPOWERS_TREE_PATH,
                 'file_count': len(plugin_source.files),
                 'total_bytes': plugin_source.total_bytes,
                 'tree_sha256': plugin_source.tree_sha256,
@@ -870,7 +968,7 @@ def prepare(
             receipt['plugin_source'] = {
                 'repository': SUPERPOWERS_REPOSITORY,
                 'commit': SUPERPOWERS_COMMIT,
-                'path': SUPERPOWERS_SOURCE_PATH,
+                'path': SUPERPOWERS_TREE_PATH,
                 'file_count': plugin_metadata['file_count'],
                 'total_bytes': plugin_metadata['total_bytes'],
                 'tree_sha256': plugin_metadata['tree_sha256'],
@@ -937,10 +1035,15 @@ def main(argv: list[str] | None = None) -> int:
                 fail('Phase 4 plugin assets cannot be used with the generic asset installer')
             if args.assets is None or args.expected_assets_sha is None:
                 fail('asset runtime requires verified assets')
-            runtime = install_assets(args.assets, args.expected_assets_sha,
-                                     args.install_assets_runtime)
-            print('OC2_ASSETS_VERIFIED: rules=7 commands=1 skills=2 theme=1 custom_agents=0 routing=none')
-            print('OC2_RUNTIME_PREPARED: ' + str(runtime))
+            if re.fullmatch(r'[0-9a-f]{64}', args.install_assets_runtime) is None:
+                fail('invalid asset runtime identity')
+            runtime_assets = verify_assets(args.assets, args.expected_assets_sha)
+            count_summary = _asset_count_summary(runtime_assets)
+            asset_runtime = _install_verified_assets(
+                runtime_assets, args.expected_assets_sha, args.install_assets_runtime,
+            )
+            print('OC2_ASSETS_VERIFIED: ' + count_summary)
+            print('OC2_RUNTIME_PREPARED: ' + str(asset_runtime))
             print('OC2_RUNTIME_VERSION: ' + VERSION)
             return 0
         if args.bundle is None or args.expected_sha is None:
@@ -976,6 +1079,8 @@ def main(argv: list[str] | None = None) -> int:
         if phase4_plugins is not None:
             print('OC2_PHASE4_PLUGINS_VERIFIED: server=akane tui=sibyl recovery_ping=not-executed')
         print('OC2_RUNTIME_PREPARED: ' + str(runtime))
+        if assets is not None:
+            print('OC2_ASSETS_VERIFIED: ' + _asset_count_summary(assets))
         print('OC2_RUNTIME_VERSION: ' + VERSION)
         return 0
     except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError) as exc:

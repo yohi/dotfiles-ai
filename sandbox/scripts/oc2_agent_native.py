@@ -110,15 +110,19 @@ SUPERPOWERS_REPOSITORY: Final[str] = 'obra/superpowers'
 SUPERPOWERS_REF: Final[str] = 'v6.4.2'
 SUPERPOWERS_COMMIT: Final[str] = '8ca22dba9a94f28898bbce59f2537ff4d87c747d'
 SUPERPOWERS_VERSION: Final[str] = '6.4.2'
-SUPERPOWERS_SOURCE_PATH: Final[str] = 'verification-superpowers'
 SUPERPOWERS_FILE_COUNT: Final[int] = 229
 SUPERPOWERS_TOTAL_BYTES: Final[int] = 1_974_678
 SUPERPOWERS_TREE_SHA256: Final[str] = (
     '19ba95fe50e96fb94d8260972cb50595ed31ada3f993e370b381a1e7718c5036'
 )
+SUPERPOWERS_SOURCE_PATH: Final[str] = 'verification-superpowers'
+SUPERPOWERS_TREE_PATH: Final[str] = (
+    SUPERPOWERS_SOURCE_PATH + '/' + SUPERPOWERS_TREE_SHA256
+)
 
 
 def parse_agent_name(value: str) -> AgentName:
+    """Accept only `hephaestus` or `oracle`; raise ValueError for every other string."""
     match value:
         case AgentName.HEPHAESTUS:
             return AgentName.HEPHAESTUS
@@ -143,8 +147,8 @@ def _agent_definitions() -> dict[AgentName, AgentDefinition]:
                 Permission('grep', '*', Effect.ALLOW),
                 Permission('lsp', '*', Effect.ALLOW),
                 Permission('edit', '*', Effect.ASK),
-                Permission('bash', '*', Effect.ASK),
-                Permission('task', '*', Effect.ASK),
+                Permission('shell', '*', Effect.ASK),
+                Permission('subagent', '*', Effect.ASK),
                 Permission('webfetch', '*', Effect.DENY),
                 Permission('websearch', '*', Effect.DENY),
                 Permission('mcp.use', '*', Effect.DENY),
@@ -166,8 +170,8 @@ def _agent_definitions() -> dict[AgentName, AgentDefinition]:
                 Permission('grep', '*', Effect.ALLOW),
                 Permission('lsp', '*', Effect.ALLOW),
                 Permission('edit', '*', Effect.DENY),
-                Permission('bash', '*', Effect.DENY),
-                Permission('task', '*', Effect.DENY),
+                Permission('shell', '*', Effect.DENY),
+                Permission('subagent', '*', Effect.DENY),
                 Permission('webfetch', '*', Effect.DENY),
                 Permission('websearch', '*', Effect.DENY),
                 Permission('mcp.use', '*', Effect.DENY),
@@ -192,6 +196,12 @@ def _agent_config(name: AgentName) -> AgentJSON:
 
 
 def build_native_payload(config: NativeConfigProtocol) -> NativePayload:
+    """Build the payload from fixed Agents and matching Plugin/MCP modes.
+
+    Disabled Plugin/MCP selections must have empty lists. Enabled selections
+    must be exactly `superpowers` and `oc2-status`; mismatches raise ValueError.
+    The result contains the schema, source digest, Agent map, and selections.
+    """
     plugin_allowlist = [plugin.value for plugin in config.plugins.allowlist]
     mcp_servers = [server.value for server in config.mcp.servers]
     if config.plugins.enabled != config.mcp.enabled:
@@ -247,12 +257,17 @@ JsonValue: TypeAlias = str | int | float | bool | None | list['JsonValue'] | dic
 
 
 def validate_agent_map(value: JsonValue | AgentMap) -> AgentMap:
+    """Normalize a map containing only exact generated `hephaestus`/`oracle` configs.
+
+    Reject non-mappings, unknown names, or Agent values that differ from the
+    fixed mode, model, description, system, and permissions configuration.
+    """
     if not isinstance(value, dict) or set(value) - {name.value for name in AgentName}:
         raise ValueError('unapproved Native Agent map')
     result: AgentMap = {}
     for raw_name in value:
         name = parse_agent_name(raw_name)
-        raw_agent = value[raw_name]
+        raw_agent = value.get(raw_name)
         expected = _agent_config(name)
         if raw_agent != expected:
             raise ValueError('Native Agent configuration is not allowlisted')
@@ -276,6 +291,12 @@ def _unique_json_object(pairs: list[tuple[str, JsonValue]]) -> dict[str, JsonVal
 
 
 def validate_native_asset(raw: bytes) -> NativePayload:
+    """Decode the unique-key JSON Native asset and return its validated payload.
+
+    Require the exact schema fields, schema identifier, lowercase 64-digit
+    source SHA-256, fixed Agent map, and matching allowlisted Plugin/MCP
+    selections. Reject invalid UTF-8/JSON, duplicate keys, or other values.
+    """
     try:
         decoded: JsonValue = json.loads(raw, object_pairs_hook=_unique_json_object)
     except (ValueError, UnicodeError) as exc:

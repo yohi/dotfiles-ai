@@ -17,6 +17,7 @@ import sys
 import tarfile
 import tempfile
 import unittest
+from typing import Any
 from unittest.mock import patch
 
 import yaml
@@ -30,8 +31,9 @@ def load(name: str):
     if name in sys.modules:
         return sys.modules[name]
     spec = importlib.util.spec_from_file_location(name, SCRIPTS / (name + '.py'))
+    if spec is None or spec.loader is None:
+        raise ImportError(f'could not load module: {name}')
     mod = importlib.util.module_from_spec(spec)
-    assert spec and spec.loader
     sys.modules[name] = mod
     spec.loader.exec_module(mod)
     return mod
@@ -300,7 +302,11 @@ class HostTest(unittest.TestCase):
             digest = hashlib.sha256(assets_file.read_bytes()).hexdigest()
             guest_sha = hashlib.sha256((SCRIPTS / 'oc2_guest.py').read_bytes()).hexdigest()
             native_sha = hashlib.sha256((SCRIPTS / 'oc2_agent_native.py').read_bytes()).hexdigest()
-            verifier_dir = f'{oc2.ROOT}/scripts/oc2_guest_{guest_sha[:16]}_{native_sha[:16]}'
+            identity_sha = hashlib.sha256((SCRIPTS / 'oc2_identity.py').read_bytes()).hexdigest()
+            verifier_dir = (
+                f'{oc2.ROOT}/scripts/oc2_guest_{guest_sha[:16]}_{native_sha[:16]}_'
+                f'{identity_sha[:16]}'
+            )
             oc2.launch(runner, oc2.SandboxLaunch(
                 'oc2-dev', 'a' * 64, oc2.PINNED[0], '/workspace/project',
                 pathlib.Path('/tmp/config'), assets_file=assets_file, assets_sha=digest,
@@ -309,6 +315,7 @@ class HostTest(unittest.TestCase):
         self.assertTrue(any('/assets/' in target for target in copied))
         self.assertIn(f'oc2-dev:{verifier_dir}/oc2_guest.py', copied)
         self.assertIn(f'oc2-dev:{verifier_dir}/oc2_agent_native.py', copied)
+        self.assertIn(f'oc2-dev:{verifier_dir}/oc2_identity.py', copied)
         self.assertTrue(any(target.endswith('/oc2_agent_native.py')
                             for target in copied))
         verify_call = next(call for call in runner.calls if '--install-assets-runtime' in call)
@@ -325,11 +332,17 @@ class HostTest(unittest.TestCase):
             script_sha = hashlib.sha256(script.read_bytes()).hexdigest()
             native_helper = oc2.HERE / 'oc2_agent_native.py'
             native_sha = hashlib.sha256(native_helper.read_bytes()).hexdigest()
-            verifier_dir = f'{oc2.ROOT}/scripts/oc2_guest_{script_sha[:16]}_{native_sha[:16]}'
+            identity_helper = oc2.HERE / 'oc2_identity.py'
+            identity_sha = hashlib.sha256(identity_helper.read_bytes()).hexdigest()
+            verifier_dir = (
+                f'{oc2.ROOT}/scripts/oc2_guest_{script_sha[:16]}_{native_sha[:16]}_'
+                f'{identity_sha[:16]}'
+            )
             runner.workspace_copies.extend((
                 (assets_file, f'oc2-dev:{oc2.ROOT}/assets/{digest[:16]}.json'),
                 (script, f'oc2-dev:{verifier_dir}/oc2_guest.py'),
                 (native_helper, f'oc2-dev:{verifier_dir}/oc2_agent_native.py'),
+                (identity_helper, f'oc2-dev:{verifier_dir}/oc2_identity.py'),
             ))
 
             oc2.launch(runner, oc2.SandboxLaunch(
@@ -343,7 +356,7 @@ class HostTest(unittest.TestCase):
                              for target in copied_targets))
 
     def test_launch_fails_closed_for_unsafe_and_unknown_asset_probe_states(self):
-        for target_kind in ('asset', 'verifier', 'native-helper'):
+        for target_kind in ('asset', 'verifier', 'native-helper', 'identity-helper'):
             for status in (1, 11, 12, 99):
                 with self.subTest(target=target_kind, status=status), \
                         tempfile.TemporaryDirectory() as temporary:
@@ -355,8 +368,12 @@ class HostTest(unittest.TestCase):
                     native_sha = hashlib.sha256(
                         (oc2.HERE / 'oc2_agent_native.py').read_bytes(),
                     ).hexdigest()
+                    identity_sha = hashlib.sha256(
+                        (oc2.HERE / 'oc2_identity.py').read_bytes(),
+                    ).hexdigest()
                     verifier_dir = (
-                        f'{oc2.ROOT}/scripts/oc2_guest_{script_sha[:16]}_{native_sha[:16]}'
+                        f'{oc2.ROOT}/scripts/oc2_guest_{script_sha[:16]}_{native_sha[:16]}_'
+                        f'{identity_sha[:16]}'
                     )
                     path = (
                         f'{oc2.ROOT}/assets/{digest[:16]}.json'
@@ -364,6 +381,8 @@ class HostTest(unittest.TestCase):
                         else f'{verifier_dir}/oc2_guest.py'
                         if target_kind == 'verifier'
                         else f'{verifier_dir}/oc2_agent_native.py'
+                        if target_kind == 'native-helper'
+                        else f'{verifier_dir}/oc2_identity.py'
                     )
                     runner.destination_states[path] = status
 
@@ -378,6 +397,9 @@ class HostTest(unittest.TestCase):
                         self.assertFalse(any('/assets/' in target for target in copied_targets))
                     elif target_kind == 'native-helper':
                         self.assertFalse(any(target.endswith('/oc2_agent_native.py')
+                                             for target in copied_targets))
+                    elif target_kind == 'identity-helper':
+                        self.assertFalse(any(target.endswith('/oc2_identity.py')
                                              for target in copied_targets))
                     else:
                         self.assertFalse(any('/scripts/oc2_guest_' in target
@@ -407,7 +429,11 @@ class HostTest(unittest.TestCase):
             digest = hashlib.sha256(assets_file.read_bytes()).hexdigest()
             script_sha = hashlib.sha256((oc2.HERE / 'oc2_guest.py').read_bytes()).hexdigest()
             native_sha = hashlib.sha256((oc2.HERE / 'oc2_agent_native.py').read_bytes()).hexdigest()
-            verifier_dir = f'{oc2.ROOT}/scripts/oc2_guest_{script_sha[:16]}_{native_sha[:16]}'
+            identity_sha = hashlib.sha256((oc2.HERE / 'oc2_identity.py').read_bytes()).hexdigest()
+            verifier_dir = (
+                f'{oc2.ROOT}/scripts/oc2_guest_{script_sha[:16]}_{native_sha[:16]}_'
+                f'{identity_sha[:16]}'
+            )
             remote_script = f'{verifier_dir}/oc2_guest.py'
             stale_script = pathlib.Path(temporary) / 'stale-guest.py'
             stale_script.write_text('unapproved verifier\n')
@@ -423,6 +449,58 @@ class HostTest(unittest.TestCase):
                 ))
             self.assertFalse(any(call[0] == 'cp' and '/scripts/oc2_guest_' in call[2]
                                  for call in runner.calls))
+
+    def test_launch_rejects_empty_sha256sum_output(self) -> None:
+        """Stop safely when the launch verifier returns no checksum token."""
+        class EmptyChecksumRunner(FakeRunner):
+            def sbx(
+                self,
+                *args: str,
+                capture: bool = False,
+                tty: bool = False,
+                timeout: int | None = 180,
+            ) -> str:
+                if args[:3] == ('exec', 'oc2-dev', 'sha256sum'):
+                    self.calls.append(args)
+                    return ''
+                result: str = super().sbx(
+                    *args, capture=capture, tty=tty, timeout=timeout,
+                )
+                return result
+
+        with tempfile.TemporaryDirectory() as temporary:
+            assets_file = pathlib.Path(temporary) / 'assets.json'
+            assets_file.write_text('{}')
+            digest = hashlib.sha256(assets_file.read_bytes()).hexdigest()
+
+            with self.assertRaisesRegex(oc2.Stop, 'guest asset bundle SHA mismatch'):
+                oc2.launch(EmptyChecksumRunner(), oc2.SandboxLaunch(
+                    'oc2-dev', 'a' * 64, oc2.PINNED[0], '/workspace/project',
+                    pathlib.Path('/tmp/config'), assets_file=assets_file, assets_sha=digest,
+                ))
+
+    def test_stage_rejects_empty_sha256sum_output(self) -> None:
+        """Stop safely when stage receives an empty checksum response."""
+        class EmptyChecksumRunner:
+            def destination_status(self, _name: str, _destination: str) -> int:
+                return 0
+
+            def sbx(self, *args: str, **kwargs: bool) -> str:
+                if args[:4] == ('exec', 'oc2-dev', 'bash', '-c'):
+                    return 'missing\n'
+                if args[:3] == ('exec', 'oc2-dev', 'sha256sum'):
+                    return ''
+                return ''
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            bundle = root / 'bundle'
+            bundle.mkdir()
+            script = root / 'oc2_guest.py'
+            script.write_text('# fixture\n')
+
+            with self.assertRaisesRegex(oc2.Stop, 'guest bootstrap code SHA mismatch'):
+                oc2.stage(EmptyChecksumRunner(), 'oc2-dev', bundle, 'a' * 64, script)
 
     def test_cloudflare_credential_accepts_existing_sandbox_scope(self):
         runner = FakeSecretRunner(sandbox_scope='oc2-dev', global_scope='(global)')
@@ -589,6 +667,30 @@ class HostTest(unittest.TestCase):
             self.assertEqual(check(link / 'target'), 12)
             self.assertEqual(check(pathlib.Path(tmp) / 'missing' / 'target'), 0)
             self.assertEqual(check(pathlib.Path('relative')), 12)
+
+    def test_directory_destination_guest_exit_codes_for_real_filesystem(self) -> None:
+        """Distinguish absent, real-directory, and unsafe remote directory targets."""
+        with tempfile.TemporaryDirectory() as tmp:
+            parent = pathlib.Path(tmp) / 'parent'
+            parent.mkdir()
+            candidate = parent / 'target'
+
+            def check(path):
+                return subprocess.run(
+                    [sys.executable, '-c', oc2.DIRECTORY_DESTINATION_CHECK_SCRIPT, str(path)],
+                    capture_output=True, check=False,
+                ).returncode
+
+            self.assertEqual(check(candidate), 0)
+            self.assertEqual(check(pathlib.Path(tmp) / 'missing' / 'target'), 0)
+            candidate.mkdir()
+            self.assertEqual(check(candidate), 10)
+            candidate.rmdir()
+            candidate.write_text('file')
+            self.assertEqual(check(candidate), 12)
+            candidate.unlink()
+            candidate.symlink_to(parent, target_is_directory=True)
+            self.assertEqual(check(candidate), 12)
 
     def test_destination_guest_permission_error_is_indeterminate(self):
         program = (
@@ -1039,6 +1141,18 @@ class HostTest(unittest.TestCase):
             with self.assertRaises(workspace.WorkspaceError):
                 workspace.snapshot(root)
 
+    def test_workspace_snapshot_excludes_env_suffixes_not_starting_with_dot_env(self):
+        workspace = load('oc2_workspace')
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            (root / 'main.py').write_text('print("safe")\n')
+            (root / 'prod.env').write_text('TOKEN=fixture-only')
+            (root / 'app.env.local').write_text('TOKEN=fixture-only')
+
+            manifest = workspace.snapshot(root)
+
+            self.assertEqual([entry.path for entry in manifest.files], ['main.py'])
+
     def test_workspace_snapshot_rejects_embedded_credential_material(self):
         workspace = load('oc2_workspace')
         with tempfile.TemporaryDirectory() as tmp:
@@ -1125,7 +1239,7 @@ class HostTest(unittest.TestCase):
             self.assertEqual(calls, [(staged, 'sbx-poc')])
 
     def test_snapshot_acl_is_limited_to_named_operator(self):
-        result = subprocess.CompletedProcess(args=[], returncode=0)
+        result: subprocess.CompletedProcess[str] = subprocess.CompletedProcess(args=[], returncode=0)
         with tempfile.TemporaryDirectory() as tmp:
             snapshot = pathlib.Path(tmp) / 'project'
             (snapshot / 'src').mkdir(parents=True)
@@ -1144,7 +1258,7 @@ class HostTest(unittest.TestCase):
             )
 
     def test_collection_acl_is_limited_to_private_temporary_directory(self):
-        result = subprocess.CompletedProcess(args=[], returncode=0)
+        result: subprocess.CompletedProcess[str] = subprocess.CompletedProcess(args=[], returncode=0)
         with patch.object(oc2.shutil, 'which', return_value='/usr/bin/setfacl'), \
              patch.object(oc2.subprocess, 'run', return_value=result) as run:
             oc2.grant_collection_directory_access(
@@ -1317,6 +1431,21 @@ class HostTest(unittest.TestCase):
         self.assertTrue(oc2.is_compatible_sandbox(runner, 'oc2-dev'))
         self.assertIn(('inspect', 'oc2-dev', '--json'), runner.calls)
 
+    def test_sandbox_identity_mismatch_rejected(self):
+        runner = FakeRunner(
+            [{'name': 'oc2-dev', 'agent': 'shell', 'id': 'new-sandbox-id'}],
+        )
+        with self.assertRaisesRegex(oc2.Stop, 'identity mismatch'):
+            oc2.is_compatible_sandbox(runner, 'oc2-dev', 'recorded-sandbox-id')
+
+    def test_sandbox_recorded_identity_matches(self):
+        runner = FakeRunner(
+            [{'name': 'oc2-dev', 'agent': 'shell', 'id': 'recorded-sandbox-id'}],
+        )
+        self.assertTrue(
+            oc2.is_compatible_sandbox(runner, 'oc2-dev', 'recorded-sandbox-id'),
+        )
+
     def test_v3_shell_workload_is_compatible_for_collection(self):
         runner = FakeRunner([{'name': 'oc2-dev', 'agent': 'sbx-kit-shell'}])
 
@@ -1373,6 +1502,9 @@ class HostTest(unittest.TestCase):
                     self.assertEqual(oc2.main(['--repo-root', tmp, '--workspace', tmp,
                                                '--dry-run']), 0)
                 self.assertIn('no Sandbox commands executed', out.getvalue())
+                self.assertIn('Host', out.getvalue())
+                self.assertIn('Kit', out.getvalue())
+                self.assertNotIn('inside the Sandbox', out.getvalue())
 
     def test_invalid_sandbox_name_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -1546,7 +1678,7 @@ class HostTest(unittest.TestCase):
             with self.assertRaisesRegex(oc2.Stop, 'unsafe guest asset verifier path'):
                 oc2.stage(Runner(), 'oc2-dev', bundle, 'a' * 64, script)
 
-    def test_stage_selected_assets_with_bounded_paths(self):
+    def test_stage_selected_assets_with_bounded_paths(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = pathlib.Path(tmp)
             bundle = root / 'bundle'
@@ -1559,10 +1691,17 @@ class HostTest(unittest.TestCase):
             asset = root / 'oc2-assets.json'
             asset.write_text('{"fixture":true}')
             asset_sha = hashlib.sha256(asset.read_bytes()).hexdigest()
+            superpowers = root / 'verification-superpowers'
+            superpowers.mkdir()
+            (superpowers / 'index.js').write_text('verified source\n')
 
             class Runner:
                 def __init__(self):
                     self.calls = []
+
+                def directory_status(self, name, destination):
+                    self.calls.append(('directory_status', name, destination))
+                    return 0
 
                 def destination_status(self, name, destination):
                     return 0
@@ -1581,8 +1720,24 @@ class HostTest(unittest.TestCase):
                     return ''
 
             runner = Runner()
-            oc2.stage(runner, 'oc2-dev', bundle, 'a' * 64, script, asset, asset_sha)
-            self.assertEqual(len([c for c in runner.calls if c[0] == 'cp']), 5)
+            superpowers_tree_sha = assets.SUPERPOWERS_TREE_SHA256
+            superpowers_destination = (
+                f'{oc2.ROOT}/verification-superpowers/{superpowers_tree_sha}'
+            )
+            oc2.stage(
+                runner, 'oc2-dev', bundle, 'a' * 64, script, asset, asset_sha,
+                superpowers_source=superpowers,
+            )
+            copy_calls = [c for c in runner.calls if c[0] == 'cp']
+            self.assertEqual(len(copy_calls), 6)
+            self.assertIn(
+                ('cp', str(superpowers), f'oc2-dev:{superpowers_destination}'),
+                copy_calls,
+            )
+            self.assertIn(
+                ('directory_status', 'oc2-dev', superpowers_destination),
+                runner.calls,
+            )
             start = [c for c in runner.calls if c[:3] ==
                      ('exec', 'oc2-dev', 'python3')]
             self.assertEqual(len(start), 1)
@@ -1657,6 +1812,58 @@ class HostTest(unittest.TestCase):
             self.assertIn('--phase4-plugin-assets', execute[0])
             self.assertIn('--expected-phase4-plugin-sha', execute[0])
             self.assertIn(phase4_sha, execute[0])
+
+    def test_stage_reuses_existing_content_addressed_superpowers_source(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            bundle = root / 'bundle'
+            bundle.mkdir()
+            script = root / 'oc2_guest.py'
+            script.write_text('# fixture\n')
+            superpowers = root / 'verification-superpowers'
+            superpowers.mkdir()
+            (superpowers / 'index.js').write_text('verified source\n')
+            native_sha = hashlib.sha256((SCRIPTS / 'oc2_agent_native.py').read_bytes()).hexdigest()
+            identity_sha = hashlib.sha256((SCRIPTS / 'oc2_identity.py').read_bytes()).hexdigest()
+            script_sha = hashlib.sha256(script.read_bytes()).hexdigest()
+
+            class Runner:
+                def __init__(self):
+                    self.calls = []
+
+                def directory_status(self, name, destination):
+                    self.calls.append(('directory_status', name, destination))
+                    return 10
+
+                def destination_status(self, _name, _destination):
+                    return 0
+
+                def sbx(self, *args, **_kwargs):
+                    self.calls.append(args)
+                    if args[:4] == ('exec', 'oc2-dev', 'bash', '-c'):
+                        return 'missing\n'
+                    if args[:3] == ('exec', 'oc2-dev', 'sha256sum'):
+                        digest = (
+                            identity_sha if args[3].endswith('/oc2_identity.py')
+                            else native_sha if args[3].endswith('/oc2_agent_native.py')
+                            else script_sha
+                        )
+                        return digest + '  verified\n'
+                    return ''
+
+            runner = Runner()
+            superpowers_destination = (
+                f'{oc2.ROOT}/verification-superpowers/'
+                f'{assets.SUPERPOWERS_TREE_SHA256}'
+            )
+            oc2.stage(
+                runner, 'oc2-dev', bundle, 'a' * 64, script,
+                superpowers_source=superpowers,
+            )
+            self.assertIn(('directory_status', 'oc2-dev', superpowers_destination), runner.calls)
+            self.assertNotIn(
+                ('cp', str(superpowers), f'oc2-dev:{superpowers_destination}'), runner.calls,
+            )
 
     def test_stage_phase4_rejects_symlinked_plugin_asset_before_sandbox_calls(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -2024,14 +2231,14 @@ class OAuthBootstrapConfigTest(unittest.TestCase):
         config_dir = self.runtime / 'config' / 'opencode'
         config_dir.mkdir(parents=True, mode=0o700)
         self.base_file = config_dir / 'opencode.jsonc'
-        self.policies = [
+        self.policies: list[dict[str, str]] = [
             {'action': 'provider.use', 'resource': '*', 'effect': 'deny'},
             {'action': 'provider.use', 'resource': 'openai', 'effect': 'allow'},
             {'action': 'integration.connect', 'resource': '*', 'effect': 'deny'},
             {'action': 'plugin.use', 'resource': '*', 'effect': 'deny'},
             {'action': 'mcp.use', 'resource': '*', 'effect': 'deny'},
         ]
-        self.config = {
+        self.config: dict[str, Any] = {
             '$schema': 'https://opencode.ai/config.json',
             'model': 'openai/gpt-6-luna',
             'providers': {'openai': {'models': {'gpt-6-luna': {}}}},
@@ -2165,10 +2372,10 @@ class OAuthTest(unittest.TestCase):
 
     def capture_stderr(self, stderr):
         with patch.dict(os.environ, {'TMPDIR': str(self.runtime_tmp)}):
-            return bootstrap.capture_import_stderr(self.db, stderr)
+            return bootstrap.capture_import_stderr(self.runtime, self.db, stderr)
 
     def run_sync(self, before, after, fail=None):
-        calls = []
+        calls: list[tuple[Any, Any]] = []
         self.last_calls = calls
         self.last_envs = []
         exports = iter([before, after])
@@ -2196,6 +2403,40 @@ class OAuthTest(unittest.TestCase):
                 patch.object(oauth.subprocess, 'run', side_effect=run):
             oauth.synchronize('opencode', self.source, self.db)
         return calls
+
+    def test_synchronize_reads_credentials_from_the_supplied_auth_json(self) -> None:
+        """Pass the credential content read from the supplied auth.json into auth import."""
+        source = {
+            'openai': {
+                'type': 'oauth', 'access': 'oai-oat01-proxy-managed',
+                'refresh': 'oai-ort01-proxy-managed', 'expires': 123,
+                'accountId': 'account-from-auth-file',
+            },
+        }
+        self.source.write_text(json.dumps(source), encoding='utf-8')
+        expected = bootstrap.record_from_auth(source)
+
+        calls = self.run_sync([self.other], [expected, self.other])
+
+        import_input = next(
+            payload for args, payload in calls if tuple(args[1:3]) == ('auth', 'import')
+        )
+        self.assertEqual(json.loads(import_input), [expected])
+        self.assertEqual(expected['value']['metadata']['accountID'], 'account-from-auth-file')
+
+    def test_synchronize_rejects_credentials_from_the_wrong_auth_json_path(self) -> None:
+        """Reject a different auth.json content before invoking the OpenCode CLI."""
+        wrong_source = self.root / 'wrong-auth.json'
+        wrong_source.write_text(json.dumps({'openai': {
+            'type': 'oauth', 'access': 'wrong-access', 'refresh': 'wrong-refresh',
+            'expires': 123,
+        }}), encoding='utf-8')
+
+        with patch.object(oauth.subprocess, 'run') as command:
+            with self.assertRaisesRegex(ValueError, 'invalid OAuth sentinel'):
+                oauth.synchronize('opencode', wrong_source, self.db)
+
+        command.assert_not_called()
 
     def test_captures_import_stderr_only_under_runtime_tmp(self):
         legacy = self.runtime_tmp / 'oc2-oauth-import.stderr'
@@ -2250,8 +2491,7 @@ class OAuthTest(unittest.TestCase):
     def test_refuses_capture_outside_runtime_directory(self):
         elsewhere = self.root / 'elsewhere'
         elsewhere.mkdir(mode=0o700)
-        with patch.dict(os.environ, {'TMPDIR': str(elsewhere)}):
-            captured = bootstrap.capture_import_stderr(self.db, b'secret')
+        captured = bootstrap.capture_import_stderr(elsewhere, self.db, b'secret')
 
         self.assertIsNone(captured)
 

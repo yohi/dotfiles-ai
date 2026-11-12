@@ -21,6 +21,7 @@ import oc2_assets  # noqa: E402
 
 
 def _oc2_extensions(*, include_agents: bool = True) -> str:
+    """Build the APM OC2 extension fixture with optional fixed Agents."""
     agents = (
         'x-oc2-agents:\n'
         '  hephaestus:\n'
@@ -44,7 +45,7 @@ def _oc2_extensions(*, include_agents: bool = True) -> str:
 
 
 class FakeSbx:
-    def __init__(self):
+    def __init__(self) -> None:
         self.created = False
         self.installed = False
         self.kit_supported = True
@@ -84,6 +85,7 @@ class FakeSbx:
         return 10 if destination == self.workspace_destination or destination in self.remote_files else 0
 
     def sbx(self, *args: str, capture: bool = False, tty: bool = False) -> str:
+        """Simulate Sandbox commands and record their arguments and side effects."""
         self.calls.append(args)
         if args == (
             'secret', 'ls', '--sandbox', 'oc2-test', '--service',
@@ -158,9 +160,9 @@ class FakeSbx:
             if command[:2] == ('bash', '-c'):
                 return 'missing\n'
             if command[:1] == ('sha256sum',):
-                data = self.remote_files.get(command[1])
-                return (hashlib.sha256(data).hexdigest() + '  ' + command[1] + '\n'
-                        if data is not None else '')
+                remote_data = self.remote_files.get(command[1])
+                return (hashlib.sha256(remote_data).hexdigest() + '  ' + command[1] + '\n'
+                        if remote_data is not None else '')
             if (command[:2] == ('sh', '-c')
                     and command[4] == oc2.PINNED[0]):
                 return 'opencode v2.2.5\n' if self.installed else ''
@@ -245,7 +247,7 @@ class LauncherFlowTests(unittest.TestCase):
                 try:
                     status = oc2.main(args)
                 except SystemExit as exc:
-                    status = int(exc.code)
+                    status = 0 if exc.code is None else int(exc.code)
                 return status, output.getvalue()
 
     def _write_cloudflare_apm(self) -> None:
@@ -280,13 +282,14 @@ class LauncherFlowTests(unittest.TestCase):
         )
 
     def _copy_native_asset_sources(self) -> None:
+        """Copy the fixed Native asset and theme sources into the test repository."""
         source_root = pathlib.Path(oc2.__file__).resolve().parents[2]
         for source in (*oc2_assets.SOURCE_TO_TARGET, oc2_assets.THEME_SOURCE):
             destination = self.repo / source
             destination.parent.mkdir(parents=True, exist_ok=True)
             destination.write_bytes((source_root / source).read_bytes())
 
-    def test_cloudflare_sandbox_secret_is_checked_before_workspace_and_tui(self):
+    def test_cloudflare_sandbox_secret_is_checked_before_workspace_and_tui(self) -> None:
         status, output = self._run(
             '--allow-paid-inference', '--use-cloudflare-ai-gateway',
         )
@@ -315,7 +318,7 @@ class LauncherFlowTests(unittest.TestCase):
         self.assertLess(check_index, workspace_copy_index)
         self.assertLess(check_index, launch_index)
 
-    def test_missing_cloudflare_secret_without_terminal_stops_before_transfer(self):
+    def test_missing_cloudflare_secret_without_terminal_stops_before_transfer(self) -> None:
         self.fake.sandbox_cloudflare_secret = False
         status, output = self._run(
             '--allow-paid-inference', '--use-cloudflare-ai-gateway', stdin_tty=False,
@@ -327,7 +330,7 @@ class LauncherFlowTests(unittest.TestCase):
         self.assertIsNone(self.fake.workspace_destination)
         self.assertFalse(any(call[:2] == ('exec', '-it') for call in self.fake.calls))
 
-    def test_cloudflare_default_model_requires_secret_without_mode_flag(self):
+    def test_cloudflare_default_model_requires_secret_without_mode_flag(self) -> None:
         apm = self.repo / 'apm.yml'
         apm.write_text(apm.read_text().replace(
             'default_model: openai/gpt-6-luna',
@@ -347,7 +350,7 @@ class LauncherFlowTests(unittest.TestCase):
         self.assertIsNone(self.fake.workspace_destination)
         self.assertFalse(any(call[:2] == ('exec', '-it') for call in self.fake.calls))
 
-    def test_missing_cloudflare_secret_is_set_in_sandbox_scope_and_verified(self):
+    def test_missing_cloudflare_secret_is_set_in_sandbox_scope_and_verified(self) -> None:
         self.fake.sandbox_cloudflare_secret = False
         status, output = self._run(
             '--allow-paid-inference', '--use-cloudflare-ai-gateway', stdin_tty=True,
@@ -366,7 +369,7 @@ class LauncherFlowTests(unittest.TestCase):
         )
         self.assertTrue(any(call[:2] == ('exec', '-it') for call in self.fake.calls))
 
-    def test_existing_global_cloudflare_secret_is_read_only(self):
+    def test_existing_global_cloudflare_secret_is_read_only(self) -> None:
         self.fake.sandbox_cloudflare_secret = False
         self.fake.global_cloudflare_secret = True
         status, output = self._run(
@@ -380,7 +383,7 @@ class LauncherFlowTests(unittest.TestCase):
         )
         self.assertFalse(any(call[:2] == ('secret', 'set') for call in self.fake.secret_calls))
 
-    def test_cloudflare_secret_set_failure_stops_before_workspace_transfer(self):
+    def test_cloudflare_secret_set_failure_stops_before_workspace_transfer(self) -> None:
         self.fake.sandbox_cloudflare_secret = False
         self.fake.secret_set_fails = True
         status, output = self._run(
@@ -391,7 +394,7 @@ class LauncherFlowTests(unittest.TestCase):
         self.assertIsNone(self.fake.workspace_destination)
         self.assertFalse(any(call[:2] == ('exec', '-it') for call in self.fake.calls))
 
-    def test_configuration_without_gateway_provider_skips_cloudflare_secret(self):
+    def test_configuration_without_gateway_provider_skips_cloudflare_secret(self) -> None:
         (self.repo / 'apm.yml').write_text(
             _oc2_extensions(include_agents=False) +
             'shell: bash\n'
@@ -404,7 +407,7 @@ class LauncherFlowTests(unittest.TestCase):
         self.assertFalse(self.fake.secret_calls)
         self.assertTrue(any(call[:2] == ('exec', '-it') for call in self.fake.calls))
 
-    def test_mountless_snapshot_installs_and_launches_only_pinned_v2(self):
+    def test_mountless_snapshot_installs_and_launches_only_pinned_v2(self) -> None:
         status, output = self._run('--allow-paid-inference')
         self.assertEqual(status, 0, output)
         create = next(call for call in self.fake.calls if call[0] == 'create' and '--name' in call)
@@ -425,6 +428,7 @@ class LauncherFlowTests(unittest.TestCase):
                              for call in self.fake.calls))
         if self.fake.copied_config is None:
             self.fail('V2 config was not copied into the Sandbox')
+        assert self.fake.copied_config is not None
         copied_config = json.loads(self.fake.copied_config)
         self.assertEqual(copied_config['model'], 'openai/gpt-6-luna')
         self.assertNotIn('cloudflare-ai-gateway-custom', copied_config['providers'])
@@ -444,24 +448,25 @@ class LauncherFlowTests(unittest.TestCase):
         self.assertIn('opencode=v2.2.5', output)
         self.assertFalse(any('--collect' in call or '--apply' in call for call in self.fake.calls))
 
-    def test_openai_mode_hides_cloudflare_without_secret_or_terminal(self):
+    def test_openai_mode_hides_cloudflare_without_secret_or_terminal(self) -> None:
         self.fake.sandbox_cloudflare_secret = False
         status, output = self._run('--allow-paid-inference', stdin_tty=False)
 
         self.assertEqual(status, 0, output)
+        assert self.fake.copied_config is not None
         copied_config = json.loads(self.fake.copied_config)
         self.assertEqual(copied_config['model'], 'openai/gpt-6-luna')
         self.assertNotIn('cloudflare-ai-gateway-custom', copied_config['providers'])
         self.assertFalse(self.fake.secret_calls)
 
-    def test_mountless_snapshot_excludes_env_file_before_transfer(self):
+    def test_mountless_snapshot_excludes_env_file_before_transfer(self) -> None:
         (self.project / '.env').write_text('TOKEN=fixture-only')
         status, output = self._run('--allow-paid-inference')
         self.assertEqual(status, 0, output)
         self.assertTrue(self.fake.created)
         self.assertNotIn('.env', self.fake.workspace_files)
 
-    def test_mountless_workspace_excludes_project_opencode_configuration(self):
+    def test_mountless_workspace_excludes_project_opencode_configuration(self) -> None:
         (self.project / 'opencode.json').write_text('{"mcp":{}}\n')
         (self.project / '.opencode').mkdir()
         (self.project / '.opencode' / 'opencode.jsonc').write_text('{"provider":"unsafe"}\n')
@@ -478,7 +483,7 @@ class LauncherFlowTests(unittest.TestCase):
             'opencode.json', 'opencode.jsonc', 'cli.json', '.git/config',
         } for path in self.fake.workspace_files))
 
-    def test_dotfiles_ai_profile_excludes_workspace_apm_but_exports_host_apm(self):
+    def test_dotfiles_ai_profile_excludes_workspace_apm_but_exports_host_apm(self) -> None:
         subprocess.run(
             ['git', '-C', str(self.project), 'remote', 'add', 'origin',
              'git@github.com:yohi/dotfiles-ai.git'],
@@ -496,28 +501,28 @@ class LauncherFlowTests(unittest.TestCase):
         copied_config = json.loads(self.fake.copied_config)
         self.assertEqual(copied_config['model'], 'openai/gpt-6-luna')
 
-    def test_existing_sandbox_is_not_reused_or_rebuilt(self):
+    def test_existing_sandbox_is_not_reused_or_rebuilt(self) -> None:
         self.fake.created = True
         status, output = self._run('--allow-paid-inference')
         self.assertEqual(status, 1)
         self.assertIn('refusing to reuse or rebuild', output)
         self.assertFalse(any(call[0] == 'create' and '--name' in call for call in self.fake.calls))
 
-    def test_external_provider_requires_explicit_authorization_before_sandbox_commands(self):
+    def test_external_provider_requires_explicit_authorization_before_sandbox_commands(self) -> None:
         status, output = self._run()
 
         self.assertEqual(status, 1)
         self.assertIn('--allow-paid-inference', output)
         self.assertEqual(self.fake.calls, [])
 
-    def test_prepare_only_skips_inference_authorization_and_sandbox_commands(self):
+    def test_prepare_only_skips_inference_authorization_and_sandbox_commands(self) -> None:
         status, output = self._run('--prepare-only')
 
         self.assertEqual(status, 0, output)
         self.assertIn('OC2_PREPARED_ONLY', output)
         self.assertEqual(self.fake.calls, [])
 
-    def test_cloudflare_end_to_end_uses_proxy_placeholder_only(self):
+    def test_cloudflare_end_to_end_uses_proxy_placeholder_only(self) -> None:
         self._write_cloudflare_apm()
         status, output = self._run(
             '--allow-paid-inference', '--use-cloudflare-ai-gateway',
@@ -536,7 +541,7 @@ class LauncherFlowTests(unittest.TestCase):
         self.assertNotIn('OC_CF_REST_API_TOKEN=proxy-managed', launch)
         self.assertNotIn('sensitive-poison-value', repr(self.fake.calls))
 
-    def test_cloudflare_missing_identifiers_stop_before_sandbox_commands(self):
+    def test_cloudflare_missing_identifiers_stop_before_sandbox_commands(self) -> None:
         self._write_cloudflare_apm()
         status, output = self._run(
             '--allow-paid-inference', '--use-cloudflare-ai-gateway',
@@ -547,7 +552,7 @@ class LauncherFlowTests(unittest.TestCase):
         self.assertIn('Cloudflare runtime identifiers', output)
         self.assertEqual(self.fake.calls, [])
 
-    def test_launch_attaches_temporary_mixin_without_host_credentials(self):
+    def test_launch_attaches_temporary_mixin_without_host_credentials(self) -> None:
         self._write_cloudflare_apm()
         poison = {
             'OPENAI_API_KEY': 'host-api-key-poison',
@@ -575,6 +580,7 @@ class LauncherFlowTests(unittest.TestCase):
         self.assertFalse(mixin_path.exists())
         self.assertIsNotNone(self.fake.created_mixin_spec)
         self.assertFalse(self.fake.mixin_exists_at_launch)
+        assert self.fake.created_mixin_spec is not None
         mixin_spec = yaml.safe_load(self.fake.created_mixin_spec)
         self.assertFalse(any(
             value in self.fake.created_mixin_spec for value in poison.values()
@@ -599,7 +605,7 @@ class LauncherFlowTests(unittest.TestCase):
         self.assertFalse(any(value in repr(self.fake.calls) for value in poison.values()))
         self.assertNotIn('auth.json', self.fake.copied_files)
 
-    def test_launcher_stops_when_sbx_lacks_kit_support(self):
+    def test_launcher_stops_when_sbx_lacks_kit_support(self) -> None:
         self.fake.kit_supported = False
         status, output = self._run('--allow-paid-inference')
 
@@ -610,7 +616,7 @@ class LauncherFlowTests(unittest.TestCase):
 
 
 class FakeInput:
-    def __init__(self, is_tty: bool):
+    def __init__(self, is_tty: bool) -> None:
         self._is_tty = is_tty
 
     def isatty(self) -> bool:

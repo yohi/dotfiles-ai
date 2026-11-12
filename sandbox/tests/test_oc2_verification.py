@@ -17,18 +17,22 @@ import oc2_native  # noqa: E402
 
 class FakeRunner:
     def __init__(self) -> None:
+        """Initialize an empty call log for sandbox command simulations."""
         self.calls: list[tuple[str, ...]] = []
 
     def destination_status(self, _name: str, _destination: str) -> int:
+        """Return zero to simulate an absent destination that may be copied."""
         return 0
 
     def sbx(self, *args: str, **_kwargs: bool) -> str:
+        """Record a command and return empty stdout for the fake Sandbox."""
         self.calls.append(args)
         return ''
 
 
 class VerificationRuntimePreparationTest(unittest.TestCase):
-    def test_verification_refuses_to_create_or_reuse_an_incompatible_sandbox(self):
+    def test_verification_refuses_to_create_or_reuse_an_incompatible_sandbox(self) -> None:
+        """Reject incompatible Sandboxes before issuing any Sandbox command."""
         runner = FakeRunner()
         with (patch.object(oc2, 'Runner', return_value=runner),
               patch.object(oc2, 'is_compatible_sandbox', return_value=False),
@@ -137,7 +141,8 @@ class VerificationRuntimePreparationTest(unittest.TestCase):
             oc2_identity.Phase4RuntimeIdentity('a' * 64, 'b' * 64, 'c' * 64, fingerprint),
         ))
 
-    def test_verification_stages_without_credentials_cli_install_or_launch(self):
+    def test_verification_stages_without_credentials_cli_install_or_launch(self) -> None:
+        """Stage the bundle and assets without credentials, CLI installation, or launch."""
         runner = FakeRunner()
         with tempfile.TemporaryDirectory() as temporary:
             output = pathlib.Path(temporary) / 'bundle'
@@ -148,6 +153,11 @@ class VerificationRuntimePreparationTest(unittest.TestCase):
                 patch.object(oc2, 'export_v2_config', return_value=output / 'opencode.jsonc') as export,
                 patch('sandbox.scripts.stage_opencode_v2.verify_bundle', return_value='a' * 64),
                 patch.object(oc2_assets, 'build', return_value=(b'asset', 'b' * 64)),
+                patch.object(
+                    oc2_assets, 'export_superpowers_tree',
+                    side_effect=lambda _repo, _plugin, destination: destination.mkdir(),
+                    create=True,
+                ) as export_tree,
                 patch.object(oc2, 'stage') as stage,
                 patch.object(oc2, 'provision_cli', side_effect=AssertionError('no install')),
                 patch.object(oc2, 'launch', side_effect=AssertionError('no OpenCode start')),
@@ -163,10 +173,19 @@ class VerificationRuntimePreparationTest(unittest.TestCase):
         export.assert_called_once_with(
             pathlib.Path('/repo'), ANY, verification_only=True,
         )
+        export_tree.assert_called_once()
+        tree_source = export_tree.call_args.args[2]
+        self.assertEqual(tree_source.name, 'verification-superpowers')
+        self.assertEqual(stage.call_args.kwargs, {'superpowers_source': tree_source})
+        self.assertEqual(stage.call_args.args[0:2], (runner, 'oc2-test'))
+        self.assertEqual(stage.call_args.args[3:7], (
+            'a' * 64, oc2.HERE / 'oc2_guest.py', tree_source.parent / 'assets.json', 'b' * 64,
+        ))
         stage.assert_called_once()
         self.assertEqual(runner.calls, [])
 
-    def test_verification_identity_includes_generator_fingerprint(self):
+    def test_verification_identity_includes_generator_fingerprint(self) -> None:
+        """Bind the runtime identity to config, assets, and generator fingerprints."""
         runner = FakeRunner()
         with tempfile.TemporaryDirectory() as temporary:
             output = pathlib.Path(temporary) / 'bundle'
@@ -185,6 +204,7 @@ class VerificationRuntimePreparationTest(unittest.TestCase):
                 patch.object(oc2, 'export_v2_config', return_value=output / 'opencode.jsonc'),
                 patch('sandbox.scripts.stage_opencode_v2.verify_bundle', return_value='a' * 64),
                 patch.object(oc2_assets, 'build', return_value=(b'asset', 'b' * 64)),
+                patch.object(oc2_assets, 'export_superpowers_tree'),
                 patch.object(oc2, 'stage'),
             ):
                 actual = oc2.prepare_verification_runtime(
@@ -199,7 +219,8 @@ class VerificationRuntimePreparationTest(unittest.TestCase):
             ).name,
         )
 
-    def test_verification_refuses_existing_runtime_identity_before_staging(self):
+    def test_verification_refuses_existing_runtime_identity_before_staging(self) -> None:
+        """Refuse an existing runtime identity without staging any files."""
         runner = FakeRunner()
         with tempfile.TemporaryDirectory() as temporary:
             output = pathlib.Path(temporary) / 'bundle'
@@ -210,6 +231,7 @@ class VerificationRuntimePreparationTest(unittest.TestCase):
                 patch.object(oc2, 'export_v2_config', return_value=output / 'opencode.jsonc'),
                 patch('sandbox.scripts.stage_opencode_v2.verify_bundle', return_value='a' * 64),
                 patch.object(oc2_assets, 'build', return_value=(b'asset', 'b' * 64)),
+                patch.object(oc2_assets, 'export_superpowers_tree'),
                 patch.object(oc2, 'stage') as stage,
                 patch.object(runner, 'destination_status', return_value=10),
                 self.assertRaisesRegex(oc2.Stop, 'identity already exists'),
