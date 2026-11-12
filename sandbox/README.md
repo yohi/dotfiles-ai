@@ -125,7 +125,7 @@ ln -s "$PWD/sandbox/scripts/oc2.py" "$HOME/.local/bin/oc2"
 
 `$HOME/.local/bin` がPATHに含まれていることを確認してください。起動前にDocker Sandboxes CLIの
 インストール済みバージョンと `sbx create --help` の `--kit` 対応を確認します。
-Sandbox名が既に存在する場合は、通常起動では再利用・再構築せず停止します。Cloudflare credential確認に失敗した作成済みSandboxは、同じWorkspaceとSandbox名で`--resume`を指定するとSession receiptを照合して再開できます。
+Sandbox名が既に存在する場合は、通常起動では再利用・再構築せず停止します。Cloudflare credential確認に失敗した作成済みSandboxは、同じWorkspaceとSandbox名で`--resume`を指定するとSession receiptを照合して再開できます。receiptにはSandbox固有IDも保存し、同名の別Sandboxを拒否します。
 
 通常起動はHost Workspaceをmountせず、検査済みSnapshotだけをGuestへコピーします。
 `.git`、認証情報を含むファイル、symlink、特殊ファイル、未承認のOpenCode設定は転送しません。

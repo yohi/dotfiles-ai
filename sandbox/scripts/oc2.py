@@ -990,15 +990,8 @@ def _inspect_git_objects(workspace: pathlib.Path) -> None:
         raise Stop('Git objects cannot be safely inspected')
 
 
-def is_compatible_sandbox(runner: Runner, name: str) -> bool:
-    # sbx ls --format json on v0.49.2 gives identity but does not report
-    # workspace/mounts. Inspect the exact named sandbox before trusting it.
+def _sandbox_record(runner: Runner, name: str) -> tuple[dict[str, object], str]:
     import json
-
-    raw = runner.sbx('ls', '-q', capture=True)
-    names = {line.strip() for line in raw.splitlines() if line.strip()}
-    if name not in names:
-        return False
 
     try:
         listing = json.loads(runner.sbx('ls', '--format', 'json', capture=True))
@@ -1008,17 +1001,39 @@ def is_compatible_sandbox(runner: Runner, name: str) -> bool:
     if isinstance(listing, list):
         records = listing
     elif isinstance(listing, dict):
-        records = listing.get('sandboxes')
+        candidate = listing.get('sandboxes')
+        records = candidate if isinstance(candidate, list) else None
     else:
         records = None
-    if not isinstance(records, list):
+    if records is None:
         raise Stop('could not establish existing Sandbox identity')
-    matches = [row for row in records if isinstance(row, dict)
-               and row.get('name') == name]
+    matches = [row for row in records if isinstance(row, dict) and row.get('name') == name]
     if len(matches) != 1:
         raise Stop('could not establish existing Sandbox identity')
-    row = matches[0]
-    if row.get('agent') != 'shell':
+    record = matches[0]
+    sandbox_id = record.get('id')
+    if not isinstance(sandbox_id, str) or re.fullmatch(
+            r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}',
+            sandbox_id) is None:
+        raise Stop('existing Sandbox has no valid stable identifier')
+    return record, sandbox_id
+
+
+def sandbox_id(runner: Runner, name: str) -> str:
+    return _sandbox_record(runner, name)[1]
+
+
+def is_compatible_sandbox(runner: Runner, name: str, expected_id: str) -> bool:
+    # sbx ls --format json on v0.49.2 gives identity but does not report
+    # workspace/mounts. Inspect the exact named sandbox before trusting it.
+    raw = runner.sbx('ls', '-q', capture=True)
+    names = {line.strip() for line in raw.splitlines() if line.strip()}
+    if name not in names:
+        return False
+    row, actual_id = _sandbox_record(runner, name)
+    if actual_id != expected_id:
+        raise Stop('Sandbox identity mismatch; refusing reuse')
+    if row.get('agent') not in ('shell', 'sbx-kit-shell'):
         raise Stop('existing Sandbox agent is not shell')
 
     # Earlier CLI versions included optional workspace fields in the list.
@@ -1337,7 +1352,7 @@ def _session_action(args: argparse.Namespace, workspace: pathlib.Path,
         if session.collected:
             raise Stop('changes have already been collected for this transfer')
         runner = Runner(args.sbx_user)
-        if not is_compatible_sandbox(runner, session.sandbox):
+        if not is_compatible_sandbox(runner, session.sandbox, session.sandbox_id):
             raise Stop('the recorded Sandbox no longer exists')
         collected = session.directory / 'collected'
         if collected.exists() or collected.is_symlink():
@@ -1490,7 +1505,7 @@ def main(argv: list[str] | None = None) -> int:
                     raise Stop('--resume Sandbox does not match the retained transfer receipt')
                 if session.manifest != workspace_manifest:
                     raise Stop('--resume Workspace differs from the retained transfer snapshot')
-                if not is_compatible_sandbox(runner, args.sandbox):
+                if not is_compatible_sandbox(runner, args.sandbox, session.sandbox_id):
                     raise Stop('--resume Sandbox identity or mount state could not be verified')
                 if cloudflare is not None:
                     credential_scope = ensure_cloudflare_credential(
@@ -1544,8 +1559,10 @@ def main(argv: list[str] | None = None) -> int:
                         runner.sbx('exec', args.sandbox, 'git', '-C', workdir,
                                    'remote', 'set-url', '--add', '--push', remote.name, url)
                 sessions = importlib.import_module('oc2_session')
-                sessions.create(CLONE_SOURCE_ROOT / 'sessions', args.sandbox, workdir,
-                                workspace_manifest)
+                sessions.create(
+                    CLONE_SOURCE_ROOT / 'sessions', args.sandbox, workdir,
+                    workspace_manifest, sandbox_id=sandbox_id(runner, args.sandbox),
+                )
             finally:
                 if not retained_source:
                     shutil.rmtree(clone_source_directory, ignore_errors=True)

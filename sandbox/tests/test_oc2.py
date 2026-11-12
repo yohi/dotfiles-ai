@@ -25,6 +25,7 @@ from unittest.mock import patch
 import yaml
 
 SCRIPTS = pathlib.Path(__file__).resolve().parents[1] / 'scripts'
+SANDBOX_ID = 'bae976ce-7d1b-4bfd-9ffd-af5fa71a3548'
 if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
@@ -698,6 +699,7 @@ class HostTest(unittest.TestCase):
             manifest = workspace_ops.snapshot(workspace)
             session = sessions.create(
                 state_root, 'oc2-dev', oc2.ROOT + '/projects/' + 'a' * 32, manifest,
+                sandbox_id=SANDBOX_ID,
             )
 
             class CollectionRunner:
@@ -899,55 +901,64 @@ class HostTest(unittest.TestCase):
 
     def test_missing_sandbox(self) -> None:
         runner = FakeRunner()
-        self.assertFalse(oc2.is_compatible_sandbox(runner, 'oc2-dev'))
+        self.assertFalse(oc2.is_compatible_sandbox(runner, 'oc2-dev', SANDBOX_ID))
 
     def test_mountless_sandbox_reused(self) -> None:
         # sbx v0.49.2 omits mount-related fields from ls --format json.
-        runner = FakeRunner([{'name': 'oc2-dev', 'agent': 'shell'}])
-        self.assertTrue(oc2.is_compatible_sandbox(runner, 'oc2-dev'))
+        runner = FakeRunner([{'name': 'oc2-dev', 'id': SANDBOX_ID, 'agent': 'shell'}])
+        self.assertTrue(oc2.is_compatible_sandbox(runner, 'oc2-dev', SANDBOX_ID))
         self.assertIn(('inspect', 'oc2-dev', '--json'), runner.calls)
 
+    def test_mountless_kit_shell_sandbox_reused(self) -> None:
+        runner = FakeRunner([{'name': 'oc2-dev', 'id': SANDBOX_ID, 'agent': 'sbx-kit-shell'}])
+        self.assertTrue(oc2.is_compatible_sandbox(runner, 'oc2-dev', SANDBOX_ID))
+
+    def test_missing_stable_sandbox_id_is_rejected(self) -> None:
+        runner = FakeRunner([{'name': 'oc2-dev', 'agent': 'shell'}])
+        with self.assertRaisesRegex(oc2.Stop, 'no valid stable identifier'):
+            oc2.is_compatible_sandbox(runner, 'oc2-dev', SANDBOX_ID)
+
     def test_mounted_workspace_rejected(self) -> None:
-        runner = FakeRunner([{'name': 'oc2-dev', 'agent': 'shell', 'workspace': '/home/user/repo'}])
+        runner = FakeRunner([{'name': 'oc2-dev', 'id': SANDBOX_ID, 'agent': 'shell', 'workspace': '/home/user/repo'}])
         with self.assertRaisesRegex(oc2.Stop, 'workspace mount'):
-            oc2.is_compatible_sandbox(runner, 'oc2-dev')
+            oc2.is_compatible_sandbox(runner, 'oc2-dev', SANDBOX_ID)
 
     def test_missing_runtime_mounts_evidence_rejected(self) -> None:
-        runner = FakeRunner([{'name': 'oc2-dev', 'agent': 'shell'}],
+        runner = FakeRunner([{'name': 'oc2-dev', 'id': SANDBOX_ID, 'agent': 'shell'}],
                             inspection={'name': 'oc2-dev'})
         with self.assertRaisesRegex(oc2.Stop, 'mount information missing'):
-            oc2.is_compatible_sandbox(runner, 'oc2-dev')
+            oc2.is_compatible_sandbox(runner, 'oc2-dev', SANDBOX_ID)
 
     def test_runtime_mounts_rejected(self) -> None:
-        runner = FakeRunner([{'name': 'oc2-dev', 'agent': 'shell'}],
+        runner = FakeRunner([{'name': 'oc2-dev', 'id': SANDBOX_ID, 'agent': 'shell'}],
                             inspection={'name': 'oc2-dev',
                                         'runtime_mounts': [{'source': '/home/user'}]})
         with self.assertRaisesRegex(oc2.Stop, 'runtime mounts'):
-            oc2.is_compatible_sandbox(runner, 'oc2-dev')
+            oc2.is_compatible_sandbox(runner, 'oc2-dev', SANDBOX_ID)
 
     def test_inspect_name_mismatch_rejected(self) -> None:
-        runner = FakeRunner([{'name': 'oc2-dev', 'agent': 'shell'}],
+        runner = FakeRunner([{'name': 'oc2-dev', 'id': SANDBOX_ID, 'agent': 'shell'}],
                             inspection={'name': 'other-sandbox', 'runtime_mounts': []})
         with self.assertRaisesRegex(oc2.Stop, 'identity mismatch'):
-            oc2.is_compatible_sandbox(runner, 'oc2-dev')
+            oc2.is_compatible_sandbox(runner, 'oc2-dev', SANDBOX_ID)
 
     def test_invalid_runtime_mounts_type_rejected(self) -> None:
-        runner = FakeRunner([{'name': 'oc2-dev', 'agent': 'shell'}],
+        runner = FakeRunner([{'name': 'oc2-dev', 'id': SANDBOX_ID, 'agent': 'shell'}],
                             inspection={'name': 'oc2-dev', 'runtime_mounts': {}})
         with self.assertRaisesRegex(oc2.Stop, 'mount information missing'):
-            oc2.is_compatible_sandbox(runner, 'oc2-dev')
+            oc2.is_compatible_sandbox(runner, 'oc2-dev', SANDBOX_ID)
 
     def test_list_workspace_mount_rejected_even_if_inspect_empty(self) -> None:
-        runner = FakeRunner([{'name': 'oc2-dev', 'agent': 'shell',
+        runner = FakeRunner([{'name': 'oc2-dev', 'id': SANDBOX_ID, 'agent': 'shell',
                               'workspace': '/home/user/source'}])
         with self.assertRaisesRegex(oc2.Stop, 'workspace mount'):
-            oc2.is_compatible_sandbox(runner, 'oc2-dev')
+            oc2.is_compatible_sandbox(runner, 'oc2-dev', SANDBOX_ID)
         self.assertNotIn(('inspect', 'oc2-dev', '--json'), runner.calls)
 
     def test_wrong_agent_rejected(self) -> None:
-        runner = FakeRunner([{'name': 'oc2-dev', 'agent': 'opencode', 'workspace': '-'}])
+        runner = FakeRunner([{'name': 'oc2-dev', 'id': SANDBOX_ID, 'agent': 'opencode', 'workspace': '-'}])
         with self.assertRaisesRegex(oc2.Stop, 'not shell'):
-            oc2.is_compatible_sandbox(runner, 'oc2-dev')
+            oc2.is_compatible_sandbox(runner, 'oc2-dev', SANDBOX_ID)
 
     def test_dry_run_no_subprocess(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

@@ -27,6 +27,7 @@ class FakeSbx:
         self.created = False
         self.runtime_mounts: list[dict[str, str]] = []
         self.reported_sandbox_name = 'oc2-test'
+        self.reported_sandbox_id = 'bae976ce-7d1b-4bfd-9ffd-af5fa71a3548'
         self.installed = False
         self.kit_supported = True
         self.copied_config: str | None = None
@@ -110,7 +111,11 @@ class FakeSbx:
         if args == ('ls', '-q'):
             return 'oc2-test\n' if self.created else ''
         if args == ('ls', '--format', 'json'):
-            return json.dumps([{'name': self.reported_sandbox_name, 'agent': 'shell'}])
+            return json.dumps([{
+                'name': self.reported_sandbox_name,
+                'id': self.reported_sandbox_id,
+                'agent': 'shell',
+            }])
         if args == ('inspect', 'oc2-test', '--json'):
             return json.dumps({
                 'name': 'oc2-test', 'runtime_mounts': self.runtime_mounts,
@@ -732,7 +737,7 @@ class LauncherFlowTests(unittest.TestCase):
         self.assertEqual(self.fake.secret_calls, [])
         self.assertIsNone(self.fake.created_cli_binary)
 
-    def test_resume_rejects_replaced_sandbox_before_cloudflare_credential_access(self) -> None:
+    def test_resume_rejects_same_name_replacement_before_cloudflare_credential_access(self) -> None:
         status, output = self._run(
             '--allow-paid-inference', '--use-cloudflare-ai-gateway', stdin_tty=True,
         )
@@ -740,13 +745,13 @@ class LauncherFlowTests(unittest.TestCase):
 
         self.fake.secret_calls.clear()
         self.fake.created_cli_binary = None
-        self.fake.reported_sandbox_name = 'replacement'
+        self.fake.reported_sandbox_id = '08e0c638-0c56-4284-9299-58b40435e39e'
         status, output = self._run(
             '--allow-paid-inference', '--use-cloudflare-ai-gateway', '--resume', stdin_tty=True,
         )
 
         self.assertEqual(status, 1)
-        self.assertIn('Sandbox identity', output)
+        self.assertIn('Sandbox identity mismatch', output)
         self.assertEqual(self.fake.secret_calls, [])
         self.assertIsNone(self.fake.created_cli_binary)
 
