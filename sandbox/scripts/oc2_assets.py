@@ -239,7 +239,7 @@ def export_superpowers_tree(repo: Path, source: Path, destination: Path) -> None
             continue
         try:
             metadata, encoded_path = record.split(b'\t', 1)
-            mode, entry_type, blob_id = metadata.split(b' ', 2)
+            git_mode, entry_type, blob_id = metadata.split(b' ', 2)
             relative = encoded_path.decode('utf-8')
         except (ValueError, UnicodeError) as exc:
             raise AssetError('NOT_AVAILABLE: local Plugin Git tree is invalid') from exc
@@ -248,7 +248,7 @@ def export_superpowers_tree(repo: Path, source: Path, destination: Path) -> None
                 or any(part in ('', '.', '..') for part in parts)
                 or any(ord(character) < 32 or ord(character) == 127 for character in relative)):
             raise AssetError('NOT_AVAILABLE: local Plugin Git tree path is unsafe')
-        if mode not in (b'100644', b'100755') or entry_type != b'blob':
+        if git_mode not in (b'100644', b'100755') or entry_type != b'blob':
             raise AssetError('NOT_AVAILABLE: local Plugin Git tree contains a non-regular entry')
         if re.fullmatch(rb'[0-9a-f]{40}', blob_id) is None:
             raise AssetError('NOT_AVAILABLE: local Plugin Git blob identity is invalid')
@@ -256,7 +256,7 @@ def export_superpowers_tree(repo: Path, source: Path, destination: Path) -> None
         total_bytes += len(content)
         if total_bytes > SUPERPOWERS_TOTAL_BYTES or len(files) >= SUPERPOWERS_FILE_COUNT:
             raise AssetError('NOT_AVAILABLE: local Plugin Git tree exceeds its pinned size')
-        files.append((relative, content, 0o755 if mode == b'100755' else 0o644))
+        files.append((relative, content, 0o755 if git_mode == b'100755' else 0o644))
         blob_hashes[relative] = hashlib.sha256(content).hexdigest()
 
     if len(files) != SUPERPOWERS_FILE_COUNT or total_bytes != SUPERPOWERS_TOTAL_BYTES:

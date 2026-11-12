@@ -453,11 +453,20 @@ class HostTest(unittest.TestCase):
     def test_launch_rejects_empty_sha256sum_output(self) -> None:
         """Stop safely when the launch verifier returns no checksum token."""
         class EmptyChecksumRunner(FakeRunner):
-            def sbx(self, *args: str, **kwargs: bool) -> str:
+            def sbx(
+                self,
+                *args: str,
+                capture: bool = False,
+                tty: bool = False,
+                timeout: int | None = 180,
+            ) -> str:
                 if args[:3] == ('exec', 'oc2-dev', 'sha256sum'):
                     self.calls.append(args)
                     return ''
-                return super().sbx(*args, **kwargs)
+                result: str = super().sbx(
+                    *args, capture=capture, tty=tty, timeout=timeout,
+                )
+                return result
 
         with tempfile.TemporaryDirectory() as temporary:
             assets_file = pathlib.Path(temporary) / 'assets.json'

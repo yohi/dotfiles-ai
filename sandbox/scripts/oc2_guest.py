@@ -746,13 +746,13 @@ def main(argv: list[str] | None = None) -> int:
                 fail('asset runtime requires verified assets')
             if re.fullmatch(r'[0-9a-f]{64}', args.install_assets_runtime) is None:
                 fail('invalid asset runtime identity')
-            assets = verify_assets(args.assets, args.expected_assets_sha)
-            count_summary = _asset_count_summary(assets)
-            runtime = _install_verified_assets(
-                assets, args.expected_assets_sha, args.install_assets_runtime,
+            runtime_assets = verify_assets(args.assets, args.expected_assets_sha)
+            count_summary = _asset_count_summary(runtime_assets)
+            asset_runtime = _install_verified_assets(
+                runtime_assets, args.expected_assets_sha, args.install_assets_runtime,
             )
             print('OC2_ASSETS_VERIFIED: ' + count_summary)
-            print('OC2_RUNTIME_PREPARED: ' + str(runtime))
+            print('OC2_RUNTIME_PREPARED: ' + str(asset_runtime))
             print('OC2_RUNTIME_VERSION: ' + VERSION)
             return 0
         if args.bundle is None or args.expected_sha is None:
@@ -766,12 +766,14 @@ def main(argv: list[str] | None = None) -> int:
             fail('host/guest manifest SHA mismatch')
         if (args.assets is None) != (args.expected_assets_sha is None):
             fail('asset arguments must be provided together')
-        assets = verify_assets(args.assets, args.expected_assets_sha) if args.assets else None
-        runtime = prepare(bundle, digest, assets, args.expected_assets_sha)
+        verified_assets = (
+            verify_assets(args.assets, args.expected_assets_sha) if args.assets else None
+        )
+        config_runtime = prepare(bundle, digest, verified_assets, args.expected_assets_sha)
         print('OC2_GUEST_CONFIG_VERIFIED')
-        if assets is not None:
-            print('OC2_ASSETS_VERIFIED: ' + _asset_count_summary(assets))
-        print('OC2_RUNTIME_PREPARED: ' + str(runtime))
+        if verified_assets is not None:
+            print('OC2_ASSETS_VERIFIED: ' + _asset_count_summary(verified_assets))
+        print('OC2_RUNTIME_PREPARED: ' + str(config_runtime))
         print('OC2_RUNTIME_VERSION: ' + VERSION)
         return 0
     except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError) as exc:

@@ -138,13 +138,13 @@ class SuperpowersPluginResolverTest(unittest.TestCase):
                 case ('remote', 'get-url', 'origin'):
                     return 'https://github.com/obra/superpowers.git'
                 case ('rev-parse', 'HEAD'):
-                    return oc2_assets.SUPERPOWERS_COMMIT
+                    return str(oc2_assets.SUPERPOWERS_COMMIT)
                 case ('status', '--porcelain', '--untracked-files=all'):
                     return ''
                 case ('ls-tree', '-r', '--name-only', 'HEAD'):
                     return '\n'.join(sorted(files))
                 case _:
-                    self.fail('unexpected text Git command: ' + ' '.join(args))
+                    raise AssertionError('unexpected text Git command: ' + ' '.join(args))
 
         def git_bytes(_directory: Path, *args: str) -> bytes:
             match tuple(args):
