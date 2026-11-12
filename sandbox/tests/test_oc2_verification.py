@@ -109,7 +109,10 @@ class VerificationRuntimePreparationTest(unittest.TestCase):
                 patch.object(runner, 'destination_status', return_value=0),
                 patch.object(oc2, 'cli_path', return_value=oc2.PINNED[0]),
                 patch.object(oc2, 'export_v2_config', return_value=output / 'opencode.jsonc'),
-                patch('sandbox.scripts.stage_opencode_v2.verify_bundle', return_value='a' * 64),
+                patch(
+                    'sandbox.scripts.stage_opencode_v2.verify_bundle',
+                    return_value='a' * 64,
+                ) as verify_bundle,
                 patch.object(oc2_assets, 'build', return_value=(b'base-assets', 'b' * 64)),
                 patch.object(oc2_assets, 'build_phase4_plugins', return_value=(b'phase4-assets', 'c' * 64)),
                 patch.object(oc2, 'stage') as stage,
@@ -130,6 +133,11 @@ class VerificationRuntimePreparationTest(unittest.TestCase):
                 )
 
         stage.assert_called_once()
+        verify_bundle.assert_called_once()
+        verified_bundle = verify_bundle.call_args.args[0]
+        self.assertEqual(
+            verify_bundle.call_args.kwargs['trusted_root'], verified_bundle.parent,
+        )
         self.assertEqual(stage.call_args.kwargs['phase4_plugins_sha'], 'c' * 64)
         fingerprint = oc2_identity.phase4_generator_fingerprint((
             oc2.HERE / 'oc2_guest.py',

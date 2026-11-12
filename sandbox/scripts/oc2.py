@@ -1137,7 +1137,7 @@ def prepare_phase4_runtime(
         temporary_path = pathlib.Path(temporary)
         bundle = temporary_path / 'bundle'
         export_v2_config(repo, bundle, verification_only=True)
-        config_sha = verify_bundle(bundle)
+        config_sha = verify_bundle(bundle, trusted_root=bundle.parent)
         try:
             base_assets_raw, base_assets_sha = build_assets(
                 repo,
