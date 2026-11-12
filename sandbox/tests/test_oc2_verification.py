@@ -12,7 +12,6 @@ import oc2  # noqa: E402
 import oc2_assets  # noqa: E402
 import oc2_guest  # noqa: E402
 import oc2_identity  # noqa: E402
-import oc2_native  # noqa: E402
 
 
 class FakeRunner:
