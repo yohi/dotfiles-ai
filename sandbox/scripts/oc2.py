@@ -1148,11 +1148,15 @@ def launch(runner: Runner, request: SandboxLaunch) -> None:
         guest_script_sha = hashlib.sha256(guest_script.read_bytes()).hexdigest()
         native_helper = HERE / 'oc2_agent_native.py'
         native_helper_sha = hashlib.sha256(native_helper.read_bytes()).hexdigest()
+        identity_helper = HERE / 'oc2_identity.py'
+        identity_helper_sha = hashlib.sha256(identity_helper.read_bytes()).hexdigest()
         verifier_dir = (
-            f'{ROOT}/scripts/oc2_guest_{guest_script_sha[:16]}_{native_helper_sha[:16]}'
+            f'{ROOT}/scripts/oc2_guest_{guest_script_sha[:16]}_{native_helper_sha[:16]}_'
+            f'{identity_helper_sha[:16]}'
         )
         remote_script = f'{verifier_dir}/oc2_guest.py'
         remote_helper = f'{verifier_dir}/oc2_agent_native.py'
+        remote_identity_helper = f'{verifier_dir}/oc2_identity.py'
         runner.sbx(
             'exec', request.name, 'mkdir', '-p',
             f'{ROOT}/assets', f'{ROOT}/scripts', verifier_dir,
@@ -1161,6 +1165,7 @@ def launch(runner: Runner, request: SandboxLaunch) -> None:
             (request.assets_file, remote_assets, request.assets_sha, 'asset bundle'),
             (guest_script, remote_script, guest_script_sha, 'asset verifier'),
             (native_helper, remote_helper, native_helper_sha, 'native verifier'),
+            (identity_helper, remote_identity_helper, identity_helper_sha, 'identity verifier'),
         ):
             _transfer_verified_file(
                 runner,
@@ -1351,7 +1356,10 @@ def main(argv: list[str] | None = None) -> int:
             print('OC2 PLAN: mountless shell Sandbox=' + args.sandbox)
             print('OC2 PLAN: workspace=' + str(workspace))
             print('OC2 PLAN: transfer only the verified Workspace Snapshot; no .git or OpenCode project config')
-            print(f'OC2 PLAN: install and verify @opencode/cli@{VERSION} inside the Sandbox')
+            print(
+                f'OC2 PLAN: download and SHA-256 verify @opencode/cli@{VERSION} on the Host; '
+                'bake it into the Sandbox Kit at /opt/oc2/bin/opencode'
+            )
             print('OC2 PLAN: no credentials, provider settings, MCP, plugins, or host config')
             print('OC2 PLAN: no Sandbox commands executed')
             return 0

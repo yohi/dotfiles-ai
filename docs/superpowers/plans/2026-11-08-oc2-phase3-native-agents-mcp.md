@@ -8,7 +8,7 @@
 
 **Tech Stack:** Python 3.14, PyYAML, OpenCode v2.2.5 config schema, unittest.
 
-**Spec:** User-provided “OC2 Phase 3 — Remaining Work Implementation Instruction” and the follow-up approval in this conversation; frozen baseline `2ebcc963ea53f792b88d99f285d7eb75ff96171e`.
+**Spec:** [OC2 Phase 3 Native Agents and MCP Design Specification](../specs/2026-11-08-oc2-phase3-native-agents-mcp-design.md); frozen baseline `2ebcc963ea53f792b88d99f285d7eb75ff96171e`.
 
 ## Global Constraints
 

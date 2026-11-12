@@ -137,6 +137,7 @@ class NativeApmConfigTest(unittest.TestCase):
         self.assertEqual(hephaestus_permissions[('edit', '*')], 'ask')
         self.assertEqual(hephaestus_permissions[('shell', '*')], 'ask')
         self.assertEqual(hephaestus_permissions[('subagent', '*')], 'ask')
+        self.assertEqual(hephaestus_permissions[('grep', '*')], 'allow')
         self.assertEqual(oracle_permissions[('*', '*')], 'deny')
         self.assertEqual(oracle_permissions[('read', '*')], 'allow')
         self.assertEqual(oracle_permissions[('edit', '*')], 'deny')
@@ -145,6 +146,7 @@ class NativeApmConfigTest(unittest.TestCase):
         self.assertEqual(oracle_permissions[('webfetch', '*')], 'deny')
         self.assertEqual(oracle_permissions[('websearch', '*')], 'deny')
         self.assertEqual(oracle_permissions[('mcp.use', '*')], 'deny')
+        self.assertEqual(oracle_permissions[('grep', '*')], 'allow')
         self.assertNotIn('fallback_models', oracle)
         self.assertNotIn('fallback_models', hephaestus)
 

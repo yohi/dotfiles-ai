@@ -99,7 +99,15 @@ def _sequence(node: Node, label: str) -> tuple[Node, ...]:
 
 
 def parse_superpowers_lock(raw: bytes) -> str:
-    """Return the pinned Superpowers commit after validating its APM lock entry."""
+    """Parse an APM lockfile and return its pinned Superpowers commit.
+
+    Accepts YAML bytes whose root mapping contains a ``dependencies`` sequence
+    with exactly one ``superpowers`` entry for the approved repository. The
+    entry must match the fixed host, ref, commit, version, and package type.
+    Invalid/empty YAML, malformed mappings, missing dependencies, duplicate or
+    absent Superpowers entries, and mismatched identity fields raise
+    ``NativeConfigError``.
+    """
     try:
         root = yaml.compose(raw, Loader=yaml.SafeLoader)
     except (yaml.YAMLError, UnicodeError) as exc:
@@ -268,14 +276,21 @@ def parse_apm_native(
     require_oc2_assets: bool = False,
     verification_only: bool = False,
 ) -> NativeConfig:
-    """Parse a YAML APM mapping into a digest-bound Native config.
+    """Parse YAML APM bytes into a digest-bound Native configuration.
 
-    Asset paths must be unique safe members of ``ASSET_SOURCES``; Agents are
-    either absent or the fixed pair with approved modes/models; APM Plugin and
-    MCP activation is rejected. OC2 extensions must be complete. An
-    extension-free mapping is accepted only when neither verification-only nor
-    required-assets mode is enabled. Returns ordered selections and the source
-    digest; malformed YAML or disallowed values raise ``NativeConfigError``.
+    Accepts a YAML root mapping with either no OC2 extensions or the complete
+    ``x-oc2-assets``, ``x-oc2-agents``, ``x-oc2-plugins``, and ``x-oc2-mcp``
+    extension set. Assets are returned in declared order after validating
+    unique safe allowlisted paths. The approved Agent selections are returned
+    as an ordered tuple (Agents may be absent or the fixed approved pair).
+    Plugin and MCP selections default to disabled and
+    empty; when ``verification_only`` is true, their fixed candidate lists are
+    selected and must include exactly ``superpowers`` and ``oc2-status``.
+    ``require_oc2_assets`` requires the OC2 extension set even when no other
+    extension is present. The result includes the SHA-256 of the exact input
+    bytes. Invalid/empty YAML, incomplete extensions, malformed or duplicate
+    fields, unsupported selections, and rejected activation raise
+    ``NativeConfigError``.
     """
     try:
         root = yaml.compose(raw, Loader=yaml.SafeLoader)
@@ -337,11 +352,17 @@ def parse_apm_native(
 
 
 def validate_skill_frontmatter(expected_name: str, content: str) -> SkillFrontmatter:
-    """Parse a Skill document and return its required name/description fields.
+    """Parse and validate the frontmatter of a native Skill document.
 
-    Accept only a non-empty body following YAML frontmatter with exactly
-    ``name`` and ``description``. Reject malformed/missing fields, name
-    mismatch or non-native name, and descriptions longer than 1024 characters.
+    Accepts text beginning with a YAML frontmatter block followed by a
+    non-empty Markdown body. Returns the validated ``name`` and trimmed
+    ``description``. Frontmatter may contain only ``name`` and ``description``;
+    the name must equal ``expected_name`` and match the native-compatible
+    lowercase name syntax, and description length is limited to 1024
+    characters. Missing delimiters
+    or body, invalid/empty YAML, duplicate or unknown fields, missing/invalid
+    values, name mismatch, and overlong descriptions raise
+    ``NativeConfigError``.
     """
     if not content.startswith('---\n'):
         raise NativeConfigError('Skill frontmatter is missing')

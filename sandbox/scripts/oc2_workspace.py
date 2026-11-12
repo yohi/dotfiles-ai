@@ -136,6 +136,7 @@ def _excluded(
                        for prefix in profile.excluded_prefixes)
             ))
             or any(part in EXCLUDED_NAMES or part.startswith('.env')
+                   or part.endswith('.env') or '.env.' in part
                    or any(term in part.lower() for term in ('secret', 'credential', 'token'))
                    or part.endswith(('.pem', '.key', '.p12', '.pfx')) for part in relative.parts))
 
