@@ -25,6 +25,8 @@ class FakeSbx:
 
     def __init__(self) -> None:
         self.created = False
+        self.runtime_mounts: list[dict[str, str]] = []
+        self.reported_sandbox_name = 'oc2-test'
         self.installed = False
         self.kit_supported = True
         self.copied_config: str | None = None
@@ -107,6 +109,12 @@ class FakeSbx:
             return capabilities
         if args == ('ls', '-q'):
             return 'oc2-test\n' if self.created else ''
+        if args == ('ls', '--format', 'json'):
+            return json.dumps([{'name': self.reported_sandbox_name, 'agent': 'shell'}])
+        if args == ('inspect', 'oc2-test', '--json'):
+            return json.dumps({
+                'name': 'oc2-test', 'runtime_mounts': self.runtime_mounts,
+            })
         if args[:1] == ('create',):
             kit_paths = [
                 pathlib.Path(args[index + 1])
@@ -450,8 +458,7 @@ class LauncherFlowTests(unittest.TestCase):
         self.assertIn('OpenCode project configuration', output)
         self.assertFalse(self.fake.created)
 
-    def test_dotfiles_ai_profile_transfers_verified_apm_and_excludes_r1_paths(self) -> None:
-        """Apply R1 only for the exact origin while transferring a verified apm.yml."""
+    def test_dotfiles_ai_profile_excludes_apm_and_r1_paths_from_guest(self) -> None:
         subprocess.run(
             ['git', '-C', str(self.project), 'remote', 'set-url', 'origin',
              'git@github.com:yohi/dotfiles-ai.git'],
@@ -464,7 +471,7 @@ class LauncherFlowTests(unittest.TestCase):
         status, output = self._run('--allow-paid-inference')
 
         self.assertEqual(status, 0, output)
-        self.assertIn('apm.yml', self.fake.workspace_files)
+        self.assertNotIn('apm.yml', self.fake.workspace_files)
         self.assertNotIn('_docs/aws-resource-inventory.md', self.fake.workspace_files)
 
     def test_dotfiles_ai_profile_does_not_hide_credentials_in_apm(self) -> None:
@@ -703,6 +710,45 @@ class LauncherFlowTests(unittest.TestCase):
         creates = [call for call in self.fake.calls if call[0] == 'create' and '--name' in call]
         self.assertEqual(len(creates), 1)
         self.assertTrue(any(call[:2] == ('exec', '-it') for call in self.fake.calls))
+
+    def test_resume_rejects_mounted_sandbox_before_cloudflare_credential_access(self) -> None:
+        self.fake.sandbox_cloudflare_secret = False
+        self.fake.secret_set_fails = True
+        status, output = self._run(
+            '--allow-paid-inference', '--use-cloudflare-ai-gateway', stdin_tty=True,
+        )
+        self.assertNotEqual(status, 0, output)
+        self.assertTrue(self.fake.created)
+
+        self.fake.secret_calls.clear()
+        self.fake.runtime_mounts = [{'source': '/host/workspace'}]
+        self.fake.secret_set_fails = False
+        status, output = self._run(
+            '--allow-paid-inference', '--use-cloudflare-ai-gateway', '--resume', stdin_tty=True,
+        )
+
+        self.assertEqual(status, 1)
+        self.assertIn('runtime mounts', output)
+        self.assertEqual(self.fake.secret_calls, [])
+        self.assertIsNone(self.fake.created_cli_binary)
+
+    def test_resume_rejects_replaced_sandbox_before_cloudflare_credential_access(self) -> None:
+        status, output = self._run(
+            '--allow-paid-inference', '--use-cloudflare-ai-gateway', stdin_tty=True,
+        )
+        self.assertEqual(status, 0, output)
+
+        self.fake.secret_calls.clear()
+        self.fake.created_cli_binary = None
+        self.fake.reported_sandbox_name = 'replacement'
+        status, output = self._run(
+            '--allow-paid-inference', '--use-cloudflare-ai-gateway', '--resume', stdin_tty=True,
+        )
+
+        self.assertEqual(status, 1)
+        self.assertIn('Sandbox identity', output)
+        self.assertEqual(self.fake.secret_calls, [])
+        self.assertIsNone(self.fake.created_cli_binary)
 
 
 class FakeInput:

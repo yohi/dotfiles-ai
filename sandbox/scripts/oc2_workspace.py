@@ -50,6 +50,7 @@ DOTFILES_AI_PROFILE_ID: Final[str] = 'dotfiles-ai/workspace-safe-transfer/r1'
 DOTFILES_AI_PROFILE = WorkspaceProfile(
     profile_id=DOTFILES_AI_PROFILE_ID,
     excluded_paths=frozenset({
+        'apm.yml',
         '_docs/aws-resource-inventory.md',
         '_scripts/generate_atlassian_auth.py',
         '.agents/skills/claude-api/csharp/claude-api/README.md',

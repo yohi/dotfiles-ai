@@ -1490,6 +1490,8 @@ def main(argv: list[str] | None = None) -> int:
                     raise Stop('--resume Sandbox does not match the retained transfer receipt')
                 if session.manifest != workspace_manifest:
                     raise Stop('--resume Workspace differs from the retained transfer snapshot')
+                if not is_compatible_sandbox(runner, args.sandbox):
+                    raise Stop('--resume Sandbox identity or mount state could not be verified')
                 if cloudflare is not None:
                     credential_scope = ensure_cloudflare_credential(
                         runner, args.sandbox, interactive=sys.stdin.isatty(),

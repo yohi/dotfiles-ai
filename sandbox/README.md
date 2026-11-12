@@ -134,7 +134,7 @@ Sandbox名が既に存在する場合は、通常起動では再利用・再構�
 Workspace originが正確に `yohi/dotfiles-ai` の場合だけ、Workspace Safe Transfer Profile R1を適用します。
 R1の除外は他のRepositoryには適用されません。一般的な秘密ファイル・Credential検査は全Repositoryで実施します。
 
-- 検査を通過した`apm.yml`はSnapshotに含まれ、Guestへ転送されます。OpenCode V2設定の生成にはHost側SSOTも使用します。
+- `apm.yml`はGuestへ転送しません。認証情報パターンの検査は除外前に行い、一致した場合は起動を拒否します。OpenCode V2設定の生成にはHost側SSOTを使用します。
 - Guestでの`apm.yml`編集・新規作成はサポート対象外です。Guestで作った`apm.yml`はcollect/apply対象になりません。
 - `_docs/aws-resource-inventory.md`、`_scripts/generate_atlassian_auth.py`、
   `.agents/skills/claude-api/csharp/claude-api/README.md`、
