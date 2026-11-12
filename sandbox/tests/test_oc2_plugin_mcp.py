@@ -232,6 +232,26 @@ class SuperpowersPluginResolverTest(unittest.TestCase):
 
         self.assertFalse(destination.exists())
 
+    def test_export_rejects_a_git_tree_over_the_pinned_byte_limit(self) -> None:
+        """Reject a full pinned tree whose blob bytes exceed the configured bound."""
+        files, tree_sha, git_text, git_bytes = self._git_tree_fakes(
+            {'oversized.js': b'x' * 128},
+        )
+        destination = Path(self.temporary.name) / 'oversized-source'
+
+        with (
+            patch.object(oc2_assets, '_git_output', side_effect=git_text),
+            patch.object(oc2_assets, '_git_output_bytes', side_effect=git_bytes),
+            patch.object(oc2_assets, 'parse_superpowers_lock', return_value=oc2_assets.SUPERPOWERS_COMMIT),
+            patch.object(oc2_assets, 'SUPERPOWERS_FILE_COUNT', len(files)),
+            patch.object(oc2_assets, 'SUPERPOWERS_TOTAL_BYTES', sum(map(len, files.values())) - 1),
+            patch.object(oc2_assets, 'SUPERPOWERS_TREE_SHA256', tree_sha),
+            self.assertRaisesRegex(oc2_assets.AssetError, 'exceeds its pinned size'),
+        ):
+            oc2_assets.export_superpowers_tree(REPO, self.plugin_dir, destination)
+
+        self.assertFalse(destination.exists())
+
     def _git_output(self, _directory: Path, *args: str) -> str:
         command = tuple(args)
         match command:
