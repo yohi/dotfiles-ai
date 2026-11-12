@@ -92,7 +92,6 @@ class ExportTests(unittest.TestCase):
         self.assertNotIn("policies", server)
 
     def test_v2_provider_config_supports_openai_and_cloudflare_custom(self) -> None:
-        """Allow only the selected OpenAI and Cloudflare provider configuration."""
         self.apm.write_text(
             "shell: bash\nsnapshot: true\n"
             "provider:\n"
@@ -157,6 +156,7 @@ class ExportTests(unittest.TestCase):
             self.assertNotIn("OC_CF_REST_API_TOKEN", generated.read_text())
 
     def test_v2_native_agents_use_only_apm_selected_fixed_config(self) -> None:
+        """Allow only the Native Agent map selected by APM in normal V2 output."""
         self.apm.write_text(
             "provider:\n"
             "  openai:\n"

@@ -247,11 +247,11 @@ class SuperpowersPluginResolverTest(unittest.TestCase):
         ):
             oc2_assets.resolve_superpowers_plugin(REPO, self.plugin_dir)
 
-    def test_missing_local_plugin_is_not_available(self):
+    def test_missing_local_plugin_is_not_available(self) -> None:
         with self.assertRaisesRegex(oc2_assets.AssetError, 'NOT_AVAILABLE'):
             oc2_assets.resolve_superpowers_plugin(REPO, None)
 
-    def test_pinned_checkout_allows_node_builtins_and_exports_native_skills(self):
+    def test_pinned_checkout_allows_node_builtins_and_exports_native_skills(self) -> None:
         with (
             patch.object(oc2_assets, '_git_output', side_effect=self._git_output),
             patch.object(oc2_assets, '_git_output_bytes', side_effect=self._git_output_bytes),
@@ -277,7 +277,7 @@ class SuperpowersPluginResolverTest(unittest.TestCase):
             '8ca22dba9a94f28898bbce59f2537ff4d87c747d',
         )
 
-    def test_unapproved_node_builtin_is_rejected(self):
+    def test_unapproved_node_builtin_is_rejected(self) -> None:
         entrypoint = self.plugin_dir / '.opencode' / 'plugins' / 'superpowers.js'
         entrypoint.write_text("import fs from 'node:fs';\n", encoding='utf-8')
 
@@ -287,7 +287,7 @@ class SuperpowersPluginResolverTest(unittest.TestCase):
         ):
             oc2_assets.resolve_superpowers_plugin(REPO, self.plugin_dir)
 
-    def test_unbundled_external_dependency_is_rejected(self):
+    def test_unbundled_external_dependency_is_rejected(self) -> None:
         entrypoint = self.plugin_dir / '.opencode' / 'plugins' / 'superpowers.js'
         entrypoint.write_text("import helper from 'unapproved-package';\n", encoding='utf-8')
 
@@ -297,7 +297,7 @@ class SuperpowersPluginResolverTest(unittest.TestCase):
         ):
             oc2_assets.resolve_superpowers_plugin(REPO, self.plugin_dir)
 
-    def test_wrong_local_commit_is_not_available(self):
+    def test_wrong_local_commit_is_not_available(self) -> None:
         def wrong_commit(_directory: Path, *args: str) -> str:
             if tuple(args) == ('rev-parse', 'HEAD'):
                 return '0' * 40
@@ -307,7 +307,7 @@ class SuperpowersPluginResolverTest(unittest.TestCase):
               self.assertRaisesRegex(oc2_assets.AssetError, 'NOT_AVAILABLE')):
             oc2_assets.resolve_superpowers_plugin(REPO, self.plugin_dir)
 
-    def test_dirty_local_checkout_is_not_available(self):
+    def test_dirty_local_checkout_is_not_available(self) -> None:
         def dirty_checkout(_directory: Path, *args: str) -> str:
             if tuple(args) == ('status', '--porcelain', '--untracked-files=all'):
                 return ' M index.js'
@@ -318,7 +318,7 @@ class SuperpowersPluginResolverTest(unittest.TestCase):
             oc2_assets.resolve_superpowers_plugin(REPO, self.plugin_dir)
 
 class NativeMcpCandidateTest(unittest.TestCase):
-    def test_unknown_mcp_server_is_rejected(self):
+    def test_unknown_mcp_server_is_rejected(self) -> None:
         with self.assertRaisesRegex(ValueError, 'unapproved MCP server'):
             oc2_native.parse_apm_native(config(
                 mcp='  enabled: false\n  servers: [filesystem]\n',
@@ -353,7 +353,7 @@ class VerificationAssetBundleTest(unittest.TestCase):
             ),
         )
 
-    def test_verification_bundle_uses_native_git_plugin_and_local_mcp(self):
+    def test_verification_bundle_uses_native_git_plugin_and_local_mcp(self) -> None:
         with patch.object(
             oc2_assets, 'resolve_superpowers_plugin', return_value=self.artifact,
         ):
@@ -391,7 +391,7 @@ class VerificationAssetBundleTest(unittest.TestCase):
         self.assertEqual(native['plugins'], {'enabled': True, 'allowlist': ['superpowers']})
         self.assertEqual(native['mcp'], {'enabled': True, 'servers': ['oc2-status']})
 
-    def test_verification_bundle_checks_the_local_plugin_checkout(self):
+    def test_verification_bundle_checks_the_local_plugin_checkout(self) -> None:
         plugin_dir = Path('/fixture/superpowers')
         with patch.object(
             oc2_assets, 'resolve_superpowers_plugin', return_value=self.artifact,
@@ -402,14 +402,14 @@ class VerificationAssetBundleTest(unittest.TestCase):
 
         resolve.assert_called_once_with(REPO, plugin_dir)
 
-    def test_verification_bundle_rejects_wrong_lock_commit(self):
+    def test_verification_bundle_rejects_wrong_lock_commit(self) -> None:
         with (patch.object(oc2_assets, 'parse_superpowers_lock', return_value='0' * 40),
               self.assertRaisesRegex(oc2_assets.AssetError, 'NOT_AVAILABLE')):
             oc2_assets.build(REPO, verification_only=True)
 
 
 class VerificationHostModeTest(unittest.TestCase):
-    def test_verification_mode_requires_prepare_only_before_host_operations(self):
+    def test_verification_mode_requires_prepare_only_before_host_operations(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             (root / 'apm.yml').write_text('shell: bash\n', encoding='utf-8')
@@ -422,7 +422,7 @@ class VerificationHostModeTest(unittest.TestCase):
 
         self.assertEqual(result, 1)
 
-    def test_verification_requires_a_local_plugin_checkout(self):
+    def test_verification_requires_a_local_plugin_checkout(self) -> None:
         with patch.object(oc2, 'prepare_verification_runtime') as prepare:
             result = oc2.main([
                 '--repo-root', str(REPO),
@@ -434,7 +434,7 @@ class VerificationHostModeTest(unittest.TestCase):
         prepare.assert_not_called()
         self.assertEqual(result, 1)
 
-    def test_verification_passes_the_local_plugin_checkout(self):
+    def test_verification_passes_the_local_plugin_checkout(self) -> None:
         plugin_dir = Path('/fixture/superpowers')
         with patch.object(oc2, 'prepare_verification_runtime') as prepare:
             try:
@@ -451,7 +451,7 @@ class VerificationHostModeTest(unittest.TestCase):
         self.assertEqual(result, 0)
         prepare.assert_called_once_with(REPO, 'oc2-p3-verify-test', plugin_dir)
 
-    def test_verification_dry_run_does_not_contact_sandbox(self):
+    def test_verification_dry_run_does_not_contact_sandbox(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             (root / 'apm.yml').write_text('shell: bash\n', encoding='utf-8')
@@ -473,14 +473,14 @@ class VerificationHostModeTest(unittest.TestCase):
 
 
 class NativePluginDeclarationTest(unittest.TestCase):
-    def test_apm_cannot_enable_plugin_or_mcp_by_default(self):
+    def test_apm_cannot_enable_plugin_or_mcp_by_default(self) -> None:
         with self.assertRaisesRegex(ValueError, 'must remain disabled'):
             oc2_native.parse_apm_native(config(
                 plugins='  enabled: true\n  allowlist: [superpowers]\n',
                 mcp='  enabled: false\n  servers: []\n',
             ))
 
-    def test_duplicate_plugin_fields_are_rejected(self):
+    def test_duplicate_plugin_fields_are_rejected(self) -> None:
         with self.assertRaisesRegex(ValueError, 'duplicate'):
             oc2_native.parse_apm_native(config(
                 plugins=(

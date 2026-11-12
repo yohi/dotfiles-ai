@@ -2184,6 +2184,40 @@ class OAuthTest(unittest.TestCase):
             oauth.synchronize('opencode', self.source, self.db)
         return calls
 
+    def test_synchronize_reads_credentials_from_the_supplied_auth_json(self) -> None:
+        """Pass the credential content read from the supplied auth.json into auth import."""
+        source = {
+            'openai': {
+                'type': 'oauth', 'access': 'oai-oat01-proxy-managed',
+                'refresh': 'oai-ort01-proxy-managed', 'expires': 123,
+                'accountId': 'account-from-auth-file',
+            },
+        }
+        self.source.write_text(json.dumps(source), encoding='utf-8')
+        expected = bootstrap.record_from_auth(source)
+
+        calls = self.run_sync([self.other], [expected, self.other])
+
+        import_input = next(
+            payload for args, payload in calls if tuple(args[1:3]) == ('auth', 'import')
+        )
+        self.assertEqual(json.loads(import_input), [expected])
+        self.assertEqual(expected['value']['metadata']['accountID'], 'account-from-auth-file')
+
+    def test_synchronize_rejects_credentials_from_the_wrong_auth_json_path(self) -> None:
+        """Reject a different auth.json content before invoking the OpenCode CLI."""
+        wrong_source = self.root / 'wrong-auth.json'
+        wrong_source.write_text(json.dumps({'openai': {
+            'type': 'oauth', 'access': 'wrong-access', 'refresh': 'wrong-refresh',
+            'expires': 123,
+        }}), encoding='utf-8')
+
+        with patch.object(oauth.subprocess, 'run') as command:
+            with self.assertRaisesRegex(ValueError, 'invalid OAuth sentinel'):
+                oauth.synchronize('opencode', wrong_source, self.db)
+
+        command.assert_not_called()
+
     def test_captures_import_stderr_only_under_runtime_tmp(self):
         legacy = self.runtime_tmp / 'oc2-oauth-import.stderr'
         legacy.write_bytes(b'previous attempt')
