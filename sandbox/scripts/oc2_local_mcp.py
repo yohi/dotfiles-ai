@@ -116,7 +116,8 @@ def _dispatch(value: JsonValue, state: SessionState) -> DispatchResult:
         return DispatchResult(_error(request_id, -32002, 'Server not initialized'), state, False)
 
     if method == 'tools/list':
-        if params not in (None, {}):
+        if (params is not None and
+                (not isinstance(params, dict) or set(params) - {'_meta'})):
             return DispatchResult(_error(request_id, -32602, 'Invalid params'), state, False)
         tool: JsonObject = {
             'name': 'oc2_status',
@@ -126,7 +127,7 @@ def _dispatch(value: JsonValue, state: SessionState) -> DispatchResult:
         return DispatchResult(_response(request_id, {'tools': [tool]}), state, False)
 
     if method == 'tools/call':
-        if not isinstance(params, dict) or set(params) - {'name', 'arguments'}:
+        if not isinstance(params, dict) or set(params) - {'name', 'arguments', '_meta'}:
             return DispatchResult(_error(request_id, -32602, 'Invalid params'), state, False)
         arguments = params.get('arguments', {})
         if (params.get('name') != 'oc2_status' or not isinstance(arguments, dict)

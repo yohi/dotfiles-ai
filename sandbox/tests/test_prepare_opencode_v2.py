@@ -69,6 +69,7 @@ class ExportTests(unittest.TestCase):
             self.assertEqual(sha, hashlib.sha256((self.out / name).read_bytes()).hexdigest())
 
     def test_verification_export_contains_no_provider_or_credential_configuration(self) -> None:
+        """Require verification-only output to omit all provider and credential settings."""
         self.apm.write_text(
             "shell: bash\nsnapshot: true\n"
             "x-oc2-assets: [global-rules/AGENTS.global.md]\n"
@@ -91,6 +92,7 @@ class ExportTests(unittest.TestCase):
         self.assertNotIn("policies", server)
 
     def test_v2_provider_config_supports_openai_and_cloudflare_custom(self) -> None:
+        """Allow only the selected OpenAI and Cloudflare provider configuration."""
         self.apm.write_text(
             "shell: bash\nsnapshot: true\n"
             "provider:\n"

@@ -16,18 +16,22 @@ import oc2_identity  # noqa: E402
 
 class FakeRunner:
     def __init__(self) -> None:
+        """Initialize an empty call log for sandbox command simulations."""
         self.calls: list[tuple[str, ...]] = []
 
     def destination_status(self, _name: str, _destination: str) -> int:
+        """Return zero to simulate an absent destination that may be copied."""
         return 0
 
     def sbx(self, *args: str, **_kwargs: bool) -> str:
+        """Record a command and return empty stdout for the fake Sandbox."""
         self.calls.append(args)
         return ''
 
 
 class VerificationRuntimePreparationTest(unittest.TestCase):
-    def test_verification_refuses_to_create_or_reuse_an_incompatible_sandbox(self):
+    def test_verification_refuses_to_create_or_reuse_an_incompatible_sandbox(self) -> None:
+        """Reject incompatible Sandboxes before issuing any Sandbox command."""
         runner = FakeRunner()
         with (patch.object(oc2, 'Runner', return_value=runner),
               patch.object(oc2, 'is_compatible_sandbox', return_value=False),
@@ -38,7 +42,8 @@ class VerificationRuntimePreparationTest(unittest.TestCase):
 
         self.assertEqual(runner.calls, [])
 
-    def test_verification_stages_without_credentials_cli_install_or_launch(self):
+    def test_verification_stages_without_credentials_cli_install_or_launch(self) -> None:
+        """Stage the bundle and assets without credentials, CLI installation, or launch."""
         runner = FakeRunner()
         with tempfile.TemporaryDirectory() as temporary:
             output = pathlib.Path(temporary) / 'bundle'
@@ -80,7 +85,8 @@ class VerificationRuntimePreparationTest(unittest.TestCase):
         stage.assert_called_once()
         self.assertEqual(runner.calls, [])
 
-    def test_verification_identity_includes_generator_fingerprint(self):
+    def test_verification_identity_includes_generator_fingerprint(self) -> None:
+        """Bind the runtime identity to config, assets, and generator fingerprints."""
         runner = FakeRunner()
         with tempfile.TemporaryDirectory() as temporary:
             output = pathlib.Path(temporary) / 'bundle'
@@ -114,7 +120,8 @@ class VerificationRuntimePreparationTest(unittest.TestCase):
             ).name,
         )
 
-    def test_verification_refuses_existing_runtime_identity_before_staging(self):
+    def test_verification_refuses_existing_runtime_identity_before_staging(self) -> None:
+        """Refuse an existing runtime identity without staging any files."""
         runner = FakeRunner()
         with tempfile.TemporaryDirectory() as temporary:
             output = pathlib.Path(temporary) / 'bundle'

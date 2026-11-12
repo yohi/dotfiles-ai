@@ -466,6 +466,13 @@ def _build_v2_config(
 
 
 def _read_apm_source(root: Path, *, verification_only: bool = False) -> APMConfig:
+    """Read and validate the APM source, selecting provider parsing by export mode.
+
+    Verification-only mode validates OC2 native selections and omits V2 provider
+    settings; normal mode selects only approved V2 providers when configured.
+    Reject linked or oversized sources, invalid APM structure, and disallowed
+    shell, snapshot, native, provider, or credential values.
+    """
     source = root / "apm.yml"
     if source.is_symlink() or not source.is_file():
         raise ExportError("apm.yml must be a regular, non-symlink file")
@@ -518,6 +525,12 @@ def _build_files(
     v2_config: dict[str, JsonValue] | None = None,
     *, verification_only: bool = False,
 ) -> dict[str, bytes]:
+    """Build server, TUI, and manifest files for normal or verification-only export.
+
+    Verification-only output uses ``oc2-verification`` format and contains no
+    V2 model, provider, or provider policy configuration. Normal output uses V2
+    provider settings only when an approved configuration is selected.
+    """
     # Strict positive selection: none of the other apm.yml values is serialized.
     server: dict[str, JsonValue] = {
         "$schema": "https://opencode.ai/config.json",
