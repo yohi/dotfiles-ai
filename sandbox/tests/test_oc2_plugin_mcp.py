@@ -9,6 +9,7 @@ import unittest
 import contextlib
 import io
 from pathlib import Path
+from typing import Callable
 from unittest.mock import patch
 
 SCRIPTS = Path(__file__).resolve().parents[1] / 'scripts'
@@ -105,8 +106,12 @@ class SuperpowersPluginResolverTest(unittest.TestCase):
             encoding='utf-8',
         )
 
-    def test_export_materializes_the_complete_pinned_git_tree(self) -> None:
-        """Export every committed source blob and bind it to the pinned tree digest."""
+    def _git_tree_fakes(
+        self,
+        extra_files: dict[str, bytes] | None = None,
+        modes: dict[str, bytes] | None = None,
+    ) -> tuple[dict[str, bytes], str, Callable[..., str], Callable[..., bytes]]:
+        """Build deterministic fake Git metadata and blobs for tree export tests."""
         files = {
             relative: path.read_bytes()
             for relative in (
@@ -115,6 +120,8 @@ class SuperpowersPluginResolverTest(unittest.TestCase):
             )
             if (path := self.plugin_dir / relative).is_file()
         }
+        files.update(extra_files or {})
+        entry_modes = modes or {}
         blob_ids = {
             relative: hashlib.sha1(
                 b'blob ' + str(len(content)).encode() + b'\0' + content,
@@ -145,7 +152,8 @@ class SuperpowersPluginResolverTest(unittest.TestCase):
                     return files[specifier.removeprefix('HEAD:')]
                 case ('ls-tree', '-rz', '--full-tree', 'HEAD'):
                     return b''.join(
-                        b'100644 blob ' + blob_ids[name].encode() + b'\t'
+                        entry_modes.get(name, b'100644') + b' blob '
+                        + blob_ids[name].encode() + b'\t'
                         + name.encode() + b'\0'
                         for name in sorted(files)
                     )
@@ -155,6 +163,11 @@ class SuperpowersPluginResolverTest(unittest.TestCase):
                 case _:
                     self.fail('unexpected byte Git command: ' + ' '.join(args))
 
+        return files, tree_sha, git_text, git_bytes
+
+    def test_export_materializes_the_complete_pinned_git_tree(self) -> None:
+        """Export every committed source blob and bind it to the pinned tree digest."""
+        files, tree_sha, git_text, git_bytes = self._git_tree_fakes()
         destination = Path(self.temporary.name) / 'verified-source'
         previous_umask = os.umask(0o077)
         try:
@@ -178,6 +191,46 @@ class SuperpowersPluginResolverTest(unittest.TestCase):
         self.assertEqual(destination.stat().st_mode & 0o777, 0o755)
         self.assertTrue(all(path.stat().st_mode & 0o777 == 0o644
                             for path in destination.rglob('*') if path.is_file()))
+
+    def test_export_rejects_non_regular_git_tree_entries(self) -> None:
+        """Reject symlink-mode entries from the Host Git tree before materialization."""
+        files, tree_sha, git_text, git_bytes = self._git_tree_fakes(
+            {'unreviewed-link': b'target'}, {'unreviewed-link': b'120000'},
+        )
+        destination = Path(self.temporary.name) / 'unsafe-source'
+
+        with (
+            patch.object(oc2_assets, '_git_output', side_effect=git_text),
+            patch.object(oc2_assets, '_git_output_bytes', side_effect=git_bytes),
+            patch.object(oc2_assets, 'parse_superpowers_lock', return_value=oc2_assets.SUPERPOWERS_COMMIT),
+            patch.object(oc2_assets, 'SUPERPOWERS_FILE_COUNT', len(files)),
+            patch.object(oc2_assets, 'SUPERPOWERS_TOTAL_BYTES', sum(map(len, files.values()))),
+            patch.object(oc2_assets, 'SUPERPOWERS_TREE_SHA256', tree_sha),
+            self.assertRaisesRegex(oc2_assets.AssetError, 'non-regular entry'),
+        ):
+            oc2_assets.export_superpowers_tree(REPO, self.plugin_dir, destination)
+
+        self.assertFalse(destination.exists())
+
+    def test_export_rejects_control_characters_in_git_paths(self) -> None:
+        """Reject control characters in Host Git paths before materialization."""
+        files, tree_sha, git_text, git_bytes = self._git_tree_fakes(
+            {'untrusted\npath': b'content'},
+        )
+        destination = Path(self.temporary.name) / 'unsafe-path-source'
+
+        with (
+            patch.object(oc2_assets, '_git_output', side_effect=git_text),
+            patch.object(oc2_assets, '_git_output_bytes', side_effect=git_bytes),
+            patch.object(oc2_assets, 'parse_superpowers_lock', return_value=oc2_assets.SUPERPOWERS_COMMIT),
+            patch.object(oc2_assets, 'SUPERPOWERS_FILE_COUNT', len(files)),
+            patch.object(oc2_assets, 'SUPERPOWERS_TOTAL_BYTES', sum(map(len, files.values()))),
+            patch.object(oc2_assets, 'SUPERPOWERS_TREE_SHA256', tree_sha),
+            self.assertRaisesRegex(oc2_assets.AssetError, 'tree path is unsafe'),
+        ):
+            oc2_assets.export_superpowers_tree(REPO, self.plugin_dir, destination)
+
+        self.assertFalse(destination.exists())
 
     def _git_output(self, _directory: Path, *args: str) -> str:
         command = tuple(args)
