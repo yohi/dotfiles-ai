@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import hashlib
+import io
 import json
 import sys
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
 
@@ -68,6 +70,55 @@ class VerificationGuestMaterializationTest(unittest.TestCase):
                 patcher = patch.object(module, name, value, create=True)
                 patcher.start()
                 self.addCleanup(patcher.stop)
+
+    def _selected_asset_files(self) -> dict[str, bytes]:
+        return {
+            'config/opencode/rules/custom.md': b'rule\n',
+            'config/opencode/commands/custom.md': b'command\n',
+            'config/opencode/skills/demo/SKILL.md': b'skill\n',
+            'config/opencode/agents/custom.md': b'agent\n',
+            'metadata/agent-routes.json': b'{}\n',
+            'theme.json': b'{"name":"tokyonight"}\n',
+        }
+
+    def test_install_assets_output_counts_selected_file_keys(self) -> None:
+        """Report installed asset counts from the verified files mapping."""
+        files = self._selected_asset_files()
+        output = io.StringIO()
+        with patch.object(oc2_guest, 'verify_assets', return_value=files.copy()):
+            with redirect_stdout(output):
+                status = oc2_guest.main([
+                    '--assets', str(self.base / 'assets.json'),
+                    '--expected-assets-sha', 'b' * 64,
+                    '--install-assets-runtime', 'a' * 64,
+                ])
+
+        self.assertEqual(status, 0)
+        self.assertIn(
+            'OC2_ASSETS_VERIFIED: rules=1 commands=1 skills=1 theme=1 custom_agents=1 routing=1',
+            output.getvalue(),
+        )
+
+    def test_verification_output_counts_selected_file_keys(self) -> None:
+        """Report verification asset counts from the same selected file categories."""
+        output = io.StringIO()
+        with (
+            patch.object(oc2_guest, 'validate_location'),
+            patch.object(oc2_guest, 'verify', return_value='a' * 64),
+            patch.object(oc2_guest, 'verify_assets', return_value=self._selected_asset_files()),
+            patch.object(oc2_guest, 'prepare', return_value=self.base / 'runtime'),
+            redirect_stdout(output),
+        ):
+            status = oc2_guest.main([
+                '--bundle', str(self.base / 'bundle'), '--expected-sha', 'a' * 64,
+                '--assets', str(self.base / 'assets.json'), '--expected-assets-sha', 'b' * 64,
+            ])
+
+        self.assertEqual(status, 0)
+        self.assertIn(
+            'OC2_ASSETS_VERIFIED: rules=1 commands=1 skills=1 theme=1 custom_agents=1 routing=1',
+            output.getvalue(),
+        )
 
     def _provider_bundle(self, verification_only: bool) -> Path:
         apm = prepare_opencode_v2._read_apm_source(

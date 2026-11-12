@@ -499,10 +499,36 @@ def verify_assets(source: pathlib.Path, expected_sha: str) -> dict[str, bytes]:
     return result
 
 
+def _asset_count_summary(files: dict[str, bytes]) -> str:
+    """Summarize selected asset categories using the verified file keys."""
+    rules = sum(name.startswith('config/opencode/rules/') for name in files)
+    commands = sum(name.startswith('config/opencode/commands/') for name in files)
+    skills = sum(
+        name.startswith('config/opencode/skills/') and name.endswith('/SKILL.md')
+        for name in files
+    )
+    theme = int('theme.json' in files)
+    custom_agents = sum(name.startswith('config/opencode/agents/') for name in files)
+    routing_count = sum(name.startswith('metadata/agent-routes') for name in files)
+    routing = str(routing_count) if routing_count else 'none'
+    return (
+        f'rules={rules} commands={commands} skills={skills} theme={theme} '
+        f'custom_agents={custom_agents} routing={routing}'
+    )
+
+
 def install_assets(source: pathlib.Path, expected_sha: str, runtime_id: str) -> pathlib.Path:
+    """Verify an asset file and install its selected contents into a new runtime."""
     if re.fullmatch(r'[0-9a-f]{64}', runtime_id) is None:
         fail('invalid asset runtime identity')
     files = verify_assets(source, expected_sha)
+    return _install_verified_assets(files, expected_sha, runtime_id)
+
+
+def _install_verified_assets(
+    files: dict[str, bytes], expected_sha: str, runtime_id: str,
+) -> pathlib.Path:
+    """Materialize already-verified files under a unique asset runtime identity."""
     runtime_root = BASE / 'runtime'
     if not runtime_root.exists():
         runtime_root.mkdir(mode=0o700)
@@ -718,9 +744,14 @@ def main(argv: list[str] | None = None) -> int:
         if args.install_assets_runtime is not None:
             if args.assets is None or args.expected_assets_sha is None:
                 fail('asset runtime requires verified assets')
-            runtime = install_assets(args.assets, args.expected_assets_sha,
-                                     args.install_assets_runtime)
-            print('OC2_ASSETS_VERIFIED: rules=7 commands=1 skills=2 theme=1 custom_agents=0 routing=none')
+            if re.fullmatch(r'[0-9a-f]{64}', args.install_assets_runtime) is None:
+                fail('invalid asset runtime identity')
+            assets = verify_assets(args.assets, args.expected_assets_sha)
+            count_summary = _asset_count_summary(assets)
+            runtime = _install_verified_assets(
+                assets, args.expected_assets_sha, args.install_assets_runtime,
+            )
+            print('OC2_ASSETS_VERIFIED: ' + count_summary)
             print('OC2_RUNTIME_PREPARED: ' + str(runtime))
             print('OC2_RUNTIME_VERSION: ' + VERSION)
             return 0
@@ -739,7 +770,7 @@ def main(argv: list[str] | None = None) -> int:
         runtime = prepare(bundle, digest, assets, args.expected_assets_sha)
         print('OC2_GUEST_CONFIG_VERIFIED')
         if assets is not None:
-            print('OC2_ASSETS_VERIFIED: rules=7 commands=1 skills=2 theme=1 custom_agents=0 routing=none')
+            print('OC2_ASSETS_VERIFIED: ' + _asset_count_summary(assets))
         print('OC2_RUNTIME_PREPARED: ' + str(runtime))
         print('OC2_RUNTIME_VERSION: ' + VERSION)
         return 0

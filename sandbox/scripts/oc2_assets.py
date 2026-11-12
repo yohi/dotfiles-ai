@@ -91,6 +91,22 @@ def _git_output(directory: Path, *arguments: str) -> str:
     return result.stdout
 
 
+def _git_output_bytes(directory: Path, *arguments: str) -> bytes:
+    """Return Git stdout without text decoding or newline conversion."""
+    try:
+        result = subprocess.run(
+            ['git', '-C', str(directory), *arguments],
+            capture_output=True,
+            timeout=5,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise AssetError('NOT_AVAILABLE: local Plugin checkout cannot be verified') from exc
+    if result.returncode != 0:
+        raise AssetError('NOT_AVAILABLE: local Plugin checkout cannot be verified')
+    return result.stdout
+
+
 def _safe_plugin_path(source: Path) -> None:
     path = source.absolute()
     while path != path.parent:
@@ -199,8 +215,7 @@ def resolve_superpowers_plugin(repo: Path, source: Path | None) -> PluginArtifac
         if local_file.is_symlink() or not local_file.is_file() or local_file.stat().st_size > MAX_FILE:
             raise AssetError('NOT_AVAILABLE: required local Plugin file is invalid')
         local_bytes = local_file.read_bytes()
-        committed_text = _git_output(source, 'show', 'HEAD:' + relative)
-        committed_bytes = committed_text.encode('utf-8')
+        committed_bytes = _git_output_bytes(source, 'show', 'HEAD:' + relative)
         if local_bytes != committed_bytes:
             raise AssetError('NOT_AVAILABLE: local Plugin file differs from pinned commit')
         files.append(PluginFile(relative, local_bytes, hashlib.sha256(local_bytes).hexdigest()))

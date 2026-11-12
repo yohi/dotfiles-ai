@@ -75,6 +75,7 @@ class SuperpowersPluginResolverTest(unittest.TestCase):
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
+        self.committed_skill_blob: bytes | None = None
         self.plugin_dir = Path(self.temporary.name) / 'superpowers'
         (self.plugin_dir / '.opencode' / 'plugins').mkdir(parents=True)
         (self.plugin_dir / 'lib').mkdir(parents=True)
@@ -134,12 +135,52 @@ class SuperpowersPluginResolverTest(unittest.TestCase):
             case _:
                 self.fail('unexpected local git command: ' + ' '.join(command))
 
+    def _git_output_bytes(self, _directory: Path, *args: str) -> bytes:
+        if tuple(args) == ('show', 'HEAD:skills/demo/SKILL.md'):
+            if self.committed_skill_blob is not None:
+                return self.committed_skill_blob
+        return self._git_output(_directory, *args).encode('utf-8')
+
+    def test_selected_skill_blob_compares_crlf_and_non_utf8_bytes_exactly(self) -> None:
+        """Compare a committed binary Skill blob to its local bytes without decoding."""
+        skill = self.plugin_dir / 'skills' / 'demo' / 'SKILL.md'
+        committed = b'---\r\nname: demo\r\n---\r\n\xff\n'
+        self.committed_skill_blob = committed
+        skill.write_bytes(committed)
+
+        with (
+            patch.object(oc2_assets, '_git_output', side_effect=self._git_output),
+            patch.object(oc2_assets, '_git_output_bytes', side_effect=self._git_output_bytes),
+        ):
+            artifact = oc2_assets.resolve_superpowers_plugin(REPO, self.plugin_dir)
+
+        self.assertEqual(
+            next(item.content for item in artifact.files if item.path == 'skills/demo/SKILL.md'),
+            committed,
+        )
+
+    def test_selected_skill_blob_rejects_changed_binary_bytes(self) -> None:
+        """Reject local binary Skill content that differs from the committed blob."""
+        skill = self.plugin_dir / 'skills' / 'demo' / 'SKILL.md'
+        self.committed_skill_blob = b'---\r\nname: demo\r\n---\r\n\xff\n'
+        skill.write_bytes(b'---\r\nname: demo\r\n---\r\n\xfe\n')
+
+        with (
+            patch.object(oc2_assets, '_git_output', side_effect=self._git_output),
+            patch.object(oc2_assets, '_git_output_bytes', side_effect=self._git_output_bytes),
+            self.assertRaisesRegex(oc2_assets.AssetError, 'differs from pinned commit'),
+        ):
+            oc2_assets.resolve_superpowers_plugin(REPO, self.plugin_dir)
+
     def test_missing_local_plugin_is_not_available(self):
         with self.assertRaisesRegex(oc2_assets.AssetError, 'NOT_AVAILABLE'):
             oc2_assets.resolve_superpowers_plugin(REPO, None)
 
     def test_pinned_checkout_allows_node_builtins_and_exports_native_skills(self):
-        with patch.object(oc2_assets, '_git_output', side_effect=self._git_output):
+        with (
+            patch.object(oc2_assets, '_git_output', side_effect=self._git_output),
+            patch.object(oc2_assets, '_git_output_bytes', side_effect=self._git_output_bytes),
+        ):
             artifact = oc2_assets.resolve_superpowers_plugin(REPO, self.plugin_dir)
 
         self.assertEqual(
