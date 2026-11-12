@@ -50,7 +50,7 @@ PHASE4_IDENTITIES = {
 }
 
 
-def package_archive(package: Mapping[str, str | dict[str, str]], entry: str, code: bytes) -> bytes:
+def package_archive(package: Mapping[str, object], entry: str, code: bytes) -> bytes:
     buffer = io.BytesIO()
     with tarfile.open(fileobj=buffer, mode='w:gz') as archive:
         for name, content in (
@@ -63,7 +63,7 @@ def package_archive(package: Mapping[str, str | dict[str, str]], entry: str, cod
     return buffer.getvalue()
 
 
-def symlink_archive(package: Mapping[str, str | dict[str, str]]) -> bytes:
+def symlink_archive(package: Mapping[str, object]) -> bytes:
     buffer = io.BytesIO()
     with tarfile.open(fileobj=buffer, mode='w:gz') as archive:
         package_bytes = json.dumps(package, sort_keys=True).encode()

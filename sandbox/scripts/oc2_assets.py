@@ -450,10 +450,11 @@ def build_phase4_plugins(
     from oc2_phase4_assets import Phase4AssetError, build_phase4_plugin_bundle
 
     try:
-        return build_phase4_plugin_bundle(
+        result: tuple[bytes, str] = build_phase4_plugin_bundle(
             repo,
             artifact_paths,
             explicit_opt_in=explicit_opt_in,
         )
+        return result
     except Phase4AssetError as exc:
         raise AssetError(str(exc)) from exc

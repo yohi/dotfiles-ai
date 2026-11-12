@@ -845,8 +845,9 @@ def prepare(
                     or any(not isinstance(name, str) for name in plugin_files)
                     or set(bundled_plugins) != set(plugin_files)):
                 fail('Superpowers Plugin bundle differs from its file manifest')
+            plugin_file_names = [name for name in plugin_files if isinstance(name, str)]
             required_skills = {
-                name for name in plugin_files
+                name for name in plugin_file_names
                 if name.startswith('skills/') and name.endswith('/SKILL.md')
                 and len(name.split('/')) == 3
             }
@@ -1007,7 +1008,7 @@ def prepare(
             validate_location(location, BASE)
             if regular(location) != value:
                 fail('existing runtime asset mismatch')
-        return dest
+        return pathlib.Path(dest)
 
     (dest / 'config/opencode').mkdir(parents=True, mode=0o700)
     for name in ('home', 'data', 'state', 'cache', 'tmp', 'project'):
@@ -1017,7 +1018,7 @@ def prepare(
         location.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         write_new(location, data)
     write_new(marker, encoded(receipt))
-    return dest
+    return pathlib.Path(dest)
 
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser()

@@ -1189,7 +1189,7 @@ def prepare_phase4_runtime(
             phase4_plugins_sha=phase4_assets_sha,
         )
         print('OC2_PHASE4_PREPARED: sandbox=' + request.sandbox + ' runtime=' + runtime_sha[:16])
-        return runtime_sha
+        return str(runtime_sha)
 
 
 def cli_path(runner: Runner, name: str) -> str | None:
@@ -1552,6 +1552,8 @@ def main(argv: list[str] | None = None) -> int:
         if not (repo / 'apm.yml').is_file():
             raise Stop('dotfiles-ai apm.yml not found')
         if args.phase4_plugins:
+            if args.akane_artifact is None or args.sibyl_artifact is None:
+                raise Stop('Phase 4 plugin artifact paths are required')
             prepare_phase4_runtime(
                 repo,
                 Phase4RuntimeRequest(
