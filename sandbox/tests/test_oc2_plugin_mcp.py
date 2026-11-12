@@ -40,14 +40,16 @@ def config(*, plugins: str = '  enabled: false\n  allowlist: [superpowers]\n',
 
 
 class NativePluginMcpSelectionTest(unittest.TestCase):
-    def test_normal_selection_is_disabled_even_when_candidates_are_declared(self):
+    def test_normal_selection_is_disabled_even_when_candidates_are_declared(self) -> None:
+        """Keep declared Plugin/MCP candidates disabled for normal exports."""
         parsed = oc2_native.parse_apm_native(config())
         payload = oc2_native.build_native_payload(parsed)
 
         self.assertEqual(payload['plugins'], {'enabled': False, 'allowlist': []})
         self.assertEqual(payload['mcp'], {'enabled': False, 'servers': []})
 
-    def test_verification_selection_uses_only_the_declared_fixed_candidates(self):
+    def test_verification_selection_uses_only_the_declared_fixed_candidates(self) -> None:
+        """Enable only the declared fixed candidates for verification exports."""
         parsed = oc2_native.parse_apm_native(config(), verification_only=True)
         payload = oc2_native.build_native_payload(parsed)
 
@@ -60,7 +62,8 @@ class NativePluginMcpSelectionTest(unittest.TestCase):
             'servers': ['oc2-status'],
         })
 
-    def test_unknown_plugin_candidate_is_rejected(self):
+    def test_unknown_plugin_candidate_is_rejected(self) -> None:
+        """Reject Plugin candidates outside the fixed verification allowlist."""
         with self.assertRaisesRegex(ValueError, 'unapproved plugin'):
             oc2_native.parse_apm_native(config(
                 plugins='  enabled: false\n  allowlist: [other]\n',

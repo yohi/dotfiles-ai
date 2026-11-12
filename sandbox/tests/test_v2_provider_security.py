@@ -116,6 +116,7 @@ def _server_config(
 
 class ProviderSecurityContractTests(unittest.TestCase):
     def test_native_agents_pass_export_boundary_with_explicit_modes(self) -> None:
+        """Accept only the fixed Native Agent map with explicit approved modes."""
         native_config = native.parse_apm_native((SCRIPTS.parents[1] / 'apm.yml').read_bytes())
         config = _server_config()
         config['agents'] = native.build_native_payload(native_config)['agents']
@@ -124,6 +125,7 @@ class ProviderSecurityContractTests(unittest.TestCase):
         guest.verify_v2_config(config)
 
     def test_native_agent_fallback_fields_fail_export_validation(self) -> None:
+        """Reject fallback_models when it crosses the provider export boundary."""
         native_config = native.parse_apm_native((SCRIPTS.parents[1] / 'apm.yml').read_bytes())
         config = _server_config()
         config['agents'] = native.build_native_payload(native_config)['agents']
