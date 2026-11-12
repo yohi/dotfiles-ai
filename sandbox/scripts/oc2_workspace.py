@@ -295,4 +295,4 @@ def _by_path(manifest: Manifest) -> dict[str, FileEntry]:
     return {item.path: item for item in manifest.files}
 
 
-from oc2_workspace_ops import apply_changes, changes, materialize
+from oc2_workspace_ops import apply_changes, changes, materialize  # noqa: E402, F401
