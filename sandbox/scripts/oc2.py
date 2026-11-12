@@ -694,7 +694,11 @@ def export_v2_config(
     return config
 
 
-def is_compatible_sandbox(runner: Runner, name: str) -> bool:
+def is_compatible_sandbox(
+    runner: Runner,
+    name: str,
+    expected_id: str | None = None,
+) -> bool:
     # sbx ls --format json on v0.49.2 gives identity but does not report
     # workspace/mounts. Inspect the exact named sandbox before trusting it.
     import json
@@ -723,6 +727,10 @@ def is_compatible_sandbox(runner: Runner, name: str) -> bool:
     if len(matches) != 1:
         raise Stop('could not establish existing Sandbox identity')
     row = matches[0]
+    if expected_id is not None:
+        actual_id = row.get('id')
+        if not isinstance(actual_id, str) or actual_id != expected_id:
+            raise Stop('Sandbox identity mismatch; refusing reuse')
     if row.get('agent') not in ('shell', 'sbx-kit-shell'):
         raise Stop('existing Sandbox agent is not shell')
 
@@ -908,16 +916,21 @@ def stage(runner: Runner, name: str, bundle: pathlib.Path, manifest_sha: str,
     native_helper_dest = f'{verifier_dir}/oc2_agent_native.py'
     identity_helper_dest = f'{verifier_dir}/oc2_identity.py'
     superpowers_destination: str | None = None
+    superpowers_parent: str | None = None
     if superpowers_source is not None:
-        from oc2_agent_native import SUPERPOWERS_SOURCE_PATH
+        from oc2_agent_native import SUPERPOWERS_TREE_PATH
 
         if superpowers_source.is_symlink() or not superpowers_source.is_dir():
             raise Stop('verified Superpowers source directory is missing or linked')
-        superpowers_destination = f'{ROOT}/{SUPERPOWERS_SOURCE_PATH}'
+        superpowers_destination = f'{ROOT}/{SUPERPOWERS_TREE_PATH}'
+        superpowers_parent = str(pathlib.PurePosixPath(superpowers_destination).parent)
     # sbx exec v0.49.2 was observed invoking bash -c without the expected
     # trailing positional parameters. Use direct argv for filesystem operations.
-    execute(runner, name, 'mkdir', '-p', ROOT, f'{ROOT}/bundles', f'{ROOT}/scripts', verifier_dir)
-    execute(runner, name, 'chmod', '700', ROOT, f'{ROOT}/bundles', f'{ROOT}/scripts', verifier_dir)
+    directories = [ROOT, f'{ROOT}/bundles', f'{ROOT}/scripts', verifier_dir]
+    if superpowers_parent is not None:
+        directories.append(superpowers_parent)
+    execute(runner, name, 'mkdir', '-p', *directories)
+    execute(runner, name, 'chmod', '700', *directories)
     # Never overwrite an existing bundle or bootstrap script. Reuse is allowed
     # only after the guest validates their content and hash.
     exists = runner.sbx('exec', name, 'bash', '-c',
@@ -953,7 +966,7 @@ def stage(runner: Runner, name: str, bundle: pathlib.Path, manifest_sha: str,
         if source_status == 0:
             runner.sbx('cp', str(superpowers_source), f'{name}:{superpowers_destination}')
         elif source_status == 10:
-            raise Stop('verified Superpowers source already exists; refusing reuse')
+            pass
         elif source_status == 12:
             raise Stop('unsafe guest Superpowers source path')
         else:
@@ -1252,7 +1265,7 @@ def _session_action(args: argparse.Namespace, workspace: pathlib.Path,
         if session.collected:
             raise Stop('changes have already been collected for this transfer')
         runner = Runner(args.sbx_user)
-        if not is_compatible_sandbox(runner, session.sandbox):
+        if not is_compatible_sandbox(runner, session.sandbox, session.sandbox_id):
             raise Stop('the recorded Sandbox no longer exists')
         collected = session.directory / 'collected'
         if collected.exists() or collected.is_symlink():

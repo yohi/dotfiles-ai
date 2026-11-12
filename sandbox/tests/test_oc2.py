@@ -1423,6 +1423,21 @@ class HostTest(unittest.TestCase):
         self.assertTrue(oc2.is_compatible_sandbox(runner, 'oc2-dev'))
         self.assertIn(('inspect', 'oc2-dev', '--json'), runner.calls)
 
+    def test_sandbox_identity_mismatch_rejected(self):
+        runner = FakeRunner(
+            [{'name': 'oc2-dev', 'agent': 'shell', 'id': 'new-sandbox-id'}],
+        )
+        with self.assertRaisesRegex(oc2.Stop, 'identity mismatch'):
+            oc2.is_compatible_sandbox(runner, 'oc2-dev', 'recorded-sandbox-id')
+
+    def test_sandbox_recorded_identity_matches(self):
+        runner = FakeRunner(
+            [{'name': 'oc2-dev', 'agent': 'shell', 'id': 'recorded-sandbox-id'}],
+        )
+        self.assertTrue(
+            oc2.is_compatible_sandbox(runner, 'oc2-dev', 'recorded-sandbox-id'),
+        )
+
     def test_v3_shell_workload_is_compatible_for_collection(self):
         runner = FakeRunner([{'name': 'oc2-dev', 'agent': 'sbx-kit-shell'}])
 
@@ -1656,7 +1671,6 @@ class HostTest(unittest.TestCase):
                 oc2.stage(Runner(), 'oc2-dev', bundle, 'a' * 64, script)
 
     def test_stage_selected_assets_with_bounded_paths(self) -> None:
-        """Stage selected assets and the verified source tree only at fixed paths."""
         with tempfile.TemporaryDirectory() as tmp:
             root = pathlib.Path(tmp)
             bundle = root / 'bundle'
@@ -1698,6 +1712,10 @@ class HostTest(unittest.TestCase):
                     return ''
 
             runner = Runner()
+            superpowers_tree_sha = assets.SUPERPOWERS_TREE_SHA256
+            superpowers_destination = (
+                f'{oc2.ROOT}/verification-superpowers/{superpowers_tree_sha}'
+            )
             oc2.stage(
                 runner, 'oc2-dev', bundle, 'a' * 64, script, asset, asset_sha,
                 superpowers_source=superpowers,
@@ -1705,11 +1723,11 @@ class HostTest(unittest.TestCase):
             copy_calls = [c for c in runner.calls if c[0] == 'cp']
             self.assertEqual(len(copy_calls), 6)
             self.assertIn(
-                ('cp', str(superpowers), f'oc2-dev:{oc2.ROOT}/verification-superpowers'),
+                ('cp', str(superpowers), f'oc2-dev:{superpowers_destination}'),
                 copy_calls,
             )
             self.assertIn(
-                ('directory_status', 'oc2-dev', f'{oc2.ROOT}/verification-superpowers'),
+                ('directory_status', 'oc2-dev', superpowers_destination),
                 runner.calls,
             )
             start = [c for c in runner.calls if c[:3] ==
@@ -1718,6 +1736,63 @@ class HostTest(unittest.TestCase):
             self.assertIn('--expected-assets-sha', start[0])
             self.assertIn(asset_sha, start[0])
             self.assertIn('--assets', start[0])
+
+    def test_stage_reuses_existing_content_addressed_superpowers_source(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            bundle = root / 'bundle'
+            bundle.mkdir()
+            script = root / 'oc2_guest.py'
+            script.write_text('# fixture\n')
+            superpowers = root / 'verification-superpowers'
+            superpowers.mkdir()
+            (superpowers / 'index.js').write_text('verified source\n')
+            native_sha = hashlib.sha256((SCRIPTS / 'oc2_agent_native.py').read_bytes()).hexdigest()
+            identity_sha = hashlib.sha256((SCRIPTS / 'oc2_identity.py').read_bytes()).hexdigest()
+            script_sha = hashlib.sha256(script.read_bytes()).hexdigest()
+
+            class Runner:
+                def __init__(self):
+                    self.calls = []
+
+                def directory_status(self, name, destination):
+                    self.calls.append(('directory_status', name, destination))
+                    return 10
+
+                def destination_status(self, name, destination):
+                    return 0
+
+                def sbx(self, *args, **kwargs):
+                    self.calls.append(args)
+                    if args[:4] == ('exec', 'oc2-dev', 'bash', '-c'):
+                        return 'missing\n'
+                    if args[:3] == ('exec', 'oc2-dev', 'sha256sum'):
+                        digest = (
+                            identity_sha if args[3].endswith('/oc2_identity.py')
+                            else native_sha if args[3].endswith('/oc2_agent_native.py')
+                            else script_sha
+                        )
+                        return digest + '  verified\n'
+                    return ''
+
+            runner = Runner()
+            superpowers_destination = (
+                f'{oc2.ROOT}/verification-superpowers/'
+                f'{assets.SUPERPOWERS_TREE_SHA256}'
+            )
+            oc2.stage(
+                runner, 'oc2-dev', bundle, 'a' * 64, script,
+                superpowers_source=superpowers,
+            )
+
+            self.assertIn(
+                ('directory_status', 'oc2-dev', superpowers_destination),
+                runner.calls,
+            )
+            self.assertNotIn(
+                ('cp', str(superpowers), f'oc2-dev:{superpowers_destination}'),
+                runner.calls,
+            )
 
     def test_stage_selected_assets_sha_mismatch_stops(self):
         with tempfile.TemporaryDirectory() as tmp:

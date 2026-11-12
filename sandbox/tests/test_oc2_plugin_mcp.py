@@ -445,7 +445,10 @@ class VerificationAssetBundleTest(unittest.TestCase):
         )
         self.assertEqual(plugin_source['source'], 'obra/superpowers')
         self.assertEqual(plugin_source['commit'], '8ca22dba9a94f28898bbce59f2537ff4d87c747d')
-        self.assertEqual(plugin_source['source_path'], 'verification-superpowers')
+        self.assertEqual(
+            plugin_source['source_path'],
+            'verification-superpowers/' + oc2_assets.SUPERPOWERS_TREE_SHA256,
+        )
         self.assertEqual(plugin_source['entrypoint'], '.opencode/plugins/superpowers.js')
         self.assertEqual(
             set(plugin_source['plugin_files']),

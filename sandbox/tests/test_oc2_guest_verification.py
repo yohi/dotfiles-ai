@@ -31,7 +31,7 @@ class VerificationGuestMaterializationTest(unittest.TestCase):
         self.base_patcher = patch.object(oc2_guest, 'BASE', self.base)
         self.base_patcher.start()
         self.addCleanup(self.base_patcher.stop)
-        self.plugin_source = self.base / 'verification-superpowers'
+        self.plugin_source = self.base / 'source-fixture'
         self.plugin_source.mkdir()
         files = {
             'index.js': b'export const plugin = true;\n',
@@ -62,11 +62,16 @@ class VerificationGuestMaterializationTest(unittest.TestCase):
             for relative in sorted(file_hashes)
         ).encode('utf-8')
         self.plugin_tree_sha = hashlib.sha256(tree_content).hexdigest()
+        source = self.base / 'verification-superpowers' / self.plugin_tree_sha
+        source.parent.mkdir()
+        self.plugin_source.rename(source)
+        self.plugin_source = source
         for module in (oc2_assets, oc2_guest):
             for name, value in (
                 ('SUPERPOWERS_FILE_COUNT', len(files)),
                 ('SUPERPOWERS_TOTAL_BYTES', self.plugin_bytes),
                 ('SUPERPOWERS_TREE_SHA256', self.plugin_tree_sha),
+                ('SUPERPOWERS_TREE_PATH', f'verification-superpowers/{self.plugin_tree_sha}'),
             ):
                 patcher = patch.object(module, name, value, create=True)
                 patcher.start()

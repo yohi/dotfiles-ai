@@ -19,7 +19,7 @@ from pathlib import PurePosixPath
 from oc2_agent_native import (
     SUPERPOWERS_FILE_COUNT,
     SUPERPOWERS_REPOSITORY,
-    SUPERPOWERS_SOURCE_PATH,
+    SUPERPOWERS_TREE_PATH,
     SUPERPOWERS_TOTAL_BYTES,
     SUPERPOWERS_TREE_SHA256,
     SUPERPOWERS_VERSION,
@@ -397,7 +397,7 @@ def build(
             'source': SUPERPOWERS_REPOSITORY,
             'version': SUPERPOWERS_VERSION,
             'commit': locked_commit,
-            'source_path': SUPERPOWERS_SOURCE_PATH,
+            'source_path': SUPERPOWERS_TREE_PATH,
             'entrypoint': PLUGIN_ENTRYPOINT,
             'skills_directory': 'skills',
             'file_count': SUPERPOWERS_FILE_COUNT,

@@ -19,7 +19,7 @@ from oc2_agent_native import (
     SUPERPOWERS_COMMIT,
     SUPERPOWERS_FILE_COUNT,
     SUPERPOWERS_REPOSITORY,
-    SUPERPOWERS_SOURCE_PATH,
+    SUPERPOWERS_TREE_PATH,
     SUPERPOWERS_TOTAL_BYTES,
     SUPERPOWERS_TREE_SHA256,
     SUPERPOWERS_VERSION,
@@ -96,7 +96,7 @@ class VerifiedSuperpowersSource:
 
 
 def verify_superpowers_source() -> VerifiedSuperpowersSource:
-    source = BASE / SUPERPOWERS_SOURCE_PATH
+    source = BASE / SUPERPOWERS_TREE_PATH
     validate_location(source, BASE)
     if source.is_symlink() or not source.is_dir():
         fail('verified Superpowers source directory is missing or linked')
@@ -389,7 +389,7 @@ def _verify_plugin_source_metadata(raw: bytes) -> dict[str, JsonValue]:
         'source': SUPERPOWERS_REPOSITORY,
         'version': SUPERPOWERS_VERSION,
         'commit': SUPERPOWERS_COMMIT,
-        'source_path': SUPERPOWERS_SOURCE_PATH,
+        'source_path': SUPERPOWERS_TREE_PATH,
         'entrypoint': '.opencode/plugins/superpowers.js',
         'skills_directory': 'skills',
         'file_count': SUPERPOWERS_FILE_COUNT,
@@ -701,7 +701,7 @@ def prepare(
         receipt['plugin_source'] = {
             'repository': SUPERPOWERS_REPOSITORY,
             'commit': SUPERPOWERS_COMMIT,
-            'path': SUPERPOWERS_SOURCE_PATH,
+            'path': SUPERPOWERS_TREE_PATH,
             'file_count': len(plugin_source.files),
             'total_bytes': plugin_source.total_bytes,
             'tree_sha256': plugin_source.tree_sha256,
