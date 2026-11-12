@@ -3,6 +3,7 @@ from __future__ import annotations
 import sys
 import hashlib
 import json
+import os
 import tempfile
 import unittest
 import contextlib
@@ -103,6 +104,80 @@ class SuperpowersPluginResolverTest(unittest.TestCase):
             '"main":".opencode/plugins/superpowers.js"}\n',
             encoding='utf-8',
         )
+
+    def test_export_materializes_the_complete_pinned_git_tree(self) -> None:
+        """Export every committed source blob and bind it to the pinned tree digest."""
+        files = {
+            relative: path.read_bytes()
+            for relative in (
+                '.opencode/plugins/superpowers.js', 'index.js', 'lib/runtime.js',
+                'package.json', 'skills/demo/SKILL.md',
+            )
+            if (path := self.plugin_dir / relative).is_file()
+        }
+        blob_ids = {
+            relative: hashlib.sha1(
+                b'blob ' + str(len(content)).encode() + b'\0' + content,
+            ).hexdigest()
+            for relative, content in files.items()
+        }
+        tree_sha = hashlib.sha256(''.join(
+            f'{relative}\0{hashlib.sha256(content).hexdigest()}\n'
+            for relative, content in sorted(files.items())
+        ).encode()).hexdigest()
+
+        def git_text(_directory: Path, *args: str) -> str:
+            match tuple(args):
+                case ('remote', 'get-url', 'origin'):
+                    return 'https://github.com/obra/superpowers.git'
+                case ('rev-parse', 'HEAD'):
+                    return oc2_assets.SUPERPOWERS_COMMIT
+                case ('status', '--porcelain', '--untracked-files=all'):
+                    return ''
+                case ('ls-tree', '-r', '--name-only', 'HEAD'):
+                    return '\n'.join(sorted(files))
+                case _:
+                    self.fail('unexpected text Git command: ' + ' '.join(args))
+
+        def git_bytes(_directory: Path, *args: str) -> bytes:
+            match tuple(args):
+                case ('show', specifier) if specifier.startswith('HEAD:'):
+                    return files[specifier.removeprefix('HEAD:')]
+                case ('ls-tree', '-rz', '--full-tree', 'HEAD'):
+                    return b''.join(
+                        b'100644 blob ' + blob_ids[name].encode() + b'\t'
+                        + name.encode() + b'\0'
+                        for name in sorted(files)
+                    )
+                case ('cat-file', 'blob', blob_id):
+                    relative = next(name for name, oid in blob_ids.items() if oid == blob_id)
+                    return files[relative]
+                case _:
+                    self.fail('unexpected byte Git command: ' + ' '.join(args))
+
+        destination = Path(self.temporary.name) / 'verified-source'
+        previous_umask = os.umask(0o077)
+        try:
+            with (
+                patch.object(oc2_assets, '_git_output', side_effect=git_text),
+                patch.object(oc2_assets, '_git_output_bytes', side_effect=git_bytes),
+                patch.object(oc2_assets, 'parse_superpowers_lock', return_value=oc2_assets.SUPERPOWERS_COMMIT),
+                patch.object(oc2_assets, 'SUPERPOWERS_FILE_COUNT', len(files)),
+                patch.object(oc2_assets, 'SUPERPOWERS_TOTAL_BYTES', sum(map(len, files.values()))),
+                patch.object(oc2_assets, 'SUPERPOWERS_TREE_SHA256', tree_sha),
+            ):
+                oc2_assets.export_superpowers_tree(REPO, self.plugin_dir, destination)
+        finally:
+            os.umask(previous_umask)
+
+        self.assertEqual(
+            {path.relative_to(destination).as_posix(): path.read_bytes()
+             for path in destination.rglob('*') if path.is_file()},
+            files,
+        )
+        self.assertEqual(destination.stat().st_mode & 0o777, 0o755)
+        self.assertTrue(all(path.stat().st_mode & 0o777 == 0o644
+                            for path in destination.rglob('*') if path.is_file()))
 
     def _git_output(self, _directory: Path, *args: str) -> str:
         command = tuple(args)

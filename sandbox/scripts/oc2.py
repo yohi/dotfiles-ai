@@ -88,6 +88,35 @@ finally:
         os.close(fd)
 '''
 
+DIRECTORY_DESTINATION_CHECK_SCRIPT = '''import errno, os, stat, sys
+path = sys.argv[1] if len(sys.argv) == 2 else ""
+parts = path.split("/")
+if not path.startswith("/") or len(parts) < 3 or any(p in ("", ".", "..") for p in parts[1:]):
+    sys.exit(12)
+fd = None
+try:
+    flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+    fd = os.open("/", flags)
+    for part in parts[1:-1]:
+        try:
+            child = os.open(part, flags, dir_fd=fd)
+        except FileNotFoundError as exc:
+            sys.exit(0 if exc.errno == errno.ENOENT else 11)
+        os.close(fd)
+        fd = child
+    try:
+        mode = os.stat(parts[-1], dir_fd=fd, follow_symlinks=False).st_mode
+    except FileNotFoundError as exc:
+        sys.exit(0 if exc.errno == errno.ENOENT else 11)
+    sys.exit(10 if stat.S_ISDIR(mode) else 12)
+except OSError as exc:
+    sys.exit(12 if exc.errno in (errno.ELOOP, errno.ENOTDIR) else 11)
+finally:
+    if fd is not None:
+        os.close(fd)
+'''
+
+
 
 @dataclass(frozen=True, slots=True)
 class CloudflareGatewayRuntime:
@@ -553,6 +582,22 @@ class Runner:
             raise Stop('DESTINATION_CHECK_COMMAND_FAILED') from exc
         return result.returncode
 
+    def directory_status(self, name: str, destination: str) -> int:
+        """Check whether a remote path is absent or an existing real directory."""
+        command = operator_command(
+            self.user, 'sbx', 'exec', name, 'python3', '-c',
+            DIRECTORY_DESTINATION_CHECK_SCRIPT, destination,
+        )
+        if self.dry_run:
+            raise Stop('DESTINATION_CHECK_COMMAND_FAILED')
+        try:
+            result = subprocess.run(command, check=False, capture_output=True, timeout=180)
+        except subprocess.TimeoutExpired as exc:
+            raise Stop('DESTINATION_CHECK_TIMEOUT') from exc
+        except OSError as exc:
+            raise Stop('DESTINATION_CHECK_COMMAND_FAILED') from exc
+        return result.returncode
+
     def sbx(self, *args: str, capture: bool = False, tty: bool = False) -> str:
         command = operator_command(self.user, 'sbx', *args)
         if self.dry_run:
@@ -810,7 +855,8 @@ def transfer_workspace(runner: Runner, name: str, snapshot: pathlib.Path,
 
 def stage(runner: Runner, name: str, bundle: pathlib.Path, manifest_sha: str,
           guest_script: pathlib.Path, assets_file: pathlib.Path | None = None,
-          assets_sha: str | None = None) -> None:
+          assets_sha: str | None = None, *,
+          superpowers_source: pathlib.Path | None = None) -> None:
     destination = f'{ROOT}/bundles/{manifest_sha[:16]}'
     script_sha = hashlib.sha256(guest_script.read_bytes()).hexdigest()
     native_helper = HERE / 'oc2_agent_native.py'
@@ -824,6 +870,13 @@ def stage(runner: Runner, name: str, bundle: pathlib.Path, manifest_sha: str,
     script_dest = f'{verifier_dir}/oc2_guest.py'
     native_helper_dest = f'{verifier_dir}/oc2_agent_native.py'
     identity_helper_dest = f'{verifier_dir}/oc2_identity.py'
+    superpowers_destination: str | None = None
+    if superpowers_source is not None:
+        from oc2_agent_native import SUPERPOWERS_SOURCE_PATH
+
+        if superpowers_source.is_symlink() or not superpowers_source.is_dir():
+            raise Stop('verified Superpowers source directory is missing or linked')
+        superpowers_destination = f'{ROOT}/{SUPERPOWERS_SOURCE_PATH}'
     # sbx exec v0.49.2 was observed invoking bash -c without the expected
     # trailing positional parameters. Use direct argv for filesystem operations.
     execute(runner, name, 'mkdir', '-p', ROOT, f'{ROOT}/bundles', f'{ROOT}/scripts', verifier_dir)
@@ -877,6 +930,16 @@ def stage(runner: Runner, name: str, bundle: pathlib.Path, manifest_sha: str,
     ).split()[0]
     if identity_sha != identity_helper_sha:
         raise Stop('guest identity verifier SHA mismatch')
+    if superpowers_source is not None and superpowers_destination is not None:
+        source_status = runner.directory_status(name, superpowers_destination)
+        if source_status == 0:
+            runner.sbx('cp', str(superpowers_source), f'{name}:{superpowers_destination}')
+        elif source_status == 10:
+            raise Stop('verified Superpowers source already exists; refusing reuse')
+        elif source_status == 12:
+            raise Stop('unsafe guest Superpowers source path')
+        else:
+            raise Stop('cannot determine guest Superpowers source state')
     args = ['--bundle', destination, '--expected-sha', manifest_sha]
     if (assets_file is None) != (assets_sha is None):
         raise Stop('asset file and hash must be supplied together')
@@ -919,12 +982,19 @@ def prepare_verification_runtime(
         bundle = temporary_path / 'bundle'
         export_v2_config(repo, bundle, verification_only=True)
         config_sha = verify_bundle(bundle, trusted_root=bundle.parent)
-        from oc2_assets import AssetError, build as build_assets, write_new
+        from oc2_assets import (
+            AssetError,
+            build as build_assets,
+            export_superpowers_tree,
+            write_new,
+        )
 
         try:
             asset_raw, asset_sha = build_assets(
                 repo, verification_only=True, plugin_dir=plugin_dir,
             )
+            superpowers_source = temporary_path / 'verification-superpowers'
+            export_superpowers_tree(repo, plugin_dir, superpowers_source)
         except AssetError as exc:
             raise Stop('verification Plugin/MCP asset export failed: ' + str(exc)) from exc
         asset_file = temporary_path / 'assets.json'
@@ -945,7 +1015,7 @@ def prepare_verification_runtime(
             raise Stop('could not establish verification Runtime identity availability')
         stage(
             runner, sandbox, bundle, config_sha, HERE / 'oc2_guest.py',
-            asset_file, asset_sha,
+            asset_file, asset_sha, superpowers_source=superpowers_source,
         )
         print('OC2_VERIFICATION_PREPARED: sandbox=' + sandbox + ' runtime=' + runtime_sha[:16])
         return str(runtime_sha)

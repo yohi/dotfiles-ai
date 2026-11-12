@@ -592,6 +592,31 @@ class HostTest(unittest.TestCase):
             self.assertEqual(check(pathlib.Path(tmp) / 'missing' / 'target'), 11)
             self.assertEqual(check(pathlib.Path('relative')), 12)
 
+    def test_directory_destination_guest_exit_codes_for_real_filesystem(self) -> None:
+        """Distinguish absent, real-directory, and unsafe remote directory targets."""
+        with tempfile.TemporaryDirectory() as tmp:
+            parent = pathlib.Path(tmp) / 'parent'
+            parent.mkdir()
+            candidate = parent / 'target'
+
+            def check(path):
+                return subprocess.run(
+                    [sys.executable, '-c', oc2.DIRECTORY_DESTINATION_CHECK_SCRIPT, str(path)],
+                    capture_output=True, check=False,
+                ).returncode
+
+            self.assertEqual(check(candidate), 0)
+            self.assertEqual(check(pathlib.Path(tmp) / 'missing' / 'target'), 0)
+            candidate.mkdir()
+            self.assertEqual(check(candidate), 10)
+            candidate.rmdir()
+            candidate.write_text('file')
+            self.assertEqual(check(candidate), 12)
+            candidate.unlink()
+            candidate.symlink_to(parent, target_is_directory=True)
+            self.assertEqual(check(candidate), 12)
+            self.assertEqual(check(pathlib.Path('relative')), 12)
+
     def test_destination_guest_permission_error_is_indeterminate(self):
         program = (
             'import os, sys\n'
@@ -1548,7 +1573,8 @@ class HostTest(unittest.TestCase):
             with self.assertRaisesRegex(oc2.Stop, 'unsafe guest asset verifier path'):
                 oc2.stage(Runner(), 'oc2-dev', bundle, 'a' * 64, script)
 
-    def test_stage_selected_assets_with_bounded_paths(self):
+    def test_stage_selected_assets_with_bounded_paths(self) -> None:
+        """Stage selected assets and the verified source tree only at fixed paths."""
         with tempfile.TemporaryDirectory() as tmp:
             root = pathlib.Path(tmp)
             bundle = root / 'bundle'
@@ -1561,10 +1587,17 @@ class HostTest(unittest.TestCase):
             asset = root / 'oc2-assets.json'
             asset.write_text('{"fixture":true}')
             asset_sha = hashlib.sha256(asset.read_bytes()).hexdigest()
+            superpowers = root / 'verification-superpowers'
+            superpowers.mkdir()
+            (superpowers / 'index.js').write_text('verified source\n')
 
             class Runner:
                 def __init__(self):
                     self.calls = []
+
+                def directory_status(self, name, destination):
+                    self.calls.append(('directory_status', name, destination))
+                    return 0
 
                 def destination_status(self, name, destination):
                     return 0
@@ -1583,8 +1616,20 @@ class HostTest(unittest.TestCase):
                     return ''
 
             runner = Runner()
-            oc2.stage(runner, 'oc2-dev', bundle, 'a' * 64, script, asset, asset_sha)
-            self.assertEqual(len([c for c in runner.calls if c[0] == 'cp']), 5)
+            oc2.stage(
+                runner, 'oc2-dev', bundle, 'a' * 64, script, asset, asset_sha,
+                superpowers_source=superpowers,
+            )
+            copy_calls = [c for c in runner.calls if c[0] == 'cp']
+            self.assertEqual(len(copy_calls), 6)
+            self.assertIn(
+                ('cp', str(superpowers), f'oc2-dev:{oc2.ROOT}/verification-superpowers'),
+                copy_calls,
+            )
+            self.assertIn(
+                ('directory_status', 'oc2-dev', f'{oc2.ROOT}/verification-superpowers'),
+                runner.calls,
+            )
             start = [c for c in runner.calls if c[:3] ==
                      ('exec', 'oc2-dev', 'python3')]
             self.assertEqual(len(start), 1)

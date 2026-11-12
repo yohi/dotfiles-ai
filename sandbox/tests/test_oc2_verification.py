@@ -49,6 +49,11 @@ class VerificationRuntimePreparationTest(unittest.TestCase):
                 patch.object(oc2, 'export_v2_config', return_value=output / 'opencode.jsonc') as export,
                 patch('sandbox.scripts.stage_opencode_v2.verify_bundle', return_value='a' * 64),
                 patch.object(oc2_assets, 'build', return_value=(b'asset', 'b' * 64)),
+                patch.object(
+                    oc2_assets, 'export_superpowers_tree',
+                    side_effect=lambda _repo, _plugin, destination: destination.mkdir(),
+                    create=True,
+                ) as export_tree,
                 patch.object(oc2, 'stage') as stage,
                 patch.object(oc2, 'provision_cli', side_effect=AssertionError('no install')),
                 patch.object(oc2, 'launch', side_effect=AssertionError('no OpenCode start')),
@@ -64,6 +69,14 @@ class VerificationRuntimePreparationTest(unittest.TestCase):
         export.assert_called_once_with(
             pathlib.Path('/repo'), ANY, verification_only=True,
         )
+        export_tree.assert_called_once()
+        tree_source = export_tree.call_args.args[2]
+        self.assertEqual(tree_source.name, 'verification-superpowers')
+        self.assertEqual(stage.call_args.kwargs, {'superpowers_source': tree_source})
+        self.assertEqual(stage.call_args.args[0:2], (runner, 'oc2-test'))
+        self.assertEqual(stage.call_args.args[3:7], (
+            'a' * 64, oc2.HERE / 'oc2_guest.py', tree_source.parent / 'assets.json', 'b' * 64,
+        ))
         stage.assert_called_once()
         self.assertEqual(runner.calls, [])
 
@@ -86,6 +99,7 @@ class VerificationRuntimePreparationTest(unittest.TestCase):
                 patch.object(oc2, 'export_v2_config', return_value=output / 'opencode.jsonc'),
                 patch('sandbox.scripts.stage_opencode_v2.verify_bundle', return_value='a' * 64),
                 patch.object(oc2_assets, 'build', return_value=(b'asset', 'b' * 64)),
+                patch.object(oc2_assets, 'export_superpowers_tree'),
                 patch.object(oc2, 'stage'),
             ):
                 actual = oc2.prepare_verification_runtime(
@@ -111,6 +125,7 @@ class VerificationRuntimePreparationTest(unittest.TestCase):
                 patch.object(oc2, 'export_v2_config', return_value=output / 'opencode.jsonc'),
                 patch('sandbox.scripts.stage_opencode_v2.verify_bundle', return_value='a' * 64),
                 patch.object(oc2_assets, 'build', return_value=(b'asset', 'b' * 64)),
+                patch.object(oc2_assets, 'export_superpowers_tree'),
                 patch.object(oc2, 'stage') as stage,
                 patch.object(runner, 'destination_status', return_value=10),
                 self.assertRaisesRegex(oc2.Stop, 'identity already exists'),

@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import shutil
 import sys
 import tempfile
 import unittest
@@ -295,6 +296,26 @@ class VerificationGuestMaterializationTest(unittest.TestCase):
         )
 
         with self.assertRaisesRegex(ValueError, 'tree SHA-256'):
+            oc2_guest.prepare(bundle, oc2_guest.verify(bundle), assets, assets_sha)
+
+    def test_verification_rejects_missing_pinned_plugin_source(self) -> None:
+        """Stop verification when the pinned source tree was not staged."""
+        bundle = self._provider_bundle(verification_only=True)
+        assets_path, assets_sha = self._asset_file(verification_only=True)
+        assets = oc2_guest.verify_assets(assets_path, assets_sha)
+        shutil.rmtree(self.plugin_source)
+
+        with self.assertRaisesRegex(ValueError, 'source directory is missing'):
+            oc2_guest.prepare(bundle, oc2_guest.verify(bundle), assets, assets_sha)
+
+    def test_verification_rejects_plugin_source_file_count_mismatch(self) -> None:
+        """Stop verification when the staged tree omits a pinned file."""
+        bundle = self._provider_bundle(verification_only=True)
+        assets_path, assets_sha = self._asset_file(verification_only=True)
+        assets = oc2_guest.verify_assets(assets_path, assets_sha)
+        (self.plugin_source / 'support' / 'file-000.js').unlink()
+
+        with self.assertRaisesRegex(ValueError, 'file count mismatch'):
             oc2_guest.prepare(bundle, oc2_guest.verify(bundle), assets, assets_sha)
 
     def test_verification_rejects_plugin_source_symlink(self):
