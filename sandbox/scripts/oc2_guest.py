@@ -162,6 +162,71 @@ def regular(path: pathlib.Path, max_bytes: int = 1048576) -> bytes:
     return path.read_bytes()
 
 
+def _verify_model_settings(value: JsonValue, label: str) -> None:
+    if not isinstance(value, dict):
+        fail('invalid model reasoning settings: ' + label)
+    allowed = {
+        'reasoningEffort': {'minimal', 'low', 'medium', 'high', 'xhigh', 'max'},
+        'reasoningSummary': {'auto', 'concise', 'detailed'},
+    }
+    for key, item in value.items():
+        if key not in allowed or not isinstance(item, str) or item not in allowed[key]:
+            fail('unapproved model reasoning setting: ' + label)
+
+
+def _verify_model_options(key: str, options: dict[str, JsonValue], label: str) -> None:
+    if key == 'headers':
+        if options:
+            fail('unsupported model headers: ' + label)
+        return
+    if set(options) - {'thinking'}:
+        fail('unsupported model body field: ' + label)
+    thinking = options.get('thinking')
+    if thinking is None and 'thinking' not in options:
+        return
+    if (not isinstance(thinking, dict) or set(thinking) != {'type'}
+            or not isinstance(thinking['type'], str)
+            or thinking['type'] not in {'enabled', 'disabled'}):
+        fail('unsupported model thinking option: ' + label)
+
+
+def _verify_model_catalog(models: JsonValue) -> None:
+    if not isinstance(models, dict):
+        fail('invalid V2 model catalog')
+    for model_id, value in models.items():
+        if not isinstance(value, dict) or set(value) - {
+            'modelID', 'name', 'settings', 'headers', 'body', 'variants',
+        }:
+            fail('invalid V2 model configuration')
+        if value.get('modelID') != model_id or not isinstance(value.get('name'), str):
+            fail('V2 model identity does not match its catalog')
+        _verify_model_settings(value.get('settings', {}), model_id)
+        for key in ('headers', 'body'):
+            options = value.get(key, {})
+            if not isinstance(options, dict):
+                fail('invalid V2 model ' + key)
+            _verify_model_options(key, options, model_id + '.' + key)
+        variants = value.get('variants', [])
+        if not isinstance(variants, list):
+            fail('invalid V2 model variants')
+        seen: set[str] = set()
+        for variant in variants:
+            if not isinstance(variant, dict):
+                fail('invalid V2 model variant')
+            variant_id = variant.get('id')
+            if not isinstance(variant_id, str):
+                fail('invalid V2 model variant')
+            if variant_id in seen or set(variant) - {'id', 'settings', 'headers', 'body'}:
+                fail('invalid V2 model variant')
+            seen.add(variant_id)
+            _verify_model_settings(variant.get('settings', {}), model_id + '.' + variant_id)
+            for key in ('headers', 'body'):
+                options = variant.get(key, {})
+                if not isinstance(options, dict):
+                    fail('invalid V2 model variant ' + key)
+                _verify_model_options(key, options, model_id + '.' + variant_id)
+
+
 def verify_v2_config(server: dict[str, JsonValue]) -> None:
     """Reject provider fallback, Guest auth, and literal credentials at activation."""
     allowed_fields = {'$schema', 'shell', 'snapshot', 'model', 'providers', 'policies'}
@@ -187,6 +252,10 @@ def verify_v2_config(server: dict[str, JsonValue]) -> None:
     models = provider.get('models')
     if not isinstance(models, dict) or model_id not in models:
         fail('V2 default model is not in the provider catalog')
+    for provider_config in providers.values():
+        if not isinstance(provider_config, dict):
+            fail('invalid V2 provider configuration')
+        _verify_model_catalog(provider_config.get('models'))
     expected_policies: list[JsonValue] = [
         {'action': 'provider.use', 'resource': '*', 'effect': 'deny'},
         {'action': 'provider.use', 'resource': 'openai', 'effect': 'allow'},

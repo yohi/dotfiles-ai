@@ -81,7 +81,7 @@ def prepare(
     write: bool,
 ) -> None:
     guest_path(bundle, existing=True)
-    digest = verify_bundle(bundle)
+    digest = verify_bundle(bundle, trusted_root=WORKSPACE)
     dest = guest_path(runtime, existing=False)
     if dest.exists() or dest.is_symlink():
         raise StageError("runtime exists; overwrite is forbidden")

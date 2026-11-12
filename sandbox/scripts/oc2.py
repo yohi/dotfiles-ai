@@ -405,7 +405,7 @@ def _cloudflare_secret_scope(
     """Parse only scope metadata for the Cloudflare service secret."""
     try:
         document = json.loads(listing)
-    except json.JSONDecodeError as exc:
+    except json.JSONDecodeError:
         raise Stop('Cloudflare credential listing JSON is invalid') from None
     if not isinstance(document, dict) or set(document) != {'secrets'}:
         raise Stop('Cloudflare credential listing JSON schema is unsupported')
@@ -625,7 +625,7 @@ def export_v2_config(
     from sandbox.scripts.stage_opencode_v2 import StageError, verify_bundle
 
     try:
-        verify_bundle(output)
+        verify_bundle(output, trusted_root=output.parent)
     except StageError as exc:
         raise Stop('APM V2 config bundle failed verification') from exc
     config = output / 'opencode.jsonc'
@@ -692,7 +692,7 @@ def export_config(repo: pathlib.Path, out: pathlib.Path) -> tuple[pathlib.Path, 
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=40)
     if result.returncode:
         raise Stop('apm.yml configuration export failed; existing settings untouched')
-    digest = verify_bundle(out)
+    digest = verify_bundle(out, trusted_root=out.parent)
     # Source export is scalar-only; files are explicitly safe for a different
     # UID to read. A dedicated temp directory is used, not the repo itself.
     out.chmod(0o755)
@@ -916,7 +916,7 @@ def prepare_verification_runtime(
         temporary_path = pathlib.Path(temporary)
         bundle = temporary_path / 'bundle'
         export_v2_config(repo, bundle, verification_only=True)
-        config_sha = verify_bundle(bundle)
+        config_sha = verify_bundle(bundle, trusted_root=bundle.parent)
         from oc2_assets import AssetError, build as build_assets, write_new
 
         try:

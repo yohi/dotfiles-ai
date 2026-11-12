@@ -114,12 +114,12 @@ class ExportTests(unittest.TestCase):
             "  deny_provider_fallback: true\n"
             "  deny_guest_auth: true\n"
             "  providers:\n"
-            "    openai:\n"
-            "      enabled: true\n"
-            "      auth_method: docker_openai_oauth\n"
             "    cloudflare-ai-gateway-custom:\n"
             "      enabled: true\n"
-            "      auth_method: docker_custom_secret\n",
+            "      auth_method: docker_custom_secret\n"
+            "    openai:\n"
+            "      enabled: true\n"
+            "      auth_method: docker_openai_oauth\n",
             encoding="utf-8",
         )
 

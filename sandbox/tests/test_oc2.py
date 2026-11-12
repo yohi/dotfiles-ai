@@ -2062,7 +2062,7 @@ class OAuthTest(unittest.TestCase):
 
     def capture_stderr(self, stderr):
         with patch.dict(os.environ, {'TMPDIR': str(self.runtime_tmp)}):
-            return bootstrap.capture_import_stderr(self.db, stderr)
+            return bootstrap.capture_import_stderr(self.runtime, self.db, stderr)
 
     def run_sync(self, before, after, fail=None):
         calls = []
@@ -2147,8 +2147,7 @@ class OAuthTest(unittest.TestCase):
     def test_refuses_capture_outside_runtime_directory(self):
         elsewhere = self.root / 'elsewhere'
         elsewhere.mkdir(mode=0o700)
-        with patch.dict(os.environ, {'TMPDIR': str(elsewhere)}):
-            captured = bootstrap.capture_import_stderr(self.db, b'secret')
+        captured = bootstrap.capture_import_stderr(elsewhere, self.db, b'secret')
 
         self.assertIsNone(captured)
 

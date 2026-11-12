@@ -72,7 +72,7 @@ def _cf_provider(
     base_url: str = SAFE_BASE_URL,
     headers: dict[str, str] | None = None,
     settings_extra: dict[str, str] | None = None,
-) -> dict[str, object]:
+) -> dict[str, exporter.JsonValue]:
     settings: dict[str, object] = {"baseURL": base_url}
     settings.update(settings_extra or {})
     return {
@@ -93,7 +93,7 @@ def _server_config(
     base_url: str = SAFE_BASE_URL,
     headers: dict[str, str] | None = None,
     settings_extra: dict[str, str] | None = None,
-) -> dict[str, object]:
+) -> dict[str, exporter.JsonValue]:
     return {
         "$schema": "https://opencode.ai/config.json",
         "shell": "bash",
@@ -203,6 +203,82 @@ class ProviderSecurityContractTests(unittest.TestCase):
         stage._verify_v2_config(config)
         guest.verify_v2_config(config)
 
+    def test_exporter_rejects_variant_reasoning_values_outside_allowlist(self) -> None:
+        with self.assertRaises(exporter.ExportError):
+            exporter._v2_variant({"reasoningEffort": "unbounded"}, "model.variant")
+
+    def test_max_reasoning_effort_passes_all_validation_layers(self) -> None:
+        source_model: dict[str, exporter.JsonValue] = {
+            "name": "Kimi K3",
+            "variants": {
+                "default": {"body": {"thinking": {"type": "enabled"}}},
+                "max": {"reasoningEffort": "max"},
+            },
+        }
+        model = exporter._v2_model("custom-ollama-cloud/kimi-k3", source_model)
+        config = _server_config()
+        config["providers"][CF_PROVIDER]["models"]["custom-ollama-cloud/kimi-k3"] = model
+
+        stage._verify_v2_config(config)
+        guest.verify_v2_config(config)
+
+        self.assertEqual(model["body"]["thinking"]["type"], "enabled")
+        self.assertEqual(model["variants"][0]["settings"]["reasoningEffort"], "max")
+
+    def test_exporter_rejects_credentials_in_variant_settings_headers_and_body(self) -> None:
+        for variant in (
+            {"settings": {"apiKey": "not-a-real-secret"}},
+            {"headers": {"Authorization": "Bearer not-a-real-secret"}},
+            {"body": {"options": {"apiKey": "not-a-real-secret"}}},
+        ):
+            with self.subTest(variant=variant), self.assertRaises(exporter.ExportError):
+                exporter._v2_variant(variant, "model.variant")
+
+    def test_all_layers_reject_unapproved_model_headers_and_body_fields(self) -> None:
+        for options in (
+            {"headers": {"X-Auth": "sk-example"}},
+            {"body": {"temperature": 0.5}},
+            {"body": {"thinking": {"type": "unapproved"}}},
+            {"body": {"thinking": None}},
+            {"body": {"thinking": {"type": ["enabled"]}}},
+        ):
+            with self.subTest(options=options):
+                with self.assertRaises(exporter.ExportError):
+                    exporter._v2_variant(options, "model.variant")
+                with self.assertRaises(exporter.ExportError):
+                    exporter._v2_model(
+                        "custom-ollama-cloud/test",
+                        {"name": "Test", "variants": {"default": options}},
+                    )
+
+                config = _server_config()
+                config["providers"]["openai"]["models"]["gpt-6-luna"].update(options)
+                with self.assertRaises(stage.StageError):
+                    stage._verify_v2_config(config)
+                with self.assertRaises(ValueError):
+                    guest.verify_v2_config(config)
+
+                config = _server_config()
+                config["providers"]["openai"]["models"]["gpt-6-luna"]["variants"] = [
+                    {"id": "unsafe", **options},
+                ]
+                with self.assertRaises(stage.StageError):
+                    stage._verify_v2_config(config)
+                with self.assertRaises(ValueError):
+                    guest.verify_v2_config(config)
+
+    def test_stage_and_guest_reject_credentials_in_model_variants(self) -> None:
+        config = _server_config()
+        config["providers"]["openai"]["models"]["gpt-6-luna"]["variants"] = [
+            {"id": "unsafe", "body": {"options": {"apiKey": "not-a-real-secret"}}},
+        ]
+
+        with self.assertRaises(stage.StageError):
+            stage._verify_v2_config(config)
+
+        with self.assertRaises(ValueError):
+            guest.verify_v2_config(config)
+
     def test_rejects_unsafe_base_urls_in_all_layers(self) -> None:
         for url in BAD_BASE_URLS:
             with self.subTest(url=url):
@@ -277,11 +353,12 @@ class ProviderSecurityContractTests(unittest.TestCase):
             (bundle / "export-manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
 
             with self.assertRaises((ValueError, stage.StageError)):
-                stage.verify_bundle(bundle)
+                stage.verify_bundle(bundle, trusted_root=stage.BUNDLE_ROOT)
             with self.assertRaises(ValueError):
                 guest.verify(bundle)
 
     def test_host_export_rejects_credential_material_in_generated_bundle(self) -> None:
+        """Reject credentials at Host bundle generation, including after hash regeneration."""
         config = _server_config()
         config["providers"][CF_PROVIDER]["models"][
             "custom-ollama-cloud/kimi-k2.7-code"
@@ -294,6 +371,7 @@ class ProviderSecurityContractTests(unittest.TestCase):
             exporter._build_files("bash", True, "a" * 64, v2_config)
 
     def test_stage_rejects_credential_material_in_hash_valid_bundle(self) -> None:
+        """Reject credentials at Stage validation even when the bundle hash is updated."""
         config = _server_config()
         v2_config = {
             key: config[key] for key in ("model", "providers", "policies")
@@ -318,7 +396,7 @@ class ProviderSecurityContractTests(unittest.TestCase):
             manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
 
             with self.assertRaises(stage.StageError):
-                stage.verify_bundle(bundle)
+                stage.verify_bundle(bundle, trusted_root=stage.BUNDLE_ROOT)
 
 
 if __name__ == "__main__":

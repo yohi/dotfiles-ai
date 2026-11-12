@@ -51,41 +51,64 @@ def validate_db(path: pathlib.Path) -> None:
             raise ValueError('unsafe database sidecar')
 
 
-def capture_import_stderr(db_path: pathlib.Path, stderr: bytes) -> pathlib.Path | None:
-    tmp_dir = pathlib.Path(os.environ.get('TMPDIR', ''))
-    runtime_dir = tmp_dir.parent
+def capture_import_stderr(
+    runtime_dir: pathlib.Path, db_path: pathlib.Path, stderr: bytes,
+) -> pathlib.Path | None:
+    tmp_dir = runtime_dir / 'tmp'
     expected_db = runtime_dir / 'home/.local/share/opencode/oc2.db'
-    if (not tmp_dir.is_absolute() or tmp_dir != runtime_dir / 'tmp'
-            or db_path != expected_db or not hasattr(os, 'O_NOFOLLOW')):
+    if (not runtime_dir.is_absolute() or '..' in runtime_dir.parts
+            or db_path != expected_db or not hasattr(os, 'O_NOFOLLOW')
+            or not hasattr(os, 'O_DIRECTORY')):
         return None
-    if any(path.is_symlink() for path in (tmp_dir, *tmp_dir.parents)):
+    if any(path.is_symlink() for path in (runtime_dir, *runtime_dir.parents)):
         return None
+    runtime_fd: int | None = None
+    directory_fd: int | None = None
+    descriptor: int | None = None
     try:
-        directory = tmp_dir.stat()
-        if (not stat.S_ISDIR(directory.st_mode) or directory.st_uid != os.geteuid()
-                or stat.S_IMODE(directory.st_mode) != 0o700):
+        runtime_fd = os.open(
+            runtime_dir, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW,
+        )
+        runtime_info = os.fstat(runtime_fd)
+        if (not stat.S_ISDIR(runtime_info.st_mode) or runtime_info.st_uid != os.geteuid()
+                or stat.S_IMODE(runtime_info.st_mode) != 0o700):
             return None
-        destination = tmp_dir / f'oc2-oauth-import-{secrets.token_hex(8)}.stderr'
+        directory_fd = os.open(
+            'tmp',
+            os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW,
+            dir_fd=runtime_fd,
+        )
+        directory_info = os.fstat(directory_fd)
+        if (not stat.S_ISDIR(directory_info.st_mode) or directory_info.st_uid != os.geteuid()
+                or stat.S_IMODE(directory_info.st_mode) != 0o700):
+            return None
+        filename = f'oc2-oauth-import-{secrets.token_hex(8)}.stderr'
+        destination = tmp_dir / filename
         descriptor = os.open(
-            destination,
+            filename,
             os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
             0o600,
+            dir_fd=directory_fd,
         )
-        try:
-            os.fchmod(descriptor, 0o600)
-            file_info = os.fstat(descriptor)
-            if (not stat.S_ISREG(file_info.st_mode) or file_info.st_uid != os.geteuid()
-                    or stat.S_IMODE(file_info.st_mode) != 0o600 or file_info.st_nlink != 1):
-                raise OSError('unsafe capture file')
-            with os.fdopen(descriptor, 'wb', closefd=False) as output:
-                output.write(stderr)
-                output.flush()
-            os.fsync(descriptor)
-        finally:
-            os.close(descriptor)
+        os.fchmod(descriptor, 0o600)
+        file_info = os.fstat(descriptor)
+        if (not stat.S_ISREG(file_info.st_mode) or file_info.st_uid != os.geteuid()
+                or stat.S_IMODE(file_info.st_mode) != 0o600 or file_info.st_nlink != 1):
+            raise OSError('unsafe capture file')
+        with os.fdopen(descriptor, 'wb', closefd=False) as output:
+            output.write(stderr)
+            output.flush()
+        os.fsync(descriptor)
         return destination
     except OSError:
         return None
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
+        if directory_fd is not None:
+            os.close(directory_fd)
+        if runtime_fd is not None:
+            os.close(runtime_fd)
 
 
 def create(base_config: pathlib.Path, runtime_dir: pathlib.Path) -> pathlib.Path:
