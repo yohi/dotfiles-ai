@@ -26,10 +26,12 @@ from typing import Iterable, TypeAlias
 def _load_agent_policy() -> ModuleType:
     """Load the verified sibling policy helper without importing a Host package."""
     sidecar = Path(str(__file__) + '.native.py')
-    helper = (
-        sidecar if sidecar.exists() or sidecar.is_symlink()
-        else Path(__file__).with_name('oc2_agent_native.py')
-    )
+    if sidecar.exists() or sidecar.is_symlink():
+        helper = sidecar
+    elif Path(__file__).name == 'stage_opencode_v2.py':
+        helper = Path(__file__).with_name('oc2_agent_native.py')
+    else:
+        raise ImportError('SHA-verified Native Agent policy sidecar is missing')
     if helper.is_symlink() or not helper.is_file():
         raise ImportError('Native Agent policy helper is missing or linked')
     spec = importlib.util.spec_from_file_location('oc2_agent_native_guest', helper)

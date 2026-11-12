@@ -101,6 +101,32 @@ class StageTests(unittest.TestCase):
             self.assertIn('VERIFY_OK:', result.stdout)
             self.assertEqual(result.stderr, '')
 
+    def test_guest_verifier_refuses_unverified_repository_helper_without_sidecar(self) -> None:
+        """Reject an ambient Native helper when the staged SHA-verified sidecar is absent."""
+        with tempfile.TemporaryDirectory() as temporary:
+            guest_root = Path(temporary)
+            scripts = guest_root / 'sandbox' / 'scripts'
+            scripts.mkdir(parents=True)
+            guest_script = scripts / 'stage_guest.py'
+            guest_script.write_bytes(SCRIPT.read_bytes())
+            (scripts / 'oc2_agent_native.py').write_text(
+                'unverified_ambient_helper = True\n', encoding='utf-8',
+            )
+            import_code = (
+                'import importlib.util, pathlib, sys; '
+                'path = pathlib.Path(sys.argv[1]); '
+                'spec = importlib.util.spec_from_file_location("guest_stage", path); '
+                'module = importlib.util.module_from_spec(spec); '
+                'spec.loader.exec_module(module)'
+            )
+            result = subprocess.run(
+                [sys.executable, '-S', '-c', import_code, str(guest_script)],
+                capture_output=True, text=True, check=False, cwd=guest_root, env={'PATH': ''},
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('SHA-verified Native Agent policy sidecar is missing', result.stderr)
+
     def test_guest_verify_rejects_path_in_cli_argument(self) -> None:
         """Reject a caller-selected Guest bundle path outside the fixed staging location."""
         with patch.object(stage, "REMOTE_PARENT", str(self.bundle.parent)):
