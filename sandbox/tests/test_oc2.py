@@ -426,6 +426,49 @@ class HostTest(unittest.TestCase):
             self.assertFalse(any(call[0] == 'cp' and '/scripts/oc2_guest_' in call[2]
                                  for call in runner.calls))
 
+    def test_launch_rejects_empty_sha256sum_output(self) -> None:
+        """Stop safely when the launch verifier returns no checksum token."""
+        class EmptyChecksumRunner(FakeRunner):
+            def sbx(self, *args: str, **kwargs: bool) -> str:
+                if args[:3] == ('exec', 'oc2-dev', 'sha256sum'):
+                    self.calls.append(args)
+                    return ''
+                return super().sbx(*args, **kwargs)
+
+        with tempfile.TemporaryDirectory() as temporary:
+            assets_file = pathlib.Path(temporary) / 'assets.json'
+            assets_file.write_text('{}')
+            digest = hashlib.sha256(assets_file.read_bytes()).hexdigest()
+
+            with self.assertRaisesRegex(oc2.Stop, 'guest asset bundle SHA mismatch'):
+                oc2.launch(EmptyChecksumRunner(), oc2.SandboxLaunch(
+                    'oc2-dev', 'a' * 64, oc2.PINNED[0], '/workspace/project',
+                    pathlib.Path('/tmp/config'), assets_file=assets_file, assets_sha=digest,
+                ))
+
+    def test_stage_rejects_empty_sha256sum_output(self) -> None:
+        """Stop safely when stage receives an empty checksum response."""
+        class EmptyChecksumRunner:
+            def destination_status(self, _name: str, _destination: str) -> int:
+                return 0
+
+            def sbx(self, *args: str, **kwargs: bool) -> str:
+                if args[:4] == ('exec', 'oc2-dev', 'bash', '-c'):
+                    return 'missing\n'
+                if args[:3] == ('exec', 'oc2-dev', 'sha256sum'):
+                    return ''
+                return ''
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            bundle = root / 'bundle'
+            bundle.mkdir()
+            script = root / 'oc2_guest.py'
+            script.write_text('# fixture\n')
+
+            with self.assertRaisesRegex(oc2.Stop, 'guest bootstrap code SHA mismatch'):
+                oc2.stage(EmptyChecksumRunner(), 'oc2-dev', bundle, 'a' * 64, script)
+
     def test_cloudflare_credential_accepts_existing_sandbox_scope(self):
         runner = FakeSecretRunner(sandbox_scope='oc2-dev', global_scope='(global)')
 
@@ -589,7 +632,7 @@ class HostTest(unittest.TestCase):
             link = pathlib.Path(tmp) / 'link'
             link.symlink_to(parent, target_is_directory=True)
             self.assertEqual(check(link / 'target'), 12)
-            self.assertEqual(check(pathlib.Path(tmp) / 'missing' / 'target'), 11)
+            self.assertEqual(check(pathlib.Path(tmp) / 'missing' / 'target'), 0)
             self.assertEqual(check(pathlib.Path('relative')), 12)
 
     def test_directory_destination_guest_exit_codes_for_real_filesystem(self) -> None:

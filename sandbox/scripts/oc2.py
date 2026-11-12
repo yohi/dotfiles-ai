@@ -73,7 +73,10 @@ try:
     flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
     fd = os.open("/", flags)
     for part in parts[1:-1]:
-        child = os.open(part, flags, dir_fd=fd)
+        try:
+            child = os.open(part, flags, dir_fd=fd)
+        except FileNotFoundError as exc:
+            sys.exit(0 if exc.errno == errno.ENOENT else 11)
         os.close(fd)
         fd = child
     try:
@@ -136,6 +139,18 @@ class SandboxLaunch:
     cloudflare: CloudflareGatewayRuntime | None = None
     assets_file: pathlib.Path | None = None
     assets_sha: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class VerifiedFileTransfer:
+    """Describe a Guest file copy whose destination and content must be verified."""
+
+    source: pathlib.Path
+    destination: str
+    sha256: str
+    unsafe_message: str
+    unknown_status_message: str
+    mismatch_message: str
 
 
 class Stop(Exception):
@@ -853,6 +868,28 @@ def transfer_workspace(runner: Runner, name: str, snapshot: pathlib.Path,
     return destination
 
 
+def _transfer_verified_file(
+    runner: Runner,
+    name: str,
+    transfer: VerifiedFileTransfer,
+) -> None:
+    """Copy or reuse one Guest file only after matching its expected SHA-256."""
+    status = runner.destination_status(name, transfer.destination)
+    if status == 0:
+        runner.sbx('cp', str(transfer.source), f'{name}:{transfer.destination}')
+    elif status == 10:
+        pass
+    elif status == 12:
+        raise Stop(transfer.unsafe_message)
+    else:
+        raise Stop(transfer.unknown_status_message)
+    output = runner.sbx(
+        'exec', name, 'sha256sum', transfer.destination, capture=True,
+    ).split()
+    if not output or output[0] != transfer.sha256:
+        raise Stop(transfer.mismatch_message)
+
+
 def stage(runner: Runner, name: str, bundle: pathlib.Path, manifest_sha: str,
           guest_script: pathlib.Path, assets_file: pathlib.Path | None = None,
           assets_sha: str | None = None, *,
@@ -890,46 +927,27 @@ def stage(runner: Runner, name: str, bundle: pathlib.Path, manifest_sha: str,
         runner.sbx('cp', str(bundle), f'{name}:{destination}')
     elif exists != 'exists':
         raise Stop('cannot determine remote bundle state')
-    script_status = runner.destination_status(name, script_dest)
-    if script_status == 0:
-        runner.sbx('cp', str(guest_script), f'{name}:{script_dest}')
-    elif script_status == 10:
-        pass
-    elif script_status == 12:
-        raise Stop('unsafe guest asset verifier path')
-    else:
-        raise Stop('cannot determine remote bootstrap script state')
-    remote_sha = runner.sbx('exec', name, 'sha256sum', script_dest, capture=True).split()[0]
-    if remote_sha != script_sha:
-        raise Stop('guest bootstrap code SHA mismatch')
-    helper_status = runner.destination_status(name, native_helper_dest)
-    if helper_status == 0:
-        runner.sbx('cp', str(native_helper), f'{name}:{native_helper_dest}')
-    elif helper_status == 10:
-        pass
-    elif helper_status == 12:
-        raise Stop('unsafe guest native verifier path')
-    else:
-        raise Stop('cannot determine remote native verifier state')
-    helper_sha = runner.sbx(
-        'exec', name, 'sha256sum', native_helper_dest, capture=True,
-    ).split()[0]
-    if helper_sha != native_helper_sha:
-        raise Stop('guest native verifier SHA mismatch')
-    identity_status = runner.destination_status(name, identity_helper_dest)
-    if identity_status == 0:
-        runner.sbx('cp', str(identity_helper), f'{name}:{identity_helper_dest}')
-    elif identity_status == 10:
-        pass
-    elif identity_status == 12:
-        raise Stop('unsafe guest identity verifier path')
-    else:
-        raise Stop('cannot determine guest identity verifier state')
-    identity_sha = runner.sbx(
-        'exec', name, 'sha256sum', identity_helper_dest, capture=True,
-    ).split()[0]
-    if identity_sha != identity_helper_sha:
-        raise Stop('guest identity verifier SHA mismatch')
+    for transfer in (
+        VerifiedFileTransfer(
+            guest_script, script_dest, script_sha,
+            'unsafe guest asset verifier path',
+            'cannot determine remote bootstrap script state',
+            'guest bootstrap code SHA mismatch',
+        ),
+        VerifiedFileTransfer(
+            native_helper, native_helper_dest, native_helper_sha,
+            'unsafe guest native verifier path',
+            'cannot determine remote native verifier state',
+            'guest native verifier SHA mismatch',
+        ),
+        VerifiedFileTransfer(
+            identity_helper, identity_helper_dest, identity_helper_sha,
+            'unsafe guest identity verifier path',
+            'cannot determine guest identity verifier state',
+            'guest identity verifier SHA mismatch',
+        ),
+    ):
+        _transfer_verified_file(runner, name, transfer)
     if superpowers_source is not None and superpowers_destination is not None:
         source_status = runner.directory_status(name, superpowers_destination)
         if source_status == 0:
@@ -948,19 +966,15 @@ def stage(runner: Runner, name: str, bundle: pathlib.Path, manifest_sha: str,
             raise Stop('invalid asset hash')
         remote_assets = f'{ROOT}/assets/{assets_sha[:16]}.json'
         execute(runner, name, 'mkdir', '-p', f'{ROOT}/assets')
-        status = runner.destination_status(name, remote_assets)
-        if status == 0:
-            runner.sbx('cp', str(assets_file), f'{name}:{remote_assets}')
-        elif status == 10:
-            pass
-        elif status == 12:
-            raise Stop('unsafe guest asset bundle path')
-        else:
-            raise Stop('cannot establish guest asset state')
-        actual = runner.sbx('exec', name, 'sha256sum',
-                            remote_assets, capture=True).split()[0]
-        if actual != assets_sha:
-            raise Stop('guest asset bundle SHA mismatch')
+        _transfer_verified_file(
+            runner, name,
+            VerifiedFileTransfer(
+                assets_file, remote_assets, assets_sha,
+                'unsafe guest asset bundle path',
+                'cannot establish guest asset state',
+                'guest asset bundle SHA mismatch',
+            ),
+        )
         args.extend(['--assets', remote_assets, '--expected-assets-sha', assets_sha])
     execute(runner, name, 'python3', script_dest, *args)
 
@@ -1143,28 +1157,21 @@ def launch(runner: Runner, request: SandboxLaunch) -> None:
             'exec', request.name, 'mkdir', '-p',
             f'{ROOT}/assets', f'{ROOT}/scripts', verifier_dir,
         )
-        for local, remote, label in (
-            (request.assets_file, remote_assets, 'asset bundle'),
-            (guest_script, remote_script, 'asset verifier'),
-            (native_helper, remote_helper, 'native verifier'),
+        for source, remote, expected_sha, label in (
+            (request.assets_file, remote_assets, request.assets_sha, 'asset bundle'),
+            (guest_script, remote_script, guest_script_sha, 'asset verifier'),
+            (native_helper, remote_helper, native_helper_sha, 'native verifier'),
         ):
-            state = runner.destination_status(request.name, remote)
-            if state == 0:
-                runner.sbx('cp', str(local), f'{request.name}:{remote}')
-            elif state == 10:
-                pass
-            elif state == 12:
-                raise Stop('unsafe guest ' + label + ' path')
-            else:
-                raise Stop('cannot establish guest ' + label + ' state')
-            expected = (
-                request.assets_sha if label == 'asset bundle'
-                else guest_script_sha if label == 'asset verifier'
-                else native_helper_sha
+            _transfer_verified_file(
+                runner,
+                request.name,
+                VerifiedFileTransfer(
+                    source, remote, expected_sha,
+                    'unsafe guest ' + label + ' path',
+                    'cannot establish guest ' + label + ' state',
+                    'guest ' + label + ' SHA mismatch',
+                ),
             )
-            actual = runner.sbx('exec', request.name, 'sha256sum', remote, capture=True).split()
-            if not actual or actual[0] != expected:
-                raise Stop('guest ' + label + ' SHA mismatch')
         runner.sbx(
             'exec', request.name, 'python3', remote_script,
             '--assets', remote_assets, '--expected-assets-sha', request.assets_sha,
