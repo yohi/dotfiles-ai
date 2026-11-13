@@ -154,6 +154,7 @@ class SandboxLaunch:
     manifest_sha: str | None = None
     phase4_plugin_file: pathlib.Path | None = None
     phase4_plugins_sha: str | None = None
+    superpowers_source: pathlib.Path | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -1329,17 +1330,19 @@ def launch(runner: Runner, request: SandboxLaunch) -> None:
     runtime = f'{ROOT}/runtime/{request.digest[:16]}'
     unified_runtime = request.bundle is not None
     if unified_runtime:
-        if request.bundle is None:
-            raise Stop('unified Runtime bundle is missing')
         if (request.manifest_sha is None or request.assets_file is None
                 or request.assets_sha is None or request.phase4_plugin_file is None
-                or request.phase4_plugins_sha is None):
-            raise Stop('unified Runtime requires config, asset, and pinned Plugin identities')
+                or request.phase4_plugins_sha is None
+                or request.superpowers_source is None):
+            raise Stop(
+                'unified Runtime requires config, asset, and pinned Plugin identities/source'
+            )
         stage(
             runner, request.name, request.bundle, request.manifest_sha,
             HERE / 'oc2_guest.py', request.assets_file, request.assets_sha,
             phase4_plugin_file=request.phase4_plugin_file,
             phase4_plugins_sha=request.phase4_plugins_sha,
+            superpowers_source=request.superpowers_source,
         )
     elif any((request.manifest_sha, request.phase4_plugin_file, request.phase4_plugins_sha)):
         raise Stop('unified Runtime inputs must be supplied together')
@@ -1754,6 +1757,7 @@ def main(argv: list[str] | None = None) -> int:
             from oc2_assets import (
                 build as build_assets,
                 build_phase4_plugins,
+                export_superpowers_tree,
                 write_new as write_asset_new,
             )
 
@@ -1763,6 +1767,7 @@ def main(argv: list[str] | None = None) -> int:
             unified_runtime = native_config.unified_runtime
             phase4_asset_file: pathlib.Path | None = None
             phase4_assets_sha: str | None = None
+            superpowers_source: pathlib.Path | None = None
             if unified_runtime:
                 from sandbox.scripts.oc2_artifacts import artifact_paths
 
@@ -1777,6 +1782,8 @@ def main(argv: list[str] | None = None) -> int:
                 asset_raw, asset_sha = build_assets(
                     repo, plugin_dir=artifacts.superpowers,
                 )
+                superpowers_source = temporary_path / 'verification-superpowers'
+                export_superpowers_tree(repo, artifacts.superpowers, superpowers_source)
                 phase4_assets_raw, phase4_assets_sha = build_phase4_plugins(
                     repo, (artifacts.akane, artifacts.sibyl), explicit_opt_in=True,
                 )
@@ -1888,7 +1895,8 @@ def main(argv: list[str] | None = None) -> int:
                 SandboxLaunch(args.sandbox, runtime_sha, cli, workdir, config_file,
                               cloudflare, asset_file, asset_sha,
                               bundle if unified_runtime else None, config_sha,
-                              phase4_asset_file, phase4_assets_sha),
+                              phase4_asset_file, phase4_assets_sha,
+                              superpowers_source),
             )
             return 0
     except (Stop, OSError, ValueError, subprocess.TimeoutExpired,

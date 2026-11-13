@@ -39,6 +39,7 @@ class VerificationRuntimePreparationTest(unittest.TestCase):
             bundle=pathlib.Path('/tmp/bundle'), manifest_sha='c' * 64,
             phase4_plugin_file=pathlib.Path('/tmp/phase4.json'),
             phase4_plugins_sha='d' * 64,
+            superpowers_source=pathlib.Path('/tmp/verification-superpowers'),
         )
 
         with (
@@ -52,6 +53,7 @@ class VerificationRuntimePreparationTest(unittest.TestCase):
             oc2.HERE / 'oc2_guest.py', request.assets_file, request.assets_sha,
             phase4_plugin_file=request.phase4_plugin_file,
             phase4_plugins_sha=request.phase4_plugins_sha,
+            superpowers_source=request.superpowers_source,
         )
 
     def test_verification_refuses_to_create_or_reuse_an_incompatible_sandbox(self) -> None:

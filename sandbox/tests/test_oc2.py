@@ -294,6 +294,38 @@ class HostTest(unittest.TestCase):
         self.assertNotIn('-i', auth)
         self.assertNotIn('-i', tui)
 
+    def test_unified_launch_stages_verified_superpowers_source(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            bundle = root / 'bundle'
+            bundle.mkdir()
+            assets_file = root / 'assets.json'
+            assets_file.write_text('{}')
+            phase4_file = root / 'phase4-assets.json'
+            phase4_file.write_text('{}')
+            superpowers_source = root / 'verification-superpowers'
+            superpowers_source.mkdir()
+            captured = {}
+
+            def capture_stage(*_args, **kwargs):
+                captured.update(kwargs)
+
+            with patch.object(oc2, 'stage', side_effect=capture_stage):
+                oc2.launch(
+                    FakeRunner(),
+                    oc2.SandboxLaunch(
+                        'oc2-dev', 'a' * 64, oc2.PINNED[0], '/workspace/project',
+                        pathlib.Path('/tmp/config'), assets_file=assets_file,
+                        assets_sha=hashlib.sha256(assets_file.read_bytes()).hexdigest(),
+                        bundle=bundle, manifest_sha='b' * 64,
+                        phase4_plugin_file=phase4_file,
+                        phase4_plugins_sha=hashlib.sha256(phase4_file.read_bytes()).hexdigest(),
+                        superpowers_source=superpowers_source,
+                    ),
+                )
+
+            self.assertEqual(captured['superpowers_source'], superpowers_source)
+
     def test_launch_transfers_and_guest_verifies_selected_assets(self):
         runner = FakeRunner()
         with tempfile.TemporaryDirectory() as temporary:

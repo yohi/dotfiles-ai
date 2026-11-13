@@ -357,10 +357,18 @@ class LauncherFlowTests(unittest.TestCase):
                 'runtime_sha': request.digest,
                 'manifest_sha': str(request.manifest_sha),
                 'asset_sha': str(request.assets_sha),
+                'superpowers_source_staged': str(
+                    (pathlib.Path(request.superpowers_source) / 'index.js').read_text()
+                ),
             })
+
+        def export_tree(_repo, _source, destination) -> None:
+            destination.mkdir()
+            (destination / 'index.js').write_text('fixture\n')
 
         with (
             patch.object(oc2_assets, 'resolve_superpowers_plugin', return_value=artifact),
+            patch.object(oc2_assets, 'export_superpowers_tree', side_effect=export_tree),
             patch.object(oc2_assets, 'build_phase4_plugins', return_value=(b'pinned-phase4', 'd' * 64)),
             patch.object(oc2_artifacts, 'artifact_paths', return_value=paths),
             patch.object(oc2, 'launch', side_effect=capture_launch),
@@ -376,6 +384,7 @@ class LauncherFlowTests(unittest.TestCase):
         self.assertEqual(captured['provider_set'], 'openai')
         self.assertEqual(captured['plugin_enabled'], 'True')
         self.assertEqual(captured['mcp_enabled'], 'True')
+        self.assertEqual(captured['superpowers_source_staged'], 'fixture\n')
         expected = oc2_identity.unified_runtime_identity_sha256(
             oc2_identity.Phase4RuntimeIdentity(
                 captured['manifest_sha'], captured['asset_sha'],
