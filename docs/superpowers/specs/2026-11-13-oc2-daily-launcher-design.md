@@ -1,9 +1,9 @@
-# OC2 Daily Launcher — Design R0.1
+# OC2 Daily Launcher — Design R0.1.1
 
 - Date: 2026-11-13
 - Repository: `yohi/dotfiles-ai`
 - Baseline: `master` at `e79573903f1a2b550e32bc6022d91c43fdcccbb4`
-- Status: **Human Owner approved design**
+- Status: **R0.1.1 limited document remediation (F-001–F-005); revised design adoption pending Human Owner decision**
 - Scope: **Design only**. This document does not authorize implementation, Sandbox changes, Credential changes, PR creation, or Merge.
 
 ## 1. 背景と目的
@@ -54,9 +54,9 @@ oc2
 
 `oc2`のPATH設定は初回に標準化する。通常使用では`--workspace`、`--sandbox`、手動`sbx cp`、手動Collect/Applyを要求しない。診断・保守用の明示オプションを残してよい。
 
-## 5. APM SSOTとOpenCode Version
+## 5. APM SSOTとOpenCode Version — F-001限定訂正
 
-ユーザーが指定するバージョンは既存`apm.yml`の`x-oc2-runtime`配下に置く。
+ユーザー指定バージョンは既存`apm.yml`の`x-oc2-runtime.opencode.version`を唯一の選択元とする。他の既存Runtime設定は維持する。
 
 ```yaml
 x-oc2-runtime:
@@ -67,106 +67,187 @@ x-oc2-runtime:
   # 既存watchdog / sibylObserver等は保持
 ```
 
-- Launcher、Guest Validator、CLI Artifact選択は同一の検証済みバージョン設定を使用し、個別のユーザー設定値を持たない。
-- バージョンごとの公式Artifact、サイズ、ダイジェスト等は**信頼済みLock契約**から取得する。APMの文字列だけを根拠に未検証バイナリを実行しない。
-- Lockにないバージョン、Identity不一致、構成不整合はFail-Closed。勝手な最新版への追従やFallbackはしない。
-- Models、Providers、Agents、Plugin、MCP、Rules/Commands/Skills、Theme、Timeout、Akane/Sibyl Optionsは既存Full SSOT契約を継承する。
-- VersionまたはRuntime設定の変更が適用互換性に影響するときはRuntime/Sandbox互換性を再評価する。旧Sandboxを無断で上書きしない。
+### Version Lockの所有・保存・検証
 
-固定Artifact Identity、Sandbox隔離、Credentialの安全制約など、ユーザー操作で緩和させないルールはコード側に維持する。
+- **APM = 選択の正本、Version Lock = 実行可能Artifactの信頼済み許可リスト。** 両者を同一視しない。
+- リポジトリ管理のLockパスは`sandbox/locks/opencode-cli-v2.json`とする（実装時に新規作成）。JSON UTF-8、重複キー拒否、余剰キー拒否。トップレベルは`{"schema":"dotfiles-ai/oc2-cli-lock/v1","entries":[...]}`。
+- `entries`の各要素は**厳密に**`version`（SemVerの`MAJOR.MINOR.PATCH`）、`os`（現段階は`linux`のみ）、`arch`（`x86_64`のみ）、`asset_url`（公式`github.com/anomalyco/opencode` ReleaseのHTTPS固定URL）、`archive_size`（正整数）、`archive_sha256`（64桁hex）、`member_path`（`opencode`固定）、`binary_size`（正整数）、`binary_sha256`（64桁hex）を持つ。(`version`,`os`,`arch`)は一意、ソート順を検証する。
+- Host上の**承認済みLock Digest**を`$XDG_STATE_HOME/oc2/trust/approved-cli-lock-sha256`（`XDG_STATE_HOME`未指定時は`~/.local/state/oc2/trust/approved-cli-lock-sha256`）にユーザー所有、ディレクトリ0700・ファイル0600で保存する。DigestはLockファイルの**生バイト**SHA-256であり、APMまたはGuestから変更できない。初期承認値も明示的なOwner操作で設定する。値がない・一致しない場合は起動しない。
+- Ownerによる新バージョン登録は、公式Releaseの取得元・Archive Size/SHA-256・展開MemberとBinary Size/SHA-256を独立に確認した後、LockをGit上で変更し、**別途Host信頼Digestの更新を明示承認**する二段階とする。通常の`oc2`起動、Guest、AIのCommit、GitのMergeだけでは承認Digestを変更できない。旧Digestでの検証なしに自動信頼更新しない。
+- Launcherは`apm.yml`のVersion、Host Platform、承認済みLockを照合してからダウンロード／再利用し、ArchiveのURL（redirect先ホストも許可リスト）、Size、SHA-256、Member構造、展開済みBinaryのSize・SHA-256を確認する。Guestは受領した検証済みVersion/Platform/Binary Identityと実行する固定パスを照合する。バージョン文字列の`--version`結果**だけ**をArtifact同一性の証拠としない。
+- Version/OS/Arch/Lock Digest/Artifact Digestを検証済みHost→Guest ManifestおよびRuntime Identityへ反映し、Launcher、Exporter、Guestで完全一致させる。別々の固定Version定数を独立した設定として残さない。
+- 未登録Version、未承認Lock、Platform不一致、Asset転送元不一致、Archive/Binary Digest不一致、Host/Guest Version不一致、Manifest不一致は**Fail-Closed**。代替Version・最新Version・Providerへの自動Fallbackなし。
 
-## 6. Sandbox自動選択・多重起動
+### 既存v2.2.5からの移行
 
-Host側でWorkspaceごとにSandboxインベントリとLeaseを管理する。紐付けには以下を含める。
+現行`oc2.py`の`VERSION`・固定Asset URL/Size/SHA-256、`prepare_opencode_v2.py`の`OPENCODE_VERSION`、`oc2_guest.py`の固定Version、`oc2_native.py`の固定許容キーを、同一の検証済みLock選択経路へ置換する。既知のArchive値は既存固定値と照合して初期Lockへ転記する。**Binary SHA-256は、正しいArchive SHA-256を検証した公式配布物から算出・照合すること**（既存R5の観測Hashを無根拠に期待値として採用しない）。初期Lockと信頼Digestの承認が完了するまで新経路を有効化しない。旧SandboxはVersion/Artifact Identityが一致したときだけ再利用可能とし、自動書換えを禁止する。
 
-- Host側Git Workspaceの正規化された絶対パスと識別子
-- Sandboxの固有ID（**名前だけでは再利用しない**）
-- 選択されたOpenCodeバージョンと検証済みCLI Identity
-- Runtime Identity、Workspace baseline、同期状態
-- Leaseの所有者・有効性（PIDだけでなく実行状態と競合を確認）
+Models/Providers/Agents/Plugin/MCP/Rules/Commands/Skills/Theme/Timeout/Akane・Sibyl Optionsは既存Full SSOTの契約を継承する。
 
-通常起動：
+## 6. Sandbox自動選択・多重起動 — F-002限定訂正
 
-1. 対象WorkspaceとAPM/Artifact/Runtimeを検証する。
-2. 排他ロック下で互換性のあるSandboxを検索し、未使用ならLeaseを取得する。
-3. 空きがなければ独立したSandboxを新規作成する。多重起動は別Sandboxを使う。
-4. TUI終了時にLeaseを解放するがSandboxは保持する。
-5. 再起動・異常終了後にLeaseが不確かな場合は二重占有せず保留する。
+### 識別子とHost永続レイアウト
 
-Sandboxの互換性には既存`is_compatible_sandbox`のmountless検証、Sandbox ID、固定CLI、必要なRuntime Identityが含まれる。既存の検証用R5/R6等を名前の一致だけで通常再利用しない。使用中・バージョン不一致・未反映変更を持つSandboxの内容を破棄しない。
+- `WorkspaceID`: `sha256(uid || NUL || canonical_host_git_root)`の先頭32桁hex。Host上の解決済みGitルートに紐付け、任意の作業ディレクトリ名だけで同一視しない。
+- `SandboxID`: Dockerが返すUUID。Sandbox名とは独立して検証する。
+- `SessionGeneration`: 起動・同期のたびに生成するUUID v4。Hostが生成し、同一Workspaceの複数Sandboxでも一意。
+- `SessionKey`: (`WorkspaceID`,`SandboxID`,`SessionGeneration`)の組。Baseline、差分、Git収集、承認、LeaseはこのKeyへ帰属させる。
 
-## 7. Workspace Snapshotと再利用時の同期
+永続状態Rootは`$XDG_STATE_HOME/oc2`（未指定時`~/.local/state/oc2`）。Workspace外・ユーザー所有・0700、各ファイル0600、symlink/所有者不正を拒否する。
 
-HostのWorkspaceディレクトリはGuestへ直接マウントしない。
+```text
+$XDG_STATE_HOME/oc2/
+  workspaces/<workspace-id>/
+    inventory.json
+    lock
+    leases/<sandbox-id>.json
+    sessions/<session-generation>/
+      receipt.json
+      baseline.json
+      git-baseline.json
+      collection/              # immutable after collection
+      apply-journal.json       # created only when applying
+  trust/approved-cli-lock-sha256
+  policy/inference-v1.json
+```
 
-- Git追跡済みファイルの未Commit変更と、安全な未追跡の新規ソースファイルをSnapshotに含める。
-- `.git`、Credential、Secret、特別なファイル、無許可のsymlinkや既存の除外対象はGuestへ直接転送しない。
-- 除外だけで安全を推定せず、既存の秘密情報検査と明示的な転送許可契約を維持する。
-- HostのHEAD、Index、作業ツリーとSnapshot Manifestの基準状態を保持する。
+- `inventory.json`は`WorkspaceID`、canonical path、Sandboxの(`name`,`id`,Version/CLI/Runtime Identity,Generation,状態)を記録する。
+- `receipt.json`はschema `dotfiles-ai/oc2-session/v3`、SessionKey、Remote Project Path、Baseline Digest、Sandbox/Runtime Identity、状態遷移を格納する。状態は`PREPARING → READY → RUNNING → COLLECTED → APPLIED`、または`PENDING`/`RECOVERY_REQUIRED`。戻り遷移と重複Applyは拒否する。
+- `baseline.json`はWorkspace Snapshotの基準、`git-baseline.json`は§7-8のGit基準、`collection/`はGuest成果。既存Receipt固定名をWorkspace直下で共有しない。
+- LeaseはSandboxIDごとに保持し、Owner UID、Launcher PID＋開始時刻、SessionGeneration、SandboxID、取得時刻、状態を記録する。PIDが存在するだけでは生存の証拠としない。
 
-再利用時には、前回のHost同期基準と現在のHost状態およびGuest側の未反映変更を比較する。**Guestで未反映の変更がある場合、上書き同期しない。** 安全に更新できる変更だけを取り込み、競合時は旧Guest状態を保持して停止する。利用者が操作しない限り未反映の変更を破棄しない。
+### 選択・占有と異常終了
 
-## 8. Sandbox内のGit履歴・Commit
+1. Workspace単位のHost `flock`で、Inventory検証→Sandbox選択→Lease割当→Session v3作成を**排他的**に処理する。同時起動は別Generationとなる。
+2. 互換性判定はWorkspaceID、SandboxID、Mountless/Runtime Mountなし、Version/Artifact/Runtime Identity、既存Guest Project/Session receipt整合、未反映変更の有無を含む。
+3. 空き・整合済みSandboxのみ再利用する。使用中なら別Sandboxを作る。Sandbox作成途中に失敗した場合も不完全状態を残し、同一名の別実体を誤再利用しない。
+4. TUI終了時、まず差分を収集・確定してからLeaseを解放する。未反映変更があるSandboxは`PENDING`とし、**自動再利用対象から外す**。HostへのApply前に別`oc2`を開始する場合は、安全な独立Sandboxを選択する。
+5. Launcher異常終了時、次回はHost PID＋開始時刻、Docker Sandbox ID、Guest実行プロセス/Receiptを照合する。生存/状態の判別不能時はLeaseを自動回収せず`RECOVERY_REQUIRED`で隔離。明確に停止済み・Guest成果保全済みと確認できた場合だけOwnerの確認を伴う回収経路で復旧する。孤立Sessionを削除しない。
 
-Mountlessを維持したまま、検証済みの選択的Git Bundleを使い、Guest内に**独立したGit Repository**を構築する。
+**旧v2 Receipt移行:** 従来の`workspaces/<workspace-id>/baseline.json`/`receipt.json`相当のWorkspace単位Session v2は読み取り専用Legacyとして保護し、v3へ暗黙変換・上書きしない。Legacyに未回収・未適用変更がある場合はそのSandboxの通常再利用を停止し、独立Sandboxへ分岐またはOwnerに判断を求める。旧状態の移送が必要な場合はOwner承認の明示操作とする。
 
-- Hostの`.git`のマウント・丸ごとコピーは禁止。
-- Bundleで必要なRefとCommit履歴を持ち込み、その上に許可済みWorkspace Snapshot（未Commit・未追跡ファイルを含む）を再現する。
-- `git status`、`git diff`、`git log`、ブランチ作成、`git commit`を通常利用できるようにする。
-- Git Bundleには過去の削除済みファイルやSecretが含まれ得る。参照・到達オブジェクトの対象を制限し、転送前の機密性を検査する。安全を確認できない履歴は転送せずFail-Closedとする。
-- HostのSSH Agent、認証設定、Git Push権限をGuestへ暗黙に渡さない。外部へのGit Pushは別途明示承認の対象。
+## 7. Workspace Snapshotと再利用時の同期 — F-003限定訂正
 
-Git Bundleは履歴の輸送手段であり、現在のHost Working Treeの未Commit内容を自動的に含めるものではない。この2つを別々に検証・復元する。
+HostのWorkspaceディレクトリはGuestへ直接マウントしない。Gitルートはsymlinkでない正規化パスとし、Snapshotの前後で同一Identityを確認する。
 
-## 9. 認証とProvider
+### Git Baseline（Snapshotとは独立）
 
-`apm.yml`はProvider/モデル選択のSSOTとする。Host側の既存Credential ProxyとDockerのCredential Bindingを再利用する。
+SessionGenerationごとに、以下を決定論的に記録し、全体SHA-256をReceiptに格納する。
 
-- OpenAI OAuth: 既に登録済みのHost Broker/Proxy経由で使用する。SecretをSnapshot、APM、Git、Guest環境へ平文コピーしない。
-- Cloudflare AI Gateway: APMで選択されたProviderに応じて利用可否を自動決定し、検証済みの非Secret IDと既存SecretのBindingを解決する。毎回`--use-cloudflare-ai-gateway`を入力する必要をなくす。
-- 登録済みCredentialが欠ける・期限切れ・Brokerが利用不能なら明示的に案内し、安全に停止する。勝手にGuestへTokenを埋め込まない。
-- 外部推論の許可はHost側の明示的で取り消し可能な利用ポリシーに基づく。初回の確認なく課金可能な推論を有効化しない。モデル選択自体はAPMに従う。
-- OpenCode v1のCredential、環境、設定には変更を加えない。
+- `head_oid`（40/64桁Git OID）、`branch_ref`（symbolic HEADの完全Ref）、`object_format`（SHA-1/SHA-256）、`index_oid`（生IndexバイトのSHA-256）、`index_entries`（`git ls-files --stage -z`の正規化レコード、mode/blob OID/stage/intent-to-addを含む）。
+- `staged_delta`（HEAD→Index）、`unstaged_delta`（Index→Working Tree）、`untracked_files`（`git ls-files --others --exclude-standard -z`に相当する安全なファイルのPath/Mode/Size/SHA-256）。区分を混合しない。
+- `working_manifest`（既存ファイルSnapshot Manifest）、`transfer_policy_id`、各差分のSHA-256。IndexとWorking TreeがGit HEADに対してdirtyかを別々に記録する。
 
-## 10. TUI終了後のCollect / Preview / Apply
+`git diff --cached`と`git diff`、Index entries、Snapshotの結果が同一瞬間を示すまで再照合する。衝突状態のIndex（stage 1/2/3）、unborn HEAD、Submodule、Git Object代替格納など現段階で復元を検証できないケースはGuest起動前にFail-Closedする。Ignored/除外/Secretファイルは転送しない。対象外ファイルはGuestに存在するかのように再現せず、部分的なGit状態であることを明示する。
 
-TUI終了後、Launcherは変更を自動**収集**して提示する。自動**適用**はしない。
+### Guest復元と三者比較
 
-1. GuestのCommit履歴（Bundle等）と未Commit差分を隔離されたHost側の一時領域/参照に収集する。
-2. File Manifest、Secret検査、Git履歴、HostのHEAD・Index・作業ツリーの現在状態を照合する。
-3. 追加・変更・削除・Commit一覧と適用可否を提示する。
-4. **Human Ownerの1回の承認**で、安全に成立する変更だけをHostへ適用する。
-5. 承認拒否、失敗、競合時はGuestの変更と隔離済み成果を保持する。
+1. 許可済みGit BundleをGuestの独立Repositoryへ取り込み、同じHEAD OID/Branchから開始。
+2. Guest IndexをHostのStaged状態へ再構成し、その上にUnstaged変更と安全なUntrackedファイルを適用する。結果のHEAD/Index entries/Staged delta/Unstaged delta/Untracked ManifestをHost Baselineと比較し、不一致なら起動しない。
+3. Sandbox再利用時には**Base（前回正常同期時）、現在のHost、現在のGuest**をHEAD・Index・Working Tree・Untrackedの各層で比較する。Guestの未反映変更があれば自動上書きせず`PENDING`扱いにする。Hostのみ変更された場合に限り、差分を安全に同期して新GenerationのBaselineへ更新する。
+4. HostとGuestがともに変更されている場合、経路ごとのファイルHashが一致してもGit層（Stage/Commit）の競合があれば停止し、Owner承認なしにMerge/Rebase/Resetしない。
 
-Git Commitは履歴を保持し、安全にFast-forwardできる場合のみHostの対象ブランチへ取り込む。未Commit変更は別途差分として適用する。Hostブランチが分岐している場合、無断Merge/Rebase/Reset/Force Pushを行わず、隔離Refへ保存して停止する。
+GuestのCommitは**Session開始後のCommit OID集合とParent関係**でHostから転送した履歴と区別する。Host由来の未Commit変更がGuest Commitへ含まれた場合、それを再びUncommitted差分として二重適用しない。Guest最終状態は`base HEAD → Guest commits → Guest final Index/Working Tree`の単一状態として計算する。Host baselineがdirtyの場合のCommit取込みの保留条件は§10に従う。
 
-Hostが起動・同期時から更新された場合や、Index/Worktreeの変更が衝突する場合も自動上書きしない。適用操作は競合検出から書込みまでの整合性を再確認し、部分的な失敗でもデータを失わない。承認前にHostの現行HEADやファイルを変更しない。
+## 8. Sandbox内のGit履歴・Commit — F-003限定訂正
+
+Mountlessを維持したまま、**選択的Git Bundle**からGuest内に独立したGit Repositoryを構築する。
+
+- Hostの`.git`はマウント・丸ごとコピーしない。GuestにはHostのSSH Agent、Git Credentials、Remote Push権限、任意の外部Remoteを与えない。
+- Bundleで転送するRefは**Session開始時の検証済み`HEAD`のCommit OIDのみ**とし、必要な祖先とTree/Blob到達Objectだけを含める。Remote-tracking Ref、Tag、無関係なBranch、Stash、Reflogの輸送を禁止する。
+- Git Bundleの`list-heads`、`verify`、Object整合検証に加え、転送可能なReachable Objectの全量・サイズと履歴中のBlobに対するSecret/除外ポリシーを検査する。**現在のWorking Treeが安全でも過去のCommitが安全とは限らない。** 完全に検査できない場合は履歴転送を停止し、密かに非Gitモードへ退避しない。
+- Host SnapshotとGit Bundleは別々に転送・Digest照合する。GuestのHEAD/Branch/Index/Working Treeの一致が取れるまではTUIを起動しない。
+- Guest内で`git status`、`git diff`、`git log`、Branch作成、`git commit`を利用可能とする。Guestが別Branchに移った場合や非Fast-forward Commitを作った場合もCommitは収集対象に残し、Hostへ無断で反映しない。
+- Collectでは、Host由来の転送済みCommitとGuest新規CommitをOIDとParent関係で識別し、Guestが最終HEADに含めたHost未Commit内容と残存Unstaged差分を**二重計上しない**。Guestに複数の未統合Branchがあれば明示的に収集候補を表示し、現在HEAD以外を無条件にApplyしない。
+
+Commitを取り込める条件、Dirty Baselineでの保留、Hostへの順序は§10で固定する。
+
+## 9. 認証とProvider — F-005限定訂正
+
+`apm.yml`はモデルとProviderの**設定選択**のSSOTであり、課金可能な外部推論の**操作許可**は別権限とする。Host Credential ProxyとDocker Credential Bindingを維持し、OpenAI OAuthおよびCloudflare AI GatewayのSecretをGuest設定・Git・Snapshotへ平文転送しない。
+
+### Host継続許可ポリシー
+
+- 保存先: `$XDG_STATE_HOME/oc2/policy/inference-v1.json`（未指定時は`~/.local/state/oc2/policy/inference-v1.json`）。`schema=dotfiles-ai/oc2-inference-policy/v1`、Host Launcherのみが作成・変更し、所有者UID一致、ディレクトリ0700・ファイル0600、symlink/不明Schema/不正値は拒否する。
+- 1 Grantの厳密なスコープは**Host UID、WorkspaceID＋正規化Host Path、Provider ID、非Secret Account IdentityのFingerprint、明示的なModel ID集合、承認時刻、失効時刻（UTC）、grant_id**。Credential本文/Tokenを保存しない。
+- 初回は`oc2`のTUI起動前に、APMで実際に選択されたProvider/Modelごとの対象と外部推論・課金の可能性を表示し、端末で明示承認する。承認されるまで当該Providerを使うRuntimeを起動しない。非対話・拒否の場合は`INFERENCE_NOT_AUTHORIZED`で停止する（推論・課金なし）。
+- Grantは**30日以内**の有効期限を持つ（初回既定30日、長期無期限は不可）。承認済みの同一スコープでは後続の通常`oc2`は再質問しない。失効・明示取消・Account/Workspace/Provider/Model許可範囲変更時は再承認が必要。
+- 取消操作は明示的なHost CLI `oc2 --revoke-inference`とし、対象WorkspaceのGrantを無効化する。期限・取消・破損は次回Launcher起動時にFail-Closed。既に動作中の推論を即座に強制停止する機構ではないことを明示する。
+- Provider一覧への登録、Credentialの存在、Docker Brokerの利用可能性は推論許可ではない。`apm.yml`の選択と許可Grantの**積集合のみ**利用可能。許可外のProvider/ModelがTUIのモデル切替で利用可能とならないよう、生成Runtimeと実際の通信経路の許可境界で拒否する。APMに新しいModel/Providerを追加しても既存Grantを拡張しない。
+- Cloudflare AI GatewayはAPM選択に従って自動解決し、別途`--use-cloudflare-ai-gateway`の常用を不要にする。Account識別子・SecretのHost ScopeとProxy Bindingを照合する。欠損・期限切れ・不整合時に別AccountやOpenAIへFallbackしない。
+- 既存`--allow-paid-inference`の起動単位許可は新ポリシーへ自動移行せず、移行後の通常`oc2`は本Grantを使う。明示的な互換オプションを残す場合も範囲外の権限昇格を許さない。
+- OpenCode v1の認証情報、設定、利用許可には影響しない。
+
+継続Grantは起動操作を簡素化するものであり、外部送信・課金ゼロや予算上限を自動保証するものではない。
+
+## 10. TUI終了後のCollect / Preview / Apply — F-004限定訂正
+
+TUI終了時にCollectとPreviewを自動実行するが、**Host ApplyはHuman Ownerの承認まで絶対に実行しない**。対象はSessionKeyで固定したGuest最終HEAD、Guest新規Commit OID群、最終Index/Working Tree/Untrackedの集合であり、最新状態を再取得して黙って差し替えない。
+
+### 10.1 収集と候補の固定
+
+1. Guest Commit（BundleとOID）、GuestのIndex/Working Tree/Untracked、最終File ManifestをHostのWorkspace外・0700のSession `collection/`に保存し、全ファイルSHA-256と`collection_digest`を記録する。収集後はそのGenerationのCollectionを不変として扱う。
+2. Guest CommitのParentがHost Baseline HEADへ連続するか、最終Guest HEADが選択されたBranchに属するか、Commit済み内容と残存未Commit内容が二重計上されないかを検証する。
+3. OwnerへのPreviewには対象Workspace/Branch、SessionKey、Host Baseline HEAD、収集済みGuest HEAD、Commit OID一覧、Staged/Unstaged/Untrackedの追加/変更/削除、`collection_digest`、適用可能/保留理由を提示する。
+4. Owner承認は`ApplyAuthorization` = (`SessionKey`, `collection_digest`, `host_baseline_digest`, `expected_host_head`, `expected_index_digest`, `expected_worktree_digest`, `target_result_digest`, `approved_at`)の**1回限りの同意**とする。候補に変化があれば同意を再利用しない。
+
+### 10.2 Apply可否の一意な条件
+
+- 共通前提: Host Workspace/BranchがBaselineと同じ、HEAD OID・Index Digest・Working Tree/Untracked Manifestが**Baselineから不変**、対象ファイルのsymlink/permission/secret検査PASS、Guest Collection Identity一致、他のApplyが非稼働、既存未完了Journalがない。
+- **Guest新規Commitなし:** HostのBaselineがDirtyでも、Index（staged状態）とWorking Tree（unstaged/untracked状態）をBaseから最終Guest状態へ安全に再現できる場合に限り適用可能。Hostの既存変更を上書きせず、三者の前提一致を必須とする。
+- **Guest新規Commitあり、Host BaselineがClean:** Guest HEADがHost HEADのFast-forward先で、Guest残存差分を二重計上せず再現できる場合に限り、Commit履歴と最終Index/Working Treeを一括適用可能。
+- **Guest新規Commitあり、Host BaselineがDirty:** Hostが不変でも、既存のStaged/Unstaged/UntrackedとGuest Commitの整合を自動証明できないため、**通常Apply全体を保留**する。CommitをHost側の隔離Ref/Bundleに保持し、Hostの作業状態を変更しない。Ownerが別途手動整理するまではFile差分だけ先行適用して後からCommitを二重取込みしない。
+- **Host HEAD分岐、Index/Working TreeのBaseline逸脱、Guest非Fast-forward:** 通常Apply全体を保留する。Commitは`refs/oc2/pending/<workspace-id>/<session-generation>`へ検証済みの隔離Refとして保存し、Worktree/Index/現在Branch Refは変更しない。隔離Refを保存できない場合もCollection Bundleを保持し、削除しない。
+- **部分適用は禁止**。対象Commit・Index・Working Treeを同一Owner承認の1トランザクションとして扱い、成功を偽装しない。新しいCommitを取込まない一部ファイルのApply、暗黙Merge/Rebase/Reset、Force Pushは行わない。
+
+### 10.3 更新順序とクラッシュ復旧
+
+Git Ref・Index・Working Treeは単一の原子更新単位ではないため、**事前準備＋Undo Journal＋CAS Ref更新**を規定する。
+
+1. Host側Workspaceの排他Applyロックを保持し、承認対象の固定Collection、現行HEAD/Index/全対象Working Tree/Untrackedを再検証する（検査後に外部プロセスの競合が検出されたら停止）。
+2. 現行HEAD/Index原本・対象ファイルの原本/Mode/不在状態をWorkspace外の私有復旧領域へ永続バックアップし、所望の新IndexとWorking Treeファイルを一時領域で全量準備・検証する。承認前のHost Ref/Index/Working Treeは書き換えない。
+3. `apply-journal.json`へ`PREPARED`をfsyncしてから、同一データを参照する`APPLYING`を永続化する。以後は再入時にも復旧判定を優先する。
+4. 再検証に成功した場合、用意したWorking TreeとIndexの更新を行い、**最後に**Fast-forward対象BranchのRefを期待旧OIDから期待新OIDへCAS更新する。各段階の実行結果・HashをJournalへ記録する。Ref変更なしの場合は新しいIndex/Working Tree検証だけで完成判定する。
+5. 全部一致したときのみ`APPLIED`を永続記録し、承認を消費する。書込み途中の失敗やRef CAS失敗時は、JournalとバックアップからHostの元状態へ戻す。Rollbackの各対象も現在内容を確認してから復元し、外部変更を上書きしない。
+6. 異常終了からの再起動時、Refが旧OIDならBackupと書込み済みファイルを照合して安全にRollbackする。Refが新OIDかつ最終Index/Worktreeが期待値ならCommit済みとして完了記録する。どちらとも判定できない、外部書換えがある、Rollback失敗時は`RECOVERY_REQUIRED`として**自動Apply・再利用・削除を停止**し、原本・Journal・Collectionを保全する。
+
+この方式でも他のHostプロセスから途中状態が一時的に見える可能性は残る。**完全な原子性を主張しない**。各段階の書込み・RenameとRef更新の整合性を照合し、Hostの既存データを失わないことを最優先とする。
 
 ## 11. エラー・保全条件
 
-- Mount、Sandbox ID、Artifact、Runtime、Session Receipt、Credential、Manifestの不一致はFail-Closed。
-- 同時起動時のLease重複、未回収のGuest変更、同期競合、Secret検出では既存データを保存して停止または安全な独立Sandboxへ分岐する。
-- `sbx exec`が停止中Sandboxを起動し得る点を考慮し、`--dry-run`や情報表示の経路では副作用を避ける。
-- Sandbox削除、作業データ破棄、HostのGit履歴改変、Credential更新、外部Git Pushは通常の`oc2`操作に暗黙に含めない。
-- デバッグ用ログとSession状態にToken、認証DB、Secret本文を記録しない。
+- Mount、Sandbox ID、Artifact、Version Lock、Runtime、Session v3 Receipt、Git Baseline、Collection、Credential、推論Grant、Workspace Manifestの不一致はFail-Closed。個別の不一致を自動で同一視・修復しない。
+- 同時起動時のLease重複、未回収のGuest変更、同期競合、Secret検出、Legacy v2状態、Git Ref分岐、Apply Journal未終端では既存データを保存して停止または新しい独立Sandboxを選択する（既存状態への書込みは禁止）。
+- `sbx exec`が停止中Sandboxを起動し得る点を考慮し、`--dry-run`や情報表示の経路で副作用のある検査をしない。
+- Sandbox削除、作業データ破棄、Host Gitの無断Merge/Rebase/Reset、Credential更新、外部Git Push、信頼済みLockの更新、推論Grantの拡張は通常`oc2`操作に暗黙に含めない。
+- Host側状態はWorkspace外に0700/0600で保存し、symlink・所有者・重複Identityを拒否する。デバッグログやReceiptにToken、認証DB、Secret本文を記録しない。
+- 異常停止時は観測済みFailureと未実行・不明を区別する。Guest/Host成果が残るときは削除せず`PENDING`/`RECOVERY_REQUIRED`として可視化する。
 
-## 12. 受入条件
+**非機能契約:** 起動・同時起動・同期・ApplyはWorkspace/Session単位の排他制御を持ち、Secret出力を抑止する。設定・Identity・Receiptは決定論的に検証可能とし、通常経路に無制限の自動Retryや追加ネットワーク取得を組み込まない。
+
+## 12. 受入条件・テスト境界
 
 1. Gitリポジトリのルートで`oc2`のみを実行して、APM指定バージョンのOpenCode TUIを起動できる。
-2. APMとLockが一致しないバージョンでは、安全に起動を拒否する。
-3. 初回起動後、空きSandboxを正しいIdentityで再利用でき、使用中の多重起動は独立Sandboxを使う。
-4. 既存Sandbox再利用時にHostの最新Workspaceを同期し、Guest未反映変更を失わない。
-5. Hostの未Commit・安全な未追跡ファイルをGuestで利用できる。Hostの`.git`やSecretを直接共有しない。
-6. GuestでGit履歴閲覧、ブランチ作成、Commit、未Commit編集が機能する。
-7. TUI終了時にCommit・未Commit差分を収集・提示し、Human Ownerの1回の承認で安全にHostへ反映できる。
-8. HostのHEAD分岐、並行編集、Secret混入、同期不整合ではデータを保持してFail-Closedする。
-9. APMに基づくOpenAI OAuth/Cloudflareの認証解決が動作し、Secretの直接転送や無承認推論を行わない。
-10. 既存OC2 Phase 5機能、OpenCode v1環境、隔離・固定Artifact検証を回帰させない。
+2. 承認済みVersion Lockだけが実行され、未登録Version、未承認Lock、Platform/Archive/Binary Digest/Host・Guest Identity不一致をFail-Closedできる。
+3. 空きSandboxは正しいWorkspace/SandboxID/Generation/CLI/Runtime Identityで再利用、同時起動は別Sandboxと別Session Receiptを使用する。
+4. Host/Guest Baseline、Lease、Collect、Apply JournalはSessionGeneration単位で隔離され、異常終了でも互いの成果を上書きしない。旧v2 Receiptも保護する。
+5. HostのGit HEAD、Staged、Unstaged、UntrackedをGuestで区別して再現できる。履歴中のSecret/除外Objectが検出された場合はBundle転送せず停止する。
+6. GuestのBranch/Commit/未Commit編集を収集し、Host由来の未Commit内容を二重適用しない。
+7. TUI終了時に固定CollectionをPreviewし、Ownerが1回承認した同じIdentityだけをHostへ適用できる。変更された候補や再承認なしの再適用は禁止。
+8. Clean Baseline＋Guest Fast-forward Commitは履歴保持で反映でき、Dirty Baseline＋Guest CommitはCollection/隔離Refを保全して全体保留する。Guest CommitなしのDirty BaselineはStaged/Unstagedの独立状態を安全に反映できる。
+9. Host HEAD/Index/WorktreeのBaseline逸脱、Ref分岐、途中クラッシュ、Rollback不能を再現し、データ消失・Partial Successなしで`RECOVERY_REQUIRED`または保留へ移行できる。
+10. 初回のみ有効期限付き推論Grantを承認し、同一スコープで`oc2`だけの継続起動ができる。未承認・期限切れ・取消・Provider/Model/Account/Workspaceの変更は推論前に停止する。
+11. OpenAI OAuth、Cloudflare Credential BindingとAPM Provider選択を維持し、OpenCode v1やHostのCredentialを変更しない。
+12. 既存OC2 Phase 5のPlugin/MCP/Runtime検証、Mountless隔離、固定Artifact境界を回帰させない。
+
+テストは**オフライン単体・統合検証を先行**し、Version Lock/Schema異常、2つの並行Session、Lease Crash、Stage/Unstage/Untracked、Git履歴Secret、Fast-forward/分岐、Apply Fault Injection、Grant失効/取消を決定論的なFixtureで検証する。Sandbox・実際の推論・Credential操作による実機受入は、実装とは別途Human Ownerの承認がある場合だけ行う。未実行をPASS/FAILと混同しない。
 
 ## 13. 非目標・停止条件・後続判断
 
 **非目標:** Direct Mount化、既存Runtime全面再実装、OpenCode v1改変、任意Plugin/MCPの解禁、任意未検証CLI起動、無承認Git Push、無断Host書込み、既存Sandboxの自動破棄。
 
-**設計完了条件:** 承認済みの操作体験、安全境界、Git履歴・未Commit同期、競合時挙動と受入条件を1文書で定義すること。
+**今回の限定訂正の完了条件:** F-001（Version Lock）、F-002（多重Session）、F-003（Git Baseline）、F-004（Host Apply）、F-005（外部推論Grant）の主要責務・Identity・状態・失敗時契約を本Designで一意に定めること。既存のMountless/Snapshot/選択的Bundle/APM SSOT/Owner Apply承認を変更しない。
 
-**停止条件:** 本Designの記録・Commit・Push後は終了する。実装、Implementation Plan、独立レビュー、PR、Merge、Sandbox実機操作、Credential変更は、別途Human Ownerが承認するまで自動開始しない。
+**承認境界:** R0.1の既存アーキテクチャはHuman Owner採択済み。R0.1.1の限定訂正はOwnerの文書訂正承認に基づき記録するもので、**訂正後の設計採択・実装開始の承認を意味しない**。
+
+**停止条件:** 本Design R0.1.1を1文書更新・Commit・Pushした後は終了する。Implementation Plan、実装、追加の独立レビュー、PR、Merge、Sandbox/Runtime実機操作、Credential変更は、別途Human Ownerが承認するまで自動開始しない。
+
