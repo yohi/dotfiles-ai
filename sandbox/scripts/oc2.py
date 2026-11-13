@@ -1037,8 +1037,6 @@ def stage(runner: Runner, name: str, bundle: pathlib.Path, manifest_sha: str,
         )
         args.extend(['--assets', remote_assets, '--expected-assets-sha', assets_sha])
     if phase4_plugin_file is not None and phase4_plugins_sha is not None:
-        if re.fullmatch(r'[0-9a-f]{64}', phase4_plugins_sha) is None:
-            raise Stop('invalid Phase 4 plugin asset hash')
         remote_phase4 = f'{ROOT}/assets/phase4-{phase4_plugins_sha[:16]}.json'
         status = runner.destination_status(name, remote_phase4)
         if status == 0:
