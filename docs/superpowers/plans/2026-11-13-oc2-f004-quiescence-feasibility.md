@@ -10,7 +10,9 @@
 
 **Spec:** `docs/superpowers/specs/2026-11-13-oc2-daily-launcher-design.md` — Design R0.1.3 at commit `32957409840f99aa25c974c3a31547fc25e32ab2`, blob `bb4218078c5dcb4c609fe0c8d77fe778ee1ebbfa`; §6, §10.1, §11 and §12.
 
-**Scope:** F-004 **feasibility only**, not implementation of OC2 Daily Launcher. The Plan is a document, not authorization to write code or operate a Sandbox.
+**Scope:** F-004 **feasibility only**, not implementation of OC2 Daily Launcher. The Plan is a document, not authorization to write code or operate a Sandbox. This correction is limited to Review Gate findings **F-004-P1/P2/P3**; do not introduce a different architecture.
+
+**Owner Decision (separate authorities):** (1) Design R0.1.3 was **accepted as a document with blockers** (`ADOPT_DESIGN_R0.1.3_WITH_BLOCKERS`); (2) unrestricted/final implementation-ready Design adoption and residual-risk acceptance are **NOT AUTHORIZED**; (3) this Plan's drafting and prior GitHub commit were authorized, but **execution of this Feasibility Plan is NOT AUTHORIZED**; (4) production implementation/Host Apply **GO = HOLD**. None of these decisions imply the next one. Do not treat Plan review or documentation correction as PoC execution approval.
 
 ## Global Constraints
 
@@ -22,6 +24,8 @@
 - `frozen 1` is necessary but insufficient: it does not prove absence of escaped, migrated, privileged, or out-of-group writers.
 - Existing single-Writer PoC passed **for its fixture only**; do not rerun it or treat it as full OpenCode/Plugin/MCP coverage.
 - A FAIL or NOT_VERIFIED never creates final `collection_digest`, `ApplyAuthorization`, or Host Apply. Preserve Guest original and partial evidence, and stop without switching architectures automatically.
+- All three full-runtime Gates must derive from **one probe_run_id, one SessionKey, one SandboxID and one Writer Group identity**, with individually verified SHA-256 Evidence Manifests. Evidence gathered from another Session, fixture, different Sandbox or another run cannot be silently combined.
+- **Verdict semantics:** observed successful prohibited write, observed Writer escape, or observed unauthorized source mutation is `FAIL`; not executed, unable to observe, unknown, missing/mismatched evidence, or incomplete runtime coverage is `NOT_VERIFIED`. An independently verified unsafe `FAIL` for this probe run takes priority over missing Gates; invalid or unrelated evidence never becomes `PASS`.
 
 ## File Map
 
@@ -38,29 +42,41 @@
 - `sandbox/tests/fixtures/f004_collector.py`: non-writing collector probe; prohibited-write tests.
 - Evidence: `/tmp/oc2-f004-feasibility.<unique>/` (not committed and without credentials/private project data).
 
-**Test-only interface fixed across tasks:**
+**Test-only interface fixed across tasks (F-004-P2):**
 
 ```python
 from dataclasses import dataclass
+from collections.abc import Mapping
 from typing import Literal
 
 ProbeVerdict = Literal['PASS', 'FAIL', 'NOT_VERIFIED']
+ProbeScope = Literal['fixture', 'full-runtime']
 
 @dataclass(frozen=True)
 class GateResult:
     gate: Literal['containment', 'collector', 'consistency']
+    probe_run_id: str
+    session_key: tuple[str, str, str]  # WorkspaceID, SandboxID, SessionGeneration
+    sandbox_id: str
+    writer_group_identity: str
+    evidence_manifest_digest: str  # SHA-256 of the canonical manifest bytes
+    scope: ProbeScope
     verdict: ProbeVerdict
     evidence_paths: tuple[str, ...]
-    scope: Literal['fixture', 'full-runtime']
     reason: str
 
-def combine_gates(results: tuple[GateResult, ...]) -> ProbeVerdict:
-    # FAIL if an observed unsafe condition exists; PASS only for exactly
-    # three full-runtime PASS gates; otherwise NOT_VERIFIED.
+def combine_gates(
+    results: tuple[GateResult, ...],
+    manifests_by_digest: Mapping[str, bytes],
+) -> ProbeVerdict:
+    # Verify every used manifest/digest and binding to the run/SessionKey/
+    # SandboxID/cgroup identity/scope, then aggregate. No proof, no PASS.
     ...
 ```
 
-Every PASS must reference concrete kernel/cgroup/process/permission/hash observations, not just asserted booleans.
+**Evidence Manifest v1 (test-only, canonical UTF-8 JSON):** Each Gate has one immutable manifest containing `schema`, `gate`, `probe_run_id`, `session_key` (3 elements, including matching `sandbox_id`), `sandbox_id`, `writer_group_identity`, `scope`, `verdict`, `observations` (executed operation, expected/observed outcome, evidence file SHA-256), `evidence_file_digests`, `runtime_participants` (actual OpenCode/approved Plugin/MCP versions and observed processes for full-runtime), and `reason`. Canonical encoding: UTF-8, `sort_keys=True`, `separators=(',', ':')`, `ensure_ascii=False`; `evidence_manifest_digest = sha256(canonical_manifest_bytes)`. The digest is not embedded within its own manifest. `writer_group_identity` records the observed cgroup-v2 mount/namespace identity, canonical cgroup path and directory inode within the same live Sandbox; the raw identity is recorded identically in all three Gates, not inferred from an arbitrary PID. Evidence paths must stay under the private PoC evidence directory; verify content SHA-256 before trusting the manifest.
+
+**Aggregation contract:** Before any PASS, verify manifest SHA-256, every referenced evidence hash, exact `GateResult`↔Manifest field agreement and **identical** `probe_run_id`, `session_key`, `sandbox_id`, `writer_group_identity` across the three Gates. Reject duplicate/missing Gates, mixed Session/Sandbox/run identity, fixture presented as full-runtime, manifest mismatch, unknown outcomes or omitted negative probes as `NOT_VERIFIED` (never PASS). A **verified observed unsafe event belonging to the probe run** wins as `FAIL`, even if other Gates remain unexecuted. Mere absence of evidence is `NOT_VERIFIED`, not an observed failure. No test-only PASS produces a production Collection Digest or ApplyAuthorization.
 
 ## Review Focus — Dangerous inputs requiring negative tests
 
@@ -78,9 +94,9 @@ Every PASS must reference concrete kernel/cgroup/process/permission/hash observa
 
 **Interfaces:** Produces `GateResult` and `combine_gates(...)` for Tasks 2–4. Consumes evidence references tied to a Sandbox ID and SessionKey.
 
-- [ ] **Step 1 — RED:** Write tests `test_three_full_runtime_passes_required`, `test_fixture_pass_is_not_full_runtime_pass`, `test_missing_or_duplicate_gate_not_verified`, `test_observed_escape_is_fail`, `test_digest_not_issued_on_failure`. Assertions: only three distinct full-runtime PASS gates yield PASS; unsafe observation yields FAIL; incomplete proof yields NOT_VERIFIED.
+- [ ] **Step 1 — RED:** Write tests `test_three_full_runtime_passes_required`, `test_fixture_pass_is_not_full_runtime_pass`, `test_missing_or_duplicate_gate_not_verified`, `test_mixed_probe_run_rejected`, `test_mixed_session_or_sandbox_rejected`, `test_writer_group_identity_mismatch_rejected`, `test_manifest_digest_mismatch_rejected`, `test_missing_evidence_file_not_verified`, `test_observed_escape_is_fail_even_when_other_gate_missing`, `test_digest_not_issued_on_failure`. Assert exact run/Session/Sandbox/Writer Group/manifest binding, verified-unsafe `FAIL` precedence, and incomplete-proof `NOT_VERIFIED`.
 - [ ] **Step 2 — Verify RED:** `python3 -m unittest sandbox.tests.test_oc2_f004_feasibility -v`; expect failure because gate implementation is missing.
-- [ ] **Step 3 — Minimal implementation:** Add the exact test-only interface above and deterministic validation of gate coverage, evidence references, verdict and scope. Do not add launcher integration.
+- [ ] **Step 3 — Minimal implementation:** Add the exact `GateResult`/Evidence Manifest v1 interface above and validation of Gate↔Manifest SHA-256, referenced evidence SHA-256, identity equality, fixture/full-runtime scope, Gate coverage, negative-probe outcomes and verified-unsafe `FAIL` precedence. Do not add launcher integration or production digest issuance.
 - [ ] **Step 4 — Verify GREEN:** Re-run the same unit tests; expect named tests PASS.
 - [ ] **Step 5 — Stop:** Record test results. Do not commit without separate Owner GitHub-write approval.
 
@@ -95,57 +111,59 @@ Every PASS must reference concrete kernel/cgroup/process/permission/hash observa
 - [ ] **Step 1 — RED:** Add tests `test_writer_attached_before_first_instruction`, `test_child_and_detached_grandchild_captured`, `test_writer_cgroup_migration_refused`, `test_privileged_socket_or_capability_escape_refused`, `test_unexamined_plugin_topology_not_verified`.
 - [ ] **Step 2 — Verify RED:** Run `python3 -m unittest sandbox.tests.test_oc2_f004_feasibility -v`; expect failures in newly added tests only.
 - [ ] **Step 3 — Minimal fixture:** Implement synthetic parent/child/grandchild/background Writer, with instrumentation proving membership **before the first file write**. Assess an atomic spawn-into-cgroup primitive such as `clone3(CLONE_INTO_CGROUP)` under actual Sandbox permissions/seccomp; an after-spawn `echo PID > cgroup.procs` alone is insufficient. Do not install packages or broaden the mechanism if unavailable.
-- [ ] **Step 4 — Authorized Sandbox test:** Launch fixture under the Session Writer Group; collect `/proc/<pid>/cgroup`, creation/exit evidence, `cgroup.events`, UID/capabilities, socket exposure and migration attempt results. Attempt out-of-group writes and privileged escape using only disposable fixture files. Observe `frozen 1` once all fixture writers are captured.
-- [ ] **Step 5 — Full-runtime applicability:** Verify **actual** OpenCode, approved Plugin/MCP and spawned/background writers under a no-inference, no-credential configuration if achievable without changing production configuration. Otherwise record full-runtime `NOT_VERIFIED`, even if the synthetic fixture passes. Successful privileged escape is `FAIL`.
+- [ ] **Step 4 — Authorized fixture pass:** Allocate a unique `probe_run_id`, SessionKey, SandboxID, Writer Group identity and private evidence directory. Launch the synthetic fixture under the Writer Group; collect `/proc/<pid>/cgroup`, creation/exit evidence, `cgroup.events`, UID/capabilities, socket exposure and migration-attempt results. Attempt out-of-group writes and privileged escape using **only disposable fixture files**. Observe `frozen 1` once all fixture writers are captured. Emit a `scope='fixture'` Evidence Manifest; do not label it full-runtime.
+- [ ] **Step 5 — Separately observed full-runtime pass:** On the **same controlled probe run identity** and disposable Sandbox, start the *actual* approved OpenCode/Plugin/MCP process configuration with no credentials, no inference, no production repository and no unapproved configuration changes; verify the complete runtime topology including idle/detached/background children **before first write** and attempted cgroup migration/escape. Emit a separate `scope='full-runtime'` Evidence Manifest. If actual participants cannot be launched or their topology cannot be exhaustively observed, record full-runtime `NOT_VERIFIED` (not a fabricated PASS); observed unauthorized escape/write is `FAIL`. Do not promote the preceding fixture result.
 - [ ] **Step 6 — Verify GREEN and classify:** Run `python3 -m unittest sandbox.tests.test_oc2_f004_feasibility -v`; retain per-process evidence and output one containment GateResult. Stop if bypass observed or complete topology cannot be verified; do not start alternate mechanisms.
 
 **Deliverable:** Evidence about pre-exec capture, descendants, migration/escape, and external writers; not just a Freeze test.
 
-### Task 3: Enforced read-only Collector
+### Task 3: Enforced read-only Collector — fixture / full-runtime explicitly separated (F-004-P1)
 
 **Files:** Create `sandbox/tests/fixtures/f004_collector.py`; extend `sandbox/tests/test_oc2_f004_feasibility.py`; evidence `/tmp/oc2-f004-feasibility.*/collector/`.
 
-**Interfaces:** Consumes frozen fixture repository and containment evidence. Produces `GateResult(gate='collector', ...)`.
+**Interfaces:** Consumes Task 2 containment evidence tied to the same `probe_run_id`, `session_key`, `sandbox_id`, `writer_group_identity`; produces a Collector `GateResult` and SHA-256-verified Evidence Manifest with explicit `scope='fixture'` or `scope='full-runtime'`.
 
-- [ ] **Step 1 — RED:** Add tests `test_collector_reads_git_layers`, `test_index_object_worktree_writes_denied`, `test_rename_unlink_denied`, `test_writable_remount_denied`, `test_collector_cannot_spawn_writer_to_source`.
-- [ ] **Step 2 — Verify RED:** `python3 -m unittest sandbox.tests.test_oc2_f004_feasibility -v`; expect newly added tests FAIL.
-- [ ] **Step 3 — Establish real enforcement:** Attempt an independent collector identity outside Writer Group, with a **kernel-enforced read-only source view**, no write/remount capability and a separate writable staging area (e.g. separate mount namespace and read-only bind view **if supported**). Environment variable `GIT_OPTIONAL_LOCKS=0` or an application promise alone is insufficient.
-- [ ] **Step 4 — Test negative operations:** Explicitly attempt `open(O_WRONLY)`, index update, object creation, rename/unlink, privileged remount and a child writer against source; all must be denied. Run Git HEAD/Index/Working Tree/Untracked reads and selective Bundle/Manifest creation **to staging**, comparing raw Index/source hashes before/after. Never exercise these probes on an actual user repository.
-- [ ] **Step 5 — Verify GREEN and classify:** Run offline unit tests and record observed permission/capability/mount failures. If read-only enforcement cannot be established, result is `NOT_VERIFIED`, no unapproved workaround.
+- [ ] **Step 1 — RED:** Add tests `test_fixture_collector_reads_git_layers`, `test_fixture_index_object_worktree_writes_denied`, `test_fixture_rename_unlink_denied`, `test_fixture_writable_remount_denied`, `test_full_runtime_collector_boundary_required`, `test_no_full_runtime_collector_evidence_not_verified`, `test_manifest_identity_binding`.
+- [ ] **Step 2 — Verify RED:** `python3 -m unittest sandbox.tests.test_oc2_f004_feasibility -v`; expect newly added tests to FAIL.
+- [ ] **Step 3 — Establish enforcement (fixture):** Build an independent Collector process **outside Writer Group**, with a kernel-enforced read-only view of a **disposable Git repository** and writable staging elsewhere. Verify actual permissions, UID/capabilities and mount namespace; read-only environment flags or `GIT_OPTIONAL_LOCKS=0` do not prove enforcement. If mount/capability restriction is unsupported, record `NOT_VERIFIED`; do not silently substitute a weaker architecture.
+- [ ] **Step 4 — Run fixture negative probes:** Against the disposable source only, attempt `open(O_WRONLY)`, Index update, Git Object creation, Working Tree modification, rename/unlink, remount writable and a child Writer from the Collector context. Record the observed errno/exit for each; **any actually successful forbidden source write or privilege bypass = `FAIL`**. Verify HEAD, raw Index hash, Git Objects, Working Tree and Untracked before/after; generate selected Bundle/Manifest only in staging. Emit immutable `scope='fixture'` evidence and manifest.
+- [ ] **Step 5 — Run separate full-runtime Collector probe:** In **the same `probe_run_id`/SessionKey/SandboxID/Writer Group identity as Task 2 full-runtime**, start the real approved OpenCode/Plugin/MCP topology using **a disposable repository**, then verify that the **actual Collector invocation and its descendants** operate outside Writer Group with source kernel-enforced read-only and staging separate. Repeat the full prohibited-write matrix *from this actual Collector boundary*, capture observed denials and source hashes, and confirm the real runtime cannot remount, spawn a source Writer or bypass the Collector boundary. Never probe a live user repository. Emit a distinct `scope='full-runtime'` manifest, not an alias of fixture evidence.
+- [ ] **Step 6 — Verify GREEN and classify:** Run `python3 -m unittest sandbox.tests.test_oc2_f004_feasibility -v`; validate both manifests and binding fields. Fixture-only PASS is insufficient. If real Collector/runtime is unavailable, any negative probe is unexecuted, source write prevention is not enforceable, or evidence is missing, **full-runtime = `NOT_VERIFIED`** (unless an unsafe act was actually observed, in which case `FAIL`). Do not enable Collect.
 
-**Deliverable:** Reproducible proof of collector non-write enforcement or explicit NOT_VERIFIED/FAIL.
+**Deliverable:** Independent fixture and full-runtime evidence of non-writing Collector enforcement, or honest NOT_VERIFIED/FAIL without an architecture change.
 
-### Task 4: Freeze → copy → consistency and PENDING preservation
+### Task 4: Freeze → copy → consistency and PENDING preservation (F-004-P1/P2)
 
 **Files:** Extend `sandbox/tests/test_oc2_f004_feasibility.py`; evidence `/tmp/oc2-f004-feasibility.*/consistency/`.
 
-**Interfaces:** Consumes Tasks 2–3 evidence; produces `GateResult(gate='consistency', ...)`. Never creates a production `collection_digest` or `ApplyAuthorization`.
+**Interfaces:** Consumes Tasks 2–3 evidence bound to **exactly the same `probe_run_id`, `session_key`, `sandbox_id`, and `writer_group_identity`**; emits a `GateResult(gate='consistency', ...)` with an independently hashed manifest. No production `collection_digest` or `ApplyAuthorization` is ever created.
 
-- [ ] **Step 1 — RED:** Add tests `test_thaw_before_copy_complete_rejected`, `test_new_writer_during_copy_rejected`, `test_session_identity_change_rejected`, `test_untracked_mismatch_rejected`, `test_partial_copy_preserves_pending`.
-- [ ] **Step 2 — Verify RED:** `python3 -m unittest sandbox.tests.test_oc2_f004_feasibility -v`; expect new tests FAIL.
-- [ ] **Step 3 — Implement test-only comparison:** Check Sandbox ID, SessionKey, Writer Group identity, `frozen 1` and no external Writer **before staging, before `sbx cp`, after copy and immediately before simulated finalization**. Check Git HEAD/Branch, raw Index SHA-256, staged/unstaged/untracked manifest, Bundle object reachability, source/destination digests and `git fsck`.
-- [ ] **Step 4 — Dynamic negative tests:** Induce one controlled thaw/new Writer and one partial copy/failure on disposable fixture data. Confirm no simulated finalization; Guest original, evidence and partial Host collection remain, and status is `PENDING`/`GUEST_QUIESCENCE_UNVERIFIED`.
-- [ ] **Step 5 — Verify GREEN:** Run unit tests, capture hashes and classify gate. A static fixture PASS is not full-runtime consistency PASS.
+- [ ] **Step 1 — RED:** Add tests `test_thaw_before_copy_complete_rejected`, `test_new_writer_during_copy_rejected`, `test_session_identity_change_rejected`, `test_mixed_probe_evidence_rejected`, `test_fixture_consistency_not_full_runtime_pass`, `test_untracked_mismatch_rejected`, `test_partial_copy_preserves_pending`, `test_verified_unsafe_failure_precedence`.
+- [ ] **Step 2 — Verify RED:** `python3 -m unittest sandbox.tests.test_oc2_f004_feasibility -v`; expect failures only in new tests.
+- [ ] **Step 3 — Implement test-only comparison:** Resolve one shared run/Session/Sandbox/Writer Group identity from Tasks 2/3, validate their manifests and evidence hashes, then check `frozen 1` and absence of external Writers **before staging, before `sbx cp`, after copy and immediately before simulated finalization**. Compare HEAD/Branch, raw Index SHA-256, Staged/Unstaged/Untracked manifests, Bundle/Commit reachability, SHA-256 and `git fsck`. Missing/mixed evidence is `NOT_VERIFIED`; an observed unsafe write/thaw/bypass is `FAIL`.
+- [ ] **Step 4 — Fixture-only negative tests:** With a disposable fixture repository, induce a controlled thaw/new Writer and interrupted/partial copy. Observe **no simulated finalization**, unchanged Guest originals, retained partial Host evidence and `PENDING`/`GUEST_QUIESCENCE_UNVERIFIED`. Save `scope='fixture'` evidence. Do not promote this PASS to full-runtime.
+- [ ] **Step 5 — Separate full-runtime Freeze→Copy→Consistency:** Using **the same SessionKey/SandboxID/probe_run_id and Writer Group identity** as the full-runtime Task 2 containment and Task 3 real Collector probe, run the approved OpenCode/Plugin/MCP topology against a disposable repo, block new Writers, freeze Group (`frozen 1`), invoke the actual read-only Collector to stage a Bundle/Index/Working Tree/Untracked manifest, then perform live-Sandbox `sbx cp`. Verify all identity, freeze and hash checkpoints and Git consistency until the **simulated** finalization gate. Do not issue real Collection Digest or ApplyAuthorization.
+- [ ] **Step 6 — Failure preservation and GREEN:** Repeat one bounded controlled negative event (thaw/new Writer or copy failure) *only if permitted in the authorized full-runtime PoC*, prove fail-closed `PENDING` and evidence retention; execute `python3 -m unittest sandbox.tests.test_oc2_f004_feasibility -v`. Emit separate `scope='full-runtime'` evidence or `NOT_VERIFIED` if actual Runtime/Collector/Identity/copy proof is unavailable. An observed unauthorized write, containment escape or inconsistent finalization is `FAIL`. No automatic alternative route or more PoC runs.
 
-**Deliverable:** Consistency and preservation evidence without granting Host Apply.
+**Deliverable:** Fixture and (when authorized/possible) real-runtime Freeze→Copy→Consistency evidence, with no unsafe promotion and PENDING/HOLD on incomplete proof.
 
 ### Task 5: One Human Owner decision checkpoint (no review loop)
 
 **Files:** Future evidence only: `/tmp/oc2-f004-feasibility.*/decision.md`.
 
-**Interfaces:** Consumes exactly the three GateResults and returns one `PASS` / `FAIL` / `NOT_VERIFIED` verdict with observed evidence IDs.
+**Interfaces:** Consumes exactly the three **full-runtime** GateResults plus independently linked fixture evidence, returns one `PASS` / `FAIL` / `NOT_VERIFIED` verdict without generating any production authorization.
 
-- [ ] **Step 1 — Check evidence:** Verify sandbox/tool versions, identity, time window, negative tests, hashes and no credentials/inference; missing items remain NOT_VERIFIED.
-- [ ] **Step 2 — Report:** One compact table for containment, collector, consistency; distinguish fixture from actual runtime.
-- [ ] **Step 3 — Decide:** Full-runtime three-gate PASS → eligible for Owner consideration of a later implementation plan (NOT Implementation GO). Any unsafe behavior → FAIL, HOLD. Missing proof → NOT_VERIFIED, HOLD.
+- [ ] **Step 1 — Check evidence:** Validate the three SHA-256 manifests and their recorded evidence file digests; require matching `probe_run_id`, `session_key`, `sandbox_id`, `writer_group_identity`, actual-runtime participants and negative-probe coverage. Record separate fixture verdicts. Mixed identity or missing proof remains NOT_VERIFIED; a verified prohibited write/escape from the actual run is FAIL.
+- [ ] **Step 2 — Report:** One compact table for containment, collector, consistency containing scope, identity, manifest digest, verdict and observed failures; distinguish fixture from real runtime.
+- [ ] **Step 3 — Decide:** Three identity-consistent, evidence-complete full-runtime PASS Gates → eligible for Owner consideration of a later implementation plan (**not** Implementation GO). Verified observed unsafe behavior → FAIL/HOLD even with other Gates missing. Missing/mixed evidence → NOT_VERIFIED/HOLD. Never generate production Collection Digest or ApplyAuthorization.
 - [ ] **Step 4 — Stop:** Ask Human Owner for one decision. Do **not** automatically start implementation, new independent review, architecture alternatives, PR, or GitHub write.
 
 ## Completion / Stop Conditions
 
-- **Writing-plans complete now:** A plan with exact files, interfaces, test commands, negative tests, failure-preservation rules and one decision gate has been produced. No Source changes or Sandbox tests executed by this task.
+- **Review Gate document correction complete now:** F-004-P1 separates fixture and full-runtime in Tasks 3/4; F-004-P2 binds three GateResults to SHA-256 evidence manifests, one run/Session/Sandbox/Writer Group; F-004-P3 separates conditional Design document acceptance from final adoption, Plan execution and Implementation GO. No Source changes or Sandbox tests executed.
 - **Feasibility PASS later:** All actual full-runtime Writer/Collector/Consistency gates are proven with kernel-backed evidence. This only permits a separate Owner judgment about implementation planning.
 - **FAIL:** Observed escape, collector write, inconsistent state, lost data or unauthorized finalization; preserve Guest state and stop.
 - **NOT_VERIFIED:** Cannot exercise actual runtime or prove an enforcement boundary. Preserve state, keep auto-Collect/Host Apply and Implementation GO on HOLD.
 - **No loop:** One bounded test attempt for each unverified hypothesis. Do not repeat prior single-writer PoC or start review/correction sessions by default.
 
-**Authorization record:** The Owner approved Design R0.1.3 **WITH BLOCKERS**. The explicit request here is `superpowers:writing-plans`, **not** approval to execute this plan, commit/push it, or change the runtime.
+**Authorization record (F-004-P3):** Human Owner accepted Design R0.1.3 **as a document WITH BLOCKERS**; no final implementation-ready Design adoption or residual-risk acceptance is inferred. The earlier `writing-plans` request and explicit Plan `commit,push` authorized drafting and publishing the previous Plan, **not execution**. This Review Gate authorizes **document-only limited correction**; it does **not** authorize PoC/Sandbox actions, Production implementation, Host Apply, Credential changes, further GitHub Commit/Push/PR/Merge, or a new review. The next step is one Human Owner decision checkpoint.
