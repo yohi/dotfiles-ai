@@ -10,11 +10,14 @@ import tarfile
 import tempfile
 import unittest
 from collections.abc import Mapping
+from unittest.mock import patch
 
 SCRIPTS = pathlib.Path(__file__).resolve().parents[1] / 'scripts'
 sys.path.insert(0, str(SCRIPTS))
 
 import oc2_assets  # noqa: E402
+import oc2_phase4_assets  # noqa: E402
+from oc2_phase4_selection import ArtifactAcquisition, Phase4ArtifactPin, Phase4Plugin  # noqa: E402
 
 
 AKANE_PACKAGE = {
@@ -77,6 +80,23 @@ def symlink_archive(package: Mapping[str, object]) -> bytes:
     return buffer.getvalue()
 
 
+def archive_with_members(package: Mapping[str, object], entry: str, count: int) -> bytes:
+    buffer = io.BytesIO()
+    with tarfile.open(fileobj=buffer, mode='w:gz') as archive:
+        for name, content in (
+            ('package/package.json', json.dumps(package).encode()),
+            (entry, b'export default {};'),
+        ):
+            info = tarfile.TarInfo(name)
+            info.size = len(content)
+            archive.addfile(info, io.BytesIO(content))
+        for index in range(count - 2):
+            info = tarfile.TarInfo(f'package/extra-{index}.txt')
+            info.size = 0
+            archive.addfile(info, io.BytesIO())
+    return buffer.getvalue()
+
+
 def apm_document(akane_sha: str, sibyl_sha: str) -> bytes:
     akane_package, akane_repo, akane_commit = PHASE4_IDENTITIES['akane']
     sibyl_package, sibyl_repo, sibyl_commit = PHASE4_IDENTITIES['sibyl']
@@ -114,6 +134,45 @@ x-oc2-phase4:
 
 
 class Phase4ArtifactExportTest(unittest.TestCase):
+    def test_archive_members_are_processed_without_bulk_materialization(self):
+        raw = package_archive(AKANE_PACKAGE, 'package/dist/index.js', b'export default {};')
+        pin = Phase4ArtifactPin(
+            Phase4Plugin.AKANE, AKANE_PACKAGE['name'], AKANE_PACKAGE['version'],
+            'yohi/akane', PHASE4_IDENTITIES['akane'][2],
+            ArtifactAcquisition.GITHUB_PACKAGE, hashlib.sha512(raw).hexdigest(),
+        )
+
+        with patch.object(tarfile.TarFile, 'getmembers', side_effect=AssertionError):
+            artifact = oc2_phase4_assets.verify_plugin_artifact(raw, Phase4Plugin.AKANE, pin)
+
+        self.assertEqual({name for name, _ in artifact.files}, {'package.json', 'dist/index.js'})
+
+    def test_archive_member_limit_is_enforced(self):
+        raw = archive_with_members(AKANE_PACKAGE, 'package/dist/index.js',
+                                   oc2_phase4_assets.MAX_ARTIFACT_FILES + 1)
+        pin = Phase4ArtifactPin(
+            Phase4Plugin.AKANE, AKANE_PACKAGE['name'], AKANE_PACKAGE['version'],
+            'yohi/akane', PHASE4_IDENTITIES['akane'][2],
+            ArtifactAcquisition.GITHUB_PACKAGE, hashlib.sha512(raw).hexdigest(),
+        )
+
+        with self.assertRaisesRegex(oc2_phase4_assets.Phase4AssetError, 'file count'):
+            oc2_phase4_assets.verify_plugin_artifact(raw, Phase4Plugin.AKANE, pin)
+
+    def test_empty_archive_is_rejected_as_missing_required_files(self):
+        buffer = io.BytesIO()
+        with tarfile.open(fileobj=buffer, mode='w:gz'):
+            pass
+        raw = buffer.getvalue()
+        pin = Phase4ArtifactPin(
+            Phase4Plugin.AKANE, AKANE_PACKAGE['name'], AKANE_PACKAGE['version'],
+            'yohi/akane', PHASE4_IDENTITIES['akane'][2],
+            ArtifactAcquisition.GITHUB_PACKAGE, hashlib.sha512(raw).hexdigest(),
+        )
+
+        with self.assertRaisesRegex(oc2_phase4_assets.Phase4AssetError, 'missing its package metadata'):
+            oc2_phase4_assets.verify_plugin_artifact(raw, Phase4Plugin.AKANE, pin)
+
     def test_phase4_export_emits_only_pinned_runtime_entrypoints(self):
         akane = package_archive(
             AKANE_PACKAGE,

@@ -129,10 +129,11 @@ def verify_plugin_artifact(
     try:
         archive = tarfile.open(fileobj=io.BytesIO(raw), mode='r:gz')
         with archive:
-            members = archive.getmembers()
-            if not members or len(members) > MAX_ARTIFACT_FILES:
-                raise Phase4AssetError('plugin artifact file count is invalid')
-            for member in members:
+            member_count = 0
+            for member in archive:
+                member_count += 1
+                if member_count > MAX_ARTIFACT_FILES:
+                    raise Phase4AssetError('plugin artifact file count is invalid')
                 name = member.name
                 relative = PurePosixPath(name)
                 if (relative.is_absolute() or '\\' in name
