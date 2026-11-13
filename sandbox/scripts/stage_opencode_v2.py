@@ -275,13 +275,14 @@ def _verify_v2_config(server: dict[str, JsonValue]) -> None:
         if not isinstance(provider_config, dict):
             raise StageError("invalid V2 provider configuration")
         _verify_model_catalog(provider_config.get("models"))
+    provider_policies: list[JsonValue] = [
+        {"action": "provider.use", "resource": provider_name, "effect": "allow"}
+        for provider_name in ("openai", "cloudflare-ai-gateway-custom")
+        if provider_name in providers
+    ]
     expected_policies: list[JsonValue] = [
         {"action": "provider.use", "resource": "*", "effect": "deny"},
-        *(
-            {"action": "provider.use", "resource": provider_name, "effect": "allow"}
-            for provider_name in ("openai", "cloudflare-ai-gateway-custom")
-            if provider_name in providers
-        ),
+        *provider_policies,
         {"action": "integration.connect", "resource": "*", "effect": "deny"},
         {"action": "plugin.use", "resource": "*", "effect": "deny"},
         {"action": "mcp.use", "resource": "*", "effect": "deny"},

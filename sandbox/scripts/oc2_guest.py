@@ -301,13 +301,14 @@ def verify_v2_config(server: dict[str, JsonValue]) -> None:
         if not isinstance(provider_config, dict):
             fail('invalid V2 provider configuration')
         _verify_model_catalog(provider_config.get('models'))
+    provider_policies: list[JsonValue] = [
+        {'action': 'provider.use', 'resource': provider_id, 'effect': 'allow'}
+        for provider_id in ('openai', 'cloudflare-ai-gateway-custom')
+        if provider_id in providers
+    ]
     expected_policies: list[JsonValue] = [
         {'action': 'provider.use', 'resource': '*', 'effect': 'deny'},
-        *(
-            {'action': 'provider.use', 'resource': provider_id, 'effect': 'allow'}
-            for provider_id in ('openai', 'cloudflare-ai-gateway-custom')
-            if provider_id in providers
-        ),
+        *provider_policies,
         {'action': 'integration.connect', 'resource': '*', 'effect': 'deny'},
         {'action': 'plugin.use', 'resource': '*', 'effect': 'deny'},
         {'action': 'mcp.use', 'resource': '*', 'effect': 'deny'},

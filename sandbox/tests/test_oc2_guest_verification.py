@@ -243,11 +243,11 @@ class VerificationGuestMaterializationTest(unittest.TestCase):
             SCRIPTS / 'oc2_identity.py',
             SCRIPTS / 'oc2_phase4_policy.py',
         ))
-        return oc2_identity.unified_runtime_identity_sha256(
+        return str(oc2_identity.unified_runtime_identity_sha256(
             oc2_identity.Phase4RuntimeIdentity(
                 manifest_sha, assets_sha, phase4.bundle_sha256, generator_sha,
             ),
-        )
+        ))
 
     def _phase4_assets(self, source_sha: str, name: str) -> oc2_guest.VerifiedPhase4PluginBundle:
         payload = json.loads(phase4_fixture.asset_bundle())
@@ -492,7 +492,7 @@ class VerificationGuestMaterializationTest(unittest.TestCase):
         )
 
     def test_phase4_rejects_plugin_asset_that_differs_from_pinned_source(self):
-        bundle = self._provider_bundle(verification_only=True)
+        self._provider_bundle(verification_only=True)
         assets_path, _ = self._asset_file(verification_only=True)
         payload = json.loads(assets_path.read_bytes())
         target = oc2_assets.PLUGIN_PREFIX + 'index.js'

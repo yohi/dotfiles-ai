@@ -290,9 +290,8 @@ def validate_agent_map(value: JsonValue | AgentMap, allowed_models: list[str]) -
     if not isinstance(value, dict) or set(value) - {name.value for name in AgentName}:
         raise ValueError('unapproved Native Agent map')
     result: AgentMap = {}
-    for raw_name in value:
+    for raw_name, raw_agent in value.items():
         name = parse_agent_name(raw_name)
-        raw_agent = value[raw_name]
         if not isinstance(raw_agent, dict):
             raise ValueError('Native Agent configuration is not allowlisted')
         model = raw_agent.get('model')

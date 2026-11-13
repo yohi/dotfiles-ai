@@ -18,7 +18,6 @@ import pathlib
 import platform
 import re
 import secrets
-import shlex
 import shutil
 import subprocess
 import sys
@@ -1330,6 +1329,8 @@ def launch(runner: Runner, request: SandboxLaunch) -> None:
     runtime = f'{ROOT}/runtime/{request.digest[:16]}'
     unified_runtime = request.bundle is not None
     if unified_runtime:
+        if request.bundle is None:
+            raise Stop('unified Runtime bundle is missing')
         if (request.manifest_sha is None or request.assets_file is None
                 or request.assets_sha is None or request.phase4_plugin_file is None
                 or request.phase4_plugins_sha is None):
