@@ -806,8 +806,6 @@ def prepare(
         dest = runtime_path(manifest_sha, assets_sha, generator_fingerprint)
     validate_location(dest, BASE)
     asset_files: dict[str, bytes] = {}
-    plugin_source: VerifiedSuperpowersSource | None = None
-    plugin_metadata: dict[str, JsonValue] | None = None
     bundled_plugins: dict[str, bytes] = {}
     if assets is not None:
         native_payload = validate_native_asset(assets[NATIVE_ASSET_TARGET])
@@ -856,10 +854,9 @@ def prepare(
             }
             if not required_skills or not required_plugin_files <= set(bundled_plugins):
                 fail('Verification Asset Bundle is missing Native Skill files')
-            if plugin_source is not None:
-                source_files = {item.path: item.content for item in plugin_source.files}
-                if any(source_files.get(name) != content for name, content in bundled_plugins.items()):
-                    fail('Plugin Asset Bundle differs from the pinned source tree')
+            source_files = {item.path: item.content for item in plugin_source.files}
+            if any(source_files.get(name) != content for name, content in bundled_plugins.items()):
+                fail('Plugin Asset Bundle differs from the pinned source tree')
             plugin_path = dest / 'plugins/superpowers'
             server['plugins'] = [str(plugin_path)]
             server['mcp'] = {
@@ -932,13 +929,10 @@ def prepare(
         **asset_files,
     }
     if verification_only:
-        if plugin_source is not None:
-            expected.update({
-                PLUGIN_PREFIX + item.path: item.content
-                for item in plugin_source.files
-            })
-        elif phase4_plugins is None:
-            fail('verification Runtime is missing its pinned Plugin source')
+        expected.update({
+            PLUGIN_PREFIX + item.path: item.content
+            for item in plugin_source.files
+        })
     if phase4_plugins is not None:
         if not verification_only:
             fail('Phase 4 plugins require a verification-only Runtime')
@@ -951,32 +945,18 @@ def prepare(
         receipt['assets_sha256'] = assets_sha
     if verification_only:
         receipt['verification_only'] = True
-        if generator_fingerprint is None or plugin_metadata is None:
+        if generator_fingerprint is None:
             fail('verification Runtime is missing its generator fingerprint')
         receipt['generator_sha256'] = generator_fingerprint
-        if plugin_source is not None:
-            receipt['plugin_source'] = {
-                'repository': SUPERPOWERS_REPOSITORY,
-                'commit': SUPERPOWERS_COMMIT,
-                'path': SUPERPOWERS_TREE_PATH,
-                'file_count': len(plugin_source.files),
-                'total_bytes': plugin_source.total_bytes,
-                'tree_sha256': plugin_source.tree_sha256,
-                'file_sha256': {item.path: item.sha256 for item in plugin_source.files},
-            }
-        else:
-            receipt['plugin_source'] = {
-                'repository': SUPERPOWERS_REPOSITORY,
-                'commit': SUPERPOWERS_COMMIT,
-                'path': SUPERPOWERS_TREE_PATH,
-                'file_count': plugin_metadata['file_count'],
-                'total_bytes': plugin_metadata['total_bytes'],
-                'tree_sha256': plugin_metadata['tree_sha256'],
-                'file_sha256': {
-                    name: hashlib.sha256(content).hexdigest()
-                    for name, content in bundled_plugins.items()
-                },
-            }
+        receipt['plugin_source'] = {
+            'repository': SUPERPOWERS_REPOSITORY,
+            'commit': SUPERPOWERS_COMMIT,
+            'path': SUPERPOWERS_TREE_PATH,
+            'file_count': len(plugin_source.files),
+            'total_bytes': plugin_source.total_bytes,
+            'tree_sha256': plugin_source.tree_sha256,
+            'file_sha256': {item.path: item.sha256 for item in plugin_source.files},
+        }
     if phase4_plugins is not None:
         receipt['phase4_plugins_sha256'] = phase4_plugins.bundle_sha256
         receipt['phase4_plugins'] = [
