@@ -285,6 +285,31 @@ class NativeApmConfigTest(unittest.TestCase):
             ):
                 oc2_native.parse_apm_native(changed, require_oc2_assets=True)
 
+    def test_yaml_integer_spellings_match_safe_loader_values(self) -> None:
+        """Parse octal and hexadecimal YAML integers using YAML semantics."""
+        source = (REPO / 'apm.yml').read_bytes()
+
+        for raw_value, expected in ((b'0100000', 32768), (b'0x1d4c0', 120000)):
+            changed = source.replace(b'mcp_timeout: 120000', b'mcp_timeout: ' + raw_value)
+            with self.subTest(raw_value=raw_value):
+                config = oc2_native.parse_apm_native(changed, require_oc2_assets=True)
+                self.assertEqual(config.runtime.mcp_execution_timeout_ms, expected)
+
+    def test_watchdog_stage2_accepts_timer_maximum_and_rejects_larger_values(self) -> None:
+        """Enforce the maximum timer duration while retaining the existing lower bound."""
+        source = (REPO / 'apm.yml').read_bytes()
+        at_maximum = source.replace(
+            b'stage2Ms: 86400000', b'stage2Ms: 2147483647',
+        )
+        above_maximum = source.replace(
+            b'stage2Ms: 86400000', b'stage2Ms: 2147483648',
+        )
+
+        config = oc2_native.parse_apm_native(at_maximum, require_oc2_assets=True)
+        self.assertEqual(config.runtime.watchdog.stage2_ms, 2147483647)
+        with self.assertRaises(oc2_native.NativeConfigError):
+            oc2_native.parse_apm_native(above_maximum, require_oc2_assets=True)
+
     def test_agent_fallback_fields_are_rejected(self) -> None:
         """Reject unsupported fallback model fields in Agent definitions."""
         raw = apm_config(agents=(

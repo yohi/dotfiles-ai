@@ -1138,6 +1138,23 @@ def prepare(
             validate_location(location, BASE)
             if regular(location) != value:
                 fail('existing runtime asset mismatch')
+        if plugin_runtime:
+            plugin_root = dest / PLUGIN_PREFIX.rstrip('/')
+            expected_plugin_files = {
+                name[len(PLUGIN_PREFIX):]
+                for name in expected
+                if name.startswith(PLUGIN_PREFIX)
+            }
+            actual_plugin_files: set[str] = set()
+            if plugin_root.is_symlink() or not plugin_root.is_dir():
+                fail('existing Plugin file set mismatch')
+            for path in plugin_root.rglob('*'):
+                if path.is_symlink():
+                    fail('existing Plugin file set mismatch')
+                if path.is_file():
+                    actual_plugin_files.add(path.relative_to(plugin_root).as_posix())
+            if actual_plugin_files != expected_plugin_files:
+                fail('existing Plugin file set mismatch')
         return pathlib.Path(dest)
 
     (dest / 'config/opencode').mkdir(parents=True, mode=0o700)

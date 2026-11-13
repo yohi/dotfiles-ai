@@ -213,8 +213,8 @@ def _parse_v2_settings(
 
     enabled = tuple(provider for provider in selections if provider.enabled)
     enabled_ids = {provider.provider_id for provider in enabled}
-    if enabled_ids != {'openai', 'cloudflare-ai-gateway-custom'} or len(enabled) != 2:
-        raise ExportError('opencode_v2 must enable OpenAI and Cloudflare Custom')
+    if not enabled_ids:
+        raise ExportError('opencode_v2 must enable at least one approved provider')
     provider_id, separator, model_id = native.default_model.partition("/")
     matching_providers = tuple(
         provider for provider in enabled if provider.provider_id == provider_id

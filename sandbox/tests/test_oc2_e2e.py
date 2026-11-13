@@ -399,17 +399,21 @@ class LauncherFlowTests(unittest.TestCase):
         self.assertEqual(captured['runtime_sha'], expected)
 
     def test_artifact_provisioning_dry_run_does_not_write_or_contact_sandbox(self):
-        cache_root = self.root / 'unused-cache'
+        cache_root = self.root / 'artifact-cache'
+        paths = oc2_artifacts.artifact_paths(cache_root)
 
-        status, output = self._run(
-            '--provision-artifacts',
-            '--superpowers-checkout', str(self.root / 'source'),
-            '--akane-artifact', str(self.root / 'akane.tgz'),
-            '--sibyl-artifact', str(self.root / 'sibyl.tgz'),
-            '--dry-run',
-        )
+        with patch.object(oc2_artifacts, 'artifact_paths', return_value=paths):
+            status, output = self._run(
+                '--provision-artifacts',
+                '--superpowers-checkout', str(self.root / 'source'),
+                '--akane-artifact', str(self.root / 'akane.tgz'),
+                '--sibyl-artifact', str(self.root / 'sibyl.tgz'),
+                '--dry-run',
+            )
 
         self.assertEqual(status, 0, output)
+        self.assertTrue(paths.root.is_relative_to(cache_root))
+        self.assertFalse(paths.root.exists())
         self.assertFalse(cache_root.exists())
         self.assertEqual(self.fake.calls, [])
 

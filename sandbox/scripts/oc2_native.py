@@ -241,8 +241,9 @@ def _boolean(node: Node | None, label: str) -> bool:
 def _integer(node: Node, label: str, minimum: int, maximum: int) -> int:
     match node:
         case ScalarNode(tag='tag:yaml.org,2002:int', value=value):
-            result = int(value)
-            if minimum <= result <= maximum:
+            parsed = yaml.safe_load(value)
+            if type(parsed) is int and minimum <= parsed <= maximum:
+                result = parsed
                 return result
         case _:
             pass
@@ -268,7 +269,7 @@ def _runtime_options(node: Node, mcp_execution_timeout_ms: int) -> RuntimeOption
     if not _boolean(watchdog_fields['enabled'], 'watchdog.enabled'):
         raise NativeConfigError('Akane Watchdog must remain enabled for Sibyl state production')
     stage1 = _integer(watchdog_fields['stage1Ms'], 'watchdog.stage1Ms', 1000, 3600000)
-    stage2 = _integer(watchdog_fields['stage2Ms'], 'watchdog.stage2Ms', 86400000, 2678400000)
+    stage2 = _integer(watchdog_fields['stage2Ms'], 'watchdog.stage2Ms', 86400000, 2147483647)
     max_pings = _integer(watchdog_fields['maxPings'], 'watchdog.maxPings', 1, 1)
     max_cycles = _integer(watchdog_fields['maxToolGateCycles'], 'watchdog.maxToolGateCycles', 1, 8)
     notifier = _string(watchdog_fields['notifierType'], 'watchdog.notifierType')

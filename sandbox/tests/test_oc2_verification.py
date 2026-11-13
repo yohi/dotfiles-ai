@@ -30,7 +30,8 @@ class FakeRunner:
 
 
 class VerificationRuntimePreparationTest(unittest.TestCase):
-    def test_unified_launch_stages_one_config_assets_and_plugin_bundle(self):
+    def test_unified_launch_stages_one_config_assets_and_plugin_bundle(self) -> None:
+        """Stage the config, selected assets, and Plugin bundle in one launch."""
         runner = FakeRunner()
         request = oc2.SandboxLaunch(
             'oc2-unified-test', 'a' * 64, oc2.PINNED[0], '/workspace',
@@ -68,7 +69,8 @@ class VerificationRuntimePreparationTest(unittest.TestCase):
 
         self.assertEqual(runner.calls, [])
 
-    def test_phase4_refuses_an_incompatible_sandbox_without_staging(self):
+    def test_phase4_refuses_an_incompatible_sandbox_without_staging(self) -> None:
+        """Reject an incompatible Phase 4 Sandbox before staging files."""
         runner = FakeRunner()
         with (
             patch.object(oc2, 'Runner', return_value=runner),
@@ -89,7 +91,8 @@ class VerificationRuntimePreparationTest(unittest.TestCase):
 
         self.assertEqual(runner.calls, [])
 
-    def test_phase4_cli_rejects_non_dedicated_sandbox_name_before_runner(self):
+    def test_phase4_cli_rejects_non_dedicated_sandbox_name_before_runner(self) -> None:
+        """Reject a non-dedicated Sandbox name before constructing the Runner."""
         with patch.object(oc2, 'Runner', side_effect=AssertionError('no Sandbox CLI')):
             result = oc2.main([
                 '--phase4-plugins',
@@ -106,7 +109,8 @@ class VerificationRuntimePreparationTest(unittest.TestCase):
 
         self.assertEqual(result, 1)
 
-    def test_phase4_dry_run_accepts_base_superpowers_and_artifact_inputs(self):
+    def test_phase4_dry_run_accepts_base_superpowers_and_artifact_inputs(self) -> None:
+        """Accept valid Phase 4 inputs in dry-run mode without Sandbox commands."""
         with patch.object(oc2, 'Runner', side_effect=AssertionError('no Sandbox commands')):
             result = oc2.main([
                 '--phase4-plugins',
@@ -124,7 +128,8 @@ class VerificationRuntimePreparationTest(unittest.TestCase):
 
         self.assertEqual(result, 0)
 
-    def test_phase4_stages_two_pinned_assets_with_phase4_runtime_identity(self):
+    def test_phase4_stages_two_pinned_assets_with_phase4_runtime_identity(self) -> None:
+        """Stage pinned Phase 4 artifacts using their combined runtime identity."""
         runner = FakeRunner()
         with tempfile.TemporaryDirectory() as temporary:
             output = pathlib.Path(temporary) / 'bundle'

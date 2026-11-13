@@ -606,6 +606,27 @@ class VerificationGuestMaterializationTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'file count mismatch'):
             oc2_guest.prepare(bundle, oc2_guest.verify(bundle), assets, assets_sha)
 
+    def test_verification_rejects_extra_plugin_file_in_existing_runtime(self) -> None:
+        """Reject Runtime reuse when the installed Plugin has an unlisted file."""
+        bundle = self._provider_bundle(verification_only=False)
+        assets_path, assets_sha = self._asset_file(
+            verification_only=False, unified_runtime=True,
+        )
+        assets = oc2_guest.verify_assets(assets_path, assets_sha)
+        native = oc2_guest.validate_native_asset(assets[oc2_guest.NATIVE_ASSET_TARGET])
+        phase4 = self._phase4_assets(native['source_sha256'], 'extra-file-phase4-assets.json')
+        config_sha = oc2_guest.verify(bundle)
+        runtime = oc2_guest.prepare(
+            bundle, config_sha, assets, assets_sha, phase4_plugins=phase4,
+        )
+        extra_file = runtime / 'plugins/superpowers/unexpected.js'
+        extra_file.write_text('unexpected\n', encoding='utf-8')
+
+        with self.assertRaisesRegex(ValueError, 'file set mismatch'):
+            oc2_guest.prepare(
+                bundle, config_sha, assets, assets_sha, phase4_plugins=phase4,
+            )
+
     def test_verification_rejects_plugin_source_symlink(self):
         bundle = self._provider_bundle(verification_only=True)
         assets_path, assets_sha = self._asset_file(verification_only=True)

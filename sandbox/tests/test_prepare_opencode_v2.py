@@ -220,6 +220,30 @@ class ExportTests(unittest.TestCase):
             {"custom-ollama-cloud/kimi-k2.6"},
         )
 
+    def test_openai_only_provider_selection_exports_its_default_model(self) -> None:
+        self.apm.write_text(
+            "provider:\n"
+            "  openai: {whitelist: [gpt-6-luna]}\n"
+            "opencode_v2:\n"
+            "  default_model: openai/gpt-6-luna\n"
+            "  deny_provider_fallback: true\n"
+            "  deny_guest_auth: true\n"
+            "  providers:\n"
+            "    openai: {enabled: true, auth_method: docker_openai_oauth}\n",
+            encoding="utf-8",
+        )
+
+        result = self.run_export()
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        server = json.loads((self.out / "opencode.jsonc").read_text())
+        self.assertEqual(set(server["providers"]), {"openai"})
+        self.assertEqual(server["model"], "openai/gpt-6-luna")
+        self.assertIn(
+            {"action": "provider.use", "resource": "openai", "effect": "allow"},
+            server["policies"],
+        )
+
     def test_v2_native_agents_use_only_apm_selected_fixed_config(self) -> None:
         """Allow only the Native Agent map selected by APM in normal V2 output."""
         self.apm.write_text(
