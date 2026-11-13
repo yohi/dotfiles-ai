@@ -1,9 +1,9 @@
-# OC2 Daily Launcher — Design R0.1.1
+# OC2 Daily Launcher — Design R0.1.2
 
 - Date: 2026-11-13
 - Repository: `yohi/dotfiles-ai`
 - Baseline: `master` at `e79573903f1a2b550e32bc6022d91c43fdcccbb4`
-- Status: **R0.1.1 limited document remediation (F-001–F-005); revised design adoption pending Human Owner decision**
+- Status: **R0.1.2 limited document remediation (F-003/F-004/F-005); revised design adoption pending Human Owner decision**
 - Scope: **Design only**. This document does not authorize implementation, Sandbox changes, Credential changes, PR creation, or Merge.
 
 ## 1. 背景と目的
@@ -124,6 +124,15 @@ $XDG_STATE_HOME/oc2/
 4. TUI終了時、まず差分を収集・確定してからLeaseを解放する。未反映変更があるSandboxは`PENDING`とし、**自動再利用対象から外す**。HostへのApply前に別`oc2`を開始する場合は、安全な独立Sandboxを選択する。
 5. Launcher異常終了時、次回はHost PID＋開始時刻、Docker Sandbox ID、Guest実行プロセス/Receiptを照合する。生存/状態の判別不能時はLeaseを自動回収せず`RECOVERY_REQUIRED`で隔離。明確に停止済み・Guest成果保全済みと確認できた場合だけOwnerの確認を伴う回収経路で復旧する。孤立Sessionを削除しない。
 
+### Workspace復旧中の全Session遮断（F-004）
+
+Workspace全体のHost Apply状態（`HostApplyGate`）は、全SessionGenerationの`apply-journal.json`とWorkspace単位のApply排他ロックを根拠に判定する。**`PREPARED`・`APPLYING`・`RECOVERY_REQUIRED`のJournal、または終端を検証できないJournalが1件でも存在する間は、同一Workspaceについて既存・新規を問わず、いかなるSessionも新しいHost Snapshot/Baselineを採用してはならない。** `oc2 --new`で独立Sandboxを作成することも、この禁止を回避する手段にならない。読み取り専用の診断・復旧情報表示は許す。
+
+- 起動直前にWorkspace排他ロック下で全Journalを照合する。Apply開始は同一ロックでGateを閉じ、新規Sessionとの競合を排除する。旧Sessionが`PENDING`であることだけを根拠にHost Applyが進行中とは判定しない。
+- **Guest PENDINGのみ・Host Apply Journalなし／正常終了・Host状態検証PASS:** 既存Sandboxの未反映成果は保全し、Hostの安定状態を基準にした別Sandboxの新規Sessionは許可する。
+- **Host Apply途中停止・復旧要求・Journal状態不明:** Workspaceを`HOST_RECOVERY_BLOCKED`扱いとして全新規Session/Host Snapshot採用/Applyを禁止する。Guest PENDINGや別Sandboxの利用可否とは独立したWorkspace全域のGateとする。
+- Gate再開は、Undo Journalの復旧手続きでHost HEAD/Index/Working Tree・未追跡ファイルの整合を検証し、Journalを`APPLIED`または復旧完了の終端状態へ永続化した**後だけ**許す。復旧不能なら禁止を維持し、原本・Journal・Collectionを保護する。単なるPID消滅、Sandbox停止、Journal削除は復旧完了の証拠にならない。
+
 **旧v2 Receipt移行:** 従来の`workspaces/<workspace-id>/baseline.json`/`receipt.json`相当のWorkspace単位Session v2は読み取り専用Legacyとして保護し、v3へ暗黙変換・上書きしない。Legacyに未回収・未適用変更がある場合はそのSandboxの通常再利用を停止し、独立Sandboxへ分岐またはOwnerに判断を求める。旧状態の移送が必要な場合はOwner承認の明示操作とする。
 
 ## 7. Workspace Snapshotと再利用時の同期 — F-003限定訂正
@@ -134,9 +143,11 @@ HostのWorkspaceディレクトリはGuestへ直接マウントしない。Git�
 
 SessionGenerationごとに、以下を決定論的に記録し、全体SHA-256をReceiptに格納する。
 
-- `head_oid`（40/64桁Git OID）、`branch_ref`（symbolic HEADの完全Ref）、`object_format`（SHA-1/SHA-256）、`index_oid`（生IndexバイトのSHA-256）、`index_entries`（`git ls-files --stage -z`の正規化レコード、mode/blob OID/stage/intent-to-addを含む）。
+- `head_oid`（40/64桁Git OID）、`branch_ref`（symbolic HEADの完全Ref）、`object_format`（SHA-1/SHA-256）、`index_oid`（生IndexバイトのSHA-256）、`index_entries`（`git ls-files --stage -z`の正規化レコード、mode/blob OID/stageを含む。**intent-to-addフラグはこのコマンドだけでは判定できない**）。
 - `staged_delta`（HEAD→Index）、`unstaged_delta`（Index→Working Tree）、`untracked_files`（`git ls-files --others --exclude-standard -z`に相当する安全なファイルのPath/Mode/Size/SHA-256）。区分を混合しない。
 - `working_manifest`（既存ファイルSnapshot Manifest）、`transfer_policy_id`、各差分のSHA-256。IndexとWorking TreeがGit HEADに対してdirtyかを別々に記録する。
+
+**intent-to-addは現段階では未対応とし、検出したらGuest起動前にFail-Closedする（F-003方式B）。** 判定は`git ls-files --stage -z`の結果から推測しない。Hostで`git -C <canonical_host_git_root> rev-parse --git-path index`によりIndexパスを解決し、読み取り専用の厳密なGit Index ReaderでIndexヘッダー、エントリ、通常フラグ、拡張フラグ（`CE_INTENT_TO_ADD`）とChecksumを検証する。サポート対象は検証可能なIndex v2/v3とし、intent-to-addの存在、未知のEntry/Extension、v4、Split/Sparse Index、検証不能なIndex形式、Indexパスの不正・読み取り失敗時は**拒否**する。ReaderはIndexの正規化・書き換えを行わず、読み取ったIndex生バイトSHA-256を`index_oid`と照合する。取得コマンドと検査方法はImplementation Planでこの境界のまま具体化し、未対応状態を正常なStaged状態に変換しない。
 
 `git diff --cached`と`git diff`、Index entries、Snapshotの結果が同一瞬間を示すまで再照合する。衝突状態のIndex（stage 1/2/3）、unborn HEAD、Submodule、Git Object代替格納など現段階で復元を検証できないケースはGuest起動前にFail-Closedする。Ignored/除外/Secretファイルは転送しない。対象外ファイルはGuestに存在するかのように再現せず、部分的なGit状態であることを明示する。
 
@@ -173,10 +184,23 @@ Commitを取り込める条件、Dirty Baselineでの保留、Hostへの順序�
 - 初回は`oc2`のTUI起動前に、APMで実際に選択されたProvider/Modelごとの対象と外部推論・課金の可能性を表示し、端末で明示承認する。承認されるまで当該Providerを使うRuntimeを起動しない。非対話・拒否の場合は`INFERENCE_NOT_AUTHORIZED`で停止する（推論・課金なし）。
 - Grantは**30日以内**の有効期限を持つ（初回既定30日、長期無期限は不可）。承認済みの同一スコープでは後続の通常`oc2`は再質問しない。失効・明示取消・Account/Workspace/Provider/Model許可範囲変更時は再承認が必要。
 - 取消操作は明示的なHost CLI `oc2 --revoke-inference`とし、対象WorkspaceのGrantを無効化する。期限・取消・破損は次回Launcher起動時にFail-Closed。既に動作中の推論を即座に強制停止する機構ではないことを明示する。
-- Provider一覧への登録、Credentialの存在、Docker Brokerの利用可能性は推論許可ではない。`apm.yml`の選択と許可Grantの**積集合のみ**利用可能。許可外のProvider/ModelがTUIのモデル切替で利用可能とならないよう、生成Runtimeと実際の通信経路の許可境界で拒否する。APMに新しいModel/Providerを追加しても既存Grantを拡張しない。
+- Provider一覧への登録、Credentialの存在、Docker Brokerの利用可能性は推論許可ではない。`apm.yml`の選択と有効Grantの**積集合のみを通常のOpenCode Runtimeのモデル選択候補へ公開**する。許可外Provider/Modelが通常のTUI/設定経由で選択可能になる場合はRuntime起動を拒否する。APM追加だけで既存Grantを拡張しない。**HTTP通信中のModel ID強制認可まで保証するものではない**（責務と残余リスクは以下）。
 - Cloudflare AI GatewayはAPM選択に従って自動解決し、別途`--use-cloudflare-ai-gateway`の常用を不要にする。Account識別子・SecretのHost ScopeとProxy Bindingを照合する。欠損・期限切れ・不整合時に別AccountやOpenAIへFallbackしない。
 - 既存`--allow-paid-inference`の起動単位許可は新ポリシーへ自動移行せず、移行後の通常`oc2`は本Grantを使う。明示的な互換オプションを残す場合も範囲外の権限昇格を許さない。
 - OpenCode v1の認証情報、設定、利用許可には影響しない。
+
+### Grant Enforcementの責任主体・保証範囲（F-005）
+
+| 境界 | Owner | 強制内容 | 保証しないこと |
+| --- | --- | --- | --- |
+| 起動前のGrant認可 | **Host Launcher（許可判定のAuthority）** | 保存されたGrantの期限・取消・UID/Workspace/Account/Provider/Model集合を検証し、不許可時は推論可能なRuntimeを開始しない | 起動後の任意HTTP RequestのModel ID解析 |
+| 通常のモデル選択 | **OpenCode Runtime/Provider設定エクスポータ（通常UIのEnforcer）** | APMと有効Grantの積集合だけを構成・モデル一覧に採用し、未承認Provider/Modelが通常UI/設定経由で利用できる場合はFail-Closed | Pluginが独自HTTP Clientを使う場合の通信内容 |
+| Credential・送信先 | **既存Credential Proxy/BrokerおよびDocker Network Policy** | 承認されたCredential Bindingと通信可能Host/Domainを制御 | リクエストBodyのModel ID、許可済みHost内の別Modelへの振替 |
+| Trusted Plugin | **既存Phase 5のPlugin権限境界** | 既存のPlugin許可・実行制約を維持 | Pluginが通信権限を使ってOpenCodeの通常モデル選択を迂回する可能性 |
+
+**採択済み保証:** 通常のOpenCode TUIと生成Runtimeのモデル選択では未承認Provider/Modelを利用させない。Host LauncherはGrant失効や構成不一致を起動時にFail-Closedする。一方、**Credential Proxy/Network PolicyはModel-awareの通信Enforcerではない**。許可済みDomainを使うTrusted Pluginや他のGuestプロセスが独自HTTP要求を送れる場合、許可外のModel IDをリクエストする可能性を完全には排除できない。認証情報が直接渡らない通信経路は保護されるが、許可済みProxy経由の任意Payloadに対するModel ID検査は保証しない。
+
+**設計境界と残余リスク:** 現行のHost Launcher＋生成Runtime＋Credential/Network境界による保証は、**通常UI/設定に限定**する。全Guest通信に対するProvider/Model単位の強制認可・稼働中Grant取消・課金上限保証は未達成・未検証と記録する。既存Phase 5 Trusted Pluginの通信権限を事実に反して制限済みとは扱わない。これを満たすためのModel-aware Proxy/Gateway追加、Plugin無断削除・権限変更は**未採択**であり、必要時はHuman Ownerの別途判断を要する。意図しない推論・課金が起こり得る残余リスクをOwnerに明示し、未承認モデルが通常のOpenCode操作から選択可能となる構成は採用しない。
 
 継続Grantは起動操作を簡素化するものであり、外部送信・課金ゼロや予算上限を自動保証するものではない。
 
@@ -186,6 +210,8 @@ TUI終了時にCollectとPreviewを自動実行するが、**Host ApplyはHuman 
 
 ### 10.1 収集と候補の固定
 
+**Collection確定前のGuest静止条件（F-004）:** TUI終了は必要条件だが十分条件ではない。Launcherは当該Sessionに紐付くOpenCode本体、Plugin/MCP、Spawnされた子孫・Background Jobの終了と、収集対象に対してGuestから書込みを継続できる実行主体がないことを**検証可能なGuest実行境界**で確認し、収集途中に再書込みされないよう隔離する。停止後に固定したGuest HEAD/Index/Worktree/Untracked Manifestを取得前後で照合し、不一致なら最終成果としない。PID消滅や一定時間のHash一致だけを静止の証明とはしない。Guest実行の完全静止を保証するMechanismを実装環境で確立できない場合、**`PENDING`（理由`GUEST_QUIESCENCE_UNVERIFIED`）のまま保全し、Collection DigestやApplyAuthorizationの最終確定を禁止**する。Guest成果を自動破棄しない。
+
 1. Guest Commit（BundleとOID）、GuestのIndex/Working Tree/Untracked、最終File ManifestをHostのWorkspace外・0700のSession `collection/`に保存し、全ファイルSHA-256と`collection_digest`を記録する。収集後はそのGenerationのCollectionを不変として扱う。
 2. Guest CommitのParentがHost Baseline HEADへ連続するか、最終Guest HEADが選択されたBranchに属するか、Commit済み内容と残存未Commit内容が二重計上されないかを検証する。
 3. OwnerへのPreviewには対象Workspace/Branch、SessionKey、Host Baseline HEAD、収集済みGuest HEAD、Commit OID一覧、Staged/Unstaged/Untrackedの追加/変更/削除、`collection_digest`、適用可能/保留理由を提示する。
@@ -193,6 +219,7 @@ TUI終了時にCollectとPreviewを自動実行するが、**Host ApplyはHuman 
 
 ### 10.2 Apply可否の一意な条件
 
+- Workspace Gate: §6の`HostApplyGate`が回復済みで、全Sessionの非終端Apply Journalが存在しないことを、新規Session/Snapshot採用時だけでなく**Apply開始時**にもWorkspace排他ロック下で確認する。Collectionの静止確認が未完了ならApplyを許可しない。
 - 共通前提: Host Workspace/BranchがBaselineと同じ、HEAD OID・Index Digest・Working Tree/Untracked Manifestが**Baselineから不変**、対象ファイルのsymlink/permission/secret検査PASS、Guest Collection Identity一致、他のApplyが非稼働、既存未完了Journalがない。
 - **Guest新規Commitなし:** HostのBaselineがDirtyでも、Index（staged状態）とWorking Tree（unstaged/untracked状態）をBaseから最終Guest状態へ安全に再現できる場合に限り適用可能。Hostの既存変更を上書きせず、三者の前提一致を必須とする。
 - **Guest新規Commitあり、Host BaselineがClean:** Guest HEADがHost HEADのFast-forward先で、Guest残存差分を二重計上せず再現できる場合に限り、Commit履歴と最終Index/Working Treeを一括適用可能。
@@ -209,14 +236,14 @@ Git Ref・Index・Working Treeは単一の原子更新単位ではないため�
 3. `apply-journal.json`へ`PREPARED`をfsyncしてから、同一データを参照する`APPLYING`を永続化する。以後は再入時にも復旧判定を優先する。
 4. 再検証に成功した場合、用意したWorking TreeとIndexの更新を行い、**最後に**Fast-forward対象BranchのRefを期待旧OIDから期待新OIDへCAS更新する。各段階の実行結果・HashをJournalへ記録する。Ref変更なしの場合は新しいIndex/Working Tree検証だけで完成判定する。
 5. 全部一致したときのみ`APPLIED`を永続記録し、承認を消費する。書込み途中の失敗やRef CAS失敗時は、JournalとバックアップからHostの元状態へ戻す。Rollbackの各対象も現在内容を確認してから復元し、外部変更を上書きしない。
-6. 異常終了からの再起動時、Refが旧OIDならBackupと書込み済みファイルを照合して安全にRollbackする。Refが新OIDかつ最終Index/Worktreeが期待値ならCommit済みとして完了記録する。どちらとも判定できない、外部書換えがある、Rollback失敗時は`RECOVERY_REQUIRED`として**自動Apply・再利用・削除を停止**し、原本・Journal・Collectionを保全する。
+6. 異常終了からの再起動時、Refが旧OIDならBackupと書込み済みファイルを照合して安全にRollbackする。Refが新OIDかつ最終Index/Worktreeが期待値ならCommit済みとして完了記録する。どちらとも判定できない、外部書換えがある、Rollback失敗時は`RECOVERY_REQUIRED`として**同じWorkspaceの全新規Session・Host Snapshot採用・自動Apply・Sandbox再利用・削除を停止**し、原本・Journal・Collectionを保全する。復旧の整合検証と終端Journalの永続化が済むまで、別SandboxのBaselineとしてHostの部分更新状態を転用しない。
 
 この方式でも他のHostプロセスから途中状態が一時的に見える可能性は残る。**完全な原子性を主張しない**。各段階の書込み・RenameとRef更新の整合性を照合し、Hostの既存データを失わないことを最優先とする。
 
 ## 11. エラー・保全条件
 
 - Mount、Sandbox ID、Artifact、Version Lock、Runtime、Session v3 Receipt、Git Baseline、Collection、Credential、推論Grant、Workspace Manifestの不一致はFail-Closed。個別の不一致を自動で同一視・修復しない。
-- 同時起動時のLease重複、未回収のGuest変更、同期競合、Secret検出、Legacy v2状態、Git Ref分岐、Apply Journal未終端では既存データを保存して停止または新しい独立Sandboxを選択する（既存状態への書込みは禁止）。
+- 同時起動時のLease重複、Guest PENDING、同期競合、Secret検出、Legacy v2状態、Git Ref分岐では既存データを保持する。**Guest PENDINGのみでHost状態が正常かつ全Journalが終端なら別Sandboxで新規Sessionを許可**する。**Host Apply JournalがPREPARED/APPLYING/RECOVERY_REQUIREDまたは終端不明の場合はWorkspace全体を停止し、別Sandboxを作成しても新たなHost Snapshot/Baselineを採用しない**。
 - `sbx exec`が停止中Sandboxを起動し得る点を考慮し、`--dry-run`や情報表示の経路で副作用のある検査をしない。
 - Sandbox削除、作業データ破棄、Host Gitの無断Merge/Rebase/Reset、Credential更新、外部Git Push、信頼済みLockの更新、推論Grantの拡張は通常`oc2`操作に暗黙に含めない。
 - Host側状態はWorkspace外に0700/0600で保存し、symlink・所有者・重複Identityを拒否する。デバッグログやReceiptにToken、認証DB、Secret本文を記録しない。
@@ -230,24 +257,24 @@ Git Ref・Index・Working Treeは単一の原子更新単位ではないため�
 2. 承認済みVersion Lockだけが実行され、未登録Version、未承認Lock、Platform/Archive/Binary Digest/Host・Guest Identity不一致をFail-Closedできる。
 3. 空きSandboxは正しいWorkspace/SandboxID/Generation/CLI/Runtime Identityで再利用、同時起動は別Sandboxと別Session Receiptを使用する。
 4. Host/Guest Baseline、Lease、Collect、Apply JournalはSessionGeneration単位で隔離され、異常終了でも互いの成果を上書きしない。旧v2 Receiptも保護する。
-5. HostのGit HEAD、Staged、Unstaged、UntrackedをGuestで区別して再現できる。履歴中のSecret/除外Objectが検出された場合はBundle転送せず停止する。
+5. HostのGit HEAD、Staged、Unstaged、UntrackedをGuestで区別して再現し、Indexのintent-to-add検出時は誤復元せずFail-Closedする。履歴中のSecret/除外Objectが検出された場合はBundle転送せず停止する。
 6. GuestのBranch/Commit/未Commit編集を収集し、Host由来の未Commit内容を二重適用しない。
-7. TUI終了時に固定CollectionをPreviewし、Ownerが1回承認した同じIdentityだけをHostへ適用できる。変更された候補や再承認なしの再適用は禁止。
+7. TUI終了後にGuestの書込み停止を保証できた場合のみCollectionを最終確定し、保証不能ならPENDINGで保全する。固定CollectionをPreviewし、Ownerが1回承認した同じIdentityだけをHostへ適用できる。変更された候補や再承認なしの再適用は禁止。
 8. Clean Baseline＋Guest Fast-forward Commitは履歴保持で反映でき、Dirty Baseline＋Guest CommitはCollection/隔離Refを保全して全体保留する。Guest CommitなしのDirty BaselineはStaged/Unstagedの独立状態を安全に反映できる。
-9. Host HEAD/Index/WorktreeのBaseline逸脱、Ref分岐、途中クラッシュ、Rollback不能を再現し、データ消失・Partial Successなしで`RECOVERY_REQUIRED`または保留へ移行できる。
-10. 初回のみ有効期限付き推論Grantを承認し、同一スコープで`oc2`だけの継続起動ができる。未承認・期限切れ・取消・Provider/Model/Account/Workspaceの変更は推論前に停止する。
+9. Host HEAD/Index/WorktreeのBaseline逸脱、Ref分岐、途中クラッシュ、Rollback不能を再現し、データ消失・Partial Successなしで`RECOVERY_REQUIRED`または保留へ移行できる。Host Apply中は`--new`を含め新規Session/Snapshot採用を全て拒否し、Guest PENDINGのみの場合と区別できる。
+10. 初回のみ有効期限付き推論Grantを承認し、同一スコープで`oc2`だけの継続起動ができる。未承認・期限切れ・取消・Provider/Model/Account/Workspaceの変更はRuntime起動前に停止する。通常のOpenCodeモデル選択には承認済みProvider/Modelだけが現れ、独自HTTP要求のModel ID制御は保証外として明示する。
 11. OpenAI OAuth、Cloudflare Credential BindingとAPM Provider選択を維持し、OpenCode v1やHostのCredentialを変更しない。
 12. 既存OC2 Phase 5のPlugin/MCP/Runtime検証、Mountless隔離、固定Artifact境界を回帰させない。
 
-テストは**オフライン単体・統合検証を先行**し、Version Lock/Schema異常、2つの並行Session、Lease Crash、Stage/Unstage/Untracked、Git履歴Secret、Fast-forward/分岐、Apply Fault Injection、Grant失効/取消を決定論的なFixtureで検証する。Sandbox・実際の推論・Credential操作による実機受入は、実装とは別途Human Ownerの承認がある場合だけ行う。未実行をPASS/FAILと混同しない。
+テストは**オフライン単体・統合検証を先行**し、Version Lock/Schema異常、2つの並行Session、Lease Crash、Stage/Unstage/Untracked、**intent-to-add検出と未知Index形式の拒否、Guest Quiescence未確認、Host APPLYING/RECOVERY_REQUIRED時の新規Session遮断と復旧解除、通常モデル選択のGrant投影とTrusted Plugin独自HTTPの非保証境界**、Git履歴Secret、Fast-forward/分岐、Apply Fault Injection、Grant失効/取消を決定論的なFixtureで検証する。Sandbox・実際の推論・Credential操作による実機受入は、実装とは別途Human Ownerの承認がある場合だけ行う。未実行をPASS/FAILと混同しない。
 
 ## 13. 非目標・停止条件・後続判断
 
 **非目標:** Direct Mount化、既存Runtime全面再実装、OpenCode v1改変、任意Plugin/MCPの解禁、任意未検証CLI起動、無承認Git Push、無断Host書込み、既存Sandboxの自動破棄。
 
-**今回の限定訂正の完了条件:** F-001（Version Lock）、F-002（多重Session）、F-003（Git Baseline）、F-004（Host Apply）、F-005（外部推論Grant）の主要責務・Identity・状態・失敗時契約を本Designで一意に定めること。既存のMountless/Snapshot/選択的Bundle/APM SSOT/Owner Apply承認を変更しない。
+**今回の限定訂正の完了条件:** F-001（Version Lock）とF-002（多重Session）の既存解決を保持し、F-003（intent-to-add拒否）、F-004（Workspace復旧Gate・Guest静止確認）、F-005（推論Grant Enforcementの保証範囲）の責務・Identity・停止条件を明文化すること。既存のMountless/Snapshot/選択的Bundle/APM SSOT/Owner Apply承認を変更しない。
 
-**承認境界:** R0.1の既存アーキテクチャはHuman Owner採択済み。R0.1.1の限定訂正はOwnerの文書訂正承認に基づき記録するもので、**訂正後の設計採択・実装開始の承認を意味しない**。
+**承認境界:** R0.1の既存アーキテクチャはHuman Owner採択済み。R0.1.1のF-001/F-002解決を維持し、R0.1.2のF-003/F-004/F-005限定訂正はOwnerの文書訂正承認に基づき記録する。**訂正後のDesign採択・残余リスク受容・実装開始の承認を意味しない**。
 
-**停止条件:** 本Design R0.1.1を1文書更新・Commit・Pushした後は終了する。Implementation Plan、実装、追加の独立レビュー、PR、Merge、Sandbox/Runtime実機操作、Credential変更は、別途Human Ownerが承認するまで自動開始しない。
+**停止条件:** 本Design R0.1.2を1文書更新してGitHubへ反映した後は終了する。Implementation Plan、実装、追加の独立レビュー、PR、Merge、Sandbox/Runtime実機操作、Credential変更は、別途Human Ownerが承認するまで自動開始しない。
 
