@@ -831,10 +831,9 @@ def prepare(
                        if name != 'theme.json'}
         if verification_only:
             plugin_metadata = _verify_plugin_source_metadata(assets[PLUGIN_META_TARGET])
-            if phase4_plugins is None:
-                plugin_source = verify_superpowers_source()
-                if plugin_metadata['tree_sha256'] != plugin_source.tree_sha256:
-                    fail('Superpowers source tree SHA-256 mismatch')
+            plugin_source = verify_superpowers_source()
+            if plugin_metadata['tree_sha256'] != plugin_source.tree_sha256:
+                fail('Superpowers source tree SHA-256 mismatch')
             bundled_plugins = {
                 name[len(PLUGIN_PREFIX):]: content
                 for name, content in assets.items()

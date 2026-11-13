@@ -113,6 +113,10 @@ class VerificationRuntimePreparationTest(unittest.TestCase):
                     return_value='a' * 64,
                 ) as verify_bundle,
                 patch.object(oc2_assets, 'build', return_value=(b'base-assets', 'b' * 64)),
+                patch.object(
+                    oc2_assets, 'export_superpowers_tree',
+                    side_effect=lambda _repo, _plugin, destination: destination.mkdir(),
+                ) as export_tree,
                 patch.object(oc2_assets, 'build_phase4_plugins', return_value=(b'phase4-assets', 'c' * 64)),
                 patch.object(oc2, 'stage') as stage,
                 patch.object(oc2, 'provision_cli', side_effect=AssertionError('no CLI install')),
@@ -133,6 +137,11 @@ class VerificationRuntimePreparationTest(unittest.TestCase):
 
         stage.assert_called_once()
         verify_bundle.assert_called_once()
+        export_tree.assert_called_once()
+        self.assertEqual(
+            stage.call_args.kwargs['superpowers_source'],
+            export_tree.call_args.args[2],
+        )
         verified_bundle = verify_bundle.call_args.args[0]
         self.assertEqual(
             verify_bundle.call_args.kwargs['trusted_root'], verified_bundle.parent,

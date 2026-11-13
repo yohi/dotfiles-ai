@@ -1129,7 +1129,13 @@ def prepare_phase4_runtime(
     if cli_path(runner, request.sandbox) is None:
         raise Stop('Phase 4 requires the pinned OpenCode CLI to be present')
     from sandbox.scripts.stage_opencode_v2 import verify_bundle
-    from oc2_assets import AssetError, build as build_assets, build_phase4_plugins, write_new
+    from oc2_assets import (
+        AssetError,
+        build as build_assets,
+        build_phase4_plugins,
+        export_superpowers_tree,
+        write_new,
+    )
 
     with tempfile.TemporaryDirectory(prefix='oc2-phase4-plugins-') as temporary:
         temporary_path = pathlib.Path(temporary)
@@ -1141,6 +1147,10 @@ def prepare_phase4_runtime(
                 repo,
                 verification_only=True,
                 plugin_dir=request.superpowers_plugin_dir,
+            )
+            superpowers_source = temporary_path / 'verification-superpowers'
+            export_superpowers_tree(
+                repo, request.superpowers_plugin_dir, superpowers_source,
             )
             phase4_assets_raw, phase4_assets_sha = build_phase4_plugins(
                 repo,
@@ -1183,6 +1193,7 @@ def prepare_phase4_runtime(
             HERE / 'oc2_guest.py',
             base_assets_file,
             base_assets_sha,
+            superpowers_source=superpowers_source,
             phase4_plugin_file=phase4_assets_file,
             phase4_plugins_sha=phase4_assets_sha,
         )
