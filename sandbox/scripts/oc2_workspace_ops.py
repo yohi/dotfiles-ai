@@ -4,9 +4,9 @@ import hashlib
 import os
 import pathlib
 import shutil
+import stat
 
 from oc2_workspace import (
-    FileEntry,
     Manifest,
     WorkspaceError,
     _by_path,
@@ -34,7 +34,7 @@ def materialize(source: pathlib.Path, destination: pathlib.Path, manifest: Manif
             if len(data) != entry.size or hashlib.sha256(data).hexdigest() != entry.sha256:
                 raise WorkspaceError('workspace changed while snapshot was copied')
             target = destination.joinpath(*relative.split('/'))
-            _ = target.parent.mkdir(mode=directory_mode, parents=True, exist_ok=True)
+            target.parent.mkdir(mode=directory_mode, parents=True, exist_ok=True)
             descriptor = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL |
                                   getattr(os, 'O_NOFOLLOW', 0), file_mode)
             with os.fdopen(descriptor, 'wb') as stream:
@@ -82,13 +82,22 @@ def apply_changes(host: pathlib.Path, guest: pathlib.Path, baseline: Manifest,
             snapshot(host, profile=baseline.profile),
         ).get(relative) != before[relative]:
             raise WorkspaceError('host workspace conflict; no files applied')
+
+    originals: dict[str, bytes | None] = {}
+    original_modes: dict[str, int] = {}
+    prepared: dict[str, pathlib.Path] = {}
+    contents: dict[str, bytes] = {}
+    created_directories: set[pathlib.Path] = set()
     for relative in changed:
         target = host.joinpath(*relative.split('/'))
         source = guest.joinpath(*relative.split('/'))
+        if relative in before:
+            originals[relative] = _read_regular(target)
+            original_modes[relative] = stat.S_IMODE(target.stat().st_mode)
+        else:
+            originals[relative] = None
         if relative not in after:
-            target.unlink(missing_ok=True)
             continue
-        _ = target.parent.mkdir(parents=True, exist_ok=True)
         data = _read_regular(source)
         entry = after[relative]
         if len(data) != entry.size or hashlib.sha256(data).hexdigest() != entry.sha256:
@@ -96,9 +105,67 @@ def apply_changes(host: pathlib.Path, guest: pathlib.Path, baseline: Manifest,
         temporary = target.with_name(target.name + '.oc2-new')
         if temporary.exists() or temporary.is_symlink():
             raise WorkspaceError('temporary apply destination already exists')
-        descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL |
-                             getattr(os, 'O_NOFOLLOW', 0), 0o600)
-        with os.fdopen(descriptor, 'wb') as stream:
-            _ = stream.write(data)
-        os.replace(temporary, target)
+        contents[relative] = data
+        prepared[relative] = temporary
+
+    for relative in changed:
+        target = host.joinpath(*relative.split('/'))
+        rollback = target.with_name(target.name + '.oc2-rollback')
+        if rollback.exists() or rollback.is_symlink():
+            raise WorkspaceError('temporary rollback destination already exists')
+
+    applied: list[str] = []
+    try:
+        for relative, temporary in prepared.items():
+            target = host.joinpath(*relative.split('/'))
+            missing = [parent for parent in target.parents
+                       if parent != host and not parent.exists()]
+            target.parent.mkdir(parents=True, exist_ok=True)
+            created_directories.update(missing)
+            descriptor = os.open(
+                temporary,
+                os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, 'O_NOFOLLOW', 0),
+                0o600,
+            )
+            with os.fdopen(descriptor, 'wb') as stream:
+                _ = stream.write(contents[relative])
+        for relative in changed:
+            target = host.joinpath(*relative.split('/'))
+            if relative in after:
+                os.replace(prepared[relative], target)
+            else:
+                target.unlink(missing_ok=True)
+            applied.append(relative)
+    except (OSError, WorkspaceError) as exc:
+        try:
+            for relative in reversed(applied):
+                target = host.joinpath(*relative.split('/'))
+                original_bytes = originals[relative]
+                if original_bytes is None:
+                    target.unlink(missing_ok=True)
+                else:
+                    rollback = target.with_name(target.name + '.oc2-rollback')
+                    descriptor = os.open(
+                        rollback,
+                        os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, 'O_NOFOLLOW', 0),
+                        0o600,
+                    )
+                    with os.fdopen(descriptor, 'wb') as stream:
+                        _ = stream.write(original_bytes)
+                        stream.flush()
+                        os.fchmod(stream.fileno(), original_modes[relative])
+                    os.replace(rollback, target)
+            for temporary in prepared.values():
+                if temporary.exists() or temporary.is_symlink():
+                    temporary.unlink()
+            for directory in sorted(created_directories, key=lambda item: len(item.parts),
+                                     reverse=True):
+                directory.rmdir()
+        except OSError as rollback_error:
+            raise WorkspaceError('apply failed and Host rollback was incomplete') from rollback_error
+        raise exc
+    finally:
+        for temporary in prepared.values():
+            if temporary.exists() or temporary.is_symlink():
+                temporary.unlink()
     return changed

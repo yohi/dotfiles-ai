@@ -123,6 +123,7 @@ def _excluded(
     relative: pathlib.PurePosixPath,
     profile: WorkspaceProfile | None = None,
 ) -> bool:
+    """Return whether a relative workspace path matches built-in or selected profile exclusions."""
     relative_name = relative.as_posix()
     return ((len(relative.parts) == 1
              and relative.name in ROOT_PROJECT_CONFIG_NAMES | ROOT_GENERATED_DIRECTORY_NAMES)
@@ -135,6 +136,7 @@ def _excluded(
                        for prefix in profile.excluded_prefixes)
             ))
             or any(part in EXCLUDED_NAMES or part.startswith('.env')
+                   or part.endswith('.env') or '.env.' in part
                    or any(term in part.lower() for term in ('secret', 'credential', 'token'))
                    or part.endswith(('.pem', '.key', '.p12', '.pfx')) for part in relative.parts))
 
@@ -218,6 +220,15 @@ def decode_manifest(raw: bytes, root: pathlib.Path) -> Manifest:
         _fail('workspace manifest profile is invalid')
     profile = profile_by_id(profile_value if isinstance(profile_value, str) else None)
     raw_entries = payload.get('files')
+    entries = _decode_manifest_entries(raw_entries, profile)
+    return Manifest(str(root.resolve(strict=True)), entries, profile)
+
+
+def _decode_manifest_entries(
+    raw_entries: object,
+    profile: WorkspaceProfile | None,
+) -> tuple[FileEntry, ...]:
+    """Decode sorted manifest entries, rejecting malformed, duplicate, oversized, or excluded paths."""
     if not isinstance(raw_entries, list):
         _fail('workspace manifest schema is invalid')
     entries: list[FileEntry] = []
@@ -238,7 +249,7 @@ def decode_manifest(raw: bytes, root: pathlib.Path) -> Manifest:
         entries.append(FileEntry(relative, size, digest))
     if entries != sorted(entries, key=lambda entry: entry.path):
         _fail('workspace manifest entries are not ordered')
-    return Manifest(str(root.resolve(strict=True)), tuple(entries), profile)
+    return tuple(entries)
 
 
 def _string_mapping(value: object) -> dict[str, object]:
@@ -263,36 +274,57 @@ def snapshot(
     if profile is not None and profile_by_id(profile.profile_id) != profile:
         raise WorkspaceError('workspace profile is not registered')
     base = root.resolve(strict=True)
+    entries = _snapshot_entries(base, profile)
+    entries.sort(key=lambda item: item.path)
+    return Manifest(str(base), tuple(entries), profile)
+
+
+def _snapshot_entries(
+    base: pathlib.Path,
+    profile: WorkspaceProfile | None,
+) -> list[FileEntry]:
+    """Collect included regular files beneath a validated root; fail when traversal is incomplete."""
     entries: list[FileEntry] = []
+
     def fail_walk(error: OSError) -> None:
         raise WorkspaceError('workspace cannot be read safely') from error
 
     for current, directories, filenames in os.walk(base, followlinks=False, onerror=fail_walk):
-        current_path = pathlib.Path(current)
-        retained: list[str] = []
-        for name in directories:
-            candidate = current_path / name
-            rel = pathlib.PurePosixPath(candidate.relative_to(base).as_posix())
-            if _excluded(rel, profile):
-                continue
-            if candidate.is_symlink():
-                raise WorkspaceError('workspace contains a symlink')
-            retained.append(name)
-        directories[:] = retained
-        for name in filenames:
-            candidate = current_path / name
-            rel = pathlib.PurePosixPath(candidate.relative_to(base).as_posix())
-            if _excluded(rel, profile):
-                continue
-            if candidate.is_symlink():
-                raise WorkspaceError('workspace contains a symlink')
-            entries.append(_safe_file(candidate, rel))
-    entries.sort(key=lambda item: item.path)
-    return Manifest(str(base), tuple(entries), profile)
+        _snapshot_directory(base, pathlib.Path(current), directories, filenames, profile, entries)
+    return entries
+
+
+def _snapshot_directory(
+    base: pathlib.Path,
+    current_path: pathlib.Path,
+    directories: list[str],
+    filenames: list[str],
+    profile: WorkspaceProfile | None,
+    entries: list[FileEntry],
+) -> None:
+    """Filter one walked directory and reject included symlinks and unsafe file entries."""
+    retained: list[str] = []
+    for name in directories:
+        candidate = current_path / name
+        relative = pathlib.PurePosixPath(candidate.relative_to(base).as_posix())
+        if _excluded(relative, profile):
+            continue
+        if candidate.is_symlink():
+            raise WorkspaceError('workspace contains a symlink')
+        retained.append(name)
+    directories[:] = retained
+    for name in filenames:
+        candidate = current_path / name
+        relative = pathlib.PurePosixPath(candidate.relative_to(base).as_posix())
+        if _excluded(relative, profile):
+            continue
+        if candidate.is_symlink():
+            raise WorkspaceError('workspace contains a symlink')
+        entries.append(_safe_file(candidate, relative))
 
 
 def _by_path(manifest: Manifest) -> dict[str, FileEntry]:
     return {item.path: item for item in manifest.files}
 
 
-from oc2_workspace_ops import apply_changes, changes, materialize
+from oc2_workspace_ops import apply_changes, changes, materialize  # noqa: E402, F401

@@ -59,7 +59,8 @@ def apm_config(
 
 
 class NativeApmConfigTest(unittest.TestCase):
-    def test_repository_apm_declares_the_approved_native_selection(self):
+    def test_repository_apm_declares_the_approved_native_selection(self) -> None:
+        """Verify the repository APM selects the approved Native configuration."""
         config = oc2_native.parse_apm_native((REPO / 'apm.yml').read_bytes(), require_oc2_assets=True)
 
         self.assertEqual(set(config.asset_sources), set(oc2_native.ASSET_SOURCES))
@@ -111,7 +112,8 @@ class NativeApmConfigTest(unittest.TestCase):
             'enabled': True, 'allowlist': ['superpowers'],
         })
 
-    def test_valid_config_emits_only_two_fixed_native_agents_and_disabled_mcp(self):
+    def test_valid_config_emits_only_two_fixed_native_agents_and_disabled_mcp(self) -> None:
+        """Accept the two fixed Agents and emit disabled Plugin/MCP selections."""
         raw = apm_config()
 
         config = oc2_native.parse_apm_native(raw)
@@ -124,7 +126,8 @@ class NativeApmConfigTest(unittest.TestCase):
         self.assertEqual(payload['agents']['oracle']['model'], 'openai/gpt-6-luna')
         self.assertEqual(payload['mcp'], {'enabled': False, 'servers': []})
 
-    def test_skill_frontmatter_is_validated_against_native_discovery_name(self):
+    def test_skill_frontmatter_is_validated_against_native_discovery_name(self) -> None:
+        """Accept matching Skill metadata and reject missing or mismatched fields."""
         valid = (
             '---\nname: config-modernizer\n'
             'description: Modernizes approved OpenCode configuration.\n---\nBody\n'
@@ -143,7 +146,8 @@ class NativeApmConfigTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'description'):
             oc2_native.validate_skill_frontmatter('config-modernizer', missing_description)
 
-    def test_existing_apm_skills_have_native_discovery_frontmatter(self):
+    def test_existing_apm_skills_have_native_discovery_frontmatter(self) -> None:
+        """Verify selected repository Skills expose native discovery metadata."""
         for name in ('agent-skill-architect', 'config-modernizer'):
             path = REPO / 'agent-skills' / 'custom' / name / 'SKILL.md'
             frontmatter = oc2_native.validate_skill_frontmatter(
@@ -153,7 +157,8 @@ class NativeApmConfigTest(unittest.TestCase):
                 self.assertEqual(frontmatter['name'], name)
                 self.assertTrue(frontmatter['description'])
 
-    def test_agent_permissions_keep_oracle_read_only_and_delegation_manual(self):
+    def test_agent_permissions_keep_oracle_read_only_and_delegation_manual(self) -> None:
+        """Allow manual shell/subagent actions and keep Oracle read-only."""
         payload = oc2_native.build_native_payload(oc2_native.parse_apm_native(apm_config()))
         hephaestus = payload['agents']['hephaestus']
         oracle = payload['agents']['oracle']
@@ -167,20 +172,23 @@ class NativeApmConfigTest(unittest.TestCase):
         }
 
         self.assertEqual(hephaestus_permissions[('edit', '*')], 'ask')
-        self.assertEqual(hephaestus_permissions[('bash', '*')], 'ask')
-        self.assertEqual(hephaestus_permissions[('task', '*')], 'ask')
+        self.assertEqual(hephaestus_permissions[('shell', '*')], 'ask')
+        self.assertEqual(hephaestus_permissions[('subagent', '*')], 'ask')
+        self.assertEqual(hephaestus_permissions[('grep', '*')], 'allow')
         self.assertEqual(oracle_permissions[('*', '*')], 'deny')
         self.assertEqual(oracle_permissions[('read', '*')], 'allow')
         self.assertEqual(oracle_permissions[('edit', '*')], 'deny')
-        self.assertEqual(oracle_permissions[('bash', '*')], 'deny')
-        self.assertEqual(oracle_permissions[('task', '*')], 'deny')
+        self.assertEqual(oracle_permissions[('shell', '*')], 'deny')
+        self.assertEqual(oracle_permissions[('subagent', '*')], 'deny')
         self.assertEqual(oracle_permissions[('webfetch', '*')], 'deny')
         self.assertEqual(oracle_permissions[('websearch', '*')], 'deny')
         self.assertEqual(oracle_permissions[('mcp.use', '*')], 'deny')
+        self.assertEqual(oracle_permissions[('grep', '*')], 'allow')
         self.assertNotIn('fallback_models', oracle)
         self.assertNotIn('fallback_models', hephaestus)
 
-    def test_unknown_agent_is_rejected(self):
+    def test_unknown_agent_is_rejected(self) -> None:
+        """Reject Agent names outside the fixed allowlist."""
         raw = apm_config(agents=(
             '  sisyphus:\n'
             '    mode: primary\n'
@@ -190,7 +198,8 @@ class NativeApmConfigTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'unapproved agent'):
             oc2_native.parse_apm_native(raw)
 
-    def test_agent_model_must_be_in_the_v2_apm_allowlist(self):
+    def test_agent_model_must_be_in_the_v2_apm_allowlist(self) -> None:
+        """Reject Native Agent models absent from the OpenAI APM whitelist."""
         raw = apm_config(agents=(
             '  hephaestus:\n'
             '    mode: primary\n'
@@ -203,7 +212,8 @@ class NativeApmConfigTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'unapproved agent model'):
             oc2_native.parse_apm_native(raw)
 
-    def test_agent_model_is_independent_of_the_approved_v2_default(self):
+    def test_agent_model_is_independent_of_the_approved_v2_default(self) -> None:
+        """Keep each approved Agent model fixed when the provider default changes."""
         raw = apm_config().replace(
             b'whitelist: [gpt-6-luna]',
             b'whitelist: [gpt-6-luna, gpt-6.1-sol]',
@@ -275,7 +285,8 @@ class NativeApmConfigTest(unittest.TestCase):
             ):
                 oc2_native.parse_apm_native(changed, require_oc2_assets=True)
 
-    def test_agent_fallback_fields_are_rejected(self):
+    def test_agent_fallback_fields_are_rejected(self) -> None:
+        """Reject unsupported fallback model fields in Agent definitions."""
         raw = apm_config(agents=(
             '  hephaestus:\n'
             '    mode: primary\n'
@@ -289,7 +300,8 @@ class NativeApmConfigTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'unsupported agent fields'):
             oc2_native.parse_apm_native(raw)
 
-    def test_mcp_must_remain_disabled_and_empty(self):
+    def test_mcp_must_remain_disabled_and_empty(self) -> None:
+        """Reject enabled MCP and non-allowlisted MCP server selections."""
         for mcp in (
             '  enabled: true\n  servers: []\n',
             '  enabled: false\n  servers: [codegraph]\n',
@@ -297,7 +309,8 @@ class NativeApmConfigTest(unittest.TestCase):
             with self.subTest(mcp=mcp), self.assertRaises(ValueError):
                 oc2_native.parse_apm_native(apm_config(mcp=mcp))
 
-    def test_asset_paths_must_be_unique_and_allowlisted(self):
+    def test_asset_paths_must_be_unique_and_allowlisted(self) -> None:
+        """Reject duplicate and path-traversing asset selections."""
         for assets in (
             '  - global-rules/AGENTS.global.md\n  - global-rules/AGENTS.global.md\n',
             '  - ../outside.md\n',
@@ -305,13 +318,15 @@ class NativeApmConfigTest(unittest.TestCase):
             with self.subTest(assets=assets), self.assertRaises(ValueError):
                 oc2_native.parse_apm_native(apm_config(assets=assets))
 
-    def test_unknown_asset_path_is_rejected(self):
+    def test_unknown_asset_path_is_rejected(self) -> None:
+        """Reject asset sources absent from the fixed source allowlist."""
         raw = apm_config(assets='  - docs/unreviewed.md\n')
 
         with self.assertRaisesRegex(ValueError, 'unapproved asset'):
             oc2_native.parse_apm_native(raw)
 
-    def test_missing_oc2_extensions_remain_compatible_with_config_only_exports(self):
+    def test_missing_oc2_extensions_remain_compatible_with_config_only_exports(self) -> None:
+        """Allow extension-free APM in ordinary config-only exports."""
         config = oc2_native.parse_apm_native(b'name: fixture\nversion: 1\n')
 
         self.assertEqual(config.asset_sources, ())
@@ -319,7 +334,22 @@ class NativeApmConfigTest(unittest.TestCase):
         self.assertEqual(oc2_native.build_native_payload(config)['mcp'],
                          {'enabled': False, 'servers': []})
 
-    def test_partial_oc2_extensions_are_rejected(self):
+    def test_missing_oc2_extensions_are_rejected_in_verification_mode(self) -> None:
+        """Reject extension-free APM when verification-only selection is requested."""
+        with self.assertRaisesRegex(ValueError, 'extensions are required'):
+            oc2_native.parse_apm_native(
+                b'name: fixture\nversion: 1\n', verification_only=True,
+            )
+
+    def test_missing_oc2_extensions_are_rejected_when_assets_are_required(self) -> None:
+        """Reject extension-free APM when OC2 assets are required."""
+        with self.assertRaisesRegex(ValueError, 'extensions are required'):
+            oc2_native.parse_apm_native(
+                b'name: fixture\nversion: 1\n', require_oc2_assets=True,
+            )
+
+    def test_partial_oc2_extensions_are_rejected(self) -> None:
+        """Reject APM documents that declare only part of the OC2 extension set."""
         raw = b'name: fixture\nversion: 1\nx-oc2-agents: {}\n'
 
         with self.assertRaisesRegex(ValueError, 'extensions must be declared together'):
@@ -331,7 +361,8 @@ class NativeApmConfigTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'Runtime requires'):
             oc2_native.parse_apm_native(raw)
 
-    def test_duplicate_mapping_keys_are_rejected(self):
+    def test_duplicate_mapping_keys_are_rejected(self) -> None:
+        """Reject duplicate keys in Native APM mappings."""
         raw = apm_config().replace(
             b'    mode: primary\n',
             b'    mode: primary\n    mode: subagent\n',

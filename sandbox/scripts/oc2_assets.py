@@ -19,7 +19,7 @@ from pathlib import PurePosixPath
 from oc2_agent_native import (
     SUPERPOWERS_FILE_COUNT,
     SUPERPOWERS_REPOSITORY,
-    SUPERPOWERS_SOURCE_PATH,
+    SUPERPOWERS_TREE_PATH,
     SUPERPOWERS_TOTAL_BYTES,
     SUPERPOWERS_TREE_SHA256,
     SUPERPOWERS_VERSION,
@@ -82,6 +82,22 @@ def _git_output(directory: Path, *arguments: str) -> str:
             ['git', '-C', str(directory), *arguments],
             capture_output=True,
             text=True,
+            timeout=5,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise AssetError('NOT_AVAILABLE: local Plugin checkout cannot be verified') from exc
+    if result.returncode != 0:
+        raise AssetError('NOT_AVAILABLE: local Plugin checkout cannot be verified')
+    return result.stdout
+
+
+def _git_output_bytes(directory: Path, *arguments: str) -> bytes:
+    """Return Git stdout without text decoding or newline conversion."""
+    try:
+        result = subprocess.run(
+            ['git', '-C', str(directory), *arguments],
+            capture_output=True,
             timeout=5,
             check=False,
         )
@@ -218,12 +234,80 @@ def resolve_superpowers_plugin(repo: Path, source: Path | None) -> PluginArtifac
         if local_file.is_symlink() or not local_file.is_file() or local_file.stat().st_size > MAX_FILE:
             raise AssetError('NOT_AVAILABLE: required local Plugin file is invalid')
         local_bytes = local_file.read_bytes()
-        committed_text = _git_output(source, 'show', 'HEAD:' + relative)
-        committed_bytes = committed_text.encode('utf-8')
+        committed_bytes = _git_output_bytes(source, 'show', 'HEAD:' + relative)
         if local_bytes != committed_bytes:
             raise AssetError('NOT_AVAILABLE: local Plugin file differs from pinned commit')
         files.append(PluginFile(relative, local_bytes, hashlib.sha256(local_bytes).hexdigest()))
     return PluginArtifact(lock_commit, tuple(files), tuple(tree_files))
+
+
+def export_superpowers_tree(repo: Path, source: Path, destination: Path) -> None:
+    """Materialize the complete pinned Git tree after validating its lock and provenance."""
+    resolve_superpowers_plugin(repo, source)
+    if destination.is_symlink() or destination.exists():
+        raise AssetError('NOT_AVAILABLE: verified Superpowers destination already exists')
+    if destination.parent.is_symlink() or not destination.parent.is_dir():
+        raise AssetError('NOT_AVAILABLE: verified Superpowers destination parent is unsafe')
+
+    raw_tree = _git_output_bytes(source, 'ls-tree', '-rz', '--full-tree', 'HEAD')
+    files: list[tuple[str, bytes, int]] = []
+    blob_hashes: dict[str, str] = {}
+    total_bytes = 0
+    for record in raw_tree.split(b'\0'):
+        if not record:
+            continue
+        try:
+            metadata, encoded_path = record.split(b'\t', 1)
+            git_mode, entry_type, blob_id = metadata.split(b' ', 2)
+            relative = encoded_path.decode('utf-8')
+        except (ValueError, UnicodeError) as exc:
+            raise AssetError('NOT_AVAILABLE: local Plugin Git tree is invalid') from exc
+        parts = relative.split('/')
+        if (not relative or relative.startswith('/') or '\\' in relative
+                or any(part in ('', '.', '..') for part in parts)
+                or any(ord(character) < 32 or ord(character) == 127 for character in relative)):
+            raise AssetError('NOT_AVAILABLE: local Plugin Git tree path is unsafe')
+        if git_mode not in (b'100644', b'100755') or entry_type != b'blob':
+            raise AssetError('NOT_AVAILABLE: local Plugin Git tree contains a non-regular entry')
+        if re.fullmatch(rb'[0-9a-f]{40}', blob_id) is None:
+            raise AssetError('NOT_AVAILABLE: local Plugin Git blob identity is invalid')
+        content = _git_output_bytes(source, 'cat-file', 'blob', blob_id.decode('ascii'))
+        total_bytes += len(content)
+        if total_bytes > SUPERPOWERS_TOTAL_BYTES or len(files) >= SUPERPOWERS_FILE_COUNT:
+            raise AssetError('NOT_AVAILABLE: local Plugin Git tree exceeds its pinned size')
+        files.append((relative, content, 0o755 if git_mode == b'100755' else 0o644))
+        blob_hashes[relative] = hashlib.sha256(content).hexdigest()
+
+    if len(files) != SUPERPOWERS_FILE_COUNT or total_bytes != SUPERPOWERS_TOTAL_BYTES:
+        raise AssetError('NOT_AVAILABLE: local Plugin Git tree size or file count mismatch')
+    tree_material = ''.join(
+        f'{relative}\0{blob_hashes[relative]}\n' for relative in sorted(blob_hashes)
+    ).encode('utf-8')
+    if hashlib.sha256(tree_material).hexdigest() != SUPERPOWERS_TREE_SHA256:
+        raise AssetError('NOT_AVAILABLE: local Plugin Git tree SHA-256 mismatch')
+
+    try:
+        destination.mkdir(mode=0o755)
+        destination.chmod(0o755)
+        for relative, content, mode in files:
+            target = destination.joinpath(*relative.split('/'))
+            target.parent.mkdir(parents=True, exist_ok=True, mode=0o755)
+            directory = target.parent
+            while directory != destination:
+                if directory.is_symlink():
+                    raise AssetError('NOT_AVAILABLE: verified Superpowers destination is linked')
+                directory.chmod(0o755)
+                directory = directory.parent
+            fd = os.open(
+                target,
+                os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, 'O_NOFOLLOW', 0),
+                mode,
+            )
+            os.fchmod(fd, mode)
+            with os.fdopen(fd, 'wb') as output:
+                output.write(content)
+    except OSError as exc:
+        raise AssetError('NOT_AVAILABLE: verified Superpowers tree cannot be staged') from exc
 
 
 def _regular_text(repo: Path, name: str) -> str:
@@ -336,7 +420,7 @@ def build(
             'source': SUPERPOWERS_REPOSITORY,
             'version': SUPERPOWERS_VERSION,
             'commit': locked_commit,
-            'source_path': SUPERPOWERS_SOURCE_PATH,
+            'source_path': SUPERPOWERS_TREE_PATH,
             'entrypoint': PLUGIN_ENTRYPOINT,
             'skills_directory': 'skills',
             'file_count': SUPERPOWERS_FILE_COUNT,
@@ -393,10 +477,11 @@ def build_phase4_plugins(
     from oc2_phase4_assets import Phase4AssetError, build_phase4_plugin_bundle
 
     try:
-        return build_phase4_plugin_bundle(
+        result: tuple[bytes, str] = build_phase4_plugin_bundle(
             repo,
             artifact_paths,
             explicit_opt_in=explicit_opt_in,
         )
+        return result
     except Phase4AssetError as exc:
         raise AssetError(str(exc)) from exc

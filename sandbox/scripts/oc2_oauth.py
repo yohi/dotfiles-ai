@@ -27,18 +27,20 @@ class Stage(Enum):
 
 class Progress:
     def __init__(self):
-        self.stage = None
+        self.stage: Stage | None = None
         self.completed = True
 
-    def start(self, stage):
+    def start(self, stage: Stage) -> None:
         if self.stage is not None and not self.completed:
             self.emit('PASS')
         self.stage = stage
         self.completed = False
         self.emit('START')
 
-    def emit(self, outcome, stage=None):
-        current = self.stage if stage is None else stage
+    def emit(self, outcome: str, stage: Stage | None = None) -> None:
+        current = stage if stage is not None else self.stage
+        if current is None:
+            return
         print(f'OC2_OAUTH {current.value} {outcome}', file=sys.stderr, flush=True)
         if current is self.stage and outcome in ('PASS', 'FAIL'):
             self.completed = True
@@ -89,6 +91,10 @@ def synchronize(cli, source_path, db_path):
 def _synchronize(cli, source_path, db_path, progress):
     progress.start(Stage.INITIAL_DB_CHECK)
     validate_db(db_path)
+    try:
+        runtime_dir = db_path.parents[4]
+    except IndexError as error:
+        raise ValueError('unsafe database path') from error
     original = (db_path.stat().st_dev, db_path.stat().st_ino) if db_path.exists() else None
     progress.start(Stage.SENTINEL_VALIDATE)
     if source_path.is_symlink() or not source_path.is_file():
@@ -101,7 +107,7 @@ def _synchronize(cli, source_path, db_path, progress):
         ) -> None:
             if isinstance(stderr, str):
                 stderr = stderr.encode('utf-8', errors='replace')
-            captured = capture_import_stderr(db_path, stderr)
+            captured = capture_import_stderr(runtime_dir, db_path, stderr)
             print(f'OC2_OAUTH {code}', file=sys.stderr, flush=True)
             print(f'IMPORT_EXIT_CODE={exit_code}', file=sys.stderr, flush=True)
             print(f'IMPORT_STDERR_CAPTURED={str(captured is not None).lower()}',
@@ -158,7 +164,6 @@ def _synchronize(cli, source_path, db_path, progress):
         return
     inode = (db_path.stat().st_dev, db_path.stat().st_ino) if db_path.exists() else None
     progress.start(Stage.BOOTSTRAP_CONFIG)
-    runtime_dir = db_path.parents[4]
     base_config = pathlib.Path(os.environ['XDG_CONFIG_HOME']) / 'opencode/opencode.jsonc'
     bootstrap_dir = create_bootstrap_config(base_config, runtime_dir)
     progress.start(Stage.IMPORT)
@@ -232,7 +237,8 @@ def _synchronize(cli, source_path, db_path, progress):
 
 if __name__ == '__main__':
     try:
-        synchronize(sys.argv[1], pathlib.Path('/home/agent/.local/share/opencode/auth.json'),
+        source_path = pathlib.Path(os.environ['XDG_DATA_HOME']) / 'opencode/auth.json'
+        synchronize(sys.argv[1], source_path,
                     pathlib.Path(os.environ['OPENCODE_DB']))
     except (OSError, ValueError, TypeError, KeyError, IndexError, subprocess.SubprocessError):
         print('OC2_OAUTH_STOP', file=sys.stderr)

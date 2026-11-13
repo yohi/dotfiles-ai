@@ -130,10 +130,11 @@ def verify_plugin_artifact(
     try:
         archive = tarfile.open(fileobj=io.BytesIO(raw), mode='r:gz')
         with archive:
-            members = archive.getmembers()
-            if not members or len(members) > MAX_ARTIFACT_FILES:
-                raise Phase4AssetError('plugin artifact file count is invalid')
-            for member in members:
+            member_count = 0
+            for member in archive:
+                member_count += 1
+                if member_count > MAX_ARTIFACT_FILES:
+                    raise Phase4AssetError('plugin artifact file count is invalid')
                 name = member.name
                 relative = PurePosixPath(name)
                 if (relative.is_absolute() or '\\' in name
@@ -224,7 +225,7 @@ def build_phase4_plugin_bundle(
             'acquisition': pin.acquisition.value,
             'artifact_sha512': pin.artifact_sha512,
             'entrypoint': PHASE4_POLICY_BY_ID[pin.plugin.value].entrypoint,
-            'files': paths,
+            'files': list(paths),
         }
         if pin.build_tool is not None and pin.lock_sha256 is not None:
             row['build_tool'] = pin.build_tool
@@ -233,10 +234,10 @@ def build_phase4_plugin_bundle(
     payload: dict[str, JsonValue] = {
         'schema': ASSET_SCHEMA,
         'source_sha256': hashlib.sha256(apm_bytes).hexdigest(),
-        'selection': [plugin.value for plugin in config.phase4_plugins.allowlist],
-        'plugins': plugin_rows,
-        'files': files,
-        'sha256': hashes,
+        'selection': list(plugin.value for plugin in config.phase4_plugins.allowlist),
+        'plugins': list(plugin_rows),
+        'files': dict(files),
+        'sha256': dict(hashes),
     }
     raw = (json.dumps(payload, sort_keys=True, separators=(',', ':')) + '\n').encode()
     if len(raw) > MAX_BUNDLE_BYTES:

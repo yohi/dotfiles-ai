@@ -167,7 +167,7 @@ def _mapping(node: Node, label: str) -> dict[str, Node]:
 def _string(node: Node, label: str) -> str:
     match node:
         case ScalarNode(tag='tag:yaml.org,2002:str', value=value) if value:
-            return value
+            return str(value)
         case _:
             raise NativeConfigError(f'{label} must be a non-empty string')
 
@@ -181,7 +181,15 @@ def _sequence(node: Node, label: str) -> tuple[Node, ...]:
 
 
 def parse_superpowers_lock(raw: bytes) -> str:
-    """Return the pinned Superpowers commit after validating its APM lock entry."""
+    """Parse an APM lockfile and return its pinned Superpowers commit.
+
+    Accepts YAML bytes whose root mapping contains a ``dependencies`` sequence
+    with exactly one ``superpowers`` entry for the approved repository. The
+    entry must match the fixed host, ref, commit, version, and package type.
+    Invalid/empty YAML, malformed mappings, missing dependencies, duplicate or
+    absent Superpowers entries, and mismatched identity fields raise
+    ``NativeConfigError``.
+    """
     try:
         root = yaml.compose(raw, Loader=yaml.SafeLoader)
     except (yaml.YAMLError, UnicodeError) as exc:
@@ -217,7 +225,7 @@ def parse_superpowers_lock(raw: bytes) -> str:
         node = entry.get(key)
         if node is None or _string(node, 'Superpowers lock ' + key) != value:
             raise NativeConfigError('APM lock Superpowers identity mismatch')
-    return SUPERPOWERS_COMMIT
+    return str(SUPERPOWERS_COMMIT)
 
 
 def _boolean(node: Node | None, label: str) -> bool:
@@ -388,6 +396,104 @@ def _mcp_server_id(value: str) -> McpServerId:
             raise NativeConfigError('unapproved MCP server')
 
 
+def _parse_asset_sources(node: Node) -> tuple[str, ...]:
+    """Parse unique, relative asset paths that are present in the fixed allowlist."""
+    assets = tuple(_string(item, 'x-oc2-assets entry') for item in _sequence(
+        node, 'x-oc2-assets',
+    ))
+    if not assets or len(assets) != len(set(assets)):
+        raise NativeConfigError('x-oc2-assets must contain unique paths')
+    if any(path.startswith('/') or '..' in path.split('/') or '\\' in path for path in assets):
+        raise NativeConfigError('unsafe OC2 asset source path')
+    if not set(assets) <= ASSET_SOURCES:
+        raise NativeConfigError('unapproved asset source path')
+    return tuple(source for source in ASSET_SOURCE_TO_TARGET if source in assets)
+
+
+def _parse_agent_selections(
+    top: dict[str, Node], agents_node: Node,
+) -> tuple[AgentSelection, ...]:
+    """Parse the fixed Agent pair, enforcing its mode and APM model allowlist."""
+    agent_nodes = _mapping(agents_node, 'x-oc2-agents')
+    try:
+        agent_names = {name: parse_agent_name(name) for name in agent_nodes}
+    except ValueError as exc:
+        raise NativeConfigError(str(exc)) from exc
+    selected_agents = set(agent_names.values())
+    if selected_agents and selected_agents != {AgentName.HEPHAESTUS, AgentName.ORACLE}:
+        raise NativeConfigError('x-oc2-agents must select the fixed Native Agent set')
+    if not selected_agents:
+        return ()
+
+    root_config = _mapping(top.get('opencode_v2', MappingNode('tag:yaml.org,2002:map', [])), 'opencode_v2')
+    providers = _mapping(
+        root_config.get('providers', MappingNode('tag:yaml.org,2002:map', [])),
+        'opencode_v2.providers',
+    )
+    openai = _mapping(
+        providers.get('openai', MappingNode('tag:yaml.org,2002:map', [])),
+        'opencode_v2.providers.openai',
+    )
+    enabled_node = openai.get('enabled')
+    if enabled_node is None or not _boolean(enabled_node, 'openai enabled'):
+        raise NativeConfigError('OpenAI must be enabled for Native Agents')
+    catalog = _mapping(top.get('provider', MappingNode('tag:yaml.org,2002:map', [])), 'provider')
+    openai_catalog = _mapping(
+        catalog.get('openai', MappingNode('tag:yaml.org,2002:map', [])),
+        'provider.openai',
+    )
+    model_whitelist = tuple(_string(item, 'provider.openai.whitelist item') for item in _sequence(
+        openai_catalog.get('whitelist', SequenceNode('tag:yaml.org,2002:seq', [])),
+        'provider.openai.whitelist',
+    ))
+    if NATIVE_MODEL.partition('/')[2] not in model_whitelist:
+        raise NativeConfigError('Native Agent model is not in the APM provider whitelist')
+
+    expected_modes = {AgentName.HEPHAESTUS: AgentMode.PRIMARY, AgentName.ORACLE: AgentMode.SUBAGENT}
+    selections: list[AgentSelection] = []
+    for name, agent_node in agent_nodes.items():
+        agent_name = agent_names[name]
+        fields = _mapping(agent_node, 'x-oc2-agents.' + name)
+        if set(fields) != {'mode', 'model'}:
+            raise NativeConfigError('unsupported agent fields: ' + name)
+        mode = _string(fields['mode'], 'agent mode')
+        model = _string(fields['model'], 'agent model')
+        if mode != expected_modes[agent_name].value:
+            raise NativeConfigError('unapproved agent mode: ' + name)
+        if model != NATIVE_MODEL:
+            raise NativeConfigError('unapproved agent model: ' + name)
+        selections.append(AgentSelection(agent_name, expected_modes[agent_name], model))
+    return tuple(selections)
+
+
+def _parse_plugin_ids(node: Node) -> tuple[PluginId, ...]:
+    """Parse disabled Plugin configuration and its unique fixed candidate list."""
+    plugins = _mapping(node, 'x-oc2-plugins')
+    if set(plugins) != {'enabled', 'allowlist'}:
+        raise NativeConfigError('x-oc2-plugins fields are invalid')
+    if _boolean(plugins['enabled'], 'x-oc2-plugins.enabled'):
+        raise NativeConfigError('x-oc2-plugins must remain disabled in APM')
+    plugin_ids = tuple(_plugin_id(_string(item, 'x-oc2-plugins.allowlist entry')) for item in
+                       _sequence(plugins['allowlist'], 'x-oc2-plugins.allowlist'))
+    if len(plugin_ids) != len(set(plugin_ids)):
+        raise NativeConfigError('x-oc2-plugins.allowlist must be unique')
+    return plugin_ids
+
+
+def _parse_mcp_server_ids(node: Node) -> tuple[McpServerId, ...]:
+    """Parse disabled MCP configuration and its unique fixed server list."""
+    mcp = _mapping(node, 'x-oc2-mcp')
+    if set(mcp) != {'enabled', 'servers'}:
+        raise NativeConfigError('x-oc2-mcp fields are invalid')
+    if _boolean(mcp['enabled'], 'x-oc2-mcp.enabled'):
+        raise NativeConfigError('x-oc2-mcp must remain disabled in APM')
+    server_ids = tuple(_mcp_server_id(_string(item, 'x-oc2-mcp.servers entry')) for item in
+                       _sequence(mcp['servers'], 'x-oc2-mcp.servers'))
+    if len(server_ids) != len(set(server_ids)):
+        raise NativeConfigError('x-oc2-mcp.servers must be unique')
+    return server_ids
+
+
 def parse_apm_native(
     raw: bytes,
     *,
@@ -395,6 +501,22 @@ def parse_apm_native(
     verification_only: bool = False,
     phase4_plugins: bool = False,
 ) -> NativeConfig:
+    """Parse YAML APM bytes into a digest-bound Native configuration.
+
+    Accepts a YAML root mapping with either no OC2 extensions or the complete
+    ``x-oc2-assets``, ``x-oc2-agents``, ``x-oc2-plugins``, and ``x-oc2-mcp``
+    extension set. Assets are returned in declared order after validating
+    unique safe allowlisted paths. The approved Agent selections are returned
+    as an ordered tuple (Agents may be absent or the fixed approved pair).
+    Plugin and MCP selections default to disabled and
+    empty; when ``verification_only`` is true, their fixed candidate lists are
+    selected and must include exactly ``superpowers`` and ``oc2-status``.
+    ``require_oc2_assets`` requires the OC2 extension set even when no other
+    extension is present. The result includes the SHA-256 of the exact input
+    bytes. Invalid/empty YAML, incomplete extensions, malformed or duplicate
+    fields, unsupported selections, and rejected activation raise
+    ``NativeConfigError``.
+    """
     try:
         root = yaml.compose(raw, Loader=yaml.SafeLoader)
     except (yaml.YAMLError, UnicodeError) as exc:
@@ -428,7 +550,7 @@ def parse_apm_native(
     if not any(extension_presence):
         if runtime_node is not None:
             raise NativeConfigError('Unified Runtime requires the complete OC2 APM extension set')
-        if require_oc2_assets:
+        if require_oc2_assets or verification_only:
             raise NativeConfigError('OC2 APM extensions are required')
         return NativeConfig(
             source_sha256=hashlib.sha256(raw).hexdigest(),
@@ -538,6 +660,10 @@ def parse_apm_native(
         servers=server_ids if selected_mcp else (),
     )
     asset_sources = tuple(source for source in ASSET_SOURCE_TO_TARGET if source in assets)
+    if verification_only and plugin_ids != (PluginId.SUPERPOWERS,):
+        raise NativeConfigError('verification requires the Superpowers plugin candidate')
+    if verification_only and server_ids != (McpServerId.OC2_STATUS,):
+        raise NativeConfigError('verification requires the oc2-status MCP candidate')
     return NativeConfig(
         source_sha256=hashlib.sha256(raw).hexdigest(),
         asset_sources=asset_sources,
@@ -554,6 +680,18 @@ def parse_apm_native(
 
 
 def validate_skill_frontmatter(expected_name: str, content: str) -> SkillFrontmatter:
+    """Parse and validate the frontmatter of a native Skill document.
+
+    Accepts text beginning with a YAML frontmatter block followed by a
+    non-empty Markdown body. Returns the validated ``name`` and trimmed
+    ``description``. Frontmatter may contain only ``name`` and ``description``;
+    the name must equal ``expected_name`` and match the native-compatible
+    lowercase name syntax, and description length is limited to 1024
+    characters. Missing delimiters
+    or body, invalid/empty YAML, duplicate or unknown fields, missing/invalid
+    values, name mismatch, and overlong descriptions raise
+    ``NativeConfigError``.
+    """
     if not content.startswith('---\n'):
         raise NativeConfigError('Skill frontmatter is missing')
     parts = content.split('\n---\n', 1)

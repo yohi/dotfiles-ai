@@ -41,8 +41,17 @@ APM dependency `obra/superpowers#v6.4.2`, resolved commit
 `8ca22dba9a94f28898bbce59f2537ff4d87c747d`. The APM lock entry records the
 marketplace package deployment (Skills and Hooks); it does not prove that an
 OpenCode v2 plugin directory is present. The exporter must therefore verify
-both the lock pin and a locally present OpenCode v2 plugin directory containing
-the root `index.js` and all required files against the fixed commit. OpenCode v2
+both the lock pin and a locally present OpenCode v2 plugin directory against
+the fixed commit. Its `package.json` must identify `superpowers` version `6.4.2`
+and set `main` to `.opencode/plugins/superpowers.js`; that entrypoint, the root
+`index.js`, and every tracked `skills/*/SKILL.md` file are required. The resolver
+collects the entrypoint's relative-import closure and permits only Node built-in
+bare specifiers `fs`, `path`, and `url` plus OpenCode runtime imports
+`@opencode-ai/plugin` and `@opencode-ai/sdk`; all other unbundled dependencies
+are rejected. The exporter verifies collected bytes against the clean pinned
+checkout. Guest verification additionally checks the complete pinned source tree: 229
+files, 1,974,678 bytes, and tree SHA-256
+`19ba95fe50e96fb94d8260972cb50595ed31ada3f993e370b381a1e7718c5036`. OpenCode v2
 configuration must reference the verified plugin directory. The exporter must
 not install or fetch the plugin. If the local plugin artifact or verifiable
 source identity is unavailable, report `NOT_AVAILABLE` and stop. The generated

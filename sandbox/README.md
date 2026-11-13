@@ -3,7 +3,7 @@
 > **Status: PHASE5_IMPLEMENTED / RUNTIME_ACCEPTANCE_PARTIAL**
 >
 > このディレクトリは、ホスト管理・Sandbox実行に向けた設定雛形と、読み取り主体の限定的な設定エクスポーターです。
-> `oc2`実行時は新しいClone-mode Sandboxを作成します。既存Sandboxの再構築・削除、`sbx policy`変更、
+> `oc2`実行時は検査済みSnapshotだけを転送する新しいmountless Sandboxを作成します。既存Sandboxの再構築・削除、`sbx policy`変更、
 > ホストOpenCode v1の更新、認証情報の転送は自動で行いません。
 > `sandbox/` 配下のYAMLは、Docker Sandboxes公式スキーマではなく独自の設計用メタデータです。
 
@@ -67,8 +67,9 @@ SibylサイドバーのVisual Acceptanceは未完了です。
 
 ```sh
 python3 -m pip show PyYAML  # 依存が既存環境にあることを確認（インストールしない）
-python3 sandbox/scripts/prepare_opencode_v2.py --out /tmp/opencode-v2-export-20261030
-python3 sandbox/scripts/prepare_opencode_v2.py --out /tmp/opencode-v2-export-20261030 --check
+OUT="${TMPDIR:-/tmp}/opencode-v2-export-20261030"
+python3 sandbox/scripts/prepare_opencode_v2.py --out "$OUT"
+python3 sandbox/scripts/prepare_opencode_v2.py --out "$OUT" --check
 python3 -m unittest discover -s sandbox/tests -p 'test_*.py' -v
 ```
 
@@ -84,11 +85,12 @@ python3 -m unittest discover -s sandbox/tests -p 'test_*.py' -v
 
 ```sh
 # 第2段で作成したスナップショットを検証（sbxを起動・呼び出ししない）
-python3 sandbox/scripts/stage_opencode_v2.py --bundle /tmp/opencode-v2-export-20261030
+# --bundle には一時ディレクトリ内の生成名だけを指定する
+python3 sandbox/scripts/stage_opencode_v2.py --bundle opencode-v2-export-20261030
 
 # 既存のmountless Sandboxにだけ、明示的な適用オプションで転送（この例は実行しない）
 python3 sandbox/scripts/stage_opencode_v2.py \
-  --bundle /tmp/opencode-v2-export-20261030 \
+  --bundle opencode-v2-export-20261030 \
   --sandbox oc-v2-poc --apply
 
 # CI/ローカルの模擬テスト。実際のsbxは呼び出さない
@@ -140,17 +142,17 @@ ln -s "$PWD/sandbox/scripts/oc2.py" "$HOME/.local/bin/oc2"
 ```
 
 `$HOME/.local/bin` がPATHに含まれていることを確認してください。起動前にDocker Sandboxes CLIの
-インストール済みバージョンと `sbx create --help` の `--clone` 対応を確認します。
-Sandbox名が既に存在する場合は、再利用・再構築せず停止します。
+インストール済みバージョンと `sbx create --help` の `--kit` 対応を確認します。
+Sandbox名が既に存在する場合は、通常起動では再利用・再構築せず停止します。Cloudflare credential確認に失敗した作成済みSandboxは、同じWorkspaceとSandbox名で`--resume`を指定するとSession receiptを照合して再開できます。receiptにはSandbox固有IDも保存し、同名の別Sandboxを拒否します。
 
 通常起動はHost Workspaceをmountせず、検査済みSnapshotだけをGuestへコピーします。
 `.git`、認証情報を含むファイル、symlink、特殊ファイル、未承認のOpenCode設定は転送しません。
 残ったファイルにCredential検出が一致した場合はSandbox作成前に停止します。
 
 Workspace originが正確に `yohi/dotfiles-ai` の場合だけ、Workspace Safe Transfer Profile R1を適用します。
-他のRepositoryの `apm.yml` にはこの除外を適用しません。
+R1の除外は他のRepositoryには適用されません。一般的な秘密ファイル・Credential検査は全Repositoryで実施します。
 
-- `apm.yml`はHost側SSOTとして読み込み、HostでOpenCode V2設定を生成します。原本はGuestへ転送しません。
+- `apm.yml`はGuestへ転送しません。認証情報パターンの検査は除外前に行い、一致した場合は起動を拒否します。OpenCode V2設定の生成にはHost側SSOTを使用します。
 - Guestでの`apm.yml`編集・新規作成はサポート対象外です。Guestで作った`apm.yml`はcollect/apply対象になりません。
 - `_docs/aws-resource-inventory.md`、`_scripts/generate_atlassian_auth.py`、
   `.agents/skills/claude-api/csharp/claude-api/README.md`、
@@ -173,9 +175,9 @@ oc2 --allow-paid-inference
 `--allow-paid-inference`による起動ごとの明示承認が必要です。
 未指定の場合はSandbox作成前に停止します。
 
-通常起動はDockerのv3 shell workloadと2つのMixinを合成し、新規のmountless Sandboxを作成します。
-Credential MixinはHost側の認証仲介を担当します。CLI MixinはHostが公式GitHub Releaseから取得し、
-サイズ・SHA-256・Archive構造を検証したOpenCode v2.2.5 standalone BinaryをローカルCOPYします。
+通常起動はDockerのv3 shell workloadとCredential Mixinを使って、新規のmountless Sandboxを作成します。
+Credential MixinはHost側の認証仲介を担当します。OpenCode v2.2.5 standalone BinaryはHostが公式GitHub Release APIから取得し、
+APIのサイズ・固定SHA-256・Archive構造を検証した後に`sbx cp`でGuestへコピーします。
 Host PATHへはインストールせず、Guest内の`npm install`やKit build時のnpm Registry接続も行いません。
 新しいSandboxを作るたびに約119 MBの公式AssetをHostから取得します。Docker Hubのshell workload取得は別途必要です。
 Hostの環境変数は継承せず、Sandbox専用のHome/XDG領域を使います。Provider設定と一時
@@ -200,12 +202,13 @@ printf 'print("safe sandbox fixture")\n' > "$test_repo/main.py"
 git -C "$test_repo" add main.py
 git -C "$test_repo" -c user.name='OC2 Test' -c user.email='oc2-test@example.invalid' commit -m fixture
 cd "$test_repo"
-oc2 --repo-root "$HOME/dotfiles/components/dotfiles-ai" --sandbox oc2-phase1-test
+oc2 --repo-root "$HOME/dotfiles/components/dotfiles-ai" --sandbox oc2-phase1-test \
+  --allow-paid-inference
 ```
 
 TUIの操作確認後は `Ctrl+C` で終了します。Sandboxは残ります。既存Sandboxの再利用・削除が必要な場合は、
 対象を確認したうえでHuman Ownerが別途判断してください。この実機テストはDocker Sandboxes `v0.49.2`の
-Clone modeとOpenCode `v2.2.5`の起動だけを確認し、実プロジェクトでの機密ファイル非露出を保証しません。
+検査済みSnapshotの転送とOpenCode `v2.2.5`の起動を確認し、実プロジェクトでの機密ファイル非露出を保証しません。
 
 `sbx diagnose` が `/dev/kvm: permission denied` を示した場合は、起動を迂回せず停止します。
 Human Ownerが権限変更を承認した場合に限り、管理者が `sudo usermod -aG kvm "$USER"` を実行し、

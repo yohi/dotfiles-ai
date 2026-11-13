@@ -14,7 +14,7 @@
 
 - Keep `apm.yml` as the source of truth; do not edit generated OpenCode configuration directly.
 - Superpowers identity is `obra/superpowers`, tag `v6.4.2`, commit `8ca22dba9a94f28898bbce59f2537ff4d87c747d`; the APM marketplace lock entry is not proof that an OpenCode v2 Plugin is installed.
-- Plugin verification accepts only an operator-supplied local Git checkout whose origin is `obra/superpowers`, whose `HEAD` equals the locked commit, whose worktree/index are clean, and whose root `index.js` plus all tracked files required by its local import graph match that commit. The path locates the artifact but does not establish identity. No `git fetch`, package-manager install, URL resolution, or symlink is allowed.
+- Plugin verification accepts only an operator-supplied local Git checkout whose origin is `obra/superpowers`, whose `HEAD` equals the locked commit, whose worktree/index are clean, and whose package metadata identifies `superpowers` version `6.4.2` with `main: .opencode/plugins/superpowers.js`. The required entrypoint, root `index.js`, all tracked `skills/*/SKILL.md` files, and the entrypoint's relative-import closure must match that commit. Bare imports are limited to Node built-ins `fs`, `path`, and `url` plus OpenCode runtime imports `@opencode-ai/plugin` and `@opencode-ai/sdk`; other unbundled dependencies are rejected. Guest verification also checks the pinned complete source tree: 229 files, 1,974,678 bytes, and tree SHA-256 `19ba95fe50e96fb94d8260972cb50595ed31ada3f993e370b381a1e7718c5036`. The path locates the artifact but does not establish identity. No `git fetch`, package-manager install, URL resolution, or symlink is allowed.
 - Never download or install a Plugin/MCP dependency during export, Runtime preparation, or offline tests; missing verifiable local Plugin bytes yield `NOT_AVAILABLE` and fail closed.
 - Ordinary OC2 keeps `plugin.use: deny`, `mcp.use: deny`, no enabled Plugin, and no MCP entries.
 - Verification Runtime permits only the fixed local Superpowers directory and fixed local MCP server; it has separate config, storage, and Runtime Identity and receives no real OAuth or Cloudflare credentials.
@@ -43,10 +43,10 @@
 - Create: `sandbox/tests/test_oc2_plugin_mcp.py`
 
 **Interfaces:**
-- Consumes: existing `x-oc2-assets`, `x-oc2-agents`, and `x-oc2-mcp` declarations plus the APM lock entry for Superpowers.
+- Consumes: existing `x-oc2-assets`, `x-oc2-agents`, `x-oc2-plugins`, and `x-oc2-mcp` declarations plus the APM lock entry for Superpowers.
 - Produces: immutable `PluginSelection` and `McpSelection` values carried by `NativeConfig`; default values mean disabled with empty selections. `parse_apm_native(raw, *, require_oc2_assets=False, verification_only=False)` is the exact parser interface. `verification_only=False` is the default and never upgrades ordinary launch. Parser selection validates the APM declaration; Task 2 separately verifies `apm.lock.yaml` and local Git provenance.
 - APM declarations use `x-oc2-plugins: {enabled: false, allowlist: [superpowers]}` and `x-oc2-mcp: {enabled: false, servers: [oc2-status]}`. Disabled declarations describe fixed candidates; only the explicit `--verification-only` build option selects them.
-- The only initial Plugin identity is repository `obra/superpowers`, ref `v6.4.2`, commit `8ca22dba9a94f28898bbce59f2537ff4d87c747d`; only a verified local checkout and its root `index.js` can be selected.
+- The only initial Plugin identity is repository `obra/superpowers`, ref `v6.4.2`, commit `8ca22dba9a94f28898bbce59f2537ff4d87c747d`; only a verified local checkout with `package.json` name/version/main equal to `superpowers`/`6.4.2`/`.opencode/plugins/superpowers.js` can be selected. Required artifacts include root `index.js`, the collected `skills/*/SKILL.md` files, and the entrypoint's relative-import closure. Only `fs`, `path`, `url`, `@opencode-ai/plugin`, and `@opencode-ai/sdk` bare imports are allowed. Guest validation checks the complete pinned source tree: 229 files, 1,974,678 bytes, and tree SHA-256 `19ba95fe50e96fb94d8260972cb50595ed31ada3f993e370b381a1e7718c5036`.
 - The only MCP identity is server id `oc2-status`, tool name `oc2_status`, fixed Guest interpreter command `python3 -I`, fixed Runtime-contained script path, fixed stdio transport, no caller-supplied arguments, and no added environment variables. The subprocess test uses `sys.executable -I` to isolate its test process.
 
 - [x] **Step 1: Add failing parser tests** for default-disabled declarations, valid explicit verification selection, duplicate/unknown fields, incorrect Superpowers candidate, and unknown MCP server id.
@@ -69,7 +69,7 @@
 
 - [x] **Step 1: Add failing resolver tests** for a pinned checkout with a relative dependency, absent source (`NOT_AVAILABLE`), wrong origin/commit, and dirty worktree.
 - [x] **Step 2: Run the focused exporter tests** and confirm the expected failures.
-- [x] **Step 3: Implement local artifact resolution** using the exact APM lock identity, a clean local Git checkout, the root `index.js`, and its allowlisted relative import closure; prohibit unbundled package imports and never fetch or install dependencies.
+- [x] **Step 3: Implement local artifact resolution** using the exact APM lock identity and a clean local Git checkout; require package name `superpowers`, version `6.4.2`, and main entrypoint `.opencode/plugins/superpowers.js`. Require root `index.js` and collect tracked `skills/*/SKILL.md` files plus the entrypoint's allowlisted relative import closure. Permit bare imports only for Node built-ins `fs`, `path`, and `url` and OpenCode runtime modules `@opencode-ai/plugin` and `@opencode-ai/sdk`; prohibit other unbundled imports and never fetch or install dependencies.
 - [x] **Step 4: Run `python3 -m unittest sandbox.tests.test_oc2_plugin_mcp.SuperpowersPluginResolverTest -v`**; resolver success must produce the exact tracked closure and every failed provenance check must return `NOT_AVAILABLE`.
 
 ### Task 3: Add the fixed read-only local MCP stdio server
@@ -97,6 +97,7 @@
 - Modify: `sandbox/scripts/stage_opencode_v2.py`
 - Modify: `sandbox/scripts/oc2_assets.py`
 - Modify: `sandbox/scripts/oc2.py`
+- Modify: `sandbox/scripts/oc2_identity.py`
 - Test: `sandbox/tests/test_oc2_native.py`
 - Test: `sandbox/tests/test_oc2_plugin_mcp.py`
 - Test: `sandbox/tests/test_oc2_verification.py`
@@ -106,7 +107,7 @@
 
 **Interfaces:**
 - Consumes: validated Task 1 selections, Task 2 Plugin bytes/provenance, and Task 3 MCP entrypoint.
-- Produces: ordinary provider and asset bundles with disabled selection; explicit `--verification-only --plugin-dir PATH --prepare-only` exports mode-marked provider and asset bundles whose selected components and bytes are covered by manifest hashes. Host provider config remains minimal and credential-free; Guest materialization is Task 5.
+- Produces: ordinary provider and asset bundles with disabled selection; explicit `--verification-only --plugin-dir PATH --prepare-only` exports mode-marked provider and asset bundles whose selected components and bytes are covered by manifest hashes. `oc2_identity.py` provides `runtime_identity_sha256(manifest_sha256, assets_sha256, generator_fingerprint=None)` and `verification_generator_fingerprint(guest_script, native_helper, identity_helper)` so Host and Guest derive the same identity from the manifest, assets, and verifier sources. Host provider config remains minimal and credential-free; Guest materialization is Task 5.
 - `prepare_opencode_v2._read_apm_source(root, verification_only=False)` and `oc2_assets.build(repo, verification_only=False, plugin_dir=None)` remain disabled by default. `plugin_dir` is required and validated only when `verification_only=True`.
 - `oc2.py` verification mode requires `--prepare-only`, an already-existing compatible mountless Sandbox, and an already-present pinned CLI; it must neither create a Sandbox nor seed/install/download a CLI. Ordinary invocation behavior is unchanged.
 
@@ -120,6 +121,7 @@
 **Files:**
 - Modify: `sandbox/scripts/oc2_guest.py`
 - Modify: `sandbox/scripts/oc2.py`
+- Modify: `sandbox/scripts/oc2_identity.py`
 - Create: `sandbox/tests/test_oc2_guest_verification.py`
 - Test: `sandbox/tests/test_oc2_plugin_mcp.py`
 - Test: `sandbox/tests/test_oc2_e2e.py`
@@ -127,7 +129,7 @@
 
 **Interfaces:**
 - Consumes: Task 4's mode-marked bundle and fixed allowlisted Plugin/MCP artifacts.
-- Produces: ordinary Guest config with Plugin/MCP denied; alternate Runtime materialized only from a mode-marked bundle and explicit verification-only request, with exact Plugin/MCP permissions, isolated storage, and identity derived from bundle mode and hashes.
+- Produces: ordinary Guest config with Plugin/MCP denied; alternate Runtime materialized only from a mode-marked bundle and explicit verification-only request, with exact Plugin/MCP permissions, isolated storage, and identity derived from bundle mode and hashes. Stage `oc2_identity.py` alongside `oc2_guest.py` and `oc2_agent_native.py`; use its `runtime_identity_sha256` and `verification_generator_fingerprint` functions for Host/Guest Runtime Identity agreement, and include the Identity helper in the generator fingerprint inputs.
 - Guest validation requires exact agreement between APM-derived selection, exported file set, plugin entrypoint, MCP command, config, and hashes; no existing Runtime is overwritten. The launcher environment uses a fixed allowlist without OAuth, Cloudflare, Docker credential proxy, or ambient credential variables.
 - Guest Runtime preparation does not launch the OpenCode TUI/server. The Host's `--prepare-only` requirement prevents implicit launch; it only checks the existing pinned CLI with `--version`. A separately authorized live acceptance is needed to execute the prepared Runtime.
 
