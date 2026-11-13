@@ -1,5 +1,5 @@
 lockfile_version: '1'
-generated_at: '2026-10-03T16:29:01.440204+00:00'
+generated_at: '2026-11-08T01:42:13.482249+00:00'
 apm_version: 0.31.0
 dependencies:
 - repo_url: anthropics/claude-code
@@ -6603,7 +6603,25 @@ deployments:
   content_hash: sha256:368bdc9c441c001a28ce4ca9b84fc211c33e3f1442b128e671fde1ba00ec1f32
 - kind: uri
   target: mcp
+  value: aws-mcp
+  runtime: antigravity
+  scope: project
+  owners:
+  - .
+  active_owner: .
+  content_hash: null
+- kind: uri
+  target: mcp
   value: cf-mcp-portal
+  runtime: antigravity
+  scope: project
+  owners:
+  - .
+  active_owner: .
+  content_hash: null
+- kind: uri
+  target: mcp
+  value: cf-mcp-portal-personal
   runtime: antigravity
   scope: project
   owners:
@@ -6649,15 +6667,6 @@ deployments:
 - kind: uri
   target: mcp
   value: filesystem
-  runtime: antigravity
-  scope: project
-  owners:
-  - .
-  active_owner: .
-  content_hash: null
-- kind: uri
-  target: mcp
-  value: io.github.SonarSource/sonarqube-mcp-server
   runtime: antigravity
   scope: project
   owners:
@@ -6693,7 +6702,25 @@ deployments:
   content_hash: null
 - kind: uri
   target: mcp
+  value: aws-mcp
+  runtime: codex
+  scope: project
+  owners:
+  - .
+  active_owner: .
+  content_hash: null
+- kind: uri
+  target: mcp
   value: cf-mcp-portal
+  runtime: codex
+  scope: project
+  owners:
+  - .
+  active_owner: .
+  content_hash: null
+- kind: uri
+  target: mcp
+  value: cf-mcp-portal-personal
   runtime: codex
   scope: project
   owners:
@@ -6739,15 +6766,6 @@ deployments:
 - kind: uri
   target: mcp
   value: filesystem
-  runtime: codex
-  scope: project
-  owners:
-  - .
-  active_owner: .
-  content_hash: null
-- kind: uri
-  target: mcp
-  value: io.github.SonarSource/sonarqube-mcp-server
   runtime: codex
   scope: project
   owners:
@@ -6783,7 +6801,25 @@ deployments:
   content_hash: null
 - kind: uri
   target: mcp
+  value: aws-mcp
+  runtime: opencode
+  scope: project
+  owners:
+  - .
+  active_owner: .
+  content_hash: null
+- kind: uri
+  target: mcp
   value: cf-mcp-portal
+  runtime: opencode
+  scope: project
+  owners:
+  - .
+  active_owner: .
+  content_hash: null
+- kind: uri
+  target: mcp
+  value: cf-mcp-portal-personal
   runtime: opencode
   scope: project
   owners:
@@ -6829,15 +6865,6 @@ deployments:
 - kind: uri
   target: mcp
   value: filesystem
-  runtime: opencode
-  scope: project
-  owners:
-  - .
-  active_owner: .
-  content_hash: null
-- kind: uri
-  target: mcp
-  value: io.github.SonarSource/sonarqube-mcp-server
   runtime: opencode
   scope: project
   owners:
@@ -6899,28 +6926,62 @@ deployments:
   active_owner: coderabbitai/skills
   content_hash: sha256:cba1e6915ee98d24f288e3fb2dfb4b9b5bdc9e3164abf66b885aa9b66d8ce17d
 mcp_servers:
+- aws-mcp
 - cf-mcp-portal
+- cf-mcp-portal-personal
 - cf-mcp-portal-work
 - chronos-graph
 - codegraph
 - com.atlassian/atlassian-mcp-server
 - filesystem
-- io.github.SonarSource/sonarqube-mcp-server
 - nexus
 - semgrep
 - skillport
 mcp_configs:
+  aws-mcp:
+    name: aws-mcp
+    transport: stdio
+    env:
+      AWS_MCP_PROXY_PROFILES: aws-mcp-readonly
+      AWS_REGION: ap-northeast-1
+      AWS_DEFAULT_REGION: ap-northeast-1
+    args:
+    - mcp-proxy-for-aws-cli==1.7.0
+    - https://aws-mcp.ap-northeast-1.api.aws/mcp
+    - --service
+    - aws-mcp
+    - --region
+    - ap-northeast-1
+    - --metadata
+    - AWS_REGION=ap-northeast-1
+    - --profile
+    - aws-mcp-readonly
+    - --retries
+    - '0'
+    - --log-level
+    - ERROR
+    registry: false
+    command: uvx
+    title: AWS Managed MCP (STS Scoped)
+    standalone: true
+    timeout: 120000
   cf-mcp-portal:
     name: cf-mcp-portal
     transport: streamable-http
     registry: false
-    url: https://mcp.y-ohi.com/mcp?codemode=search_and_execute
+    url: https://mcp.y-ohi.com/mcp
+    title: Cloudflare MCP Portal (Default / Common)
+  cf-mcp-portal-personal:
+    name: cf-mcp-portal-personal
+    transport: streamable-http
+    registry: false
+    url: https://personal.mcp.y-ohi.com/mcp
     title: Cloudflare MCP Portal (Personal)
   cf-mcp-portal-work:
     name: cf-mcp-portal-work
     transport: streamable-http
     registry: false
-    url: https://work.mcp.y-ohi.com/mcp?codemode=search_and_execute
+    url: https://work.mcp.y-ohi.com/mcp
     title: Cloudflare MCP Portal (Work)
   chronos-graph:
     name: chronos-graph
@@ -6967,8 +7028,7 @@ mcp_configs:
     - serve
     - --mcp
     registry: false
-    command: _scripts/codegraph-bootstrap.sh
-    cwd: .
+    command: codegraph
     title: CodeGraph MCP
   com.atlassian/atlassian-mcp-server:
     name: com.atlassian/atlassian-mcp-server
@@ -6978,20 +7038,23 @@ mcp_configs:
     args:
     - -y
     - '@modelcontextprotocol/server-filesystem'
-    - ${env:PWD}
+    - .
     registry: false
     command: npx
     title: Filesystem MCP
     standalone: true
     timeout: 60000
-  io.github.SonarSource/sonarqube-mcp-server:
-    name: io.github.SonarSource/sonarqube-mcp-server
   nexus:
     name: nexus
     transport: stdio
     env:
       LOG_LEVEL: ERROR
       GITHUB_TOKEN: ${env:GITHUB_TOKEN}
+      NEXUS_EMBEDDING_PROVIDER: ''
+      NEXUS_EMBEDDING_MODEL: ''
+      NEXUS_EMBEDDING_DIMENSIONS: ''
+      NEXUS_EMBEDDING_BASE_URL: ''
+      NEXUS_EMBEDDING_MAX_CONCURRENCY: ''
       NEXUS_WATCHER_IGNORE_PATHS: node_modules,opencode/node_modules,.opencode/node_modules,oss/apm/node_modules,oss/apm/docs/node_modules,.git,.nexus,.codegraph,.justice,.omo,.sisyphus,.superpowers,dist,gemini,agent-skills,apm_modules,.agents,.opencode,.gemini,.claude,.codex,.vscode,.devcontainer,oss,codex/.tmp,.worktrees,.venv,target,.mypy_cache,.ruff_cache,build,.serena,.cache,.wrangler,.terraform,.playwright-cli,.eslintcache,.coverage,coverage.xml,*.tsbuildinfo,__pycache__,*.db,*.sqlite,*.log
       CHOKIDAR_USEPOLLING: 'false'
       CHOKIDAR_INTERVAL: '2000'
@@ -7011,15 +7074,10 @@ mcp_configs:
     env:
       SEMGREP_APP_TOKEN: ${env:SEMGREP_APP_TOKEN}
     args:
-    - --python
-    - '3.13'
-    - semgrep-mcp
-    - -t
-    - stdio
-    - --semgrep-path
-    - ${env:HOME}/.local/bin/semgrep
+    - -c
+    - exec "$HOME/.local/bin/semgrep" mcp -t stdio
     registry: false
-    command: uvx
+    command: bash
     title: Semgrep MCP
     timeout: 60000
   skillport:
@@ -7036,35 +7094,38 @@ mcp_configs:
     timeout: 60000
 mcp_target_servers:
   antigravity:
+  - aws-mcp
   - cf-mcp-portal
+  - cf-mcp-portal-personal
   - cf-mcp-portal-work
   - chronos-graph
   - codegraph
   - com.atlassian/atlassian-mcp-server
   - filesystem
-  - io.github.SonarSource/sonarqube-mcp-server
   - nexus
   - semgrep
   - skillport
   codex:
+  - aws-mcp
   - cf-mcp-portal
+  - cf-mcp-portal-personal
   - cf-mcp-portal-work
   - chronos-graph
   - codegraph
   - com.atlassian/atlassian-mcp-server
   - filesystem
-  - io.github.SonarSource/sonarqube-mcp-server
   - nexus
   - semgrep
   - skillport
   opencode:
+  - aws-mcp
   - cf-mcp-portal
+  - cf-mcp-portal-personal
   - cf-mcp-portal-work
   - chronos-graph
   - codegraph
   - com.atlassian/atlassian-mcp-server
   - filesystem
-  - io.github.SonarSource/sonarqube-mcp-server
   - nexus
   - semgrep
   - skillport
