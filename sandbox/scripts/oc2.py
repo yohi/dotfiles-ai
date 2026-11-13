@@ -1049,10 +1049,10 @@ def stage(runner: Runner, name: str, bundle: pathlib.Path, manifest_sha: str,
             raise Stop('unsafe Phase 4 plugin asset path')
         else:
             raise Stop('cannot establish Phase 4 plugin asset state')
-        actual_phase4_sha = runner.sbx(
+        phase4_checksum = runner.sbx(
             'exec', name, 'sha256sum', remote_phase4, capture=True,
-        ).split()[0]
-        if actual_phase4_sha != phase4_plugins_sha:
+        ).split()
+        if not phase4_checksum or phase4_checksum[0] != phase4_plugins_sha:
             raise Stop('Phase 4 plugin asset SHA mismatch')
         args.extend([
             '--phase4-plugin-assets', remote_phase4,

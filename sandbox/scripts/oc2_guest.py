@@ -1075,8 +1075,6 @@ def main(argv: list[str] | None = None) -> int:
             bundle, digest, assets, args.expected_assets_sha, phase4_plugins=phase4_plugins,
         )
         print('OC2_GUEST_CONFIG_VERIFIED')
-        if assets is not None:
-            print('OC2_ASSETS_VERIFIED: rules=7 commands=1 skills=2 theme=1 custom_agents=0 routing=none')
         if phase4_plugins is not None:
             print('OC2_PHASE4_PLUGINS_VERIFIED: server=akane tui=sibyl recovery_ping=not-executed')
         print('OC2_RUNTIME_PREPARED: ' + str(runtime))
