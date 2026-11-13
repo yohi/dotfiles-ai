@@ -294,6 +294,38 @@ class HostTest(unittest.TestCase):
         self.assertNotIn('-i', auth)
         self.assertNotIn('-i', tui)
 
+    def test_unified_launch_stages_verified_superpowers_source(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            bundle = root / 'bundle'
+            bundle.mkdir()
+            assets_file = root / 'assets.json'
+            assets_file.write_text('{}')
+            phase4_file = root / 'phase4-assets.json'
+            phase4_file.write_text('{}')
+            superpowers_source = root / 'verification-superpowers'
+            superpowers_source.mkdir()
+            captured = {}
+
+            def capture_stage(*_args, **kwargs):
+                captured.update(kwargs)
+
+            with patch.object(oc2, 'stage', side_effect=capture_stage):
+                oc2.launch(
+                    FakeRunner(),
+                    oc2.SandboxLaunch(
+                        'oc2-dev', 'a' * 64, oc2.PINNED[0], '/workspace/project',
+                        pathlib.Path('/tmp/config'), assets_file=assets_file,
+                        assets_sha=hashlib.sha256(assets_file.read_bytes()).hexdigest(),
+                        bundle=bundle, manifest_sha='b' * 64,
+                        phase4_plugin_file=phase4_file,
+                        phase4_plugins_sha=hashlib.sha256(phase4_file.read_bytes()).hexdigest(),
+                        superpowers_source=superpowers_source,
+                    ),
+                )
+
+            self.assertEqual(captured['superpowers_source'], superpowers_source)
+
     def test_launch_transfers_and_guest_verifies_selected_assets(self):
         runner = FakeRunner()
         with tempfile.TemporaryDirectory() as temporary:
@@ -654,7 +686,7 @@ class HostTest(unittest.TestCase):
             self.assertEqual(check(candidate), 10)
             candidate.unlink()
             candidate.mkdir()
-            self.assertEqual(check(candidate), 12)
+            self.assertEqual(check(candidate), 13)
             candidate.rmdir()
             candidate.symlink_to(parent / 'missing')
             self.assertEqual(check(candidate), 12)
@@ -1527,7 +1559,14 @@ class HostTest(unittest.TestCase):
         self.assertEqual(command[4:7], ('oc2-dev', 'python3', '-c'))
         self.assertIn(oc2.GUEST_EXEC_WRAPPER, command)
         self.assertEqual(command[-2:], (oc2.PINNED[0], '--standalone'))
-        self.assertIn('OPENCODE_WATCHDOG_ENABLED=false', command)
+        for setting in (
+            'OPENCODE_WATCHDOG_ENABLED=true',
+            'OPENCODE_WATCHDOG_STAGE1_MS=180000',
+            'OPENCODE_WATCHDOG_STAGE2_MS=86400000',
+            'SIBYL_OBSERVER_ENABLED=true',
+            'OPENCODE_WATCHDOG_ENABLED=false',
+        ):
+            self.assertNotIn(setting, command)
         self.assertNotIn('bash', command)
         self.assertNotIn('--mount', command)
         self.assertFalse(any(argument.startswith('OPENCODE_CONFIG_DIR=') for argument in command))
@@ -1589,7 +1628,24 @@ class HostTest(unittest.TestCase):
             runner.calls[2],
             ('cp', str(config_file), f'oc2-dev:{runtime}/config/opencode/opencode.jsonc'),
         )
-        auth, tui = runner.calls[3:5]
+        # Runtime permission enforcement precedes OAuth Bootstrap.
+        mode_check, auth, tui = runner.calls[-3:]
+
+        self.assertEqual(
+            mode_check[:4],
+            ('exec', 'oc2-dev', 'python3', '-c'),
+        )
+        self.assertEqual(len(mode_check), 6)
+        self.assertEqual(mode_check[5], runtime)
+        self.assertIn(
+            'os.fchmod(fd, 0o700)',
+            mode_check[4],
+        )
+        compile(
+            mode_check[4],
+            '<oc2-runtime-mode-program>',
+            'exec',
+        )
         self.assertEqual(tui[3], project)
         self.assertIn(oc2.GUEST_EXEC_WRAPPER, auth)
         self.assertIn(oc2.GUEST_EXEC_WRAPPER, tui)
@@ -1666,6 +1722,8 @@ class HostTest(unittest.TestCase):
             script_sha = hashlib.sha256(script.read_bytes()).hexdigest()
             class Runner:
                 def destination_status(self, name, destination):
+                    if destination.startswith(f'{oc2.ROOT}/bundles/'):
+                        return 0
                     return 12
 
                 def sbx(self, *args, **kwargs):
@@ -2137,6 +2195,24 @@ class HostTest(unittest.TestCase):
             policy.get('resource') == 'cloudflare-ai-gateway-custom'
             for policy in runtime_config['policies']
         ))
+
+    def test_unrequested_cloudflare_agent_model_stops_before_provider_removal(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config = pathlib.Path(tmp) / 'opencode.jsonc'
+            config.write_text(json.dumps({
+                'model': 'openai/gpt-6-luna',
+                'agents': {
+                    'hephaestus': {'model': 'cloudflare-ai-gateway-custom/custom/kimi'},
+                },
+                'providers': {
+                    'openai': {'models': {}},
+                    'cloudflare-ai-gateway-custom': {'models': {'custom/kimi': {}}},
+                },
+                'policies': [],
+            }))
+
+            with self.assertRaisesRegex(oc2.Stop, 'Agent model requires explicit Cloudflare'):
+                oc2.configure_cloudflare_provider(config, include_cloudflare=False)
 
     def test_explicit_cloudflare_mode_keeps_provider_available(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -2924,24 +3000,23 @@ class GuestTest(unittest.TestCase):
         output = self.base / 'native-export'
         output.parent.mkdir(parents=True, exist_ok=True)
         config_file = oc2.export_v2_config(repo, output)
-        asset_raw, asset_sha = assets.build(repo)
-        asset_file = self.base / 'assets.json'
-        asset_file.write_bytes(asset_raw)
-
-        config_sha = guest.verify(output)
-        native_assets = guest.verify_assets(asset_file, asset_sha)
-        runtime = guest.prepare(output, config_sha, native_assets, asset_sha)
         server = json.loads((config_file).read_text(encoding='utf-8'))
-        client = json.loads((runtime / 'config/opencode/cli.json').read_text(encoding='utf-8'))
+        manifest = json.loads((output / 'export-manifest.json').read_text(encoding='utf-8'))
+        native_config = native.parse_apm_native(
+            (repo / 'apm.yml').read_bytes(), require_oc2_assets=True,
+        )
+        selection = native.build_native_payload(native_config)
 
         self.assertEqual(set(server['agents']), {'hephaestus', 'oracle'})
         self.assertEqual(server['agents']['oracle']['mode'], 'subagent')
         self.assertNotIn('default_agent', server)
-        self.assertNotIn('mcp', server)
-        self.assertEqual(server['policies'][-1],
-                         {'action': 'mcp.use', 'resource': '*', 'effect': 'deny'})
-        self.assertEqual(client['theme'], {'name': 'tokyonight'})
-        self.assertEqual(runtime, guest.runtime_path(config_sha, asset_sha))
+        self.assertEqual(manifest['config_format'], 'opencode-v2-unified')
+        self.assertEqual(selection['plugins'], {
+            'enabled': True, 'allowlist': ['superpowers'],
+        })
+        self.assertEqual(selection['mcp'], {
+            'enabled': True, 'servers': ['oc2-status'],
+        })
 
     def test_materialize_idempotently(self):
         digest = guest.verify(self.bundle)
@@ -3020,9 +3095,18 @@ class GuestTest(unittest.TestCase):
     def test_guest_rejects_v2_config_not_bound_to_native_asset_agents(self):
         path, _ = self._assets()
         payload = json.loads(path.read_bytes())
-        native_payload = native.build_native_payload(
-            native.parse_apm_native((SCRIPTS.parents[1] / 'apm.yml').read_bytes())
+        parsed_native = native.parse_apm_native(
+            (SCRIPTS.parents[1] / 'apm.yml').read_bytes(), verification_only=True,
         )
+        native_payload = native.build_native_payload(native.NativeConfig(
+            parsed_native.source_sha256,
+            parsed_native.asset_sources,
+            parsed_native.agents,
+            native.PluginSelection(enabled=False, allowlist=()),
+            native.McpSelection(enabled=False, servers=()),
+            False,
+            parsed_native.phase4_plugins,
+        ))
         native_payload['source_sha256'] = '0' * 64
         payload['files'][guest.NATIVE_ASSET_TARGET] = json.dumps(
             native_payload, sort_keys=True,
@@ -3207,13 +3291,19 @@ class AssetExporterTest(unittest.TestCase):
             'provider:\n'
             '  openai:\n'
             '    whitelist: [gpt-6-luna]\n'
+            '  cloudflare-ai-gateway-custom:\n'
+            '    models: {custom/test-model: {name: Test}}\n'
             'opencode_v2:\n'
             '  default_model: openai/gpt-6-luna\n'
+            '  deny_provider_fallback: true\n'
+            '  deny_guest_auth: true\n'
             '  providers:\n'
             '    openai:\n'
             '      enabled: true\n'
+            '      auth_method: docker_openai_oauth\n'
             '    cloudflare-ai-gateway-custom:\n'
             '      enabled: true\n'
+            '      auth_method: docker_custom_secret\n'
             'x-oc2-assets:\n' + ''.join(f'  - {source}\n' for source in sources)
             + 'x-oc2-agents:\n'
             '  hephaestus:\n'

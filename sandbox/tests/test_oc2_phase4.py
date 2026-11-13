@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import pathlib
 import sys
 import unittest
+from unittest.mock import patch
 
 SCRIPTS = pathlib.Path(__file__).resolve().parents[1] / 'scripts'
 REPO = pathlib.Path(__file__).resolve().parents[2]
@@ -36,6 +38,26 @@ PHASE4_BLOCK = b'''\nx-oc2-phase4:
 '''
 
 
+def _superpowers_artifact() -> oc2_assets.PluginArtifact:
+    contents = {
+        'index.js': b'export default {}\n',
+        'package.json': b'{"name":"superpowers","version":"6.4.2"}\n',
+        '.opencode/plugins/superpowers.js': b'export default {}\n',
+        'skills/demo/SKILL.md': b'---\nname: demo\n---\n',
+    }
+    return oc2_assets.PluginArtifact(
+        source_commit=oc2_native.SUPERPOWERS_COMMIT,
+        files=tuple(
+            oc2_assets.PluginFile(name, data, hashlib.sha256(data).hexdigest())
+            for name, data in sorted(contents.items())
+        ),
+        tree_files=tuple(
+            (name, hashlib.sha256(data).hexdigest())
+            for name, data in sorted(contents.items())
+        ),
+    )
+
+
 def phase4_config(block: bytes = PHASE4_BLOCK) -> bytes:
     source = (REPO / 'apm.yml').read_bytes()
     return source.replace(PHASE4_BLOCK, block, 1)
@@ -43,23 +65,34 @@ def phase4_config(block: bytes = PHASE4_BLOCK) -> bytes:
 
 class Phase4PluginSelectionTest(unittest.TestCase):
     def test_default_asset_export_does_not_include_phase4_plugins(self):
-        raw, _digest = oc2_assets.build(REPO)
+        with patch.object(
+            oc2_assets, 'resolve_superpowers_plugin', return_value=_superpowers_artifact(),
+        ):
+            raw, _digest = oc2_assets.build(REPO, plugin_dir=pathlib.Path('/fixture/superpowers'))
 
         payload = json.loads(raw)
 
         self.assertFalse(any(name.startswith('plugins/akane/') for name in payload['files']))
         self.assertFalse(any(name.startswith('plugins/sibyl/') for name in payload['files']))
 
-    def test_phase4_plugins_are_disabled_without_explicit_runtime_opt_in(self):
+    def test_unified_apm_selects_phase4_and_verification_mode_stays_separate(self):
         raw = phase4_config()
 
         config = oc2_native.parse_apm_native(raw)
+        verification = oc2_native.parse_apm_native(raw, verification_only=True)
         payload = oc2_native.build_native_payload(config)
 
-        self.assertFalse(config.phase4_plugins.enabled)
-        self.assertEqual(config.phase4_plugins.allowlist, ())
-        self.assertEqual(payload['plugins'], {'enabled': False, 'allowlist': []})
-        self.assertNotIn('phase4_plugins', payload)
+        self.assertTrue(config.unified_runtime)
+        self.assertTrue(config.phase4_plugins.enabled)
+        self.assertEqual(
+            tuple(plugin.value for plugin in config.phase4_plugins.allowlist),
+            ('akane', 'sibyl'),
+        )
+        self.assertEqual(payload['plugins'], {
+            'enabled': True, 'allowlist': ['superpowers'],
+        })
+        self.assertFalse(verification.unified_runtime)
+        self.assertFalse(verification.phase4_plugins.enabled)
 
     def test_explicit_phase4_opt_in_selects_server_before_tui_plugin(self):
         raw = phase4_config()

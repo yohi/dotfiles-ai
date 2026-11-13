@@ -1,6 +1,6 @@
 # OpenCode Sandbox runtime — 設定と開発環境
 
-> **Status: PHASE1_LIVE_PASS**
+> **Status: PHASE5_IMPLEMENTED / RUNTIME_ACCEPTANCE_PARTIAL**
 >
 > このディレクトリは、ホスト管理・Sandbox実行に向けた設定雛形と、読み取り主体の限定的な設定エクスポーターです。
 > `oc2`実行時は検査済みSnapshotだけを転送する新しいmountless Sandboxを作成します。既存Sandboxの再構築・削除、`sbx policy`変更、
@@ -9,13 +9,28 @@
 
 ## 責務と正本
 
-- **Host**: `dotfiles-ai` の `apm.yml` を設定SSOTとし、プロジェクトのGitリポジトリを正本として保持する。
-- **Sandbox**: `oc2`はOpenCode v2.2.5のTUIと、APMから選別したProvider設定を
-  扱う。Docker Credential MixinでHost側Provider認証を仲介する。MCPとPluginは扱わない。
+- **Host**: `dotfiles-ai` の `apm.yml` をOpenCode v2 Runtime設定のSSOTとし、プロジェクトのGitリポジトリを正本として保持する。
+- **Sandbox**: `oc2`はOpenCode v2.2.5のTUIと、APMから選別・検証したProvider、Native Agent、Theme、Plugin、MCP設定を扱う。Docker Credential MixinでHost側Provider認証を仲介する。
 - **受渡し**: 選別済み設定とレビュー済みソースのみを渡し、変更結果はホストでレビュー後に明示的に採用する。
 
 既存の `make setup`、`make sync-opencode`、`make sync-mcp` には接続しません。
 `opencode/opencode.jsonc` とルート`opencode.json`は生成物なので編集しません。
+
+Unified Runtimeのユーザー設定は`apm.yml`の`opencode_v2`、`x-oc2-agents`、
+`x-oc2-plugins`、`x-oc2-phase4`、`x-oc2-mcp`、`x-oc2-assets`、
+`x-oc2-runtime`から選択します。Providerカタログと`opencode_v2.allowed_models`
+がモデル許可範囲を決め、Agentごとの`model`も同じ範囲から選びます。Themeと
+Akane Watchdog / Sibyl ObserverのOptionsも`x-oc2-runtime`からGuest設定へ反映されます。
+
+ParserとGuestは未知フィールド・未許可モデル・Plugin/MCP・Themeを拒否します。
+OpenCode v2.2.5、Phase 4固定Artifact Identity、OAuth方式、Sandbox隔離、Default Deny
+Policy、Credential Proxy、明示的な外部推論承認はコード側の制約として維持します。
+AkaneのState生成とSibyl Observerはサイドバー成立条件のため無効化できません。
+Stage 2は最低24時間、Recovery Pingは最大1回に制限し、完全無効化を設定可能とはしません。
+現在の`86400000ms`は受入確認用の暫定値であり、長時間稼働中の自動Pingを防ぐ保証ではありません。
+既存の`experimental.mcp_timeout`（ミリ秒）はOC2のMCP execution timeoutとして
+`mcp.timeout.execution`へ伝播します。許容範囲は1秒から10分です。MCP startup/catalogのTimeoutと
+Host側Sandbox・Artifact・OAuth subprocess期限は別のプロトコル/運用境界であり、ここから変更しません。
 
 ## スタック構成
 
@@ -31,7 +46,8 @@
 
 `sandbox/scripts/prepare_opencode_v2.py` は `apm.yml` の `opencode_v2` と
 Provider定義を読み取り、許可された OpenAI と Cloudflare Custom Provider の設定だけを
-OpenCode V2用に変換します。OpenAIを既定Providerとし、Cloudflareは既存の`/compat`
+OpenCode V2用に変換します。`allowed_models`は生成されるProviderのモデル一覧を絞り込みます。
+OpenAIを既定Providerとし、Cloudflareは既存の`/compat`
 経路を使います。baseURL、Header、Guest auth、Provider policyはExporter、Stage、Guestの
 各検証層で照合します。資格情報となる値は出力せず、Host側Docker Credential Proxyが
 管理する固定placeholderだけを参照します。
@@ -42,8 +58,10 @@ OpenCode V2用に変換します。OpenAIを既定Providerとし、Cloudflareは
 - `cli.json`: 最小TUI設定、`plugins: []`
 - `export-manifest.json`: ソース・出力ファイルのSHA-256、OpenCode固定バージョン
 
-**対象外・未検証:** Plugin登録、MCP移植、Secrets Broker、Claude Agent。OpenAI ChatGPT OAuthの
-Docker Sandbox上での交換・更新と、Provider設定の実OpenCode V2実行は未検証です。
+このExporter単体はPlugin/MCP Artifactを出力しません。Unified Runtimeでは、別の固定Artifact
+検証経路がSuperpowers、Akane、Sibylと`oc2-status`をGuest Runtimeへ構成します。任意Plugin/MCPや
+Secrets Broker、Claude Agentは対象外です。R3ではOpenAI OAuthとモデル応答を確認しましたが、
+SibylサイドバーのVisual Acceptanceは未完了です。
 
 外部の一時ディレクトリへ手動で出力する場合：
 

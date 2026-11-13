@@ -11,6 +11,7 @@ _GENERATOR_NAMESPACE: Final[bytes] = b'dotfiles-ai/oc2-verification-generator/v2
 _RUNTIME_NAMESPACE: Final[bytes] = b'dotfiles-ai/oc2-verification-runtime/v1\0'
 _PHASE4_GENERATOR_NAMESPACE: Final[bytes] = b'dotfiles-ai/oc2-phase4-generator/v1\0'
 _PHASE4_RUNTIME_NAMESPACE: Final[bytes] = b'dotfiles-ai/oc2-phase4-runtime/v1\0'
+_UNIFIED_RUNTIME_NAMESPACE: Final[bytes] = b'dotfiles-ai/oc2-unified-runtime/v1\0'
 
 
 @dataclass(frozen=True, slots=True)
@@ -72,3 +73,14 @@ def phase4_runtime_identity_sha256(identity: Phase4RuntimeIdentity) -> str:
         identity.generator_sha256,
     ))
     return hashlib.sha256(_PHASE4_RUNTIME_NAMESPACE + material).hexdigest()
+
+
+def unified_runtime_identity_sha256(identity: Phase4RuntimeIdentity) -> str:
+    """Identify config, selected assets, pinned plugins, and Guest code together."""
+    material = b''.join(bytes.fromhex(value) for value in (
+        identity.manifest_sha256,
+        identity.base_assets_sha256,
+        identity.plugin_assets_sha256,
+        identity.generator_sha256,
+    ))
+    return hashlib.sha256(_UNIFIED_RUNTIME_NAMESPACE + material).hexdigest()

@@ -28,9 +28,13 @@ def config(*, plugins: str = '  enabled: false\n  allowlist: [superpowers]\n',
         '  openai:\n'
         '    whitelist: [gpt-6-luna]\n'
         'opencode_v2:\n'
+        '  default_model: openai/gpt-6-luna\n'
+        '  deny_provider_fallback: true\n'
+        '  deny_guest_auth: true\n'
         '  providers:\n'
         '    openai:\n'
         '      enabled: true\n'
+        '      auth_method: docker_openai_oauth\n'
         'x-oc2-assets:\n'
         '  - global-rules/AGENTS.global.md\n'
         'x-oc2-agents: {}\n'
@@ -42,6 +46,25 @@ def config(*, plugins: str = '  enabled: false\n  allowlist: [superpowers]\n',
 
 
 class NativePluginMcpSelectionTest(unittest.TestCase):
+    def test_repository_apm_selects_the_unified_runtime_allowlists(self):
+        parsed = oc2_native.parse_apm_native(
+            (REPO / 'apm.yml').read_bytes(), require_oc2_assets=True,
+        )
+        payload = oc2_native.build_native_payload(parsed)
+
+        self.assertEqual(payload['plugins'], {
+            'enabled': True,
+            'allowlist': ['superpowers'],
+        })
+        self.assertEqual(payload['mcp'], {
+            'enabled': True,
+            'servers': ['oc2-status'],
+        })
+        self.assertEqual(
+            tuple(plugin.value for plugin in parsed.phase4_plugins.allowlist),
+            ('akane', 'sibyl'),
+        )
+
     def test_normal_selection_is_disabled_even_when_candidates_are_declared(self) -> None:
         """Keep declared Plugin/MCP candidates disabled for normal exports."""
         parsed = oc2_native.parse_apm_native(config())
@@ -105,6 +128,37 @@ class SuperpowersPluginResolverTest(unittest.TestCase):
             '"main":".opencode/plugins/superpowers.js"}\n',
             encoding='utf-8',
         )
+        fixture_tree = tuple(
+            (path.relative_to(self.plugin_dir).as_posix(),
+             hashlib.sha256(path.read_bytes()).hexdigest())
+            for path in sorted(self.plugin_dir.rglob('*')) if path.is_file()
+        )
+        tree_material = ''.join(f'{name}\0{digest}\n' for name, digest in fixture_tree).encode()
+        constants = patch.multiple(
+            oc2_assets,
+            SUPERPOWERS_FILE_COUNT=len(fixture_tree),
+            SUPERPOWERS_TOTAL_BYTES=sum(
+                (self.plugin_dir / name).stat().st_size for name, _ in fixture_tree
+            ),
+            SUPERPOWERS_TREE_SHA256=hashlib.sha256(tree_material).hexdigest(),
+        )
+        constants.start()
+        self.addCleanup(constants.stop)
+
+    def _current_tree_sha(self) -> str:
+        records = [
+            (path.relative_to(self.plugin_dir).as_posix(),
+             hashlib.sha256(path.read_bytes()).hexdigest())
+            for path in sorted(self.plugin_dir.rglob('*')) if path.is_file()
+        ]
+        return hashlib.sha256(
+            ''.join(f'{name}\0{digest}\n' for name, digest in records).encode(),
+        ).hexdigest()
+
+    def _current_tree_bytes(self) -> int:
+        return sum(
+            path.stat().st_size for path in self.plugin_dir.rglob('*') if path.is_file()
+        )
 
     def _git_tree_fakes(
         self,
@@ -121,6 +175,10 @@ class SuperpowersPluginResolverTest(unittest.TestCase):
             if (path := self.plugin_dir / relative).is_file()
         }
         files.update(extra_files or {})
+        for relative, content in (extra_files or {}).items():
+            path = self.plugin_dir / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(content)
         entry_modes = modes or {}
         blob_ids = {
             relative: hashlib.sha1(
@@ -226,7 +284,7 @@ class SuperpowersPluginResolverTest(unittest.TestCase):
             patch.object(oc2_assets, 'SUPERPOWERS_FILE_COUNT', len(files)),
             patch.object(oc2_assets, 'SUPERPOWERS_TOTAL_BYTES', sum(map(len, files.values()))),
             patch.object(oc2_assets, 'SUPERPOWERS_TREE_SHA256', tree_sha),
-            self.assertRaisesRegex(oc2_assets.AssetError, 'tree path is unsafe'),
+            self.assertRaisesRegex(oc2_assets.AssetError, 'tracked file set is invalid'),
         ):
             oc2_assets.export_superpowers_tree(REPO, self.plugin_dir, destination)
 
@@ -299,6 +357,8 @@ class SuperpowersPluginResolverTest(unittest.TestCase):
         with (
             patch.object(oc2_assets, '_git_output', side_effect=self._git_output),
             patch.object(oc2_assets, '_git_output_bytes', side_effect=self._git_output_bytes),
+            patch.object(oc2_assets, 'SUPERPOWERS_TOTAL_BYTES', self._current_tree_bytes()),
+            patch.object(oc2_assets, 'SUPERPOWERS_TREE_SHA256', self._current_tree_sha()),
         ):
             artifact = oc2_assets.resolve_superpowers_plugin(REPO, self.plugin_dir)
 
@@ -316,6 +376,8 @@ class SuperpowersPluginResolverTest(unittest.TestCase):
         with (
             patch.object(oc2_assets, '_git_output', side_effect=self._git_output),
             patch.object(oc2_assets, '_git_output_bytes', side_effect=self._git_output_bytes),
+            patch.object(oc2_assets, 'SUPERPOWERS_TOTAL_BYTES', self._current_tree_bytes()),
+            patch.object(oc2_assets, 'SUPERPOWERS_TREE_SHA256', self._current_tree_sha()),
             self.assertRaisesRegex(oc2_assets.AssetError, 'differs from pinned commit'),
         ):
             oc2_assets.resolve_superpowers_plugin(REPO, self.plugin_dir)
@@ -349,6 +411,16 @@ class SuperpowersPluginResolverTest(unittest.TestCase):
             artifact.source_commit,
             '8ca22dba9a94f28898bbce59f2537ff4d87c747d',
         )
+        self.assertEqual(
+            dict(artifact.tree_files),
+            {
+                relative: hashlib.sha256((self.plugin_dir / relative).read_bytes()).hexdigest()
+                for relative in (
+                    '.opencode/plugins/superpowers.js', 'index.js',
+                    'lib/runtime.js', 'package.json', 'skills/demo/SKILL.md',
+                )
+            },
+        )
 
     def test_unapproved_node_builtin_is_rejected(self) -> None:
         entrypoint = self.plugin_dir / '.opencode' / 'plugins' / 'superpowers.js'
@@ -356,6 +428,11 @@ class SuperpowersPluginResolverTest(unittest.TestCase):
 
         with (
             patch.object(oc2_assets, '_git_output', side_effect=self._git_output),
+            patch.object(oc2_assets, 'SUPERPOWERS_TREE_SHA256', self._current_tree_sha()),
+            patch.object(
+                oc2_assets, 'SUPERPOWERS_TOTAL_BYTES',
+                sum(path.stat().st_size for path in self.plugin_dir.rglob('*') if path.is_file()),
+            ),
             self.assertRaisesRegex(oc2_assets.AssetError, 'unbundled dependency'),
         ):
             oc2_assets.resolve_superpowers_plugin(REPO, self.plugin_dir)
@@ -366,6 +443,11 @@ class SuperpowersPluginResolverTest(unittest.TestCase):
 
         with (
             patch.object(oc2_assets, '_git_output', side_effect=self._git_output),
+            patch.object(oc2_assets, 'SUPERPOWERS_TREE_SHA256', self._current_tree_sha()),
+            patch.object(
+                oc2_assets, 'SUPERPOWERS_TOTAL_BYTES',
+                sum(path.stat().st_size for path in self.plugin_dir.rglob('*') if path.is_file()),
+            ),
             self.assertRaisesRegex(oc2_assets.AssetError, 'unbundled dependency'),
         ):
             oc2_assets.resolve_superpowers_plugin(REPO, self.plugin_dir)
@@ -424,6 +506,28 @@ class VerificationAssetBundleTest(unittest.TestCase):
                 )
                 for relative, content in sorted(source_files.items())
             ),
+            tree_files=tuple(
+                (relative, hashlib.sha256(content).hexdigest())
+                for relative, content in sorted(source_files.items())
+            ),
+        )
+
+    def test_unified_asset_export_includes_fixed_plugin_and_mcp_sources(self):
+        with patch.object(
+            oc2_assets, 'resolve_superpowers_plugin', return_value=self.artifact,
+        ):
+            raw, asset_sha = oc2_assets.build(REPO, plugin_dir=self.plugin_dir)
+
+        payload = json.loads(raw)
+        native = json.loads(payload['files'][oc2_assets.NATIVE_TARGET])
+        self.assertEqual(asset_sha, hashlib.sha256(raw).hexdigest())
+        self.assertEqual(native['plugins'], {'enabled': True, 'allowlist': ['superpowers']})
+        self.assertEqual(native['mcp'], {'enabled': True, 'servers': ['oc2-status']})
+        self.assertIn('metadata/superpowers-plugin.json', payload['files'])
+        self.assertIn('mcp/oc2_local_mcp.py', payload['files'])
+        self.assertEqual(
+            {name for name in payload['files'] if name.startswith('plugins/superpowers/')},
+            {oc2_assets.PLUGIN_PREFIX + item.path for item in self.artifact.files},
         )
 
     def test_verification_bundle_uses_native_git_plugin_and_local_mcp(self) -> None:
@@ -549,8 +653,8 @@ class VerificationHostModeTest(unittest.TestCase):
 
 
 class NativePluginDeclarationTest(unittest.TestCase):
-    def test_apm_cannot_enable_plugin_or_mcp_by_default(self) -> None:
-        with self.assertRaisesRegex(ValueError, 'must remain disabled'):
+    def test_plugin_enablement_requires_unified_runtime_selection(self):
+        with self.assertRaisesRegex(ValueError, 'match unified Runtime selection'):
             oc2_native.parse_apm_native(config(
                 plugins='  enabled: true\n  allowlist: [superpowers]\n',
                 mcp='  enabled: false\n  servers: []\n',

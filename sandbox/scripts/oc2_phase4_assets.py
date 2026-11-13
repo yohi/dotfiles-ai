@@ -13,6 +13,7 @@ from typing import Final, TypeAlias
 from oc2_native import parse_apm_native
 from oc2_phase4_policy import PHASE4_POLICY_BY_ID
 from oc2_phase4_selection import Phase4ArtifactPin, Phase4Plugin
+from oc2_workspace import contains_credential_material
 
 JsonValue: TypeAlias = str | int | float | bool | None | list['JsonValue'] | dict[str, 'JsonValue']
 MAX_ARTIFACT_BYTES: Final[int] = 16 * 1024 * 1024
@@ -168,6 +169,8 @@ def verify_plugin_artifact(
     except (ValueError, UnicodeError) as exc:
         raise Phase4AssetError('plugin package metadata is invalid') from exc
     selected['package.json'] = _package_entry(plugin, pin, package)
+    if any(contains_credential_material(content) for content in selected.values()):
+        raise Phase4AssetError('plugin artifact contains credential material')
     try:
         entrypoint = selected[PHASE4_POLICY_BY_ID[plugin.value].entrypoint].decode('utf-8')
     except UnicodeError as exc:

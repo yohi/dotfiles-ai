@@ -73,6 +73,7 @@ class PluginFile:
 class PluginArtifact:
     source_commit: str
     files: tuple[PluginFile, ...]
+    tree_files: tuple[tuple[str, str], ...]
 
 
 def _git_output(directory: Path, *arguments: str) -> str:
@@ -161,10 +162,28 @@ def resolve_superpowers_plugin(repo: Path, source: Path | None) -> PluginArtifac
     if _git_output(source, 'status', '--porcelain', '--untracked-files=all').strip():
         raise AssetError('NOT_AVAILABLE: local Plugin checkout is not clean')
     tracked = set(_git_output(source, 'ls-tree', '-r', '--name-only', 'HEAD').splitlines())
-    if (not tracked or len(tracked) > MAX_PLUGIN_FILES or 'index.js' not in tracked
+    if (len(tracked) != SUPERPOWERS_FILE_COUNT or 'index.js' not in tracked
             or any(not path or '\\' in path or path.startswith('/') or '..' in path.split('/')
                    for path in tracked)):
         raise AssetError('NOT_AVAILABLE: local Plugin tracked file set is invalid')
+
+    tree_files: list[tuple[str, str]] = []
+    tree_bytes = 0
+    for relative in sorted(tracked):
+        local_file = source / relative
+        if local_file.is_symlink() or not local_file.is_file():
+            raise AssetError('NOT_AVAILABLE: local Plugin tracked file is not regular')
+        content = local_file.read_bytes()
+        tree_bytes += len(content)
+        if tree_bytes > SUPERPOWERS_TOTAL_BYTES:
+            raise AssetError('NOT_AVAILABLE: local Plugin source tree exceeds its pinned size')
+        tree_files.append((relative, hashlib.sha256(content).hexdigest()))
+    tree_material = ''.join(
+        f'{name}\0{digest}\n' for name, digest in tree_files
+    ).encode('utf-8')
+    if (tree_bytes != SUPERPOWERS_TOTAL_BYTES
+            or hashlib.sha256(tree_material).hexdigest() != SUPERPOWERS_TREE_SHA256):
+        raise AssetError('NOT_AVAILABLE: local Plugin source tree does not match the pin')
 
     package_path = source / 'package.json'
     try:
@@ -219,7 +238,7 @@ def resolve_superpowers_plugin(repo: Path, source: Path | None) -> PluginArtifac
         if local_bytes != committed_bytes:
             raise AssetError('NOT_AVAILABLE: local Plugin file differs from pinned commit')
         files.append(PluginFile(relative, local_bytes, hashlib.sha256(local_bytes).hexdigest()))
-    return PluginArtifact(lock_commit, tuple(files))
+    return PluginArtifact(lock_commit, tuple(files), tuple(tree_files))
 
 
 def export_superpowers_tree(repo: Path, source: Path, destination: Path) -> None:
@@ -339,8 +358,9 @@ def build(
         )
     except NativeConfigError as exc:
         raise AssetError(str(exc)) from exc
-    if plugin_dir is not None and not verification_only:
-        raise AssetError('local Plugin source is accepted only in verification mode')
+    plugin_runtime = verification_only or native.unified_runtime
+    if plugin_dir is not None and not plugin_runtime:
+        raise AssetError('local Plugin source is accepted only in selected Plugin runtimes')
     declared_sources = native.asset_sources
     for source in declared_sources:
         target = SOURCE_TO_TARGET[source]
@@ -356,19 +376,23 @@ def build(
             raise AssetError("selected asset appears to contain credential material: " + source)
         files[target] = data
 
-    theme_source = _regular_text(repo, THEME_SOURCE)
-    try:
-        tui = json.loads(theme_source)
-    except ValueError as exc:
-        raise AssetError("invalid source TUI JSON") from exc
-    theme = tui.get("theme") if isinstance(tui, dict) else None
+    if native.runtime is not None:
+        theme = native.runtime.theme
+    else:
+        theme_source = _regular_text(repo, THEME_SOURCE)
+        try:
+            tui = json.loads(theme_source)
+        except ValueError as exc:
+            raise AssetError("invalid source TUI JSON") from exc
+        theme = tui.get("theme") if isinstance(tui, dict) else None
     if not isinstance(theme, str) or not theme.isascii() or not (
             1 <= len(theme) <= 40 and
             all(c.islower() or c.isdigit() or c == "-" for c in theme)):
         raise AssetError("unapproved TUI theme")
     files[THEME_TARGET] = json.dumps({"name": theme}, sort_keys=True)
 
-    if verification_only:
+    plugin_file_hashes: dict[str, str] = {}
+    if plugin_runtime:
         # APM lock remains authoritative, but OpenCode's native Plugin Manager
         # owns the Git package and Superpowers' runtime Skill registration.
         lock = repo / 'apm.lock.yaml'
@@ -383,7 +407,6 @@ def build(
         artifact = resolve_superpowers_plugin(repo, plugin_dir)
         if artifact.source_commit != locked_commit:
             raise AssetError('NOT_AVAILABLE: local Plugin commit does not match APM lock')
-        plugin_file_hashes: dict[str, str] = {}
         for item in artifact.files:
             if contains_credential_material(item.content):
                 raise AssetError('selected Plugin asset appears to contain credential material')
@@ -403,6 +426,10 @@ def build(
             'file_count': SUPERPOWERS_FILE_COUNT,
             'total_bytes': SUPERPOWERS_TOTAL_BYTES,
             'tree_sha256': SUPERPOWERS_TREE_SHA256,
+            'tree_files': [
+                {'path': name, 'sha256': digest}
+                for name, digest in artifact.tree_files
+            ],
             'plugin_files': sorted(plugin_file_hashes),
         }, ensure_ascii=False, sort_keys=True)
         mcp_source = _regular_text(repo, MCP_SERVER_SOURCE)
@@ -416,7 +443,7 @@ def build(
     expected = {SOURCE_TO_TARGET[source] for source in declared_sources} | {
         THEME_TARGET, NATIVE_TARGET,
     }
-    if verification_only:
+    if plugin_runtime:
         expected.update({PLUGIN_META_TARGET, MCP_SERVER_TARGET})
         expected.update(PLUGIN_PREFIX + name for name in plugin_file_hashes)
     if set(files) != expected:

@@ -23,8 +23,28 @@ x-oc2-agents:
     mode: subagent
     model: openai/gpt-6-luna
 
+x-oc2-runtime:
+  enabled: true
+  theme: tokyonight
+  watchdog:
+    enabled: true
+    stage1Ms: 180000
+    # Temporary acceptance value; Recovery Ping remains possible after 24 hours.
+    stage2Ms: 86400000
+    maxPings: 1
+    maxToolGateCycles: 1
+    notifierType: tmux
+    notifyWaiting: false
+  sibylObserver:
+    enabled: true
+    maxVisibleSubagents: 8
+    showModel: false
+    showProvider: false
+    showLatestText: false
+    showReasoningSummary: false
+
 x-oc2-plugins:
-  enabled: false
+  enabled: true
   allowlist: [superpowers]
 
 x-oc2-phase4:
@@ -49,7 +69,7 @@ x-oc2-phase4:
       lock_sha256: 71c0d8e7cd1267e0973066d01045a47e266907733d043d79f6ad899043f6e8b7
 
 x-oc2-mcp:
-  enabled: false
+  enabled: true
   servers: [oc2-status]
 
 # CodeRabbit & Greptile Skills
@@ -570,6 +590,9 @@ enabled_providers:
 # selects the V2 model and the providers allowed in the isolated Sandbox.
 opencode_v2:
   default_model: openai/gpt-6-luna
+  allowed_models:
+    - openai/gpt-6-luna
+    - cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.7-code
   deny_provider_fallback: true
   deny_guest_auth: true
   providers:
@@ -972,6 +995,7 @@ experimental:
   batch_tool: true
   openTelemetry: true
   continue_loop_on_deny: false
+  # OC2 maps this existing SSOT value to mcp.timeout.execution (milliseconds).
   mcp_timeout: 120000
   watchdog:
     enabled: true

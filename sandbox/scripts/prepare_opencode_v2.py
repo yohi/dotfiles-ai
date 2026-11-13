@@ -21,7 +21,7 @@ from typing import Final, Literal, TypeAlias
 import yaml
 from yaml.nodes import MappingNode, Node, ScalarNode, SequenceNode
 from oc2_workspace import contains_credential_material
-from oc2_native import NativeConfigError, build_native_payload, parse_apm_native
+from oc2_native import NativeConfig, NativeConfigError, build_native_payload, parse_apm_native
 
 
 VERSION = "v0.2"
@@ -65,6 +65,7 @@ class APMConfig:
     source_sha256: str
     v2_config: dict[str, JsonValue] | None
     verification_only: bool
+    unified_runtime: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -185,66 +186,48 @@ def _model_ids(provider_id: str, source: dict[str, JsonValue]) -> tuple[str, ...
 
 
 def _parse_v2_settings(
-    apm: dict[str, JsonValue], provider_catalog: dict[str, JsonValue],
+    provider_catalog: dict[str, JsonValue], native: NativeConfig,
 ) -> V2Settings | None:
-    raw_settings = apm.get("opencode_v2")
-    if raw_settings is None:
+    if native.default_model is None:
         return None
-    settings = _mapping(raw_settings, "opencode_v2")
-    default_model = _string(settings.get("default_model"), "opencode_v2.default_model")
-    if settings.get("deny_provider_fallback") is not True:
-        raise ExportError("opencode_v2 must deny provider fallback")
-    if settings.get("deny_guest_auth") is not True:
-        raise ExportError("opencode_v2 must deny Guest-side authentication")
-
-    raw_providers = _mapping(settings.get("providers"), "opencode_v2.providers")
     selections: list[ProviderSelection] = []
-    for provider_id, raw_selection in raw_providers.items():
-        selection = _mapping(raw_selection, f"opencode_v2.providers.{provider_id}")
-        enabled = selection.get("enabled")
-        if type(enabled) is not bool:
-            raise ExportError(f"opencode_v2.providers.{provider_id}.enabled must be boolean")
-        raw_auth_method = selection.get("auth_method")
-        if not isinstance(raw_auth_method, str):
-            raise ExportError(f"opencode_v2.providers.{provider_id}.auth_method is required")
-        match raw_auth_method:
-            case "docker_openai_oauth":
-                auth_method: AuthMethod = raw_auth_method
-            case "docker_custom_secret":
-                auth_method = raw_auth_method
-            case _:
-                raise ExportError(f"unsupported auth method for provider {provider_id}")
-        expected_methods: dict[str, AuthMethod] = {
-            "openai": "docker_openai_oauth",
-            "cloudflare-ai-gateway-custom": "docker_custom_secret",
-        }
-        if auth_method != expected_methods.get(provider_id):
-            raise ExportError(f"unsupported auth method for provider {provider_id}")
-        source = _mapping(provider_catalog.get(provider_id), f"provider.{provider_id}")
-        selections.append(
-            ProviderSelection(
-                provider_id=provider_id,
-                enabled=enabled,
-                auth_method=auth_method,
-                model_ids=_model_ids(provider_id, source),
-            )
+    for selection in native.provider_selections:
+        if not selection.enabled:
+            continue
+        source = _mapping(
+            provider_catalog.get(selection.provider_id),
+            f"provider.{selection.provider_id}",
         )
+        auth_method: AuthMethod = selection.auth_method
+        model_ids = tuple(
+            model_id for model_id in _model_ids(selection.provider_id, source)
+            if f"{selection.provider_id}/{model_id}" in native.allowed_models
+        )
+        if model_ids:
+            selections.append(ProviderSelection(
+                provider_id=selection.provider_id,
+                enabled=True,
+                auth_method=auth_method,
+                model_ids=model_ids,
+            ))
 
-    enabled_providers = tuple(provider for provider in selections if provider.enabled)
-    enabled_ids = {provider.provider_id for provider in enabled_providers}
-    if enabled_ids != {"openai", "cloudflare-ai-gateway-custom"} or len(enabled_providers) != 2:
-        raise ExportError("opencode_v2 must enable OpenAI and Cloudflare Custom")
-    provider_id, separator, model_id = default_model.partition("/")
+    enabled = tuple(provider for provider in selections if provider.enabled)
+    enabled_ids = {provider.provider_id for provider in enabled}
+    if not enabled_ids:
+        raise ExportError('opencode_v2 must enable at least one approved provider')
+    provider_id, separator, model_id = native.default_model.partition("/")
     matching_providers = tuple(
-        provider for provider in enabled_providers if provider.provider_id == provider_id
+        provider for provider in enabled if provider.provider_id == provider_id
     )
     if not separator or not model_id or len(matching_providers) != 1:
         raise ExportError("opencode_v2.default_model must use an enabled provider")
+    if native.default_model not in native.allowed_models:
+        raise ExportError("opencode_v2.default_model is outside the APM model allowlist")
     selected_provider = matching_providers[0]
     if model_id not in selected_provider.model_ids:
         raise ExportError("opencode_v2.default_model is not declared in apm.yml")
     return V2Settings(
-        default_model=default_model,
+        default_model=native.default_model,
         deny_provider_fallback=True,
         deny_guest_auth=True,
         providers=tuple(selections),
@@ -502,16 +485,17 @@ def _read_apm_source(root: Path, *, verification_only: bool = False) -> APMConfi
     if type(snapshot) is not bool:
         raise ExportError("apm.yml snapshot must be a boolean")
     provider_catalog = _mapping(normalized.get("provider", {}), "provider")
-    v2_settings = None if verification_only else _parse_v2_settings(normalized, provider_catalog)
+    v2_settings = None if verification_only else _parse_v2_settings(provider_catalog, native_config)
     v2_config = _build_v2_config(v2_settings, provider_catalog) if v2_settings is not None else None
     if v2_config is not None and native_config.agents:
-        v2_config["agents"] = build_native_payload(native_config)["agents"]
+        v2_config["agents"] = json.loads(json.dumps(build_native_payload(native_config)["agents"]))
     return APMConfig(
         shell=shell,
         snapshot=snapshot,
         source_sha256=hashlib.sha256(raw).hexdigest(),
         v2_config=v2_config,
         verification_only=verification_only,
+        unified_runtime=native_config.unified_runtime and not verification_only,
     )
 
 
@@ -523,7 +507,7 @@ def _read_apm(root: Path) -> tuple[str, bool, str]:
 def _build_files(
     shell: str, snapshot: bool, apm_sha: str,
     v2_config: dict[str, JsonValue] | None = None,
-    *, verification_only: bool = False,
+    *, verification_only: bool = False, unified_runtime: bool = False,
 ) -> dict[str, bytes]:
     """Build server, TUI, and manifest files for normal or verification-only export.
 
@@ -556,6 +540,7 @@ def _build_files(
         "source": "apm.yml",
         "config_format": (
             "oc2-verification" if verification_only else
+            "opencode-v2-unified" if unified_runtime else
             "opencode-v2" if v2_config is not None else "legacy-minimal"
         ),
         "source_sha256": apm_sha,
@@ -624,6 +609,38 @@ def _create(output: Path, generated: dict[str, bytes]) -> None:
             handle.write(data)
 
 
+def refresh_manifest(output: Path) -> str:
+    """Rebind the temporary export manifest to its selected Provider config."""
+    manifest_path = output / "export-manifest.json"
+    if (output.is_symlink() or not output.is_dir() or manifest_path.is_symlink()
+            or not manifest_path.is_file()):
+        raise ExportError("export manifest is missing or unsafe")
+    try:
+        manifest: JsonValue = json.loads(
+            manifest_path.read_bytes(), object_pairs_hook=_unique_json_object,
+        )
+    except (OSError, ValueError, UnicodeError) as exc:
+        raise ExportError("export manifest could not be read") from exc
+    if (not isinstance(manifest, dict)
+            or set(manifest) != {
+                "schema", "generator", "source", "config_format", "source_sha256",
+                "opencode_version", "plugins_exported", "mcp_entries_exported",
+                "artifacts_sha256",
+            }):
+        raise ExportError("export manifest fields are invalid")
+    hashes = manifest.get("artifacts_sha256")
+    if not isinstance(hashes, dict) or set(hashes) != {"opencode.jsonc", "cli.json"}:
+        raise ExportError("export artifact hashes are invalid")
+    for name in ("opencode.jsonc", "cli.json"):
+        artifact = output / name
+        if artifact.is_symlink() or not artifact.is_file():
+            raise ExportError("export artifact is missing or unsafe")
+        hashes[name] = hashlib.sha256(artifact.read_bytes()).hexdigest()
+    raw = _json_bytes(manifest)
+    manifest_path.write_bytes(raw)
+    return hashlib.sha256(raw).hexdigest()
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo-root", type=Path, default=Path(__file__).resolve().parents[2])
@@ -641,6 +658,7 @@ def main(argv: list[str] | None = None) -> int:
         generated = _build_files(
             apm.shell, apm.snapshot, apm.source_sha256, apm.v2_config,
             verification_only=apm.verification_only,
+            unified_runtime=apm.unified_runtime,
         )
         if args.check:
             _check(output, generated)

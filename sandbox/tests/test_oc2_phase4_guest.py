@@ -76,6 +76,19 @@ def asset_bundle() -> bytes:
 
 
 class Phase4GuestAssetTest(unittest.TestCase):
+    def test_unified_runtime_identity_includes_config_assets_plugins_and_generator(self):
+        values = ('1' * 64, '2' * 64, '3' * 64, '4' * 64)
+        expected = hashlib.sha256(
+            b'dotfiles-ai/oc2-unified-runtime/v1\0'
+            + b''.join(bytes.fromhex(value) for value in values)
+        ).hexdigest()
+
+        actual = oc2_identity.unified_runtime_identity_sha256(
+            oc2_identity.Phase4RuntimeIdentity(*values),
+        )
+
+        self.assertEqual(actual, expected)
+
     def test_phase4_runtime_identity_includes_plugin_bundle_and_own_namespace(self):
         manifest_sha = '1' * 64
         asset_sha = '2' * 64

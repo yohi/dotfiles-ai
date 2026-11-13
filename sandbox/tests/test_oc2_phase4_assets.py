@@ -134,6 +134,29 @@ x-oc2-phase4:
 
 
 class Phase4ArtifactExportTest(unittest.TestCase):
+    def test_phase4_export_rejects_literal_credentials_in_pinned_entrypoints(self):
+        akane = package_archive(
+            AKANE_PACKAGE, 'package/dist/index.js',
+            b'-----BEGIN PRIVATE KEY-----\nfixture-only\n',
+        )
+        sibyl = package_archive(
+            SIBYL_PACKAGE, 'package/dist/tui.js',
+            b'import { Plugin } from "@opencode/plugin/tui"; export default Plugin;',
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            (root / 'apm.yml').write_bytes(
+                apm_document(hashlib.sha512(akane).hexdigest(), hashlib.sha512(sibyl).hexdigest()),
+            )
+            akane_path = root / 'akane.tgz'
+            sibyl_path = root / 'sibyl.tgz'
+            akane_path.write_bytes(akane)
+            sibyl_path.write_bytes(sibyl)
+
+            with self.assertRaisesRegex(oc2_assets.AssetError, 'credential material'):
+                oc2_assets.build_phase4_plugins(
+                    root, (akane_path, sibyl_path), explicit_opt_in=True,
+                )
     def test_archive_members_are_processed_without_bulk_materialization(self):
         raw = package_archive(AKANE_PACKAGE, 'package/dist/index.js', b'export default {};')
         pin = Phase4ArtifactPin(

@@ -233,7 +233,22 @@ def _verify_v2_config(server: dict[str, JsonValue]) -> None:
     if "agents" in server:
         expected_keys.add("agents")
         try:
-            agent_policy.validate_agent_map(server["agents"])
+            providers = server.get("providers")
+            if not isinstance(providers, dict):
+                raise ValueError("provider models are missing")
+            allowed_agent_models: list[str] = []
+            for provider_id, provider in providers.items():
+                if not isinstance(provider, dict):
+                    continue
+                models = provider.get("models")
+                if not isinstance(models, dict):
+                    continue
+                allowed_agent_models.extend(
+                    f"{provider_id}/{model_id}"
+                    for model_id in models
+                    if isinstance(model_id, str)
+                )
+            agent_policy.validate_agent_map(server["agents"], allowed_agent_models)
         except ValueError as exc:
             raise StageError("unapproved V2 Native Agent configuration") from exc
     if set(server) != expected_keys:
@@ -243,7 +258,8 @@ def _verify_v2_config(server: dict[str, JsonValue]) -> None:
     policies = server.get("policies")
     allowed_providers = {"openai", "cloudflare-ai-gateway-custom"}
     if (not isinstance(model, str) or "/" not in model
-            or not isinstance(providers, dict) or set(providers) != allowed_providers
+            or not isinstance(providers, dict) or not providers
+            or not set(providers) <= allowed_providers
             or not isinstance(policies, list)):
         raise StageError("invalid V2 provider selection")
     provider_id, model_id = model.split("/", 1)
@@ -259,10 +275,14 @@ def _verify_v2_config(server: dict[str, JsonValue]) -> None:
         if not isinstance(provider_config, dict):
             raise StageError("invalid V2 provider configuration")
         _verify_model_catalog(provider_config.get("models"))
+    provider_policies: list[JsonValue] = [
+        {"action": "provider.use", "resource": provider_name, "effect": "allow"}
+        for provider_name in ("openai", "cloudflare-ai-gateway-custom")
+        if provider_name in providers
+    ]
     expected_policies: list[JsonValue] = [
         {"action": "provider.use", "resource": "*", "effect": "deny"},
-        {"action": "provider.use", "resource": "openai", "effect": "allow"},
-        {"action": "provider.use", "resource": "cloudflare-ai-gateway-custom", "effect": "allow"},
+        *provider_policies,
         {"action": "integration.connect", "resource": "*", "effect": "deny"},
         {"action": "plugin.use", "resource": "*", "effect": "deny"},
         {"action": "mcp.use", "resource": "*", "effect": "deny"},
@@ -425,6 +445,8 @@ def _validate_server_config(
                 raise StageError("unapproved verification server config values")
         case "opencode-v2":
             _verify_v2_config(server)
+        case "opencode-v2-unified":
+            _verify_v2_config(server)
         case _:
             raise StageError("unrecognized config format")
 
@@ -477,6 +499,7 @@ def _check_source(root: Path, bundle: Path) -> None:
     expected = exporter._build_files(
         apm.shell, apm.snapshot, apm.source_sha256, apm.v2_config,
         verification_only=apm.verification_only,
+        unified_runtime=apm.unified_runtime,
     )
     directory_fd = _open_bundle_directory(bundle)
     try:

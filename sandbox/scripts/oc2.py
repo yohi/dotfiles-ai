@@ -18,7 +18,6 @@ import pathlib
 import platform
 import re
 import secrets
-import shlex
 import shutil
 import subprocess
 import sys
@@ -29,11 +28,13 @@ from urllib.parse import urlsplit
 
 import yaml
 from oc2_oauth_bundle import oauth_helper_source
+from oc2_native import parse_apm_native
 from oc2_identity import (
     Phase4RuntimeIdentity,
     phase4_generator_fingerprint,
     phase4_runtime_identity_sha256,
     runtime_identity_sha256,
+    unified_runtime_identity_sha256,
     verification_generator_fingerprint,
 )
 
@@ -89,7 +90,11 @@ try:
         mode = os.stat(parts[-1], dir_fd=fd, follow_symlinks=False).st_mode
     except FileNotFoundError as exc:
         sys.exit(0 if exc.errno == errno.ENOENT else 11)
-    sys.exit(10 if stat.S_ISREG(mode) else 12)
+    sys.exit(
+        10 if stat.S_ISREG(mode)
+        else 13 if stat.S_ISDIR(mode)
+        else 12
+    )
 except OSError as exc:
     sys.exit(12 if exc.errno in (errno.ELOOP, errno.ENOTDIR) else 11)
 finally:
@@ -145,6 +150,11 @@ class SandboxLaunch:
     cloudflare: CloudflareGatewayRuntime | None = None
     assets_file: pathlib.Path | None = None
     assets_sha: str | None = None
+    bundle: pathlib.Path | None = None
+    manifest_sha: str | None = None
+    phase4_plugin_file: pathlib.Path | None = None
+    phase4_plugins_sha: str | None = None
+    superpowers_source: pathlib.Path | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -438,6 +448,17 @@ def configure_cloudflare_provider(
         return True
     if cloudflare_provider is None:
         return False
+
+    agents = config.get('agents', {})
+    if not isinstance(agents, dict):
+        raise Stop('generated OpenCode Native Agent selection is invalid')
+    for agent in agents.values():
+        if not isinstance(agent, dict):
+            raise Stop('generated OpenCode Native Agent selection is invalid')
+        agent_model = agent.get('model')
+        if (isinstance(agent_model, str)
+                and agent_model.partition('/')[0] == CF_GATEWAY_PROVIDER_ID):
+            raise Stop('Agent model requires explicit Cloudflare Gateway selection')
 
     policies = config.get('policies', [])
     if not isinstance(policies, list) or any(not isinstance(policy, dict) for policy in policies):
@@ -976,12 +997,15 @@ def stage(runner: Runner, name: str, bundle: pathlib.Path, manifest_sha: str,
     execute(runner, name, 'chmod', '700', *directories)
     # Never overwrite an existing bundle or bootstrap script. Reuse is allowed
     # only after the guest validates their content and hash.
-    exists = runner.sbx('exec', name, 'bash', '-c',
-                        f'if test -e {shlex.quote(destination)}; then echo exists; else echo missing; fi',
-                        capture=True).strip()
-    if exists == 'missing':
+    status = runner.destination_status(name, destination)
+    if status == 0:
         runner.sbx('cp', str(bundle), f'{name}:{destination}')
-    elif exists != 'exists':
+    elif status == 13:
+        # Existing directory; downstream Guest verification remains mandatory.
+        pass
+    elif status in (10, 12):
+        raise Stop('unsafe remote bundle destination')
+    else:
         raise Stop('cannot determine remote bundle state')
     for transfer in (
         VerifiedFileTransfer(guest_script, script_dest, script_sha,
@@ -1304,9 +1328,28 @@ def launch(runner: Runner, request: SandboxLaunch) -> None:
     if request.cli not in PINNED:
         raise Stop('unapproved OpenCode executable path')
     runtime = f'{ROOT}/runtime/{request.digest[:16]}'
+    unified_runtime = request.bundle is not None
+    if request.bundle is not None:
+        if (request.manifest_sha is None or request.assets_file is None
+                or request.assets_sha is None or request.phase4_plugin_file is None
+                or request.phase4_plugins_sha is None
+                or request.superpowers_source is None):
+            raise Stop(
+                'unified Runtime requires config, asset, and pinned Plugin identities/source'
+            )
+        stage(
+            runner, request.name, request.bundle, request.manifest_sha,
+            HERE / 'oc2_guest.py', request.assets_file, request.assets_sha,
+            phase4_plugin_file=request.phase4_plugin_file,
+            phase4_plugins_sha=request.phase4_plugins_sha,
+            superpowers_source=request.superpowers_source,
+        )
+    elif any((request.manifest_sha, request.phase4_plugin_file, request.phase4_plugins_sha)):
+        raise Stop('unified Runtime inputs must be supplied together')
     if (request.assets_file is None) != (request.assets_sha is None):
         raise Stop('asset file and hash must be supplied together')
-    if request.assets_file is not None and request.assets_sha is not None:
+    if (not unified_runtime and request.assets_file is not None
+            and request.assets_sha is not None):
         if re.fullmatch(r'[0-9a-f]{64}', request.assets_sha) is None:
             raise Stop('invalid asset hash')
         remote_assets = f'{ROOT}/assets/{request.assets_sha[:16]}.json'
@@ -1368,10 +1411,11 @@ def launch(runner: Runner, request: SandboxLaunch) -> None:
     )
     runner.sbx('exec', request.name, 'mkdir', '-p', '-m', '700',
                f'{runtime}/home/.local/share/opencode')
-    runner.sbx(
-        'cp', str(request.config_file),
-        f'{request.name}:{config_dir}/opencode.jsonc',
-    )
+    if not unified_runtime:
+        runner.sbx(
+            'cp', str(request.config_file),
+            f'{request.name}:{config_dir}/opencode.jsonc',
+        )
     runtime_environment = (
         f'HOME={runtime}/home',
         'USER=agent',
@@ -1385,13 +1429,67 @@ def launch(runner: Runner, request: SandboxLaunch) -> None:
         f'XDG_STATE_HOME={runtime}/state',
         f'XDG_CACHE_HOME={runtime}/cache',
         f'TMPDIR={runtime}/tmp',
-        'OPENCODE_WATCHDOG_ENABLED=false',
         'OPENCODE_DISABLE_AUTOUPDATE=1',
         'OPENCODE_DISABLE_MODELS_FETCH=1',
         'OPENCODE_CONFIG_PROJECT_DISABLE=1',
         *cloudflare_environment,
     )
     helper = oauth_helper_source(HERE)
+    # OC2_PHASE5_RUNTIME_MODE_FIX_R2
+    # Enforce Runtime directory privacy before OAuth Bootstrap.
+    # mkdir -p -m does not repair an existing directory's mode.
+    runtime_mode_program = '''import os
+import re
+import stat
+import sys
+
+path = sys.argv[1]
+prefix = "/home/agent/workspace/oc2/runtime/"
+
+if (
+    not path.startswith(prefix)
+    or re.fullmatch(r"[0-9a-f]{16}", path[len(prefix):]) is None
+):
+    raise SystemExit("invalid runtime path")
+
+flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+fd = os.open("/", flags)
+
+try:
+    for component in path.split("/")[1:]:
+        next_fd = os.open(component, flags, dir_fd=fd)
+        os.close(fd)
+        fd = next_fd
+
+    before = os.fstat(fd)
+
+    if not stat.S_ISDIR(before.st_mode):
+        raise SystemExit("runtime is not a directory")
+
+    if before.st_uid != os.geteuid():
+        raise SystemExit("runtime owner mismatch")
+
+    os.fchmod(fd, 0o700)
+
+    after = os.fstat(fd)
+
+    if (
+        before.st_dev != after.st_dev
+        or before.st_ino != after.st_ino
+        or before.st_uid != after.st_uid
+        or stat.S_IMODE(after.st_mode) != 0o700
+    ):
+        raise SystemExit("runtime mode verification failed")
+
+finally:
+    os.close(fd)
+'''
+
+    runner.sbx(
+        'exec', request.name,
+        'python3', '-c', runtime_mode_program, runtime,
+    )
+
     runner.sbx(
         'exec', '-w', workdir, request.name,
         'python3', '-c', GUEST_EXEC_WRAPPER, '--', *runtime_environment, '--',
@@ -1491,6 +1589,10 @@ def main(argv: list[str] | None = None) -> int:
                    help='clean local Git checkout for the pinned Superpowers Plugin')
     p.add_argument('--akane-artifact', type=pathlib.Path)
     p.add_argument('--sibyl-artifact', type=pathlib.Path)
+    p.add_argument('--provision-artifacts', action='store_true',
+                   help='verify and cache the APM-pinned OC2 Plugins for normal launches')
+    p.add_argument('--superpowers-checkout', type=pathlib.Path,
+                   help='clean APM-locked Superpowers source checkout for provisioning')
     p.add_argument('--allow-paid-inference', action='store_true',
                    help='authorize external inference for this interactive launch')
     p.add_argument('--use-cloudflare-ai-gateway', action='store_true',
@@ -1511,8 +1613,18 @@ def main(argv: list[str] | None = None) -> int:
             if (not NAME_RE.fullmatch(args.sandbox)
                     or not args.sandbox.startswith('oc2-phase4-')):
                 raise Stop('--phase4-plugins requires a dedicated oc2-phase4-* Sandbox name')
-        elif args.akane_artifact is not None or args.sibyl_artifact is not None:
+        elif ((args.akane_artifact is not None or args.sibyl_artifact is not None)
+              and not args.provision_artifacts):
             raise Stop('plugin artifacts are only valid with --phase4-plugins')
+        if args.provision_artifacts:
+            if (args.verification_only or args.phase4_plugins or args.use_cloudflare_ai_gateway
+                    or args.allow_paid_inference):
+                raise Stop('artifact provisioning cannot include Runtime, credential, or inference modes')
+            if (args.superpowers_checkout is None or args.akane_artifact is None
+                    or args.sibyl_artifact is None):
+                raise Stop('--provision-artifacts requires the pinned Superpowers, Akane, and Sibyl inputs')
+        elif args.superpowers_checkout is not None:
+            raise Stop('--superpowers-checkout is only valid with --provision-artifacts')
         if args.verification_only:
             if not args.prepare_only:
                 raise Stop('--verification-only requires --prepare-only')
@@ -1523,6 +1635,10 @@ def main(argv: list[str] | None = None) -> int:
         elif args.plugin_dir is not None and not args.phase4_plugins:
             raise Stop('--plugin-dir is only valid with --verification-only')
         if args.dry_run:
+            if args.provision_artifacts:
+                print('OC2 PLAN: would verify fixed Superpowers, Akane, and Sibyl source identities')
+                print('OC2 PLAN: no artifact files written and no Sandbox commands executed')
+                return 0
             if args.phase4_plugins:
                 if (not NAME_RE.fullmatch(args.sandbox)
                         or not args.sandbox.startswith('oc2-phase4-')):
@@ -1550,32 +1666,64 @@ def main(argv: list[str] | None = None) -> int:
             print('OC2 PLAN: mountless shell Sandbox=' + args.sandbox)
             print('OC2 PLAN: workspace=' + str(workspace))
             print('OC2 PLAN: transfer only the verified Workspace Snapshot; no .git or OpenCode project config')
+            print('OC2 PLAN: Host-side verification, then stage the verified CLI in the Sandbox Kit')
             print(
                 f'OC2 PLAN: download and SHA-256 verify @opencode/cli@{VERSION} on the Host; '
                 'bake it into the Sandbox Kit at /opt/oc2/bin/opencode'
             )
-            print('OC2 PLAN: no credentials, provider settings, MCP, plugins, or host config')
+            dry_repo = args.repo_root.resolve(strict=True)
+            if not (dry_repo / 'apm.yml').is_file():
+                raise Stop('dotfiles-ai apm.yml not found')
+            dry_native = parse_apm_native(
+                (dry_repo / 'apm.yml').read_bytes(),
+            )
+            if dry_native.unified_runtime:
+                print('OC2 PLAN: APM Unified Provider, Native Agents, selected assets, Plugins, and MCP')
+                print('OC2 PLAN: reuse only locally provisioned pinned artifacts; no runtime network install')
+            else:
+                print('OC2 PLAN: no Plugins or MCP selected by the APM runtime contract')
             print('OC2 PLAN: no Sandbox commands executed')
             return 0
         repo = args.repo_root.resolve(strict=True)
         if not (repo / 'apm.yml').is_file():
             raise Stop('dotfiles-ai apm.yml not found')
+        if args.provision_artifacts:
+            from sandbox.scripts.oc2_artifacts import ProvisionInputs, provision_artifacts
+
+            superpowers_checkout = args.superpowers_checkout
+            akane_artifact = args.akane_artifact
+            sibyl_artifact = args.sibyl_artifact
+            if (not isinstance(superpowers_checkout, pathlib.Path)
+                    or not isinstance(akane_artifact, pathlib.Path)
+                    or not isinstance(sibyl_artifact, pathlib.Path)):
+                raise Stop('artifact provisioning inputs are incomplete')
+            paths = provision_artifacts(ProvisionInputs(
+                repo, superpowers_checkout, akane_artifact, sibyl_artifact,
+            ))
+            print('OC2_ARTIFACTS_PROVISIONED: ' + str(paths.root))
+            return 0
         if args.phase4_plugins:
-            if args.akane_artifact is None or args.sibyl_artifact is None:
-                raise Stop('Phase 4 plugin artifact paths are required')
+            plugin_dir = args.plugin_dir
+            akane_artifact = args.akane_artifact
+            sibyl_artifact = args.sibyl_artifact
+            if (not isinstance(plugin_dir, pathlib.Path)
+                    or not isinstance(akane_artifact, pathlib.Path)
+                    or not isinstance(sibyl_artifact, pathlib.Path)):
+                raise Stop('Phase 4 artifact paths are incomplete')
             prepare_phase4_runtime(
                 repo,
                 Phase4RuntimeRequest(
                     args.sandbox,
-                    args.plugin_dir,
-                    Phase4ArtifactPaths(args.akane_artifact, args.sibyl_artifact),
+                    plugin_dir,
+                    Phase4ArtifactPaths(akane_artifact, sibyl_artifact),
                 ),
             )
             return 0
         if args.verification_only:
-            if args.plugin_dir is None:
-                raise Stop('plugin directory is required for verification-only mode')
-            prepare_verification_runtime(repo, args.sandbox, args.plugin_dir)
+            plugin_dir = args.plugin_dir
+            if not isinstance(plugin_dir, pathlib.Path):
+                raise Stop('verification Plugin checkout is missing')
+            prepare_verification_runtime(repo, args.sandbox, plugin_dir)
             return 0
         if args.prepare_only:
             with tempfile.TemporaryDirectory(prefix='oc2-v2-config-') as temporary:
@@ -1604,10 +1752,45 @@ def main(argv: list[str] | None = None) -> int:
         )
         with tempfile.TemporaryDirectory(prefix='oc2-v2-config-') as temporary:
             temporary_path = pathlib.Path(temporary)
-            config_file = export_v2_config(repo, temporary_path / 'export')
-            from oc2_assets import build as build_assets
+            bundle = temporary_path / 'export'
+            config_file = export_v2_config(repo, bundle)
+            from oc2_assets import (
+                build as build_assets,
+                build_phase4_plugins,
+                export_superpowers_tree,
+                write_new as write_asset_new,
+            )
 
-            asset_raw, asset_sha = build_assets(repo)
+            native_config = parse_apm_native(
+                (repo / 'apm.yml').read_bytes(), require_oc2_assets=True,
+            )
+            unified_runtime = native_config.unified_runtime
+            phase4_asset_file: pathlib.Path | None = None
+            phase4_assets_sha: str | None = None
+            superpowers_source: pathlib.Path | None = None
+            if unified_runtime:
+                from sandbox.scripts.oc2_artifacts import artifact_paths
+
+                artifacts = artifact_paths()
+                if not all(path.exists() for path in (
+                    artifacts.superpowers, artifacts.akane, artifacts.sibyl,
+                )):
+                    raise Stop(
+                        'pinned OC2 artifacts are not provisioned; run '
+                        '--provision-artifacts once before launching'
+                    )
+                asset_raw, asset_sha = build_assets(
+                    repo, plugin_dir=artifacts.superpowers,
+                )
+                superpowers_source = temporary_path / 'verification-superpowers'
+                export_superpowers_tree(repo, artifacts.superpowers, superpowers_source)
+                phase4_assets_raw, phase4_assets_sha = build_phase4_plugins(
+                    repo, (artifacts.akane, artifacts.sibyl), explicit_opt_in=True,
+                )
+                phase4_asset_file = temporary_path / 'phase4-plugins.json'
+                write_asset_new(phase4_asset_file, phase4_assets_raw)
+            else:
+                asset_raw, asset_sha = build_assets(repo)
             asset_payload = json.loads(asset_raw)
             asset_file = temporary_path / 'assets.json'
             asset_file.write_bytes(asset_raw)
@@ -1615,6 +1798,25 @@ def main(argv: list[str] | None = None) -> int:
                 config_file,
                 include_cloudflare=args.use_cloudflare_ai_gateway,
             )
+            config_sha: str | None = None
+            runtime_sha: str | None = None
+            if unified_runtime:
+                from sandbox.scripts.stage_opencode_v2 import verify_bundle
+                exporter = importlib.import_module('prepare_opencode_v2')
+
+                exporter.refresh_manifest(bundle)
+                config_sha = verify_bundle(bundle, trusted_root=bundle.parent)
+                generator_fingerprint = phase4_generator_fingerprint((
+                    HERE / 'oc2_guest.py',
+                    HERE / 'oc2_agent_native.py',
+                    HERE / 'oc2_identity.py',
+                    HERE / 'oc2_phase4_policy.py',
+                ))
+                if phase4_assets_sha is None:
+                    raise Stop('unified Runtime is missing its Phase 4 asset identity')
+                runtime_sha = unified_runtime_identity_sha256(Phase4RuntimeIdentity(
+                    config_sha, asset_sha, phase4_assets_sha, generator_fingerprint,
+                ))
             if (requires_external_inference(config_file)
                     and not args.allow_paid_inference):
                 raise Stop('external inference requires --allow-paid-inference')
@@ -1672,24 +1874,29 @@ def main(argv: list[str] | None = None) -> int:
             workdir = transfer_workspace(
                 runner, args.sandbox, snapshot_path, workspace_manifest, runner.user,
             )
-            runtime_sha = hashlib.sha256(
-                (str(workspace) + '\0' + VERSION + '\0' + asset_sha).encode(),
-            ).hexdigest()
-            config = json.loads(config_file.read_text(encoding='utf-8'))
-            config['instructions'] = [
-                f'{ROOT}/runtime/{runtime_sha[:16]}/{name}'
-                for name in sorted(asset_payload['files'])
-                if name == 'config/opencode/AGENTS.md'
-                or name.startswith('config/opencode/rules/')
-            ]
-            config_file.write_text(
-                json.dumps(config, ensure_ascii=False, indent=2) + '\n', encoding='utf-8',
-            )
+            if runtime_sha is None:
+                runtime_sha = hashlib.sha256(
+                    (str(workspace) + '\0' + VERSION + '\0' + asset_sha).encode(),
+                ).hexdigest()
+            if not unified_runtime:
+                config = json.loads(config_file.read_text(encoding='utf-8'))
+                config['instructions'] = [
+                    f'{ROOT}/runtime/{runtime_sha[:16]}/{name}'
+                    for name in sorted(asset_payload['files'])
+                    if name == 'config/opencode/AGENTS.md'
+                    or name.startswith('config/opencode/rules/')
+                ]
+                config_file.write_text(
+                    json.dumps(config, ensure_ascii=False, indent=2) + '\n', encoding='utf-8',
+                )
             print(f'OC2_READY: sandbox={args.sandbox} opencode=v{VERSION}')
             launch(
                 runner,
                 SandboxLaunch(args.sandbox, runtime_sha, cli, workdir, config_file,
-                              cloudflare, asset_file, asset_sha),
+                              cloudflare, asset_file, asset_sha,
+                              bundle if unified_runtime else None, config_sha,
+                              phase4_asset_file, phase4_assets_sha,
+                              superpowers_source),
             )
             return 0
     except (Stop, OSError, ValueError, subprocess.TimeoutExpired,

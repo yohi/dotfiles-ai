@@ -115,6 +115,19 @@ def _server_config(
 
 
 class ProviderSecurityContractTests(unittest.TestCase):
+    def test_openai_only_selection_keeps_fail_closed_provider_policy(self) -> None:
+        config = _server_config()
+        config['providers'].pop(CF_PROVIDER)
+        config['policies'] = [
+            rule for rule in config['policies']
+            if rule['resource'] != CF_PROVIDER
+        ]
+
+        stage._verify_v2_config(config)
+        guest.verify_v2_config(config)
+
+        self.assertEqual(set(config['providers']), {'openai'})
+
     def test_native_agents_pass_export_boundary_with_explicit_modes(self) -> None:
         """Accept only the fixed Native Agent map with explicit approved modes."""
         native_config = native.parse_apm_native((SCRIPTS.parents[1] / 'apm.yml').read_bytes())

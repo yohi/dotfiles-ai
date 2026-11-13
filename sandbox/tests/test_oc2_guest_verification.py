@@ -129,22 +129,51 @@ class VerificationGuestMaterializationTest(unittest.TestCase):
             output.getvalue(),
         )
 
-    def _provider_bundle(self, verification_only: bool) -> Path:
+    def _provider_bundle(
+        self,
+        verification_only: bool,
+        repo: Path = REPO,
+        bundle_name: str | None = None,
+    ) -> Path:
         apm = prepare_opencode_v2._read_apm_source(
-            REPO, verification_only=verification_only,
+            repo, verification_only=verification_only,
         )
         generated = prepare_opencode_v2._build_files(
             apm.shell, apm.snapshot, apm.source_sha256, apm.v2_config,
             verification_only=verification_only,
+            unified_runtime=apm.unified_runtime,
         )
-        bundle = self.root / ('verification' if verification_only else 'normal')
+        name = bundle_name or ('verification' if verification_only else 'normal')
+        bundle = self.root / name
         bundle.mkdir()
         for name, contents in generated.items():
             (bundle / name).write_bytes(contents)
         return bundle
 
-    def _asset_file(self, verification_only: bool) -> tuple[Path, str]:
-        if verification_only:
+    def test_unified_guest_accepts_manifest_with_provider_and_native_agents(self):
+        apm = prepare_opencode_v2._read_apm_source(REPO)
+        generated = prepare_opencode_v2._build_files(
+            apm.shell, apm.snapshot, apm.source_sha256, apm.v2_config,
+            unified_runtime=apm.unified_runtime,
+        )
+        bundle = self.root / 'unified'
+        bundle.mkdir()
+        for name, contents in generated.items():
+            (bundle / name).write_bytes(contents)
+
+        digest = oc2_guest.verify(bundle)
+
+        self.assertEqual(
+            digest,
+            hashlib.sha256(generated['export-manifest.json']).hexdigest(),
+        )
+
+    def _asset_file(
+        self, verification_only: bool, *, unified_runtime: bool = False,
+        repo: Path = REPO,
+    ) -> tuple[Path, str]:
+        unified_runtime = unified_runtime or (not verification_only)
+        if verification_only or unified_runtime:
             plugin_paths = {
                 'index.js',
                 'package.json',
@@ -164,20 +193,188 @@ class VerificationGuestMaterializationTest(unittest.TestCase):
                     )
                     for relative in sorted(plugin_paths)
                 ),
+                tree_files=tuple(
+                    (relative, hashlib.sha256(content).hexdigest())
+                    for relative, content in sorted(self.plugin_source_files.items())
+                ),
             )
             with patch.object(
                 oc2_assets, 'resolve_superpowers_plugin', return_value=artifact,
             ):
                 raw, digest = oc2_assets.build(
-                    REPO,
-                    verification_only=True,
+                    repo,
+                    verification_only=verification_only,
                     plugin_dir=Path('/fixture/superpowers'),
                 )
         else:
-            raw, digest = oc2_assets.build(REPO, verification_only=False)
+            raw, digest = oc2_assets.build(repo, verification_only=False)
         path = self.base / ('verification-assets.json' if verification_only else 'normal-assets.json')
         path.write_bytes(raw)
         return path, digest
+
+    def _copy_apm_runtime_sources(self, name: str, apm_bytes: bytes) -> Path:
+        """Build an isolated test repo containing only APM-selected runtime sources."""
+        repo = self.root / name
+        repo.mkdir()
+        (repo / 'apm.yml').write_bytes(apm_bytes)
+        (repo / 'apm.lock.yaml').write_bytes((REPO / 'apm.lock.yaml').read_bytes())
+        native = oc2_native.parse_apm_native(apm_bytes, require_oc2_assets=True)
+        for source in native.asset_sources:
+            destination = repo / source
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(REPO / source, destination)
+        mcp_source = 'sandbox/scripts/oc2_local_mcp.py'
+        (repo / mcp_source).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(REPO / mcp_source, repo / mcp_source)
+        return repo
+
+    def _unified_identity(self, repo: Path, name: str) -> str:
+        bundle = self._provider_bundle(False, repo, f'{name}-bundle')
+        manifest_sha = oc2_guest.verify(bundle)
+        assets_path, assets_sha = self._asset_file(
+            verification_only=False, unified_runtime=True, repo=repo,
+        )
+        assets = oc2_guest.verify_assets(assets_path, assets_sha)
+        native = oc2_guest.validate_native_asset(assets[oc2_guest.NATIVE_ASSET_TARGET])
+        phase4 = self._phase4_assets(native['source_sha256'], f'{name}-phase4-assets.json')
+        generator_sha = oc2_identity.phase4_generator_fingerprint((
+            SCRIPTS / 'oc2_guest.py',
+            SCRIPTS / 'oc2_agent_native.py',
+            SCRIPTS / 'oc2_identity.py',
+            SCRIPTS / 'oc2_phase4_policy.py',
+        ))
+        return str(oc2_identity.unified_runtime_identity_sha256(
+            oc2_identity.Phase4RuntimeIdentity(
+                manifest_sha, assets_sha, phase4.bundle_sha256, generator_sha,
+            ),
+        ))
+
+    def _phase4_assets(self, source_sha: str, name: str) -> oc2_guest.VerifiedPhase4PluginBundle:
+        payload = json.loads(phase4_fixture.asset_bundle())
+        payload['source_sha256'] = source_sha
+        raw = (json.dumps(payload, sort_keys=True, separators=(',', ':')) + '\n').encode()
+        path = self.base / name
+        path.write_bytes(raw)
+        return oc2_guest.verify_phase4_plugin_assets(
+            path, hashlib.sha256(raw).hexdigest(), source_sha,
+        )
+
+    def test_asset_rehash_cannot_change_a_pinned_superpowers_file(self):
+        path, _digest = self._asset_file(verification_only=True)
+        payload = json.loads(path.read_bytes())
+        target = 'plugins/superpowers/.opencode/plugins/superpowers.js'
+        payload['files'][target] = 'export default { changed: true }\n'
+        payload['sha256'][target] = hashlib.sha256(
+            payload['files'][target].encode(),
+        ).hexdigest()
+        raw = (json.dumps(payload, sort_keys=True, separators=(',', ':')) + '\n').encode()
+        path.write_bytes(raw)
+
+        with self.assertRaisesRegex(ValueError, 'pinned source tree'):
+            oc2_guest.verify_assets(path, hashlib.sha256(raw).hexdigest())
+
+    def test_unified_runtime_registers_all_pinned_plugins_with_provider_agents_and_mcp(self):
+        baseline_bundle = self._provider_bundle(False)
+        baseline_manifest_sha = oc2_guest.verify(baseline_bundle)
+        baseline_assets_path, baseline_assets_sha = self._asset_file(
+            verification_only=False, unified_runtime=True,
+        )
+        baseline_assets = oc2_guest.verify_assets(baseline_assets_path, baseline_assets_sha)
+        baseline_native = oc2_guest.validate_native_asset(
+            baseline_assets[oc2_guest.NATIVE_ASSET_TARGET],
+        )
+        baseline_phase4 = self._phase4_assets(
+            baseline_native['source_sha256'], 'baseline-timeout-phase4-assets.json',
+        )
+        generator_sha = oc2_identity.phase4_generator_fingerprint((
+            SCRIPTS / 'oc2_guest.py',
+            SCRIPTS / 'oc2_agent_native.py',
+            SCRIPTS / 'oc2_identity.py',
+            SCRIPTS / 'oc2_phase4_policy.py',
+        ))
+        baseline_identity = oc2_identity.unified_runtime_identity_sha256(
+            oc2_identity.Phase4RuntimeIdentity(
+                baseline_manifest_sha,
+                baseline_assets_sha,
+                baseline_phase4.bundle_sha256,
+                generator_sha,
+            ),
+        )
+
+        apm_bytes = (REPO / 'apm.yml').read_bytes().replace(
+            b'stage1Ms: 180000', b'stage1Ms: 240000',
+        ).replace(
+            b'maxVisibleSubagents: 8', b'maxVisibleSubagents: 5',
+        ).replace(
+            b'theme: tokyonight', b'theme: nord',
+        ).replace(b'mcp_timeout: 120000', b'mcp_timeout: 45000')
+        repo = self._copy_apm_runtime_sources('custom-apm', apm_bytes)
+
+        apm = prepare_opencode_v2._read_apm_source(repo)
+        generated = prepare_opencode_v2._build_files(
+            apm.shell, apm.snapshot, apm.source_sha256, apm.v2_config,
+            unified_runtime=apm.unified_runtime,
+        )
+        bundle = self.root / 'unified'
+        bundle.mkdir()
+        for name, contents in generated.items():
+            (bundle / name).write_bytes(contents)
+        assets_path, assets_sha = self._asset_file(
+            verification_only=False, unified_runtime=True, repo=repo,
+        )
+        assets = oc2_guest.verify_assets(assets_path, assets_sha)
+        native = oc2_guest.validate_native_asset(assets[oc2_guest.NATIVE_ASSET_TARGET])
+        phase4 = self._phase4_assets(native['source_sha256'], 'unified-phase4-assets.json')
+
+        runtime = oc2_guest.prepare(
+            bundle, oc2_guest.verify(bundle), assets, assets_sha,
+            phase4_plugins=phase4,
+        )
+
+        server = json.loads((runtime / 'config/opencode/opencode.jsonc').read_text())
+        tui = json.loads((runtime / 'config/opencode/cli.json').read_text())
+        self.assertEqual(server['mcp']['timeout']['execution'], 45000)
+        self.assertNotEqual(runtime.name, baseline_identity[:16])
+        self.assertEqual(server['model'], 'openai/gpt-6-luna')
+        self.assertEqual(server['plugins'][1]['options']['stage1Ms'], 240000)
+        self.assertEqual(server['plugins'][1]['options']['stage2Ms'], 86400000)
+        self.assertEqual(server['plugins'][1]['options']['maxPings'], 1)
+        self.assertEqual(set(server['agents']), {'hephaestus', 'oracle'})
+        self.assertEqual(len(server['providers']), 2)
+        self.assertEqual(len(server['plugins']), 2)
+        self.assertEqual(server['mcp']['servers']['oc2-status']['enabled'], True)
+        self.assertEqual(tui['plugins'][0]['package'], str(runtime / 'plugins/sibyl'))
+        self.assertEqual(tui['plugins'][0]['options']['observer']['maxVisibleSubagents'], 5)
+        self.assertEqual(tui['plugins'][0]['options']['observer']['enabled'], True)
+        self.assertEqual(tui['theme'], {'name': 'nord'})
+        self.assertTrue((runtime / 'plugins/akane/dist/index.js').is_file())
+        self.assertTrue((runtime / 'plugins/sibyl/dist/tui.js').is_file())
+        policies = {
+            (rule['action'], rule['resource']): rule['effect']
+            for rule in server['policies']
+        }
+        self.assertEqual(policies[('plugin.use', '*')], 'deny')
+        self.assertEqual(policies[('plugin.use', str(runtime / 'plugins/superpowers'))], 'allow')
+        self.assertEqual(policies[('plugin.use', str(runtime / 'plugins/akane'))], 'allow')
+        self.assertEqual(policies[('mcp.use', '*')], 'deny')
+        self.assertEqual(policies[('mcp.use', 'oc2-status')], 'allow')
+        serialized = b''.join(path.read_bytes() for path in runtime.rglob('*') if path.is_file())
+        self.assertNotIn(b'TOP_SECRET_DO_NOT_EXPORT', serialized)
+
+    def test_mcp_timeout_change_alone_changes_identity_deterministically(self):
+        original_apm = (REPO / 'apm.yml').read_bytes()
+        changed_apm = original_apm.replace(
+            b'mcp_timeout: 120000', b'mcp_timeout: 45000',
+        )
+        original_repo = self._copy_apm_runtime_sources('timeout-original', original_apm)
+        changed_repo = self._copy_apm_runtime_sources('timeout-changed', changed_apm)
+
+        original_identity = self._unified_identity(original_repo, 'timeout-original-first')
+        repeated_identity = self._unified_identity(original_repo, 'timeout-original-repeat')
+        changed_identity = self._unified_identity(changed_repo, 'timeout-changed')
+
+        self.assertEqual(original_identity, repeated_identity)
+        self.assertNotEqual(original_identity, changed_identity)
 
     def test_verification_registers_local_plugin_with_native_skills_and_mcp(self):
         bundle = self._provider_bundle(verification_only=True)
@@ -295,7 +492,7 @@ class VerificationGuestMaterializationTest(unittest.TestCase):
         )
 
     def test_phase4_rejects_plugin_asset_that_differs_from_pinned_source(self):
-        bundle = self._provider_bundle(verification_only=True)
+        self._provider_bundle(verification_only=True)
         assets_path, _ = self._asset_file(verification_only=True)
         payload = json.loads(assets_path.read_bytes())
         target = oc2_assets.PLUGIN_PREFIX + 'index.js'
@@ -308,27 +505,8 @@ class VerificationGuestMaterializationTest(unittest.TestCase):
         ) + '\n').encode('utf-8')
         assets_path.write_bytes(assets_raw)
         assets_sha = hashlib.sha256(assets_raw).hexdigest()
-        assets = oc2_guest.verify_assets(assets_path, assets_sha)
-        config_sha = oc2_guest.verify(bundle)
-        phase4_payload = json.loads(phase4_fixture.asset_bundle())
-        native = oc2_guest.validate_native_asset(assets[oc2_guest.NATIVE_ASSET_TARGET])
-        phase4_payload['source_sha256'] = native['source_sha256']
-        phase4_raw = (json.dumps(
-            phase4_payload, sort_keys=True, separators=(',', ':'),
-        ) + '\n').encode('utf-8')
-        phase4_path = self.base / 'phase4-tampered-assets.json'
-        phase4_path.write_bytes(phase4_raw)
-        phase4_plugins = oc2_guest.verify_phase4_plugin_assets(
-            phase4_path,
-            hashlib.sha256(phase4_raw).hexdigest(),
-            native['source_sha256'],
-        )
-
-        with self.assertRaisesRegex(ValueError, 'differs from the pinned source tree'):
-            oc2_guest.prepare(
-                bundle, config_sha, assets, assets_sha,
-                phase4_plugins=phase4_plugins,
-            )
+        with self.assertRaisesRegex(ValueError, 'does not match its pinned source tree'):
+            oc2_guest.verify_assets(assets_path, assets_sha)
 
     def test_verification_runtime_identity_tracks_generator_fingerprint(self):
         manifest_sha = 'a' * 64
@@ -428,6 +606,27 @@ class VerificationGuestMaterializationTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'file count mismatch'):
             oc2_guest.prepare(bundle, oc2_guest.verify(bundle), assets, assets_sha)
 
+    def test_verification_rejects_extra_plugin_file_in_existing_runtime(self) -> None:
+        """Reject Runtime reuse when the installed Plugin has an unlisted file."""
+        bundle = self._provider_bundle(verification_only=False)
+        assets_path, assets_sha = self._asset_file(
+            verification_only=False, unified_runtime=True,
+        )
+        assets = oc2_guest.verify_assets(assets_path, assets_sha)
+        native = oc2_guest.validate_native_asset(assets[oc2_guest.NATIVE_ASSET_TARGET])
+        phase4 = self._phase4_assets(native['source_sha256'], 'extra-file-phase4-assets.json')
+        config_sha = oc2_guest.verify(bundle)
+        runtime = oc2_guest.prepare(
+            bundle, config_sha, assets, assets_sha, phase4_plugins=phase4,
+        )
+        extra_file = runtime / 'plugins/superpowers/unexpected.js'
+        extra_file.write_text('unexpected\n', encoding='utf-8')
+
+        with self.assertRaisesRegex(ValueError, 'file set mismatch'):
+            oc2_guest.prepare(
+                bundle, config_sha, assets, assets_sha, phase4_plugins=phase4,
+            )
+
     def test_verification_rejects_plugin_source_symlink(self):
         bundle = self._provider_bundle(verification_only=True)
         assets_path, assets_sha = self._asset_file(verification_only=True)
@@ -440,16 +639,25 @@ class VerificationGuestMaterializationTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'symlink'):
             oc2_guest.prepare(bundle, oc2_guest.verify(bundle), assets, assets_sha)
 
-    def test_normal_and_verification_modes_use_distinct_runtime_storage(self):
+    def test_unified_and_verification_modes_use_distinct_runtime_storage(self):
         normal_bundle = self._provider_bundle(verification_only=False)
         verification_bundle = self._provider_bundle(verification_only=True)
-        normal_assets, normal_sha = self._asset_file(verification_only=False)
+        normal_assets, normal_sha = self._asset_file(
+            verification_only=False, unified_runtime=True,
+        )
         verification_assets, verification_sha = self._asset_file(verification_only=True)
+        normal_verified_assets = oc2_guest.verify_assets(normal_assets, normal_sha)
+        normal_native = oc2_guest.validate_native_asset(
+            normal_verified_assets[oc2_guest.NATIVE_ASSET_TARGET],
+        )
         normal = oc2_guest.prepare(
             normal_bundle,
             oc2_guest.verify(normal_bundle),
-            oc2_guest.verify_assets(normal_assets, normal_sha),
+            normal_verified_assets,
             normal_sha,
+            phase4_plugins=self._phase4_assets(
+                normal_native['source_sha256'], 'identity-phase4-assets.json',
+            ),
         )
         verification = oc2_guest.prepare(
             verification_bundle,
@@ -460,15 +668,22 @@ class VerificationGuestMaterializationTest(unittest.TestCase):
 
         self.assertNotEqual(normal, verification)
         normal_config = json.loads((normal / 'config/opencode/opencode.jsonc').read_text())
-        self.assertEqual(normal_config.get('plugins', []), [])
-        self.assertEqual(normal_config.get('mcp', {}), {})
+        self.assertEqual(len(normal_config['plugins']), 2)
+        self.assertIn('model', normal_config)
+        self.assertIn('providers', normal_config)
+        verification_config = json.loads(
+            (verification / 'config/opencode/opencode.jsonc').read_text(),
+        )
+        self.assertNotIn('providers', verification_config)
 
-    def test_verification_config_rejects_nonverification_asset_selection(self):
-        bundle = self._provider_bundle(verification_only=True)
-        assets_path, assets_sha = self._asset_file(verification_only=False)
+    def test_unified_config_requires_the_pinned_phase4_assets(self):
+        bundle = self._provider_bundle(verification_only=False)
+        assets_path, assets_sha = self._asset_file(
+            verification_only=False, unified_runtime=True,
+        )
         verified_assets = oc2_guest.verify_assets(assets_path, assets_sha)
 
-        with self.assertRaisesRegex(ValueError, 'verification mode'):
+        with self.assertRaisesRegex(ValueError, 'Phase 4 plugin bundle'):
             oc2_guest.prepare(bundle, oc2_guest.verify(bundle), verified_assets, assets_sha)
 
 
