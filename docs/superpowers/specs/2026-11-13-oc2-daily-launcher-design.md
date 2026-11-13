@@ -232,9 +232,9 @@ TUI終了時にCollectとPreviewを自動実行するが、**Host ApplyはHuman 
 2. SupervisorがSession専用`cgroup.freeze=1`を設定し、`cgroup.events`の`frozen 1`を確認する。単なるPID消滅、一定時間のHash一致、`sbx stop`、`cgroup.freeze`への書込み成功だけでは静止の証明としない。
 3. Collectorが非Writer側の独立境界から、Git HEAD/Branch/Commit OID/Index生バイト、Staged/Unstaged/Untracked、File Manifestを読取り専用に記録する。必要な選択的Git Bundleは専用ステージング領域で生成・検証し、収集元への副作用とSecret/除外Objectを拒否する。
 4. 凍結状態とWriter Group Identity/所属・外部Writer不在が維持される間だけ、稼働中Sandboxから`sbx cp`でステージング成果をHostへ回収する。`sbx cp`の前後とCollection確定直前に`frozen 1`および実行境界を再検証し、回収前後のHEAD/Index/Working Tree/Untracked Manifest・Bundle/Commit整合性を照合する。再起動・解凍・新たなWriter・Digest不一致があれば失敗とする。
-5. 上記を全てPASSした場合に限り、HostのSession `collection/`にGuest Commit（BundleとOID）、最終Index/Working Tree/Untracked、最終File Manifestを保全して、全ファイルSHA-256と`collection_digest`を**最後に**確定する。成果はそのSessionGenerationに固定・不変とし、最新Guest状態で黙って置換しない。
-6. Guest CommitのParentがHost Baseline HEADへ連続するか、最終Guest HEADが選択Branchに属するか、Commit済み内容と未Commit内容が二重計上されないかを確認する。Owner PreviewにはWorkspace/Branch、SessionKey、Baseline、Guest HEAD、Commit OID、Staged/Unstaged/Untracked差分、Collection Digest、保留理由を示す。ApplyAuthorizationは§10.2の前提と既存の固定Identityに対する1回承認のみとする。
-7. 成功後もWriterを無条件に解凍して再利用せず、Supervisorがプロセス終了と再Spawn防止を確認してからLease解放・Sandbox再利用可否を判定する。失敗や判定不能時は**`PENDING`（理由`GUEST_QUIESCENCE_UNVERIFIED`）**としてGuest原本、部分収集物、Journal/Receipt、Sandbox Identityを保全し、`collection_digest`の最終確定・ApplyAuthorization発行・Host Applyを禁止する。凍結解除、Sandbox削除、別方式への自動Fallbackをしない。既存の安全な別Session開始条件は§6に従う。
+5. Guest CommitのParentがHost Baseline HEADへ連続するか、最終Guest HEADが選択Branchに属するか、Commit済み内容と未Commit内容が二重計上されないかを確認する。全検査がPASSするまではCollection Digestを確定せず、ApplyAuthorizationを発行しない。
+6. Writerを無条件に解凍して再利用せず、Supervisorが全Writerプロセスの終了と再Spawn防止を確認する。手順1〜4の全検査、Commit整合性検査、プロセス終了・再Spawn防止検査が全てPASSした場合に限り、HostのSession `collection/`にGuest Commit（BundleとOID）、最終Index/Working Tree/Untracked、最終File Manifestを保全し、全ファイルSHA-256と`collection_digest`を**最後に**確定する。成果はそのSessionGenerationに固定・不変とし、最新Guest状態で黙って置換しない。Owner PreviewにはWorkspace/Branch、SessionKey、Baseline、Guest HEAD、Commit OID、Staged/Unstaged/Untracked差分、確定したCollection Digest、保留理由を示す。
+7. Digest確定後にLease解放・Sandbox再利用可否を判定する。いずれかの検査失敗・判定不能時は**`PENDING`（理由`GUEST_QUIESCENCE_UNVERIFIED`）**としてGuest原本、部分収集物、Journal/Receipt、Sandbox Identityを保全し、`collection_digest`の最終確定・ApplyAuthorization発行・Host Applyを禁止する。凍結解除、Sandbox削除、別方式への自動Fallbackをしない。既存の安全な別Session開始条件は§6に従う。
 
 既存のOwner承認は`ApplyAuthorization` = (`SessionKey`, `collection_digest`, `host_baseline_digest`, `expected_host_head`, `expected_index_digest`, `expected_worktree_digest`, `target_result_digest`, `approved_at`)の**1回限りの同意**であり、候補に変化があれば再利用しない。Hostへの無承認書込み・部分適用を認めない。
 
@@ -255,7 +255,7 @@ Git Ref・Index・Working Treeは単一の原子更新単位ではないため�
 1. Host側Workspaceの排他Applyロックを保持し、承認対象の固定Collection、現行HEAD/Index/全対象Working Tree/Untrackedを再検証する（検査後に外部プロセスの競合が検出されたら停止）。
 2. 現行HEAD/Index原本・対象ファイルの原本/Mode/不在状態をWorkspace外の私有復旧領域へ永続バックアップし、所望の新IndexとWorking Treeファイルを一時領域で全量準備・検証する。承認前のHost Ref/Index/Working Treeは書き換えない。
 3. `apply-journal.json`へ`PREPARED`をfsyncしてから、同一データを参照する`APPLYING`を永続化する。以後は再入時にも復旧判定を優先する。
-4. 再検証に成功した場合、用意したWorking TreeとIndexの更新を行い、**最後に**Fast-forward対象BranchのRefを期待旧OIDから期待新OIDへCAS更新する。各段階の実行結果・HashをJournalへ記録する。Ref変更なしの場合は新しいIndex/Working Tree検証だけで完成判定する。
+4. 再検証後から対象Working TreeとIndexの更新完了まで、対象への外部書込みを排除する境界を確立・維持する。境界を確立できない、または維持を確認できない場合はファイル更新を行わずApplyを保留する。既に永続化したJournalは削除・終端扱いにせず、更新を開始していない事実と保留理由を記録して既存の復旧Gateとの整合を保つ。境界を確立・維持できる場合に限り、用意したWorking TreeとIndexの更新を行い、**最後に**Fast-forward対象BranchのRefを期待旧OIDから期待新OIDへCAS更新する。各段階の実行結果・HashをJournalへ記録する。Ref変更なしの場合は新しいIndex/Working Tree検証だけで完成判定する。
 5. 全部一致したときのみ`APPLIED`を永続記録し、承認を消費する。書込み途中の失敗やRef CAS失敗時は、JournalとバックアップからHostの元状態へ戻す。Rollbackの各対象も現在内容を確認してから復元し、外部変更を上書きしない。
 6. 異常終了からの再起動時、Refが旧OIDならBackupと書込み済みファイルを照合して安全にRollbackする。Refが新OIDかつ最終Index/Worktreeが期待値ならCommit済みとして完了記録する。どちらとも判定できない、外部書換えがある、Rollback失敗時は`RECOVERY_REQUIRED`として**同じWorkspaceの全新規Session・Host Snapshot採用・自動Apply・Sandbox再利用・削除を停止**し、原本・Journal・Collectionを保全する。復旧の整合検証と終端Journalの永続化が済むまで、別SandboxのBaselineとしてHostの部分更新状態を転用しない。
 
@@ -298,5 +298,4 @@ Git Ref・Index・Working Treeは単一の原子更新単位ではないため�
 
 **承認境界:** R0.1の既存アーキテクチャはHuman Owner採択済み。R0.1.1のF-001/F-002、R0.1.2のF-003/F-005解決を維持し、2026-11-13の限定PoC結果を根拠にF-004だけをOwner承認の文書限定訂正として記録する。**Design R0.1.3最終採択・残余リスク受容・Implementation Plan作成・実装開始の承認を意味しない**。本番の全Writer封じ込めとCollector非書込み性は未検証で、成立するまで自動Collect/Host ApplyはHOLDする。
 
-**停止条件:** 本Design R0.1.3のF-004限定訂正を1文書だけGitHubへ反映した後は終了する。Implementation Plan、実装、追加の独立レビュー、PR、Merge、Sandbox/Runtime実機操作、Credential変更は、別途Human Ownerが承認するまで自動開始しない。
-
+**停止条件:** 本Design R0.1.3と対応するF-004 Feasibility Planの文書限定訂正をGitHubへ反映した後は終了する。追加のImplementation Plan、実装、独立レビュー、PR、Merge、Sandbox/Runtime実機操作、Credential変更は、別途Human Ownerが承認するまで自動開始しない。
