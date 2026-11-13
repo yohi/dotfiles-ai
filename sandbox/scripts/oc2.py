@@ -29,7 +29,13 @@ from urllib.parse import urlsplit
 
 import yaml
 from oc2_oauth_bundle import oauth_helper_source
-from oc2_identity import runtime_identity_sha256, verification_generator_fingerprint
+from oc2_identity import (
+    Phase4RuntimeIdentity,
+    phase4_generator_fingerprint,
+    phase4_runtime_identity_sha256,
+    runtime_identity_sha256,
+    verification_generator_fingerprint,
+)
 
 if TYPE_CHECKING:
     from sandbox.scripts.oc2_workspace import Manifest as WorkspaceManifest
@@ -139,6 +145,19 @@ class SandboxLaunch:
     cloudflare: CloudflareGatewayRuntime | None = None
     assets_file: pathlib.Path | None = None
     assets_sha: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class Phase4ArtifactPaths:
+    akane: pathlib.Path
+    sibyl: pathlib.Path
+
+
+@dataclass(frozen=True, slots=True)
+class Phase4RuntimeRequest:
+    sandbox: str
+    superpowers_plugin_dir: pathlib.Path
+    artifacts: Phase4ArtifactPaths
 
 
 @dataclass(frozen=True, slots=True)
@@ -900,18 +919,42 @@ def _transfer_verified_file(
 
 def stage(runner: Runner, name: str, bundle: pathlib.Path, manifest_sha: str,
           guest_script: pathlib.Path, assets_file: pathlib.Path | None = None,
-          assets_sha: str | None = None, *,
+          assets_sha: str | None = None,
+          phase4_plugin_file: pathlib.Path | None = None,
+          phase4_plugins_sha: str | None = None, *,
           superpowers_source: pathlib.Path | None = None) -> None:
+    if (phase4_plugin_file is None) != (phase4_plugins_sha is None):
+        raise Stop('Phase 4 plugin asset file and hash must be supplied together')
+    if phase4_plugin_file is not None and phase4_plugins_sha is not None:
+        if (phase4_plugin_file.is_symlink() or not phase4_plugin_file.is_file()
+                or phase4_plugin_file.stat().st_size > 512 * 1024):
+            raise Stop('Phase 4 plugin asset must be a regular file within the size limit')
+        current = phase4_plugin_file.absolute()
+        while current != current.parent:
+            if current.is_symlink():
+                raise Stop('Phase 4 plugin asset path contains a symlink')
+            current = current.parent
+        if re.fullmatch(r'[0-9a-f]{64}', phase4_plugins_sha) is None:
+            raise Stop('invalid Phase 4 plugin asset hash')
+        if hashlib.sha256(phase4_plugin_file.read_bytes()).hexdigest() != phase4_plugins_sha:
+            raise Stop('Phase 4 plugin asset local SHA mismatch')
     destination = f'{ROOT}/bundles/{manifest_sha[:16]}'
     script_sha = hashlib.sha256(guest_script.read_bytes()).hexdigest()
     native_helper = HERE / 'oc2_agent_native.py'
     native_helper_sha = hashlib.sha256(native_helper.read_bytes()).hexdigest()
     identity_helper = HERE / 'oc2_identity.py'
     identity_helper_sha = hashlib.sha256(identity_helper.read_bytes()).hexdigest()
+    phase4_policy = HERE / 'oc2_phase4_policy.py' if phase4_plugin_file is not None else None
+    phase4_policy_sha = (
+        hashlib.sha256(phase4_policy.read_bytes()).hexdigest()
+        if phase4_policy is not None else None
+    )
     verifier_dir = (
         f'{ROOT}/scripts/oc2_guest_{script_sha[:16]}_{native_helper_sha[:16]}_'
         f'{identity_helper_sha[:16]}'
     )
+    if phase4_policy_sha is not None:
+        verifier_dir += '_phase4_' + phase4_policy_sha[:16]
     script_dest = f'{verifier_dir}/oc2_guest.py'
     native_helper_dest = f'{verifier_dir}/oc2_agent_native.py'
     identity_helper_dest = f'{verifier_dir}/oc2_identity.py'
@@ -941,26 +984,30 @@ def stage(runner: Runner, name: str, bundle: pathlib.Path, manifest_sha: str,
     elif exists != 'exists':
         raise Stop('cannot determine remote bundle state')
     for transfer in (
-        VerifiedFileTransfer(
-            guest_script, script_dest, script_sha,
-            'unsafe guest asset verifier path',
-            'cannot determine remote bootstrap script state',
-            'guest bootstrap code SHA mismatch',
-        ),
-        VerifiedFileTransfer(
-            native_helper, native_helper_dest, native_helper_sha,
-            'unsafe guest native verifier path',
-            'cannot determine remote native verifier state',
-            'guest native verifier SHA mismatch',
-        ),
-        VerifiedFileTransfer(
-            identity_helper, identity_helper_dest, identity_helper_sha,
-            'unsafe guest identity verifier path',
-            'cannot determine guest identity verifier state',
-            'guest identity verifier SHA mismatch',
-        ),
+        VerifiedFileTransfer(guest_script, script_dest, script_sha,
+                             'unsafe guest asset verifier path',
+                             'cannot determine remote bootstrap script state',
+                             'guest bootstrap code SHA mismatch'),
+        VerifiedFileTransfer(native_helper, native_helper_dest, native_helper_sha,
+                             'unsafe guest native verifier path',
+                             'cannot determine remote native verifier state',
+                             'guest native verifier SHA mismatch'),
+        VerifiedFileTransfer(identity_helper, identity_helper_dest, identity_helper_sha,
+                             'unsafe guest identity verifier path',
+                             'cannot determine guest identity verifier state',
+                             'guest identity verifier SHA mismatch'),
     ):
         _transfer_verified_file(runner, name, transfer)
+    phase4_policy_dest: str | None = None
+    if phase4_policy is not None and phase4_policy_sha is not None:
+        phase4_policy_dest = f'{verifier_dir}/oc2_phase4_policy.py'
+        _transfer_verified_file(
+            runner, name,
+            VerifiedFileTransfer(phase4_policy, phase4_policy_dest, phase4_policy_sha,
+                                 'unsafe guest Phase 4 policy path',
+                                 'cannot determine guest Phase 4 policy state',
+                                 'guest Phase 4 policy SHA mismatch'),
+        )
     if superpowers_source is not None and superpowers_destination is not None:
         source_status = runner.directory_status(name, superpowers_destination)
         if source_status == 0:
@@ -989,6 +1036,26 @@ def stage(runner: Runner, name: str, bundle: pathlib.Path, manifest_sha: str,
             ),
         )
         args.extend(['--assets', remote_assets, '--expected-assets-sha', assets_sha])
+    if phase4_plugin_file is not None and phase4_plugins_sha is not None:
+        remote_phase4 = f'{ROOT}/assets/phase4-{phase4_plugins_sha[:16]}.json'
+        status = runner.destination_status(name, remote_phase4)
+        if status == 0:
+            runner.sbx('cp', str(phase4_plugin_file), f'{name}:{remote_phase4}')
+        elif status == 10:
+            pass
+        elif status == 12:
+            raise Stop('unsafe Phase 4 plugin asset path')
+        else:
+            raise Stop('cannot establish Phase 4 plugin asset state')
+        phase4_checksum = runner.sbx(
+            'exec', name, 'sha256sum', remote_phase4, capture=True,
+        ).split()
+        if not phase4_checksum or phase4_checksum[0] != phase4_plugins_sha:
+            raise Stop('Phase 4 plugin asset SHA mismatch')
+        args.extend([
+            '--phase4-plugin-assets', remote_phase4,
+            '--expected-phase4-plugin-sha', phase4_plugins_sha,
+        ])
     execute(runner, name, 'python3', script_dest, *args)
 
 
@@ -1045,6 +1112,92 @@ def prepare_verification_runtime(
             asset_file, asset_sha, superpowers_source=superpowers_source,
         )
         print('OC2_VERIFICATION_PREPARED: sandbox=' + sandbox + ' runtime=' + runtime_sha[:16])
+        return str(runtime_sha)
+
+
+def prepare_phase4_runtime(
+    repo: pathlib.Path,
+    request: Phase4RuntimeRequest,
+) -> str:
+    """Stage a fresh Phase 4 Runtime in a dedicated, existing Sandbox."""
+    if (not NAME_RE.fullmatch(request.sandbox)
+            or not request.sandbox.startswith('oc2-phase4-')):
+        raise Stop('Phase 4 requires a new dedicated oc2-phase4-* Sandbox')
+    runner = Runner(getpass.getuser())
+    if not is_compatible_sandbox(runner, request.sandbox):
+        raise Stop('Phase 4 requires an existing compatible mountless Sandbox')
+    if cli_path(runner, request.sandbox) is None:
+        raise Stop('Phase 4 requires the pinned OpenCode CLI to be present')
+    from sandbox.scripts.stage_opencode_v2 import verify_bundle
+    from oc2_assets import (
+        AssetError,
+        build as build_assets,
+        build_phase4_plugins,
+        export_superpowers_tree,
+        write_new,
+    )
+
+    with tempfile.TemporaryDirectory(prefix='oc2-phase4-plugins-') as temporary:
+        temporary_path = pathlib.Path(temporary)
+        bundle = temporary_path / 'bundle'
+        export_v2_config(repo, bundle, verification_only=True)
+        config_sha = verify_bundle(bundle, trusted_root=bundle.parent)
+        try:
+            base_assets_raw, base_assets_sha = build_assets(
+                repo,
+                verification_only=True,
+                plugin_dir=request.superpowers_plugin_dir,
+            )
+            superpowers_source = temporary_path / 'verification-superpowers'
+            export_superpowers_tree(
+                repo, request.superpowers_plugin_dir, superpowers_source,
+            )
+            phase4_assets_raw, phase4_assets_sha = build_phase4_plugins(
+                repo,
+                (request.artifacts.akane, request.artifacts.sibyl),
+                explicit_opt_in=True,
+            )
+        except AssetError as exc:
+            raise Stop('Phase 4 asset export failed: ' + str(exc)) from exc
+        base_assets_file = temporary_path / 'base-assets.json'
+        phase4_assets_file = temporary_path / 'phase4-plugin-assets.json'
+        write_new(base_assets_file, base_assets_raw)
+        write_new(phase4_assets_file, phase4_assets_raw)
+
+        generator_fingerprint = phase4_generator_fingerprint((
+            HERE / 'oc2_guest.py',
+            HERE / 'oc2_agent_native.py',
+            HERE / 'oc2_identity.py',
+            HERE / 'oc2_phase4_policy.py',
+        ))
+        runtime_sha = phase4_runtime_identity_sha256(Phase4RuntimeIdentity(
+            config_sha,
+            base_assets_sha,
+            phase4_assets_sha,
+            generator_fingerprint,
+        ))
+        destination = f'{ROOT}/runtime/{runtime_sha[:16]}'
+        destination_status = runner.destination_status(request.sandbox, destination)
+        if destination_status == 10:
+            raise Stop('Phase 4 Runtime identity already exists; refusing reuse')
+        if destination_status == 12:
+            raise Stop('Phase 4 Runtime destination is unsafe')
+        if destination_status != 0:
+            raise Stop('could not establish Phase 4 Runtime identity availability')
+
+        stage(
+            runner,
+            request.sandbox,
+            bundle,
+            config_sha,
+            HERE / 'oc2_guest.py',
+            base_assets_file,
+            base_assets_sha,
+            superpowers_source=superpowers_source,
+            phase4_plugin_file=phase4_assets_file,
+            phase4_plugins_sha=phase4_assets_sha,
+        )
+        print('OC2_PHASE4_PREPARED: sandbox=' + request.sandbox + ' runtime=' + runtime_sha[:16])
         return str(runtime_sha)
 
 
@@ -1307,6 +1460,7 @@ def _session_action(args: argparse.Namespace, workspace: pathlib.Path,
         print('COLLECTED_FOR_REVIEW: ' + str(collected))
         return 0
 
+
     if not session.collected:
         raise Stop('run --collect before --apply')
     collected = session.directory / 'collected'
@@ -1331,8 +1485,12 @@ def main(argv: list[str] | None = None) -> int:
                    help='prepare config without launching OpenCode')
     p.add_argument('--verification-only', action='store_true',
                    help='prepare the fixed Plugin/MCP Runtime without launching OpenCode')
+    p.add_argument('--phase4-plugins', action='store_true',
+                   help='prepare a separate Runtime with the pinned Akane/Sibyl Plugins')
     p.add_argument('--plugin-dir', type=pathlib.Path,
                    help='clean local Git checkout for the pinned Superpowers Plugin')
+    p.add_argument('--akane-artifact', type=pathlib.Path)
+    p.add_argument('--sibyl-artifact', type=pathlib.Path)
     p.add_argument('--allow-paid-inference', action='store_true',
                    help='authorize external inference for this interactive launch')
     p.add_argument('--use-cloudflare-ai-gateway', action='store_true',
@@ -1341,6 +1499,20 @@ def main(argv: list[str] | None = None) -> int:
     oc2_workspace = importlib.import_module('oc2_workspace')
 
     try:
+        if args.phase4_plugins:
+            if args.verification_only:
+                raise Stop('--phase4-plugins replaces --verification-only')
+            if not args.prepare_only:
+                raise Stop('--phase4-plugins requires --prepare-only')
+            if args.plugin_dir is None or args.akane_artifact is None or args.sibyl_artifact is None:
+                raise Stop('--phase4-plugins requires --plugin-dir, --akane-artifact and --sibyl-artifact')
+            if args.use_cloudflare_ai_gateway or args.allow_paid_inference:
+                raise Stop('Phase 4 verification does not permit provider credentials or inference')
+            if (not NAME_RE.fullmatch(args.sandbox)
+                    or not args.sandbox.startswith('oc2-phase4-')):
+                raise Stop('--phase4-plugins requires a dedicated oc2-phase4-* Sandbox name')
+        elif args.akane_artifact is not None or args.sibyl_artifact is not None:
+            raise Stop('plugin artifacts are only valid with --phase4-plugins')
         if args.verification_only:
             if not args.prepare_only:
                 raise Stop('--verification-only requires --prepare-only')
@@ -1348,9 +1520,18 @@ def main(argv: list[str] | None = None) -> int:
                 raise Stop('--verification-only requires --plugin-dir')
             if args.use_cloudflare_ai_gateway or args.allow_paid_inference:
                 raise Stop('verification mode does not permit provider credentials or inference')
-        elif args.plugin_dir is not None:
+        elif args.plugin_dir is not None and not args.phase4_plugins:
             raise Stop('--plugin-dir is only valid with --verification-only')
         if args.dry_run:
+            if args.phase4_plugins:
+                if (not NAME_RE.fullmatch(args.sandbox)
+                        or not args.sandbox.startswith('oc2-phase4-')):
+                    raise Stop('invalid Phase 4 Sandbox name')
+                print('OC2 PLAN: Phase 4 Akane/Sibyl Runtime in existing Sandbox=' + args.sandbox)
+                print('OC2 PLAN: verify both package artifacts against apm.yml SHA-512 pins')
+                print('OC2 PLAN: no Sandbox creation, credential provisioning, inference, or TUI launch')
+                print('OC2 PLAN: no Sandbox commands executed')
+                return 0
             if args.verification_only:
                 if not NAME_RE.fullmatch(args.sandbox):
                     raise Stop('invalid Sandbox name')
@@ -1379,6 +1560,18 @@ def main(argv: list[str] | None = None) -> int:
         repo = args.repo_root.resolve(strict=True)
         if not (repo / 'apm.yml').is_file():
             raise Stop('dotfiles-ai apm.yml not found')
+        if args.phase4_plugins:
+            if args.akane_artifact is None or args.sibyl_artifact is None:
+                raise Stop('Phase 4 plugin artifact paths are required')
+            prepare_phase4_runtime(
+                repo,
+                Phase4RuntimeRequest(
+                    args.sandbox,
+                    args.plugin_dir,
+                    Phase4ArtifactPaths(args.akane_artifact, args.sibyl_artifact),
+                ),
+            )
+            return 0
         if args.verification_only:
             if args.plugin_dir is None:
                 raise Stop('plugin directory is required for verification-only mode')

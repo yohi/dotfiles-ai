@@ -27,6 +27,27 @@ x-oc2-plugins:
   enabled: false
   allowlist: [superpowers]
 
+x-oc2-phase4:
+  enabled: true
+  allowlist: [akane, sibyl]
+  artifacts:
+    akane:
+      package: "@yohi/akane"
+      version: "3.0.1"
+      repository: "yohi/akane"
+      commit: b30772082e92cf148d5d8714266f326bad27f86a
+      acquisition: github-package
+      sha512: 3c42e0df8bcc595db9139ae34552cfc184521fb948d4fdb80561d44760159badace7057a54999857de70e14ac078be063f4fca350681b6922ee74519590fb82b
+    sibyl:
+      package: "@yohi/sibyl"
+      version: "3.0.1"
+      repository: "yohi/sibyl"
+      commit: e0249482701159bcd5a556fe06faae11dd41f66e
+      acquisition: source-build
+      sha512: 4ba5594a52cd30bba6fc010b573ede46431a4819b31bfa03f3d7aeb915d7471f3a8c1b339bff541e7e3d5bb0df10b67715dce1fe16c6263fa4ef7c039f311eec
+      build_tool: bun@1.4.2
+      lock_sha256: 71c0d8e7cd1267e0973066d01045a47e266907733d043d79f6ad899043f6e8b7
+
 x-oc2-mcp:
   enabled: false
   servers: [oc2-status]

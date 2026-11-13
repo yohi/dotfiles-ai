@@ -12,13 +12,16 @@ from pathlib import Path
 from unittest.mock import patch
 
 SCRIPTS = Path(__file__).resolve().parents[1] / 'scripts'
+TESTS = Path(__file__).resolve().parent
 REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(SCRIPTS))
+sys.path.insert(0, str(TESTS))
 import oc2_assets  # noqa: E402
 import oc2_guest  # noqa: E402
 import oc2_identity  # noqa: E402
 import oc2_native  # noqa: E402
 import prepare_opencode_v2  # noqa: E402
+import test_oc2_phase4_guest as phase4_fixture  # noqa: E402
 
 
 class VerificationGuestMaterializationTest(unittest.TestCase):
@@ -224,6 +227,108 @@ class VerificationGuestMaterializationTest(unittest.TestCase):
                 Path(oc2_guest.__file__).with_name('oc2_identity.py'),
             ),
         )
+
+    def test_phase4_registers_server_and_tui_plugins_in_separate_configs(self):
+        bundle = self._provider_bundle(verification_only=True)
+        assets_path, assets_sha = self._asset_file(verification_only=True)
+        config_sha = oc2_guest.verify(bundle)
+        assets = oc2_guest.verify_assets(assets_path, assets_sha)
+        phase4_payload = json.loads(phase4_fixture.asset_bundle())
+        native = oc2_guest.validate_native_asset(assets[oc2_guest.NATIVE_ASSET_TARGET])
+        phase4_payload['source_sha256'] = native['source_sha256']
+        phase4_raw = (json.dumps(phase4_payload, sort_keys=True, separators=(',', ':')) + '\n').encode()
+        phase4_path = self.base / 'phase4-plugins.json'
+        phase4_path.write_bytes(phase4_raw)
+        phase4_plugins = oc2_guest.verify_phase4_plugin_assets(
+            phase4_path,
+            hashlib.sha256(phase4_raw).hexdigest(),
+            native['source_sha256'],
+        )
+
+        runtime = oc2_guest.prepare(
+            bundle, config_sha, assets, assets_sha, phase4_plugins=phase4_plugins,
+        )
+
+        server = json.loads((runtime / 'config/opencode/opencode.jsonc').read_text())
+        client = json.loads((runtime / 'config/opencode/cli.json').read_text())
+        self.assertEqual(server['plugins'], [
+            str(runtime / 'plugins/superpowers'),
+            {'package': str(runtime / 'plugins/akane'), 'options': {
+                'enabled': True,
+                'stage1Ms': 2147483647,
+                'stage2Ms': 2147483647,
+                'maxPings': 1,
+                'maxToolGateCycles': 1,
+                'notifierType': 'tmux',
+                'notifyWaiting': False,
+                'agents': {'include': ['__oc2_phase4_fixture__']},
+            }},
+        ])
+        self.assertEqual(client['plugins'], [{
+            'package': str(runtime / 'plugins/sibyl'),
+            'options': {'observer': {
+                'enabled': True,
+                'maxVisibleSubagents': 8,
+                'showModel': False,
+                'showProvider': False,
+                'showLatestText': False,
+                'showReasoningSummary': False,
+            }},
+        }])
+        self.assertTrue((runtime / 'plugins/akane/dist/index.js').is_file())
+        self.assertTrue((runtime / 'plugins/sibyl/dist/tui.js').is_file())
+        self.assertEqual(server['mcp']['servers']['oc2-status']['enabled'], True)
+        self.assertNotIn('model', server)
+        self.assertEqual(
+            runtime.name,
+            oc2_identity.phase4_runtime_identity_sha256(oc2_identity.Phase4RuntimeIdentity(
+                config_sha,
+                assets_sha,
+                phase4_plugins.bundle_sha256,
+                oc2_identity.phase4_generator_fingerprint((
+                    Path(oc2_guest.__file__),
+                    Path(oc2_guest.__file__).with_name('oc2_agent_native.py'),
+                    Path(oc2_guest.__file__).with_name('oc2_identity.py'),
+                    Path(oc2_guest.__file__).with_name('oc2_phase4_policy.py'),
+                )),
+            ))[:16],
+        )
+
+    def test_phase4_rejects_plugin_asset_that_differs_from_pinned_source(self):
+        bundle = self._provider_bundle(verification_only=True)
+        assets_path, _ = self._asset_file(verification_only=True)
+        payload = json.loads(assets_path.read_bytes())
+        target = oc2_assets.PLUGIN_PREFIX + 'index.js'
+        payload['files'][target] = 'export const plugin = altered;\n'
+        payload['sha256'][target] = hashlib.sha256(
+            payload['files'][target].encode('utf-8'),
+        ).hexdigest()
+        assets_raw = (json.dumps(
+            payload, sort_keys=True, separators=(',', ':'),
+        ) + '\n').encode('utf-8')
+        assets_path.write_bytes(assets_raw)
+        assets_sha = hashlib.sha256(assets_raw).hexdigest()
+        assets = oc2_guest.verify_assets(assets_path, assets_sha)
+        config_sha = oc2_guest.verify(bundle)
+        phase4_payload = json.loads(phase4_fixture.asset_bundle())
+        native = oc2_guest.validate_native_asset(assets[oc2_guest.NATIVE_ASSET_TARGET])
+        phase4_payload['source_sha256'] = native['source_sha256']
+        phase4_raw = (json.dumps(
+            phase4_payload, sort_keys=True, separators=(',', ':'),
+        ) + '\n').encode('utf-8')
+        phase4_path = self.base / 'phase4-tampered-assets.json'
+        phase4_path.write_bytes(phase4_raw)
+        phase4_plugins = oc2_guest.verify_phase4_plugin_assets(
+            phase4_path,
+            hashlib.sha256(phase4_raw).hexdigest(),
+            native['source_sha256'],
+        )
+
+        with self.assertRaisesRegex(ValueError, 'differs from the pinned source tree'):
+            oc2_guest.prepare(
+                bundle, config_sha, assets, assets_sha,
+                phase4_plugins=phase4_plugins,
+            )
 
     def test_verification_runtime_identity_tracks_generator_fingerprint(self):
         manifest_sha = 'a' * 64

@@ -6,6 +6,8 @@ Executed by the agent inside a mountless Docker Sandbox. No network operations.
 from __future__ import annotations
 
 import argparse
+import base64
+import binascii
 import hashlib
 import json
 import os
@@ -62,6 +64,10 @@ PLUGIN_PREFIX = 'plugins/superpowers/'
 PLUGIN_META_TARGET = 'metadata/superpowers-plugin.json'
 MCP_SERVER_TARGET = 'mcp/oc2_local_mcp.py'
 MAX_ASSETS = 512 * 1024
+MAX_PHASE4_PLUGIN_FILE = 4 * 1024 * 1024
+IMPORT_SPECIFIER = re.compile(
+    r'''(?:\bfrom\s*|\bimport\s*(?:\(\s*)?|\brequire\s*\(\s*)['"]([^'"]+)['"]''',
+)
 
 CLI_CANDIDATES = (
     '/home/agent/.local/oc2-runtime/node_modules/.bin/opencode',
@@ -93,6 +99,29 @@ class VerifiedSuperpowersSource:
     files: tuple[SuperpowersFile, ...]
     tree_sha256: str
     total_bytes: int
+
+
+@dataclass(frozen=True, slots=True)
+class Phase4PluginReceipt:
+    plugin_id: str
+    package: str
+    version: str
+    repository: str
+    commit: str
+    acquisition: str
+    artifact_sha512: str
+    entrypoint: str
+    build_tool: str | None
+    lock_sha256: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class VerifiedPhase4PluginBundle:
+    files: tuple[tuple[str, bytes], ...]
+    plugins: tuple[Phase4PluginReceipt, ...]
+    selection: tuple[str, ...]
+    source_sha256: str
+    bundle_sha256: str
 
 
 def verify_superpowers_source() -> VerifiedSuperpowersSource:
@@ -499,6 +528,154 @@ def verify_assets(source: pathlib.Path, expected_sha: str) -> dict[str, bytes]:
     return result
 
 
+def verify_phase4_plugin_assets(
+    source: pathlib.Path,
+    expected_sha: str,
+    expected_source_sha: str,
+) -> VerifiedPhase4PluginBundle:
+    """Validate Phase 4 plugin identities and entrypoint bytes before import."""
+    from oc2_phase4_policy import PHASE4_PLUGIN_POLICIES, PHASE4_POLICY_BY_ID
+
+    validate_location(source, BASE)
+    if re.fullmatch(r'[0-9a-f]{64}', expected_sha) is None:
+        fail('invalid Phase 4 plugin asset SHA-256')
+    if re.fullmatch(r'[0-9a-f]{64}', expected_source_sha) is None:
+        fail('invalid Phase 4 source SHA-256')
+    raw = regular(source, MAX_ASSETS)
+    if hashlib.sha256(raw).hexdigest() != expected_sha:
+        fail('Phase 4 plugin asset SHA-256 mismatch')
+    try:
+        payload: JsonValue = json.loads(raw, object_pairs_hook=_unique_json_object)
+    except (ValueError, UnicodeError) as exc:
+        raise ValueError('invalid Phase 4 plugin asset JSON') from exc
+    if not isinstance(payload, dict) or set(payload) != {
+        'schema', 'source_sha256', 'selection', 'plugins', 'files', 'sha256',
+    }:
+        fail('invalid Phase 4 plugin asset manifest')
+    if (payload['schema'] != 'dotfiles-ai/oc2-phase4-plugin-assets/v1'
+            or payload['source_sha256'] != expected_source_sha):
+        fail('Phase 4 plugin asset source identity mismatch')
+    expected_selection = [policy.plugin_id for policy in PHASE4_PLUGIN_POLICIES]
+    if payload['selection'] != expected_selection:
+        fail('Phase 4 plugin selection is not allowlisted')
+    files = payload['files']
+    hashes = payload['sha256']
+    rows = payload['plugins']
+    if (not isinstance(files, dict) or not isinstance(hashes, dict)
+            or not isinstance(rows, list) or len(rows) != len(PHASE4_PLUGIN_POLICIES)
+            or any(not isinstance(name, str) for name in files)
+            or any(not isinstance(name, str) for name in hashes)):
+        fail('invalid Phase 4 plugin asset contents')
+
+    verified_files: dict[str, bytes] = {}
+    receipts: list[Phase4PluginReceipt] = []
+    expected_targets: set[str] = set()
+    for index, policy in enumerate(PHASE4_PLUGIN_POLICIES):
+        row = rows[index]
+        if not isinstance(row, dict):
+            fail('invalid Phase 4 plugin identity row')
+        fields = {
+            'id', 'package', 'version', 'repository', 'commit', 'acquisition',
+            'artifact_sha512', 'entrypoint', 'files',
+        }
+        if policy.build_tool is not None:
+            fields.update({'build_tool', 'lock_sha256'})
+        if set(row) != fields:
+            fail('invalid Phase 4 plugin identity fields')
+        if any(row.get(key) != value for key, value in {
+            'id': policy.plugin_id,
+            'package': policy.package,
+            'version': policy.version,
+            'repository': policy.repository,
+            'commit': policy.source_commit,
+            'acquisition': policy.acquisition,
+            'entrypoint': policy.entrypoint,
+        }.items()):
+            fail('Phase 4 plugin source identity mismatch')
+        artifact_sha = row['artifact_sha512']
+        if not isinstance(artifact_sha, str) or re.fullmatch(r'[0-9a-f]{128}', artifact_sha) is None:
+            fail('invalid Phase 4 artifact SHA-512')
+        if policy.build_tool is not None and (
+            row.get('build_tool') != policy.build_tool or row.get('lock_sha256') != policy.lock_sha256
+        ):
+            fail('Phase 4 plugin build provenance mismatch')
+        listed_files = row['files']
+        required_relative = {'package.json', policy.entrypoint}
+        if (not isinstance(listed_files, list)
+                or any(not isinstance(name, str) for name in listed_files)
+                or set(listed_files) != required_relative or len(listed_files) != len(required_relative)):
+            fail('Phase 4 plugin file manifest is invalid')
+        for relative in required_relative:
+            target = f'plugins/{policy.plugin_id}/{relative}'
+            expected_targets.add(target)
+        receipts.append(Phase4PluginReceipt(
+            policy.plugin_id,
+            policy.package,
+            policy.version,
+            policy.repository,
+            policy.source_commit,
+            policy.acquisition,
+            artifact_sha,
+            policy.entrypoint,
+            policy.build_tool,
+            policy.lock_sha256,
+        ))
+
+    if set(files) != expected_targets or set(hashes) != expected_targets:
+        fail('Phase 4 plugin asset path allowlist mismatch')
+    for target in sorted(expected_targets):
+        encoded = files[target]
+        if not isinstance(encoded, str):
+            fail('Phase 4 plugin asset is not base64 text')
+        try:
+            content = base64.b64decode(encoded, validate=True)
+        except (ValueError, binascii.Error) as exc:
+            raise ValueError('Phase 4 plugin asset base64 is invalid') from exc
+        if (len(content) > MAX_PHASE4_PLUGIN_FILE or not isinstance(hashes[target], str)
+                or hashlib.sha256(content).hexdigest() != hashes[target]):
+            fail('Phase 4 plugin asset content SHA-256 mismatch')
+        verified_files[target] = content
+
+    for plugin in receipts:
+        policy = PHASE4_POLICY_BY_ID[plugin.plugin_id]
+        package_path = f'plugins/{plugin.plugin_id}/package.json'
+        entry_path = f'plugins/{plugin.plugin_id}/{plugin.entrypoint}'
+        try:
+            package = json.loads(verified_files[package_path], object_pairs_hook=_unique_json_object)
+            entrypoint = verified_files[entry_path].decode('utf-8')
+        except (ValueError, UnicodeError) as exc:
+            raise ValueError('Phase 4 package metadata or entrypoint is invalid') from exc
+        if (not isinstance(package, dict) or package.get('name') != policy.package
+                or package.get('version') != policy.version or package.get('type') != 'module'):
+            fail('Phase 4 runtime package identity mismatch')
+        if {'dependencies', 'optionalDependencies', 'peerDependencies'} & set(package):
+            fail('Phase 4 runtime package contains external dependencies')
+        if policy.plugin_id == 'akane':
+            exports = package.get('exports')
+            if (package.get('main') != './dist/index.js' or not isinstance(exports, dict)
+                    or exports.get('./server') != './dist/index.js'):
+                fail('Akane server package export mismatch')
+        else:
+            exports = package.get('exports')
+            tui = exports.get('./tui') if isinstance(exports, dict) else None
+            root = exports.get('.') if isinstance(exports, dict) else None
+            if (package.get('main') != './dist/tui.js' or not isinstance(tui, dict)
+                    or tui.get('import') != './dist/tui.js' or not isinstance(root, dict)
+                    or root.get('import') != './dist/tui.js'):
+                fail('Sibyl TUI package export mismatch')
+        imports = set(IMPORT_SPECIFIER.findall(entrypoint))
+        if any(name.startswith(('./', '../')) or name not in policy.external_imports for name in imports):
+            fail('Phase 4 runtime dependency is not allowlisted')
+
+    return VerifiedPhase4PluginBundle(
+        tuple(sorted(verified_files.items())),
+        tuple(receipts),
+        tuple(expected_selection),
+        expected_source_sha,
+        expected_sha,
+    )
+
+
 def _asset_count_summary(files: dict[str, bytes]) -> str:
     """Summarize selected asset categories using the verified file keys."""
     rules = sum(name.startswith('config/opencode/rules/') for name in files)
@@ -579,9 +756,12 @@ def prepare(
     manifest_sha: str,
     assets: dict[str, bytes] | None = None,
     assets_sha: str | None = None,
+    phase4_plugins: VerifiedPhase4PluginBundle | None = None,
 ) -> pathlib.Path:
     if (assets is None) != (assets_sha is None):
         fail('asset content/identity mismatch')
+    if phase4_plugins is not None and (assets is None or assets_sha is None):
+        fail('Phase 4 Runtime requires the verified Phase 3 asset bundle')
 
     server = json.loads(regular(bundle / 'opencode.jsonc'))
     client = json.loads(regular(bundle / 'cli.json'))
@@ -600,14 +780,40 @@ def prepare(
             pathlib.Path(__file__).with_name('oc2_agent_native.py'),
             pathlib.Path(__file__).with_name('oc2_identity.py'),
         )
-    dest = runtime_path(manifest_sha, assets_sha, generator_fingerprint)
+    if phase4_plugins is not None:
+        if not verification_only or assets_sha is None:
+            fail('Phase 4 plugins require a verification-only Runtime')
+        from oc2_identity import (
+            Phase4RuntimeIdentity,
+            phase4_generator_fingerprint,
+            phase4_runtime_identity_sha256,
+        )
+
+        generator_fingerprint = phase4_generator_fingerprint((
+            pathlib.Path(__file__),
+            pathlib.Path(__file__).with_name('oc2_agent_native.py'),
+            pathlib.Path(__file__).with_name('oc2_identity.py'),
+            pathlib.Path(__file__).with_name('oc2_phase4_policy.py'),
+        ))
+        runtime_id = phase4_runtime_identity_sha256(Phase4RuntimeIdentity(
+            manifest_sha,
+            assets_sha,
+            phase4_plugins.bundle_sha256,
+            generator_fingerprint,
+        ))
+        dest = BASE / 'runtime' / runtime_id[:16]
+    else:
+        dest = runtime_path(manifest_sha, assets_sha, generator_fingerprint)
     validate_location(dest, BASE)
     asset_files: dict[str, bytes] = {}
-    plugin_source: VerifiedSuperpowersSource | None = None
+    bundled_plugins: dict[str, bytes] = {}
     if assets is not None:
         native_payload = validate_native_asset(assets[NATIVE_ASSET_TARGET])
         if native_payload['source_sha256'] != manifest.get('source_sha256'):
             fail('APM config and Native Agent asset source SHA mismatch')
+        if (phase4_plugins is not None
+                and phase4_plugins.source_sha256 != native_payload['source_sha256']):
+            fail('Phase 4 plugin and base asset source SHA mismatch')
         plugin_enabled = native_payload['plugins']['enabled']
         if verification_only != plugin_enabled:
             fail('verification mode does not match Plugin/MCP asset selection')
@@ -631,9 +837,14 @@ def prepare(
                 for name, content in assets.items()
                 if name.startswith(PLUGIN_PREFIX)
             }
-            source_files = {item.path: item.content for item in plugin_source.files}
+            plugin_files = plugin_metadata['plugin_files']
+            if (not isinstance(plugin_files, list)
+                    or any(not isinstance(name, str) for name in plugin_files)
+                    or set(bundled_plugins) != set(plugin_files)):
+                fail('Superpowers Plugin bundle differs from its file manifest')
+            plugin_file_names = [name for name in plugin_files if isinstance(name, str)]
             required_skills = {
-                name for name in source_files
+                name for name in plugin_file_names
                 if name.startswith('skills/') and name.endswith('/SKILL.md')
                 and len(name.split('/')) == 3
             }
@@ -643,6 +854,7 @@ def prepare(
             }
             if not required_skills or not required_plugin_files <= set(bundled_plugins):
                 fail('Verification Asset Bundle is missing Native Skill files')
+            source_files = {item.path: item.content for item in plugin_source.files}
             if any(source_files.get(name) != content for name, content in bundled_plugins.items()):
                 fail('Plugin Asset Bundle differs from the pinned source tree')
             plugin_path = dest / 'plugins/superpowers'
@@ -666,6 +878,44 @@ def prepare(
                 {'action': 'mcp.use', 'resource': '*', 'effect': 'deny'},
                 {'action': 'mcp.use', 'resource': 'oc2-status', 'effect': 'allow'},
             ]
+            if phase4_plugins is not None:
+                akane_path = dest / 'plugins/akane'
+                sibyl_path = dest / 'plugins/sibyl'
+                server['plugins'].append({
+                    'package': str(akane_path),
+                    'options': {
+                        'enabled': True,
+                        'stage1Ms': 2_147_483_647,
+                        'stage2Ms': 2_147_483_647,
+                        'maxPings': 1,
+                        'maxToolGateCycles': 1,
+                        'notifierType': 'tmux',
+                        'notifyWaiting': False,
+                        'agents': {'include': ['__oc2_phase4_fixture__']},
+                    },
+                })
+                server['policies'].append({
+                    'action': 'plugin.use',
+                    'resource': str(akane_path),
+                    'effect': 'allow',
+                })
+                client['plugins'] = [{
+                    'package': str(sibyl_path),
+                    'options': {
+                        'observer': {
+                            'enabled': True,
+                            'maxVisibleSubagents': 8,
+                            'showModel': False,
+                            'showProvider': False,
+                            'showLatestText': False,
+                            'showReasoningSummary': False,
+                        },
+                    },
+                }]
+                for target, content in phase4_plugins.files:
+                    if target in asset_files:
+                        fail('Phase 4 plugin asset conflicts with base Runtime assets')
+                    asset_files[target] = content
     elif verification_only:
         fail('verification Runtime requires selected Plugin/MCP assets')
 
@@ -679,12 +929,14 @@ def prepare(
         **asset_files,
     }
     if verification_only:
-        if plugin_source is None:
-            fail('verification Runtime is missing its pinned Plugin source')
         expected.update({
             PLUGIN_PREFIX + item.path: item.content
             for item in plugin_source.files
         })
+    if phase4_plugins is not None:
+        if not verification_only:
+            fail('Phase 4 plugins require a verification-only Runtime')
+        expected.update(dict(phase4_plugins.files))
     receipt: dict[str, JsonValue] = {
         'manifest_sha256': manifest_sha,
         'opencode_version': VERSION,
@@ -696,8 +948,6 @@ def prepare(
         if generator_fingerprint is None:
             fail('verification Runtime is missing its generator fingerprint')
         receipt['generator_sha256'] = generator_fingerprint
-        if plugin_source is None:
-            fail('verification Runtime is missing its pinned Plugin receipt')
         receipt['plugin_source'] = {
             'repository': SUPERPOWERS_REPOSITORY,
             'commit': SUPERPOWERS_COMMIT,
@@ -707,6 +957,23 @@ def prepare(
             'tree_sha256': plugin_source.tree_sha256,
             'file_sha256': {item.path: item.sha256 for item in plugin_source.files},
         }
+    if phase4_plugins is not None:
+        receipt['phase4_plugins_sha256'] = phase4_plugins.bundle_sha256
+        receipt['phase4_plugins'] = [
+            {
+                'id': plugin.plugin_id,
+                'package': plugin.package,
+                'version': plugin.version,
+                'repository': plugin.repository,
+                'commit': plugin.commit,
+                'acquisition': plugin.acquisition,
+                'artifact_sha512': plugin.artifact_sha512,
+                'entrypoint': plugin.entrypoint,
+                'build_tool': plugin.build_tool,
+                'lock_sha256': plugin.lock_sha256,
+            }
+            for plugin in phase4_plugins.plugins
+        ]
     marker = dest / 'receipt.json'
     if dest.exists():
         if verification_only:
@@ -720,7 +987,7 @@ def prepare(
             validate_location(location, BASE)
             if regular(location) != value:
                 fail('existing runtime asset mismatch')
-        return dest
+        return pathlib.Path(dest)
 
     (dest / 'config/opencode').mkdir(parents=True, mode=0o700)
     for name in ('home', 'data', 'state', 'cache', 'tmp', 'project'):
@@ -730,7 +997,7 @@ def prepare(
         location.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         write_new(location, data)
     write_new(marker, encoded(receipt))
-    return dest
+    return pathlib.Path(dest)
 
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser()
@@ -738,10 +1005,14 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument('--expected-sha')
     p.add_argument('--assets', type=pathlib.Path)
     p.add_argument('--expected-assets-sha')
+    p.add_argument('--phase4-plugin-assets', type=pathlib.Path)
+    p.add_argument('--expected-phase4-plugin-sha')
     p.add_argument('--install-assets-runtime')
     args = p.parse_args(argv)
     try:
         if args.install_assets_runtime is not None:
+            if args.phase4_plugin_assets is not None or args.expected_phase4_plugin_sha is not None:
+                fail('Phase 4 plugin assets cannot be used with the generic asset installer')
             if args.assets is None or args.expected_assets_sha is None:
                 fail('asset runtime requires verified assets')
             if re.fullmatch(r'[0-9a-f]{64}', args.install_assets_runtime) is None:
@@ -766,14 +1037,28 @@ def main(argv: list[str] | None = None) -> int:
             fail('host/guest manifest SHA mismatch')
         if (args.assets is None) != (args.expected_assets_sha is None):
             fail('asset arguments must be provided together')
-        verified_assets = (
-            verify_assets(args.assets, args.expected_assets_sha) if args.assets else None
+        assets = verify_assets(args.assets, args.expected_assets_sha) if args.assets else None
+        if (args.phase4_plugin_assets is None) != (args.expected_phase4_plugin_sha is None):
+            fail('Phase 4 plugin asset file and hash must be provided together')
+        phase4_plugins: VerifiedPhase4PluginBundle | None = None
+        if args.phase4_plugin_assets is not None:
+            if assets is None:
+                fail('Phase 4 plugin assets require the verified base asset bundle')
+            native = validate_native_asset(assets[NATIVE_ASSET_TARGET])
+            phase4_plugins = verify_phase4_plugin_assets(
+                args.phase4_plugin_assets,
+                args.expected_phase4_plugin_sha,
+                native['source_sha256'],
+            )
+        runtime = prepare(
+            bundle, digest, assets, args.expected_assets_sha, phase4_plugins=phase4_plugins,
         )
-        config_runtime = prepare(bundle, digest, verified_assets, args.expected_assets_sha)
         print('OC2_GUEST_CONFIG_VERIFIED')
-        if verified_assets is not None:
-            print('OC2_ASSETS_VERIFIED: ' + _asset_count_summary(verified_assets))
-        print('OC2_RUNTIME_PREPARED: ' + str(config_runtime))
+        if phase4_plugins is not None:
+            print('OC2_PHASE4_PLUGINS_VERIFIED: server=akane tui=sibyl recovery_ping=not-executed')
+        print('OC2_RUNTIME_PREPARED: ' + str(runtime))
+        if assets is not None:
+            print('OC2_ASSETS_VERIFIED: ' + _asset_count_summary(assets))
         print('OC2_RUNTIME_VERSION: ' + VERSION)
         return 0
     except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError) as exc:
