@@ -764,10 +764,15 @@ class FailClosedTest(unittest.TestCase):
         self.assertFalse(lifecycle(docker).stop(make_identity()).verified)
 
     def test_probe_exception_and_none(self):
-        for observations in ([RuntimeError('probe'), clean_obs()],
-                             [clean_obs(), RuntimeError('probe')],
-                             [None, clean_obs()],
-                             [clean_obs(), w.StopObservation(None, None, None, None)]):
+        observation_cases: tuple[
+            Sequence[writer_types.StopObservation | BaseException | None], ...
+        ] = (
+            [RuntimeError('probe'), clean_obs()],
+            [clean_obs(), RuntimeError('probe')],
+            [None, clean_obs()],
+            [clean_obs(), w.StopObservation(None, None, None, None)],
+        )
+        for observations in observation_cases:
             with self.subTest(observations=observations):
                 docker = self._running_docker()
                 v = lifecycle(docker, FakeProbe(observations=observations)).stop(

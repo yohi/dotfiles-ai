@@ -143,11 +143,14 @@ class FakeGuestFs:
         self.calls.append(('lstat', path))
         self._check(path)
         if path in self.symlinks:
-            return sup.FsStat(5, 'symlink')
+            stat: FsStat = sup.FsStat(5, 'symlink')
+            return stat
         if path in self.dirs:
-            return sup.FsStat(self.dirs[path], 'dir')
+            stat = sup.FsStat(self.dirs[path], 'dir')
+            return stat
         if path in self.files:
-            return sup.FsStat(7, 'file')
+            stat = sup.FsStat(7, 'file')
+            return stat
         raise sup.GuestFsAbsent('absent')
 
     def listdir(self, path: str) -> tuple[str, ...]:
@@ -214,7 +217,8 @@ class FakeTransport:
             if isinstance(item, BaseException):
                 raise item
             return item
-        return sup.TransportResult(0, b'ok\n', False, False)
+        result: TransportResult = sup.TransportResult(0, b'ok\n', False, False)
+        return result
 
 
 class BridgeTransport:
@@ -233,19 +237,23 @@ class BridgeTransport:
         try:
             rc, out = self.docker.run(['docker'] + list(argv[1:]), timeout=timeout)
         except SimTimeout:
-            return sup.TransportResult(-1, b'', True, False)
-        return sup.TransportResult(rc, out.encode('utf-8'), False, False)
+            result: TransportResult = sup.TransportResult(-1, b'', True, False)
+            return result
+        result = sup.TransportResult(rc, out.encode('utf-8'), False, False)
+        return result
 
 
 def runner_for(transport: Callable[[list[str], int, int], FakeTransportOutput],
                **kw: Any) -> CliDockerRunner:
     """Create the real runner adapter around a test-only transport callable."""
-    return sup.CliDockerRunner(DOCKER_PATH, transport, **kw)
+    runner: CliDockerRunner = sup.CliDockerRunner(DOCKER_PATH, transport, **kw)
+    return runner
 
 
 def ok(stdout: bytes = b'') -> TransportResult:
     """Build a successful non-EOF transport result with the supplied bytes."""
-    return sup.TransportResult(0, stdout, False, False)
+    result: TransportResult = sup.TransportResult(0, stdout, False, False)
+    return result
 
 
 def all_builder_argvs(spec):
@@ -325,7 +333,8 @@ class DockerRunnerTest(unittest.TestCase):
             with self.subTest(timeout=bad_timeout):
                 transport = FakeTransport()
                 with self.assertRaises(sup.SupervisorInputError):
-                    runner_for(transport).run(w.build_start_argv(CID), timeout=bad_timeout)
+                    run: Callable[..., object] = runner_for(transport).run
+                    run(w.build_start_argv(CID), timeout=bad_timeout)
                 self.assertEqual(transport.calls, [])
 
     def test_timeout_result(self):
@@ -1001,13 +1010,13 @@ class ObserveTest(ProbeBase):
         self.confirmed()
         original = self.fs.listdir
 
-        def failing_listdir(path):
+        def failing_listdir(path: str) -> tuple[str, ...]:
             if path == '/sys/fs/cgroup/system.slice':
                 raise sup.GuestFsUnknown('unreadable')
             return original(path)
 
-        self.fs.listdir = failing_listdir
-        self.assertIsNone(self.probe.observe(self.identity()).cgroup_exists)
+        with mock.patch.object(self.fs, 'listdir', side_effect=failing_listdir):
+            self.assertIsNone(self.probe.observe(self.identity()).cgroup_exists)
 
     def test_unconfirmed_identity_is_unknown(self):
         self.docker.state = 'exited'
@@ -1046,8 +1055,11 @@ class ObserveTest(ProbeBase):
     def test_vanished_pid_ignored(self):
         self.confirmed()
         original = self.fs.listdir
-        self.fs.listdir = lambda path: original(path) + (('888',) if path == '/proc' else ())
-        self.assertEqual(self.probe.observe(self.identity()).writer_uid_pids, ())
+        def listdir_with_vanished_pid(path: str) -> tuple[str, ...]:
+            return original(path) + (('888',) if path == '/proc' else ())
+
+        with mock.patch.object(self.fs, 'listdir', side_effect=listdir_with_vanished_pid):
+            self.assertEqual(self.probe.observe(self.identity()).writer_uid_pids, ())
 
     def test_rw_holder_other_running_container(self):
         self.confirmed()
@@ -1549,8 +1561,12 @@ class EndToEndOfflineTest(unittest.TestCase):
         self.sup.launch(self.spec)
         self.docker.hooks['stop'] = lambda: None
         original = self.fs.writer_exit
-        self.fs.writer_exit = lambda: (original(), self.fs.dirs.update({SCOPE: INODE}))
-        verdict = self.sup.stop()
+        def writer_exit_with_remaining_cgroup() -> None:
+            original()
+            self.fs.dirs.update({SCOPE: INODE})
+
+        with mock.patch.object(self.fs, 'writer_exit', side_effect=writer_exit_with_remaining_cgroup):
+            verdict = self.sup.stop()
         self.assertFalse(verdict.verified)
         self.assertTrue(any('cgroup still exists' in r for r in verdict.reasons))
 
@@ -1587,6 +1603,7 @@ class ApiSurfaceTest(unittest.TestCase):
 
     def test_stopped_verified_docstring(self):
         for doc in (sup.GuestSupervisor.__doc__, sup.__doc__):
+            assert doc is not None
             self.assertIn('is a limited Writer-stop verdict', doc)
             self.assertIn('NOT proof of', doc)
             self.assertIn('Git tree immutability', doc)
