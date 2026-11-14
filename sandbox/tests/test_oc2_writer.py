@@ -865,10 +865,10 @@ class SpecValidationTest(unittest.TestCase):
 
     def test_compute_workspace_id(self):
         import hashlib
-        expected = hashlib.sha256(b'1000\x00/home/u/repo').hexdigest()[:32]
-        self.assertEqual(w.compute_workspace_id(1000, '/home/u/repo'), expected)
+        expected = hashlib.sha256(b'1000\x00/home/user/repo').hexdigest()[:32]
+        self.assertEqual(w.compute_workspace_id(1000, '/home/user/repo'), expected)
         self.assertRegex(expected, r'^[0-9a-f]{32}$')
-        self.assertNotEqual(w.compute_workspace_id(1001, '/home/u/repo'), expected)
+        self.assertNotEqual(w.compute_workspace_id(1001, '/home/user/repo'), expected)
         for uid, root in ((-1, '/r'), (True, '/r'), ('1000', '/r'), (1000, 'repo'),
                           (1000, ''), (1000, '/r/'), (1000, '/r/../x'), (1000, '/r/./x'),
                           (1000, '//r'), (1000, '/r//x'), (1000, '/r\x00x')):

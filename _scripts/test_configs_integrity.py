@@ -88,7 +88,7 @@ def check_path_leak(content: str, candidates: set[str], regex: re.Pattern) -> bo
         return True
     for home in candidates:
         normalized = home.replace("\\", "/").rstrip("/")
-        if normalized in {"/home/agent", "/home/username", "/home/user",
+        if normalized in {"/home/agent", "/home/writer", "/home/username", "/home/user",
                           "/home/skillport", "/Users/agent", "/Users/username",
                           "/Users/user", "/Users/skillport"}:
             continue
@@ -100,7 +100,7 @@ def check_path_leak(content: str, candidates: set[str], regex: re.Pattern) -> bo
 class TestConfigIntegrity(unittest.TestCase):
     PROJECT_ROOT: str = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     HOME_REGEX: re.Pattern[str] = re.compile(
-        r'(?:/home/|/Users/|C:\\Users\\)(?!(?:agent|username|user|<[^>]+>|skillport)(?:[/\s"\'\\`,.:;()]|$))[^/\s"\'\\`,.:;()]+'
+        r'(?:/home/|/Users/|C:\\Users\\)(?!(?:agent|writer|username|user|<[^>]+>|skillport)(?:[/\s"\'\\`,.:;()]|$))[^/\s"\'\\`,.:;()]+'
     )
     home_candidates: set[str]
 
@@ -140,6 +140,15 @@ class TestConfigIntegrity(unittest.TestCase):
         self.assertFalse(
             check_path_leak(
                 "/home/agent/workspace/runtime",
+                self.home_candidates,
+                self.HOME_REGEX,
+            )
+        )
+
+    def test_writer_container_home_is_not_a_personal_path(self):
+        self.assertFalse(
+            check_path_leak(
+                "/home/writer/.cache/opencode",
                 self.home_candidates,
                 self.HOME_REGEX,
             )
