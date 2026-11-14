@@ -7,6 +7,7 @@ test_oc2_writer); the Guest filesystem is replaced by FakeGuestFs.
 from __future__ import annotations
 
 import copy
+import dataclasses
 import hashlib
 import importlib.util
 import json
@@ -349,50 +350,352 @@ class DockerRunnerTest(unittest.TestCase):
 
 
 # 2 -- SubprocessTransport (never spawns a real process here) -------------------------
+class FakeClock:
+    def __init__(self):
+        self.now = 1000.0
+
+    def __call__(self):
+        return self.now
+
+
+class FakePipe:
+    """Fake stdout pipe.  ``script`` items: bytes chunk, None (not ready), or
+    an exception.  ``endless`` keeps producing data after the script."""
+
+    def __init__(self, clock, script=(), endless=False, block_s=0.0):
+        self.clock = clock
+        self.script = list(script)
+        self.endless = endless
+        self.block_s = block_s
+        self.reads = 0
+        self.requested: list[int] = []
+        self.closed = False
+
+    def close(self):
+        self.closed = True
+
+    def read(self, size, timeout_s):
+        self.reads += 1
+        self.requested.append(size)
+        if self.reads > 10000:
+            raise AssertionError('unbounded read loop')
+        if self.script:
+            item = self.script.pop(0)
+        elif self.endless:
+            item = b'x' * size
+        else:
+            item = b''
+        if item is None:
+            self.clock.now += min(self.block_s or timeout_s, timeout_s)
+            return None
+        if isinstance(item, BaseException):
+            raise item
+        return item
+
+
+def fake_reader(stream, size, timeout_s):
+    return stream.read(size, timeout_s)
+
+
+class FakeProc:
+    def __init__(self, pipe, pid=4321, rc=0, exit_wait_ok=True, reap_ok=True,
+                 kill_raises=False):
+        self.stdout = pipe
+        self.pid = pid
+        self.rc = rc
+        self.returncode = None
+        self.exit_wait_ok = exit_wait_ok
+        self.reap_ok = reap_ok
+        self.kill_raises = kill_raises
+        self.killed = False
+        self.kills = 0
+        self.waits: list[float] = []
+
+    def kill(self):
+        self.kills += 1
+        if self.kill_raises:
+            raise OSError('kill ' + SENTINEL)
+        self.killed = True
+
+    def wait(self, timeout=None):
+        self.waits.append(timeout)
+        if len(self.waits) > 5:
+            raise AssertionError('unbounded wait loop')
+        if self.killed:
+            if not self.reap_ok:
+                raise subprocess.TimeoutExpired(['x', SENTINEL], timeout)
+            self.returncode = -9
+            return self.returncode
+        if not self.exit_wait_ok:
+            raise subprocess.TimeoutExpired(['x', SENTINEL], timeout)
+        self.returncode = self.rc
+        return self.rc
+
+
+class FakePopen:
+    def __init__(self, proc=None, error=None):
+        self.proc = proc
+        self.error = error
+        self.calls: list[tuple[list, dict]] = []
+
+    def __call__(self, argv, **kwargs):
+        self.calls.append((argv, kwargs))
+        if self.error is not None:
+            raise self.error
+        return self.proc
+
+
+class FakeKillpg:
+    def __init__(self, proc=None, error=None):
+        self.proc = proc
+        self.error = error
+        self.calls: list[tuple[int, int]] = []
+
+    def __call__(self, pgid, sig):
+        self.calls.append((pgid, sig))
+        if self.error is not None:
+            raise self.error
+        if self.proc is not None:
+            self.proc.killed = True
+
+
+ARGV = [DOCKER_PATH, 'ps', '-a', '-q', '--no-trunc']
+
+
 class SubprocessTransportTest(unittest.TestCase):
+    def make(self, script=(), env=None, endless=False, block_s=0.0, killpg_error=None,
+             popen_error=None, **proc_kw):
+        self.clock = FakeClock()
+        self.pipe = FakePipe(self.clock, script, endless=endless, block_s=block_s)
+        self.proc = FakeProc(self.pipe, **proc_kw)
+        self.popen = FakePopen(self.proc, popen_error)
+        self.killpg = FakeKillpg(self.proc, killpg_error)
+        return sup.SubprocessTransport(env, _popen=self.popen, _clock=self.clock,
+                                       _reader=fake_reader, _killpg=self.killpg)
+
+    def assert_killed_and_reaped(self):
+        self.assertEqual(self.killpg.calls, [(4321, sup.signal.SIGKILL)])
+        self.assertTrue(self.pipe.closed)
+        self.assertEqual(self.proc.waits, [sup._REAP_TIMEOUT_S])
+
     def test_source_never_uses_shell(self):
         source = (SCRIPTS / 'oc2_supervisor.py').read_text(encoding='utf-8')
         self.assertIn('shell=False', source)
         self.assertNotIn('shell=True', source)
-        for frag in ('os.system', 'os.popen', 'Popen(', 'shlex', "'--pid'"):
+        # Only the bounded Popen read loop is allowed: no unbounded capture.
+        for frag in ('os.system', 'os.popen', 'shlex', "'--pid'", '.communicate(',
+                     'subprocess.run(', 'check_output', 'getoutput', '.read()',
+                     'stdout.read('):
             self.assertNotIn(frag, source)
+        self.assertIn('subprocess.Popen', source)
+        self.assertEqual(source.count('self._popen('), 1)
+        self.assertIn('start_new_session=True', source)
+        self.assertIn('stdin=subprocess.DEVNULL', source)
+        self.assertIn('stderr=subprocess.DEVNULL', source)
         # SubprocessTransport is never instantiated by the module itself.
         self.assertNotIn('SubprocessTransport(', source)
 
-    def test_run_kwargs_recorded_via_fake(self):
-        recorded = {}
+    def test_popen_kwargs_and_env_not_inherited(self):
+        with mock.patch.dict(os.environ, {'OC2_TEST_SECRET': SENTINEL}):
+            transport = self.make([b'abc', b''])
+            result = transport(list(ARGV), 7, 10)
+        self.assertEqual(result, sup.TransportResult(0, b'abc', False, False))
+        self.assertEqual(len(self.popen.calls), 1)
+        argv, kwargs = self.popen.calls[0]
+        self.assertEqual(argv, ARGV)
+        self.assertIsInstance(argv, list)
+        self.assertIs(kwargs['shell'], False)
+        self.assertEqual(kwargs['env'], {})
+        self.assertIs(kwargs['stdin'], subprocess.DEVNULL)
+        self.assertIs(kwargs['stdout'], subprocess.PIPE)
+        self.assertIs(kwargs['stderr'], subprocess.DEVNULL)
+        self.assertIs(kwargs['start_new_session'], True)
+        self.assertIs(kwargs['close_fds'], True)
+        self.assertNotIn('timeout', kwargs)
+        self.assertEqual(self.killpg.calls, [])
+        self.assertTrue(self.pipe.closed)
+        transport = self.make([b''], env={'LANG': 'C'})
+        transport(list(ARGV), 7, 10)
+        self.assertEqual(self.popen.calls[0][1]['env'], {'LANG': 'C'})
 
-        def fake_run(argv, **kwargs):
-            recorded['argv'] = argv
-            recorded.update(kwargs)
-            return subprocess.CompletedProcess(argv, 0, stdout=b'abcdef', stderr=None)
+    def test_output_below_and_equal_limit(self):
+        transport = self.make([b'abc', b'de', b''])
+        self.assertEqual(transport(list(ARGV), 5, 8),
+                         sup.TransportResult(0, b'abcde', False, False))
+        transport = self.make([b'abcd', b'efgh', b''])
+        self.assertEqual(transport(list(ARGV), 5, 8),
+                         sup.TransportResult(0, b'abcdefgh', False, False))
+        self.assertEqual(self.killpg.calls, [])
+        self.assertLessEqual(max(self.pipe.requested), 9)
 
-        transport = sup.SubprocessTransport()
-        with mock.patch.object(sup.subprocess, 'run', fake_run):
-            result = transport([DOCKER_PATH, 'ps', '-a', '-q', '--no-trunc'], 7, 4)
-        self.assertIs(recorded['shell'], False)
-        self.assertEqual(recorded['env'], {})
-        self.assertEqual(recorded['timeout'], 7)
-        self.assertIs(recorded['stderr'], subprocess.DEVNULL)
-        self.assertIs(recorded['stdin'], subprocess.DEVNULL)
-        self.assertIsInstance(recorded['argv'], list)
-        self.assertEqual(result, sup.TransportResult(0, b'abcd', False, True))
+    def test_limit_plus_one_truncated(self):
+        transport = self.make([b'abcdefgh', b'i', b'never'])
+        result = transport(list(ARGV), 5, 8)
+        self.assertEqual(result, sup.TransportResult(-9, b'abcdefgh', False, True))
+        self.assertEqual(self.pipe.script, [b'never'])
+        self.assert_killed_and_reaped()
 
-    def test_timeout_and_start_failure(self):
-        def raise_timeout(argv, **kwargs):
-            raise subprocess.TimeoutExpired(cmd=argv + [SENTINEL], timeout=1)
+    def test_far_over_limit_stops_reading(self):
+        transport = self.make(endless=True)
+        limit = 3 * sup._READ_CHUNK_BYTES + 17
+        result = transport(list(ARGV), 5, limit)
+        self.assertTrue(result.truncated)
+        self.assertFalse(result.timed_out)
+        self.assertEqual(len(result.stdout), limit)
+        self.assertLessEqual(sum(self.pipe.requested), limit + 1)
+        self.assertLessEqual(max(self.pipe.requested), sup._READ_CHUNK_BYTES)
+        self.assertEqual(self.pipe.reads, 4)
+        self.assert_killed_and_reaped()
 
-        def raise_oserror(argv, **kwargs):
-            raise OSError('no such file ' + SENTINEL)
+    def test_oversized_reader_chunk_fails_closed(self):
+        transport = self.make([b'x' * 100])
+        with self.assertRaisesRegex(sup.DockerCommandError, 'read failed'):
+            transport(list(ARGV), 5, 8)
+        self.assert_killed_and_reaped()
 
-        transport = sup.SubprocessTransport({'LANG': 'C'})
-        with mock.patch.object(sup.subprocess, 'run', raise_timeout):
-            self.assertEqual(transport([DOCKER_PATH, 'ps'], 1, 10),
-                             sup.TransportResult(-1, b'', True, False))
-        with mock.patch.object(sup.subprocess, 'run', raise_oserror):
-            with self.assertRaises(sup.DockerCommandError) as ctx:
-                transport([DOCKER_PATH, 'ps'], 1, 10)
+    def test_many_tiny_chunks(self):
+        transport = self.make([b'a'] * 50 + [b''])
+        self.assertEqual(transport(list(ARGV), 5, 50),
+                         sup.TransportResult(0, b'a' * 50, False, False))
+        transport = self.make([b'a'] * 51 + [b'b'] * 100)
+        result = transport(list(ARGV), 5, 50)
+        self.assertEqual(result, sup.TransportResult(-9, b'a' * 50, False, True))
+        self.assertEqual(self.pipe.reads, 51)
+
+    def test_timeout_without_output(self):
+        transport = self.make([None] * 100, block_s=0.5)
+        result = transport(list(ARGV), 2, 10)
+        self.assertEqual(result, sup.TransportResult(-1, b'', True, False))
+        self.assertEqual(self.pipe.reads, 4)
+        self.assertGreaterEqual(self.clock.now, 1002.0)
+        self.assert_killed_and_reaped()
+
+    def test_timeout_during_large_output(self):
+        clock_holder = {}
+
+        def chunk_then_advance(stream, size, timeout_s):
+            clock_holder['clock'].now += 0.5
+            return stream.read(size, timeout_s)
+
+        transport = self.make(endless=True)
+        clock_holder['clock'] = self.clock
+        transport._reader = chunk_then_advance
+        result = transport(list(ARGV), 2, 10 * 1024 * 1024)
+        self.assertEqual(result, sup.TransportResult(-1, b'', True, False))
+        self.assertEqual(self.pipe.reads, 4)
+        self.assert_killed_and_reaped()
+
+    def test_eof_but_process_does_not_exit_is_timeout(self):
+        transport = self.make([b'ok', b''], exit_wait_ok=False)
+        result = transport(list(ARGV), 3, 10)
+        self.assertEqual(result, sup.TransportResult(-1, b'', True, False))
+        self.assertEqual(self.proc.waits, [3.0, sup._REAP_TIMEOUT_S])
+        self.assertEqual(self.killpg.calls, [(4321, sup.signal.SIGKILL)])
+
+    def test_non_zero_exit_preserved(self):
+        transport = self.make([b'Error', b''], rc=125)
+        self.assertEqual(transport(list(ARGV), 5, 10),
+                         sup.TransportResult(125, b'Error', False, False))
+        self.assertEqual(self.killpg.calls, [])
+
+    def test_popen_start_failure(self):
+        for error in (OSError('no such file ' + SENTINEL), ValueError(SENTINEL),
+                      subprocess.SubprocessError(SENTINEL)):
+            with self.subTest(error=type(error).__name__):
+                transport = self.make(popen_error=error)
+                with self.assertRaisesRegex(sup.DockerCommandError, 'start failed') as ctx:
+                    transport(list(ARGV), 5, 10)
+                self.assertNotIn(SENTINEL, exc_texts(ctx.exception))
+                self.assertIsNone(ctx.exception.__context__)
+                self.assertEqual(self.pipe.reads, 0)
+
+    def test_read_error_kills_and_fails(self):
+        transport = self.make([b'ab', OSError('read ' + SENTINEL)])
+        with self.assertRaisesRegex(sup.DockerCommandError, 'read failed') as ctx:
+            transport(list(ARGV), 5, 10)
         self.assertNotIn(SENTINEL, exc_texts(ctx.exception))
+        self.assert_killed_and_reaped()
+
+    def test_reap_failure_fails_closed(self):
+        for script, kw in (([b'x' * 9], {}), ([None] * 10, {'block_s': 1.0}),
+                           ([OSError('x')], {})):
+            with self.subTest(script=type(script[0]).__name__):
+                transport = self.make(script, reap_ok=False, **kw)
+                with self.assertRaises(sup.TransportReapError) as ctx:
+                    transport(list(ARGV), 2, 8)
+                self.assertIsInstance(ctx.exception, sup.DockerCommandError)
+                self.assertNotIn(SENTINEL, exc_texts(ctx.exception))
+                self.assertIsNone(ctx.exception.__context__)
+                self.assertEqual(len(self.killpg.calls), 1)
+                self.assertEqual(len(self.proc.waits), 1)
+                self.assertTrue(self.pipe.closed)
+
+    def test_killpg_failure_falls_back_to_kill_once(self):
+        transport = self.make([b'x' * 9], killpg_error=PermissionError(SENTINEL))
+        result = transport(list(ARGV), 2, 8)
+        self.assertTrue(result.truncated)
+        self.assertEqual(self.proc.kills, 1)
+        # Neither signal path works and the child is still alive: fail closed.
+        transport = self.make([b'x' * 9], killpg_error=PermissionError(SENTINEL),
+                              kill_raises=True, exit_wait_ok=False)
+        with self.assertRaises(sup.TransportReapError) as ctx:
+            transport(list(ARGV), 2, 8)
+        self.assertNotIn(SENTINEL, exc_texts(ctx.exception))
+        self.assertEqual(self.proc.kills, 1)
+        self.assertEqual(len(self.proc.waits), 1)
+
+    def test_group_already_gone_is_reaped(self):
+        transport = self.make([b'x' * 9], killpg_error=ProcessLookupError())
+        self.proc.killed = True
+        self.assertTrue(transport(list(ARGV), 2, 8).truncated)
+        self.assertEqual(self.proc.kills, 0)
+
+    def test_unsafe_pid_never_signals_group(self):
+        for pid in (0, 1, -5, None, True):
+            with self.subTest(pid=pid):
+                transport = self.make([b'x' * 9], pid=pid)
+                self.assertTrue(transport(list(ARGV), 2, 8).truncated)
+                self.assertEqual(self.killpg.calls, [])
+                self.assertEqual(self.proc.kills, 1)
+
+    def test_runner_fails_closed_on_transport_outcomes(self):
+        transport = self.make([b'x' * 9])
+        with self.assertRaisesRegex(sup.DockerOutputError, 'limit'):
+            runner_for(transport, max_output=8).run(list(w.LIST_ALL_ARGV), timeout=5)
+        transport = self.make([None] * 10, block_s=1.0)
+        with self.assertRaises(sup.DockerTimeoutError):
+            runner_for(transport).run(list(w.LIST_ALL_ARGV), timeout=2)
+        transport = self.make([b'x' * 9], reap_ok=False)
+        with self.assertRaisesRegex(sup.DockerCommandError, 'transport failed') as ctx:
+            runner_for(transport, max_output=8).run(list(w.LIST_ALL_ARGV), timeout=5)
+        self.assertIsNone(ctx.exception.__context__)
+        self.assertEqual(self.popen.calls[0][0], [DOCKER_PATH] + list(w.LIST_ALL_ARGV[1:]))
+
+    def test_invalid_call_arguments(self):
+        transport = self.make()
+        for argv, timeout, max_output in ((['docker', 'ps'], 5, 10), ([], 5, 10),
+                                          ('x', 5, 10), (list(ARGV), 0, 10),
+                                          (list(ARGV), True, 10), (list(ARGV), 5, 0),
+                                          (list(ARGV), 5, 1.5)):
+            with self.subTest(argv=argv, timeout=timeout, max_output=max_output):
+                with self.assertRaises(sup.SupervisorInputError):
+                    transport(argv, timeout, max_output)
+        self.assertEqual(self.popen.calls, [])
+
+    def test_poll_read_on_os_pipe(self):
+        read_fd, write_fd = os.pipe()
+        try:
+            with os.fdopen(read_fd, 'rb', buffering=0) as stream:
+                self.assertIsNone(sup._poll_read(stream, 4, 0))
+                os.write(write_fd, b'abcdefgh')
+                self.assertEqual(sup._poll_read(stream, 4, 1), b'abcd')
+                self.assertEqual(sup._poll_read(stream, 100, 1), b'efgh')
+                os.close(write_fd)
+                write_fd = -1
+                self.assertEqual(sup._poll_read(stream, 4, 1), b'')
+        finally:
+            if write_fd >= 0:
+                os.close(write_fd)
 
     def test_env_validation(self):
         for env in ({'DOCKER_HOST': 'tcp://x'}, {'docker_context': 'x'}, {'A=B': 'x'},
@@ -400,6 +703,12 @@ class SubprocessTransportTest(unittest.TestCase):
             with self.subTest(env=list(env)):
                 with self.assertRaises(sup.SupervisorInputError):
                     sup.SubprocessTransport(env)
+
+    def test_default_seams_are_real_but_unused_at_construction(self):
+        transport = sup.SubprocessTransport()
+        self.assertIs(transport._popen, subprocess.Popen)
+        self.assertIs(transport._killpg, os.killpg)
+        self.assertIs(transport._reader, sup._poll_read)
 
 
 # 3 -- LocalGuestFs (temporary directory only) -----------------------------------------
@@ -558,9 +867,36 @@ class ObserveTest(ProbeBase):
         self.fs.writer_exit()
 
     def test_clean_after_stop(self):
+        # Docker-side zero RW holders is not proof of kernel-wide absence, so
+        # the Docker-only probe reports rw_mount_holders as unknown (None).
         self.confirmed()
         obs = self.probe.observe(self.identity())
-        self.assertEqual(obs, w.StopObservation(False, (), (), BOOT))
+        self.assertEqual(obs, w.StopObservation(False, (), None, BOOT))
+        self.assertEqual(self.probe._docker_rw_mount_holders(), ())
+
+    def test_docker_zero_is_not_absence(self):
+        self.confirmed()
+        self.docker.existing = []
+        self.assertEqual(self.probe._docker_rw_mount_holders(), ())
+        holders = self.probe.observe(self.identity()).rw_mount_holders
+        self.assertIsNone(holders)
+        self.assertNotEqual(holders, ())
+        self.assertIn(['docker', 'ps', '-a', '-q', '--no-trunc'], self.docker.calls)
+
+    def test_unknown_rw_holders_never_stopped_verified(self):
+        self.confirmed()
+        obs = self.probe.observe(self.identity())
+        self.assertIsNone(obs.rw_mount_holders)
+        stopped = tw.stopped_inspect(self.spec)
+        verdict = w.verify_writer_stopped(self.identity(), stopped, stopped, obs, obs)
+        self.assertFalse(verdict.verified)
+        self.assertEqual(verdict.status, w.STATUS_GUEST_QUIESCENCE_UNVERIFIED)
+        self.assertTrue(any('rw mount holders unknown' in r for r in verdict.reasons))
+        # Only rw_mount_holders is missing: an independent sufficient
+        # observation of () would be the only route to STOPPED_VERIFIED.
+        sufficient = dataclasses.replace(obs, rw_mount_holders=())
+        self.assertTrue(w.verify_writer_stopped(self.identity(), stopped, stopped,
+                                                sufficient, sufficient).verified)
 
     def test_cgroup_present_absent_unknown(self):
         self.confirmed()
@@ -643,9 +979,9 @@ class ObserveTest(ProbeBase):
         parent = repo.rsplit('/', 2)[0]
         cases = {
             'ro mount': ([{'Type': 'bind', 'Source': repo, 'Destination': '/s', 'RW': False}],
-                         [f'{repo}:/s:ro'], 'running', ()),
+                         [f'{repo}:/s:ro'], 'running', None),
             'rw exited': ([{'Type': 'bind', 'Source': repo, 'Destination': '/s', 'RW': True}],
-                          [f'{repo}:/s'], 'exited', ()),
+                          [f'{repo}:/s'], 'exited', None),
             'rw parent dir': ([{'Type': 'bind', 'Source': parent, 'Destination': '/s',
                                 'RW': True}], [f'{parent}:/s'], 'running', (OTHER,)),
             'rw root': ([{'Type': 'bind', 'Source': '/', 'Destination': '/h', 'RW': True}],
@@ -656,7 +992,7 @@ class ObserveTest(ProbeBase):
             'paused rw': ([{'Type': 'bind', 'Source': repo, 'Destination': '/s', 'RW': True}],
                           [], 'paused', (OTHER,)),
             'unrelated rw': ([{'Type': 'bind', 'Source': repo + '-other', 'Destination': '/s',
-                               'RW': True}], [], 'running', ()),
+                               'RW': True}], [], 'running', None),
         }
         for name, (mounts, binds, status, expected) in cases.items():
             with self.subTest(case=name):
@@ -668,6 +1004,8 @@ class ObserveTest(ProbeBase):
                 self.docker.existing = [other]
                 self.assertEqual(self.probe.observe(self.identity()).rw_mount_holders,
                                  expected)
+                # Docker-side view: None (no Docker-visible holder) means ().
+                self.assertEqual(self.probe._docker_rw_mount_holders(), expected or ())
 
     def test_running_writer_itself_reported(self):
         self.assertEqual(self.probe.cgroup_inode(CID), INODE)
@@ -699,6 +1037,7 @@ class ObserveTest(ProbeBase):
                 mutate(other)
                 self.docker.existing = [other]
                 self.assertIsNone(self.probe.observe(self.identity()).rw_mount_holders)
+                self.assertIsNone(self.probe._docker_rw_mount_holders())
         for queued in (('ps', (1, '')), ('ps', RuntimeError('x')),
                        ('ps', (0, 'not-an-id\n')), ('inspect', (1, '')),
                        ('inspect', (0, '[]'))):
@@ -1058,14 +1397,42 @@ class EndToEndOfflineTest(unittest.TestCase):
         factory = sup.guest_lifecycle_factory(runner_for(self.bridge), self.fs, self.sleeper)
         self.sup = sup.GuestSupervisor(tw.make_key(), factory)
 
-    def test_launch_and_verified_stop(self):
+    def test_launch_and_docker_only_stop_unverified(self):
+        # GuestHostProbe only has Docker-side RW holder evidence, which can not
+        # establish kernel-wide absence: the clean stop ends UNVERIFIED.
         ident = self.sup.launch(self.spec)
         self.assertEqual(ident, w.WriterIdentity(CID, IMAGE_ID, STARTED, INODE, BOOT))
         verdict = self.sup.stop()
-        self.assertTrue(verdict.verified, verdict.reasons)
-        self.assertIs(self.sup.state, sup.SupervisorState.STOPPED_VERIFIED)
+        self.assertFalse(verdict.verified)
+        self.assertEqual(verdict.status, w.STATUS_GUEST_QUIESCENCE_UNVERIFIED)
+        self.assertTrue(any('rw mount holders unknown' in r for r in verdict.reasons))
+        for reason in verdict.reasons:
+            self.assertIn('rw mount holders unknown', reason)
+        self.assertIs(self.sup.state, sup.SupervisorState.UNVERIFIED)
         verbs = self.docker.verbs()
         self.assertGreaterEqual(verbs[verbs.index('stop'):].count('ps'), 2)
+        with self.assertRaises(sup.SupervisorStateError):
+            self.sup.stop()
+
+    def test_sufficient_observation_reaches_stopped_verified(self):
+        # Test-only stand-in for an independent sufficient kernel-side RW
+        # holder observation (not implemented by GuestHostProbe).  All other
+        # observations come from the real GuestHostProbe logic.
+        class SufficientProbe(sup.GuestHostProbe):
+            def _rw_mount_holders(self):
+                docker_side = self._docker_rw_mount_holders()
+                return docker_side if docker_side else ()
+
+        def factory(spec):
+            probe = SufficientProbe(runner_for(self.bridge), self.fs,
+                                    repo_source=spec.repo_source)
+            return w.WriterLifecycle(runner_for(self.bridge), probe, sleep=self.sleeper)
+
+        s = sup.GuestSupervisor(tw.make_key(), factory)
+        s.launch(self.spec)
+        verdict = s.stop()
+        self.assertTrue(verdict.verified, verdict.reasons)
+        self.assertIs(s.state, sup.SupervisorState.STOPPED_VERIFIED)
 
     def test_other_rw_holder_blocks_verification(self):
         self.sup.launch(self.spec)
@@ -1138,8 +1505,10 @@ class ApiSurfaceTest(unittest.TestCase):
                    sup.DockerOutputError, sup.DockerCommandRejected,
                    sup.InspectMismatchError, sup.IdentityMismatchError,
                    sup.ProbeUnavailableError, sup.StopVerificationError,
-                   sup.SupervisorStateError, sup.LaunchFailedError)
+                   sup.SupervisorStateError, sup.LaunchFailedError,
+                   sup.TransportReapError)
         self.assertEqual(len(set(classes)), len(classes))
+        self.assertTrue(issubclass(sup.TransportReapError, sup.DockerCommandError))
         for cls in classes:
             self.assertTrue(issubclass(cls, sup.SupervisorError))
             self.assertTrue(issubclass(cls, w.WriterError))

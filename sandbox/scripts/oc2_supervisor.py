@@ -7,8 +7,9 @@ sections 6, 10.1, 10.4, 11-13):
 * ``CliDockerRunner`` - a ``DockerRunner`` that only forwards the exact argv
   shapes produced by the ``oc2_writer`` builders to an injected transport,
   prefixed with an explicit absolute docker binary path.
-* ``SubprocessTransport`` - the only real process transport.  It is never
-  constructed implicitly and is not used by any test.
+* ``SubprocessTransport`` - the only real process transport (bounded
+  ``Popen`` reads, overall deadline, process-group kill, bounded reap).  It
+  is never constructed implicitly and no test starts a real process with it.
 * ``GuestHostProbe`` - a read-only ``HostProbe`` for the Guest Linux ("host"
   in ``oc2_writer`` terms means the Guest, not the physical machine).  It
   reads through an injected ``GuestFs`` and an injected ``DockerRunner``.
@@ -36,9 +37,12 @@ from __future__ import annotations
 import dataclasses
 import enum
 import errno
+import math
 import os
 import posixpath
 import re
+import select
+import signal
 import stat
 import subprocess
 import threading
@@ -310,19 +314,84 @@ class CliDockerRunner:
         return text
 
 
+class TransportReapError(DockerCommandError):
+    """The transport child could not be killed and reaped within the bound.
+
+    Raised instead of returning a result: the command outcome is unknown and
+    a child (or its process group) may still be alive.
+    """
+
+
+#: Largest single read from the child's stdout pipe.
+_READ_CHUNK_BYTES = 64 * 1024
+#: Upper bound (seconds) for reaping a killed child before failing closed.
+_REAP_TIMEOUT_S = 5
+
+#: ``reader(stream, size, timeout_s) -> bytes | None``: ``None`` means no
+#: data became readable within ``timeout_s``; ``b''`` means EOF.  Must never
+#: return more than ``size`` bytes.
+Reader = Callable[[Any, int, float], 'bytes | None']
+
+
+def _poll_read(stream: Any, size: int, timeout_s: float) -> bytes | None:
+    """Wait at most ``timeout_s`` for ``stream`` and read at most ``size`` bytes.
+
+    Uses ``poll`` (no FD_SETSIZE limit) and a single ``os.read`` so that no
+    more than ``size`` bytes are ever pulled from the pipe per call.
+    """
+    fd = stream.fileno()
+    poller = select.poll()
+    poller.register(fd, select.POLLIN | select.POLLHUP | select.POLLERR)
+    if not poller.poll(max(0, math.ceil(timeout_s * 1000))):
+        return None
+    return os.read(fd, size)
+
+
 class SubprocessTransport:
-    """Real transport: ``subprocess.run`` with ``shell=False``.
+    """Real transport: ``subprocess.Popen`` with ``shell=False``, bounded reads.
 
     Never constructed implicitly.  The child environment is exactly the
     fixed mapping given to the constructor (default ``{}``); nothing is
     inherited from the caller.  Names starting with ``DOCKER_`` are rejected
     (provisional: keeps the daemon/context/config selection at docker's
-    built-in default instead of redirecting it).  stderr is discarded and
-    never returned.  stdout is captured in memory and truncated to
-    ``max_output`` (truncation is reported so the runner fails closed).
+    built-in default instead of redirecting it).  stdin is ``/dev/null`` and
+    stderr is discarded and never returned.
+
+    Bounded output: stdout is read in chunks of at most ``_READ_CHUNK_BYTES``
+    and never more than ``max_output + 1`` bytes are retained in total.  As
+    soon as more than ``max_output`` bytes have been read, reading stops,
+    the child is killed and the result is ``truncated=True`` (``stdout``
+    holds the first ``max_output`` bytes) so ``CliDockerRunner`` fails
+    closed.  ``communicate()`` is deliberately not used.
+
+    Timeout: ``timeout`` is one overall wall-clock (monotonic) deadline that
+    covers reading and waiting for exit.  On expiry the child is killed and
+    the result is ``timed_out=True`` with empty stdout.
+
+    Kill and reap: the child is started with ``start_new_session=True`` so
+    it leads its own process group (pgid == pid); kill sends SIGKILL to that
+    whole group, so grandchildren in the group do not linger.  The group is
+    signalled only while the child is still unreaped (its pid, and thus the
+    pgid, cannot be recycled yet).  Grandchildren that leave the group (new
+    session / setpgid) are outside this bound.  On the normal EOF path the
+    group is not signalled.  After a kill the pipe is closed and the child
+    is reaped with a ``_REAP_TIMEOUT_S`` bound; if it cannot be reaped,
+    ``TransportReapError`` is raised instead of returning a result.
+
+    Child start failure and read failure raise ``DockerCommandError``.  A
+    non-zero exit is returned as ``returncode``.  Error messages never
+    contain argv text, environment values, stdout or stderr.
+
+    ``_popen``, ``_clock``, ``_reader`` and ``_killpg`` are private test
+    seams (process factory, monotonic clock, bounded pipe reader, process
+    group signal); production callers must not pass them.
     """
 
-    def __init__(self, env: Mapping[str, str] | None = None) -> None:
+    def __init__(self, env: Mapping[str, str] | None = None, *,
+                 _popen: Callable[..., Any] | None = None,
+                 _clock: Callable[[], float] | None = None,
+                 _reader: Reader | None = None,
+                 _killpg: Callable[[int, int], None] | None = None) -> None:
         fixed: dict[str, str] = {}
         for name, value in dict(env or {}).items():
             if not isinstance(name, str) or not _ENV_NAME_RE.match(name):
@@ -333,31 +402,124 @@ class SubprocessTransport:
                 raise SupervisorInputError('transport env: invalid value')
             fixed[name] = value
         self._env = fixed
+        self._popen = _popen if _popen is not None else subprocess.Popen
+        self._clock = _clock if _clock is not None else time.monotonic
+        self._reader = _reader if _reader is not None else _poll_read
+        self._killpg = _killpg if _killpg is not None else os.killpg
 
     def __call__(self, argv: list[str], timeout: int, max_output: int) -> TransportResult:
         if not isinstance(argv, list) or not argv or not all(isinstance(a, str) for a in argv) \
                 or not argv[0].startswith('/'):
             raise SupervisorInputError('transport argv: invalid')
-        timed_out = False
-        start_failed = False
-        completed: Any = None
+        for value in (timeout, max_output):
+            if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+                raise SupervisorInputError('transport limits: expected positive integers')
+        deadline = self._clock() + timeout
+        proc: Any = None
         try:
-            completed = subprocess.run(
+            proc = self._popen(
                 list(argv), shell=False, stdin=subprocess.DEVNULL,
                 stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-                timeout=timeout, env=dict(self._env), check=False, close_fds=True)
-        except subprocess.TimeoutExpired:
-            timed_out = True
-        except OSError:
-            start_failed = True
-        if start_failed:
+                env=dict(self._env), close_fds=True, start_new_session=True)
+        except Exception:
+            proc = None
+        if proc is None:
             raise DockerCommandError('transport: process start failed')
-        if timed_out:
-            return TransportResult(-1, b'', True, False)
-        out = completed.stdout if isinstance(completed.stdout, bytes) else b''
-        truncated = len(out) > max_output
-        return TransportResult(int(completed.returncode), out[:max_output], False,
-                               truncated)
+
+        buf, outcome = self._read_bounded(proc, deadline, max_output)
+        if outcome == 'eof':
+            self._close(proc)
+            remaining = deadline - self._clock()
+            rc: Any = None
+            if remaining > 0:
+                try:
+                    rc = proc.wait(timeout=remaining)
+                except Exception:
+                    rc = None
+            if isinstance(rc, int) and not isinstance(rc, bool):
+                return TransportResult(rc, bytes(buf), False, False)
+            outcome = 'timeout'  # exited stdout but not the process in time
+        reaped = self._kill_and_reap(proc)
+        if not reaped:
+            raise TransportReapError('transport: child not reaped')
+        if outcome == 'read-error':
+            raise DockerCommandError('transport: read failed')
+        if outcome == 'truncated':
+            rc = proc.returncode
+            if isinstance(rc, bool) or not isinstance(rc, int):
+                rc = -1
+            return TransportResult(rc, bytes(buf[:max_output]), False, True)
+        return TransportResult(-1, b'', True, False)
+
+    def _read_bounded(self, proc: Any, deadline: float,
+                      max_output: int) -> tuple[bytearray, str]:
+        """Read stdout until EOF, overflow, deadline or error.
+
+        Returns ``(buffer, outcome)`` with outcome ``eof``, ``truncated``,
+        ``timeout`` or ``read-error``.  ``len(buffer) <= max_output + 1``.
+        """
+        buf = bytearray()
+        limit = max_output + 1
+        stream = getattr(proc, 'stdout', None)
+        if stream is None:
+            return buf, 'read-error'
+        while True:
+            remaining = deadline - self._clock()
+            if remaining <= 0:
+                return buf, 'timeout'
+            size = min(limit - len(buf), _READ_CHUNK_BYTES)
+            try:
+                chunk = self._reader(stream, size, remaining)
+            except Exception:
+                return buf, 'read-error'
+            if chunk is None:
+                continue
+            if not isinstance(chunk, (bytes, bytearray)) or len(chunk) > size:
+                return buf, 'read-error'
+            if not chunk:
+                return buf, 'eof'
+            buf += chunk
+            if len(buf) > max_output:
+                return buf, 'truncated'
+
+    @staticmethod
+    def _close(proc: Any) -> None:
+        stream = getattr(proc, 'stdout', None)
+        if stream is None:
+            return
+        try:
+            stream.close()
+        except Exception:
+            pass
+
+    def _kill_and_reap(self, proc: Any) -> bool:
+        """SIGKILL the child's process group, close the pipe, bounded reap.
+
+        At most one group signal, one direct kill fallback and one wait.
+        Returns True only if the child was reaped within the bound.
+        """
+        signalled = False
+        pid = getattr(proc, 'pid', None)
+        if isinstance(pid, int) and not isinstance(pid, bool) and pid > 1:
+            try:
+                self._killpg(pid, signal.SIGKILL)
+                signalled = True
+            except ProcessLookupError:
+                signalled = True  # group already gone
+            except Exception:
+                signalled = False
+        if not signalled:
+            try:
+                proc.kill()
+            except Exception:
+                pass
+        self._close(proc)
+        try:
+            proc.wait(timeout=_REAP_TIMEOUT_S)
+        except Exception:
+            return False
+        rc = getattr(proc, 'returncode', None)
+        return isinstance(rc, int) and not isinstance(rc, bool)
 
 
 # --- Guest filesystem abstraction ----------------------------------------------
@@ -513,10 +675,23 @@ class GuestHostProbe:
     those sub-observations are ``None``.
 
     ``rw_mount_holders`` enumerates ALL containers (``ps -a -q --no-trunc``)
-    and inspects each.  It is the docker daemon's view only: a kernel-level
-    cross-check of mounts held outside docker is NOT implemented
-    (``/proc/self/mountinfo`` does not cover other mount namespaces), so a
-    RW mount held by a non-docker process is not detected.
+    and inspects each.  That is the docker daemon's view only, so its
+    result is fail-closed by observation scope:
+
+    * non-empty tuple - RW holders actually observed (Docker-visible
+      containers whose bind source equals, contains or is inside the repo
+      path); verification is blocked.
+    * ``None`` - absence NOT established: enumeration / inspect failure,
+      unknown mount or status, or a Docker-side count of zero.  Docker
+      cannot see non-docker processes, other runtimes or other mount
+      namespaces, and no independent kernel-side observation is
+      implemented here, so Docker-side zero is never reported as ``()``.
+    * ``()`` - reserved for an independent, sufficient kernel-side
+      observation that no holder exists in the required scope.  This probe
+      never returns it (``/proc/self/mountinfo`` does not cover other mount
+      namespaces, and a per-pid mountinfo scan is blind under hidepid or a
+      separate pid namespace), so kernel-wide absence cannot be proven and
+      a ``GuestHostProbe`` alone never yields ``STOPPED_VERIFIED``.
     """
 
     def __init__(self, runner: w.DockerRunner, fs: GuestFs,
@@ -735,6 +910,25 @@ class GuestHostProbe:
         return tuple(sorted(found))
 
     def _rw_mount_holders(self) -> tuple[str, ...] | None:
+        """Return observed RW holders, or ``None`` if absence is not established.
+
+        A non-empty Docker-side result is reported as is.  A Docker-side
+        zero is NOT proof of absence (non-docker processes, other runtimes
+        and other mount namespaces are invisible to docker) and no
+        independent kernel-side check exists, so it yields ``None``, never
+        ``()``.
+        """
+        holders = self._docker_rw_mount_holders()
+        if holders is None or not holders:
+            return None
+        return holders
+
+    def _docker_rw_mount_holders(self) -> tuple[str, ...] | None:
+        """Docker-visible RW holders only (``()`` = none visible to docker).
+
+        The result is limited to the docker daemon's view and must not be
+        used as proof of kernel-wide absence; see ``_rw_mount_holders``.
+        """
         repo = self._repo_source
         if repo is None:
             return None
