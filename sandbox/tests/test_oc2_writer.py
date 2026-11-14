@@ -10,9 +10,10 @@ import importlib.util
 import json
 import pathlib
 import sys
+import types
 import unittest
 import uuid
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Sequence
 
 if TYPE_CHECKING:
     from sandbox.scripts import oc2_writer as writer_types
@@ -22,7 +23,8 @@ if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
 
-def load(name: str):
+def load(name: str) -> types.ModuleType:
+    """Load an OC2 script by file path without creating external resources."""
     if name in sys.modules:
         return sys.modules[name]
     spec = importlib.util.spec_from_file_location(name, SCRIPTS / (name + '.py'))
@@ -56,7 +58,8 @@ def make_key(gen: str = GEN) -> writer_types.WriterSessionKey:
     return key
 
 
-def make_spec(gen: str = GEN, **overrides) -> writer_types.WriterSpec:
+def make_spec(gen: str = GEN, **overrides: Any) -> writer_types.WriterSpec:
+    """Build a valid WriterSpec, overriding only explicitly named fixture fields."""
     key = make_key(gen)
     fields = dict(
         key=key,
@@ -73,7 +76,8 @@ def make_spec(gen: str = GEN, **overrides) -> writer_types.WriterSpec:
 
 def make_inspect(
     spec: writer_types.WriterSpec, cid: str = CID, status: str = 'created'
-) -> dict:
+) -> dict[str, Any]:
+    """Build the Docker inspect shape used by WriterLifecycle validation."""
     running = status == 'running'
     return {
         'Id': cid,
@@ -127,7 +131,8 @@ def make_inspect(
     }
 
 
-def stopped_inspect(spec: writer_types.WriterSpec, cid: str = CID) -> dict:
+def stopped_inspect(spec: writer_types.WriterSpec, cid: str = CID) -> dict[str, Any]:
+    """Build a fully stopped inspect for the same immutable container identity."""
     info = make_inspect(spec, cid, 'exited')
     info['State']['StartedAt'] = STARTED
     return info
@@ -153,20 +158,24 @@ class FakeDocker:
     Exception instance.  When the queue is empty the default is used.
     """
 
-    def __init__(self, spec: writer_types.WriterSpec, existing=None):
+    def __init__(self, spec: writer_types.WriterSpec,
+                 existing: Sequence[dict[str, Any]] | None = None) -> None:
         self.spec = spec
         self.calls: list[list[str]] = []
-        self.responses: dict[str, list] = {}
-        self.existing = list(existing or [])
+        self.responses: dict[str, list[tuple[int, str] | BaseException]] = {}
+        self.existing: list[dict[str, Any]] = list(existing or [])
         self.state = 'none'
 
-    def queue(self, verb: str, *results) -> None:
+    def queue(self, verb: str, *results: tuple[int, str] | BaseException) -> None:
+        """Queue DockerRunner results or exceptions, including interrupts."""
         self.responses.setdefault(verb, []).extend(results)
 
     def verbs(self) -> list[str]:
+        """Return the Docker verbs observed so far, in call order."""
         return [c[1] for c in self.calls]
 
-    def run(self, argv, *, timeout):
+    def run(self, argv: Sequence[str], *, timeout: int) -> tuple[int, str]:
+        """Implement DockerRunner with canned results and explicit failures."""
         argv = list(argv)
         assert isinstance(timeout, int) and timeout > 0
         self.calls.append(argv)
@@ -174,7 +183,7 @@ class FakeDocker:
         queued = self.responses.get(verb)
         if queued:
             result = queued.pop(0)
-            if isinstance(result, Exception):
+            if isinstance(result, BaseException):
                 raise result
             return result
         if verb == 'ps':
@@ -200,40 +209,59 @@ class FakeDocker:
 
 
 class FakeProbe:
-    def __init__(self, inode=987654, boot=BOOT, observations=None):
+    """HostProbe fake distinguishing valid absence, unknown values and exceptions."""
+
+    def __init__(self, inode: int | BaseException | None = 987654,
+                 boot: str | None = BOOT,
+                 observations: Sequence[
+                     writer_types.StopObservation | BaseException | None
+                 ] | None = None
+                 ) -> None:
         self.inode = inode
         self.boot = boot
         self.observations = list(observations or [clean_obs(), clean_obs()])
         self.calls: list[str] = []
 
-    def cgroup_inode(self, cid):
+    def cgroup_inode(self, cid: str) -> int | None:
+        """Return the configured inode, None for unknown, or the injected exception."""
         self.calls.append('cgroup_inode')
-        if isinstance(self.inode, Exception):
+        if isinstance(self.inode, BaseException):
             raise self.inode
         return self.inode
 
-    def boot_id(self):
+    def boot_id(self) -> str | None:
+        """Return the configured boot identity or None when the probe is unknown."""
         self.calls.append('boot_id')
         return self.boot
 
-    def observe(self, identity):
+    def observe(
+        self, identity: writer_types.WriterIdentity
+    ) -> writer_types.StopObservation | None:
+        """Return observations in order or raise the queued observation failure."""
         self.calls.append('observe')
         item = self.observations.pop(0)
-        if isinstance(item, Exception):
+        if isinstance(item, BaseException):
             raise item
         return item
 
 
 class Sleeper:
-    def __init__(self):
+    """Record requested sleep durations without waiting in real time."""
+
+    def __init__(self) -> None:
         self.calls: list[float] = []
 
-    def __call__(self, seconds):
+    def __call__(self, seconds: float) -> None:
         self.calls.append(seconds)
 
 
-def lifecycle(docker, probe=None, sleeper=None):
-    return w.WriterLifecycle(docker, probe or FakeProbe(), sleep=sleeper or Sleeper())
+def lifecycle(docker: FakeDocker, probe: FakeProbe | None = None,
+              sleeper: Sleeper | None = None) -> writer_types.WriterLifecycle:
+    """Construct the production lifecycle with test-only Docker/probe/sleep seams."""
+    result: writer_types.WriterLifecycle = w.WriterLifecycle(
+        docker, probe or FakeProbe(), sleep=sleeper or Sleeper()
+    )
+    return result
 
 
 def bad(info: dict, *path_and_value):
@@ -575,6 +603,18 @@ class IdentityMismatchTest(InspectAssertMixin, unittest.TestCase):
                 with self.assertRaises(w.WriterError):
                     lifecycle(docker, probe).launch(spec)
                 self.assertIn('stop', docker.verbs())
+
+    def test_post_start_keyboard_interrupt_stops_confirmed_container(self) -> None:
+        """Stop only the confirmed ID after post-start work is interrupted."""
+        spec = make_spec()
+        docker = FakeDocker(spec)
+        interrupt = KeyboardInterrupt()
+        with self.assertRaises(KeyboardInterrupt) as ctx:
+            lifecycle(docker, FakeProbe(inode=interrupt)).launch(spec)
+        self.assertIs(ctx.exception, interrupt)
+        self.assertEqual(docker.verbs(),
+                         ['ps', 'create', 'inspect', 'start', 'inspect', 'inspect', 'stop'])
+        self.assertEqual(docker.calls[-1][-1], CID)
 
 
 # 8 ------------------------------------------------------------------------------

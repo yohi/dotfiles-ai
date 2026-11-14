@@ -429,30 +429,39 @@ class SubprocessTransport:
         if proc is None:
             raise DockerCommandError('transport: process start failed')
 
-        buf, outcome = self._read_bounded(proc, deadline, max_output)
-        if outcome == 'eof':
+        try:
+            buf, outcome = self._read_bounded(proc, deadline, max_output)
+            if outcome == 'eof':
+                self._close(proc)
+                remaining = deadline - self._clock()
+                rc: Any = None
+                if remaining > 0:
+                    try:
+                        rc = proc.wait(timeout=remaining)
+                    except Exception:
+                        rc = None
+                if isinstance(rc, int) and not isinstance(rc, bool):
+                    return TransportResult(rc, bytes(buf), False, False)
+                outcome = 'timeout'  # exited stdout but not the process in time
+            reaped = self._kill_and_reap(proc)
+            if not reaped:
+                raise TransportReapError('transport: child not reaped')
+            if outcome == 'read-error':
+                raise DockerCommandError('transport: read failed')
+            if outcome == 'truncated':
+                rc = proc.returncode
+                if isinstance(rc, bool) or not isinstance(rc, int):
+                    rc = -1
+                return TransportResult(rc, bytes(buf[:max_output]), False, True)
+            return TransportResult(-1, b'', True, False)
+        except KeyboardInterrupt:
             self._close(proc)
-            remaining = deadline - self._clock()
-            rc: Any = None
-            if remaining > 0:
+            if getattr(proc, 'returncode', None) is None:
                 try:
-                    rc = proc.wait(timeout=remaining)
-                except Exception:
-                    rc = None
-            if isinstance(rc, int) and not isinstance(rc, bool):
-                return TransportResult(rc, bytes(buf), False, False)
-            outcome = 'timeout'  # exited stdout but not the process in time
-        reaped = self._kill_and_reap(proc)
-        if not reaped:
-            raise TransportReapError('transport: child not reaped')
-        if outcome == 'read-error':
-            raise DockerCommandError('transport: read failed')
-        if outcome == 'truncated':
-            rc = proc.returncode
-            if isinstance(rc, bool) or not isinstance(rc, int):
-                rc = -1
-            return TransportResult(rc, bytes(buf[:max_output]), False, True)
-        return TransportResult(-1, b'', True, False)
+                    self._kill_and_reap(proc)
+                except KeyboardInterrupt:
+                    pass
+            raise
 
     def _read_bounded(self, proc: Any, deadline: float,
                       max_output: int) -> tuple[bytearray, str]:
@@ -748,6 +757,12 @@ class GuestHostProbe:
     # -- cgroup --
 
     def _running_pid(self, info: Mapping[str, Any]) -> tuple[int, str] | None:
+        """Return (PID, StartedAt) only for a verified running process.
+
+        ``None`` means the inspect is malformed, the process is not running,
+        or its identity is incomplete; it never implies that the process is
+        absent. Callers must treat that indeterminate state as failure.
+        """
         state = info.get('State')
         if not isinstance(state, Mapping):
             return None
@@ -876,6 +891,11 @@ class GuestHostProbe:
 
     @staticmethod
     def _guard(func: Callable[..., Any], *args: Any) -> Any:
+        """Return an observation, or ``None`` when its probe raises.
+
+        A rejected or failed observation is not evidence of absence, so
+        consumers must fail closed on ``None``.
+        """
         try:
             return func(*args)
         except Exception:
@@ -1066,6 +1086,11 @@ def _exception_chain(exc: BaseException) -> list[BaseException]:
 
 
 def _classify_launch_failure(exc: BaseException) -> tuple[type[SupervisorError], str]:
+    """Map a launch exception chain to a safe public error type and code.
+
+    Returns a fixed code without exposing exception text. Unknown failures
+    become ``LaunchFailedError``/``unclassified``; they are never success.
+    """
     chain = _exception_chain(exc)
     for item in reversed(chain):
         if isinstance(item, SupervisorError) and type(item) is not SupervisorError:
@@ -1150,6 +1175,7 @@ class GuestSupervisor:
         if spec.key != self._key:
             raise SupervisorInputError('launch: spec session key mismatch')
         self._transition(SupervisorState.NEW, SupervisorState.STARTING)
+        failure: SupervisorError | None = None
         try:
             lifecycle = self._factory(spec)
             if not isinstance(lifecycle, w.WriterLifecycle):
@@ -1163,7 +1189,9 @@ class GuestSupervisor:
             if not isinstance(exc, Exception):
                 raise
             cls, code = _classify_launch_failure(exc)
-            raise cls(f'launch failed: {code}') from exc
+            failure = cls(f'launch failed: {code}')
+        if failure is not None:
+            raise failure
         with self._lock:
             self._identity = identity
             self._lifecycle = lifecycle
@@ -1193,6 +1221,7 @@ class GuestSupervisor:
             lifecycle, current = self._lifecycle, self._identity
         finally:
             self._lock.release()
+        failure: StopVerificationError | None = None
         try:
             if lifecycle is None or current is None:
                 raise StopVerificationError('stop: lifecycle unavailable')
@@ -1201,12 +1230,14 @@ class GuestSupervisor:
                 raise StopVerificationError('stop: no verdict')
         except BaseException as exc:
             self._set_state(SupervisorState.UNVERIFIED)
-            if isinstance(exc, StopVerificationError) or not isinstance(exc, Exception):
+            if not isinstance(exc, Exception):
                 raise
-            raise StopVerificationError(
+            failure = StopVerificationError(
                 'stop failed: unexpected error cid='
                 + _cid_tag(getattr(current, 'container_id', None))
-            ) from exc
+            )
+        if failure is not None:
+            raise failure
         self._set_state(SupervisorState.STOPPED_VERIFIED if verdict.verified
                         else SupervisorState.UNVERIFIED)
         return verdict

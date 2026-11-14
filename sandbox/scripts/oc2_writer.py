@@ -354,6 +354,11 @@ _MISSING = object()
 
 
 def _get(obj: Any, *path: str) -> Any:
+    """Return the nested value or ``_MISSING`` when a key is absent.
+
+    An explicit ``None`` is preserved; callers must not interpret missing or
+    unknown data as proof that a container or process is absent.
+    """
     cur = obj
     for part in path:
         if not isinstance(cur, Mapping) or part not in cur:
@@ -697,6 +702,11 @@ def capture_identity(inspect: Mapping[str, Any], probe: HostProbe) -> WriterIden
 
 
 def _check_stopped_inspect(label: str, inspect: Any, before: WriterIdentity) -> list[str]:
+    """Compare Docker inspect with the identity and required stopped state.
+
+    Return one reason per missing or mismatched field. The list is empty only
+    when all checks pass; unavailable or unknown fields do not prove absence.
+    """
     if not isinstance(inspect, Mapping):
         return [f'{label}: inspect unavailable']
     reasons = []
@@ -722,6 +732,12 @@ def _check_stopped_inspect(label: str, inspect: Any, before: WriterIdentity) -> 
 
 
 def _check_observation(label: str, obs: Any, before: WriterIdentity) -> list[str]:
+    """Return reasons an observation cannot prove quiescence.
+
+    The list is empty only when every value is known and confirms the expected
+    stopped state. Unknown values differ from affirmative absence and add a
+    failure reason.
+    """
     if not isinstance(obs, StopObservation):
         return [f'{label}: observation unavailable']
     reasons = []
@@ -864,6 +880,12 @@ class WriterLifecycle:
             if not state_ok:
                 raise WriterError('post-start state is not running')
             return capture_identity(post, self._probe)
+        except KeyboardInterrupt:
+            try:
+                self._abort_started(cid, 'interrupted')
+            except KeyboardInterrupt:
+                pass
+            raise
         except WriterError as exc:
             raise self._abort_started(cid, str(exc)) from exc
 

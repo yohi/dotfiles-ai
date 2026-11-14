@@ -100,7 +100,9 @@ def check_path_leak(content: str, candidates: set[str], regex: re.Pattern) -> bo
 class TestConfigIntegrity(unittest.TestCase):
     PROJECT_ROOT: str = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     HOME_REGEX: re.Pattern[str] = re.compile(
-        r'(?:/home/|/Users/|C:\\Users\\)(?!(?:agent|writer|username|user|<[^>]+>|skillport)(?:[/\s"\'\\`,.:;()]|$))[^/\s"\'\\`,.:;()]+'
+        r'(?:/home/(?!writer(?:[/\s"\'\\`,.:;()]|$))|/Users/|C:\\Users\\)'
+        r'(?!(?:agent|username|user|<[^>]+>|skillport)(?:[/\s"\'\\`,.:;()]|$))'
+        r'[^/\s"\'\\`,.:;()]+'
     )
     home_candidates: set[str]
 
@@ -153,6 +155,13 @@ class TestConfigIntegrity(unittest.TestCase):
                 self.HOME_REGEX,
             )
         )
+
+    def test_writer_user_paths_on_other_platforms_are_personal_paths(self):
+        for path in ("/Users/writer/.cache/opencode", "C:\\Users\\writer\\AppData"):
+            with self.subTest(path=path):
+                self.assertTrue(
+                    check_path_leak(path, self.home_candidates, self.HOME_REGEX)
+                )
 
     def test_placeholder_home_is_not_a_personal_path(self):
         self.assertFalse(

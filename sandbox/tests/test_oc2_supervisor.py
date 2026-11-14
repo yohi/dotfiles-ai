@@ -16,12 +16,15 @@ import pathlib
 import subprocess
 import sys
 import tempfile
+import types
 import unittest
 from unittest import mock
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Callable, Sequence, TypeAlias
 
 if TYPE_CHECKING:
+    from sandbox.scripts.oc2_supervisor import CliDockerRunner, FsStat, TransportResult
     from sandbox.scripts.oc2_supervisor import GuestHostProbe as GuestHostProbeBase
+    from sandbox.scripts import oc2_writer as writer_types
     from sandbox.tests.test_oc2_writer import FakeDocker as FakeDockerBase
 
 TESTS = pathlib.Path(__file__).resolve().parent
@@ -30,7 +33,8 @@ if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
 
-def load(name: str, directory: pathlib.Path = SCRIPTS):
+def load(name: str, directory: pathlib.Path = SCRIPTS) -> types.ModuleType:
+    """Load one local test module without installing or starting services."""
     if name in sys.modules:
         return sys.modules[name]
     spec = importlib.util.spec_from_file_location(name, directory / (name + '.py'))
@@ -54,13 +58,16 @@ CID, CID2, OTHER = tw.CID, tw.CID2, tw.OTHER
 BOOT, STARTED, IMAGE_ID = tw.BOOT, tw.STARTED, tw.IMAGE_ID
 SENTINEL = tw.SENTINEL
 DOCKER_PATH = '/usr/bin/docker'
+FakeTransportInput: TypeAlias = 'TransportResult | tuple[int, bytes] | None | BaseException'
+FakeTransportOutput: TypeAlias = 'TransportResult | tuple[int, bytes] | None'
 SCOPE_REL = f'/system.slice/docker-{CID}.scope'
 SCOPE = '/sys/fs/cgroup' + SCOPE_REL
 INODE = 987654
-WRITER_BLOB = '0adc818b42a1ef91de015af791a9704802bd722c'
+WRITER_BLOB = '13153b3f6aef0d506b58afef2d4d3fefc6f05a73'
 
 
 def status_text(uid: int, saved: int | None = None) -> str:
+    """Build a minimal proc status fixture for the requested UID."""
     saved = uid if saved is None else saved
     return f'Name:\tx\nUid:\t{uid}\t{uid}\t{saved}\t{uid}\nGid:\t{uid}\t{uid}\t{uid}\t{uid}\n'
 
@@ -86,15 +93,16 @@ def exc_texts(exc: BaseException) -> str:
 class FakeGuestFs:
     """In-memory GuestFs with explicit absent / unknown / symlink states."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.dirs: dict[str, int] = {}
-        self.files: dict[str, object] = {}
+        self.files: dict[str, str | BaseException] = {}
         self.symlinks: set[str] = set()
         self.unknown: set[str] = set()
         self.calls: list[tuple[str, str]] = []
 
     @classmethod
-    def standard(cls):
+    def standard(cls) -> FakeGuestFs:
+        """Build the canonical proc/cgroup fixture for one running Writer."""
         fs = cls()
         fs.dirs.update({'/sys/fs/cgroup': 1, '/sys/fs/cgroup/system.slice': 2,
                         SCOPE: INODE, '/proc': 3})
@@ -106,16 +114,19 @@ class FakeGuestFs:
         })
         return fs
 
-    def writer_exit(self):
+    def writer_exit(self) -> None:
+        """Remove the Writer's proc and cgroup entries after a fake stop."""
         self.dirs.pop(SCOPE, None)
         for path in [p for p in self.files if p.startswith('/proc/4242/')]:
             del self.files[path]
 
-    def _check(self, path):
+    def _check(self, path: str) -> None:
+        """Raise the injected unknown-state error for an unreadable path."""
         if path in self.unknown:
             raise sup.GuestFsUnknown('unknown')
 
-    def read_text(self, path):
+    def read_text(self, path: str) -> str:
+        """Return text, raise GuestFsAbsent for EOF-by-absence, or injected error."""
         self.calls.append(('read_text', path))
         self._check(path)
         if path in self.symlinks:
@@ -127,7 +138,8 @@ class FakeGuestFs:
             raise value
         return value
 
-    def lstat(self, path):
+    def lstat(self, path: str) -> FsStat:
+        """Report file kind/inode, distinguishing symlinks and confirmed absence."""
         self.calls.append(('lstat', path))
         self._check(path)
         if path in self.symlinks:
@@ -138,7 +150,8 @@ class FakeGuestFs:
             return sup.FsStat(7, 'file')
         raise sup.GuestFsAbsent('absent')
 
-    def listdir(self, path):
+    def listdir(self, path: str) -> tuple[str, ...]:
+        """Return a deterministic directory listing or raise on unknown paths."""
         self.calls.append(('listdir', path))
         self._check(path)
         if path not in self.dirs:
@@ -154,12 +167,16 @@ class FakeGuestFs:
 class HookDocker(FakeDockerBase):
     """FakeDocker that lists the Writer once created and supports hooks."""
 
-    def __init__(self, spec, existing=None, fs=None):
+    def __init__(self, spec: writer_types.WriterSpec,
+                 existing: Sequence[dict[str, Any]] | None = None,
+                 fs: FakeGuestFs | None = None) -> None:
+        """Create a Docker fake that can reflect stop state into FakeGuestFs."""
         super().__init__(spec, existing)
-        self.hooks: dict = {}
+        self.hooks: dict[str, Callable[[], None]] = {}
         self.fs = fs
 
-    def run(self, argv, *, timeout):
+    def run(self, argv: Sequence[str], *, timeout: int) -> tuple[int, str]:
+        """Return queued Docker results or FakeDocker defaults; never run Docker."""
         verb = list(argv)[1]
         hook = self.hooks.get(verb)
         if hook is not None:
@@ -183,11 +200,14 @@ class SimTimeout(Exception):
 class FakeTransport:
     """Transport returning canned TransportResults and recording argv."""
 
-    def __init__(self, *results):
-        self.results = list(results)
+    def __init__(self, *results: FakeTransportInput) -> None:
+        """Queue valid outcomes, EOF, malformed unknown values, or injected errors."""
+        self.results: list[FakeTransportInput] = list(results)
         self.calls: list[tuple[list, int, int]] = []
 
-    def __call__(self, argv, timeout, max_output):
+    def __call__(self, argv: list[str], timeout: int,
+                 max_output: int) -> FakeTransportOutput:
+        """Return queued outcomes verbatim so the adapter can reject malformed values."""
         self.calls.append((list(argv), timeout, max_output))
         if self.results:
             item = self.results.pop(0)
@@ -200,11 +220,14 @@ class FakeTransport:
 class BridgeTransport:
     """Transport that forwards to a FakeDocker (no real process)."""
 
-    def __init__(self, docker):
+    def __init__(self, docker: FakeDockerBase) -> None:
+        """Bridge transport calls to FakeDocker without a process or daemon."""
         self.docker = docker
         self.calls: list[list[str]] = []
 
-    def __call__(self, argv, timeout, max_output):
+    def __call__(self, argv: list[str], timeout: int,
+                 max_output: int) -> TransportResult:
+        """Translate fake Docker output into UTF-8 TransportResult bytes."""
         assert argv[0] == DOCKER_PATH
         self.calls.append(list(argv))
         try:
@@ -214,11 +237,14 @@ class BridgeTransport:
         return sup.TransportResult(rc, out.encode('utf-8'), False, False)
 
 
-def runner_for(transport, **kw):
+def runner_for(transport: Callable[[list[str], int, int], FakeTransportOutput],
+               **kw: Any) -> CliDockerRunner:
+    """Create the real runner adapter around a test-only transport callable."""
     return sup.CliDockerRunner(DOCKER_PATH, transport, **kw)
 
 
-def ok(stdout: bytes = b'') -> object:
+def ok(stdout: bytes = b'') -> TransportResult:
+    """Build a successful non-EOF transport result with the supplied bytes."""
     return sup.TransportResult(0, stdout, False, False)
 
 
@@ -363,10 +389,12 @@ class DockerRunnerTest(unittest.TestCase):
 
 # 2 -- SubprocessTransport (never spawns a real process here) -------------------------
 class FakeClock:
-    def __init__(self):
+    """Mutable deterministic clock used to drive bounded transport deadlines."""
+
+    def __init__(self) -> None:
         self.now = 1000.0
 
-    def __call__(self):
+    def __call__(self) -> float:
         return self.now
 
 
@@ -374,7 +402,9 @@ class FakePipe:
     """Fake stdout pipe.  ``script`` items: bytes chunk, None (not ready), or
     an exception.  ``endless`` keeps producing data after the script."""
 
-    def __init__(self, clock, script=(), endless=False, block_s=0.0):
+    def __init__(self, clock: FakeClock,
+                 script: Sequence[bytes | None | BaseException] = (),
+                 endless: bool = False, block_s: float = 0.0) -> None:
         self.clock = clock
         self.script = list(script)
         self.endless = endless
@@ -383,10 +413,11 @@ class FakePipe:
         self.requested: list[int] = []
         self.closed = False
 
-    def close(self):
+    def close(self) -> None:
         self.closed = True
 
-    def read(self, size, timeout_s):
+    def read(self, size: int, timeout_s: float) -> bytes | None:
+        """Return bytes, None for not-ready, or raise the scripted exception."""
         self.reads += 1
         self.requested.append(size)
         if self.reads > 10000:
@@ -405,52 +436,65 @@ class FakePipe:
         return item
 
 
-def fake_reader(stream, size, timeout_s):
+def fake_reader(stream: FakePipe, size: int, timeout_s: float) -> bytes | None:
+    """Match the production Reader contract while using FakePipe state."""
     return stream.read(size, timeout_s)
 
 
 class FakeProc:
-    def __init__(self, pipe, pid=4321, rc=0, exit_wait_ok=True, reap_ok=True,
-                 kill_raises=False):
+    """Process fake tracking signal, pipe close and bounded wait/reap behavior."""
+
+    def __init__(self, pipe: FakePipe, pid: int | None = 4321, rc: int = 0,
+                 exit_wait_ok: bool = True, reap_ok: bool = True,
+                 kill_raises: bool = False) -> None:
         self.stdout = pipe
         self.pid = pid
         self.rc = rc
-        self.returncode = None
+        self.returncode: int | None = None
         self.exit_wait_ok = exit_wait_ok
         self.reap_ok = reap_ok
         self.kill_raises = kill_raises
         self.killed = False
         self.kills = 0
-        self.waits: list[float] = []
+        self.waits: list[float | None] = []
+        self.wait_interrupt: KeyboardInterrupt | None = None
 
-    def kill(self):
+    def kill(self) -> None:
         self.kills += 1
         if self.kill_raises:
             raise OSError('kill ' + SENTINEL)
         self.killed = True
 
-    def wait(self, timeout=None):
+    def wait(self, timeout: float | None = None) -> int:
+        """Return an exit code or raise timeout for an unreaped fake process."""
         self.waits.append(timeout)
         if len(self.waits) > 5:
             raise AssertionError('unbounded wait loop')
+        if len(self.waits) == 1 and self.wait_interrupt is not None:
+            raise self.wait_interrupt
+        timeout_value = 0.0 if timeout is None else timeout
         if self.killed:
             if not self.reap_ok:
-                raise subprocess.TimeoutExpired(['x', SENTINEL], timeout)
+                raise subprocess.TimeoutExpired(['x', SENTINEL], timeout_value)
             self.returncode = -9
             return self.returncode
         if not self.exit_wait_ok:
-            raise subprocess.TimeoutExpired(['x', SENTINEL], timeout)
+            raise subprocess.TimeoutExpired(['x', SENTINEL], timeout_value)
         self.returncode = self.rc
         return self.rc
 
 
 class FakePopen:
-    def __init__(self, proc=None, error=None):
+    """Capture Popen arguments and return a fake process or injected error."""
+
+    def __init__(self, proc: FakeProc | None = None,
+                 error: BaseException | None = None) -> None:
         self.proc = proc
         self.error = error
         self.calls: list[tuple[list, dict]] = []
 
-    def __call__(self, argv, **kwargs):
+    def __call__(self, argv: list[str], **kwargs: Any) -> FakeProc | None:
+        """Capture the launch contract without starting a host process."""
         self.calls.append((argv, kwargs))
         if self.error is not None:
             raise self.error
@@ -458,12 +502,16 @@ class FakePopen:
 
 
 class FakeKillpg:
-    def __init__(self, proc=None, error=None):
+    """Record group signals and optionally mark the associated process killed."""
+
+    def __init__(self, proc: FakeProc | None = None,
+                 error: BaseException | None = None) -> None:
         self.proc = proc
         self.error = error
         self.calls: list[tuple[int, int]] = []
 
-    def __call__(self, pgid, sig):
+    def __call__(self, pgid: int, sig: int) -> None:
+        """Record a signal or raise the configured failure."""
         self.calls.append((pgid, sig))
         if self.error is not None:
             raise self.error
@@ -627,6 +675,33 @@ class SubprocessTransportTest(unittest.TestCase):
             transport(list(ARGV), 5, 10)
         self.assertNotIn(SENTINEL, exc_texts(ctx.exception))
         self.assert_killed_and_reaped()
+
+    def test_keyboard_interrupt_during_read_closes_kills_and_reaps(self) -> None:
+        """Re-raise reader interruption only after closing, killing and reaping."""
+        transport = self.make()
+        interrupt = KeyboardInterrupt()
+
+        def interrupt_reader(stream: FakePipe, size: int, timeout_s: float) -> bytes:
+            """Inject the original interrupt from the bounded reader seam."""
+            raise interrupt
+
+        transport._reader = interrupt_reader
+        with self.assertRaises(KeyboardInterrupt) as ctx:
+            transport(list(ARGV), 5, 10)
+        self.assertIs(ctx.exception, interrupt)
+        self.assert_killed_and_reaped()
+
+    def test_keyboard_interrupt_during_wait_kills_and_reaps(self) -> None:
+        """Reap an interrupted EOF wait without hiding the original interrupt."""
+        transport = self.make([b''])
+        interrupt = KeyboardInterrupt()
+        self.proc.wait_interrupt = interrupt
+        with self.assertRaises(KeyboardInterrupt) as ctx:
+            transport(list(ARGV), 5, 10)
+        self.assertIs(ctx.exception, interrupt)
+        self.assertEqual(self.killpg.calls, [(4321, sup.signal.SIGKILL)])
+        self.assertTrue(self.pipe.closed)
+        self.assertEqual(len(self.proc.waits), 2)
 
     def test_reap_failure_fails_closed(self):
         for script, kw in (([b'x' * 9], {}), ([None] * 10, {'block_s': 1.0}),
@@ -1227,7 +1302,17 @@ class SupervisorLaunchTest(SupervisorBase):
         with self.assertRaises(sup.LaunchFailedError) as ctx:
             s.launch(self.spec)
         self.assertIs(s.state, sup.SupervisorState.UNVERIFIED)
-        self.assertNotIn(SENTINEL, str(ctx.exception))
+        self.assertNotIn(SENTINEL, exc_texts(ctx.exception))
+
+    def test_interrupted_writer_cleanup_failure_stays_unverified(self) -> None:
+        """Keep the Supervisor fail-closed when interrupted Writer cleanup fails."""
+        s = self.make()
+        self.probe.inode = KeyboardInterrupt()
+        self.docker.queue('stop', (1, 'stop unavailable'))
+        with self.assertRaises(KeyboardInterrupt):
+            s.launch(self.spec)
+        self.assertIs(s.state, sup.SupervisorState.UNVERIFIED)
+        self.assertIn('stop', self.docker.verbs())
 
     def test_duplicate_launch(self):
         s = self.running()
@@ -1380,7 +1465,10 @@ class SupervisorStopTest(SupervisorBase):
         self.assertTrue(verdict.verified)
 
     def test_lifecycle_stop_exception_or_garbage(self):
-        for behaviour in (RuntimeError(SENTINEL), 'garbage'):
+        chained = sup.StopVerificationError('internal stop failure')
+        chained.__cause__ = RuntimeError(SENTINEL)
+        chained.__suppress_context__ = True
+        for behaviour in (RuntimeError(SENTINEL), chained, 'garbage'):
             with self.subTest(behaviour=type(behaviour).__name__):
                 self.setUp()
                 s = self.running()
@@ -1394,7 +1482,7 @@ class SupervisorStopTest(SupervisorBase):
                 with self.assertRaises(sup.StopVerificationError) as ctx:
                     s.stop()
                 self.assertIs(s.state, sup.SupervisorState.UNVERIFIED)
-                self.assertNotIn(SENTINEL, str(ctx.exception))
+                self.assertNotIn(SENTINEL, exc_texts(ctx.exception))
 
 
 class EndToEndOfflineTest(unittest.TestCase):
