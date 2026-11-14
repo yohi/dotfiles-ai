@@ -65,7 +65,12 @@ TMPFS_TMP_OPTS = (
 TMPFS_HOME_OPTS = (
     f'rw,exec,nosuid,nodev,size=1g,uid={WRITER_UID},gid={WRITER_GID},mode=0700'
 )
-EXPECTED_TMPFS = {'/tmp': TMPFS_TMP_OPTS, '/home/writer': TMPFS_HOME_OPTS}
+EXPECTED_TMPFS = {
+    # The tmpfs is owner-only (uid/gid 10001, mode 0700) and noexec; inspect
+    # validation rejects any permission drift. Sonar cannot see Docker's options.
+    '/tmp': TMPFS_TMP_OPTS,  # NOSONAR - private tmpfs, not the host's public /tmp
+    '/home/writer': TMPFS_HOME_OPTS,
+}
 
 STATUS_STOPPED_VERIFIED = 'STOPPED_VERIFIED'
 STATUS_GUEST_QUIESCENCE_UNVERIFIED = 'GUEST_QUIESCENCE_UNVERIFIED'

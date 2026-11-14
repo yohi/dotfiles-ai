@@ -57,7 +57,7 @@ DOCKER_PATH = '/usr/bin/docker'
 SCOPE_REL = f'/system.slice/docker-{CID}.scope'
 SCOPE = '/sys/fs/cgroup' + SCOPE_REL
 INODE = 987654
-WRITER_BLOB = '877ac9289655d82d4ce5d94ee081e8298332742c'
+WRITER_BLOB = '0adc818b42a1ef91de015af791a9704802bd722c'
 
 
 def status_text(uid: int, saved: int | None = None) -> str:
