@@ -1,10 +1,12 @@
-# OC2 Daily Launcher — Design R0.1.3
+# OC2 Daily Launcher — Design R0.2
 
-- Date: 2026-11-13
+- Date: 2026-11-13 (R0.2 revision: 2026-11-14)
 - Repository: `yohi/dotfiles-ai`
 - Baseline: `master` at `e79573903f1a2b550e32bc6022d91c43fdcccbb4`
-- Status: **R0.1.3 F-004 Guest Writer cgroup Freezer limited design clarification; full design adoption and implementation remain pending Human Owner decision**
+- Status: **R0.2 F-004 design alignment to the feasibility-proven Alternative A (unprivileged Writer container, Trusted Supervisor, Read-only Git Collector, Proxy-only Relay). The R0.1.3 cgroup Freezer mechanism is withdrawn. Full design adoption and implementation remain pending Human Owner decision; Implementation GO, automatic Collect and Host Apply remain HOLD.**
+- Owner decision: `ACCEPT_TASK3B1_WITH_LIMITATIONS_AND_AUTHORIZE_F004_DESIGN_ALIGNMENT`
 - Scope: **Design only**. This document does not authorize implementation, Sandbox changes, Credential changes, PR creation, or Merge.
+- R0.2変更点: R0.1.3のSession専用cgroup v2 Writer Group＋Freezer方式は、Guestの`agent`ユーザーがNOPASSWD sudoとdocker groupを持ちWriterがWriter cgroupから脱出できるため、成立性を否定された（Owner判断`F004_CURRENT_MECHANISM_FEASIBILITY_FAILED`）。§6・§9・§10〜§13のF-004記述をAlternative Aへ置換し、§10.4に証拠分類（実証済み・制約付き・未検証）を追加した。APM SSOT、SessionKey、HostApplyGate、Owner Apply承認の仕様は意味を変更しない。
 
 ## 1. 背景と目的
 
@@ -124,12 +126,32 @@ $XDG_STATE_HOME/oc2/
 4. TUI終了時、まず差分を収集・確定してからLeaseを解放する。未反映変更があるSandboxは`PENDING`とし、**自動再利用対象から外す**。HostへのApply前に別`oc2`を開始する場合は、安全な独立Sandboxを選択する。
 5. Launcher異常終了時、次回はHost PID＋開始時刻、Docker Sandbox ID、Guest実行プロセス/Receiptを照合する。生存/状態の判別不能時はLeaseを自動回収せず`RECOVERY_REQUIRED`で隔離。明確に停止済み・Guest成果保全済みと確認できた場合だけOwnerの確認を伴う回収経路で復旧する。孤立Sessionを削除しない。
 
-### Session Writer実行境界（F-004）
+### Session Writer実行境界（F-004 Alternative A）
 
-- 各`SessionKey`に属するGuest開発作業の全Writer（OpenCode本体、Plugin/MCP、Spawnされた子孫、Background Job）は、実行開始時から同じSession専用のcgroup v2 Writer Groupに閉じ込める設計とする。別SessionのcgroupやHost側Workspace/Apply Gateを兼用しない。後から既存PIDを移送するだけの方法は、移送前の書込み・子孫の取り残しを排除できないため、本番の完全性保証には用いない。
-- Guest Supervisor/CollectorはWriter Groupの外側に置き、Launcherが`SessionKey`、Sandbox ID、Writer Group Identity、Leaseと対応を検証する。Collectorは収集元のGuest Git Repository/Working Treeを変更できない読取り専用境界を必要とし、成果の出力先はSession専用の別領域に限定する。
-- Writer Group外から同じ収集元を書き換えられるGuest主体、権限昇格・cgroupからの移動、Supervisor/Collectorによる再起動・書込みなどを禁止・検出できる制御境界が確立できなければ、**通常の自動Collect/Collection確定を有効化しない**。専用cgroupの作成と`frozen 1`だけを、全Writer封じ込めの証拠にしてはならない。
+R0.1.3のSession専用cgroup v2 Writer Group＋Freezer方式は**撤回**した（不採用の代替案としてのみ記録する）。Guestの`agent`ユーザーはNOPASSWD sudoとdocker groupを持つため、同ユーザー権限で動くWriterはWriter cgroupから脱出でき、Freezerで全Writerを覆えない。各`SessionKey`のGuest開発作業は次の主体に分離する。
+
+- **Writer Container（非特権・非信頼）:** OpenCode本体、Plugin/MCP、Spawnされた子孫、Background Jobは全て、Session専用Writer Containerのプロセスツリーとして起動時から実行する。既存プロセスを後から移送する方式は使わない。必須構成は、非root UID/GID `10001`、`--cap-drop ALL`、`no-new-privileges`、read-only rootfs、`--pids-limit`、`--restart no`、`--network none`、docker.sock・containerd socketなし、sudo・setuid/setgidファイルなし、Credential環境変数なしとする。書込み可能なのはSession専用Guest Repository（このWriterにだけrw bind）とtmpfsに限る。別SessionのWriter Container、Repository、Relay Socketを兼用しない。
+- **Trusted Supervisor（Writer外・信頼境界）:** Guestの`agent`権限（docker group・sudo）で動作し、Writer/Relay/Collectorの起動、Writer停止、停止検証、Relay Sessionの登録・失効、回収を所有する。Supervisorの権限と制御経路（docker.sock、管理Socket、Secret生成元）はWriterへ渡さない。Supervisorは制御用TCP Listenerを開かない（Guest INPUTがACCEPTのため、§10.4）。Writer-writableなTreeに対してRoot権限でGitを実行せず、読取りはno-follow・descriptor-relativeに限る。通常経路でWriterへ`docker exec`しない（exec起動プロセスはWriterと同一のContainer Identityになる）。
+- **Read-only Git Collector（別Container・非Writer）:** Writer停止検証後に起動する別Containerで、Writerとは別の非root UID、Capabilityなし、`no-new-privileges`、read-only rootfs、`--network none`とする。収集元TreeはKernelの読取り専用Mount（`ro`）で受け、書込み先はSession専用の別rwステージング領域だけとする。Writerが仕込んだRepository config、hook、filter/textconv、fsmonitor、pager、sshCommand、`core.worktree`等は実行しない（System/Global configの無効化、宣言Driverの明示上書き、`--no-optional-locks`、`GIT_DIR`/`GIT_WORK_TREE`固定）。symlinkは辿らず、Root外を指すsymlinkとhardlinkは検出・記録する。
+- Launcherは`SessionKey`、Sandbox ID、Writer Container Identity、Relay Session、Leaseの対応を検証する。**全ての非信頼プロセスがWriter Container内に留まること**が本モデルの前提であり、Writer外で収集元を書き換え得る非信頼主体、Writer Identityの不一致、Supervisor登録の不整合を検出・否定できなければ、**通常の自動Collect/Collection確定を有効化しない**。
 - Guest Writer境界とHost Apply復旧のWorkspace Gateは別の条件であり、双方がPASSした場合だけ収集・適用を進める。
+
+### Writer Egress境界（Proxy-only Relay、F-004）
+
+- Writerは`--network none`とし、`lo`以外のInterface・Route・DNS経路を持たない。Writerは名前解決を行わない。sbxのDNS Gateは、Sandbox単位の`deny **`があってもGlobal allowに載る名前を解決することがTask 3Aで観測されたため（oc2-f004-altA-task3a-report、oc2-f004-altA-task3a-dns-report）、WriterにDNS経路を与えることを禁止する。
+- Writerの唯一の外向き経路は**Proxy-only Relay**へのUnix Domain Socketとする。SupervisorはSessionごとに専用Socketディレクトリ（Relay UID所有・Writer GID・`2750`、Socket `0660`、Socket以外を置かない）を作成し、Writerへ`ro`でbind mountする。Writer内のProxy設定（必要な場合はWriter内loopbackのSocket Bridge）はこのSocketだけを指す。
+- RelayはWriterとは別Containerとし、外向き経路を持たないinternal network上に置く。許可は完全一致の`host:port` Allowlistのみで、CONNECT、IPリテラル、Allowlist外Host、Host Header不一致などの不正形式、Redirect追随を拒否する。Header/Body/Responseのサイズ、Header受信・Upstream応答の時間、1接続1要求の上限を持ち、全判定（peerのuid/gid/pid、理由）を決定ログへ記録する。Secret・Token・Hashはログに出さない。
+- Relayは**Model-awareな認可主体ではない**（§9の保証範囲を変更しない）。実Provider宛ての上流経路、TLS、Credential注入は未設計・未検証とする（§10.4）。
+
+### Relay Session認可・Container Identity・失効（F-004）
+
+- **Relay Session:** Supervisorは`SessionKey`ごとにRelay Sessionを登録し、Session専用Socketを作成する。状態は`PENDING`（登録済み・Writer未bind）→`ACTIVE`（Writer Identity bind済み）→`REVOKED`の一方向とする。
+- **Session Secret:** SupervisorがWriter外で生成する256bit以上の乱数とし、Writer専用の`ro`・`0400` Mountにだけ置く。Relayには鍵IDとSecretのSHA-256だけを渡し、定数時間比較で照合する。Secret・Hashはargv、ログ、Receipt、証跡へ出さず、Session終了時にGuest側のSecretファイルを破棄する。
+- **Container Identity:** Writer起動後、SupervisorがWriterのContainer IDとcgroup v2 inodeを取得してRelay Sessionへbindする。Relayは接続ごとに`SO_PEERPIDFD`で得たpidfdから`PIDFD_GET_INFO`でpeerのcgroup v2 IDを取得し、bind済みinodeと照合する（PID再利用の競合を受けない）。
+- **許可条件（全てAND）:** (1) Relay Sessionが`ACTIVE`、(2) `SO_PEERCRED`のuid/gidがWriterのUID/GIDに一致、(3) peerのcgroup v2 IDがSupervisor登録済みのWriter cgroup inodeに一致、(4) 接続冒頭の鍵IDとSecretが当該Socketに登録されたSessionに一致。いずれかの不成立・取得不能は拒否（Fail-Closed）する。
+- **失効:** Writerの停止・再起動（cgroup IDが変わるため、Revoke前でもbind不一致で拒否される）、Session終了、明示Revokeのいずれでも、SupervisorがRelay Sessionを`REVOKED`とし、Listenerを閉じ、Socketを削除し、処理中接続を打ち切る。Relayは処理中peerの終了をpidfdで検知して要求を中断する。失効済み・残存・再利用されたSocket、別SessionのSocket/鍵ID/Secret、同UIDの別Containerによる漏えいSecretの使用は拒否する。Socketパスを別Sessionで再利用しない。
+- **管理経路:** Relayの管理SocketはGuest uid 0（Supervisor）からの接続だけを受ける。Guest rootはSupervisorの信頼範囲に含まれる。
+- **制約:** IdentityはContainer単位であり、Writer Container内の全プロセス（`docker exec`経由を含む）は同一Identityとして許可され、Secretファイルも読める。bindの正しさはSupervisorに依存する。Task 3B-1でRelayを`--pid host`で起動した構成は制約付きのFeasibility結果であり、本番採用ではない（§10.4）。
 
 ### Workspace復旧中の全Session遮断（F-004）
 
@@ -209,6 +231,8 @@ Commitを取り込める条件、Dirty Baselineでの保留、Hostへの順序�
 
 **設計境界と残余リスク:** 現行のHost Launcher＋生成Runtime＋Credential/Network境界による保証は、**通常UI/設定に限定**する。全Guest通信に対するProvider/Model単位の強制認可・稼働中Grant取消・課金上限保証は未達成・未検証と記録する。既存Phase 5 Trusted Pluginの通信権限を事実に反して制限済みとは扱わない。これを満たすためのModel-aware Proxy/Gateway追加、Plugin無断削除・権限変更は**未採択**であり、必要時はHuman Ownerの別途判断を要する。意図しない推論・課金が起こり得る残余リスクをOwnerに明示し、未承認モデルが通常のOpenCode操作から選択可能となる構成は採用しない。
 
+**F-004 Alternative Aとの関係:** WriterのEgressは§6のProxy-only Relay（`host:port` Allowlist）に限定するが、RelayはModel IDを検査しない。Relayと既存Credential Proxy/Brokerの接続、TLS、実Providerでの動作は未検証であり（§10.4）、上記の保証範囲と残余リスクを変更しない。
+
 継続Grantは起動操作を簡素化するものであり、外部送信・課金ゼロや予算上限を自動保証するものではない。
 
 ## 10. TUI終了後のCollect / Preview / Apply — F-004限定訂正
@@ -217,24 +241,26 @@ TUI終了時にCollectとPreviewを自動実行するが、**Host ApplyはHuman 
 
 ### 10.1 収集と候補の固定
 
-**採用候補Mechanism（F-004）:** **Session専用cgroup v2 FreezerによるGuest Writer凍結＋独立Collectorによる読取り専用回収**を限定設計として選択する。TUI終了は必要条件だが十分条件ではない。Sandbox全体を`sbx stop`してから`sbx cp`する方式は採用しない（Docker Sandboxes v0.51.0/v0.53.0で、停止中`sbx cp`がSandboxを起動することを実測）。Freezerで全Writerを確実に覆えるか、Collectorの読取り専用境界が成立するかは**本番未検証**であり、成立するまで通常の自動CollectとHost ApplyをHOLDする。
-
-**限定PoCの証拠範囲（2026-11-13）:** v0.53.0の使い捨てMountless Sandboxでは、専用子cgroupに所属させた単一テストWriterが`frozen 1`となり、凍結中の`sbx cp`成功、HEAD/Index/Working Tree/UntrackedのManifest一致（`DIFF_EXIT=0`）および`git fsck`成功を観測した。これは**テストWriterに限るPASS**であり、OpenCode/Trusted Plugin/MCP/任意Background Writerの封じ込め、Root権限からの脱出防止、Collection確定・Host Applyの安全性を証明したものではない。
+**採用候補Mechanism（F-004 Alternative A）:** **Trusted SupervisorによるWriter Containerの停止・停止検証＋別ContainerのRead-only Git Collectorによる読取り専用回収**を設計とする（主体と構成は§6）。TUI終了は必要条件だが十分条件ではない。R0.1.3のcgroup v2 Freezer方式は成立性否定により撤回し、Mechanismとして用いない。Sandbox全体を`sbx stop`してから`sbx cp`する方式も採用しない（Docker Sandboxes v0.51.0/v0.53.0で、停止中`sbx cp`がSandboxを起動することを実測）。Sandboxは稼働させたまま、Writer Containerだけを停止する。証拠は§10.4のとおり範囲限定であり、通常の自動CollectとHost ApplyはHOLDする。R0.1.3記載の単一テストWriterによるFreezer PoC（2026-11-13）は撤回した方式の証拠であり、Alternative Aの根拠にしない。
 
 **責務と強制境界:**
-- **Host Launcher（Authority）:** SessionKey/Lease/Sandbox ID/Runtime Identityに結び付いたWriter GroupとCollectorの分離を起動前に検証し、未構築・不一致なら推論可能なTUIと自動Collectを開始しない。別SessionのWriter Groupを流用しない。
-- **Guest Supervisor（Writer管理）:** OpenCode・許可済みPlugin/MCP・子孫・Background Jobの全てを**初回Spawn前**からWriter Groupへ所属させ、Group外への生成・移動・脱出・再Spawnを禁止できる境界を保持する。特権プロセスや任意Guest HTTP Clientが収集対象へ書き込める状態も見逃さない。全Writerの封じ込めを証明できない場合はFail-Closedする。
-- **Guest Collector（非Writer）:** Writer Groupの外側で稼働し、収集元のGit Objects/HEAD/Index/Working Tree/Untrackedに書き込まない。Bundle/Manifest生成は別の専用ステージング領域へ行い、Git読取り処理が元RepositoryにLock・Index更新・Cleanupなどの副作用を残さないことを検証する。書込み不能・Group外Writer不存在の保証がない場合はCollectを確定しない。
+
+- **Host Launcher（Authority）:** SessionKey/Lease/Sandbox ID/Runtime Identityに結び付いたWriter Container、Relay Session、Collectorの分離を起動前に検証し、未構築・不一致なら推論可能なTUIと自動Collectを開始しない。別SessionのWriter Container・Relay Session・Repositoryを流用しない。
+- **Trusted Supervisor（停止・検証・回収の所有者）:** Writer外で動作し、Writer Containerの起動構成（§6）を強制し、停止、停止検証、Relay Session失効、Collector起動、回収を実行する。全ての非信頼プロセスがWriter Container内に留まることを証明できない場合はFail-Closedする。
+- **Writer Container:** 停止後に再起動・再利用しない（`--restart no`）。停止したWriterへのexecや再開を回収経路に用いない。
+- **Read-only Git Collector（非Writer）:** 収集元のGit Objects/HEAD/Index/Working Tree/Untrackedに書き込まない。Bundle/Manifest生成は別の専用ステージング領域へ行い、Writerが仕込んだconfig/hook/filter/fsmonitorを実行せず、元RepositoryにLock・Index更新・Cleanupなどの副作用を残さないことを検証する。書込み不能性の保証がない場合はCollectを確定しない。
 - **Host Collector:** `sbx cp`でSandbox稼働中に収集物をHostのWorkspace外・Session専用私有領域へ移し、Digest/Identity/Commit到達性/Manifestを検証してから不変Collectionを確定する。Guestの生Credential・禁止Objectを輸送しない。
 
 **状態遷移・実行順序（以下の順序を変更しない）:**
-1. TUI終了を確認し、Supervisorが同Sessionの追加Spawn・再起動経路を遮断する。Writer Group全体に属するプロセス/子孫と、Group外から収集元を書き換えられる主体の不存在を確認する。確認不能なら以後の確定手順へ進まない。
-2. SupervisorがSession専用`cgroup.freeze=1`を設定し、`cgroup.events`の`frozen 1`を確認する。単なるPID消滅、一定時間のHash一致、`sbx stop`、`cgroup.freeze`への書込み成功だけでは静止の証明としない。
-3. Collectorが非Writer側の独立境界から、Git HEAD/Branch/Commit OID/Index生バイト、Staged/Unstaged/Untracked、File Manifestを読取り専用に記録する。必要な選択的Git Bundleは専用ステージング領域で生成・検証し、収集元への副作用とSecret/除外Objectを拒否する。
-4. 凍結状態とWriter Group Identity/所属・外部Writer不在が維持される間だけ、稼働中Sandboxから`sbx cp`でステージング成果をHostへ回収する。`sbx cp`の前後とCollection確定直前に`frozen 1`および実行境界を再検証し、回収前後のHEAD/Index/Working Tree/Untracked Manifest・Bundle/Commit整合性を照合する。再起動・解凍・新たなWriter・Digest不一致があれば失敗とする。
-5. Guest CommitのParentがHost Baseline HEADへ連続するか、最終Guest HEADが選択Branchに属するか、Commit済み内容と未Commit内容が二重計上されないかを確認する。全検査がPASSするまではCollection Digestを確定せず、ApplyAuthorizationを発行しない。
-6. Writerを無条件に解凍して再利用せず、Supervisorが全Writerプロセスの終了と再Spawn防止を確認する。手順1〜4の全検査、Commit整合性検査、プロセス終了・再Spawn防止検査が全てPASSした場合に限り、HostのSession `collection/`にGuest Commit（BundleとOID）、最終Index/Working Tree/Untracked、最終File Manifestを保全し、全ファイルSHA-256と`collection_digest`を**最後に**確定する。成果はそのSessionGenerationに固定・不変とし、最新Guest状態で黙って置換しない。Owner PreviewにはWorkspace/Branch、SessionKey、Baseline、Guest HEAD、Commit OID、Staged/Unstaged/Untracked差分、確定したCollection Digest、保留理由を示す。
-7. Digest確定後にLease解放・Sandbox再利用可否を判定する。いずれかの検査失敗・判定不能時は**`PENDING`（理由`GUEST_QUIESCENCE_UNVERIFIED`）**としてGuest原本、部分収集物、Journal/Receipt、Sandbox Identityを保全し、`collection_digest`の最終確定・ApplyAuthorization発行・Host Applyを禁止する。凍結解除、Sandbox削除、別方式への自動Fallbackをしない。既存の安全な別Session開始条件は§6に従う。
+
+1. TUI終了を確認し、Supervisorが同SessionKeyのWriter新規起動・再起動経路を遮断する。
+2. SupervisorがWriter Containerを停止（TERM、期限超過時はKILL）し、Relay Sessionを失効させる（Listener閉鎖・Socket削除・処理中接続の切断）。
+3. Supervisorが停止を検証する。Container `exited`・`Running=false`・`Pid 0`・Restart Policy `no`・`RestartCount 0`、観測期間後も`StartedAt`不変、登録済みWriter cgroupの消滅、Writer UIDのプロセス不存在、Writer TreeをRW bindする稼働Containerの不存在、停止後のno-follow・descriptor-relativeな読取りScanによるTree不変を全て確認する。単なるPID消滅、一定時間のHash一致、`sbx stop`だけでは停止の証明とせず、Identity・cgroup・状態の検査と組み合わせる。確認不能なら以後の確定手順へ進まない。
+4. Read-only Git CollectorがGit HEAD/Branch/Commit OID/Index生バイト、Staged/Unstaged/Untracked、File Manifestを読取り専用に記録する。必要な選択的Git Bundleは専用ステージング領域で生成・検証し、収集元への副作用とSecret/除外Objectを拒否する。残存`index.lock`などの未完了Git Transactionを検出した場合は**修復せず**`PENDING`とする（修復方針は未決定、§10.4）。
+5. Sandbox稼働中に`sbx cp`でステージング成果をHostへ回収する。`sbx cp`の後とCollection確定直前に、同一boot ID、同一Writer Container IDが`exited`のまま、cgroup不存在、Writer UIDプロセス不存在、Tree不変、Collector再検証の一致を再確認し、回収前後のHEAD/Index/Working Tree/Untracked Manifest・Bundle/Commit整合性を照合する。再起動・新たなWriter・Digest不一致があれば失敗とする。
+6. Guest CommitのParentがHost Baseline HEADへ連続するか、最終Guest HEADが選択Branchに属するか、Commit済み内容と未Commit内容が二重計上されないかを確認する。全検査がPASSするまではCollection Digestを確定せず、ApplyAuthorizationを発行しない。
+7. Writerを再起動・再利用しない。手順1〜5の全検査とCommit整合性検査が全てPASSした場合に限り、HostのSession `collection/`にGuest Commit（BundleとOID）、最終Index/Working Tree/Untracked、最終File Manifestを保全し、全ファイルSHA-256と`collection_digest`を**最後に**確定する。成果はそのSessionGenerationに固定・不変とし、最新Guest状態で黙って置換しない。Owner PreviewにはWorkspace/Branch、SessionKey、Baseline、Guest HEAD、Commit OID、Staged/Unstaged/Untracked差分、確定したCollection Digest、保留理由を示す。
+8. Digest確定後にLease解放・Sandbox再利用可否を判定する。いずれかの検査失敗・判定不能時は**`PENDING`（理由`GUEST_QUIESCENCE_UNVERIFIED`）**としてGuest原本、部分収集物、Journal/Receipt、Sandbox Identity、停止済みWriter Containerを保全し、`collection_digest`の最終確定・ApplyAuthorization発行・Host Applyを禁止する。Writer再起動、Gitの修復、Sandbox削除、別方式への自動Fallbackをしない。既存の安全な別Session開始条件は§6に従う。
 
 既存のOwner承認は`ApplyAuthorization` = (`SessionKey`, `collection_digest`, `host_baseline_digest`, `expected_host_head`, `expected_index_digest`, `expected_worktree_digest`, `target_result_digest`, `approved_at`)の**1回限りの同意**であり、候補に変化があれば再利用しない。Hostへの無承認書込み・部分適用を認めない。
 
@@ -261,12 +287,51 @@ Git Ref・Index・Working Treeは単一の原子更新単位ではないため�
 
 この方式でも他のHostプロセスから途中状態が一時的に見える可能性は残る。**完全な原子性を主張しない**。各段階の書込み・RenameとRef更新の整合性を照合し、Hostの既存データを失わないことを最優先とする。
 
+### 10.4 F-004 Alternative Aの証拠分類と未検証事項
+
+証拠は報告書名で参照する（oc2-f004-altA-stage2-report、oc2-f004-altA-task3a-report、oc2-f004-altA-task3a-dns-report、oc2-f004-altA-task3b0-report、oc2-f004-altA-task3b1-report）。いずれも使い捨てMountless Sandbox上のFeasibility証拠であり、本番実装・本番受入のPASSではない。
+
+**実証済み（範囲限定）:**
+
+| 範囲 | 報告書 | 判定 | 示したこと |
+| --- | --- | --- | --- |
+| fixture | oc2-f004-altA-stage2-report | Evidence契約Validatorの単体テストPASS | Gate Manifestの検証規約 |
+| runtime-offline | oc2-f004-altA-stage2-report | **RUNTIME_OFFLINE_PASS_WITH_LIMITATIONS**（runtime/containment/stop/collector/consistency PASS、network NOT_VERIFIED、full-runtime NOT_VERIFIED） | Network無しの非特権Writer ContainerでOpenCode v2.2.5と承認済みPhase 5のPlugin 3件・MCP 1件がOffline動作し、全プロセスがWriter内に留まること。停止と停止後の不変、Read-only Collectorの書込み拒否とhostile config/hook/filter/fsmonitorの非実行、稼働中`sbx cp`前後のDigest一致 |
+| network-only | oc2-f004-altA-task3a-report | Gate A/C/D PASS、Gate B NOT_VERIFIED（総合NOT_VERIFIED） | 合成Probe Writer（OpenCode非実行）からDocker Engine・Supervisorへ到達できないこと、Runtime境界、Evidence整合 |
+| network-only（原因調査） | oc2-f004-altA-task3a-dns-report | 原因特定、リスクは未解消 | sbx DNS GateがSandbox単位の`deny **`を反映せずGlobal allowの名前を解決すること（接続自体は拒否） |
+| mock-only | oc2-f004-altA-task3b0-report | C1-C4・C6 PASS、C5 NOT_VERIFIED（総合NOT_VERIFIED、Credential無し） | `--network none` WriterからのDNS/直接TCP不可、Relay Socketだけが経路であること、Relay Policy（CONNECT・Allowlist外・Redirect・Size/Time違反の拒否）、Mockとの通信 |
+| mock-only | oc2-f004-altA-task3b1-report | T2 PASS、T5 PASS（Credential無し） | Relay Session認可4条件と失効（Bind前、再起動、Revoke後Socket、別Session資格情報、同UID別Container・漏えいSecretの拒否）、停止後のRead-only Collector回収とHost照合 |
+
+**制約付き:**
+
+- Task 3B-1のRelayは`--pid host`で起動した。別pid namespaceのpeerに対して`PIDFD_GET_INFO`を成立させるためであり（Relay自身のpid namespaceでは取得不能となりFail-Closedで全拒否された）、RelayからGuest全プロセスの`/proc`情報（引数・cgroup）が見える。Kernel 6.13以上の`PIDFD_GET_INFO`に依存する。これは**Feasibility上の構成結果であり本番採用ではない**。本番の代替（Supervisor側Identity Oracle、2段Relay、他のKernel機能、`--pid host`を許容する場合の緩和策）は未決定の設計項目とする。
+- Writerの`/home/writer` tmpfsはOpenTUIのNative Library読込みのためexec可能が必要であり、Writer境界内の実行可能範囲を広げる。
+- 停止後の静止観測期間は20秒であり、Task 3B-1の停止前Collector実行は停止前後の不変を示すもので、停止中の一貫性の証明ではない。
+
+**未検証（HOLD理由）:**
+
+- Git書込み中の停止: Stage 2のFault Injection（`git add`中のSIGKILL、1回）で残存`index.lock`を観測し`PENDING`と分類したが、修復・再開方針は未決定。
+- Credential Proxy、TLS、Model単位の認可、実Providerでの推論。
+- Full-runtime: SSOTの`@latest`・`file://` Plugin、Network/認証を要するMCP Server、MCP Gateway。
+- Task 3C（未着手）。
+- RelayのProcess単位Identity（Container単位のみ。`docker exec`で入ったプロセスは区別できない）。
+- Trusted Supervisorの信頼性とWriter Identity登録（bind）の正しさ。
+- Guest INPUTがACCEPTであること（SupervisorがTCP Listenerを開けばWriterから到達し得る）とその緩和。
+- user namespace remapなし（Container UIDとGuest UIDが同一）。
+- Base Libraryの来歴（Guest dpkg databaseとの照合のみ）。
+- Wildcard allowを使うDNS経由のexfil（未試験）。
+- Task 3B Design R0.1は所在不明であり、本書はその内容を推定で補わない。
+- Stage 2/3A/3B-0/3B-1のKit（Feasibility用コード・Image）はMerge対象外。
+
+**HOLD:** Implementation GO、自動Collect、Host Apply。
+
 ## 11. エラー・保全条件
 
 - Mount、Sandbox ID、Artifact、Version Lock、Runtime、Session v3 Receipt、Git Baseline、Collection、Credential、推論Grant、Workspace Manifestの不一致はFail-Closed。個別の不一致を自動で同一視・修復しない。
 - 同時起動時のLease重複、Guest PENDING、同期競合、Secret検出、Legacy v2状態、Git Ref分岐では既存データを保持する。**Guest PENDINGのみでHost状態が正常かつ全Journalが終端なら別Sandboxで新規Sessionを許可**する。**Host Apply JournalがPREPARED/APPLYING/RECOVERY_REQUIREDまたは終端不明の場合はWorkspace全体を停止し、別Sandboxを作成しても新たなHost Snapshot/Baselineを採用しない**。
 - `sbx exec`に加え、v0.51.0/v0.53.0で停止中の`sbx cp`がSandbox起動を伴うことが観測されたため、`sbx stop → sbx cp`をGuest静止/回収Mechanismに採用しない。`--dry-run`や情報表示の経路で副作用のある検査をしない。
-- Freezer未対応、Writer Group外のWriter、権限境界未確立、`frozen 1`未確認/解除、Collectorの書込み副作用、回収失敗・Digest不一致は`GUEST_QUIESCENCE_UNVERIFIED`としてCollection確定・Applyを拒否し、Guest/Hostの原本と証拠を保全する。
+- Writer Containerの構成不一致（root実行、Capability、docker.sock、Network、restart policy等）、Writer外の非信頼Writer、停止検証失敗（再起動、cgroup残存、Writer UIDプロセス残存、停止後のTree変化）、Relay Session失効の失敗、Collectorの書込み副作用・hostile設定の実行、未完了Git Transaction（残存`index.lock`等）、回収失敗・Digest不一致は`GUEST_QUIESCENCE_UNVERIFIED`としてCollection確定・Applyを拒否し、Guest/Hostの原本と証拠を保全する。
+- Relay認可条件の不成立・Identity取得不能は接続拒否（Fail-Closed）とし、Writerへ別経路のNetwork/DNSを与えて回避しない。
 - Sandbox削除、作業データ破棄、Host Gitの無断Merge/Rebase/Reset、Credential更新、外部Git Push、信頼済みLockの更新、推論Grantの拡張は通常`oc2`操作に暗黙に含めない。
 - Host側状態はWorkspace外に0700/0600で保存し、symlink・所有者・重複Identityを拒否する。デバッグログやReceiptにToken、認証DB、Secret本文を記録しない。
 - 異常停止時は観測済みFailureと未実行・不明を区別する。Guest/Host成果が残るときは削除せず`PENDING`/`RECOVERY_REQUIRED`として可視化する。
@@ -281,21 +346,22 @@ Git Ref・Index・Working Treeは単一の原子更新単位ではないため�
 4. Host/Guest Baseline、Lease、Collect、Apply JournalはSessionGeneration単位で隔離され、異常終了でも互いの成果を上書きしない。旧v2 Receiptも保護する。
 5. HostのGit HEAD、Staged、Unstaged、UntrackedをGuestで区別して再現し、Indexのintent-to-add検出時は誤復元せずFail-Closedする。履歴中のSecret/除外Objectが検出された場合はBundle転送せず停止する。
 6. GuestのBranch/Commit/未Commit編集を収集し、Host由来の未Commit内容を二重適用しない。
-7. TUI終了後、OpenCode/Plugin/MCP/子孫/Background JobをSession Writer Groupへ初回Spawn前から封じ込め、Group外からの書込み・脱出/再Spawnを防止したうえでcgroup v2 Freezerの`frozen 1`を保持し、独立Collectorが読取り専用で回収・前後照合できた場合のみCollectionを最終確定する。保証不能なら`PENDING`/`GUEST_QUIESCENCE_UNVERIFIED`で保全する。固定CollectionをPreviewし、Ownerが1回承認した同じIdentityだけをHostへ適用できる。変更された候補や再承認なしの再適用は禁止。
+7. OpenCode/Plugin/MCP/子孫/Background Jobが起動時から非特権Writer Container内で動作し、TUI終了後にTrusted SupervisorがWriterの停止・停止検証・Relay Session失効を完了し、別ContainerのRead-only Git Collectorが読取り専用で回収・前後照合できた場合のみCollectionを最終確定する。保証不能なら`PENDING`/`GUEST_QUIESCENCE_UNVERIFIED`で保全する。固定CollectionをPreviewし、Ownerが1回承認した同じIdentityだけをHostへ適用できる。変更された候補や再承認なしの再適用は禁止。
 8. Clean Baseline＋Guest Fast-forward Commitは履歴保持で反映でき、Dirty Baseline＋Guest CommitはCollection/隔離Refを保全して全体保留する。Guest CommitなしのDirty BaselineはStaged/Unstagedの独立状態を安全に反映できる。
 9. Host HEAD/Index/WorktreeのBaseline逸脱、Ref分岐、途中クラッシュ、Rollback不能を再現し、データ消失・Partial Successなしで`RECOVERY_REQUIRED`または保留へ移行できる。Host Apply中は`--new`を含め新規Session/Snapshot採用を全て拒否し、Guest PENDINGのみの場合と区別できる。
 10. 初回のみ有効期限付き推論Grantを承認し、同一スコープで`oc2`だけの継続起動ができる。未承認・期限切れ・取消・Provider/Model/Account/Workspaceの変更はRuntime起動前に停止する。通常のOpenCodeモデル選択には承認済みProvider/Modelだけが現れ、独自HTTP要求のModel ID制御は保証外として明示する。
 11. OpenAI OAuth、Cloudflare Credential BindingとAPM Provider選択を維持し、OpenCode v1やHostのCredentialを変更しない。
 12. 既存OC2 Phase 5のPlugin/MCP/Runtime検証、Mountless隔離、固定Artifact境界を回帰させない。
+13. WriterはRelay Socket以外の外向き経路とDNS経路を持たず、Relayは§6の許可条件を全て満たす接続だけをAllowlist宛てに中継し、失効後・別Session・別Containerからの接続を拒否する。
 
-テストは**オフライン単体・統合検証を先行**し、Version Lock/Schema異常、2つの並行Session、Lease Crash、Stage/Unstage/Untracked、**intent-to-add検出と未知Index形式の拒否、Guest Quiescence未確認、Host APPLYING/RECOVERY_REQUIRED時の新規Session遮断と復旧解除、通常モデル選択のGrant投影とTrusted Plugin独自HTTPの非保証境界**、Git履歴Secret、Fast-forward/分岐、Apply Fault Injection、Grant失効/取消を決定論的なFixtureで検証する。F-004では特に、初回Spawn時のWriter Group所属・Plugin/MCP子孫とBackground Jobの捕捉、Group外Writer/権限昇格/再Spawnの拒否、`frozen 1`到達と解除・失敗時のPENDING、Collectorの読取り専用性、凍結中のBundle/Manifest生成と`sbx cp`、回収前後のGit全層整合・Digest、Collection確定順序を検証する。2026-11-13の単一Writer限定PoCを本番全Writer保証のPASSに昇格させない。Sandbox・実際の推論・Credential操作による本番実機受入は、実装とは別途Human Ownerの承認がある場合だけ行う。未実行をPASS/FAILと混同しない。
+テストは**オフライン単体・統合検証を先行**し、Version Lock/Schema異常、2つの並行Session、Lease Crash、Stage/Unstage/Untracked、**intent-to-add検出と未知Index形式の拒否、Guest Quiescence未確認、Host APPLYING/RECOVERY_REQUIRED時の新規Session遮断と復旧解除、通常モデル選択のGrant投影とTrusted Plugin独自HTTPの非保証境界**、Git履歴Secret、Fast-forward/分岐、Apply Fault Injection、Grant失効/取消を決定論的なFixtureで検証する。F-004では特に、Writer Containerの起動構成とPlugin/MCP子孫・Background Jobの捕捉、Writer外への脱出・権限昇格・再起動の拒否、`--network none`とDNS経路の不在、Relay Session認可条件と失効、停止検証と失敗時のPENDING、Git書込み中停止のPENDING、Collectorの読取り専用性とhostile設定の非実行、停止後のBundle/Manifest生成と`sbx cp`、回収前後のGit全層整合・Digest、Collection確定順序を検証する。§10.4のFeasibility証拠（fixture・runtime-offline・network-only・mock-only）を本番保証のPASSに昇格させない。Sandbox・実際の推論・Credential操作による本番実機受入は、実装とは別途Human Ownerの承認がある場合だけ行う。未実行をPASS/FAILと混同しない。
 
 ## 13. 非目標・停止条件・後続判断
 
 **非目標:** Direct Mount化、既存Runtime全面再実装、OpenCode v1改変、任意Plugin/MCPの解禁、任意未検証CLI起動、無承認Git Push、無断Host書込み、既存Sandboxの自動破棄。
 
-**今回の限定訂正の完了条件:** R0.1.2で整理済みのF-001/F-002/F-003/F-005とWorkspace復旧Gateを保持し、F-004についてcgroup v2 Freezer候補、全Writer封じ込めの条件、Collector分離、凍結からCollection Digest確定までの順序、保証不能時のPENDINGを一意に記載すること。既存のMountless/Snapshot/選択的Bundle/APM SSOT/Owner Apply承認を変更しない。限定PoC PASSは本番成立性の承認ではない。
+**今回の設計整合（R0.2）の完了条件:** R0.1.2で整理済みのF-001/F-002/F-003/F-005とWorkspace復旧Gateを保持し、F-004についてFreezer方式の撤回、Writer Container/Trusted Supervisor/Read-only Git Collectorの分離、Writer `--network none`とProxy-only Relay、Relay Session認可・Container Identity・失効、停止からCollection Digest確定までの順序、保証不能時のPENDING、証拠分類（実証済み・制約付き・未検証）を一意に記載すること。既存のMountless/Snapshot/選択的Bundle/APM SSOT/SessionKey/HostApplyGate/Owner Apply承認を変更しない。Feasibility PASSは本番成立性の承認ではない。
 
-**承認境界:** R0.1の既存アーキテクチャはHuman Owner採択済み。R0.1.1のF-001/F-002、R0.1.2のF-003/F-005解決を維持し、2026-11-13の限定PoC結果を根拠にF-004だけをOwner承認の文書限定訂正として記録する。**Design R0.1.3最終採択・残余リスク受容・Implementation Plan作成・実装開始の承認を意味しない**。本番の全Writer封じ込めとCollector非書込み性は未検証で、成立するまで自動Collect/Host ApplyはHOLDする。
+**承認境界:** R0.1の既存アーキテクチャはHuman Owner採択済み。R0.1.1のF-001/F-002、R0.1.2のF-003/F-005解決を維持する。R0.1.3のFreezer方式はOwner判断`F004_CURRENT_MECHANISM_FEASIBILITY_FAILED`により撤回し、Owner判断`ACCEPT_TASK3B1_WITH_LIMITATIONS_AND_AUTHORIZE_F004_DESIGN_ALIGNMENT`に基づきF-004をAlternative Aへ整合させる。**Design R0.2最終採択・残余リスク受容・Implementation Plan作成・実装開始の承認を意味しない**。§10.4の未検証事項が解消されるまで、Implementation GO・自動Collect・Host ApplyはHOLDする。
 
-**停止条件:** 本Design R0.1.3と対応するF-004 Feasibility Planの文書限定訂正をGitHubへ反映した後は終了する。追加のImplementation Plan、実装、独立レビュー、PR、Merge、Sandbox/Runtime実機操作、Credential変更は、別途Human Ownerが承認するまで自動開始しない。
+**停止条件:** 本Design R0.2のF-004設計整合を文書へ反映した後は終了する。Commit/Push、追加のImplementation Plan、実装、独立レビュー、PR、Merge、Sandbox/Runtime実機操作、Credential変更は、別途Human Ownerが承認するまで自動開始しない。
