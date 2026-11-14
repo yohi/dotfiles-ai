@@ -12,6 +12,10 @@ import pathlib
 import sys
 import unittest
 import uuid
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from sandbox.scripts import oc2_writer as writer_types
 
 SCRIPTS = pathlib.Path(__file__).resolve().parents[1] / 'scripts'
 if str(SCRIPTS) not in sys.path:
@@ -47,11 +51,12 @@ BOOT = '11111111-2222-4333-8444-555555555555'
 SENTINEL = 'sk-SENTINEL-DO-NOT-LEAK-7f3a'
 
 
-def make_key(gen: str = GEN) -> w.WriterSessionKey:
-    return w.WriterSessionKey(WS, SANDBOX, gen)
+def make_key(gen: str = GEN) -> writer_types.WriterSessionKey:
+    key: writer_types.WriterSessionKey = w.WriterSessionKey(WS, SANDBOX, gen)
+    return key
 
 
-def make_spec(gen: str = GEN, **overrides) -> w.WriterSpec:
+def make_spec(gen: str = GEN, **overrides) -> writer_types.WriterSpec:
     key = make_key(gen)
     fields = dict(
         key=key,
@@ -62,10 +67,13 @@ def make_spec(gen: str = GEN, **overrides) -> w.WriterSpec:
         tty=False,
     )
     fields.update(overrides)
-    return w.WriterSpec(**fields)
+    spec: writer_types.WriterSpec = w.WriterSpec(**fields)
+    return spec
 
 
-def make_inspect(spec: w.WriterSpec, cid: str = CID, status: str = 'created') -> dict:
+def make_inspect(
+    spec: writer_types.WriterSpec, cid: str = CID, status: str = 'created'
+) -> dict:
     running = status == 'running'
     return {
         'Id': cid,
@@ -119,18 +127,22 @@ def make_inspect(spec: w.WriterSpec, cid: str = CID, status: str = 'created') ->
     }
 
 
-def stopped_inspect(spec: w.WriterSpec, cid: str = CID) -> dict:
+def stopped_inspect(spec: writer_types.WriterSpec, cid: str = CID) -> dict:
     info = make_inspect(spec, cid, 'exited')
     info['State']['StartedAt'] = STARTED
     return info
 
 
-def make_identity(cid: str = CID) -> w.WriterIdentity:
-    return w.WriterIdentity(cid, IMAGE_ID, STARTED, 987654, BOOT)
+def make_identity(cid: str = CID) -> writer_types.WriterIdentity:
+    identity: writer_types.WriterIdentity = w.WriterIdentity(
+        cid, IMAGE_ID, STARTED, 987654, BOOT
+    )
+    return identity
 
 
-def clean_obs() -> w.StopObservation:
-    return w.StopObservation(False, (), (), BOOT)
+def clean_obs() -> writer_types.StopObservation:
+    observation: writer_types.StopObservation = w.StopObservation(False, (), (), BOOT)
+    return observation
 
 
 class FakeDocker:
@@ -141,7 +153,7 @@ class FakeDocker:
     Exception instance.  When the queue is empty the default is used.
     """
 
-    def __init__(self, spec: w.WriterSpec, existing=None):
+    def __init__(self, spec: writer_types.WriterSpec, existing=None):
         self.spec = spec
         self.calls: list[list[str]] = []
         self.responses: dict[str, list] = {}
@@ -241,7 +253,7 @@ def bad(info: dict, *path_and_value):
 DELETE = object()
 
 
-class InspectAssertMixin:
+class InspectAssertMixin(unittest.TestCase):
     def assertRejected(self, info, pattern, spec=None):
         with self.assertRaisesRegex(w.WriterError, pattern):
             w.validate_writer_inspect(info, spec or make_spec())

@@ -126,9 +126,12 @@ class LaunchFailedError(SupervisorError):
 def _cid_tag(cid: object) -> str:
     """Return at most a 12 char prefix of a valid container id."""
     try:
-        return w.validate_container_id(cid)[:12]
+        validated = w.validate_container_id(cid)
     except w.WriterError:
         return 'invalid'
+    if not isinstance(validated, str):
+        return 'invalid'
+    return validated[:12]
 
 
 # --- DockerRunner adapter ------------------------------------------------------
@@ -207,19 +210,19 @@ def _allowed_shape(argv: list[str]) -> bool:
     """Return True only for the exact argv shapes of the oc2_writer builders."""
     verb = argv[1]
     if verb == 'ps':
-        return tuple(argv) == w.LIST_ALL_ARGV
+        return bool(tuple(argv) == w.LIST_ALL_ARGV)
     if verb == 'start':
-        return len(argv) == 3 and w.build_start_argv(argv[2]) == argv
+        return bool(len(argv) == 3 and w.build_start_argv(argv[2]) == argv)
     if verb == 'kill':
-        return len(argv) == 5 and w.build_kill_argv(argv[4]) == argv
+        return bool(len(argv) == 5 and w.build_kill_argv(argv[4]) == argv)
     if verb == 'inspect':
-        return len(argv) == 5 and w.build_inspect_argv(argv[4]) == argv
+        return bool(len(argv) == 5 and w.build_inspect_argv(argv[4]) == argv)
     if verb == 'stop':
         if len(argv) != 5 or not re.fullmatch(r'[1-9][0-9]{0,2}', argv[3]):
             return False
-        return w.build_stop_argv(argv[4], int(argv[3])) == argv
+        return bool(w.build_stop_argv(argv[4], int(argv[3])) == argv)
     if verb == 'create':
-        return w.build_create_argv(_parse_create_spec(argv)) == argv
+        return bool(w.build_create_argv(_parse_create_spec(argv)) == argv)
     return False
 
 
@@ -726,7 +729,7 @@ class GuestHostProbe:
         if out is None:
             return None
         try:
-            info = w.parse_inspect_output(out)
+            info: dict[str, Any] = w.parse_inspect_output(out)
         except w.WriterError:
             return None
         if info.get('Id') != cid:

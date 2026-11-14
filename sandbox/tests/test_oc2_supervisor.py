@@ -18,6 +18,11 @@ import sys
 import tempfile
 import unittest
 from unittest import mock
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from sandbox.scripts.oc2_supervisor import GuestHostProbe as GuestHostProbeBase
+    from sandbox.tests.test_oc2_writer import FakeDocker as FakeDockerBase
 
 TESTS = pathlib.Path(__file__).resolve().parent
 SCRIPTS = TESTS.parent / 'scripts'
@@ -41,6 +46,10 @@ w = load('oc2_writer')
 sup = load('oc2_supervisor')
 tw = load('test_oc2_writer', TESTS)
 
+if not TYPE_CHECKING:
+    GuestHostProbeBase = sup.GuestHostProbe
+    FakeDockerBase = tw.FakeDocker
+
 CID, CID2, OTHER = tw.CID, tw.CID2, tw.OTHER
 BOOT, STARTED, IMAGE_ID = tw.BOOT, tw.STARTED, tw.IMAGE_ID
 SENTINEL = tw.SENTINEL
@@ -58,14 +67,17 @@ def status_text(uid: int, saved: int | None = None) -> str:
 
 def exc_texts(exc: BaseException) -> str:
     """Return str/repr of ``exc`` and its whole cause/context chain."""
-    seen, out, todo = [], [], [exc]
+    seen: list[BaseException] = []
+    out: list[str] = []
+    todo: list[BaseException | None] = [exc]
     while todo:
         cur = todo.pop()
         if cur is None or any(cur is s for s in seen):
             continue
         seen.append(cur)
         out += [str(cur), repr(cur)]
-        todo += [cur.__cause__, cur.__context__]
+        todo.extend(linked for linked in (cur.__cause__, cur.__context__)
+                    if linked is not None)
     return '\n'.join(out)
 
 
@@ -139,7 +151,7 @@ class FakeGuestFs:
         return tuple(sorted(names))
 
 
-class HookDocker(tw.FakeDocker):
+class HookDocker(FakeDockerBase):
     """FakeDocker that lists the Writer once created and supports hooks."""
 
     def __init__(self, spec, existing=None, fs=None):
@@ -571,7 +583,7 @@ class SubprocessTransportTest(unittest.TestCase):
         self.assert_killed_and_reaped()
 
     def test_timeout_during_large_output(self):
-        clock_holder = {}
+        clock_holder: dict[str, FakeClock] = {}
 
         def chunk_then_advance(stream, size, timeout_s):
             clock_holder['clock'].now += 0.5
@@ -837,7 +849,7 @@ class CgroupInodeTest(ProbeBase):
         restarted['State']['StartedAt'] = '2026-11-14T09:09:09Z'
         swapped = tw.make_inspect(self.spec, CID2, 'running')
         stopped = tw.stopped_inspect(self.spec)
-        cases = {
+        cases: dict[str, list[tuple[int, str] | RuntimeError]] = {
             'inspect fails': [(1, '')],
             'inspect raises': [RuntimeError('x')],
             'malformed': [(0, '{bad')],
@@ -1418,7 +1430,7 @@ class EndToEndOfflineTest(unittest.TestCase):
         # Test-only stand-in for an independent sufficient kernel-side RW
         # holder observation (not implemented by GuestHostProbe).  All other
         # observations come from the real GuestHostProbe logic.
-        class SufficientProbe(sup.GuestHostProbe):
+        class SufficientProbe(GuestHostProbeBase):
             def _rw_mount_holders(self):
                 docker_side = self._docker_rw_mount_holders()
                 return docker_side if docker_side else ()
