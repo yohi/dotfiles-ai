@@ -16,8 +16,8 @@ import struct
 import subprocess
 from typing import Literal
 
-SCHEMA = "dotfiles-ai/oc2-slice-b-bundle/v1"
-POLICY = "oc2-slice-b-clean-git-bundle-v1"
+SCHEMA: Literal["dotfiles-ai/oc2-slice-b-bundle/v1"] = "dotfiles-ai/oc2-slice-b-bundle/v1"
+POLICY: Literal["oc2-slice-b-clean-git-bundle-v1"] = "oc2-slice-b-clean-git-bundle-v1"
 MAX_OBJECTS = 4000
 MAX_BLOB = 2 * 1024 * 1024
 MAX_TOTAL = 32 * 1024 * 1024
@@ -267,10 +267,11 @@ def recheck_host_baseline(baseline: GitBaseline) -> None:
 
 
 def _key_dict(key: object) -> dict[str, str]:
-    if not callable(getattr(key, "validate", None)):
+    validate = getattr(key, "validate", None)
+    if not callable(validate):
         raise SliceBGitRejected("invalid SessionKey")
     try:
-        key.validate()
+        validate()
     except Exception as e:
         raise SliceBGitRejected("invalid SessionKey") from e
     return {name: getattr(key, name) for name in ("workspace_id", "sandbox_id", "session_generation")}
