@@ -37,6 +37,7 @@ from __future__ import annotations
 import dataclasses
 import enum
 import errno
+import hashlib
 import math
 import os
 import posixpath
@@ -44,13 +45,28 @@ import re
 import select
 import signal
 import stat
+import struct
 import subprocess
 import threading
 import time
 from collections.abc import Callable, Mapping, Sequence
-from typing import Any, Protocol
+from typing import Any, Protocol, runtime_checkable
 
 import oc2_writer as w
+from oc2_slice_b_git import (
+    POLICY as BUNDLE_POLICY,
+    SCHEMA as BUNDLE_SCHEMA,
+    SliceBBundleManifestV1,
+    SliceBGitRejected,
+    GitBaseline,
+    _manifest_bytes,
+)
+from oc2_slice_b_session import (
+    SliceBSessionError,
+    SliceBStartMessage,
+    VerifiedGuestAuthority,
+    build_start_message,
+)
 
 # --- Initial policy constants (not proven safe values) ---------------------
 
@@ -71,6 +87,14 @@ _PID_RE = re.compile(r'^[1-9][0-9]{0,9}$')
 _ENV_NAME_RE = re.compile(r'^[A-Za-z_][A-Za-z0-9_]{0,127}$')
 _INACTIVE_STATUSES = frozenset({'created', 'exited', 'dead'})
 _ACTIVE_STATUSES = frozenset({'running', 'paused', 'restarting', 'removing'})
+_INTERACTIVE_FRAME_MAGIC = b'OC2T'
+_INTERACTIVE_FRAME_HEADER = struct.Struct('>4sBI')
+_INTERACTIVE_TERMINAL_FRAME = 1
+_INTERACTIVE_CONTROL_FRAME = 2
+_MAX_INTERACTIVE_FRAME_BYTES = 64 * 1024
+_INTERACTIVE_POLL_S = 0.1
+_POST_TUI_EXIT_TIMEOUT_S = 30.0
+_POST_CONTINUE_TIMEOUT_S = 30.0
 
 
 # --- Failure contract --------------------------------------------------------
@@ -119,6 +143,22 @@ class SupervisorStateError(SupervisorError):
     """Operation not allowed in the current Supervisor state."""
 
 
+class InteractiveTransportError(SupervisorError):
+    """The identity-bound raw TTY transport failed."""
+
+
+class InteractiveDetachedError(InteractiveTransportError):
+    """The attach stream reached EOF or was detached."""
+
+
+class InteractiveProtocolError(SupervisorError):
+    """The image-baked PID 1 frame was malformed or out of sequence."""
+
+
+class FixtureSnapshotError(SupervisorError):
+    """The trusted Supervisor snapshot could not be captured."""
+
+
 class LaunchFailedError(SupervisorError):
     """Launch failed for a reason not covered by a more specific class."""
 
@@ -147,7 +187,7 @@ class TransportResult:
 
 
 #: ``transport(argv, timeout, max_output) -> TransportResult``
-Transport = Callable[[list, int, int], TransportResult]
+Transport = Callable[[list[str], int, int], TransportResult]
 
 
 def _validate_docker_path(docker_path: object) -> str:
@@ -169,7 +209,8 @@ def _parse_create_spec(argv: list[str]) -> w.WriterSpec:
 
     Layout (from ``oc2_writer.build_create_argv``): fixed policy head that
     contains ``-v <repo>:/workspace:rw``, then exactly 5 ``--label`` pairs,
-    then zero or more ``-e NAME=VALUE`` pairs, optional ``-t``, the image
+    then zero or more ``-e NAME=VALUE`` pairs, optional ``-i -t`` or legacy
+    ``-t``, the image
     reference and the command.  The caller compares ``build_create_argv``
     of the result with ``argv`` for exact equality, so this parser only has
     to locate fields; all policy checks stay in ``oc2_writer``.
@@ -194,6 +235,10 @@ def _parse_create_spec(argv: list[str]) -> w.WriterSpec:
         name, value = argv[i + 1].split('=', 1)
         env.append((name, value))
         i += 2
+    stdin_open = False
+    if argv[i] == '-i':
+        stdin_open = True
+        i += 1
     tty = False
     if argv[i] == '-t':
         tty = True
@@ -203,7 +248,8 @@ def _parse_create_spec(argv: list[str]) -> w.WriterSpec:
     key = w.WriterSessionKey(labels[w.LABEL_WORKSPACE], labels[w.LABEL_SANDBOX],
                              labels[w.LABEL_GENERATION])
     return w.WriterSpec(key=key, image_ref=image_ref, repo_source=repo_source,
-                        command=command, env=tuple(env), tty=tty)
+                        command=command, env=tuple(env), tty=tty,
+                        stdin_open=stdin_open)
 
 
 def _allowed_shape(argv: list[str]) -> bool:
@@ -1041,12 +1087,97 @@ class SupervisorState(enum.Enum):
     NEW = 'NEW'
     STARTING = 'STARTING'
     RUNNING = 'RUNNING'
+    ATTACHING = 'ATTACHING'
     STOPPING = 'STOPPING'
     STOPPED_VERIFIED = 'STOPPED_VERIFIED'
     UNVERIFIED = 'UNVERIFIED'
 
 
 LifecycleFactory = Callable[[w.WriterSpec], w.WriterLifecycle]
+
+
+@runtime_checkable
+class InteractiveTransport(Protocol):
+    """Raw-byte, full-container-ID-bound TTY transport; it cannot run commands.
+
+    `receive_frame` returns one complete outer frame or None on poll timeout;
+    it raises InteractiveDetachedError on channel EOF. TUI bytes are delivered
+    only as terminal-data frames, never as independently parsed control tokens.
+    """
+
+    def attach(self, container_id: str) -> None: ...
+
+    def send_stdin(self, container_id: str, data: bytes) -> None: ...
+
+    def receive_frame(self, container_id: str, timeout: float) -> bytes | None: ...
+
+    def read_terminal_input(self, timeout: float) -> bytes | None: ...
+
+    def write_terminal_output(self, data: bytes) -> None: ...
+
+    def close(self, container_id: str) -> None: ...
+
+    def restore_terminal(self) -> None: ...
+
+
+class FixtureSnapshotter(Protocol):
+    """Supervisor-owned, pre-fixture snapshot seam; no Writer data is accepted."""
+
+    def capture(self, identity: w.WriterIdentity,
+                authority: VerifiedGuestAuthority) -> bool: ...
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class AttachOutcome:
+    """Observed attach evidence; this is not Task 7 fixture acceptance."""
+
+    tui_exit_code: int | None
+    container_exit_code: int | None
+    boundary_ready: bool
+    snapshot_captured: bool
+    continue_sent: bool
+    stop_verdict: w.StopVerdict
+    failure_code: str | None
+
+
+def _encode_interactive_frame(kind: int, payload: bytes) -> bytes:
+    """Encode one length-bounded terminal-data or Supervisor-control frame."""
+    if kind not in (_INTERACTIVE_TERMINAL_FRAME, _INTERACTIVE_CONTROL_FRAME) \
+            or not isinstance(payload, bytes) or len(payload) > _MAX_INTERACTIVE_FRAME_BYTES:
+        raise InteractiveProtocolError('invalid frame')
+    return _INTERACTIVE_FRAME_HEADER.pack(
+        _INTERACTIVE_FRAME_MAGIC, kind, len(payload),
+    ) + payload
+
+
+def _decode_interactive_frame(raw: object) -> tuple[int, bytes]:
+    """Decode exactly one outer frame without inspecting terminal-data payloads."""
+    if not isinstance(raw, bytes) or len(raw) < _INTERACTIVE_FRAME_HEADER.size:
+        raise InteractiveProtocolError('malformed frame')
+    magic, kind, size = _INTERACTIVE_FRAME_HEADER.unpack_from(raw)
+    if magic != _INTERACTIVE_FRAME_MAGIC or kind not in (
+        _INTERACTIVE_TERMINAL_FRAME, _INTERACTIVE_CONTROL_FRAME,
+    ):
+        raise InteractiveProtocolError('unrecognized frame')
+    if size > _MAX_INTERACTIVE_FRAME_BYTES \
+            or len(raw) != _INTERACTIVE_FRAME_HEADER.size + size:
+        raise InteractiveProtocolError('frame length mismatch')
+    return kind, raw[_INTERACTIVE_FRAME_HEADER.size:]
+
+
+def _parse_tui_exit(payload: bytes) -> int:
+    """Parse one canonical ASCII TUI exit-code control payload."""
+    try:
+        text = payload.decode('ascii')
+    except UnicodeDecodeError as exc:
+        raise InteractiveProtocolError('invalid TUI exit frame') from exc
+    match = re.fullmatch(r'TUI_EXIT (0|[1-9][0-9]{0,2})', text)
+    if match is None:
+        raise InteractiveProtocolError('invalid TUI exit frame')
+    code = int(match.group(1))
+    if code > 255:
+        raise InteractiveProtocolError('invalid TUI exit code')
+    return code
 
 
 def guest_lifecycle_factory(runner: w.DockerRunner, fs: GuestFs,
@@ -1105,8 +1236,9 @@ def _classify_launch_failure(exc: BaseException) -> tuple[type[SupervisorError],
 class GuestSupervisor:
     """Single-Session, single-Writer Guest Supervisor.
 
-    States: NEW -> STARTING -> RUNNING -> STOPPING -> STOPPED_VERIFIED, with
-    any failure or unknown outcome going to UNVERIFIED.  STOPPED_VERIFIED
+    States: NEW -> STARTING -> RUNNING -> ATTACHING -> STOPPING ->
+    STOPPED_VERIFIED, with any failure or unknown outcome going to UNVERIFIED.
+    STOPPED_VERIFIED
     and UNVERIFIED are terminal: there is no restart, relaunch, exec or
     recovery API, and a failed launch is never retried or replaced by a new
     container.
@@ -1123,7 +1255,13 @@ class GuestSupervisor:
     ``SupervisorStateError``.
     """
 
-    def __init__(self, key: w.WriterSessionKey, lifecycle_factory: LifecycleFactory) -> None:
+    def __init__(
+        self,
+        key: w.WriterSessionKey,
+        lifecycle_factory: LifecycleFactory,
+        *,
+        snapshotter: FixtureSnapshotter | None = None,
+    ) -> None:
         if not isinstance(key, w.WriterSessionKey):
             raise SupervisorInputError('session key: invalid type')
         try:
@@ -1132,12 +1270,16 @@ class GuestSupervisor:
             raise SupervisorInputError('session key: invalid') from exc
         if not callable(lifecycle_factory):
             raise SupervisorInputError('lifecycle factory: expected callable')
+        if snapshotter is not None and not callable(getattr(snapshotter, 'capture', None)):
+            raise SupervisorInputError('snapshotter: expected capture capability')
         self._key = key
         self._factory = lifecycle_factory
+        self._snapshotter = snapshotter
         self._lock = threading.Lock()
         self._state = SupervisorState.NEW
         self._identity: w.WriterIdentity | None = None
         self._lifecycle: w.WriterLifecycle | None = None
+        self._spec: w.WriterSpec | None = None
 
     @property
     def session_key(self) -> w.WriterSessionKey:
@@ -1166,6 +1308,121 @@ class GuestSupervisor:
         with self._lock:
             self._state = target
 
+    @staticmethod
+    def _forward_terminal_input(
+        transport: InteractiveTransport, container_id: str,
+    ) -> None:
+        """Forward only raw local terminal bytes to the already-bound full Container ID."""
+        data = transport.read_terminal_input(_INTERACTIVE_POLL_S)
+        if data is None:
+            return
+        if not isinstance(data, bytes) or len(data) > _MAX_INTERACTIVE_FRAME_BYTES:
+            raise InteractiveTransportError('terminal input invalid')
+        if data:
+            transport.send_stdin(container_id, data)
+
+    def _authority_start_line(
+        self,
+        identity: w.WriterIdentity,
+        spec: w.WriterSpec,
+        authority: VerifiedGuestAuthority,
+    ) -> bytes:
+        """Revalidate the immutable Task 2 authority before producing its wire line."""
+        if not isinstance(authority, VerifiedGuestAuthority):
+            raise SupervisorInputError('attach: verified Guest authority required')
+        if not isinstance(authority.manifest, SliceBBundleManifestV1):
+            raise SupervisorInputError('attach: verified manifest required')
+        manifest = authority.manifest
+        if authority.key != self._key or manifest.key != self._key:
+            raise IdentityMismatchError('attach: SessionKey mismatch')
+        if manifest.schema != BUNDLE_SCHEMA or not isinstance(manifest.baseline, GitBaseline):
+            raise SupervisorInputError('attach: manifest schema or baseline invalid')
+        if authority.image_ref != spec.image_ref \
+                or authority.image_config_id != identity.image_id:
+            raise IdentityMismatchError('attach: image authority mismatch')
+        if not isinstance(manifest.baseline.object_format, str):
+            raise SupervisorInputError('attach: invalid Git object format')
+        baseline = manifest.baseline
+        oid_lengths = {'sha1': 40, 'sha256': 64}
+        oid_length = oid_lengths.get(baseline.object_format)
+        if (
+            manifest.transfer_policy_id != BUNDLE_POLICY
+            or not isinstance(manifest.bundle_sha256, str)
+            or re.fullmatch(r'[0-9a-f]{64}', manifest.bundle_sha256) is None
+            or not isinstance(manifest.runtime_sha256, str)
+            or re.fullmatch(r'[0-9a-f]{64}', manifest.runtime_sha256) is None
+            or oid_length is None
+            or not isinstance(baseline.head_oid, str)
+            or re.fullmatch(rf'[0-9a-f]{{{oid_length}}}', baseline.head_oid) is None
+            or not isinstance(baseline.tree_oid, str)
+            or re.fullmatch(rf'[0-9a-f]{{{oid_length}}}', baseline.tree_oid) is None
+            or isinstance(manifest.bundle_size_bytes, bool)
+            or not isinstance(manifest.bundle_size_bytes, int)
+            or manifest.bundle_size_bytes < 0
+        ):
+            raise SupervisorInputError('attach: invalid trusted manifest fields')
+        try:
+            canonical = _manifest_bytes(manifest)
+        except (SliceBGitRejected, TypeError, ValueError) as exc:
+            raise SupervisorInputError('attach: invalid trusted manifest') from exc
+        if hashlib.sha256(canonical).hexdigest() != authority.manifest_sha256:
+            raise SupervisorInputError('attach: trusted manifest digest mismatch')
+        try:
+            task2_message = build_start_message(authority)
+            start_message = SliceBStartMessage(
+                self._key.session_generation,
+                baseline.head_oid,
+                baseline.branch_ref,
+                authority.manifest_sha256,
+            )
+            if task2_message != start_message:
+                raise SupervisorInputError('attach: Task 2 start message mismatch')
+            line = (
+                'OC2_SLICE_B_START '
+                + ' '.join((
+                    self._key.session_generation,
+                    baseline.head_oid,
+                    baseline.branch_ref,
+                    authority.manifest_sha256,
+                ))
+                + '\n'
+            )
+            start_line = line.encode('ascii')
+        except (SliceBGitRejected, SliceBSessionError, UnicodeError, TypeError, ValueError) as exc:
+            raise SupervisorInputError('attach: invalid trusted start authority') from exc
+        if len(start_line) > 512:
+            raise SupervisorInputError('attach: trusted start line exceeds bound')
+        return start_line
+
+    def _inspect_attach_identity(
+        self, identity: w.WriterIdentity, *, require_running: bool,
+    ) -> Mapping[str, Any]:
+        lifecycle, spec = self._lifecycle, self._spec
+        if lifecycle is None or spec is None:
+            raise IdentityMismatchError('attach: Writer lifecycle unavailable')
+        try:
+            info = lifecycle._inspect(identity.container_id)
+        except w.WriterError as exc:
+            raise IdentityMismatchError('attach: container inspect unavailable') from exc
+        if not isinstance(info, Mapping):
+            raise IdentityMismatchError('attach: container inspect malformed')
+        try:
+            w.validate_writer_inspect(info, spec)
+        except w.WriterError as exc:
+            raise InspectMismatchError('attach: Writer inspect mismatch') from exc
+        if info.get('Id') != identity.container_id or info.get('Image') != identity.image_id:
+            raise IdentityMismatchError('attach: container or image identity mismatch')
+        state = info.get('State')
+        if not isinstance(state, Mapping) or state.get('StartedAt') != identity.started_at:
+            raise IdentityMismatchError('attach: StartedAt mismatch')
+        if require_running:
+            pid = state.get('Pid')
+            if state.get('Status') != 'running' or state.get('Running') is not True:
+                raise InspectMismatchError('attach: Writer is not running')
+            if isinstance(pid, bool) or not isinstance(pid, int) or pid <= 0:
+                raise InspectMismatchError('attach: Writer PID invalid')
+        return state
+
     def launch(self, spec: w.WriterSpec) -> w.WriterIdentity:
         """Launch the single Writer for this Session (only from NEW)."""
         try:
@@ -1176,6 +1433,8 @@ class GuestSupervisor:
             raise SupervisorInputError('launch: spec session key mismatch')
         self._transition(SupervisorState.NEW, SupervisorState.STARTING)
         failure: SupervisorError | None = None
+        lifecycle: w.WriterLifecycle | None = None
+        identity: w.WriterIdentity | None = None
         try:
             lifecycle = self._factory(spec)
             if not isinstance(lifecycle, w.WriterLifecycle):
@@ -1192,11 +1451,243 @@ class GuestSupervisor:
             failure = cls(f'launch failed: {code}')
         if failure is not None:
             raise failure
+        if lifecycle is None or identity is None:
+            self._set_state(SupervisorState.UNVERIFIED)
+            raise LaunchFailedError('launch failed: identity unavailable')
         with self._lock:
             self._identity = identity
             self._lifecycle = lifecycle
+            self._spec = spec
             self._state = SupervisorState.RUNNING
         return identity
+
+    def attach_writer(
+        self,
+        identity: w.WriterIdentity,
+        transport: InteractiveTransport,
+        authority: VerifiedGuestAuthority,
+    ) -> AttachOutcome:
+        """Attach once to the launched Writer and return bounded evidence only.
+
+        The trusted start line is sent before any host terminal input. Only
+        framed PID 1 controls can open the snapshot/CONTINUE barrier; terminal
+        bytes are always opaque. This does not establish Task 7 acceptance.
+        """
+        if not isinstance(identity, w.WriterIdentity):
+            raise IdentityMismatchError('attach: identity type invalid')
+        try:
+            cid = w.validate_container_id(identity.container_id)
+        except w.WriterError as exc:
+            raise IdentityMismatchError('attach: full Container ID required') from exc
+        if not self._lock.acquire(blocking=False):
+            raise SupervisorStateError('state conflict: busy')
+        try:
+            if self._state is not SupervisorState.RUNNING:
+                raise SupervisorStateError(
+                    f'state conflict: {self._state.value} (need RUNNING)'
+                )
+            if identity != self._identity:
+                raise IdentityMismatchError('attach: foreign Writer identity')
+            self._state = SupervisorState.ATTACHING
+            spec = self._spec
+        finally:
+            self._lock.release()
+
+        tui_exit_code: int | None = None
+        container_exit_code: int | None = None
+        boundary_ready = False
+        snapshot_captured = False
+        continue_sent = False
+        failure_code: str | None = None
+        attach_attempted = False
+        post_tui_exit_deadline: float | None = None
+        post_continue_deadline: float | None = None
+
+        try:
+            if spec is None:
+                raise IdentityMismatchError('attach: Writer spec unavailable')
+            snapshotter = self._snapshotter
+            if snapshotter is None:
+                raise FixtureSnapshotError('snapshotter unavailable')
+            if not isinstance(transport, InteractiveTransport):
+                raise InteractiveTransportError('interactive transport invalid')
+            start_line = self._authority_start_line(identity, spec, authority)
+            state = self._inspect_attach_identity(identity, require_running=True)
+            pid = state.get('Pid')
+            if state.get('Status') != 'running' or state.get('Running') is not True \
+                    or isinstance(pid, bool) or not isinstance(pid, int) or pid <= 0:
+                raise InspectMismatchError('attach: Writer is not running')
+
+            attach_attempted = True
+            transport.attach(cid)
+            transport.send_stdin(cid, start_line)
+            while True:
+                if continue_sent and (post_continue_deadline is not None
+                                      and time.monotonic() >= post_continue_deadline):
+                    failure_code = 'writer-exit-unknown'
+                    break
+                if (tui_exit_code is not None and not continue_sent
+                        and post_tui_exit_deadline is not None
+                        and time.monotonic() >= post_tui_exit_deadline):
+                    failure_code = 'fixture-boundary-unconfirmed'
+                    break
+                raw_frame = transport.receive_frame(cid, _INTERACTIVE_POLL_S)
+                if raw_frame is None:
+                    if tui_exit_code is None:
+                        self._forward_terminal_input(transport, cid)
+                    continue
+                kind, payload = _decode_interactive_frame(raw_frame)
+                if kind == _INTERACTIVE_TERMINAL_FRAME:
+                    transport.write_terminal_output(payload)
+                else:
+                    if payload.startswith(b'TUI_EXIT'):
+                        if tui_exit_code is not None:
+                            raise InteractiveProtocolError('duplicate TUI exit frame')
+                        tui_exit_code = _parse_tui_exit(payload)
+                        if tui_exit_code != 0:
+                            failure_code = 'tui-exit-nonzero'
+                            break
+                        post_tui_exit_deadline = (
+                            time.monotonic() + _POST_TUI_EXIT_TIMEOUT_S
+                        )
+                    elif payload == b'FIXTURE_BOUNDARY_READY':
+                        if tui_exit_code != 0 or boundary_ready:
+                            raise InteractiveProtocolError('READY out of sequence')
+                        boundary_ready = True
+                        try:
+                            captured = snapshotter.capture(identity, authority)
+                        except Exception as exc:  # noqa: BLE001
+                            raise FixtureSnapshotError('snapshot unavailable') from exc
+                        if captured is not True:
+                            raise FixtureSnapshotError('snapshot unavailable')
+                        snapshot_captured = True
+                        transport.send_stdin(
+                            cid,
+                            _encode_interactive_frame(
+                                _INTERACTIVE_CONTROL_FRAME, b'FIXTURE_BOUNDARY_CONTINUE',
+                            ),
+                        )
+                        continue_sent = True
+                        post_continue_deadline = (
+                            time.monotonic() + _POST_CONTINUE_TIMEOUT_S
+                        )
+                    else:
+                        raise InteractiveProtocolError('unknown control frame')
+                if tui_exit_code is None:
+                    self._forward_terminal_input(transport, cid)
+        except InteractiveDetachedError:
+            pass
+        except KeyboardInterrupt:
+            failure_code = 'interrupted'
+            if attach_attempted:
+                try:
+                    transport.send_stdin(cid, b'\x03')
+                except (InteractiveTransportError, OSError, TimeoutError, KeyboardInterrupt):
+                    failure_code = 'interrupt-forward-failed'
+        except InteractiveProtocolError:
+            failure_code = 'interactive-protocol'
+        except FixtureSnapshotError:
+            failure_code = 'snapshot-failed'
+        except InteractiveTransportError:
+            failure_code = 'attach-transport'
+        except IdentityMismatchError:
+            failure_code = 'identity-mismatch'
+        except InspectMismatchError:
+            failure_code = 'inspect-mismatch'
+        except (SupervisorInputError, SliceBGitRejected, SliceBSessionError,
+                w.WriterError, OSError, TimeoutError, TypeError, ValueError):
+            failure_code = 'attach-validation-failed'
+        except Exception:  # noqa: BLE001
+            failure_code = 'attach-failed'
+        finally:
+            if attach_attempted:
+                try:
+                    transport.close(cid)
+                except KeyboardInterrupt:
+                    if failure_code is None:
+                        failure_code = 'attach-close-failed'
+                except Exception:  # noqa: BLE001
+                    if failure_code is None:
+                        failure_code = 'attach-close-failed'
+                try:
+                    transport.restore_terminal()
+                except KeyboardInterrupt:
+                    if failure_code is None:
+                        failure_code = 'terminal-restore-failed'
+                except Exception:  # noqa: BLE001
+                    if failure_code is None:
+                        failure_code = 'terminal-restore-failed'
+
+        stop_verdict = w.StopVerdict(
+            w.STATUS_GUEST_QUIESCENCE_UNVERIFIED, ('attach stop not attempted',),
+        )
+        try:
+            if attach_attempted:
+                try:
+                    final_state = self._inspect_attach_identity(identity, require_running=False)
+                    pid = final_state.get('Pid')
+                    exit_code = final_state.get('ExitCode')
+                    if (
+                        final_state.get('Status') != 'exited'
+                        or final_state.get('Running') is not False
+                        or isinstance(pid, bool)
+                        or not isinstance(pid, int)
+                        or pid != 0
+                        or isinstance(exit_code, bool)
+                        or not isinstance(exit_code, int)
+                        or not 0 <= exit_code <= 255
+                    ):
+                        if failure_code is None:
+                            failure_code = 'writer-exit-unknown'
+                    else:
+                        container_exit_code = exit_code
+                        if exit_code != 0 and failure_code is None:
+                            failure_code = 'writer-exit-nonzero'
+                except (IdentityMismatchError, InspectMismatchError, w.WriterError):
+                    if failure_code is None:
+                        failure_code = 'writer-exit-unknown'
+                except KeyboardInterrupt:
+                    if failure_code is None:
+                        failure_code = 'interrupted'
+                except (OSError, TimeoutError):
+                    if failure_code is None:
+                        failure_code = 'writer-exit-unknown'
+                except Exception:  # noqa: BLE001
+                    if failure_code is None:
+                        failure_code = 'writer-exit-unknown'
+            if failure_code is None and tui_exit_code is None:
+                failure_code = 'tui-exit-unknown'
+            if failure_code is None and not (boundary_ready and snapshot_captured and continue_sent):
+                failure_code = 'fixture-boundary-incomplete'
+        finally:
+            try:
+                lifecycle, current = self._begin_stop(
+                    identity, SupervisorState.ATTACHING, 'attach',
+                )
+                stop_verdict = self._finish_stop(lifecycle, current)
+            except KeyboardInterrupt:
+                self._set_state(SupervisorState.UNVERIFIED)
+                stop_verdict = w.StopVerdict(
+                    w.STATUS_GUEST_QUIESCENCE_UNVERIFIED, ('attach stop interrupted',),
+                )
+                if failure_code is None:
+                    failure_code = 'interrupted'
+            except SupervisorError:
+                self._set_state(SupervisorState.UNVERIFIED)
+                stop_verdict = w.StopVerdict(
+                    w.STATUS_GUEST_QUIESCENCE_UNVERIFIED, ('attach stop unverified',),
+                )
+            if not stop_verdict.verified and failure_code is None:
+                failure_code = 'stop-unverified'
+        return AttachOutcome(
+            tui_exit_code,
+            container_exit_code,
+            boundary_ready,
+            snapshot_captured,
+            continue_sent,
+            stop_verdict,
+            failure_code,
+        )
 
     def stop(self, identity: w.WriterIdentity | None = None) -> w.StopVerdict:
         """Stop and verify the Writer (only from RUNNING).
@@ -1207,21 +1698,39 @@ class GuestSupervisor:
         both cases; the state becomes STOPPED_VERIFIED only for a verified
         verdict and UNVERIFIED otherwise.
         """
+        lifecycle, current = self._begin_stop(identity, SupervisorState.RUNNING, 'stop')
+        return self._finish_stop(lifecycle, current)
+
+    def _begin_stop(
+        self,
+        identity: w.WriterIdentity | None,
+        expected: SupervisorState,
+        operation: str,
+    ) -> tuple[w.WriterLifecycle | None, w.WriterIdentity | None]:
         if not self._lock.acquire(blocking=False):
             raise SupervisorStateError('state conflict: busy')
         try:
-            if self._state is not SupervisorState.RUNNING:
+            if self._state is not expected:
                 raise SupervisorStateError(
-                    f'state conflict: {self._state.value} (need RUNNING)')
-            if identity is not None and (not isinstance(identity, w.WriterIdentity)
-                                         or identity != self._identity):
+                    f'state conflict: {self._state.value} (need {expected.value})'
+                )
+            if identity is not None and (
+                not isinstance(identity, w.WriterIdentity) or identity != self._identity
+            ):
                 tag = _cid_tag(getattr(identity, 'container_id', None))
-                raise IdentityMismatchError(f'stop: foreign identity cid={tag}')
+                raise IdentityMismatchError(f'{operation}: foreign identity cid={tag}')
             self._state = SupervisorState.STOPPING
-            lifecycle, current = self._lifecycle, self._identity
+            return self._lifecycle, self._identity
         finally:
             self._lock.release()
+
+    def _finish_stop(
+        self,
+        lifecycle: w.WriterLifecycle | None,
+        current: w.WriterIdentity | None,
+    ) -> w.StopVerdict:
         failure: StopVerificationError | None = None
+        verdict: w.StopVerdict | None = None
         try:
             if lifecycle is None or current is None:
                 raise StopVerificationError('stop: lifecycle unavailable')
@@ -1238,6 +1747,9 @@ class GuestSupervisor:
             )
         if failure is not None:
             raise failure
+        if verdict is None:
+            self._set_state(SupervisorState.UNVERIFIED)
+            raise StopVerificationError('stop: verdict unavailable')
         self._set_state(SupervisorState.STOPPED_VERIFIED if verdict.verified
                         else SupervisorState.UNVERIFIED)
         return verdict
