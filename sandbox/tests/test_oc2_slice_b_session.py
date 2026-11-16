@@ -1,7 +1,10 @@
 from pathlib import Path
 from dataclasses import replace
+import fcntl
+import queue
 import sys
 import tempfile
+import threading
 import unittest
 import uuid
 import subprocess
@@ -210,6 +213,74 @@ class SessionTests(unittest.TestCase):
             with self.assertRaisesRegex(OSError, "fsync failed"):
                 update_session_receipt(path, self.rec)
         self.assertFalse(path.with_name("receipt.tmp").exists())
+
+    def test_concurrent_writer_identity_binding_is_serialized(self) -> None:
+        """A second writer cannot bind from the stale unbound receipt snapshot."""
+        path = create_session_receipt(self.state, self.rec, self.art)
+        first = replace(
+            self.rec,
+            state="RUNNING",
+            writer_id="a" * 64,
+            started_at="2026-11-16T00:00:00Z",
+        )
+        second = replace(first, writer_id="b" * 64)
+        first_read = threading.Event()
+        release_first = threading.Event()
+        signals: queue.Queue[str] = queue.Queue()
+        results: queue.Queue[tuple[str, Exception | None]] = queue.Queue()
+        original_flock = fcntl.flock
+        original_verify = verify_session_receipt
+
+        def observe_flock(descriptor: int, operation: int) -> None:
+            if threading.current_thread().name == "writer-second" and operation == fcntl.LOCK_EX:
+                signals.put("lock")
+            original_flock(descriptor, operation)
+
+        def pause_first_read(receipt_path: Path, expected_key: object) -> SliceBReceipt:
+            result = original_verify(receipt_path, expected_key)
+            if threading.current_thread().name == "writer-first":
+                first_read.set()
+                if not release_first.wait(timeout=5):
+                    raise TimeoutError("first update gate timed out")
+            else:
+                signals.put("verify")
+            return result
+
+        def update(receipt: SliceBReceipt) -> None:
+            writer = threading.current_thread().name
+            try:
+                update_session_receipt(path, receipt)
+            except Exception as error:
+                results.put((writer, error))
+            else:
+                results.put((writer, None))
+
+        first_thread = threading.Thread(
+            target=update, args=(first,), name="writer-first"
+        )
+        second_thread = threading.Thread(
+            target=update, args=(second,), name="writer-second"
+        )
+        observed: str | None = None
+        with patch("oc2_slice_b_session.verify_session_receipt", side_effect=pause_first_read), \
+                patch.object(fcntl, "flock", side_effect=observe_flock):
+            first_thread.start()
+            self.assertTrue(first_read.wait(timeout=5))
+            second_thread.start()
+            try:
+                observed = signals.get(timeout=5)
+            finally:
+                release_first.set()
+            first_thread.join(timeout=5)
+            second_thread.join(timeout=5)
+
+        self.assertFalse(first_thread.is_alive())
+        self.assertFalse(second_thread.is_alive())
+        self.assertEqual(observed, "lock")
+        outcomes = dict((results.get_nowait(), results.get_nowait()))
+        self.assertIsNone(outcomes["writer-first"])
+        self.assertIsInstance(outcomes["writer-second"], SliceBSessionError)
+        self.assertEqual(verify_session_receipt(path, self.key).writer_id, first.writer_id)
 
 
 if __name__ == "__main__":

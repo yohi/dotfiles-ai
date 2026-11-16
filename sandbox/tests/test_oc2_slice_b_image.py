@@ -2,9 +2,11 @@ from pathlib import Path
 import hashlib
 import json
 import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 from oc2_slice_b_image import (
@@ -149,20 +151,94 @@ class ImageTests(unittest.TestCase):
         from oc2_slice_b_image import offline_build_argv
 
         base_ref = "alpine@sha256:" + "a" * 64
-        with self.assertRaises(SliceBImageRejected):
-            offline_build_argv(
-                self.root, base_ref, transport_tag="oc2-slice-b:transport",
-                base_image_inspect={"RepoDigests": []},
-            )
-        argv = offline_build_argv(
-            self.root, base_ref, transport_tag="oc2-slice-b:transport",
-            base_image_inspect={"RepoDigests": [base_ref]},
+        absent = subprocess.CompletedProcess(
+            ["docker", "image", "inspect", base_ref],
+            0,
+            json.dumps([{"RepoDigests": []}]),
+            "",
         )
+        with self.assertRaises(SliceBImageRejected):
+            with patch("oc2_slice_b_image._run_docker_command", return_value=absent):
+                offline_build_argv(
+                    self.root, base_ref, transport_tag="oc2-slice-b:transport"
+                )
+        present = subprocess.CompletedProcess(
+            ["docker", "image", "inspect", base_ref],
+            0,
+            json.dumps([{"RepoDigests": [base_ref]}]),
+            "",
+        )
+        with patch("oc2_slice_b_image._run_docker_command", return_value=present):
+            argv = offline_build_argv(
+                self.root, base_ref, transport_tag="oc2-slice-b:transport"
+            )
         self.assertIn("--pull=false", argv)
         self.assertIn("--network=none", argv)
         self.assertEqual(runtime_hash, json.loads(
             (self.root / "build-inputs.json").read_text()
         )["runtime_sha256"])
+
+    def test_build_executor_aborts_before_build_when_base_is_missing(self) -> None:
+        """A failed local image inspect prevents the Docker build command."""
+        self._write_build_context()
+        from oc2_slice_b_image import build_offline_image
+
+        missing = subprocess.CompletedProcess(
+            ["docker", "image", "inspect"], 1, "", "not found"
+        )
+        with patch("oc2_slice_b_image._run_docker_command", return_value=missing) as run:
+            with self.assertRaises(SliceBImageRejected):
+                build_offline_image(
+                    self.root,
+                    "alpine@sha256:" + "a" * 64,
+                    transport_tag="oc2-slice-b:transport",
+                )
+        self.assertEqual(run.call_count, 1)
+
+    def test_build_executor_inspects_before_running_offline_build(self) -> None:
+        """The actual build executor verifies local RepoDigests before invoking build."""
+        self._write_build_context()
+        from oc2_slice_b_image import build_offline_image
+
+        base_ref = "alpine@sha256:" + "a" * 64
+        inspected = subprocess.CompletedProcess(
+            ["docker", "image", "inspect", base_ref],
+            0,
+            json.dumps([{"RepoDigests": [base_ref]}]),
+            "",
+        )
+        built = subprocess.CompletedProcess(["docker", "build"], 0, "", "")
+        with patch(
+            "oc2_slice_b_image._run_docker_command",
+            side_effect=(inspected, built),
+        ) as run:
+            build_offline_image(
+                self.root,
+                base_ref,
+                transport_tag="oc2-slice-b:transport",
+            )
+        self.assertEqual(run.call_count, 2)
+        self.assertEqual(run.call_args_list[0].args[0][:3], ("docker", "image", "inspect"))
+        self.assertIn("--network=none", run.call_args_list[1].args[0])
+
+    def test_build_argv_fetches_its_own_local_inspection(self) -> None:
+        """Callers cannot replace the local base image inspection with supplied data."""
+        self._write_build_context()
+        from oc2_slice_b_image import offline_build_argv
+
+        base_ref = "alpine@sha256:" + "a" * 64
+        inspected = subprocess.CompletedProcess(
+            ["docker", "image", "inspect", base_ref],
+            0,
+            json.dumps([{"RepoDigests": [base_ref]}]),
+            "",
+        )
+        with patch("oc2_slice_b_image._run_docker_command", return_value=inspected) as run:
+            argv = offline_build_argv(
+                self.root, base_ref, transport_tag="oc2-slice-b:transport"
+            )
+        run.assert_called_once_with(("docker", "image", "inspect", base_ref))
+        self.assertIn("--network=none", argv)
 
 
 if __name__ == "__main__":

@@ -5,8 +5,10 @@ No Docker, Sandbox, privileged Writer, credentials or Host Git mutations.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
+from contextlib import contextmanager
 from dataclasses import dataclass, asdict, replace
+import fcntl
 import hashlib
 import json
 import os
@@ -310,8 +312,34 @@ def verify_session_receipt(path: Path, expected_key: object) -> SliceBReceipt:
         raise SliceBSessionError("receipt unavailable or malformed") from e
 
 
+@contextmanager
+def _receipt_update_lock(path: Path) -> Iterator[None]:
+    """Hold a stable sibling lockfile exclusively until the update transaction ends."""
+    lock_path = path.with_name("receipt.lock")
+    descriptor = os.open(
+        lock_path,
+        os.O_RDWR
+        | os.O_CREAT
+        | getattr(os, "O_NOFOLLOW", 0)
+        | getattr(os, "O_CLOEXEC", 0),
+        0o600,
+    )
+    try:
+        metadata = os.fstat(descriptor)
+        if (
+            not stat.S_ISREG(metadata.st_mode)
+            or metadata.st_nlink != 1
+            or metadata.st_mode & 0o077
+        ):
+            raise SliceBSessionError("unsafe receipt update lock")
+        fcntl.flock(descriptor, fcntl.LOCK_EX)
+        yield
+    finally:
+        os.close(descriptor)
+
+
 def update_session_receipt(path: Path, receipt: SliceBReceipt) -> None:
-    """Validate allowed receipt evolution and atomically replace via an exclusive temporary file.
+    """Serialize validation through replacement to prevent stale concurrent updates.
 
     Receipt identity is immutable; all four validated states are accepted as
     update targets, and Writer identity may bind once only on RUNNING. Once
@@ -320,6 +348,12 @@ def update_session_receipt(path: Path, receipt: SliceBReceipt) -> None:
     fails, only this call's successfully created temp file is removed; cleanup
     errors are attached to, rather than substituted for, the original error.
     """
+    with _receipt_update_lock(path):
+        _update_session_receipt_locked(path, receipt)
+
+
+def _update_session_receipt_locked(path: Path, receipt: SliceBReceipt) -> None:
+    """Update a receipt while its sibling flock is held by the caller."""
     _validate_receipt(receipt)
     old = verify_session_receipt(path, receipt.key)
     immutable = (

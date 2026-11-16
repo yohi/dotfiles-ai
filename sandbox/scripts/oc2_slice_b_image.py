@@ -1,8 +1,10 @@
-"""Trusted offline Writer image policy. Pure checks; no implicit Docker calls.
+"""Trusted offline Writer image policy and explicit build execution.
 
 G0 evidence (Alpine) does not authorize a Writer image. A local digest-ref
 resolution and expected config ID are both required; bare IDs and tags never
-pass validation for execution.
+pass validation for execution. Verification helpers do not invoke Docker;
+offline_build_argv explicitly inspects the local base, and build_offline_image
+executes only after that preflight succeeds.
 """
 
 from __future__ import annotations
@@ -14,6 +16,7 @@ import os
 from pathlib import Path
 import re
 import stat
+import subprocess
 from typing import Any, Mapping
 
 _DIGEST = re.compile(r"[0-9a-f]{64}\Z")
@@ -170,17 +173,16 @@ def verify_build_inputs(source_root: Path) -> None:
 
 def offline_build_argv(
     source_root: Path, base_ref: str, *, transport_tag: str,
-    base_image_inspect: Mapping[str, Any],
 ) -> tuple[str, ...]:
-    """Return offline build argv after requiring proof of the exact local base digest.
+    """Return offline build argv only after inspecting the exact base image locally.
 
-    Caller supplies `docker image inspect <base_ref>` output obtained locally;
-    the function does not run Docker. Inputs must remain fixed through execution.
+    Runs `docker image inspect` and rejects missing/mismatched local digest
+    evidence. Use build_offline_image to execute the returned argv immediately.
     """
     verify_build_inputs(source_root)
     if not _REF.fullmatch(base_ref):
         raise SliceBImageRejected("base must be digest pinned")
-    verify_local_base_image(base_image_inspect, base_ref)
+    verify_local_base_image(_inspect_local_base_image(base_ref), base_ref)
     meta = json.loads(_read_file(source_root.resolve() / "build-inputs.json", 64 * 1024))
     if base_ref != meta["base_image_ref"] or transport_tag != "oc2-slice-b:transport":
         raise SliceBImageRejected("untrusted build settings")
@@ -195,6 +197,55 @@ def offline_build_argv(
         transport_tag,
         str(source_root.resolve()),
     )
+
+
+def _run_docker_command(argv: tuple[str, ...]) -> subprocess.CompletedProcess[str]:
+    """Run one bounded Docker CLI command without returning its output to users."""
+    try:
+        return subprocess.run(
+            argv,
+            capture_output=True,
+            text=True,
+            timeout=300,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as error:
+        raise SliceBImageRejected("Docker command failed") from error
+
+
+def _inspect_local_base_image(base_ref: str) -> Mapping[str, Any]:
+    """Obtain one local Docker inspect record or reject before generating build argv."""
+    result = _run_docker_command(("docker", "image", "inspect", base_ref))
+    if result.returncode != 0:
+        raise SliceBImageRejected("pinned base image is not available locally")
+    try:
+        inspect_data = json.loads(result.stdout)
+    except (TypeError, ValueError) as error:
+        raise SliceBImageRejected("invalid local base image inspection") from error
+    if (
+        not isinstance(inspect_data, list)
+        or len(inspect_data) != 1
+        or not isinstance(inspect_data[0], Mapping)
+    ):
+        raise SliceBImageRejected("invalid local base image inspection")
+    return inspect_data[0]
+
+
+def build_offline_image(
+    source_root: Path, base_ref: str, *, transport_tag: str
+) -> None:
+    """Inspect the pinned base locally, then run the offline Docker build.
+
+    The same Docker CLI context is used for both commands. Missing/invalid local
+    image evidence aborts before the builder runs. Docker or validation failures
+    raise SliceBImageRejected; command output is captured and not disclosed.
+    """
+    if not _REF.fullmatch(base_ref):
+        raise SliceBImageRejected("base must be digest pinned")
+    argv = offline_build_argv(source_root, base_ref, transport_tag=transport_tag)
+    build_result = _run_docker_command(argv)
+    if build_result.returncode != 0:
+        raise SliceBImageRejected("offline Writer image build failed")
 
 
 def verify_image_archive(archive: Path, pin: ImagePin) -> None:
