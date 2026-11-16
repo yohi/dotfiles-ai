@@ -155,6 +155,7 @@ class DockerAttachTransport:
     def _read_available(self, timeout: float) -> bytes | None:
         process = self._process
         if process is None or process.stdout is None:
+            self._poisoned = True
             raise supervisor.InteractiveTransportError("attach output unavailable")
         try:
             ready, _, _ = select.select([process.stdout], [], [], timeout)
@@ -162,6 +163,7 @@ class DockerAttachTransport:
                 return None
             return os.read(process.stdout.fileno(), _CHUNK)
         except (OSError, ValueError) as exc:
+            self._poisoned = True
             raise supervisor.InteractiveTransportError("attach output failed") from exc
 
     def _next_frame_length(self) -> int | None:
@@ -219,11 +221,16 @@ class DockerAttachTransport:
         fd = self._stdin_fd
         if fd is None:
             return None
-        if not math.isfinite(timeout) or timeout < 0:
+        if (
+            isinstance(timeout, bool)
+            or not isinstance(timeout, (int, float))
+            or not math.isfinite(timeout)
+            or timeout < 0
+        ):
             raise supervisor.InteractiveTransportError("invalid terminal input timeout")
         try:
             ready, _, _ = select.select([fd], [], [], timeout)
-            data = os.read(fd, _CHUNK) if ready else None
+            data = os.read(fd, _MAX_FRAME + 1) if ready else None
             if data is not None and len(data) > _MAX_FRAME:
                 self._poisoned = True
                 raise supervisor.InteractiveTransportError("terminal input exceeds bound")
@@ -310,13 +317,16 @@ class DockerAttachTransport:
                     process.wait(timeout=_REAP_TIMEOUT)
                 except (OSError, ProcessLookupError, subprocess.TimeoutExpired):
                     failure = True
-        try:
-            if process.stdin is not None:
+        if process.stdin is not None:
+            try:
                 process.stdin.close()
-            if process.stdout is not None:
+            except OSError:
+                failure = True
+        if process.stdout is not None:
+            try:
                 process.stdout.close()
-        except OSError:
-            failure = True
+            except OSError:
+                failure = True
         self._process = None
         try:
             self._cleanup_config()

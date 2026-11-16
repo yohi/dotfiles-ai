@@ -192,6 +192,57 @@ class AttachTransportTests(unittest.TestCase):
         self.transport.attach(CID)
         self.assertIsNone(self.transport.receive_frame(CID, 0))
 
+    def test_output_read_failure_poisons_transport(self) -> None:
+        self.transport.attach(CID)
+        with patch.object(transport.select, "select", side_effect=OSError("read failed")):
+            with self.assertRaises(sup.InteractiveTransportError):
+                self.transport.receive_frame(CID, 1)
+
+        self.assertTrue(self.transport._poisoned)
+        with self.assertRaisesRegex(sup.InteractiveTransportError, "unusable"):
+            self.transport.receive_frame(CID, 1)
+
+    def test_missing_output_stream_poisons_transport(self) -> None:
+        self.transport.attach(CID)
+        process = self.processes[0]
+        stdout = process.stdout
+        process.stdout = None
+        try:
+            with self.assertRaises(sup.InteractiveTransportError):
+                self.transport.receive_frame(CID, 1)
+            self.assertTrue(self.transport._poisoned)
+        finally:
+            process.stdout = stdout
+
+    def test_terminal_input_rejects_invalid_timeout_types(self) -> None:
+        adapter = transport.DockerAttachTransport(
+            "/usr/bin/docker", _stdin_fd=0, _stdout_fd=None,
+        )
+        for timeout in (True, False, "1"):
+            with self.subTest(timeout=timeout):
+                with self.assertRaises(sup.InteractiveTransportError):
+                    adapter.read_terminal_input(timeout)
+
+    def test_terminal_input_reads_one_byte_over_limit_to_enforce_bound(self) -> None:
+        adapter = transport.DockerAttachTransport(
+            "/usr/bin/docker", _stdin_fd=0, _stdout_fd=None,
+        )
+        with patch.object(transport.select, "select", return_value=([0], [], [])):
+            with patch.object(transport.os, "read", return_value=b"x" * (transport._MAX_FRAME + 1)) as read:
+                with self.assertRaises(sup.InteractiveTransportError):
+                    adapter.read_terminal_input(0)
+
+        self.assertEqual(read.call_args.args[1], transport._MAX_FRAME + 1)
+
+    def test_stdout_is_closed_when_stdin_close_fails(self) -> None:
+        self.transport.attach(CID)
+        process = self.processes[0]
+        with patch.object(process.stdin, "close", side_effect=OSError("close failed")):
+            with self.assertRaises(sup.InteractiveTransportError):
+                self.transport.close(CID)
+
+        self.assertTrue(process.stdout.closed)
+
     def test_zero_timeout_reads_a_frame_already_available_on_pipe(self) -> None:
         self.transport.attach(CID)
         frame = FRAME.pack(b"OC2T", 1, 4) + b"data"
