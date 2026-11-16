@@ -1739,7 +1739,7 @@ class FakeInteractiveTransport:
     def __init__(
         self,
         docker: TtyExitDocker,
-        frames: Sequence[bytes | BaseException],
+        frames: Sequence[bytes | BaseException | None],
         inputs: Sequence[bytes | BaseException] = (),
         fail_attach: bool = False,
     ) -> None:
@@ -1791,7 +1791,7 @@ class FakeInteractiveTransport:
 class TtyScenario:
     def __init__(
         self,
-        frames: Sequence[bytes | BaseException] = (),
+        frames: Sequence[bytes | BaseException | None] = (),
         inputs: Sequence[bytes | BaseException] = (),
         *,
         snapshot: bool = True,

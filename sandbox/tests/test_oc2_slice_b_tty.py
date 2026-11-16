@@ -5,6 +5,7 @@ from dataclasses import replace
 from pathlib import Path
 import sys
 import unittest
+from unittest.mock import patch
 
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 TESTS = Path(__file__).resolve().parent
@@ -105,6 +106,103 @@ class SliceBTtyTests(unittest.TestCase):
         )
         self.assertTrue(outcome.snapshot_captured)
         self.assertTrue(outcome.continue_sent)
+
+    def test_normal_attach_reports_verified_zero_exit(self) -> None:
+        scenario = ts.TtyScenario(
+            frames=[ts.tty_control("TUI_EXIT 0"),
+                    ts.tty_control("FIXTURE_BOUNDARY_READY")],
+        )
+
+        outcome = scenario.supervisor.attach_writer(
+            scenario.identity, scenario.transport, scenario.authority,
+        )
+
+        self.assertIsNone(outcome.failure_code)
+        self.assertEqual(outcome.tui_exit_code, 0)
+        self.assertEqual(outcome.container_exit_code, 0)
+        self.assertTrue(outcome.stop_verdict.verified)
+
+    def test_snapshot_exception_still_stops_writer(self) -> None:
+        scenario = ts.TtyScenario(
+            frames=[ts.tty_control("TUI_EXIT 0"),
+                    ts.tty_control("FIXTURE_BOUNDARY_READY")],
+        )
+        with patch.object(scenario.snapshotter, "capture", side_effect=RuntimeError):
+            outcome = scenario.supervisor.attach_writer(
+                scenario.identity, scenario.transport, scenario.authority,
+            )
+
+        self.assertEqual(outcome.failure_code, "snapshot-failed")
+        self.assertIn("stop", scenario.docker.verbs())
+
+    def test_close_exception_does_not_skip_restore_or_stop(self) -> None:
+        scenario = ts.TtyScenario(
+            frames=[ts.tty_control("TUI_EXIT 0"),
+                    ts.tty_control("FIXTURE_BOUNDARY_READY")],
+        )
+        with patch.object(scenario.transport, "close", side_effect=RuntimeError):
+            outcome = scenario.supervisor.attach_writer(
+                scenario.identity, scenario.transport, scenario.authority,
+            )
+
+        self.assertEqual(outcome.failure_code, "attach-close-failed")
+        self.assertIn(("restore", None), scenario.transport.events)
+        self.assertIn("stop", scenario.docker.verbs())
+
+    def test_restore_exception_does_not_skip_stop(self) -> None:
+        scenario = ts.TtyScenario(
+            frames=[ts.tty_control("TUI_EXIT 0"),
+                    ts.tty_control("FIXTURE_BOUNDARY_READY")],
+        )
+        with patch.object(scenario.transport, "restore_terminal", side_effect=RuntimeError):
+            outcome = scenario.supervisor.attach_writer(
+                scenario.identity, scenario.transport, scenario.authority,
+            )
+
+        self.assertEqual(outcome.failure_code, "terminal-restore-failed")
+        self.assertIn(("close", scenario.identity.container_id), scenario.transport.events)
+        self.assertIn("stop", scenario.docker.verbs())
+
+    def test_empty_poll_before_tui_exit_preserves_interaction(self) -> None:
+        scenario = ts.TtyScenario(
+            frames=[None, ts.tty_control("TUI_EXIT 0"),
+                    ts.tty_control("FIXTURE_BOUNDARY_READY")],
+            inputs=[b"interactive input"],
+        )
+
+        outcome = scenario.supervisor.attach_writer(
+            scenario.identity, scenario.transport, scenario.authority,
+        )
+
+        self.assertIsNone(outcome.failure_code)
+        self.assertIn(("input", b"interactive input"), scenario.transport.events)
+
+    def test_missing_frame_after_tui_exit_is_bounded(self) -> None:
+        scenario = ts.TtyScenario(
+            frames=[ts.tty_control("TUI_EXIT 0"), None],
+        )
+        with patch.object(sup, "_POST_TUI_EXIT_TIMEOUT_S", 0):
+            outcome = scenario.supervisor.attach_writer(
+                scenario.identity, scenario.transport, scenario.authority,
+            )
+
+        self.assertEqual(outcome.failure_code, "fixture-boundary-unconfirmed")
+        self.assertEqual(outcome.tui_exit_code, 0)
+        self.assertIn("stop", scenario.docker.verbs())
+
+    def test_missing_frame_after_continue_is_bounded(self) -> None:
+        scenario = ts.TtyScenario(
+            frames=[ts.tty_control("TUI_EXIT 0"),
+                    ts.tty_control("FIXTURE_BOUNDARY_READY"), None],
+        )
+        with patch.object(sup, "_POST_CONTINUE_TIMEOUT_S", 0):
+            outcome = scenario.supervisor.attach_writer(
+                scenario.identity, scenario.transport, scenario.authority,
+            )
+
+        self.assertEqual(outcome.failure_code, "writer-exit-unknown")
+        self.assertTrue(outcome.continue_sent)
+        self.assertIn("stop", scenario.docker.verbs())
 
     def test_live_inspect_label_and_started_at_mismatch_blocks_attach(self) -> None:
         for tamper in ("labels", "started-at"):

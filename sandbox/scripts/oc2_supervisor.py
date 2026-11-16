@@ -93,6 +93,8 @@ _INTERACTIVE_TERMINAL_FRAME = 1
 _INTERACTIVE_CONTROL_FRAME = 2
 _MAX_INTERACTIVE_FRAME_BYTES = 64 * 1024
 _INTERACTIVE_POLL_S = 0.1
+_POST_TUI_EXIT_TIMEOUT_S = 30.0
+_POST_CONTINUE_TIMEOUT_S = 30.0
 
 
 # --- Failure contract --------------------------------------------------------
@@ -1498,6 +1500,8 @@ class GuestSupervisor:
         continue_sent = False
         failure_code: str | None = None
         attach_attempted = False
+        post_tui_exit_deadline: float | None = None
+        post_continue_deadline: float | None = None
 
         try:
             if spec is None:
@@ -1522,6 +1526,15 @@ class GuestSupervisor:
                 if raw_frame is None:
                     if tui_exit_code is None:
                         self._forward_terminal_input(transport, cid)
+                    elif continue_sent:
+                        if (post_continue_deadline is not None
+                                and time.monotonic() >= post_continue_deadline):
+                            failure_code = 'writer-exit-unknown'
+                            break
+                    elif (post_tui_exit_deadline is not None
+                          and time.monotonic() >= post_tui_exit_deadline):
+                        failure_code = 'fixture-boundary-unconfirmed'
+                        break
                     continue
                 kind, payload = _decode_interactive_frame(raw_frame)
                 if kind == _INTERACTIVE_TERMINAL_FRAME:
@@ -1534,11 +1547,18 @@ class GuestSupervisor:
                         if tui_exit_code != 0:
                             failure_code = 'tui-exit-nonzero'
                             break
+                        post_tui_exit_deadline = (
+                            time.monotonic() + _POST_TUI_EXIT_TIMEOUT_S
+                        )
                     elif payload == b'FIXTURE_BOUNDARY_READY':
                         if tui_exit_code != 0 or boundary_ready:
                             raise InteractiveProtocolError('READY out of sequence')
                         boundary_ready = True
-                        if snapshotter.capture(identity, authority) is not True:
+                        try:
+                            captured = snapshotter.capture(identity, authority)
+                        except Exception as exc:  # noqa: BLE001
+                            raise FixtureSnapshotError('snapshot unavailable') from exc
+                        if captured is not True:
                             raise FixtureSnapshotError('snapshot unavailable')
                         snapshot_captured = True
                         transport.send_stdin(
@@ -1548,6 +1568,9 @@ class GuestSupervisor:
                             ),
                         )
                         continue_sent = True
+                        post_continue_deadline = (
+                            time.monotonic() + _POST_CONTINUE_TIMEOUT_S
+                        )
                     else:
                         raise InteractiveProtocolError('unknown control frame')
                 if tui_exit_code is None:
@@ -1574,16 +1597,18 @@ class GuestSupervisor:
         except (SupervisorInputError, SliceBGitRejected, SliceBSessionError,
                 w.WriterError, OSError, TimeoutError, TypeError, ValueError):
             failure_code = 'attach-validation-failed'
+        except Exception:  # noqa: BLE001
+            failure_code = 'attach-failed'
         finally:
             if attach_attempted:
                 try:
                     transport.close(cid)
-                except (InteractiveTransportError, OSError, TimeoutError, KeyboardInterrupt):
+                except Exception:  # noqa: BLE001
                     if failure_code is None:
                         failure_code = 'attach-close-failed'
                 try:
                     transport.restore_terminal()
-                except (InteractiveTransportError, OSError, TimeoutError, KeyboardInterrupt):
+                except Exception:  # noqa: BLE001
                     if failure_code is None:
                         failure_code = 'terminal-restore-failed'
 

@@ -350,10 +350,14 @@ class HappyPathTest(unittest.TestCase):
         self.assertEqual(argv[-1], 'opencode')
 
     def test_stdin_open_requires_slice_b_command_and_tty(self):
+        slice_b_image = 'oc2/slice-b@sha256:' + 'a' * 64
         invalid_specs = (
-            make_spec(stdin_open=True, tty=False, command=('run',)),
-            make_spec(stdin_open=True, tty=True, command=('opencode',)),
-            make_spec(stdin_open=1, tty=True, command=('run',)),
+            make_spec(image_ref=slice_b_image, stdin_open=True, tty=False,
+                      command=('run',)),
+            make_spec(image_ref=slice_b_image, stdin_open=True, tty=True,
+                      command=('opencode',)),
+            make_spec(image_ref=slice_b_image, stdin_open=1, tty=True,
+                      command=('run',)),
             make_spec(
                 stdin_open=True, tty=True, command=('run',), image_ref=IMAGE_REF,
             ),
