@@ -192,6 +192,21 @@ class AttachTransportTests(unittest.TestCase):
         self.transport.attach(CID)
         self.assertIsNone(self.transport.receive_frame(CID, 0))
 
+    def test_zero_timeout_reads_a_frame_already_available_on_pipe(self) -> None:
+        self.transport.attach(CID)
+        frame = FRAME.pack(b"OC2T", 1, 4) + b"data"
+        self.processes[0].emit(frame)
+
+        self.assertEqual(self.transport.receive_frame(CID, 0), frame)
+
+    def test_zero_timeout_completes_a_buffered_partial_frame_when_remainder_is_ready(self) -> None:
+        self.transport.attach(CID)
+        frame = FRAME.pack(b"OC2T", 1, 4) + b"data"
+        self.transport._frame_buffer.extend(frame[:3])
+        self.processes[0].emit(frame[3:])
+
+        self.assertEqual(self.transport.receive_frame(CID, 0), frame)
+
     def test_timeout_with_partial_frame_fails_closed(self) -> None:
         self.transport.attach(CID)
         self.processes[0].emit(b"OC2")

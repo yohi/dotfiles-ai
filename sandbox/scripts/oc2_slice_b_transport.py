@@ -200,12 +200,7 @@ class DockerAttachTransport:
                 del self._frame_buffer[:length]
                 return frame
             remaining = end - time.monotonic()
-            if remaining <= 0:
-                if self._frame_buffer:
-                    self._poisoned = True
-                    raise supervisor.InteractiveTransportError("partial OC2T frame timed out")
-                return None
-            chunk = self._read_available(remaining)
+            chunk = self._read_available(max(0.0, remaining))
             if chunk is None:
                 if self._frame_buffer:
                     self._poisoned = True
