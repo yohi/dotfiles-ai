@@ -243,6 +243,45 @@ class SliceBTtyTests(unittest.TestCase):
         self.assertTrue(outcome.continue_sent)
         self.assertIn("stop", scenario.docker.verbs())
 
+    def test_terminal_frames_do_not_bypass_tui_exit_deadline(self) -> None:
+        scenario = ts.TtyScenario(
+            frames=[ts.tty_control("TUI_EXIT 0"), ts.tty_terminal(b"still active"), None],
+        )
+        def monotonic() -> float:
+            return 11 if scenario.transport.frames == [None] else 0
+
+        with patch.object(sup, "_POST_TUI_EXIT_TIMEOUT_S", 10), patch.object(
+            sup.time, "monotonic", side_effect=monotonic,
+        ):
+            outcome = scenario.supervisor.attach_writer(
+                scenario.identity, scenario.transport, scenario.authority,
+            )
+
+        self.assertEqual(outcome.failure_code, "fixture-boundary-unconfirmed")
+        self.assertEqual(scenario.transport.frames, [None])
+        self.assertIn("stop", scenario.docker.verbs())
+
+    def test_terminal_frames_do_not_bypass_continue_deadline(self) -> None:
+        scenario = ts.TtyScenario(
+            frames=[ts.tty_control("TUI_EXIT 0"),
+                    ts.tty_control("FIXTURE_BOUNDARY_READY"),
+                    ts.tty_terminal(b"still active"), None],
+        )
+        def monotonic() -> float:
+            return 11 if scenario.transport.frames == [None] else 0
+
+        with patch.object(sup, "_POST_TUI_EXIT_TIMEOUT_S", 10), patch.object(
+            sup, "_POST_CONTINUE_TIMEOUT_S", 10,
+        ), patch.object(sup.time, "monotonic", side_effect=monotonic):
+            outcome = scenario.supervisor.attach_writer(
+                scenario.identity, scenario.transport, scenario.authority,
+            )
+
+        self.assertEqual(outcome.failure_code, "writer-exit-unknown")
+        self.assertTrue(outcome.continue_sent)
+        self.assertEqual(scenario.transport.frames, [None])
+        self.assertIn("stop", scenario.docker.verbs())
+
     def test_live_inspect_label_and_started_at_mismatch_blocks_attach(self) -> None:
         for tamper in ("labels", "started-at"):
             scenario = ts.TtyScenario()

@@ -1522,19 +1522,19 @@ class GuestSupervisor:
             transport.attach(cid)
             transport.send_stdin(cid, start_line)
             while True:
+                if continue_sent and (post_continue_deadline is not None
+                                      and time.monotonic() >= post_continue_deadline):
+                    failure_code = 'writer-exit-unknown'
+                    break
+                if (tui_exit_code is not None and not continue_sent
+                        and post_tui_exit_deadline is not None
+                        and time.monotonic() >= post_tui_exit_deadline):
+                    failure_code = 'fixture-boundary-unconfirmed'
+                    break
                 raw_frame = transport.receive_frame(cid, _INTERACTIVE_POLL_S)
                 if raw_frame is None:
                     if tui_exit_code is None:
                         self._forward_terminal_input(transport, cid)
-                    elif continue_sent:
-                        if (post_continue_deadline is not None
-                                and time.monotonic() >= post_continue_deadline):
-                            failure_code = 'writer-exit-unknown'
-                            break
-                    elif (post_tui_exit_deadline is not None
-                          and time.monotonic() >= post_tui_exit_deadline):
-                        failure_code = 'fixture-boundary-unconfirmed'
-                        break
                     continue
                 kind, payload = _decode_interactive_frame(raw_frame)
                 if kind == _INTERACTIVE_TERMINAL_FRAME:
