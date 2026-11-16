@@ -68,6 +68,7 @@ def make_spec(gen: str = GEN, **overrides: Any) -> writer_types.WriterSpec:
         command=('opencode',),
         env=(('HOME', '/home/writer'), ('TERM', 'xterm-256color')),
         tty=False,
+        stdin_open=False,
     )
     fields.update(overrides)
     spec: writer_types.WriterSpec = w.WriterSpec(**fields)
@@ -96,6 +97,7 @@ def make_inspect(
             'Cmd': list(spec.command),
             'WorkingDir': '/workspace',
             'Tty': spec.tty,
+            'OpenStdin': getattr(spec, 'stdin_open', False),
             'Labels': dict(w.writer_labels(spec.key)),
             'Env': [f'{n}={v}' for n, v in spec.env]
             + ['PATH=/usr/local/bin:/usr/bin:/bin'],
@@ -329,6 +331,38 @@ class HappyPathTest(unittest.TestCase):
         argv = w.build_create_argv(make_spec(tty=True))
         self.assertEqual(argv[argv.index(IMAGE_REF) - 1], '-t')
 
+    def test_create_exact_it_only_for_slice_b(self):
+        image_ref = 'oc2/slice-b@sha256:' + 'a' * 64
+        spec = make_spec(
+            image_ref=image_ref,
+            command=('run',), tty=True, stdin_open=True,
+        )
+        argv = w.build_create_argv(spec)
+        image_index = argv.index(image_ref)
+        self.assertEqual(argv[image_index - 2:image_index], ['-i', '-t'])
+        self.assertEqual(argv[image_index + 1:], ['run'])
+
+    def test_no_legacy_writer_behavior_change(self):
+        argv = w.build_create_argv(make_spec(tty=True))
+        image_index = argv.index(IMAGE_REF)
+        self.assertEqual(argv[image_index - 1], '-t')
+        self.assertNotIn('-i', argv)
+        self.assertEqual(argv[-1], 'opencode')
+
+    def test_stdin_open_requires_slice_b_command_and_tty(self):
+        invalid_specs = (
+            make_spec(stdin_open=True, tty=False, command=('run',)),
+            make_spec(stdin_open=True, tty=True, command=('opencode',)),
+            make_spec(stdin_open=1, tty=True, command=('run',)),
+            make_spec(
+                stdin_open=True, tty=True, command=('run',), image_ref=IMAGE_REF,
+            ),
+        )
+        for spec in invalid_specs:
+            with self.subTest(spec=spec):
+                with self.assertRaises(w.WriterError):
+                    w.build_create_argv(spec)
+
     def test_launch_call_order_and_identity(self):
         docker = FakeDocker(make_spec())
         ident = lifecycle(docker).launch(make_spec())
@@ -357,6 +391,20 @@ class HappyPathTest(unittest.TestCase):
         alt = bad(make_inspect(make_spec()), 'HostConfig', 'SecurityOpt',
                   ['no-new-privileges:true'])
         w.validate_writer_inspect(alt, make_spec())
+
+    def test_inspect_checks_open_stdin_alongside_tty(self):
+        spec = make_spec(
+            image_ref='oc2/slice-b@sha256:' + 'a' * 64,
+            command=('run',), tty=True, stdin_open=True,
+        )
+        info = make_inspect(spec)
+        w.validate_writer_inspect(info, spec)
+        for altered in (
+            bad(info, 'Config', 'OpenStdin', False),
+            bad(info, 'Config', 'OpenStdin', DELETE),
+        ):
+            with self.assertRaises(w.WriterError):
+                w.validate_writer_inspect(altered, spec)
 
     def test_happy_stop_verified(self):
         docker = FakeDocker(make_spec())

@@ -14,6 +14,7 @@ import json
 import os
 import pathlib
 import subprocess
+import struct
 import sys
 import tempfile
 import types
@@ -25,7 +26,9 @@ if TYPE_CHECKING:
     from sandbox.scripts.oc2_supervisor import CliDockerRunner, FsStat, TransportResult
     from sandbox.scripts.oc2_supervisor import GuestHostProbe as GuestHostProbeBase
     from sandbox.scripts import oc2_writer as writer_types
+    from sandbox.scripts.oc2_slice_b_session import VerifiedGuestAuthority as VerifiedGuestAuthorityBase
     from sandbox.tests.test_oc2_writer import FakeDocker as FakeDockerBase
+    from sandbox.tests.test_oc2_writer import FakeProbe as FakeProbeBase
 
 TESTS = pathlib.Path(__file__).resolve().parent
 SCRIPTS = TESTS.parent / 'scripts'
@@ -49,10 +52,14 @@ def load(name: str, directory: pathlib.Path = SCRIPTS) -> types.ModuleType:
 w = load('oc2_writer')
 sup = load('oc2_supervisor')
 tw = load('test_oc2_writer', TESTS)
+slice_b_git = load('oc2_slice_b_git')
+slice_b_session = load('oc2_slice_b_session')
 
 if not TYPE_CHECKING:
     GuestHostProbeBase = sup.GuestHostProbe
     FakeDockerBase = tw.FakeDocker
+    FakeProbeBase = tw.FakeProbe
+    VerifiedGuestAuthorityBase = slice_b_session.VerifiedGuestAuthority
 
 CID, CID2, OTHER = tw.CID, tw.CID2, tw.OTHER
 BOOT, STARTED, IMAGE_ID = tw.BOOT, tw.STARTED, tw.IMAGE_ID
@@ -63,7 +70,7 @@ FakeTransportOutput: TypeAlias = 'TransportResult | tuple[int, bytes] | None'
 SCOPE_REL = f'/system.slice/docker-{CID}.scope'
 SCOPE = '/sys/fs/cgroup' + SCOPE_REL
 INODE = 987654
-WRITER_BLOB = '13153b3f6aef0d506b58afef2d4d3fefc6f05a73'
+WRITER_BLOB = '05d61efcd79cce59a80aa64cf7b9b0c353d2f157'
 
 
 def status_text(uid: int, saved: int | None = None) -> str:
@@ -258,6 +265,10 @@ def ok(stdout: bytes = b'') -> TransportResult:
 
 def all_builder_argvs(spec):
     return [w.build_create_argv(spec), w.build_create_argv(tw.make_spec(tty=True)),
+            w.build_create_argv(tw.make_spec(
+                image_ref='oc2/slice-b@sha256:' + 'a' * 64,
+                command=('run',), tty=True, stdin_open=True,
+            )),
             w.build_start_argv(CID), w.build_stop_argv(CID), w.build_stop_argv(CID, 7),
             w.build_kill_argv(CID), w.build_inspect_argv(CID), list(w.LIST_ALL_ARGV)]
 
@@ -281,7 +292,8 @@ class DockerRunnerTest(unittest.TestCase):
         extra_v = create[:-2] + ['-v', '/:/host:rw'] + create[-2:]
         bad_env = create[:-2] + ['-e', 'API_TOKEN=' + SENTINEL] + create[-2:]
         cases = [
-            ['docker', 'exec', CID, 'sh'], ['docker', 'rm', '-f', CID],
+            ['docker', 'exec', CID, 'sh'], ['docker', 'attach', CID],
+            ['docker', 'rm', '-f', CID],
             ['docker', 'run', '--rm', 'alpine'], ['docker', 'cp', CID + ':/x', '/tmp'],
             ['docker', 'network', 'ls'], ['docker', 'volume', 'ls'], ['docker', 'build', '.'],
             ['docker', 'context', 'use', 'remote'], ['docker', '--context', 'x', 'ps'],
@@ -1590,16 +1602,19 @@ class EndToEndOfflineTest(unittest.TestCase):
 class ApiSurfaceTest(unittest.TestCase):
     def test_no_restart_or_recovery_api(self):
         forbidden = ('restart', 'relaunch', 'exec', 'start_existing', 'recover', 'resume',
-                     'reuse', 'retry', 'unpause', 'attach', 'reset')
+                     'reuse', 'retry', 'unpause', 'reset')
         for obj in (sup, sup.GuestSupervisor, sup.GuestHostProbe, sup.CliDockerRunner):
             for name in dir(obj):
                 for frag in forbidden:
                     self.assertNotIn(frag, name.lower(), f'{obj!r} exposes {name}')
         public = {n for n in dir(sup.GuestSupervisor) if not n.startswith('_')}
-        self.assertEqual(public, {'launch', 'stop', 'state', 'identity', 'session_key'})
+        self.assertEqual(
+            public,
+            {'launch', 'stop', 'state', 'identity', 'session_key', 'attach_writer'},
+        )
         self.assertEqual({s.value for s in sup.SupervisorState},
-                         {'NEW', 'STARTING', 'RUNNING', 'STOPPING', 'STOPPED_VERIFIED',
-                          'UNVERIFIED'})
+                         {'NEW', 'STARTING', 'RUNNING', 'ATTACHING', 'STOPPING',
+                          'STOPPED_VERIFIED', 'UNVERIFIED'})
 
     def test_stopped_verified_docstring(self):
         for doc in (sup.GuestSupervisor.__doc__, sup.__doc__):
@@ -1656,6 +1671,165 @@ class RegressionTest(unittest.TestCase):
                 data = path.read_bytes()
                 bad_chars = [b for b in data if not (0x20 <= b <= 0x7E or b == 0x0A)]
                 self.assertEqual(bad_chars, [])
+
+
+TTY_MAGIC = b'OC2T'
+TTY_TERMINAL = 1
+TTY_CONTROL = 2
+TTY_CONTINUE = b'FIXTURE_BOUNDARY_CONTINUE'
+
+
+def tty_frame(kind: int, payload: bytes) -> bytes:
+    return struct.pack('>4sBI', TTY_MAGIC, kind, len(payload)) + payload
+
+
+def tty_control(payload: str) -> bytes:
+    return tty_frame(TTY_CONTROL, payload.encode('ascii'))
+
+
+def tty_terminal(payload: bytes) -> bytes:
+    return tty_frame(TTY_TERMINAL, payload)
+
+
+class TtyExitDocker(HookDocker):
+    def __init__(self, spec: writer_types.WriterSpec) -> None:
+        super().__init__(spec, fs=FakeGuestFs.standard())
+        self.final_exit_code: int | None = 0
+        self.tamper: str | None = None
+        self.tamper_on_exit: str | None = None
+
+    def run(self, argv: Sequence[str], *, timeout: int) -> tuple[int, str]:
+        result = super().run(argv, timeout=timeout)
+        if argv[1] != 'inspect':
+            return result
+        code, stdout = result
+        records = json.loads(stdout)
+        tamper = self.tamper if self.state != 'exited' else (
+            self.tamper_on_exit or self.tamper
+        )
+        if tamper == 'image':
+            records[0]['Image'] = 'sha256:' + '9' * 64
+        elif tamper == 'started-at':
+            records[0]['State']['StartedAt'] = '2026-11-16T00:00:00Z'
+        elif tamper == 'labels':
+            records[0]['Config']['Labels'][w.LABEL_ROLE] = 'foreign'
+        if self.state == 'exited':
+            if self.final_exit_code is None:
+                records[0]['State'].pop('ExitCode', None)
+            else:
+                records[0]['State']['ExitCode'] = self.final_exit_code
+        return code, json.dumps(records)
+
+
+class TtySnapshotter:
+    def __init__(self, events: list[tuple[str, str | bytes | None]], result: bool = True) -> None:
+        self.events = events
+        self.result = result
+
+    def capture(
+        self,
+        identity: writer_types.WriterIdentity,
+        authority: VerifiedGuestAuthorityBase,
+    ) -> bool:
+        self.events.append(('snapshot', identity.container_id))
+        return self.result
+
+
+class FakeInteractiveTransport:
+    def __init__(
+        self,
+        docker: TtyExitDocker,
+        frames: Sequence[bytes | BaseException],
+        inputs: Sequence[bytes | BaseException] = (),
+        fail_attach: bool = False,
+    ) -> None:
+        self.docker = docker
+        self.frames = list(frames)
+        self.inputs = list(inputs)
+        self.fail_attach = fail_attach
+        self.events: list[tuple[str, str | bytes | None]] = []
+        self.verbs_at_attach: list[str] = []
+
+    def attach(self, container_id: str) -> None:
+        self.events.append(('attach', container_id))
+        self.verbs_at_attach = self.docker.verbs()
+        if self.fail_attach:
+            raise sup.InteractiveTransportError('fake attach failure')
+
+    def send_stdin(self, container_id: str, data: bytes) -> None:
+        self.events.append(('send', data))
+        if data == tty_frame(TTY_CONTROL, TTY_CONTINUE):
+            self.docker.state = 'exited'
+
+    def receive_frame(self, container_id: str, timeout: float) -> bytes | None:
+        if not self.frames:
+            raise sup.InteractiveDetachedError('fake EOF')
+        item = self.frames.pop(0)
+        if isinstance(item, BaseException):
+            raise item
+        return item
+
+    def read_terminal_input(self, timeout: float) -> bytes | None:
+        if not self.inputs:
+            return None
+        item = self.inputs.pop(0)
+        if isinstance(item, BaseException):
+            raise item
+        self.events.append(('input', item))
+        return item
+
+    def write_terminal_output(self, data: bytes) -> None:
+        self.events.append(('display', data))
+
+    def close(self, container_id: str) -> None:
+        self.events.append(('close', container_id))
+
+    def restore_terminal(self) -> None:
+        self.events.append(('restore', None))
+
+
+class TtyScenario:
+    def __init__(
+        self,
+        frames: Sequence[bytes | BaseException] = (),
+        inputs: Sequence[bytes | BaseException] = (),
+        *,
+        snapshot: bool = True,
+        exit_code: int | None = 0,
+        probe: FakeProbeBase | None = None,
+        fail_attach: bool = False,
+    ) -> None:
+        self.spec = tw.make_spec(
+            image_ref='oc2/slice-b@sha256:' + 'a' * 64,
+            command=('run',), tty=True, stdin_open=True,
+        )
+        self.docker = TtyExitDocker(self.spec)
+        self.runner = runner_for(BridgeTransport(self.docker))
+        self.probe = probe or tw.FakeProbe()
+        self.events: list[tuple[str, str | bytes | None]] = []
+        self.snapshotter = TtySnapshotter(self.events, snapshot)
+        self.supervisor = sup.GuestSupervisor(
+            self.spec.key,
+            lambda _: w.WriterLifecycle(self.runner, self.probe, sleep=tw.Sleeper()),
+            snapshotter=self.snapshotter,
+        )
+        self.identity = self.supervisor.launch(self.spec)
+        baseline = slice_b_git.GitBaseline(
+            pathlib.Path('/guest/sessions/repo'), 'refs/heads/sliceb', 'a' * 40,
+            'b' * 40, 'sha1', 'c' * 64, 'd' * 64,
+        )
+        manifest = slice_b_git.SliceBBundleManifestV1(
+            'dotfiles-ai/oc2-slice-b-bundle/v1', self.spec.key, baseline,
+            'e' * 64, 123, 'oc2-slice-b-clean-git-bundle-v1', 'f' * 64,
+        )
+        manifest_sha = hashlib.sha256(slice_b_git._manifest_bytes(manifest)).hexdigest()
+        self.authority = slice_b_session.VerifiedGuestAuthority(
+            self.spec.key, manifest, manifest_sha, self.spec.image_ref, IMAGE_ID,
+        )
+        self.docker.final_exit_code = exit_code
+        self.transport = FakeInteractiveTransport(
+            self.docker, frames, inputs, fail_attach=fail_attach,
+        )
 
 
 if __name__ == '__main__':

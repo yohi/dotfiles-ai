@@ -57,6 +57,8 @@ DOCKER_STOP_RUNNER_TIMEOUT_S = STOP_TIMEOUT_S + 30
 
 WRITER_WORKDIR = '/workspace'
 WRITER_USER = f'{WRITER_UID}:{WRITER_GID}'
+SLICE_B_COMMAND = ('run',)
+SLICE_B_IMAGE_REPOSITORY = 'oc2/slice-b'
 TMPFS_TMP_OPTS = (
     f'rw,nosuid,nodev,noexec,size=64m,uid={WRITER_UID},gid={WRITER_GID},mode=0700'
 )
@@ -193,6 +195,7 @@ class WriterSpec:
     command: tuple[str, ...]
     env: tuple[tuple[str, str], ...] = dataclasses.field(repr=False)
     tty: bool = False
+    stdin_open: bool = False
 
 
 def expected_repo_source(key: WriterSessionKey) -> str:
@@ -262,6 +265,14 @@ def validate_writer_spec(spec: WriterSpec) -> None:
             raise WriterError('command elements must be non-empty strings without NUL')
     if not isinstance(spec.tty, bool):
         raise WriterError('tty must be bool')
+    if not isinstance(spec.stdin_open, bool):
+        raise WriterError('stdin_open must be bool')
+    if spec.stdin_open and (
+        not spec.tty
+        or spec.command != SLICE_B_COMMAND
+        or spec.image_ref.partition('@')[0] != SLICE_B_IMAGE_REPOSITORY
+    ):
+        raise WriterError('stdin_open requires the pinned Slice B image, command and TTY')
     if not isinstance(spec.env, tuple):
         raise WriterError('env must be a tuple of (name, value) pairs')
     seen: set[str] = set()
@@ -316,6 +327,8 @@ def build_create_argv(spec: WriterSpec) -> list[str]:
         argv += ['--label', f'{name}={value}']
     for name, value in spec.env:
         argv += ['-e', f'{name}={value}']
+    if spec.stdin_open:
+        argv.append('-i')
     if spec.tty:
         argv.append('-t')
     argv.append(spec.image_ref)
@@ -440,6 +453,8 @@ def validate_writer_inspect(inspect: Mapping[str, Any], spec: WriterSpec) -> Non
     expect(('Config', 'WorkingDir'), lambda v: v == WRITER_WORKDIR,
            'Config.WorkingDir mismatch')
     expect(('Config', 'Tty'), lambda v: v is spec.tty, 'Config.Tty mismatch')
+    expect(('Config', 'OpenStdin'), lambda v: v is spec.stdin_open,
+           'Config.OpenStdin mismatch')
 
     hc = ('HostConfig',)
     expect(hc + ('Privileged',), lambda v: v is False, 'Privileged must be false')
