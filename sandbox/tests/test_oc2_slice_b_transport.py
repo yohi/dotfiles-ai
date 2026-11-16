@@ -206,13 +206,13 @@ class AttachTransportTests(unittest.TestCase):
         self.transport.attach(CID)
         process = self.processes[0]
         stdout = process.stdout
-        process.stdout = None
+        setattr(process, "stdout", None)
         try:
             with self.assertRaises(sup.InteractiveTransportError):
                 self.transport.receive_frame(CID, 1)
             self.assertTrue(self.transport._poisoned)
         finally:
-            process.stdout = stdout
+            setattr(process, "stdout", stdout)
 
     def test_terminal_input_rejects_invalid_timeout_types(self) -> None:
         adapter = transport.DockerAttachTransport(
