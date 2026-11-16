@@ -533,10 +533,18 @@ class Pid1Bridge:
         self.events.append(("restore", None))
 
     def sent(self) -> list[bytes]:
-        return [event[1] for event in self.events if event[0] == "send"]
+        return [
+            event[1]
+            for event in self.events
+            if event[0] == "send" and isinstance(event[1], bytes)
+        ]
 
     def displayed(self) -> bytes:
-        return b"".join(event[1] for event in self.events if event[0] == "display")
+        return b"".join(
+            event[1]
+            for event in self.events
+            if event[0] == "display" and isinstance(event[1], bytes)
+        )
 
 
 class Pid1SupervisorInProcessTests(unittest.TestCase):

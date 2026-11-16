@@ -307,7 +307,10 @@ class Oc2tBridgeTests(unittest.TestCase):
     def run_with_tui(self, wire: Wire, tui: FakeTui) -> int:
         """Run the real entrypoint flow with only the TUI process replaced."""
         with patch.object(e, "_spawn_tui", return_value=tui):
-            return e.run_entrypoint(self.line, wire.channel)
+            result = e.run_entrypoint(self.line, wire.channel)
+        if not isinstance(result, int):
+            raise AssertionError("entrypoint returned a non-integer exit code")
+        return result
 
     def assert_no_fixture(self) -> None:
         self.assertFalse((self.root / f.FIXTURE_NAME).exists())
