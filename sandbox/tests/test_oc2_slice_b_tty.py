@@ -589,7 +589,7 @@ class Pid1SupervisorInProcessTests(unittest.TestCase):
             identity: WriterIdentity, authority: VerifiedGuestAuthority,
         ) -> bool:
             fixture_seen_at_snapshot.append(self.fixture.exists())
-            return capture(identity, authority)
+            return bool(capture(identity, authority))
 
         bridge = Pid1Bridge(scenario, inputs)
         with (
