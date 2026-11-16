@@ -77,24 +77,42 @@ class FakeProcess:
 
 class AttachTransportTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.processes: list[FakeProcess] = []
         self.calls: list[tuple[list[str], dict[str, object]]] = []
+        self.processes: list[FakeProcess] = []
+        self.transport = self._make_transport()
+
+    def _make_transport(self) -> transport.DockerAttachTransport:
+        """Create a fake-backed transport with cleanup registered immediately."""
+        processes: list[FakeProcess] = []
 
         def popen(argv: list[str], **kwargs: object) -> FakeProcess:
             self.calls.append((argv, kwargs))
             process = FakeProcess()
+            processes.append(process)
             self.processes.append(process)
             return process
 
-        self.transport = transport.DockerAttachTransport(
+        adapter = transport.DockerAttachTransport(
             "/usr/bin/docker", _popen=popen,
             _stdin_fd=None, _stdout_fd=None,
         )
+        self.addCleanup(self._cleanup_transport, adapter, processes)
+        return adapter
 
-    def tearDown(self) -> None:
-        self.transport.restore_terminal()
-        for process in self.processes:
-            process.dispose()
+    def _cleanup_transport(
+        self,
+        adapter: transport.DockerAttachTransport,
+        processes: list[FakeProcess],
+    ) -> None:
+        """Close a transport before disposing all fake process pipes it created."""
+        try:
+            adapter.close(CID)
+        finally:
+            try:
+                adapter.restore_terminal()
+            finally:
+                for process in processes:
+                    process.dispose()
 
     def test_rejects_non_full_container_ids_before_process_start(self) -> None:
         for invalid in ("a" * 12, "A" * 64, "a" * 63, "a" * 65, "name"):
@@ -164,25 +182,11 @@ class AttachTransportTests(unittest.TestCase):
         )
         for frame in malformed:
             with self.subTest(frame=frame):
-                processes: list[FakeProcess] = []
-
-                def popen(argv: list[str], **kwargs: object) -> FakeProcess:
-                    del argv, kwargs
-                    process = FakeProcess()
-                    processes.append(process)
-                    return process
-
-                self.transport = transport.DockerAttachTransport(
-                    "/usr/bin/docker", _popen=popen,
-                    _stdin_fd=None, _stdout_fd=None,
-                )
+                self.transport = self._make_transport()
                 self.transport.attach(CID)
-                processes[0].emit(frame)
+                self.processes[-1].emit(frame)
                 with self.assertRaises(sup.InteractiveTransportError):
                     self.transport.receive_frame(CID, 1)
-                self.transport.close(CID)
-                for process in processes:
-                    process.dispose()
 
     def test_timeout_without_partial_bytes_is_poll_timeout(self) -> None:
         self.transport.attach(CID)
@@ -397,6 +401,28 @@ class AttachTransportTests(unittest.TestCase):
             "/usr/bin/docker", _popen=popen,
             _stdin_fd=None, _stdout_fd=None,
         )
+
+        def cleanup_attach() -> None:
+            if process is not None and not process.stdin.closed:
+                process.stdin.close()
+            try:
+                adapter.close(scenario.identity.container_id)
+            finally:
+                if bridge._thread.ident is not None:
+                    bridge._thread.join(5)
+                if bridge._thread.is_alive():
+                    os.close(bridge._to_r)
+                    bridge._thread.join(5)
+                if process is not None and not process.stdout.closed:
+                    process.stdout.close()
+                if bridge._thread.is_alive():
+                    raise AssertionError("PID 1 daemon thread did not stop")
+                if bridge._to_r >= 0:
+                    os.close(bridge._to_r)
+                    bridge._to_r = -1
+                adapter.restore_terminal()
+
+        self.addCleanup(cleanup_attach)
         scenario.transport = adapter
         tui = tty_tests.te.FakeTui(b"offline TUI output")
         with (
@@ -411,7 +437,6 @@ class AttachTransportTests(unittest.TestCase):
         self.assertEqual(bridge.rc, 0)
         self.assertIsNotNone(process)
         self.assertEqual(scenario.docker.final_exit_code, 0)
-        os.close(bridge._to_r)
 
 
 if __name__ == "__main__":

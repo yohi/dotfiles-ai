@@ -27,6 +27,20 @@ _CID_PATTERN = re.compile(r"[0-9a-f]{64}\Z")
 
 
 class DockerAttachTransport:
+    """Docker attach process and terminal I/O adapter for framed transport.
+
+    Callers own the lifecycle: after a successful or partial ``attach``, call
+    ``close`` to reap the attach process and ``restore_terminal`` to restore
+    the caller's terminal settings. ``receive_frame`` returns ``None`` only
+    when its polling timeout expires without receiving frame bytes.
+
+    Operations raise ``InteractiveTransportError`` for invalid input, I/O,
+    framing, timeout, or cleanup failures. ``InteractiveDetachedError`` means
+    the Docker attach output stream reached EOF. A poisoned transport has
+    encountered a framing or I/O condition that makes further stream use
+    unsafe; subsequent frame operations are rejected.
+    """
+
     def __init__(
         self,
         docker_path: str,
@@ -39,6 +53,7 @@ class DockerAttachTransport:
         _set_raw: Callable[[int], None] | None = None,
         _set_terminal: Callable[[int, int, list[Any]], None] = termios.tcsetattr,
     ) -> None:
+        """Configure the attach adapter and optional terminal descriptors."""
         self._docker_path = supervisor._validate_docker_path(docker_path)
         self._popen = _popen
         self._stdin_fd = _stdin_fd
@@ -74,6 +89,7 @@ class DockerAttachTransport:
             raise supervisor.InteractiveTransportError("terminal raw mode failed") from exc
 
     def attach(self, container_id: str) -> None:
+        """Start one Docker attach session for a full container ID."""
         if self._container_id is not None:
             raise supervisor.InteractiveTransportError("attach already attempted")
         if not isinstance(container_id, str) or _CID_PATTERN.fullmatch(container_id) is None:
@@ -106,6 +122,11 @@ class DockerAttachTransport:
             raise supervisor.InteractiveTransportError("docker attach failed") from exc
 
     def send_stdin(self, container_id: str, data: bytes) -> None:
+        """Write bounded raw terminal input to the attached container.
+
+        Raises ``InteractiveTransportError`` for an identity mismatch,
+        invalid input, poisoned stream, or failed/partial write.
+        """
         self._check_container(container_id)
         if self._poisoned or not isinstance(data, bytes) or len(data) > _MAX_FRAME:
             raise supervisor.InteractiveTransportError("attach input invalid")
@@ -155,6 +176,12 @@ class DockerAttachTransport:
         return _HEADER.size + size
 
     def receive_frame(self, container_id: str, timeout: float) -> bytes | None:
+        """Return the next complete frame, or ``None`` on an empty poll timeout.
+
+        A partial frame timing out, malformed/boundedness violations, or I/O
+        failures raise ``InteractiveTransportError`` and poison the stream.
+        Output EOF raises ``InteractiveDetachedError`` and also poisons it.
+        """
         self._check_container(container_id)
         if self._poisoned:
             raise supervisor.InteractiveTransportError("attach stream is unusable")
@@ -193,6 +220,7 @@ class DockerAttachTransport:
                 raise supervisor.InteractiveTransportError("OC2T buffer exceeded bound")
 
     def read_terminal_input(self, timeout: float) -> bytes | None:
+        """Read terminal input up to the timeout, or return ``None`` if idle."""
         fd = self._stdin_fd
         if fd is None:
             return None
@@ -211,6 +239,7 @@ class DockerAttachTransport:
             raise supervisor.InteractiveTransportError("terminal input failed") from exc
 
     def write_terminal_output(self, data: bytes) -> None:
+        """Write bounded output bytes to the caller's terminal."""
         fd = self._stdout_fd
         if fd is None:
             return
@@ -232,6 +261,7 @@ class DockerAttachTransport:
             self._config_dir = None
 
     def close(self, container_id: str) -> None:
+        """Stop and reap the attached process; the caller must invoke this."""
         if self._container_id is None:
             return
         if container_id != self._container_id:
@@ -301,6 +331,7 @@ class DockerAttachTransport:
             raise supervisor.InteractiveTransportError("docker attach cleanup unverified")
 
     def restore_terminal(self) -> None:
+        """Restore saved terminal settings; the caller must invoke this."""
         if self._terminal_state is None or self._stdin_fd is None:
             return
         try:
