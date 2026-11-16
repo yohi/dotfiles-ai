@@ -17,6 +17,8 @@ SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 TESTS = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPTS))
 sys.path.insert(0, str(TESTS))
+from oc2_slice_b_session import VerifiedGuestAuthority  # noqa: E402
+from oc2_writer import WriterIdentity  # noqa: E402
 import oc2_writer as w  # noqa: E402
 import oc2_supervisor as sup  # noqa: E402
 import test_oc2_writer as tw  # noqa: E402
@@ -583,7 +585,9 @@ class Pid1SupervisorInProcessTests(unittest.TestCase):
         fixture_seen_at_snapshot: list[bool] = []
         capture = scenario.snapshotter.capture
 
-        def observing_capture(identity, authority):
+        def observing_capture(
+            identity: WriterIdentity, authority: VerifiedGuestAuthority,
+        ) -> bool:
             fixture_seen_at_snapshot.append(self.fixture.exists())
             return capture(identity, authority)
 

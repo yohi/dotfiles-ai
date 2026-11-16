@@ -425,6 +425,10 @@ def _relay_tui(channel: SupervisorChannel, tui: TuiSession) -> int:
                 closed = output == b""
             if code is not None:
                 # Exit already observed: forward only what is still buffered.
+                if drain_end is not None and time.monotonic() >= drain_end and not closed:
+                    pending, _, _ = select.select([tui.fd], [], [], 0)
+                    if pending:
+                        raise SliceBEntryRejected("TUI output drain expired")
                 if (
                     closed
                     or tui.fd not in readable

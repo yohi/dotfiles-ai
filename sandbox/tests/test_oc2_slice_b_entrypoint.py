@@ -1,12 +1,16 @@
 from pathlib import Path
+import fcntl
 import importlib.util
 import os
+import select
 import socket
 import struct
 import subprocess
 import sys
 import tempfile
+import termios
 import threading
+import time
 import unittest
 from unittest.mock import patch
 import uuid
@@ -443,6 +447,88 @@ class Oc2tBridgeTests(unittest.TestCase):
         frames = split_frames(wire.sent())
         self.assertEqual(frames[-1], (CONTROL, b"TUI_EXIT 9"))
         self.assertEqual(b"".join(payload for _, payload in frames[:-1]), output)
+
+    def test_unflushed_tui_output_at_drain_deadline_is_rejected(self) -> None:
+        wire = Wire(self)
+        wire.reply_after(READY, CONTINUE)
+        output = b"x" * (e._RELAY_CHUNK * 2)
+        with patch.object(e, "_TUI_DRAIN_S", 0):
+            result = self.run_with_tui(wire, FakeTui(output))
+        self.assertEqual(result, 22)
+        self.assert_no_fixture()
+
+    def test_real_tui_pty_runs_safe_helper_and_relays_input_output(self) -> None:
+        helper = Path(self.tmp.name) / "tui-helper"
+        helper.write_text(
+            "#!/usr/bin/python3\n"
+            "import os, sys\n"
+            "os.write(1, b'helper-ready\\n')\n"
+            "data = os.read(0, 32)\n"
+            "os.write(1, b'got:' + data)\n"
+            "raise SystemExit(7)\n"
+        )
+        helper.chmod(0o700)
+        with (
+            patch.object(e, "_TUI", str(helper)),
+            patch.object(e, "_WORKSPACE", Path(self.tmp.name)),
+        ):
+            tui = e._spawn_tui({"PATH": "/usr/bin:/bin", "HOME": "", "TERM": "xterm"})
+            self.addCleanup(tui.close)
+            self.addCleanup(tui.kill)
+            os.set_blocking(tui.fd, False)
+            observed = bytearray()
+            deadline = time.monotonic() + 3
+            while b"helper-ready\r\n" not in observed and time.monotonic() < deadline:
+                readable, _, _ = select.select([tui.fd], [], [], 0.1)
+                if readable:
+                    observed.extend(os.read(tui.fd, 4096))
+            self.assertIn(b"helper-ready\r\n", observed)
+            os.write(tui.fd, b"test-input\n")
+            while b"got:test-input\r\n" not in observed and time.monotonic() < deadline:
+                readable, _, _ = select.select([tui.fd], [], [], 0.1)
+                if readable:
+                    observed.extend(os.read(tui.fd, 4096))
+            self.assertIn(b"got:test-input\r\n", observed)
+            self.assertEqual(e._wait_tui(tui, 2), 7)
+
+    def test_real_tui_pty_resize_propagates_and_kill_reaps_process(self) -> None:
+        helper = Path(self.tmp.name) / "tui-helper"
+        helper.write_text(
+            "#!/usr/bin/python3\n"
+            "import os, time\n"
+            "os.write(1, b'ready\\n')\n"
+            "time.sleep(30)\n"
+        )
+        helper.chmod(0o700)
+        with (
+            patch.object(e, "_TUI", str(helper)),
+            patch.object(e, "_WORKSPACE", Path(self.tmp.name)),
+        ):
+            outer_master, outer_slave = os.openpty()
+            tui = e._spawn_tui({"PATH": "/usr/bin:/bin", "HOME": "", "TERM": "xterm"})
+            self.addCleanup(tui.close)
+            self.addCleanup(tui.kill)
+            ready, _, _ = select.select([tui.fd], [], [], 2)
+            self.assertTrue(ready)
+            self.assertIn(b"ready\r\n", os.read(tui.fd, 4096))
+            try:
+                fcntl.ioctl(outer_slave, termios.TIOCSWINSZ, struct.pack("HHHH", 37, 111, 0, 0))
+                saved_stdin = os.dup(0)
+                try:
+                    os.dup2(outer_slave, 0)
+                    tui.resize()
+                finally:
+                    os.dup2(saved_stdin, 0)
+                    os.close(saved_stdin)
+                self.assertEqual(
+                    fcntl.ioctl(tui.fd, termios.TIOCGWINSZ, b"\0" * 8),
+                    struct.pack("HHHH", 37, 111, 0, 0),
+                )
+            finally:
+                os.close(outer_master)
+                os.close(outer_slave)
+            tui.kill()
+            self.assertIsNotNone(tui.poll())
 
     def test_supervisor_detach_during_tui_kills_tui(self) -> None:
         """Losing the Supervisor mid-TUI kills the TUI and reports nothing as success."""
