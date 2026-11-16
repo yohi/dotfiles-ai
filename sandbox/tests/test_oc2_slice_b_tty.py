@@ -2,8 +2,14 @@
 from __future__ import annotations
 
 from dataclasses import replace
+import hashlib
+import os
 from pathlib import Path
+import select
 import sys
+import tempfile
+import threading
+import time
 import unittest
 from unittest.mock import patch
 
@@ -11,10 +17,15 @@ SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 TESTS = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPTS))
 sys.path.insert(0, str(TESTS))
+from oc2_slice_b_session import VerifiedGuestAuthority  # noqa: E402
+from oc2_writer import WriterIdentity  # noqa: E402
 import oc2_writer as w  # noqa: E402
 import oc2_supervisor as sup  # noqa: E402
 import test_oc2_writer as tw  # noqa: E402
 import test_oc2_supervisor as ts  # noqa: E402
+import test_oc2_slice_b_entrypoint as te  # noqa: E402
+
+pid1 = te.e
 
 
 class SliceBTtyTests(unittest.TestCase):
@@ -400,6 +411,313 @@ class SliceBTtyTests(unittest.TestCase):
         self.assertIn(("send", b"\x03"), scenario.transport.events)
         self.assertIn(("restore", None), scenario.transport.events)
         self.assertEqual(outcome.failure_code, "interrupted")
+
+    def test_supervisor_rejects_malformed_pid1_frames(self) -> None:
+        good = ts.tty_control("TUI_EXIT 0")
+        bad_frames = {
+            "bad-magic": b"OC2X" + good[4:],
+            "unknown-kind": good[:4] + b"\x03" + good[5:],
+            "truncated": good[:-1],
+            "trailing": good + b"x",
+            "header-only": good[:5],
+            "oversized": b"OC2T\x01\x00\x01\x00\x01" + b"x" * 65537,
+            "not-bytes": "OC2T",
+        }
+        for name, bad in bad_frames.items():
+            with self.subTest(name=name):
+                with self.assertRaises(sup.InteractiveProtocolError):
+                    sup._decode_interactive_frame(bad)
+                scenario = ts.TtyScenario(
+                    frames=[bad, good, ts.tty_control("FIXTURE_BOUNDARY_READY")],
+                )
+                outcome = scenario.supervisor.attach_writer(
+                    scenario.identity, scenario.transport, scenario.authority,
+                )
+                self.assertEqual(outcome.failure_code, "interactive-protocol")
+                self.assertFalse(outcome.snapshot_captured)
+                self.assertFalse(outcome.continue_sent)
+                # The frames after the invalid one were never consumed.
+                self.assertEqual(len(scenario.transport.frames), 2)
+
+    def test_duplicate_tui_exit_rejected(self) -> None:
+        scenario = ts.TtyScenario(
+            frames=[ts.tty_control("TUI_EXIT 0"), ts.tty_control("TUI_EXIT 0"),
+                    ts.tty_control("FIXTURE_BOUNDARY_READY")],
+        )
+        outcome = scenario.supervisor.attach_writer(
+            scenario.identity, scenario.transport, scenario.authority,
+        )
+        self.assertEqual(outcome.failure_code, "interactive-protocol")
+        self.assertFalse(outcome.continue_sent)
+
+
+class Pid1Bridge:
+    """InteractiveTransport fake joining attach_writer to a real entrypoint.serve.
+
+    Bytes cross two OS pipes (no Docker, PTY or network). This class only
+    cuts PID 1's stream at the length each header announces and hands the cut
+    to the Supervisor's own decoder; it validates nothing itself.
+    """
+
+    def __init__(self, scenario: ts.TtyScenario, inputs: tuple[bytes, ...] = ()) -> None:
+        self.docker = scenario.docker
+        self.inputs = list(inputs)
+        self.events: list[tuple[str, str | bytes | None]] = []
+        self.rc: int | None = None
+        self._to_r, self._to_w = os.pipe()
+        self._from_r, self._from_w = os.pipe()
+        self._to_w_open = True
+        self._buf = bytearray()
+        self._thread = threading.Thread(target=self._pid1, daemon=True)
+
+    def _pid1(self) -> None:
+        try:
+            self.rc = pid1.serve(self._to_r, self._from_w)
+        finally:
+            os.close(self._from_w)
+
+    def _pid1_exited(self) -> None:
+        self._thread.join(10)
+        self.docker.final_exit_code = self.rc
+        self.docker.state = "exited"
+
+    def attach(self, container_id: str) -> None:
+        self.events.append(("attach", container_id))
+        self._thread.start()
+
+    def send_stdin(self, container_id: str, data: bytes) -> None:
+        self.events.append(("send", data))
+        os.write(self._to_w, data)
+
+    def receive_frame(self, container_id: str, timeout: float) -> bytes | None:
+        end = time.monotonic() + timeout
+        while True:
+            header = sup._INTERACTIVE_FRAME_HEADER
+            if len(self._buf) >= header.size:
+                total = header.size + header.unpack_from(self._buf)[2]
+                if len(self._buf) >= total:
+                    raw = bytes(self._buf[:total])
+                    del self._buf[:total]
+                    return raw
+            ready, _, _ = select.select([self._from_r], [], [], max(0.0, end - time.monotonic()))
+            if not ready:
+                return None
+            chunk = os.read(self._from_r, 65536)
+            if not chunk:
+                self._pid1_exited()
+                if self._buf:
+                    raw = bytes(self._buf)
+                    self._buf.clear()
+                    return raw
+                raise sup.InteractiveDetachedError("PID 1 closed the channel")
+            self._buf.extend(chunk)
+
+    def read_terminal_input(self, timeout: float) -> bytes | None:
+        if not self.inputs:
+            return None
+        item = self.inputs.pop(0)
+        self.events.append(("input", item))
+        return item
+
+    def write_terminal_output(self, data: bytes) -> None:
+        self.events.append(("display", data))
+
+    def close(self, container_id: str) -> None:
+        self.events.append(("close", container_id))
+        if self._to_w_open:
+            self._to_w_open = False
+            os.close(self._to_w)
+        self._pid1_exited()
+        os.close(self._to_r)
+        os.close(self._from_r)
+
+    def restore_terminal(self) -> None:
+        self.events.append(("restore", None))
+
+    def sent(self) -> list[bytes]:
+        return [
+            event[1]
+            for event in self.events
+            if event[0] == "send" and isinstance(event[1], bytes)
+        ]
+
+    def displayed(self) -> bytes:
+        return b"".join(
+            event[1]
+            for event in self.events
+            if event[0] == "display" and isinstance(event[1], bytes)
+        )
+
+
+class Pid1SupervisorInProcessTests(unittest.TestCase):
+    """Real GuestSupervisor.attach_writer against the real PID 1 entrypoint."""
+
+    def setUp(self) -> None:
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name) / "repo"
+        self.root.mkdir()
+        te.git(self.root, "init", "-b", "sliceb")
+        te.git(self.root, "config", "user.name", "Fixture")
+        te.git(self.root, "config", "user.email", "fixture@example.invalid")
+        (self.root / "original").write_text("before\n")
+        te.git(self.root, "add", "original")
+        te.git(self.root, "commit", "-m", "base")
+        self.head = te.git(self.root, "rev-parse", "HEAD")
+        self.fixture = self.root / te.f.FIXTURE_NAME
+        workspace = patch.object(pid1, "_WORKSPACE", self.root)
+        workspace.start()
+        self.addCleanup(workspace.stop)
+
+    def attach(
+        self, tui: te.FakeTui, inputs: tuple[bytes, ...] = (), *, snapshot: bool = True,
+    ) -> tuple[ts.TtyScenario, Pid1Bridge, sup.AttachOutcome, list[bool]]:
+        """Run one full attach with the Guest repository's real HEAD as authority."""
+        scenario = ts.TtyScenario(snapshot=snapshot)
+        manifest = replace(
+            scenario.authority.manifest,
+            baseline=replace(scenario.authority.manifest.baseline, head_oid=self.head),
+        )
+        authority = replace(
+            scenario.authority, manifest=manifest,
+            manifest_sha256=hashlib.sha256(ts.slice_b_git._manifest_bytes(manifest)).hexdigest(),
+        )
+        fixture_seen_at_snapshot: list[bool] = []
+        capture = scenario.snapshotter.capture
+
+        def observing_capture(
+            identity: WriterIdentity, authority: VerifiedGuestAuthority,
+        ) -> bool:
+            fixture_seen_at_snapshot.append(self.fixture.exists())
+            return bool(capture(identity, authority))
+
+        bridge = Pid1Bridge(scenario, inputs)
+        with (
+            patch.object(scenario.snapshotter, "capture", side_effect=observing_capture),
+            patch.object(pid1, "_spawn_tui", return_value=tui),
+        ):
+            outcome = scenario.supervisor.attach_writer(scenario.identity, bridge, authority)
+        self.start_line = ts.slice_b_session.build_start_message(authority).to_wire().encode("ascii")
+        return scenario, bridge, outcome, fixture_seen_at_snapshot
+
+    def test_wire_constants_and_codecs_agree_bytewise(self) -> None:
+        self.assertEqual(pid1._FRAME_MAGIC, sup._INTERACTIVE_FRAME_MAGIC)
+        self.assertEqual(pid1._FRAME_HEADER.format, sup._INTERACTIVE_FRAME_HEADER.format)
+        self.assertEqual(pid1._FRAME_TERMINAL, sup._INTERACTIVE_TERMINAL_FRAME)
+        self.assertEqual(pid1._FRAME_CONTROL, sup._INTERACTIVE_CONTROL_FRAME)
+        self.assertEqual(pid1._MAX_FRAME_PAYLOAD, sup._MAX_INTERACTIVE_FRAME_BYTES)
+        self.assertEqual(pid1._MAX_FRAME_PAYLOAD, 65536)
+        for kind, payload in (
+            (pid1._FRAME_CONTROL, b"TUI_EXIT 0"),
+            (pid1._FRAME_CONTROL, pid1._CONTROL_READY),
+            (pid1._FRAME_CONTROL, pid1._CONTROL_CONTINUE),
+            (pid1._FRAME_TERMINAL, b""),
+            (pid1._FRAME_TERMINAL, bytes(range(256)) * 256),
+        ):
+            with self.subTest(kind=kind, size=len(payload)):
+                wire = pid1.encode_frame(kind, payload)
+                self.assertEqual(wire, sup._encode_interactive_frame(kind, payload))
+                self.assertEqual(sup._decode_interactive_frame(wire), (kind, payload))
+                self.assertEqual(pid1.decode_frame_header(wire[:9]), (kind, len(payload)))
+
+    def test_pid1_tui_exit_frames_parse_in_supervisor(self) -> None:
+        for code in (0, 1, 5, 23, 130, 255):
+            with self.subTest(code=code):
+                wire = te.Wire(self)
+                pid1._report_tui_exit(wire.channel, code)
+                raw = wire.sent()
+                self.assertEqual(raw, ts.tty_control(f"TUI_EXIT {code}"))
+                kind, payload = sup._decode_interactive_frame(raw)
+                self.assertEqual(kind, sup._INTERACTIVE_CONTROL_FRAME)
+                self.assertEqual(sup._parse_tui_exit(payload), code)
+
+    def test_supervisor_continue_frame_is_accepted_by_pid1(self) -> None:
+        wire = te.Wire(self)
+        wire.reply_after(
+            te.READY,
+            sup._encode_interactive_frame(
+                sup._INTERACTIVE_CONTROL_FRAME, b"FIXTURE_BOUNDARY_CONTINUE",
+            ),
+        )
+        pid1._supervisor_fixture_boundary(wire.channel)
+        kind, payload = sup._decode_interactive_frame(wire.sent())
+        self.assertEqual((kind, payload), (sup._INTERACTIVE_CONTROL_FRAME, b"FIXTURE_BOUNDARY_READY"))
+
+    def test_full_session_snapshot_then_continue_then_fixture(self) -> None:
+        spoof = (
+            b"tui> " + ts.tty_control("TUI_EXIT 0") + ts.tty_control("FIXTURE_BOUNDARY_READY")
+            + ts.tty_frame(ts.TTY_CONTROL, ts.TTY_CONTINUE) + b" OC2T FIXTURE_BOUNDARY_READY"
+        )
+        tui = te.FakeTui(spoof, await_input=b"q")
+        scenario, bridge, outcome, fixture_seen = self.attach(tui, (b"q",))
+
+        self.assertIsNone(outcome.failure_code)
+        self.assertEqual(outcome.tui_exit_code, 0)
+        self.assertEqual(bridge.rc, 0)
+        self.assertEqual(outcome.container_exit_code, 0)
+        self.assertTrue(outcome.boundary_ready)
+        self.assertTrue(outcome.snapshot_captured)
+        self.assertTrue(outcome.continue_sent)
+        self.assertTrue(outcome.stop_verdict.verified)
+        # One snapshot, taken while PID 1 was blocked before any fixture write.
+        self.assertEqual(fixture_seen, [False])
+        self.assertEqual(scenario.events, [("snapshot", scenario.identity.container_id)])
+        # TUI look-alike bytes were displayed verbatim and opened nothing.
+        self.assertEqual(bridge.displayed(), spoof)
+        # Start line once, raw input to the TUI only, then exactly one CONTINUE.
+        self.assertEqual(
+            bridge.sent(),
+            [self.start_line, b"q", ts.tty_frame(ts.TTY_CONTROL, ts.TTY_CONTINUE)],
+        )
+        self.assertEqual(bytes(tui.received), b"q")
+        self.assertEqual(self.fixture.read_bytes(), te.f.FIXTURE_BYTES)
+        self.assertEqual(te.git(self.root, "rev-parse", "HEAD^"), self.head)
+        self.assertEqual(
+            te.git(self.root, "diff-tree", "--no-commit-id", "--name-only", "-r", "HEAD"),
+            te.f.FIXTURE_NAME,
+        )
+
+    def test_nonzero_tui_exit_reaches_supervisor_without_ready(self) -> None:
+        scenario, bridge, outcome, fixture_seen = self.attach(te.FakeTui(b"bye", exit_code=7))
+
+        self.assertEqual(outcome.tui_exit_code, 7)
+        self.assertEqual(outcome.failure_code, "tui-exit-nonzero")
+        self.assertFalse(outcome.boundary_ready)
+        self.assertFalse(outcome.continue_sent)
+        self.assertEqual(fixture_seen, [])
+        self.assertEqual(bridge.sent(), [self.start_line])
+        self.assertEqual(bridge.rc, 23)
+        self.assertEqual(outcome.container_exit_code, 23)
+        self.assertFalse(self.fixture.exists())
+        self.assertEqual(te.git(self.root, "rev-parse", "HEAD"), self.head)
+
+    def test_snapshot_failure_sends_no_continue_and_pid1_fails_closed(self) -> None:
+        scenario, bridge, outcome, fixture_seen = self.attach(te.FakeTui(), snapshot=False)
+
+        self.assertEqual(outcome.failure_code, "snapshot-failed")
+        self.assertTrue(outcome.boundary_ready)
+        self.assertFalse(outcome.snapshot_captured)
+        self.assertFalse(outcome.continue_sent)
+        self.assertEqual(fixture_seen, [False])
+        self.assertEqual(bridge.sent(), [self.start_line])
+        self.assertEqual(bridge.rc, 22)
+        self.assertFalse(self.fixture.exists())
+        self.assertEqual(te.git(self.root, "rev-parse", "HEAD"), self.head)
+
+    def test_guest_head_mismatch_starts_no_tui_and_reports_no_exit(self) -> None:
+        # The Supervisor's trusted baseline stays at the pre-drift HEAD.
+        te.git(self.root, "commit", "--allow-empty", "-m", "drift")
+        tui = te.FakeTui()
+        self.addCleanup(tui.close)
+        with patch.object(pid1, "_relay_tui") as relay:
+            scenario, bridge, outcome, fixture_seen = self.attach(tui)
+            relay.assert_not_called()
+
+        self.assertIsNone(outcome.tui_exit_code)
+        self.assertIsNotNone(outcome.failure_code)
+        self.assertFalse(outcome.continue_sent)
+        self.assertEqual(bridge.rc, 22)
+        self.assertFalse(self.fixture.exists())
 
 
 if __name__ == "__main__":
