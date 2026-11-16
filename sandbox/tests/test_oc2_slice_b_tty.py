@@ -149,6 +149,45 @@ class SliceBTtyTests(unittest.TestCase):
         self.assertIn(("restore", None), scenario.transport.events)
         self.assertIn("stop", scenario.docker.verbs())
 
+    def test_close_interrupt_does_not_skip_restore_or_stop(self) -> None:
+        scenario = ts.TtyScenario(
+            frames=[ts.tty_control("TUI_EXIT 0"),
+                    ts.tty_control("FIXTURE_BOUNDARY_READY")],
+        )
+        with patch.object(scenario.transport, "close", side_effect=KeyboardInterrupt):
+            outcome = scenario.supervisor.attach_writer(
+                scenario.identity, scenario.transport, scenario.authority,
+            )
+
+        self.assertEqual(outcome.failure_code, "attach-close-failed")
+        self.assertIn(("restore", None), scenario.transport.events)
+        self.assertIn("stop", scenario.docker.verbs())
+
+    def test_unexpected_final_inspect_error_still_stops_writer(self) -> None:
+        scenario = ts.TtyScenario(
+            frames=[ts.tty_control("TUI_EXIT 0"),
+                    ts.tty_control("FIXTURE_BOUNDARY_READY")],
+        )
+        inspect_identity = scenario.supervisor._inspect_attach_identity
+        inspect_count = 0
+
+        def fail_final_inspect(identity, *, require_running):
+            nonlocal inspect_count
+            inspect_count += 1
+            if inspect_count == 2:
+                raise RuntimeError("simulated final inspect failure")
+            return inspect_identity(identity, require_running=require_running)
+
+        with patch.object(
+            scenario.supervisor, "_inspect_attach_identity", side_effect=fail_final_inspect,
+        ):
+            outcome = scenario.supervisor.attach_writer(
+                scenario.identity, scenario.transport, scenario.authority,
+            )
+
+        self.assertEqual(outcome.failure_code, "writer-exit-unknown")
+        self.assertIn("stop", scenario.docker.verbs())
+
     def test_restore_exception_does_not_skip_stop(self) -> None:
         scenario = ts.TtyScenario(
             frames=[ts.tty_control("TUI_EXIT 0"),

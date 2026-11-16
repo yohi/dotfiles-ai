@@ -1603,69 +1603,82 @@ class GuestSupervisor:
             if attach_attempted:
                 try:
                     transport.close(cid)
+                except KeyboardInterrupt:
+                    if failure_code is None:
+                        failure_code = 'attach-close-failed'
                 except Exception:  # noqa: BLE001
                     if failure_code is None:
                         failure_code = 'attach-close-failed'
                 try:
                     transport.restore_terminal()
+                except KeyboardInterrupt:
+                    if failure_code is None:
+                        failure_code = 'terminal-restore-failed'
                 except Exception:  # noqa: BLE001
                     if failure_code is None:
                         failure_code = 'terminal-restore-failed'
 
-        if attach_attempted:
-            try:
-                final_state = self._inspect_attach_identity(identity, require_running=False)
-                pid = final_state.get('Pid')
-                exit_code = final_state.get('ExitCode')
-                if (
-                    final_state.get('Status') != 'exited'
-                    or final_state.get('Running') is not False
-                    or isinstance(pid, bool)
-                    or not isinstance(pid, int)
-                    or pid != 0
-                    or isinstance(exit_code, bool)
-                    or not isinstance(exit_code, int)
-                    or not 0 <= exit_code <= 255
-                ):
+        stop_verdict = w.StopVerdict(
+            w.STATUS_GUEST_QUIESCENCE_UNVERIFIED, ('attach stop not attempted',),
+        )
+        try:
+            if attach_attempted:
+                try:
+                    final_state = self._inspect_attach_identity(identity, require_running=False)
+                    pid = final_state.get('Pid')
+                    exit_code = final_state.get('ExitCode')
+                    if (
+                        final_state.get('Status') != 'exited'
+                        or final_state.get('Running') is not False
+                        or isinstance(pid, bool)
+                        or not isinstance(pid, int)
+                        or pid != 0
+                        or isinstance(exit_code, bool)
+                        or not isinstance(exit_code, int)
+                        or not 0 <= exit_code <= 255
+                    ):
+                        if failure_code is None:
+                            failure_code = 'writer-exit-unknown'
+                    else:
+                        container_exit_code = exit_code
+                        if exit_code != 0 and failure_code is None:
+                            failure_code = 'writer-exit-nonzero'
+                except (IdentityMismatchError, InspectMismatchError, w.WriterError):
                     if failure_code is None:
                         failure_code = 'writer-exit-unknown'
-                else:
-                    container_exit_code = exit_code
-                    if exit_code != 0 and failure_code is None:
-                        failure_code = 'writer-exit-nonzero'
-            except (IdentityMismatchError, InspectMismatchError, w.WriterError):
-                if failure_code is None:
-                    failure_code = 'writer-exit-unknown'
+                except KeyboardInterrupt:
+                    if failure_code is None:
+                        failure_code = 'interrupted'
+                except (OSError, TimeoutError):
+                    if failure_code is None:
+                        failure_code = 'writer-exit-unknown'
+                except Exception:  # noqa: BLE001
+                    if failure_code is None:
+                        failure_code = 'writer-exit-unknown'
+            if failure_code is None and tui_exit_code is None:
+                failure_code = 'tui-exit-unknown'
+            if failure_code is None and not (boundary_ready and snapshot_captured and continue_sent):
+                failure_code = 'fixture-boundary-incomplete'
+        finally:
+            try:
+                lifecycle, current = self._begin_stop(
+                    identity, SupervisorState.ATTACHING, 'attach',
+                )
+                stop_verdict = self._finish_stop(lifecycle, current)
             except KeyboardInterrupt:
+                self._set_state(SupervisorState.UNVERIFIED)
+                stop_verdict = w.StopVerdict(
+                    w.STATUS_GUEST_QUIESCENCE_UNVERIFIED, ('attach stop interrupted',),
+                )
                 if failure_code is None:
                     failure_code = 'interrupted'
-            except (OSError, TimeoutError):
-                if failure_code is None:
-                    failure_code = 'writer-exit-unknown'
-        if failure_code is None and tui_exit_code is None:
-            failure_code = 'tui-exit-unknown'
-        if failure_code is None and not (boundary_ready and snapshot_captured and continue_sent):
-            failure_code = 'fixture-boundary-incomplete'
-
-        try:
-            lifecycle, current = self._begin_stop(
-                identity, SupervisorState.ATTACHING, 'attach',
-            )
-            stop_verdict = self._finish_stop(lifecycle, current)
-        except KeyboardInterrupt:
-            self._set_state(SupervisorState.UNVERIFIED)
-            stop_verdict = w.StopVerdict(
-                w.STATUS_GUEST_QUIESCENCE_UNVERIFIED, ('attach stop interrupted',),
-            )
-            if failure_code is None:
-                failure_code = 'interrupted'
-        except SupervisorError:
-            self._set_state(SupervisorState.UNVERIFIED)
-            stop_verdict = w.StopVerdict(
-                w.STATUS_GUEST_QUIESCENCE_UNVERIFIED, ('attach stop unverified',),
-            )
-        if not stop_verdict.verified and failure_code is None:
-            failure_code = 'stop-unverified'
+            except SupervisorError:
+                self._set_state(SupervisorState.UNVERIFIED)
+                stop_verdict = w.StopVerdict(
+                    w.STATUS_GUEST_QUIESCENCE_UNVERIFIED, ('attach stop unverified',),
+                )
+            if not stop_verdict.verified and failure_code is None:
+                failure_code = 'stop-unverified'
         return AttachOutcome(
             tui_exit_code,
             container_exit_code,
