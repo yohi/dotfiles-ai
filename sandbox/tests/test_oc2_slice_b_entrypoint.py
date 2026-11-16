@@ -126,16 +126,14 @@ class EntryTests(unittest.TestCase):
 
     def test_reject_commit_with_unexpected_fixture_blob(self) -> None:
         """Committed fixture blob is checked independently of working file bytes."""
-        original_git = f._git
-
-        def commit_wrong_blob(root: Path, *args: str, check: bool = True) -> bytes:
+        def commit_wrong_blob(root: Path, *args: str) -> bytes:
             if args and args[0] == "commit":
                 fixture = root / f.FIXTURE_NAME
                 fixture.write_bytes(b"unexpected committed fixture\n")
-                result = original_git(root, *args, check=check)
+                result = git(root, *args).encode()
                 fixture.write_bytes(f.FIXTURE_BYTES)
                 return result
-            return original_git(root, *args, check=check)
+            return git(root, *args).encode()
 
         with patch.object(f, "_git", side_effect=commit_wrong_blob):
             with self.assertRaises(f.SliceBFixtureError):
