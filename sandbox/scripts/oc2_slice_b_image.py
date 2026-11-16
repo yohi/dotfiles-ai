@@ -10,8 +10,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
+import stat
 from typing import Any, Mapping
 
 _DIGEST = re.compile(r"[0-9a-f]{64}\Z")
@@ -19,6 +21,8 @@ _REF = re.compile(r"[a-z0-9][a-z0-9._/-]*@sha256:[0-9a-f]{64}\Z")
 _IMAGE_ID = re.compile(r"sha256:[0-9a-f]{64}\Z")
 _MAX_ARCHIVE = 1024 * 1024 * 1024
 _ENTRYPOINT = ["/opt/oc2/slice-b/entrypoint"]
+_RUNTIME_FILES = ("entrypoint.py", "offline_fixture.py")
+_BASE_IMAGE_DIGESTS = re.compile(r"[a-z0-9][a-z0-9._/-]*@sha256:[0-9a-f]{64}\Z")
 
 
 class SliceBImageRejected(RuntimeError):
@@ -44,19 +48,38 @@ class BuildInputs:
 
 
 def _sha_file(path: Path, max_bytes: int) -> str:
+    """Hash a regular non-symlink file, enforcing max_bytes while reading it."""
+    descriptor: int | None = None
     try:
-        if not path.is_file() or path.is_symlink() or path.stat().st_size > max_bytes:
+        if max_bytes < 0:
+            raise SliceBImageRejected("invalid image input size limit")
+        descriptor = os.open(
+            path,
+            os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) |
+            getattr(os, "O_NONBLOCK", 0) | getattr(os, "O_CLOEXEC", 0),
+        )
+        metadata = os.fstat(descriptor)
+        if not stat.S_ISREG(metadata.st_mode) or metadata.st_size > max_bytes:
             raise SliceBImageRejected("unsafe image input")
         h = hashlib.sha256()
-        with path.open("rb") as stream:
-            while block := stream.read(1024 * 1024):
+        total = 0
+        with os.fdopen(descriptor, "rb") as stream:
+            descriptor = None
+            while block := stream.read(min(1024 * 1024, max_bytes + 1 - total)):
+                total += len(block)
+                if total > max_bytes:
+                    raise SliceBImageRejected("image input exceeds size limit")
                 h.update(block)
         return h.hexdigest()
     except OSError as e:
         raise SliceBImageRejected("image input inaccessible") from e
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
 
 
 def _validate_pin(pin: ImagePin) -> None:
+    """Validate immutable pin field formats; this does not inspect files or Manifest data."""
     if not isinstance(pin, ImagePin) or not all(
         _DIGEST.fullmatch(v)
         for v in (pin.artifact_sha256, pin.runtime_sha256, pin.archive_sha256)
@@ -73,13 +96,15 @@ def _validate_pin(pin: ImagePin) -> None:
 def verify_build_inputs(source_root: Path) -> None:
     """Require trusted, explicit and independently pinned local build inputs.
 
-    This function never downloads a binary or a base image. If the Host has not
-    supplied a complete trusted pin record, the build is blocked.
+    This function never downloads a binary or a base image. The runtime digest
+    frames each runtime filename, a NUL byte, and the raw 32-byte SHA-256 digest
+    returned by _sha_file, in _RUNTIME_FILES order. The caller must keep inputs
+    fixed between this check and the build.
     """
     root = source_root.resolve(strict=True)
     meta = root / "build-inputs.json"
     try:
-        data = json.loads(meta.read_text(encoding="utf-8"))
+        data = json.loads(_read_file(meta, 64 * 1024))
     except (OSError, ValueError) as e:
         raise SliceBImageRejected("trusted build inputs unavailable") from e
     if not isinstance(data, dict) or set(data) != {
@@ -104,7 +129,7 @@ def verify_build_inputs(source_root: Path) -> None:
     if _sha_file(binary, 64 * 1024 * 1024) != args.opencode_binary_sha256:
         raise SliceBImageRejected("OpenCode v2.2.5 binary hash mismatch")
     dockerfile = root / "Dockerfile"
-    content = dockerfile.read_text("utf-8")
+    content = _read_file(dockerfile, 64 * 1024).decode("utf-8")
     allowed = (
         "ARG BASE_IMAGE",
         "FROM ${BASE_IMAGE}",
@@ -128,8 +153,9 @@ def verify_build_inputs(source_root: Path) -> None:
         != allowed
     ):
         raise SliceBImageRejected("Dockerfile instruction order mismatch")
-    for name in ("entrypoint.py", "offline_fixture.py"):
-        _sha_file(root / name, 256 * 1024)
+    runtime_digest = _runtime_sha256(root)
+    if runtime_digest != args.runtime_sha256:
+        raise SliceBImageRejected("runtime source hash mismatch")
     # Reject broader contexts; binary/build-pins and exact source files only.
     found = {p.name for p in root.iterdir()}
     if found != {
@@ -143,13 +169,19 @@ def verify_build_inputs(source_root: Path) -> None:
 
 
 def offline_build_argv(
-    source_root: Path, base_ref: str, *, transport_tag: str
+    source_root: Path, base_ref: str, *, transport_tag: str,
+    base_image_inspect: Mapping[str, Any],
 ) -> tuple[str, ...]:
-    """Validated argv only. Caller must separately authorize and execute."""
+    """Return offline build argv after requiring proof of the exact local base digest.
+
+    Caller supplies `docker image inspect <base_ref>` output obtained locally;
+    the function does not run Docker. Inputs must remain fixed through execution.
+    """
     verify_build_inputs(source_root)
     if not _REF.fullmatch(base_ref):
         raise SliceBImageRejected("base must be digest pinned")
-    meta = json.loads((source_root / "build-inputs.json").read_text())
+    verify_local_base_image(base_image_inspect, base_ref)
+    meta = json.loads(_read_file(source_root.resolve() / "build-inputs.json", 64 * 1024))
     if base_ref != meta["base_image_ref"] or transport_tag != "oc2-slice-b:transport":
         raise SliceBImageRejected("untrusted build settings")
     return (
@@ -166,6 +198,7 @@ def offline_build_argv(
 
 
 def verify_image_archive(archive: Path, pin: ImagePin) -> None:
+    """Check archive hash against a format-validated pin; caller controls later file use."""
     _validate_pin(pin)
     if _sha_file(archive, _MAX_ARCHIVE) != pin.archive_sha256:
         raise SliceBImageRejected("Writer archive SHA-256 mismatch")
@@ -213,7 +246,54 @@ def verify_loaded_image(inspect: Mapping[str, Any], pin: ImagePin) -> None:
         seen.add(name)
 
 
+def _read_file(path: Path, max_bytes: int) -> bytes:
+    """Read a bounded regular source file with an enforced in-read byte cap."""
+    descriptor: int | None = None
+    try:
+        if max_bytes < 0:
+            raise SliceBImageRejected("invalid image input size limit")
+        descriptor = os.open(
+            path,
+            os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) |
+            getattr(os, "O_NONBLOCK", 0) | getattr(os, "O_CLOEXEC", 0),
+        )
+        metadata = os.fstat(descriptor)
+        if not stat.S_ISREG(metadata.st_mode):
+            raise SliceBImageRejected("unsafe image input")
+        with os.fdopen(descriptor, "rb") as stream:
+            descriptor = None
+            raw = stream.read(max_bytes + 1)
+    except OSError as e:
+        raise SliceBImageRejected("image input inaccessible") from e
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
+    if len(raw) > max_bytes:
+        raise SliceBImageRejected("image input exceeds size limit")
+    return raw
+
+
+def _runtime_sha256(root: Path) -> str:
+    """Hash runtime filenames and _sha_file digests in the canonical pin order."""
+    digest = hashlib.sha256()
+    for name in _RUNTIME_FILES:
+        file_digest = _sha_file(root / name, 256 * 1024)
+        digest.update(name.encode("ascii") + b"\x00")
+        digest.update(bytes.fromhex(file_digest))
+    return digest.hexdigest()
+
+
+def verify_local_base_image(inspect: Mapping[str, Any], base_ref: str) -> None:
+    """Require a local image inspection containing the exact digest-qualified base ref."""
+    if not _BASE_IMAGE_DIGESTS.fullmatch(base_ref):
+        raise SliceBImageRejected("base image must use an immutable digest ref")
+    refs = inspect.get("RepoDigests")
+    if not isinstance(refs, list) or base_ref not in refs:
+        raise SliceBImageRejected("exact base image digest is not local")
+
+
 def verify_runtime_pin_against_manifest(pin: ImagePin, runtime_sha256: str) -> None:
+    """Compare a format-validated image pin with the trusted Bundle Manifest runtime digest."""
     _validate_pin(pin)
     if not _DIGEST.fullmatch(runtime_sha256) or pin.runtime_sha256 != runtime_sha256:
         raise SliceBImageRejected("Writer runtime/Bundle Manifest mismatch")

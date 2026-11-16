@@ -1,9 +1,11 @@
 from pathlib import Path
+from dataclasses import replace
 import sys
 import tempfile
 import unittest
 import uuid
 import subprocess
+from unittest.mock import patch
 
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
@@ -21,27 +23,46 @@ from oc2_slice_b_session import (  # noqa: E402
 
 
 class Key:
-    def __init__(self):
+    """SessionKey fixture with intentionally limited local validation."""
+
+    def __init__(self) -> None:
+        """Create identifiers accepted by the Slice B test boundary."""
         self.workspace_id = "a" * 32
         self.sandbox_id = str(uuid.uuid4())
         self.session_generation = str(uuid.uuid4())
 
-    def validate(self):
+    def validate(self) -> None:
+        """Validate only the fixture's workspace identifier length."""
         if len(self.workspace_id) != 32:
             raise ValueError()
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
+        """Compare all generated fixture identity fields."""
         return vars(self) == vars(other)
 
 
-def git(root, *args):
-    r = subprocess.run(["git", "-C", str(root), *args], capture_output=True)
+def git(root: Path, *args: str) -> None:
+    """Run Git in the fixture repository with isolated user configuration."""
+    home = root.parent / "git-home"
+    home.mkdir(mode=0o700, exist_ok=True)
+    r = subprocess.run(
+        ["git", "-C", str(root), *args], capture_output=True,
+        env={
+            "PATH": "/usr/bin:/bin", "HOME": str(home), "LC_ALL": "C",
+            "GIT_CONFIG_GLOBAL": "/dev/null", "GIT_CONFIG_SYSTEM": "/dev/null",
+            "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_COUNT": "3",
+            "GIT_CONFIG_KEY_0": "core.hooksPath", "GIT_CONFIG_VALUE_0": "/dev/null",
+            "GIT_CONFIG_KEY_1": "commit.gpgSign", "GIT_CONFIG_VALUE_1": "false",
+            "GIT_CONFIG_KEY_2": "core.fsmonitor", "GIT_CONFIG_VALUE_2": "false",
+        },
+    )
     if r.returncode:
         raise AssertionError(r.stderr.decode())
 
 
 class SessionTests(unittest.TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
+        """Build a clean Host baseline, Bundle, and pending Session receipt."""
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         base = Path(self.tmp.name)
@@ -75,13 +96,15 @@ class SessionTests(unittest.TestCase):
         self.state = base / "state"
         self.guest = base / "guest"
 
-    def test_receipt_create_and_readback(self):
+    def test_receipt_create_and_readback(self) -> None:
+        """A pending receipt roundtrips and duplicate creation is rejected."""
         path = create_session_receipt(self.state, self.rec, self.art)
         self.assertEqual(verify_session_receipt(path, self.key), self.rec)
         with self.assertRaises(SliceBSessionError):
             create_session_receipt(self.state, self.rec, self.art)
 
-    def test_guest_import_and_authority(self):
+    def test_guest_import_and_authority(self) -> None:
+        """A verified Bundle imports into a new Guest and produces a start frame."""
         path = create_session_receipt(self.state, self.rec, self.art)
         guest = import_guest_baseline(
             self.art,
@@ -108,7 +131,8 @@ class SessionTests(unittest.TestCase):
         self.assertEqual(start.count(" "), 4)
         self.assertTrue(start.endswith("\n"))
 
-    def test_reject_wrong_runtime(self):
+    def test_reject_wrong_runtime(self) -> None:
+        """Guest import rejects a runtime digest different from its manifest."""
         with self.assertRaises(Exception):
             import_guest_baseline(
                 self.art,
@@ -118,15 +142,15 @@ class SessionTests(unittest.TestCase):
                 expected_runtime_sha256="e" * 64,
             )
 
-    def test_reject_receipt_identity_mutation(self):
-        from dataclasses import replace
-
+    def test_reject_receipt_identity_mutation(self) -> None:
+        """Receipt updates cannot alter immutable runtime identity."""
         path = create_session_receipt(self.state, self.rec, self.art)
         with self.assertRaises(SliceBSessionError):
             update_session_receipt(path, replace(self.rec, runtime_sha256="e" * 64))
         self.assertEqual(verify_session_receipt(path, self.key), self.rec)
 
-    def test_reject_guest_control_manifest_mutation(self):
+    def test_reject_guest_control_manifest_mutation(self) -> None:
+        """Guest authority rejects a changed copied Bundle Manifest."""
         path = create_session_receipt(self.state, self.rec, self.art)
         guest = import_guest_baseline(
             self.art,
@@ -152,6 +176,40 @@ class SessionTests(unittest.TestCase):
                     },
                 },
             )
+
+    def test_running_receipt_requires_writer_identity(self) -> None:
+        """RUNNING cannot be represented without both Writer identity fields."""
+        running = replace(self.rec, state="RUNNING")
+        with self.assertRaises(SliceBSessionError):
+            from oc2_slice_b_session import _validate_receipt
+
+            _validate_receipt(running)
+
+    def test_update_cleans_new_tmp_after_replace_failure(self) -> None:
+        """A failed replace removes only the tmp created by this update."""
+        path = create_session_receipt(self.state, self.rec, self.art)
+        with patch("oc2_slice_b_session.os.replace", side_effect=OSError("replace failed")):
+            with self.assertRaisesRegex(OSError, "replace failed"):
+                update_session_receipt(path, self.rec)
+        self.assertTrue(path.exists())
+        self.assertFalse(path.with_name("receipt.tmp").exists())
+
+    def test_update_preserves_preexisting_tmp_on_exclusive_create_failure(self) -> None:
+        """O_EXCL rejects a stale tmp without deleting a file not created here."""
+        path = create_session_receipt(self.state, self.rec, self.art)
+        tmp = path.with_name("receipt.tmp")
+        tmp.write_bytes(b"preexisting")
+        with self.assertRaises(FileExistsError):
+            update_session_receipt(path, self.rec)
+        self.assertEqual(tmp.read_bytes(), b"preexisting")
+
+    def test_update_cleans_tmp_after_fsync_failure(self) -> None:
+        """An fsync error propagates while cleaning the new temporary receipt."""
+        path = create_session_receipt(self.state, self.rec, self.art)
+        with patch("oc2_slice_b_session.os.fsync", side_effect=OSError("fsync failed")):
+            with self.assertRaisesRegex(OSError, "fsync failed"):
+                update_session_receipt(path, self.rec)
+        self.assertFalse(path.with_name("receipt.tmp").exists())
 
 
 if __name__ == "__main__":

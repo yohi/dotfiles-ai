@@ -41,6 +41,7 @@ class SliceBEntryRejected(RuntimeError):
 
 
 def parse_start_line(line: str) -> SliceBStartMessage:
+    """Parse and validate one startup frame's syntax, not Guest baseline equality."""
     try:
         wire = line.encode("ascii", "strict")
     except UnicodeError as e:
@@ -70,6 +71,7 @@ def parse_start_line(line: str) -> SliceBStartMessage:
 
 
 def _read_start_line(deadline_secs: float = 30.0) -> str:
+    """Read one bounded newline-terminated frame before the deadline."""
     end = time.monotonic() + deadline_secs
     buf = bytearray()
     while time.monotonic() < end and len(buf) <= 512:
@@ -92,6 +94,7 @@ def _read_start_line(deadline_secs: float = 30.0) -> str:
 def _check_guest_baseline(
     expected: SliceBStartMessage, repo: Path = _WORKSPACE
 ) -> None:
+    """Compare only Guest HEAD and symbolic ref with the supplied baseline identity."""
     env = {
         "PATH": "/usr/bin:/bin",
         "HOME": "/nonexistent",
@@ -104,7 +107,8 @@ def _check_guest_baseline(
         "GIT_OPTIONAL_LOCKS": "0",
     }
 
-    def git(*args):
+    def git(*args: str) -> str:
+        """Run a bounded read-only Git command in the selected Guest repository."""
         p = subprocess.run(
             ["git", *args],
             cwd=repo,
@@ -126,6 +130,7 @@ def _check_guest_baseline(
 
 
 def _run_tui() -> int:
+    """Run the fixed standalone TUI and return its process exit code."""
     # No credentials, no provider bootstrap, no untrusted repo entrypoint.
     env = {
         "PATH": "/usr/bin:/bin",
@@ -149,6 +154,12 @@ def _supervisor_fixture_boundary() -> None:
 
 
 def run_entrypoint(start_line: str) -> int:
+    """Run syntax, HEAD/ref checks, and TUI; return 0/22/23/24 for current outcomes.
+
+    Fixture execution remains behind the intentionally rejecting Supervisor
+    boundary. Status 22 covers expected validation/I/O/subprocess rejection,
+    23 is the TUI's nonzero exit, and 24 is an unexpected failure.
+    """
     try:
         data = parse_start_line(start_line)
         _check_guest_baseline(data)
@@ -167,6 +178,7 @@ def run_entrypoint(start_line: str) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Dispatch only `run`; return 20 for other argv and 21 for startup-frame failure."""
     args = sys.argv[1:] if argv is None else argv
     if args != ["run"]:
         return 20

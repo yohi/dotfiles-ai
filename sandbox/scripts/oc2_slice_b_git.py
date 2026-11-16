@@ -22,6 +22,7 @@ MAX_OBJECTS = 4000
 MAX_BLOB = 2 * 1024 * 1024
 MAX_TOTAL = 32 * 1024 * 1024
 MAX_BUNDLE = 64 * 1024 * 1024
+MAX_MANIFEST = 64 * 1024
 _REF = re.compile(r"refs/heads/[A-Za-z0-9][A-Za-z0-9/_-]{0,180}\Z")
 _SHA256 = re.compile(r"[0-9a-f]{64}\Z")
 _SECRET = (
@@ -75,7 +76,33 @@ class BundleArtifact:
 
 
 def _sha256(data: bytes) -> str:
+    """Return a SHA-256 digest for already bounded bytes."""
     return hashlib.sha256(data).hexdigest()
+
+
+def _read_bounded(path: Path, limit: int, label: str) -> bytes:
+    """Read at most limit plus one byte so concurrent growth cannot exceed the cap."""
+    descriptor: int | None = None
+    try:
+        descriptor = os.open(
+            path,
+            os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) |
+            getattr(os, "O_NONBLOCK", 0) | getattr(os, "O_CLOEXEC", 0),
+        )
+        metadata = os.fstat(descriptor)
+        if not stat.S_ISREG(metadata.st_mode):
+            raise SliceBGitRejected(f"{label} is not a regular file")
+        with os.fdopen(descriptor, "rb") as stream:
+            descriptor = None
+            raw = stream.read(limit + 1)
+    except OSError as e:
+        raise SliceBGitRejected(f"{label} unavailable") from e
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
+    if len(raw) > limit:
+        raise SliceBGitRejected(f"{label} exceeds size limit")
+    return raw
 
 
 def _git(root: Path, *args: str, max_output: int = MAX_TOTAL) -> bytes:
@@ -101,6 +128,7 @@ def _git(root: Path, *args: str, max_output: int = MAX_TOTAL) -> bytes:
 
 
 def _checked_index(raw: bytes, oid_bytes: int) -> None:
+    """Validate Index framing, checksum, path entries, and prohibited flags."""
     if len(raw) < 12 + oid_bytes or raw[:4] != b"DIRC":
         raise SliceBGitRejected("invalid Index")
     version, count = struct.unpack(">II", raw[4:12])
@@ -116,8 +144,8 @@ def _checked_index(raw: bytes, oid_bytes: int) -> None:
         if i + min_len > end:
             raise SliceBGitRejected("truncated Index entry")
         flags = struct.unpack(">H", raw[i + 40 + oid_bytes:i + 42 + oid_bytes])[0]
-        if flags & 0x3000:  # stage != 0
-            raise SliceBGitRejected("unmerged Index entry")
+        if flags & 0xB000:
+            raise SliceBGitRejected("unsupported Index entry flags")
         i += min_len
         if flags & 0x4000:
             if version != 3 or i + 2 > end:
@@ -146,6 +174,7 @@ def _checked_index(raw: bytes, oid_bytes: int) -> None:
 
 
 def _root_metadata(root: Path) -> tuple[Path, int]:
+    """Validate ordinary repository topology and return its object-ID width."""
     resolved = root.resolve(strict=True)
     gitdir = resolved / ".git"
     if not gitdir.is_dir() or gitdir.is_symlink():
@@ -163,6 +192,7 @@ def _root_metadata(root: Path) -> tuple[Path, int]:
 
 
 def _scan_history(root: Path, oid_len: int) -> None:
+    """Bound reachable history and reject unsupported objects, paths, or secrets."""
     objects = _git(root, "rev-list", "--objects", "HEAD").splitlines()
     if len(objects) > MAX_OBJECTS:
         raise SliceBGitRejected("reachable history too large")
@@ -197,6 +227,7 @@ def _scan_history(root: Path, oid_len: int) -> None:
 
 
 def _worktree_sha(root: Path) -> str:
+    """Hash tracked worktree bytes and Git-reproducible 0644/0755 file modes."""
     raw = _git(root, "ls-files", "-z")
     parts = raw.split(b"\x00")
     listed = []
@@ -231,11 +262,46 @@ def _worktree_sha(root: Path) -> str:
             raise SliceBGitRejected("worktree content changed during inspection")
         if any(p.search(data) for p in _SECRET):
             raise SliceBGitRejected("secret detected in worktree")
-        listed.append((rel, stat.S_IMODE(info.st_mode), _sha256(data)))
+        mode = 0o755 if info.st_mode & 0o111 else 0o644
+        listed.append((rel, mode, _sha256(data)))
     return _sha256(json.dumps(listed, sort_keys=True, separators=(",", ":")).encode())
 
 
+def _head_tree_sha(root: Path, oid_bytes: int, tree_oid: str) -> str:
+    """Hash HEAD's regular-file tree using the same mode/content tuple as the worktree."""
+    entries: list[tuple[str, int, str]] = []
+    raw = _git(root, "ls-tree", "-r", "-z", "--full-tree", tree_oid)
+    for record in raw.split(b"\x00"):
+        if not record:
+            continue
+        metadata, separator, raw_path = record.partition(b"\t")
+        fields = metadata.split(b" ")
+        if not separator or len(fields) != 3 or fields[1] != b"blob":
+            raise SliceBGitRejected("unsupported HEAD tree entry")
+        try:
+            name = raw_path.decode("utf-8")
+            mode = int(fields[0], 8)
+            oid = fields[2].decode("ascii")
+        except (UnicodeDecodeError, ValueError) as e:
+            raise SliceBGitRejected("invalid HEAD tree entry") from e
+        if len(oid) != oid_bytes * 2 or mode not in (0o100644, 0o100755):
+            raise SliceBGitRejected("unsupported HEAD tree file")
+        content = _git(root, "cat-file", "blob", oid, max_output=MAX_BLOB)
+        normalized_mode = 0o755 if mode & 0o111 else 0o644
+        entries.append((name, normalized_mode, _sha256(content)))
+    entries.sort(key=lambda item: item[0])
+    encoded = json.dumps(entries, sort_keys=True, separators=(",", ":")).encode()
+    return _sha256(encoded)
+
+
 def admit_clean_repo(root: Path) -> GitBaseline:
+    """Admit a clean ordinary repository after independently matching HEAD tree and worktree.
+
+    Requires a trusted local repository path. Rejects unsafe topology, Index
+    state, dirty files, unsupported history, secrets, and observations that
+    change while scanning by raising SliceBGitRejected. Does not mutate
+    repository files and returns the observed GitBaseline.
+    """
     resolved, oid_bytes = _root_metadata(root)
     branch = _git(resolved, "symbolic-ref", "--quiet", "HEAD").strip().decode("ascii")
     if not _REF.fullmatch(branch) or ".." in branch or "//" in branch or branch.endswith(".lock"):
@@ -255,18 +321,30 @@ def admit_clean_repo(root: Path) -> GitBaseline:
         raise SliceBGitRejected("dirty Index or worktree")
     _scan_history(resolved, oid_bytes)
     worktree_sha = _worktree_sha(resolved)
+    if worktree_sha != _head_tree_sha(resolved, oid_bytes, tree):
+        raise SliceBGitRejected("worktree differs from HEAD tree")
+    if _worktree_sha(resolved) != worktree_sha:
+        raise SliceBGitRejected("worktree changed during admission")
+    if (
+        _git(resolved, "rev-parse", "--verify", "HEAD^{commit}").strip().decode("ascii") != head
+        or _git(resolved, "rev-parse", "--verify", branch).strip().decode("ascii") != head
+        or _git(resolved, "symbolic-ref", "--quiet", "HEAD").strip().decode("ascii") != branch
+    ):
+        raise SliceBGitRejected("Host HEAD changed during admission")
     if index.read_bytes() != raw_index:
         raise SliceBGitRejected("Host Index changed during admission")
     return GitBaseline(resolved, branch, head, tree, "sha1" if oid_bytes == 20 else "sha256", _sha256(raw_index), worktree_sha)
 
 
 def recheck_host_baseline(baseline: GitBaseline) -> None:
+    """Re-run clean admission and reject if any Host baseline identity changed."""
     observed = admit_clean_repo(baseline.root)
     if observed != baseline:
         raise SliceBGitRejected("Host baseline changed")
 
 
 def _key_dict(key: object) -> dict[str, str]:
+    """Validate a SessionKey-like value and serialize its three identity fields."""
     validate = getattr(key, "validate", None)
     if not callable(validate):
         raise SliceBGitRejected("invalid SessionKey")
@@ -278,6 +356,7 @@ def _key_dict(key: object) -> dict[str, str]:
 
 
 def _manifest_bytes(manifest: SliceBBundleManifestV1) -> bytes:
+    """Encode a Bundle Manifest in deterministic canonical JSON form."""
     b = dataclasses.asdict(manifest.baseline)
     b["root"] = str(b["root"])
     payload = {
@@ -290,6 +369,15 @@ def _manifest_bytes(manifest: SliceBBundleManifestV1) -> bytes:
 
 
 def build_verified_bundle(baseline: GitBaseline, output: Path, *, key: object, runtime_sha256: str) -> BundleArtifact:
+    """Create and verify a bounded Bundle outside the repository, then write its Manifest.
+
+    Requires a previously admitted baseline and a valid SessionKey/runtime pin.
+    Rejects changed baselines, existing/in-repository output, oversized Bundles,
+    or mismatched refs by raising SliceBGitRejected. Writes Bundle and Manifest
+    files; on failure removes the Bundle path created by this call but may leave
+    a partially written Manifest. Returns artifact metadata; callers must
+    re-read and verify paths before trusting their current contents.
+    """
     if not _SHA256.fullmatch(runtime_sha256):
         raise SliceBGitRejected("invalid Runtime SHA")
     _key_dict(key)
@@ -302,14 +390,12 @@ def build_verified_bundle(baseline: GitBaseline, output: Path, *, key: object, r
     path.parent.mkdir(parents=True, exist_ok=True)
     try:
         _git(baseline.root, "bundle", "create", str(path), baseline.branch_ref)
-        if path.stat().st_size > MAX_BUNDLE:
-            raise SliceBGitRejected("Bundle too large")
+        raw = _read_bounded(path, MAX_BUNDLE, "Bundle")
         _git(baseline.root, "bundle", "verify", str(path))
         items = _git(baseline.root, "bundle", "list-heads", str(path)).decode().splitlines()
         if items != [f"{baseline.head_oid} {baseline.branch_ref}"]:
             raise SliceBGitRejected("Bundle refs mismatch")
         recheck_host_baseline(baseline)
-        raw = path.read_bytes()
         sha = _sha256(raw)
         manifest = SliceBBundleManifestV1(SCHEMA, key, baseline, sha, len(raw), POLICY, runtime_sha256)
         dest = path.with_name(path.name + ".manifest.json")
@@ -330,18 +416,21 @@ def build_verified_bundle(baseline: GitBaseline, output: Path, *, key: object, r
 
 def verify_bundle_manifest(artifact: BundleArtifact, *, expected_key: object,
                            expected_manifest_sha256: str, expected_runtime_sha256: str) -> SliceBBundleManifestV1:
+    """Re-read bounded artifact files and verify identity, canonical Manifest, and digests.
+
+    Requires expected identity values from a trusted caller. Rejects unsafe or
+    oversized files, mismatches, malformed JSON, and unsupported schema. This
+    returns parsed verification data but does not lock paths against later changes.
+    """
     if artifact.key != expected_key or not _SHA256.fullmatch(expected_runtime_sha256):
         raise SliceBGitRejected("untrusted Bundle identity")
     if artifact.transfer_policy_id != POLICY or artifact.runtime_sha256 != expected_runtime_sha256:
         raise SliceBGitRejected("transfer policy/Runtime mismatch")
-    try:
-        raw = artifact.manifest_path.read_bytes()
-        bundle = artifact.bundle_path.read_bytes()
-    except OSError as e:
-        raise SliceBGitRejected("missing Bundle or Manifest") from e
+    raw = _read_bounded(artifact.manifest_path, MAX_MANIFEST, "Manifest")
+    bundle = _read_bounded(artifact.bundle_path, MAX_BUNDLE, "Bundle")
     if not _SHA256.fullmatch(expected_manifest_sha256) or _sha256(raw) != expected_manifest_sha256 or _sha256(raw) != artifact.manifest_sha256:
         raise SliceBGitRejected("Manifest digest mismatch")
-    if _sha256(bundle) != artifact.bundle_sha256 or len(bundle) > MAX_BUNDLE:
+    if _sha256(bundle) != artifact.bundle_sha256:
         raise SliceBGitRejected("Bundle digest mismatch")
     try:
         data = json.loads(raw)

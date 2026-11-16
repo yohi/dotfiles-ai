@@ -5,6 +5,7 @@ No Docker, Sandbox, privileged Writer, credentials or Host Git mutations.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, asdict, replace
 import hashlib
 import json
@@ -12,7 +13,6 @@ import os
 from pathlib import Path
 import re
 import stat
-from typing import Optional
 
 from oc2_slice_b_git import (
     BundleArtifact,
@@ -49,9 +49,9 @@ class SliceBReceipt:
     image_ref: str
     image_config_id: str
     state: str
-    reason: Optional[str]
-    writer_id: Optional[str]
-    started_at: Optional[str]
+    reason: str | None
+    writer_id: str | None
+    started_at: str | None
 
 
 @dataclass(frozen=True)
@@ -71,6 +71,7 @@ class SliceBStartMessage:
     manifest_sha256: str
 
     def to_wire(self) -> str:
+        """Serialize a bounded newline-terminated start frame; oversize raises SliceBSessionError."""
         line = (
             "OC2_SLICE_B_START "
             + " ".join(
@@ -89,6 +90,7 @@ class SliceBStartMessage:
 
 
 def _private_dir(path: Path) -> None:
+    """Create or validate a normalized private directory, rejecting symlink ancestors."""
     if not path.is_absolute() or ".." in path.parts:
         raise SliceBSessionError("state root must be absolute and normalized")
     cur = Path("/")
@@ -103,6 +105,7 @@ def _private_dir(path: Path) -> None:
 
 
 def _encode_receipt(receipt: SliceBReceipt) -> bytes:
+    """Encode the complete receipt as deterministic canonical JSON bytes."""
     b = asdict(receipt.baseline)
     b["root"] = str(b["root"])
     x = {
@@ -125,6 +128,11 @@ def _encode_receipt(receipt: SliceBReceipt) -> bytes:
 
 
 def _validate_receipt(receipt: SliceBReceipt) -> None:
+    """Validate identity, states REJECTED/RUNNING/PENDING/PRESERVATION_UNVERIFIED, and Writer fields.
+
+    RUNNING requires both Writer ID and start time; other states retain the
+    existing paired-presence rule. This validates a single value, not history.
+    """
     try:
         _key_dict(receipt.key)
     except SliceBGitRejected as e:
@@ -144,10 +152,16 @@ def _validate_receipt(receipt: SliceBReceipt) -> None:
         or not _IMAGE_ID.fullmatch(receipt.image_config_id)
     ):
         raise SliceBSessionError("invalid receipt identity")
-    if receipt.writer_id is not None and not _FULL_CID.fullmatch(receipt.writer_id):
+    if receipt.writer_id is not None and (
+        not isinstance(receipt.writer_id, str) or not _FULL_CID.fullmatch(receipt.writer_id)
+    ):
         raise SliceBSessionError("invalid Writer Container ID")
+    if receipt.started_at is not None and not isinstance(receipt.started_at, str):
+        raise SliceBSessionError("invalid Writer start time")
     if bool(receipt.writer_id) != bool(receipt.started_at):
         raise SliceBSessionError("incomplete Writer identity")
+    if receipt.state == "RUNNING" and (not receipt.writer_id or not receipt.started_at):
+        raise SliceBSessionError("RUNNING receipt requires Writer identity")
     if receipt.reason is not None and (
         not isinstance(receipt.reason, str) or len(receipt.reason) > 200
     ):
@@ -155,6 +169,7 @@ def _validate_receipt(receipt: SliceBReceipt) -> None:
 
 
 def _read_strict(path: Path) -> bytes:
+    """Read a private, single-link regular receipt file within the fixed size limit."""
     flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0)
     fd = os.open(path, flags)
     try:
@@ -177,6 +192,13 @@ def _read_strict(path: Path) -> bytes:
 def create_session_receipt(
     state_root: Path, receipt: SliceBReceipt, artifact: BundleArtifact
 ) -> Path:
+    """Verify artifact identity, then create immutable manifest and receipt files.
+
+    Requires a verified BundleArtifact and matching receipt. Files are created
+    with O_EXCL, flushed and fsynced; failures may leave already-created files
+    because this two-file create path does not roll back partial writes. Git
+    verification exceptions are not universally converted to SliceBSessionError.
+    """
     _validate_receipt(receipt)
     if receipt.baseline.root.resolve().is_relative_to(state_root.resolve()):
         raise SliceBSessionError("state root cannot contain the Host repository")
@@ -225,6 +247,10 @@ def create_session_receipt(
 
 
 def verify_session_receipt(path: Path, expected_key: object) -> SliceBReceipt:
+    """Read and validate receipt plus copied Manifest; malformed data becomes SliceBSessionError.
+
+    Underlying Git baseline inspection is not performed by this function.
+    """
     try:
         raw = _read_strict(path)
         mraw = _read_strict(path.with_name("bundle.manifest.json"))
@@ -285,6 +311,15 @@ def verify_session_receipt(path: Path, expected_key: object) -> SliceBReceipt:
 
 
 def update_session_receipt(path: Path, receipt: SliceBReceipt) -> None:
+    """Validate allowed receipt evolution and atomically replace via an exclusive temporary file.
+
+    Receipt identity is immutable; all four validated states are accepted as
+    update targets, and Writer identity may bind once only on RUNNING. Once
+    bound, both Writer fields are immutable.
+    The file and directory are fsynced. If writing, flushing, fsync, or replace
+    fails, only this call's successfully created temp file is removed; cleanup
+    errors are attached to, rather than substituted for, the original error.
+    """
     _validate_receipt(receipt)
     old = verify_session_receipt(path, receipt.key)
     immutable = (
@@ -313,11 +348,20 @@ def update_session_receipt(path: Path, receipt: SliceBReceipt) -> None:
     fd = os.open(
         tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0), 0o600
     )
-    with os.fdopen(fd, "wb") as out:
-        out.write(_encode_receipt(receipt))
-        out.flush()
-        os.fsync(out.fileno())
-    os.replace(tmp, path)
+    try:
+        with os.fdopen(fd, "wb") as out:
+            out.write(_encode_receipt(receipt))
+            out.flush()
+            os.fsync(out.fileno())
+        os.replace(tmp, path)
+    except OSError as error:
+        try:
+            tmp.unlink()
+        except FileNotFoundError:
+            pass
+        except OSError as cleanup_error:
+            error.add_note(f"temporary receipt cleanup failed: {cleanup_error}")
+        raise
     fd = os.open(path.parent, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
     try:
         os.fsync(fd)
@@ -333,7 +377,13 @@ def import_guest_baseline(
     expected_key: object,
     expected_runtime_sha256: str,
 ) -> GitBaseline:
-    """Trusted Guest operation, explicitly offline and not called by any dispatcher here."""
+    """Import an already verified Bundle into a new Guest repository without network access.
+
+    Requires trusted expected key, Manifest, and runtime pins. Rejects an
+    existing/overlapping destination and validates imported HEAD/tree. Local
+    Git and filesystem side effects create the Guest repository; failures may
+    leave a partial destination. SliceBGitRejected may propagate from Git checks.
+    """
     verify_bundle_manifest(
         bundle,
         expected_key=expected_key,
@@ -378,24 +428,35 @@ def verify_guest_authority(
     guest_baseline: GitBaseline,
     image_config_id: str,
     *,
-    local_image_inspect: object = None,
+    local_image_inspect: Mapping[str, object] | None = None,
 ) -> VerifiedGuestAuthority:
-    """Return trusted authority only after caller supplies validated Host Receipt."""
+    """Bind receipt, Guest baseline, copied Manifest, and exact local Writer image evidence.
+
+    Rejects mismatched identity or image metadata with SliceBSessionError and
+    returns authority data only. Malformed JSON becomes SliceBSessionError;
+    filesystem read errors may propagate. It does not launch a Writer or freeze
+    any input file.
+    """
     _validate_receipt(receipt)
     if image_config_id != receipt.image_config_id:
         raise SliceBSessionError("image config identity mismatch")
     # Never issue Writer Baseline Authority based only on an image ID string.
     # This inspect must come from the trusted Guest's exact digest-ref lookup.
-    from collections.abc import Mapping
-
-    if not isinstance(local_image_inspect, Mapping):
+    if local_image_inspect is None:
         raise SliceBSessionError("digest-qualified local image evidence required")
+    repo_digests = local_image_inspect.get("RepoDigests")
+    image_config = local_image_inspect.get("Config")
+    if (
+        not isinstance(repo_digests, list)
+        or any(not isinstance(ref, str) for ref in repo_digests)
+        or not isinstance(image_config, Mapping)
+    ):
+        raise SliceBSessionError("invalid local image evidence")
     if (
         local_image_inspect.get("Id") != receipt.image_config_id
-        or receipt.image_ref not in local_image_inspect.get("RepoDigests", [])
-        or local_image_inspect.get("Config", {}).get("Entrypoint")
-        != ["/opt/oc2/slice-b/entrypoint"]
-        or local_image_inspect.get("Config", {}).get("Cmd") != ["run"]
+        or receipt.image_ref not in repo_digests
+        or image_config.get("Entrypoint") != ["/opt/oc2/slice-b/entrypoint"]
+        or image_config.get("Cmd") != ["run"]
     ):
         raise SliceBSessionError(
             "local digest-qualified image does not match Host Receipt"
@@ -409,7 +470,7 @@ def verify_guest_authority(
         receipt.baseline,
         receipt.bundle_sha256,
         0,
-        receipt.transfer_policy_id,
+        "oc2-slice-b-clean-git-bundle-v1",
         receipt.runtime_sha256,
     )
     try:
@@ -445,6 +506,7 @@ def verify_guest_authority(
 
 
 def build_start_message(authority: VerifiedGuestAuthority) -> SliceBStartMessage:
+    """Build the Supervisor startup frame from previously verified Guest authority."""
     key = _key_dict(authority.key)
     m = authority.manifest
     if m.key != authority.key or not _SHA256.fullmatch(authority.manifest_sha256):

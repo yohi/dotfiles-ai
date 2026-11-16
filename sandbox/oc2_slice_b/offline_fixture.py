@@ -20,6 +20,7 @@ class SliceBFixtureError(RuntimeError):
 
 
 def _git(repo: Path, *args: str, check: bool = True) -> bytes:
+    """Run one bounded Git command with fixture-owned identity and config."""
     env = {
         "HOME": "/nonexistent",
         "PATH": "/usr/bin:/bin",
@@ -63,7 +64,12 @@ def _git(repo: Path, *args: str, check: bool = True) -> bytes:
     return p.stdout
 
 
-def _snapshot(repo: Path):
+def _snapshot(repo: Path) -> tuple[tuple[bytes, ...], tuple[tuple[str, str], ...]]:
+    """Capture non-fixture Index entries and regular working files, excluding .git and the fixture.
+
+    This observes top-level and nested working files but does not restore them;
+    a later failure deliberately leaves the Guest as-is without rollback.
+    """
     # Capture non-fixture Index entries, including staged blobs and modes;
     # capture all existing non-fixture working files without writing them.
     staged = _git(repo, "ls-files", "--stage", "-z").split(b"\0")
@@ -92,7 +98,8 @@ def _snapshot(repo: Path):
     return index, tuple(files)
 
 
-def _verify_git_config(repo: Path):
+def _verify_git_config(repo: Path) -> None:
+    """Reject local Git settings outside the fixture's small trusted allowlist."""
     keys = _git(
         repo, "config", "--local", "--no-includes", "--name-only", "--list", "-z"
     )
@@ -113,6 +120,11 @@ def _verify_git_config(repo: Path):
 
 
 def run_offline_fixture(repo: Path, baseline_head: str, baseline_ref: str) -> str:
+    """Commit only the fixed fixture after verifying the expected Guest HEAD/ref.
+
+    Git/IO failures become SliceBFixtureError, unrelated staged/worktree changes
+    are preserved, and no rollback is attempted. Returns the created commit ID.
+    """
     repo = repo.resolve(strict=True)
     if not re.fullmatch("[0-9a-f]{40}|[0-9a-f]{64}", baseline_head) or not re.fullmatch(
         r"refs/heads/[A-Za-z0-9][A-Za-z0-9/_-]{0,180}", baseline_ref
@@ -165,4 +177,7 @@ def run_offline_fixture(repo: Path, baseline_head: str, baseline_ref: str) -> st
     )
     if changed != FIXTURE_NAME:
         raise SliceBFixtureError("fixture-only tree diff mismatch")
+    fixture_blob = _git(repo, "cat-file", "blob", f"{commit}:{FIXTURE_NAME}")
+    if fixture_blob != FIXTURE_BYTES:
+        raise SliceBFixtureError("committed fixture blob mismatch")
     return commit
