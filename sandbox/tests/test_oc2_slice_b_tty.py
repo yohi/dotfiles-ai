@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 from dataclasses import replace
-import hashlib
 import os
 from pathlib import Path
 import select
@@ -573,15 +572,8 @@ class Pid1SupervisorInProcessTests(unittest.TestCase):
         self, tui: te.FakeTui, inputs: tuple[bytes, ...] = (), *, snapshot: bool = True,
     ) -> tuple[ts.TtyScenario, Pid1Bridge, sup.AttachOutcome, list[bool]]:
         """Run one full attach with the Guest repository's real HEAD as authority."""
-        scenario = ts.TtyScenario(snapshot=snapshot)
-        manifest = replace(
-            scenario.authority.manifest,
-            baseline=replace(scenario.authority.manifest.baseline, head_oid=self.head),
-        )
-        authority = replace(
-            scenario.authority, manifest=manifest,
-            manifest_sha256=hashlib.sha256(ts.slice_b_git._manifest_bytes(manifest)).hexdigest(),
-        )
+        scenario = ts.TtyScenario(snapshot=snapshot, head_oid=self.head)
+        authority = scenario.authority
         fixture_seen_at_snapshot: list[bool] = []
         capture = scenario.snapshotter.capture
 

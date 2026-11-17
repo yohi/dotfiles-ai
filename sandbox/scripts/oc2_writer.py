@@ -44,6 +44,7 @@ if TYPE_CHECKING:
         SealedGuestAuthority,
         has_guest_authority_seal,
     )
+    from sandbox.scripts.oc2_slice_b_image_record import ImagePin
 else:
     from oc2_slice_b_authority import SealedGuestAuthority, has_guest_authority_seal
 
@@ -178,6 +179,9 @@ class SliceBLaunchAuthority(SealedGuestAuthority, Protocol):
 
     @property
     def runtime_sha256(self) -> str: ...
+
+    @property
+    def image_record(self) -> ImagePin: ...
 
 
 def compute_workspace_id(uid: int, canonical_git_root: str) -> str:
@@ -513,10 +517,8 @@ def validate_writer_inspect(
     Tolerated docker 29 forms: ``Name`` with a leading slash, ``Tmpfs`` as a
     dict, top-level ``Mounts`` list.  Security checks are not loosened.
 
-    Labels: the 5 ``dev.oc2.*`` labels must match exactly and no other
-    ``dev.oc2.*`` label may exist.  Other labels (merged from the image by
-    Docker) are tolerated because Docker merges image labels into the
-    container config.
+    Labels: the 5 Writer labels and all 5 pinned Slice B image provenance
+    labels must match exactly. Unknown ``dev.oc2.*`` labels remain rejected.
 
     Env: every ``Config.Env`` entry (including image-derived defaults such as
     ``PATH``) must pass the forbidden-name rules (proxy / credential-like
@@ -648,6 +650,18 @@ def validate_writer_inspect(
         problems.append('missing Config.Labels')
     else:
         expected_labels = writer_labels(spec.key)
+        if spec.image_identity_mode is WriterImageIdentityMode.SLICE_B_CONFIG_ID:
+            if authority is None:
+                problems.append('Slice B image labels require authority')
+            else:
+                pin = authority.image_record
+                expected_labels.update({
+                    'dev.oc2.source-revision': pin.source_revision,
+                    'dev.oc2.artifact-sha256': pin.artifact_sha256,
+                    'dev.oc2.runtime-sha256': pin.runtime_sha256,
+                    'dev.oc2.base-image-ref': pin.base_image_ref,
+                    'dev.oc2.build-context-sha256': pin.build_context_sha256,
+                })
         ours = {k: v for k, v in labels.items()
                 if isinstance(k, str) and k.startswith(LABEL_PREFIX)}
         if ours != expected_labels:

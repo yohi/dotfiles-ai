@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import copy
 import dataclasses
+import hashlib
 import importlib.util
 import json
 import os
@@ -1258,6 +1259,7 @@ class SupervisorBase(unittest.TestCase):
             command=('run',), tty=True, stdin_open=True,
         )
         self.docker = HookDocker(self.spec)
+        self.docker.image_authority = self.image_authority
         self.bridge = BridgeTransport(self.docker)
         self.runner = runner_for(self.bridge)
         self.probe = tw.FakeProbe()
@@ -1386,11 +1388,14 @@ class SupervisorLaunchTest(SupervisorBase):
 
     def test_pre_start_inspect_mismatch(self):
         self.docker.queue('inspect', (0, json.dumps([
-            tw.bad(tw.make_inspect(self.spec), 'HostConfig', 'NetworkMode', 'bridge')])))
+            tw.bad(tw.make_inspect(self.spec, authority=self.image_authority),
+                   'HostConfig', 'NetworkMode', 'bridge')])))
         self.assert_launch_fails(sup.InspectMismatchError, ['ps', 'create', 'inspect'])
 
     def test_pre_start_id_mismatch(self):
-        self.docker.queue('inspect', (0, json.dumps([tw.make_inspect(self.spec, CID2)])))
+        self.docker.queue('inspect', (0, json.dumps([
+            tw.make_inspect(self.spec, CID2, authority=self.image_authority),
+        ])))
         self.assert_launch_fails(sup.IdentityMismatchError, ['ps', 'create', 'inspect'])
 
     def test_start_failure(self):
@@ -1405,8 +1410,10 @@ class SupervisorLaunchTest(SupervisorBase):
         self.assertEqual(self.docker.verbs().count('start'), 1)
 
     def test_post_start_identity_mismatch_no_relaunch(self):
-        swapped = tw.make_inspect(self.spec, CID2, 'running')
-        self.docker.queue('inspect', (0, json.dumps([tw.make_inspect(self.spec)])),
+        swapped = tw.make_inspect(self.spec, CID2, 'running', self.image_authority)
+        self.docker.queue('inspect', (0, json.dumps([
+            tw.make_inspect(self.spec, authority=self.image_authority),
+        ])),
                           (0, json.dumps([swapped])), (0, json.dumps([swapped])))
         self.assert_launch_fails(sup.IdentityMismatchError)
         self.assertEqual(self.creates(), 1)
@@ -1569,14 +1576,17 @@ class SupervisorStopTest(SupervisorBase):
             command=('run',), tty=True, stdin_open=True,
         )
         other_docker = HookDocker(other_spec)
+        other_docker.image_authority = other_authority
         other = sup.GuestSupervisor(
             other_key,
             lambda spec: w.WriterLifecycle(other_docker, tw.FakeProbe(), sleep=tw.Sleeper()),
             image_authority=other_authority,
         )
         other_docker.queue('create', (0, CID2 + '\n'))
-        info = tw.make_inspect(other_spec, CID2)
-        running = tw.make_inspect(other_spec, CID2, 'running')
+        info = tw.make_inspect(other_spec, CID2, authority=other_authority)
+        running = tw.make_inspect(
+            other_spec, CID2, 'running', other_authority,
+        )
         other_docker.queue('inspect', (0, json.dumps([info])), (0, json.dumps([running])))
         other_ident = other.launch(other_spec)
         with self.assertRaises(sup.IdentityMismatchError):
@@ -1646,6 +1656,7 @@ class EndToEndOfflineTest(unittest.TestCase):
         )
         self.fs = FakeGuestFs.standard()
         self.docker = HookDocker(self.spec, fs=self.fs)
+        self.docker.image_authority = self.authority
         self.bridge = BridgeTransport(self.docker)
         self.sleeper = tw.Sleeper()
         factory = sup.guest_lifecycle_factory(runner_for(self.bridge), self.fs, self.sleeper)
@@ -1926,6 +1937,7 @@ class TtyScenario:
         inputs: Sequence[bytes | BaseException] = (),
         *,
         snapshot: bool = True,
+        head_oid: str | None = None,
         exit_code: int | None = 0,
         probe: FakeProbeBase | None = None,
         fail_attach: bool = False,
@@ -1934,7 +1946,23 @@ class TtyScenario:
         self.key, self.authority, self.spec = make_authorized_writer_fixture(
             pathlib.Path(self.temporary.name) / 'authority',
         )
+        if head_oid is not None:
+            manifest = dataclasses.replace(
+                self.authority.manifest,
+                baseline=dataclasses.replace(
+                    self.authority.manifest.baseline,
+                    head_oid=head_oid,
+                ),
+            )
+            self.authority = dataclasses.replace(
+                self.authority,
+                manifest=manifest,
+                manifest_sha256=hashlib.sha256(
+                    slice_b_git._manifest_bytes(manifest)
+                ).hexdigest(),
+            )
         self.docker = TtyExitDocker(self.spec)
+        self.docker.image_authority = self.authority
         self.runner = runner_for(BridgeTransport(self.docker))
         self.probe = probe or tw.FakeProbe()
         self.events: list[tuple[str, str | bytes | None]] = []

@@ -16,8 +16,12 @@ SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 TESTS = Path(__file__).resolve().parent
 sys.path.insert(0, str(TESTS))
-from oc2_slice_b_git import admit_clean_repo, build_verified_bundle  # noqa: E402
-from oc2_slice_b_image import ImagePin  # noqa: E402
+from oc2_slice_b_git import (  # noqa: E402
+    admit_clean_repo,
+    build_verified_bundle,
+    verify_bundle_manifest,
+)
+from oc2_slice_b_image import ImagePin, SliceBImageRejected  # noqa: E402
 from oc2_slice_b_image import GuestImageLoadRequest, import_guest_image  # noqa: E402
 from oc2_slice_b_test_support import FakeGuestImageRunner  # noqa: E402
 from oc2_slice_b_session import (  # noqa: E402
@@ -165,10 +169,36 @@ class SessionTests(unittest.TestCase):
         with self.assertRaises(SliceBSessionError):
             verify_session_receipt(path, self.key, "e" * 64)
 
+    def test_invalid_image_record_is_session_error_even_with_matching_outer_hash(self) -> None:
+        path = create_session_receipt(self.state, self.rec, self.art)
+        payload = json.loads(path.read_text(encoding="ascii"))
+        image_record = "{}"
+        payload["image_record"] = image_record
+        payload["image_record_sha256"] = hashlib.sha256(image_record.encode("ascii")).hexdigest()
+        path.write_text(json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n")
+        expected_receipt_sha256 = hashlib.sha256(path.read_bytes()).hexdigest()
+
+        with self.assertRaises(SliceBSessionError) as caught:
+            verify_session_receipt(path, self.key, expected_receipt_sha256)
+
+        self.assertIsInstance(caught.exception.__cause__, SliceBImageRejected)
+
     def test_verified_guest_authority_cannot_be_created_from_receipt_fields(self) -> None:
         with self.assertRaises(TypeError):
+            path = create_session_receipt(self.state, self.rec, self.art)
+            verified_receipt = self.verified_receipt(path)
+            manifest = verify_bundle_manifest(
+                self.art,
+                expected_key=self.key,
+                expected_manifest_sha256=self.art.manifest_sha256,
+                expected_runtime_sha256=self.art.runtime_sha256,
+            )
             VerifiedGuestAuthority(
-                self.key, self.art, self.art.manifest_sha256, self.image_authority,
+                self.key,
+                manifest,
+                self.art.manifest_sha256,
+                verified_receipt.receipt_sha256,
+                self.image_authority,
             )
 
     def test_guest_import_and_authority(self) -> None:
@@ -233,9 +263,10 @@ class SessionTests(unittest.TestCase):
             expected_runtime_sha256="b" * 64,
         )
         p = path.parent / "bundle.manifest.json"
+        verified_receipt = self.verified_receipt(path)
         p.write_bytes(p.read_bytes() + b"X")
         with self.assertRaises(SliceBSessionError):
-            verify_guest_authority(self.verified_receipt(path), guest, self.image_authority)
+            verify_guest_authority(verified_receipt, guest, self.image_authority)
 
     def test_running_receipt_requires_writer_identity(self) -> None:
         """RUNNING cannot be represented without both Writer identity fields."""

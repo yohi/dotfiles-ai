@@ -477,9 +477,12 @@ def verify_session_receipt(
         image_record_sha256 = data["image_record_sha256"]
         if not isinstance(image_record_raw, str) or not isinstance(image_record_sha256, str):
             raise SliceBSessionError("receipt Image Record is invalid")
-        image_record = ImagePin.from_bytes(
-            image_record_raw.encode("ascii"), image_record_sha256,
-        )
+        try:
+            image_record = ImagePin.from_bytes(
+                image_record_raw.encode("ascii"), image_record_sha256,
+            )
+        except SliceBImageRejected as error:
+            raise SliceBSessionError("receipt Image Record is invalid") from error
         rec = SliceBReceipt(
             key=expected_key,
             baseline=base,

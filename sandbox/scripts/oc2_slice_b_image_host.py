@@ -3,12 +3,18 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
+import shutil
 import subprocess
 from typing import Any, Mapping, Protocol
 
-from oc2_slice_b_image_build import BuildInputs, build_context_sha256, verify_build_inputs
+from oc2_slice_b_image_build import (
+    BuildInputs,
+    build_context_sha256,
+    snapshot_build_context,
+    verify_build_inputs,
+)
 from oc2_slice_b_image_record import (
     ImagePin,
     SliceBImageRejected,
@@ -26,9 +32,18 @@ from oc2_slice_b_image_verify import _validate_image_config, verify_local_base_i
 @dataclass(frozen=True, slots=True)
 class ImageBuildRequest:
     source_root: Path
+    supervisor_snapshot: Path
     base_image_ref: str
     archive_path: Path
     docker_host: str
+
+
+@dataclass(frozen=True, slots=True)
+class _BuiltImage:
+    request: ImageBuildRequest
+    inputs: BuildInputs
+    context_sha256: str
+    config_id: str
 
 
 class HostImageRunner(Protocol):
@@ -52,22 +67,28 @@ def offline_build_argv(
     base_ref: str,
     *,
     docker_host: str,
+    supervisor_snapshot: Path,
 ) -> tuple[str, ...]:
-    inputs = verify_build_inputs(source_root)
+    inputs = verify_build_inputs(source_root, supervisor_snapshot)
     if not _BASE_IMAGE_DIGESTS.fullmatch(base_ref) or base_ref != inputs.base_image_ref:
         raise SliceBImageRejected("base must match the trusted digest-pinned input")
     endpoint = _validate_docker_host(docker_host)
     verify_local_base_image(_inspect_local_base_image(base_ref, endpoint), base_ref)
-    context_sha256 = build_context_sha256(source_root)
-    return (
-        "docker", "--host", endpoint, "build", "--quiet", "--pull=false", "--network=none",
-        "--build-arg", "BASE_IMAGE=" + base_ref,
-        "--build-arg", "SOURCE_REVISION=" + inputs.source_revision,
-        "--build-arg", "ARTIFACT_SHA256=" + inputs.opencode_binary_sha256,
-        "--build-arg", "RUNTIME_SHA256=" + inputs.runtime_sha256,
-        "--build-arg", "BUILD_CONTEXT_SHA256=" + context_sha256,
-        str(source_root.resolve(strict=True)),
-    )
+    context = snapshot_build_context(source_root, supervisor_snapshot)
+    try:
+        context_sha256 = build_context_sha256(context)
+        return (
+            "docker", "--host", endpoint, "build", "--quiet", "--pull=false", "--network=none",
+            "--build-arg", "BASE_IMAGE=" + base_ref,
+            "--build-arg", "SOURCE_REVISION=" + inputs.source_revision,
+            "--build-arg", "ARTIFACT_SHA256=" + inputs.opencode_binary_sha256,
+            "--build-arg", "RUNTIME_SHA256=" + inputs.runtime_sha256,
+            "--build-arg", "BUILD_CONTEXT_SHA256=" + context_sha256,
+            str(context),
+        )
+    except (OSError, SliceBImageRejected):
+        shutil.rmtree(context)
+        raise
 
 
 def build_offline_image(
@@ -75,17 +96,24 @@ def build_offline_image(
     base_ref: str,
     *,
     docker_host: str,
+    supervisor_snapshot: Path,
 ) -> str:
     endpoint = _validate_docker_host(docker_host)
-    result = _run_docker_command(
-        offline_build_argv(source_root, base_ref, docker_host=endpoint), endpoint,
+    argv = offline_build_argv(
+        source_root, base_ref, docker_host=endpoint,
+        supervisor_snapshot=supervisor_snapshot,
     )
-    if result.returncode != 0:
-        raise SliceBImageRejected("offline Writer image build failed")
-    config_id = result.stdout.strip()
-    if not _IMAGE_ID.fullmatch(config_id):
-        raise SliceBImageRejected("offline Writer image build returned no Config ID")
-    return config_id
+    context = Path(argv[-1])
+    try:
+        result = _run_docker_command(argv, endpoint)
+        if result.returncode != 0:
+            raise SliceBImageRejected("offline Writer image build failed")
+        config_id = result.stdout.strip()
+        if not _IMAGE_ID.fullmatch(config_id):
+            raise SliceBImageRejected("offline Writer image build returned no Config ID")
+        return config_id
+    finally:
+        shutil.rmtree(context)
 
 
 def build_and_export_image(request: ImageBuildRequest, runner: HostImageRunner) -> ImagePin:
@@ -94,8 +122,10 @@ def build_and_export_image(request: ImageBuildRequest, runner: HostImageRunner) 
     docker_host = _validate_docker_host(request.docker_host)
     if runner.docker_host != docker_host:
         raise SliceBImageRejected("Host Docker socket does not match the build request")
+    if request.source_root.is_symlink():
+        raise SliceBImageRejected("Host image build source must not be a symlink")
     root = request.source_root.resolve(strict=True)
-    inputs = verify_build_inputs(root)
+    inputs = verify_build_inputs(root, request.supervisor_snapshot)
     if (
         request.base_image_ref != inputs.base_image_ref
         or not request.archive_path.is_absolute()
@@ -108,10 +138,31 @@ def build_and_export_image(request: ImageBuildRequest, runner: HostImageRunner) 
     verify_local_base_image(
         runner.inspect_image(request.base_image_ref), request.base_image_ref,
     )
-    context_sha256 = build_context_sha256(root)
-    config_id = runner.build_image(request, inputs, context_sha256)
-    if not _IMAGE_ID.fullmatch(config_id):
-        raise SliceBImageRejected("offline build did not return an image Config ID")
+    context = snapshot_build_context(root, request.supervisor_snapshot)
+    try:
+        inputs = verify_build_inputs(context, request.supervisor_snapshot)
+        context_sha256 = build_context_sha256(context)
+        snapshot_request = replace(request, source_root=context)
+        config_id = runner.build_image(snapshot_request, inputs, context_sha256)
+        if not _IMAGE_ID.fullmatch(config_id):
+            raise SliceBImageRejected("offline build did not return an image Config ID")
+        return _complete_image_export(
+            runner,
+            _BuiltImage(snapshot_request, inputs, context_sha256, config_id),
+        )
+    finally:
+        shutil.rmtree(context)
+
+
+def _complete_image_export(
+    runner: HostImageRunner,
+    built: _BuiltImage,
+) -> ImagePin:
+    request = built.request
+    inputs = built.inputs
+    context_sha256 = built.context_sha256
+    config_id = built.config_id
+    root = request.source_root
     built_inspect = runner.inspect_image(config_id)
     dockerfile_sha256 = _sha_file(root / "Dockerfile", 64 * 1024)
     _validate_image_config(

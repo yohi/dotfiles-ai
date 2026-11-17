@@ -37,8 +37,10 @@ class ImageRunnerTests(unittest.TestCase):
     def test_host_runner_build_is_offline_and_uses_pinned_inputs(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
+            root.chmod(0o700)
             request = ImageBuildRequest(
                 source_root=root,
+                supervisor_snapshot=root,
                 base_image_ref="alpine@sha256:" + "a" * 64,
                 archive_path=root / "writer.tar",
                 docker_host="unix:///run/user/1000/docker.sock",

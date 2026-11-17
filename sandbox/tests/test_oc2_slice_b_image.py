@@ -37,6 +37,8 @@ class ImageTests(unittest.TestCase):
         self.addCleanup(self.tmp.cleanup)
         self.root = Path(self.tmp.name) / "context"
         self.root.mkdir()
+        self.supervisor_snapshot = self.root.parent / "supervisor-control"
+        self.supervisor_snapshot.mkdir(mode=0o700)
         self.raw = b"test archive"
         self.archive = self.root.parent / "writer-image.tar"
         self.archive.write_bytes(self.raw)
@@ -91,6 +93,7 @@ class ImageTests(unittest.TestCase):
         initial_config_value = self.inspect["Config"]
         assert isinstance(initial_config_value, dict)
         initial_config: dict[str, JsonValue] = initial_config_value
+        build_source_root = self.root
 
         class FakeHostRunner:
             docker_host = "unix:///var/run/docker.sock"
@@ -112,6 +115,10 @@ class ImageTests(unittest.TestCase):
                 }
 
             def build_image(self, request, inputs, build_context_sha256: str) -> str:
+                if request.source_root == build_source_root or not request.source_root.is_relative_to(
+                    request.supervisor_snapshot
+                ):
+                    raise AssertionError("runner did not receive a Supervisor snapshot")
                 self.calls.append(("build", build_context_sha256))
                 self.config["Labels"] = {
                     "dev.oc2.source-revision": inputs.source_revision,
@@ -132,6 +139,7 @@ class ImageTests(unittest.TestCase):
         runner = FakeHostRunner()
         request = request_type(
             source_root=self.root,
+            supervisor_snapshot=self.supervisor_snapshot,
             base_image_ref=base_ref,
             archive_path=export_path,
             docker_host=runner.docker_host,
@@ -149,6 +157,32 @@ class ImageTests(unittest.TestCase):
         self.assertIsNone(pin.image_ref)
         self.assertEqual([verb for verb, _ in runner.calls], ["inspect", "build", "inspect", "save"])
         self.assertEqual(runner.calls[-1], ("save", self.config))
+
+    def test_host_build_rejects_changed_binary_and_matching_untrusted_hash(self) -> None:
+        self._write_build_context()
+        changed_binary = b"attacker-controlled binary"
+        (self.root / "opencode-v2.2.5").write_bytes(changed_binary)
+        inputs_path = self.root / "build-inputs.json"
+        inputs = json.loads(inputs_path.read_text())
+        inputs["opencode_binary_sha256"] = hashlib.sha256(changed_binary).hexdigest()
+        inputs_path.write_text(json.dumps(inputs))
+        request_type = image_module.ImageBuildRequest
+        request = request_type(
+            source_root=self.root,
+            supervisor_snapshot=self.supervisor_snapshot,
+            base_image_ref=inputs["base_image_ref"],
+            archive_path=self.root.parent / "host-export.tar",
+            docker_host=DOCKER_HOST,
+        )
+
+        class Runner:
+            docker_host = DOCKER_HOST
+
+            def inspect_image(self, reference):
+                raise AssertionError("untrusted build inputs reached Docker inspection")
+
+        with self.assertRaises(SliceBImageRejected):
+            image_module.build_and_export_image(request, Runner())
 
     def test_guest_import_issues_authority_without_repo_digest(self) -> None:
         request_type = getattr(image_module, "GuestImageLoadRequest", None)
@@ -386,8 +420,9 @@ class ImageTests(unittest.TestCase):
         encoded = encoder()
 
         self.assertEqual(decoder(encoded, self.pin.record_sha256), self.pin)
+        noncanonical = encoded + b" "
         with self.assertRaises(SliceBImageRejected):
-            decoder(encoded + b" ", self.pin.record_sha256)
+            decoder(noncanonical, hashlib.sha256(noncanonical).hexdigest())
 
     def test_archive_verification_checks_recorded_size(self) -> None:
         from dataclasses import replace
@@ -400,7 +435,7 @@ class ImageTests(unittest.TestCase):
     def test_unpinned_build_inputs_blocked(self) -> None:
         """Build input verification refuses a missing trust manifest."""
         with self.assertRaises(SliceBImageRejected):
-            verify_build_inputs(self.root)
+            verify_build_inputs(self.root, self.supervisor_snapshot)
 
     def test_base_image_arg_must_be_declared_inside_build_stage(self) -> None:
         self._write_build_context()
@@ -413,7 +448,7 @@ class ImageTests(unittest.TestCase):
         )
 
         with self.assertRaises(SliceBImageRejected):
-            verify_build_inputs(self.root)
+            verify_build_inputs(self.root, self.supervisor_snapshot)
 
     def _write_build_context(self) -> str:
         """Create a complete locally pinned Docker context and return its runtime digest."""
@@ -435,16 +470,24 @@ class ImageTests(unittest.TestCase):
             "source_revision": "f" * 40,
         }
         (self.root / "build-inputs.json").write_text(json.dumps(inputs))
+        trusted_path = self.supervisor_snapshot / "trusted-build-inputs.json"
+        trusted_path.write_text(
+            json.dumps({
+                "opencode_binary_sha256": inputs["opencode_binary_sha256"],
+                "runtime_sha256": runtime_hash,
+            })
+        )
+        trusted_path.chmod(0o600)
         return runtime_hash
 
     def test_runtime_pin_covers_both_runtime_sources(self) -> None:
         runtime_hash = self._write_build_context()
-        verify_build_inputs(self.root)
+        verify_build_inputs(self.root, self.supervisor_snapshot)
         for name in ("entrypoint.py", "offline_fixture.py"):
             original = (self.root / name).read_bytes()
             (self.root / name).write_bytes(original + b"tampered")
             with self.assertRaises(SliceBImageRejected):
-                verify_build_inputs(self.root)
+                verify_build_inputs(self.root, self.supervisor_snapshot)
             (self.root / name).write_bytes(original)
         expected = hashlib.sha256()
         for name in ("entrypoint.py", "offline_fixture.py"):
@@ -474,7 +517,10 @@ class ImageTests(unittest.TestCase):
         )
         with self.assertRaises(SliceBImageRejected):
             with patch("oc2_slice_b_image_host._run_docker_command", return_value=absent):
-                offline_build_argv(self.root, base_ref, docker_host=DOCKER_HOST)
+                offline_build_argv(
+                    self.root, base_ref, docker_host=DOCKER_HOST,
+                    supervisor_snapshot=self.supervisor_snapshot,
+                )
         present = subprocess.CompletedProcess(
             ["docker", "image", "inspect", base_ref],
             0,
@@ -482,7 +528,21 @@ class ImageTests(unittest.TestCase):
             "",
         )
         with patch("oc2_slice_b_image_host._run_docker_command", return_value=present):
-            argv = offline_build_argv(self.root, base_ref, docker_host=DOCKER_HOST)
+            argv = offline_build_argv(
+                self.root, base_ref, docker_host=DOCKER_HOST,
+                supervisor_snapshot=self.supervisor_snapshot,
+            )
+        context = Path(argv[-1])
+        original_binary = (context / "opencode-v2.2.5").read_bytes()
+        (self.root / "opencode-v2.2.5").write_bytes(b"changed after snapshot")
+        self.assertEqual((context / "opencode-v2.2.5").read_bytes(), original_binary)
+        self.assertEqual(
+            hashlib.sha256(original_binary).hexdigest(),
+            json.loads((context / "build-inputs.json").read_text())[
+                "opencode_binary_sha256"
+            ],
+        )
+        shutil.rmtree(context)
         self.assertIn("--pull=false", argv)
         self.assertIn("--network=none", argv)
         self.assertIn("--quiet", argv)
@@ -505,6 +565,7 @@ class ImageTests(unittest.TestCase):
                     self.root,
                     "alpine@sha256:" + "a" * 64,
                     docker_host=DOCKER_HOST,
+                    supervisor_snapshot=self.supervisor_snapshot,
                 )
         self.assertEqual(run.call_count, 1)
 
@@ -529,6 +590,7 @@ class ImageTests(unittest.TestCase):
                 self.root,
                 base_ref,
                 docker_host=DOCKER_HOST,
+                supervisor_snapshot=self.supervisor_snapshot,
             )
         self.assertEqual(run.call_count, 2)
         self.assertEqual(
@@ -550,7 +612,11 @@ class ImageTests(unittest.TestCase):
             "",
         )
         with patch("oc2_slice_b_image_host._run_docker_command", return_value=inspected) as run:
-            argv = offline_build_argv(self.root, base_ref, docker_host=DOCKER_HOST)
+            argv = offline_build_argv(
+                self.root, base_ref, docker_host=DOCKER_HOST,
+                supervisor_snapshot=self.supervisor_snapshot,
+            )
+        shutil.rmtree(Path(argv[-1]))
         run.assert_called_once_with(
             ("docker", "--host", DOCKER_HOST, "image", "inspect", base_ref),
             DOCKER_HOST,

@@ -81,7 +81,10 @@ def make_spec(gen: str = GEN, **overrides: Any) -> writer_types.WriterSpec:
 
 
 def make_inspect(
-    spec: writer_types.WriterSpec, cid: str = CID, status: str = 'created'
+    spec: writer_types.WriterSpec,
+    cid: str = CID,
+    status: str = 'created',
+    authority: writer_types.SliceBLaunchAuthority | None = None,
 ) -> dict[str, Any]:
     """Build the Docker inspect shape used by WriterLifecycle validation."""
     running = status == 'running'
@@ -105,7 +108,16 @@ def make_inspect(
             'WorkingDir': '/workspace',
             'Tty': spec.tty,
             'OpenStdin': getattr(spec, 'stdin_open', False),
-            'Labels': dict(w.writer_labels(spec.key)),
+            'Labels': {
+                **w.writer_labels(spec.key),
+                **({
+                    'dev.oc2.source-revision': authority.image_record.source_revision,
+                    'dev.oc2.artifact-sha256': authority.image_record.artifact_sha256,
+                    'dev.oc2.runtime-sha256': authority.image_record.runtime_sha256,
+                    'dev.oc2.base-image-ref': authority.image_record.base_image_ref,
+                    'dev.oc2.build-context-sha256': authority.image_record.build_context_sha256,
+                } if authority is not None else {}),
+            },
             'Env': [f'{n}={v}' for n, v in spec.env]
             + ['PATH=/usr/local/bin:/usr/bin:/bin'],
         },
@@ -175,6 +187,7 @@ class FakeDocker:
         self.existing: list[dict[str, Any]] = list(existing or [])
         self.state = 'none'
         self.create_authorities: list[writer_types.SliceBLaunchAuthority | None] = []
+        self.image_authority: writer_types.SliceBLaunchAuthority | None = None
 
     def queue(self, verb: str, *results: tuple[int, str] | BaseException) -> None:
         """Queue DockerRunner results or exceptions, including interrupts."""
@@ -198,6 +211,8 @@ class FakeDocker:
         verb = argv[1]
         if verb == 'create':
             self.create_authorities.append(image_authority)
+            if image_authority is not None:
+                self.image_authority = image_authority
         queued = self.responses.get(verb)
         if queued:
             result = queued.pop(0)
@@ -221,8 +236,12 @@ class FakeDocker:
                 if item['Id'] == target:
                     return 0, json.dumps([item])
             if self.state == 'exited':
-                return 0, json.dumps([stopped_inspect(self.spec)])
-            return 0, json.dumps([make_inspect(self.spec, CID, self.state)])
+                return 0, json.dumps([make_inspect(
+                    self.spec, CID, 'exited', self.image_authority,
+                )])
+            return 0, json.dumps([make_inspect(
+                self.spec, CID, self.state, self.image_authority,
+            )])
         raise AssertionError('unexpected argv: ' + repr(argv))
 
     def run_authorized(
@@ -512,8 +531,14 @@ class HappyPathTest(unittest.TestCase):
                 image_identity_mode=w.WriterImageIdentityMode.SLICE_B_CONFIG_ID,
                 command=('run',), tty=True, stdin_open=True,
             )
-            info = make_inspect(spec)
+            info = make_inspect(spec, authority=authority)
             w.validate_writer_inspect(info, spec, authority=authority)
+            inherited_label = bad(info, 'Config', 'Labels', {
+                **info['Config']['Labels'],
+                'dev.oc2.unrecognized': 'value',
+            })
+            with self.assertRaises(w.WriterError):
+                w.validate_writer_inspect(inherited_label, spec, authority=authority)
             for altered in (
                 bad(info, 'Config', 'OpenStdin', False),
                 bad(info, 'Config', 'OpenStdin', DELETE),
@@ -1059,7 +1084,7 @@ class SpecValidationTest(unittest.TestCase):
                 image_identity_mode=mode.SLICE_B_CONFIG_ID,
                 command=('run',), tty=True, stdin_open=True,
             )
-            inspect = make_inspect(spec)
+            inspect = make_inspect(spec, authority=authority)
             inspect['Image'] = authority.image_config_id
             inspect['Config']['Image'] = authority.image_config_id
             w.validate_writer_inspect(inspect, spec, authority=authority)
