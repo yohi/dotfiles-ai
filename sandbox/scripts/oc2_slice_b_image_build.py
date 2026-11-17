@@ -15,7 +15,7 @@ from oc2_slice_b_image_record import SliceBImageRejected, _DIGEST, _REF, _sha_fi
 _RUNTIME_FILES = ("entrypoint.py", "offline_fixture.py")
 _BUILD_INPUTS_FILENAME = "build-inputs.json"
 _OPENCODE_BINARY_FILENAME = "opencode-v2.2.5"
-_MAX_BUILD_CONTEXT_FILE = 64 * 1024 * 1024
+_MAX_BUILD_CONTEXT_FILE = 256 * 1024 * 1024
 
 
 @dataclass(frozen=True, slots=True)
