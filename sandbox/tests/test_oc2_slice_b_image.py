@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 from pathlib import Path
+from dataclasses import replace
 import hashlib
 import json
 import shutil
@@ -6,9 +9,11 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from typing import TypeAlias
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+import oc2_slice_b_image as image_module
 from oc2_slice_b_image import (
     ImagePin,
     SliceBImageRejected,
@@ -19,6 +24,11 @@ from oc2_slice_b_image import (
     verify_runtime_pin_against_manifest,
 )
 
+DOCKER_HOST = "unix:///var/run/docker.sock"
+JsonValue: TypeAlias = (
+    str | int | float | bool | None | list["JsonValue"] | dict[str, "JsonValue"]
+)
+
 
 class ImageTests(unittest.TestCase):
     def setUp(self) -> None:
@@ -27,30 +37,319 @@ class ImageTests(unittest.TestCase):
         self.addCleanup(self.tmp.cleanup)
         self.root = Path(self.tmp.name) / "context"
         self.root.mkdir()
+        self.supervisor_snapshot = self.root.parent / "supervisor-control"
+        self.supervisor_snapshot.mkdir(mode=0o700)
         self.raw = b"test archive"
         self.archive = self.root.parent / "writer-image.tar"
         self.archive.write_bytes(self.raw)
         self.ref = "oc2/slice-b@sha256:" + "a" * 64
         self.config = "sha256:" + "b" * 64
         self.pin = ImagePin(
-            "f" * 40,
-            "c" * 64,
-            "d" * 64,
-            self.ref,
-            self.config,
-            hashlib.sha256(self.raw).hexdigest(),
+            source_revision="f" * 40,
+            artifact_sha256="c" * 64,
+            runtime_sha256="d" * 64,
+            base_image_ref="alpine@sha256:" + "a" * 64,
+            build_context_sha256="1" * 64,
+            dockerfile_sha256="2" * 64,
+            image_ref=self.ref,
+            config_id=self.config,
+            archive_sha256=hashlib.sha256(self.raw).hexdigest(),
+            archive_size_bytes=len(self.raw),
+            platform="linux/amd64",
         )
-        self.inspect = {
+        self.inspect: dict[str, JsonValue] = {
             "Id": self.config,
             "RepoDigests": [self.ref],
+            "Os": "linux",
+            "Architecture": "amd64",
             "Config": {
                 "Entrypoint": ["/opt/oc2/slice-b/entrypoint"],
                 "Cmd": ["run"],
                 "User": "10001:10001",
                 "WorkingDir": "/workspace",
                 "Env": [],
+                "Labels": {
+                    "dev.oc2.source-revision": self.pin.source_revision,
+                    "dev.oc2.artifact-sha256": self.pin.artifact_sha256,
+                    "dev.oc2.runtime-sha256": self.pin.runtime_sha256,
+                    "dev.oc2.base-image-ref": self.pin.base_image_ref,
+                    "dev.oc2.build-context-sha256": self.pin.build_context_sha256,
+                },
             },
         }
+
+    def test_host_build_export_records_independent_archive_and_config_identity(self) -> None:
+        request_type = getattr(image_module, "ImageBuildRequest", None)
+        build_export = getattr(image_module, "build_and_export_image", None)
+        self.assertTrue(callable(request_type))
+        self.assertTrue(callable(build_export))
+        if not callable(request_type) or not callable(build_export):
+            return
+        runtime_sha256 = self._write_build_context()
+        base_ref = "alpine@sha256:" + "a" * 64
+        saved = b"host-exported image archive"
+        export_path = self.root.parent / "host-export.tar"
+        image_config_id = self.config
+        initial_config_value = self.inspect["Config"]
+        assert isinstance(initial_config_value, dict)
+        initial_config: dict[str, JsonValue] = initial_config_value
+        build_source_root = self.root
+
+        class FakeHostRunner:
+            docker_host = "unix:///var/run/docker.sock"
+
+            def __init__(self) -> None:
+                self.calls: list[tuple[str, str]] = []
+
+            def inspect_image(self, reference: str) -> dict[str, object]:
+                self.calls.append(("inspect", reference))
+                if reference == base_ref:
+                    return {"RepoDigests": [base_ref]}
+                return {
+                    "Id": self.config_id,
+                    "RepoDigests": [],
+                    "Os": "linux",
+                    "Architecture": "amd64",
+                    "Size": 123,
+                    "Config": self.config,
+                }
+
+            def build_image(self, request, inputs, build_context_sha256: str) -> str:
+                if request.source_root == build_source_root or not request.source_root.is_relative_to(
+                    request.supervisor_snapshot
+                ):
+                    raise AssertionError("runner did not receive a Supervisor snapshot")
+                self.calls.append(("build", build_context_sha256))
+                self.config["Labels"] = {
+                    "dev.oc2.source-revision": inputs.source_revision,
+                    "dev.oc2.artifact-sha256": inputs.opencode_binary_sha256,
+                    "dev.oc2.runtime-sha256": inputs.runtime_sha256,
+                    "dev.oc2.base-image-ref": inputs.base_image_ref,
+                    "dev.oc2.build-context-sha256": build_context_sha256,
+                }
+                return self.config_id
+
+            def save_image(self, config_id: str, archive: Path) -> None:
+                self.calls.append(("save", config_id))
+                archive.write_bytes(saved)
+
+            config_id = image_config_id
+            config: dict[str, JsonValue] = initial_config
+
+        runner = FakeHostRunner()
+        request = request_type(
+            source_root=self.root,
+            supervisor_snapshot=self.supervisor_snapshot,
+            base_image_ref=base_ref,
+            archive_path=export_path,
+            docker_host=runner.docker_host,
+        )
+
+        pin = build_export(request, runner)
+
+        self.assertEqual(pin.source_revision, "f" * 40)
+        self.assertEqual(pin.artifact_sha256, hashlib.sha256(b"binary").hexdigest())
+        self.assertEqual(pin.runtime_sha256, runtime_sha256)
+        self.assertEqual(pin.base_image_ref, base_ref)
+        self.assertEqual(pin.config_id, self.config)
+        self.assertEqual(pin.archive_sha256, hashlib.sha256(saved).hexdigest())
+        self.assertEqual(pin.archive_size_bytes, len(saved))
+        self.assertIsNone(pin.image_ref)
+        self.assertEqual([verb for verb, _ in runner.calls], ["inspect", "build", "inspect", "save"])
+        self.assertEqual(runner.calls[-1], ("save", self.config))
+
+    def test_host_build_rejects_changed_binary_and_matching_untrusted_hash(self) -> None:
+        self._write_build_context()
+        changed_binary = b"attacker-controlled binary"
+        (self.root / "opencode-v2.2.5").write_bytes(changed_binary)
+        inputs_path = self.root / "build-inputs.json"
+        inputs = json.loads(inputs_path.read_text())
+        inputs["opencode_binary_sha256"] = hashlib.sha256(changed_binary).hexdigest()
+        inputs_path.write_text(json.dumps(inputs))
+        request_type = image_module.ImageBuildRequest
+        request = request_type(
+            source_root=self.root,
+            supervisor_snapshot=self.supervisor_snapshot,
+            base_image_ref=inputs["base_image_ref"],
+            archive_path=self.root.parent / "host-export.tar",
+            docker_host=DOCKER_HOST,
+        )
+
+        class Runner:
+            docker_host = DOCKER_HOST
+
+            def inspect_image(self, reference):
+                raise AssertionError("untrusted build inputs reached Docker inspection")
+
+        with self.assertRaises(SliceBImageRejected):
+            image_module.build_and_export_image(request, Runner())
+
+    def test_guest_import_issues_authority_without_repo_digest(self) -> None:
+        request_type = getattr(image_module, "GuestImageLoadRequest", None)
+        import_image = getattr(image_module, "import_guest_image", None)
+        self.assertTrue(callable(request_type))
+        self.assertTrue(callable(import_image))
+        if not callable(request_type) or not callable(import_image):
+            return
+        control_root = self.root / "supervisor-control"
+        control_root.mkdir(mode=0o700)
+        raw = b"trusted archive bytes"
+        pin = replace(
+            self.pin,
+            archive_sha256=hashlib.sha256(raw).hexdigest(),
+            archive_size_bytes=len(raw),
+        )
+        archive = control_root / (pin.archive_sha256 + ".tar")
+        archive.write_bytes(raw)
+        archive.chmod(0o600)
+
+        class FakeGuestRunner:
+            docker_host = "unix:///var/run/docker.sock"
+
+            def __init__(self) -> None:
+                self.calls: list[tuple[str, Path | str | None]] = []
+
+            def image_ids(self):
+                self.calls.append(("list", None))
+                return ()
+
+            def load_image(self, path):
+                self.calls.append(("load", path))
+
+            def inspect_config_id(self, config_id):
+                self.calls.append(("inspect", config_id))
+                return {
+                    "Id": config_id,
+                    "RepoDigests": [],
+                    "Os": "linux",
+                    "Architecture": "amd64",
+                    "Config": {
+                        "Entrypoint": ["/opt/oc2/slice-b/entrypoint"],
+                        "Cmd": ["run"],
+                        "User": "10001:10001",
+                        "WorkingDir": "/workspace",
+                        "Env": [],
+                        "Labels": {
+                            "dev.oc2.source-revision": pin.source_revision,
+                            "dev.oc2.artifact-sha256": pin.artifact_sha256,
+                            "dev.oc2.runtime-sha256": pin.runtime_sha256,
+                            "dev.oc2.base-image-ref": pin.base_image_ref,
+                            "dev.oc2.build-context-sha256": pin.build_context_sha256,
+                        },
+                    },
+                }
+
+        runner = FakeGuestRunner()
+        request = request_type(
+            archive_path=archive,
+            supervisor_root=control_root,
+            image_pin=pin,
+            expected_record_sha256=pin.record_sha256,
+            docker_host=runner.docker_host,
+        )
+
+        authority = import_image(request, runner)
+
+        self.assertEqual(authority.config_id, pin.config_id)
+        self.assertEqual(authority.image_record_sha256, pin.record_sha256)
+        self.assertEqual([call[0] for call in runner.calls], ["list", "load", "inspect"])
+        self.assertEqual(runner.calls[2][1], pin.config_id)
+
+    def test_guest_import_rejects_archive_change_during_load(self) -> None:
+        request_type = getattr(image_module, "GuestImageLoadRequest", None)
+        import_image = getattr(image_module, "import_guest_image", None)
+        self.assertTrue(callable(request_type))
+        self.assertTrue(callable(import_image))
+        if not callable(request_type) or not callable(import_image):
+            return
+        control_root = self.root / "supervisor-control"
+        control_root.mkdir(mode=0o700)
+        archive = control_root / (self.pin.archive_sha256 + ".tar")
+        archive.write_bytes(self.raw)
+        archive.chmod(0o600)
+
+        class ReplacingGuestRunner:
+            docker_host = "unix:///var/run/docker.sock"
+
+            def __init__(self) -> None:
+                self.inspect_called = False
+
+            def image_ids(self):
+                return ()
+
+            def load_image(self, path):
+                path.write_bytes(b"replaced during load")
+
+            def inspect_config_id(self, config_id):
+                self.inspect_called = True
+                return {}
+
+        runner = ReplacingGuestRunner()
+        request = request_type(
+            archive_path=archive,
+            supervisor_root=control_root,
+            image_pin=self.pin,
+            expected_record_sha256=self.pin.record_sha256,
+            docker_host=runner.docker_host,
+        )
+
+        with self.assertRaises(SliceBImageRejected):
+            import_image(request, runner)
+        self.assertFalse(runner.inspect_called)
+
+    def test_guest_import_refuses_nonempty_image_store_before_load(self) -> None:
+        request_type = getattr(image_module, "GuestImageLoadRequest", None)
+        import_image = getattr(image_module, "import_guest_image", None)
+        self.assertTrue(callable(request_type))
+        self.assertTrue(callable(import_image))
+        if not callable(request_type) or not callable(import_image):
+            return
+        control_root = self.root / "supervisor-control"
+        control_root.mkdir(mode=0o700)
+        archive = control_root / (self.pin.archive_sha256 + ".tar")
+        archive.write_bytes(self.raw)
+        archive.chmod(0o600)
+
+        class OccupiedGuestRunner:
+            docker_host = "unix:///var/run/docker.sock"
+
+            def __init__(self) -> None:
+                self.load_called = False
+
+            def image_ids(self):
+                return ("sha256:" + "e" * 64,)
+
+            def load_image(self, path):
+                self.load_called = True
+
+            def inspect_config_id(self, config_id):
+                return {}
+
+        runner = OccupiedGuestRunner()
+        request = request_type(
+            archive_path=archive,
+            supervisor_root=control_root,
+            image_pin=self.pin,
+            expected_record_sha256=self.pin.record_sha256,
+            docker_host=runner.docker_host,
+        )
+
+        with self.assertRaises(SliceBImageRejected):
+            import_image(request, runner)
+        self.assertFalse(runner.load_called)
+
+    def test_image_authority_cannot_be_constructed_from_a_config_id(self) -> None:
+        authority_type = getattr(image_module, "VerifiedImageAuthority", None)
+        self.assertIsNotNone(authority_type)
+        if authority_type is None:
+            return
+        with self.assertRaises(TypeError):
+            authority_type(
+                self.pin,
+                self.pin.record_sha256,
+                self.pin.config_id,
+                self.pin.platform,
+            )
 
     def test_matching_local_digest(self) -> None:
         """A supplied local inspect response must match the digest-qualified pin."""
@@ -66,11 +365,21 @@ class ImageTests(unittest.TestCase):
             with self.assertRaises(SliceBImageRejected):
                 verify_loaded_image(self.inspect, replace(self.pin, image_ref=ref))
 
-    def test_reject_repo_digest_missing(self) -> None:
-        """Image validation requires the exact pinned RepoDigest."""
+    def test_loaded_config_id_does_not_require_repo_digest(self) -> None:
         d = {**self.inspect, "RepoDigests": []}
+        verify_loaded_image(d, self.pin)
+
+    def test_loaded_image_rejects_runtime_label_mismatch(self) -> None:
+        image_config = self.inspect["Config"]
+        assert isinstance(image_config, dict)
+        labels = image_config["Labels"]
+        assert isinstance(labels, dict)
+        config = {**image_config, "Labels": {
+            **labels,
+            "dev.oc2.runtime-sha256": "e" * 64,
+        }}
         with self.assertRaises(SliceBImageRejected):
-            verify_loaded_image(d, self.pin)
+            verify_loaded_image({**self.inspect, "Config": config}, self.pin)
 
     def test_reject_image_config_id_mismatch(self) -> None:
         """Image validation rejects a different image config ID."""
@@ -88,25 +397,66 @@ class ImageTests(unittest.TestCase):
         with self.assertRaises(SliceBImageRejected):
             verify_runtime_pin_against_manifest(self.pin, "e" * 64)
 
+    def test_image_pin_encodes_archive_size_and_canonical_record_hash(self) -> None:
+        self.assertEqual(getattr(self.pin, "archive_size_bytes", None), len(self.raw))
+        encoder = getattr(self.pin, "to_bytes", None)
+        self.assertTrue(callable(encoder))
+        if not callable(encoder):
+            return
+        encoded = encoder()
+        self.assertEqual(encoded, encoder())
+        self.assertEqual(
+            getattr(self.pin, "record_sha256", None),
+            hashlib.sha256(encoded).hexdigest(),
+        )
+
+    def test_image_pin_roundtrips_only_canonical_record_bytes(self) -> None:
+        encoder = getattr(self.pin, "to_bytes", None)
+        decoder = getattr(ImagePin, "from_bytes", None)
+        self.assertTrue(callable(encoder))
+        self.assertTrue(callable(decoder))
+        if not callable(encoder) or not callable(decoder):
+            return
+        encoded = encoder()
+
+        self.assertEqual(decoder(encoded, self.pin.record_sha256), self.pin)
+        noncanonical = encoded + b" "
+        with self.assertRaises(SliceBImageRejected):
+            decoder(noncanonical, hashlib.sha256(noncanonical).hexdigest())
+
+    def test_archive_verification_checks_recorded_size(self) -> None:
+        from dataclasses import replace
+
+        with self.assertRaises(SliceBImageRejected):
+            verify_image_archive(self.archive, replace(
+                self.pin, archive_size_bytes=len(self.raw) + 1,
+            ))
+
     def test_unpinned_build_inputs_blocked(self) -> None:
         """Build input verification refuses a missing trust manifest."""
         with self.assertRaises(SliceBImageRejected):
-            verify_build_inputs(self.root)
+            verify_build_inputs(self.root, self.supervisor_snapshot)
+
+    def test_base_image_arg_must_be_declared_inside_build_stage(self) -> None:
+        self._write_build_context()
+        dockerfile = self.root / "Dockerfile"
+        dockerfile.write_text(
+            dockerfile.read_text().replace(
+                "FROM ${BASE_IMAGE}\nARG BASE_IMAGE\n",
+                "FROM ${BASE_IMAGE}\n",
+            ),
+        )
+
+        with self.assertRaises(SliceBImageRejected):
+            verify_build_inputs(self.root, self.supervisor_snapshot)
 
     def _write_build_context(self) -> str:
         """Create a complete locally pinned Docker context and return its runtime digest."""
         runtime = Path(__file__).resolve().parents[1] / "oc2_slice_b"
         shutil.copyfile(runtime / "entrypoint.py", self.root / "entrypoint.py")
         shutil.copyfile(runtime / "offline_fixture.py", self.root / "offline_fixture.py")
+        shutil.copyfile(runtime / "Dockerfile", self.root / "Dockerfile")
         (self.root / "opencode-v2.2.5").write_bytes(b"binary")
-        (self.root / "Dockerfile").write_text(
-            "ARG BASE_IMAGE\nFROM ${BASE_IMAGE}\n"
-            "COPY --chmod=0555 opencode-v2.2.5 /opt/oc2/bin/opencode\n"
-            "COPY --chmod=0555 entrypoint.py /opt/oc2/slice-b/entrypoint\n"
-            "COPY --chmod=0444 offline_fixture.py /opt/oc2/slice-b/offline_fixture.py\n"
-            "WORKDIR /workspace\nUSER 10001:10001\n"
-            'ENTRYPOINT ["/opt/oc2/slice-b/entrypoint"]\nCMD ["run"]\n'
-        )
         runtime_hasher = hashlib.sha256()
         for name in ("entrypoint.py", "offline_fixture.py"):
             content = (self.root / name).read_bytes()
@@ -120,16 +470,24 @@ class ImageTests(unittest.TestCase):
             "source_revision": "f" * 40,
         }
         (self.root / "build-inputs.json").write_text(json.dumps(inputs))
+        trusted_path = self.supervisor_snapshot / "trusted-build-inputs.json"
+        trusted_path.write_text(
+            json.dumps({
+                "opencode_binary_sha256": inputs["opencode_binary_sha256"],
+                "runtime_sha256": runtime_hash,
+            })
+        )
+        trusted_path.chmod(0o600)
         return runtime_hash
 
     def test_runtime_pin_covers_both_runtime_sources(self) -> None:
         runtime_hash = self._write_build_context()
-        verify_build_inputs(self.root)
+        verify_build_inputs(self.root, self.supervisor_snapshot)
         for name in ("entrypoint.py", "offline_fixture.py"):
             original = (self.root / name).read_bytes()
             (self.root / name).write_bytes(original + b"tampered")
             with self.assertRaises(SliceBImageRejected):
-                verify_build_inputs(self.root)
+                verify_build_inputs(self.root, self.supervisor_snapshot)
             (self.root / name).write_bytes(original)
         expected = hashlib.sha256()
         for name in ("entrypoint.py", "offline_fixture.py"):
@@ -158,9 +516,10 @@ class ImageTests(unittest.TestCase):
             "",
         )
         with self.assertRaises(SliceBImageRejected):
-            with patch("oc2_slice_b_image._run_docker_command", return_value=absent):
+            with patch("oc2_slice_b_image_host._run_docker_command", return_value=absent):
                 offline_build_argv(
-                    self.root, base_ref, transport_tag="oc2-slice-b:transport"
+                    self.root, base_ref, docker_host=DOCKER_HOST,
+                    supervisor_snapshot=self.supervisor_snapshot,
                 )
         present = subprocess.CompletedProcess(
             ["docker", "image", "inspect", base_ref],
@@ -168,12 +527,26 @@ class ImageTests(unittest.TestCase):
             json.dumps([{"RepoDigests": [base_ref]}]),
             "",
         )
-        with patch("oc2_slice_b_image._run_docker_command", return_value=present):
+        with patch("oc2_slice_b_image_host._run_docker_command", return_value=present):
             argv = offline_build_argv(
-                self.root, base_ref, transport_tag="oc2-slice-b:transport"
+                self.root, base_ref, docker_host=DOCKER_HOST,
+                supervisor_snapshot=self.supervisor_snapshot,
             )
+        context = Path(argv[-1])
+        original_binary = (context / "opencode-v2.2.5").read_bytes()
+        (self.root / "opencode-v2.2.5").write_bytes(b"changed after snapshot")
+        self.assertEqual((context / "opencode-v2.2.5").read_bytes(), original_binary)
+        self.assertEqual(
+            hashlib.sha256(original_binary).hexdigest(),
+            json.loads((context / "build-inputs.json").read_text())[
+                "opencode_binary_sha256"
+            ],
+        )
+        shutil.rmtree(context)
         self.assertIn("--pull=false", argv)
         self.assertIn("--network=none", argv)
+        self.assertIn("--quiet", argv)
+        self.assertNotIn("-t", argv)
         self.assertEqual(runtime_hash, json.loads(
             (self.root / "build-inputs.json").read_text()
         )["runtime_sha256"])
@@ -186,12 +559,13 @@ class ImageTests(unittest.TestCase):
         missing = subprocess.CompletedProcess(
             ["docker", "image", "inspect"], 1, "", "not found"
         )
-        with patch("oc2_slice_b_image._run_docker_command", return_value=missing) as run:
+        with patch("oc2_slice_b_image_host._run_docker_command", return_value=missing) as run:
             with self.assertRaises(SliceBImageRejected):
                 build_offline_image(
                     self.root,
                     "alpine@sha256:" + "a" * 64,
-                    transport_tag="oc2-slice-b:transport",
+                    docker_host=DOCKER_HOST,
+                    supervisor_snapshot=self.supervisor_snapshot,
                 )
         self.assertEqual(run.call_count, 1)
 
@@ -207,18 +581,22 @@ class ImageTests(unittest.TestCase):
             json.dumps([{"RepoDigests": [base_ref]}]),
             "",
         )
-        built = subprocess.CompletedProcess(["docker", "build"], 0, "", "")
+        built = subprocess.CompletedProcess(["docker", "build"], 0, "sha256:" + "b" * 64, "")
         with patch(
-            "oc2_slice_b_image._run_docker_command",
+            "oc2_slice_b_image_host._run_docker_command",
             side_effect=(inspected, built),
         ) as run:
             build_offline_image(
                 self.root,
                 base_ref,
-                transport_tag="oc2-slice-b:transport",
+                docker_host=DOCKER_HOST,
+                supervisor_snapshot=self.supervisor_snapshot,
             )
         self.assertEqual(run.call_count, 2)
-        self.assertEqual(run.call_args_list[0].args[0][:3], ("docker", "image", "inspect"))
+        self.assertEqual(
+            run.call_args_list[0].args[0][:5],
+            ("docker", "--host", DOCKER_HOST, "image", "inspect"),
+        )
         self.assertIn("--network=none", run.call_args_list[1].args[0])
 
     def test_build_argv_fetches_its_own_local_inspection(self) -> None:
@@ -233,11 +611,16 @@ class ImageTests(unittest.TestCase):
             json.dumps([{"RepoDigests": [base_ref]}]),
             "",
         )
-        with patch("oc2_slice_b_image._run_docker_command", return_value=inspected) as run:
+        with patch("oc2_slice_b_image_host._run_docker_command", return_value=inspected) as run:
             argv = offline_build_argv(
-                self.root, base_ref, transport_tag="oc2-slice-b:transport"
+                self.root, base_ref, docker_host=DOCKER_HOST,
+                supervisor_snapshot=self.supervisor_snapshot,
             )
-        run.assert_called_once_with(("docker", "image", "inspect", base_ref))
+        shutil.rmtree(Path(argv[-1]))
+        run.assert_called_once_with(
+            ("docker", "--host", DOCKER_HOST, "image", "inspect", base_ref),
+            DOCKER_HOST,
+        )
         self.assertIn("--network=none", argv)
 
 

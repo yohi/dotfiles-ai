@@ -397,21 +397,8 @@ class AttachTransportTests(unittest.TestCase):
         harness = tty_tests.Pid1SupervisorInProcessTests()
         harness.setUp()
         self.addCleanup(harness.doCleanups)
-        scenario = tty_tests.ts.TtyScenario()
-        manifest = tty_tests.replace(
-            scenario.authority.manifest,
-            baseline=tty_tests.replace(
-                scenario.authority.manifest.baseline,
-                head_oid=harness.head,
-            ),
-        )
-        authority = tty_tests.replace(
-            scenario.authority,
-            manifest=manifest,
-            manifest_sha256=tty_tests.hashlib.sha256(
-                tty_tests.ts.slice_b_git._manifest_bytes(manifest),
-            ).hexdigest(),
-        )
+        scenario = tty_tests.ts.TtyScenario(head_oid=harness.head)
+        authority = scenario.authority
         bridge = tty_tests.Pid1Bridge(scenario)
 
         class AttachProcess:

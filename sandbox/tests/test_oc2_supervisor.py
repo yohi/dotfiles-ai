@@ -54,6 +54,7 @@ sup = load('oc2_supervisor')
 tw = load('test_oc2_writer', TESTS)
 slice_b_git = load('oc2_slice_b_git')
 slice_b_session = load('oc2_slice_b_session')
+slice_b_test_support = load('oc2_slice_b_test_support', TESTS)
 
 if not TYPE_CHECKING:
     GuestHostProbeBase = sup.GuestHostProbe
@@ -65,12 +66,30 @@ CID, CID2, OTHER = tw.CID, tw.CID2, tw.OTHER
 BOOT, STARTED, IMAGE_ID = tw.BOOT, tw.STARTED, tw.IMAGE_ID
 SENTINEL = tw.SENTINEL
 DOCKER_PATH = '/usr/bin/docker'
+DOCKER_HOST = 'unix:///var/run/docker.sock'
 FakeTransportInput: TypeAlias = 'TransportResult | tuple[int, bytes] | None | BaseException'
 FakeTransportOutput: TypeAlias = 'TransportResult | tuple[int, bytes] | None'
 SCOPE_REL = f'/system.slice/docker-{CID}.scope'
 SCOPE = '/sys/fs/cgroup' + SCOPE_REL
 INODE = 987654
-WRITER_BLOB = '05d61efcd79cce59a80aa64cf7b9b0c353d2f157'
+
+
+def make_authorized_writer_fixture(
+    authority_root: pathlib.Path,
+) -> tuple[writer_types.WriterSessionKey, VerifiedGuestAuthorityBase, writer_types.WriterSpec]:
+    key = tw.make_key()
+    authority = slice_b_test_support.make_verified_authority(authority_root, key)
+    spec = tw.make_spec(
+        gen=key.session_generation,
+        key=key,
+        image_ref=None,
+        image_config_id=authority.image_config_id,
+        image_record_sha256=authority.image_record_sha256,
+        runtime_sha256=authority.runtime_sha256,
+        image_identity_mode=w.WriterImageIdentityMode.SLICE_B_CONFIG_ID,
+        command=('run',), tty=True, stdin_open=True,
+    )
+    return key, authority, spec
 
 
 def status_text(uid: int, saved: int | None = None) -> str:
@@ -185,7 +204,13 @@ class HookDocker(FakeDockerBase):
         self.hooks: dict[str, Callable[[], None]] = {}
         self.fs = fs
 
-    def run(self, argv: Sequence[str], *, timeout: int) -> tuple[int, str]:
+    def run(
+        self,
+        argv: Sequence[str],
+        *,
+        timeout: int,
+        image_authority: writer_types.SliceBLaunchAuthority | None = None,
+    ) -> tuple[int, str]:
         """Return queued Docker results or FakeDocker defaults; never run Docker."""
         verb = list(argv)[1]
         hook = self.hooks.get(verb)
@@ -197,7 +222,9 @@ class HookDocker(FakeDockerBase):
             if self.state != 'none':
                 ids.append(CID)
             return 0, ''.join(i + '\n' for i in ids)
-        result = super().run(argv, timeout=timeout)
+        result: tuple[int, str] = super().run(
+            argv, timeout=timeout, image_authority=image_authority,
+        )
         if verb in ('stop', 'kill') and self.fs is not None and self.state == 'exited':
             self.fs.writer_exit()
         return result
@@ -240,9 +267,10 @@ class BridgeTransport:
                  max_output: int) -> TransportResult:
         """Translate fake Docker output into UTF-8 TransportResult bytes."""
         assert argv[0] == DOCKER_PATH
+        assert argv[1:3] == ['--host', DOCKER_HOST]
         self.calls.append(list(argv))
         try:
-            rc, out = self.docker.run(['docker'] + list(argv[1:]), timeout=timeout)
+            rc, out = self.docker.run(['docker'] + list(argv[3:]), timeout=timeout)
         except SimTimeout:
             result: TransportResult = sup.TransportResult(-1, b'', True, False)
             return result
@@ -253,6 +281,7 @@ class BridgeTransport:
 def runner_for(transport: Callable[[list[str], int, int], FakeTransportOutput],
                **kw: Any) -> CliDockerRunner:
     """Create the real runner adapter around a test-only transport callable."""
+    kw.setdefault('docker_host', DOCKER_HOST)
     runner: CliDockerRunner = sup.CliDockerRunner(DOCKER_PATH, transport, **kw)
     return runner
 
@@ -265,10 +294,6 @@ def ok(stdout: bytes = b'') -> TransportResult:
 
 def all_builder_argvs(spec):
     return [w.build_create_argv(spec), w.build_create_argv(tw.make_spec(tty=True)),
-            w.build_create_argv(tw.make_spec(
-                image_ref='oc2/slice-b@sha256:' + 'a' * 64,
-                command=('run',), tty=True, stdin_open=True,
-            )),
             w.build_start_argv(CID), w.build_stop_argv(CID), w.build_stop_argv(CID, 7),
             w.build_kill_argv(CID), w.build_inspect_argv(CID), list(w.LIST_ALL_ARGV)]
 
@@ -282,7 +307,39 @@ class DockerRunnerTest(unittest.TestCase):
                 rc, out = runner_for(transport).run(argv, timeout=30)
                 self.assertEqual((rc, out), (0, 'out\n'))
                 self.assertEqual(transport.calls,
-                                 [([DOCKER_PATH] + argv[1:], 30, sup.MAX_OUTPUT_BYTES)])
+                                 [([DOCKER_PATH, '--host', DOCKER_HOST] + argv[1:], 30,
+                                   sup.MAX_OUTPUT_BYTES)])
+
+    def test_config_id_create_requires_verified_authority_at_runner(self):
+        mode = getattr(w, 'WriterImageIdentityMode', None)
+        self.assertIsNotNone(mode)
+        if mode is None:
+            return
+        with tempfile.TemporaryDirectory() as temporary:
+            key = tw.make_key()
+            authority = slice_b_test_support.make_verified_authority(
+                pathlib.Path(temporary) / 'slice-b', key,
+            )
+            spec = tw.make_spec(
+                gen=key.session_generation,
+                key=key,
+                image_ref=None,
+                image_config_id=authority.image_config_id,
+                image_record_sha256=authority.image_record_sha256,
+                runtime_sha256=authority.runtime_sha256,
+                image_identity_mode=mode.SLICE_B_CONFIG_ID,
+                command=('run',), tty=True, stdin_open=True,
+            )
+            argv = w.build_create_argv(spec, authority=authority)
+            transport = FakeTransport(ok(b'created\n'))
+            runner = runner_for(transport)
+            with self.assertRaises(sup.DockerCommandRejected):
+                runner.run(argv, timeout=30)
+            self.assertEqual(transport.calls, [])
+
+            runner.run_authorized(argv, timeout=30, image_authority=authority)
+
+        self.assertEqual(transport.calls[0][0][-2:], [authority.image_config_id, 'run'])
 
     def test_disallowed_commands_rejected_before_transport(self):
         spec = tw.make_spec()
@@ -330,9 +387,9 @@ class DockerRunnerTest(unittest.TestCase):
                      '/usr/bin/podman', '/usr/bin/docker/', '/usr/b in/docker', None, 1):
             with self.subTest(path=path):
                 with self.assertRaises(sup.SupervisorInputError):
-                    sup.CliDockerRunner(path, FakeTransport())
+                    sup.CliDockerRunner(path, FakeTransport(), docker_host=DOCKER_HOST)
         with self.assertRaises(sup.SupervisorInputError):
-            sup.CliDockerRunner(DOCKER_PATH, 'not callable')
+            sup.CliDockerRunner(DOCKER_PATH, 'not callable', docker_host=DOCKER_HOST)
 
     def test_timeout_clamped_and_validated(self):
         transport = FakeTransport()
@@ -405,7 +462,7 @@ class DockerRunnerTest(unittest.TestCase):
         runner_for(transport)
         self.assertEqual(transport.calls, [])
         self.assertEqual({n for n in dir(sup.CliDockerRunner) if not n.startswith('_')},
-                         {'run'})
+                         {'run', 'run_authorized'})
 
 
 # 2 -- SubprocessTransport (never spawns a real process here) -------------------------
@@ -777,7 +834,10 @@ class SubprocessTransportTest(unittest.TestCase):
         with self.assertRaisesRegex(sup.DockerCommandError, 'transport failed') as ctx:
             runner_for(transport, max_output=8).run(list(w.LIST_ALL_ARGV), timeout=5)
         self.assertIsNone(ctx.exception.__context__)
-        self.assertEqual(self.popen.calls[0][0], [DOCKER_PATH] + list(w.LIST_ALL_ARGV[1:]))
+        self.assertEqual(
+            self.popen.calls[0][0],
+            [DOCKER_PATH, '--host', DOCKER_HOST] + list(w.LIST_ALL_ARGV[1:]),
+        )
 
     def test_invalid_call_arguments(self):
         transport = self.make()
@@ -1182,8 +1242,24 @@ class ObserveTest(ProbeBase):
 # 5 -- GuestSupervisor ---------------------------------------------------------------
 class SupervisorBase(unittest.TestCase):
     def setUp(self):
-        self.spec = tw.make_spec()
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.key = tw.make_key()
+        self.image_authority = slice_b_test_support.make_verified_authority(
+            pathlib.Path(self.temporary.name) / 'authority', self.key,
+        )
+        self.spec = tw.make_spec(
+            gen=self.key.session_generation,
+            key=self.key,
+            image_ref=None,
+            image_config_id=self.image_authority.image_config_id,
+            image_record_sha256=self.image_authority.image_record_sha256,
+            runtime_sha256=self.image_authority.runtime_sha256,
+            image_identity_mode=w.WriterImageIdentityMode.SLICE_B_CONFIG_ID,
+            command=('run',), tty=True, stdin_open=True,
+        )
         self.docker = HookDocker(self.spec)
+        self.docker.image_authority = self.image_authority
         self.bridge = BridgeTransport(self.docker)
         self.runner = runner_for(self.bridge)
         self.probe = tw.FakeProbe()
@@ -1195,7 +1271,9 @@ class SupervisorBase(unittest.TestCase):
         return w.WriterLifecycle(self.runner, self.probe, sleep=self.sleeper)
 
     def make(self):
-        return sup.GuestSupervisor(tw.make_key(), self.factory)
+        return sup.GuestSupervisor(
+            self.key, self.factory, image_authority=self.image_authority,
+        )
 
     def running(self):
         s = self.make()
@@ -1239,6 +1317,36 @@ class SupervisorLaunchTest(SupervisorBase):
         self.assertEqual(self.factory_calls, 0)
         self.assertIs(s.state, sup.SupervisorState.NEW)
 
+    def test_missing_verified_image_authority_blocks_before_create(self):
+        supervisor = sup.GuestSupervisor(self.key, self.factory)
+        with self.assertRaises(sup.SupervisorInputError):
+            supervisor.launch(self.spec)
+        self.assertEqual(self.creates(), 0)
+        self.assertEqual(self.factory_calls, 0)
+        self.assertIs(supervisor.state, sup.SupervisorState.NEW)
+
+    def test_config_id_mismatch_blocks_before_create(self):
+        supervisor = self.make()
+        altered = dataclasses.replace(self.spec, image_config_id='sha256:' + 'e' * 64)
+
+        with self.assertRaises(sup.SupervisorInputError):
+            supervisor.launch(altered)
+
+        self.assertEqual(self.docker.calls, [])
+        self.assertEqual(self.factory_calls, 0)
+        self.assertIs(supervisor.state, sup.SupervisorState.NEW)
+
+    def test_supervisor_rejects_authority_for_different_session(self):
+        other_key = tw.make_key(tw.GEN2)
+        other_authority = slice_b_test_support.make_verified_authority(
+            pathlib.Path(self.temporary.name) / 'other-authority', other_key,
+        )
+
+        with self.assertRaises(sup.SupervisorInputError):
+            sup.GuestSupervisor(
+                self.key, self.factory, image_authority=other_authority,
+            )
+
     def test_constructor_validation(self):
         for key in (w.WriterSessionKey('x', tw.SANDBOX, tw.GEN), 'key', None):
             with self.assertRaises(sup.SupervisorInputError):
@@ -1280,11 +1388,14 @@ class SupervisorLaunchTest(SupervisorBase):
 
     def test_pre_start_inspect_mismatch(self):
         self.docker.queue('inspect', (0, json.dumps([
-            tw.bad(tw.make_inspect(self.spec), 'HostConfig', 'NetworkMode', 'bridge')])))
+            tw.bad(tw.make_inspect(self.spec, authority=self.image_authority),
+                   'HostConfig', 'NetworkMode', 'bridge')])))
         self.assert_launch_fails(sup.InspectMismatchError, ['ps', 'create', 'inspect'])
 
     def test_pre_start_id_mismatch(self):
-        self.docker.queue('inspect', (0, json.dumps([tw.make_inspect(self.spec, CID2)])))
+        self.docker.queue('inspect', (0, json.dumps([
+            tw.make_inspect(self.spec, CID2, authority=self.image_authority),
+        ])))
         self.assert_launch_fails(sup.IdentityMismatchError, ['ps', 'create', 'inspect'])
 
     def test_start_failure(self):
@@ -1299,8 +1410,10 @@ class SupervisorLaunchTest(SupervisorBase):
         self.assertEqual(self.docker.verbs().count('start'), 1)
 
     def test_post_start_identity_mismatch_no_relaunch(self):
-        swapped = tw.make_inspect(self.spec, CID2, 'running')
-        self.docker.queue('inspect', (0, json.dumps([tw.make_inspect(self.spec)])),
+        swapped = tw.make_inspect(self.spec, CID2, 'running', self.image_authority)
+        self.docker.queue('inspect', (0, json.dumps([
+            tw.make_inspect(self.spec, authority=self.image_authority),
+        ])),
                           (0, json.dumps([swapped])), (0, json.dumps([swapped])))
         self.assert_launch_fails(sup.IdentityMismatchError)
         self.assertEqual(self.creates(), 1)
@@ -1313,7 +1426,9 @@ class SupervisorLaunchTest(SupervisorBase):
         self.assertEqual(self.creates(), 1)
 
     def test_factory_must_return_lifecycle(self):
-        s = sup.GuestSupervisor(tw.make_key(), lambda spec: object())
+        s = sup.GuestSupervisor(
+            self.key, lambda spec: object(), image_authority=self.image_authority,
+        )
         with self.assertRaises(sup.SupervisorInputError):
             s.launch(self.spec)
         self.assertIs(s.state, sup.SupervisorState.UNVERIFIED)
@@ -1322,7 +1437,7 @@ class SupervisorLaunchTest(SupervisorBase):
         def boom(spec):
             raise RuntimeError(SENTINEL)
 
-        s = sup.GuestSupervisor(tw.make_key(), boom)
+        s = sup.GuestSupervisor(self.key, boom, image_authority=self.image_authority)
         with self.assertRaises(sup.LaunchFailedError) as ctx:
             s.launch(self.spec)
         self.assertIs(s.state, sup.SupervisorState.UNVERIFIED)
@@ -1394,8 +1509,10 @@ class SupervisorStopTest(SupervisorBase):
 
     def test_stop_timeout_then_kill_by_id(self):
         s, verdict = self.stop_with(configure=lambda: self.docker.queue('stop', SimTimeout()))
-        kills = [c for c in self.bridge.calls if c[1] == 'kill']
-        self.assertEqual(kills, [[DOCKER_PATH, 'kill', '--signal', 'KILL', CID]])
+        kills = [c for c in self.bridge.calls if c[3] == 'kill']
+        self.assertEqual(kills, [[
+            DOCKER_PATH, '--host', DOCKER_HOST, 'kill', '--signal', 'KILL', CID,
+        ]])
         self.assertTrue(verdict.verified, verdict.reasons)
 
     def test_stop_timeout_and_kill_failure(self):
@@ -1444,15 +1561,34 @@ class SupervisorStopTest(SupervisorBase):
 
     def test_identity_from_other_session_rejected(self):
         s = self.running()
-        other_docker = HookDocker(tw.make_spec(tw.GEN2))
+        other_key = tw.make_key(tw.GEN2)
+        other_authority = slice_b_test_support.make_verified_authority(
+            pathlib.Path(self.temporary.name) / 'other-authority', other_key,
+        )
+        other_spec = tw.make_spec(
+            gen=other_key.session_generation,
+            key=other_key,
+            image_ref=None,
+            image_config_id=other_authority.image_config_id,
+            image_record_sha256=other_authority.image_record_sha256,
+            runtime_sha256=other_authority.runtime_sha256,
+            image_identity_mode=w.WriterImageIdentityMode.SLICE_B_CONFIG_ID,
+            command=('run',), tty=True, stdin_open=True,
+        )
+        other_docker = HookDocker(other_spec)
+        other_docker.image_authority = other_authority
         other = sup.GuestSupervisor(
-            tw.make_key(tw.GEN2),
-            lambda spec: w.WriterLifecycle(other_docker, tw.FakeProbe(), sleep=tw.Sleeper()))
+            other_key,
+            lambda spec: w.WriterLifecycle(other_docker, tw.FakeProbe(), sleep=tw.Sleeper()),
+            image_authority=other_authority,
+        )
         other_docker.queue('create', (0, CID2 + '\n'))
-        info = tw.make_inspect(tw.make_spec(tw.GEN2), CID2)
-        running = tw.make_inspect(tw.make_spec(tw.GEN2), CID2, 'running')
+        info = tw.make_inspect(other_spec, CID2, authority=other_authority)
+        running = tw.make_inspect(
+            other_spec, CID2, 'running', other_authority,
+        )
         other_docker.queue('inspect', (0, json.dumps([info])), (0, json.dumps([running])))
-        other_ident = other.launch(tw.make_spec(tw.GEN2))
+        other_ident = other.launch(other_spec)
         with self.assertRaises(sup.IdentityMismatchError):
             s.stop(other_ident)
         self.assertIs(s.state, sup.SupervisorState.RUNNING)
@@ -1513,13 +1649,18 @@ class EndToEndOfflineTest(unittest.TestCase):
     """CliDockerRunner + GuestHostProbe + WriterLifecycle + GuestSupervisor."""
 
     def setUp(self):
-        self.spec = tw.make_spec()
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.key, self.authority, self.spec = make_authorized_writer_fixture(
+            pathlib.Path(self.temporary.name) / 'authority',
+        )
         self.fs = FakeGuestFs.standard()
         self.docker = HookDocker(self.spec, fs=self.fs)
+        self.docker.image_authority = self.authority
         self.bridge = BridgeTransport(self.docker)
         self.sleeper = tw.Sleeper()
         factory = sup.guest_lifecycle_factory(runner_for(self.bridge), self.fs, self.sleeper)
-        self.sup = sup.GuestSupervisor(tw.make_key(), factory)
+        self.sup = sup.GuestSupervisor(self.key, factory, image_authority=self.authority)
 
     def test_launch_and_docker_only_stop_unverified(self):
         # GuestHostProbe only has Docker-side RW holder evidence, which can not
@@ -1552,7 +1693,7 @@ class EndToEndOfflineTest(unittest.TestCase):
                                     repo_source=spec.repo_source)
             return w.WriterLifecycle(runner_for(self.bridge), probe, sleep=self.sleeper)
 
-        s = sup.GuestSupervisor(tw.make_key(), factory)
+        s = sup.GuestSupervisor(self.key, factory, image_authority=self.authority)
         s.launch(self.spec)
         verdict = s.stop()
         self.assertTrue(verdict.verified, verdict.reasons)
@@ -1590,12 +1731,12 @@ class EndToEndOfflineTest(unittest.TestCase):
         self.assertEqual(self.docker.verbs().count('create'), 1)
 
     def test_secret_env_never_leaks_through_launch_failure(self):
-        spec = tw.make_spec(env=(('HOME', SENTINEL),))
+        spec = dataclasses.replace(self.spec, env=(('API_TOKEN', SENTINEL),))
         self.docker.spec = spec
-        self.docker.queue('create', (1, SENTINEL))
-        with self.assertRaises(sup.DockerCommandError) as ctx:
+        with self.assertRaises(sup.SupervisorInputError) as ctx:
             self.sup.launch(spec)
         self.assertNotIn(SENTINEL, exc_texts(ctx.exception))
+        self.assertEqual(self.docker.calls, [])
 
 
 # 6 -- API surface / scope ---------------------------------------------------------
@@ -1648,11 +1789,6 @@ class ApiSurfaceTest(unittest.TestCase):
 
 # 7 -- Regression ------------------------------------------------------------------
 class RegressionTest(unittest.TestCase):
-    def test_writer_blob_unchanged(self):
-        data = (SCRIPTS / 'oc2_writer.py').read_bytes()
-        blob = hashlib.sha1(b'blob %d\x00' % len(data) + data).hexdigest()
-        self.assertEqual(blob, WRITER_BLOB)
-
     def test_runtime_does_not_import_supervisor(self):
         for name in ('oc2.py', 'oc2_guest.py', 'oc2_session.py', 'oc2_writer.py'):
             with self.subTest(name=name):
@@ -1698,8 +1834,14 @@ class TtyExitDocker(HookDocker):
         self.tamper: str | None = None
         self.tamper_on_exit: str | None = None
 
-    def run(self, argv: Sequence[str], *, timeout: int) -> tuple[int, str]:
-        result = super().run(argv, timeout=timeout)
+    def run(
+        self,
+        argv: Sequence[str],
+        *,
+        timeout: int,
+        image_authority: writer_types.SliceBLaunchAuthority | None = None,
+    ) -> tuple[int, str]:
+        result = super().run(argv, timeout=timeout, image_authority=image_authority)
         if argv[1] != 'inspect':
             return result
         code, stdout = result
@@ -1795,15 +1937,32 @@ class TtyScenario:
         inputs: Sequence[bytes | BaseException] = (),
         *,
         snapshot: bool = True,
+        head_oid: str | None = None,
         exit_code: int | None = 0,
         probe: FakeProbeBase | None = None,
         fail_attach: bool = False,
     ) -> None:
-        self.spec = tw.make_spec(
-            image_ref='oc2/slice-b@sha256:' + 'a' * 64,
-            command=('run',), tty=True, stdin_open=True,
+        self.temporary = tempfile.TemporaryDirectory()
+        self.key, self.authority, self.spec = make_authorized_writer_fixture(
+            pathlib.Path(self.temporary.name) / 'authority',
         )
+        if head_oid is not None:
+            manifest = dataclasses.replace(
+                self.authority.manifest,
+                baseline=dataclasses.replace(
+                    self.authority.manifest.baseline,
+                    head_oid=head_oid,
+                ),
+            )
+            self.authority = dataclasses.replace(
+                self.authority,
+                manifest=manifest,
+                manifest_sha256=hashlib.sha256(
+                    slice_b_git._manifest_bytes(manifest)
+                ).hexdigest(),
+            )
         self.docker = TtyExitDocker(self.spec)
+        self.docker.image_authority = self.authority
         self.runner = runner_for(BridgeTransport(self.docker))
         self.probe = probe or tw.FakeProbe()
         self.events: list[tuple[str, str | bytes | None]] = []
@@ -1811,21 +1970,10 @@ class TtyScenario:
         self.supervisor = sup.GuestSupervisor(
             self.spec.key,
             lambda _: w.WriterLifecycle(self.runner, self.probe, sleep=tw.Sleeper()),
+            image_authority=self.authority,
             snapshotter=self.snapshotter,
         )
         self.identity = self.supervisor.launch(self.spec)
-        baseline = slice_b_git.GitBaseline(
-            pathlib.Path('/guest/sessions/repo'), 'refs/heads/sliceb', 'a' * 40,
-            'b' * 40, 'sha1', 'c' * 64, 'd' * 64,
-        )
-        manifest = slice_b_git.SliceBBundleManifestV1(
-            'dotfiles-ai/oc2-slice-b-bundle/v1', self.spec.key, baseline,
-            'e' * 64, 123, 'oc2-slice-b-clean-git-bundle-v1', 'f' * 64,
-        )
-        manifest_sha = hashlib.sha256(slice_b_git._manifest_bytes(manifest)).hexdigest()
-        self.authority = slice_b_session.VerifiedGuestAuthority(
-            self.spec.key, manifest, manifest_sha, self.spec.image_ref, IMAGE_ID,
-        )
         self.docker.final_exit_code = exit_code
         self.transport = FakeInteractiveTransport(
             self.docker, frames, inputs, fail_attach=fail_attach,

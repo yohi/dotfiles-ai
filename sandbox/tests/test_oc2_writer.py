@@ -10,6 +10,7 @@ import importlib.util
 import json
 import pathlib
 import sys
+import tempfile
 import types
 import unittest
 import uuid
@@ -21,13 +22,16 @@ if TYPE_CHECKING:
 SCRIPTS = pathlib.Path(__file__).resolve().parents[1] / 'scripts'
 if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
+TESTS = pathlib.Path(__file__).resolve().parent
+if str(TESTS) not in sys.path:
+    sys.path.insert(0, str(TESTS))
 
 
-def load(name: str) -> types.ModuleType:
+def load(name: str, directory: pathlib.Path = SCRIPTS) -> types.ModuleType:
     """Load an OC2 script by file path without creating external resources."""
     if name in sys.modules:
         return sys.modules[name]
-    spec = importlib.util.spec_from_file_location(name, SCRIPTS / (name + '.py'))
+    spec = importlib.util.spec_from_file_location(name, directory / (name + '.py'))
     if spec is None or spec.loader is None:
         raise ImportError(f'could not load module: {name}')
     mod = importlib.util.module_from_spec(spec)
@@ -37,6 +41,7 @@ def load(name: str) -> types.ModuleType:
 
 
 w = load('oc2_writer')
+slice_b_test_support = load('oc2_slice_b_test_support', TESTS)
 
 WS = 'a' * 32
 SANDBOX = '0f8e9a52-3b1c-11ef-9a7d-0242ac120002'
@@ -76,14 +81,19 @@ def make_spec(gen: str = GEN, **overrides: Any) -> writer_types.WriterSpec:
 
 
 def make_inspect(
-    spec: writer_types.WriterSpec, cid: str = CID, status: str = 'created'
+    spec: writer_types.WriterSpec,
+    cid: str = CID,
+    status: str = 'created',
+    authority: writer_types.SliceBLaunchAuthority | None = None,
 ) -> dict[str, Any]:
     """Build the Docker inspect shape used by WriterLifecycle validation."""
     running = status == 'running'
+    image_id = spec.image_config_id or IMAGE_ID
+    config_image = spec.image_config_id or spec.image_ref
     return {
         'Id': cid,
         'Name': '/' + w.writer_container_name(spec.key),
-        'Image': IMAGE_ID,
+        'Image': image_id,
         'RestartCount': 0,
         'State': {
             'Status': status,
@@ -92,13 +102,22 @@ def make_inspect(
             'StartedAt': STARTED if status != 'created' else w._UNSET_TIME,
         },
         'Config': {
-            'Image': spec.image_ref,
+            'Image': config_image,
             'User': '10001:10001',
             'Cmd': list(spec.command),
             'WorkingDir': '/workspace',
             'Tty': spec.tty,
             'OpenStdin': getattr(spec, 'stdin_open', False),
-            'Labels': dict(w.writer_labels(spec.key)),
+            'Labels': {
+                **w.writer_labels(spec.key),
+                **({
+                    'dev.oc2.source-revision': authority.image_record.source_revision,
+                    'dev.oc2.artifact-sha256': authority.image_record.artifact_sha256,
+                    'dev.oc2.runtime-sha256': authority.image_record.runtime_sha256,
+                    'dev.oc2.base-image-ref': authority.image_record.base_image_ref,
+                    'dev.oc2.build-context-sha256': authority.image_record.build_context_sha256,
+                } if authority is not None else {}),
+            },
             'Env': [f'{n}={v}' for n, v in spec.env]
             + ['PATH=/usr/local/bin:/usr/bin:/bin'],
         },
@@ -167,6 +186,8 @@ class FakeDocker:
         self.responses: dict[str, list[tuple[int, str] | BaseException]] = {}
         self.existing: list[dict[str, Any]] = list(existing or [])
         self.state = 'none'
+        self.create_authorities: list[writer_types.SliceBLaunchAuthority | None] = []
+        self.image_authority: writer_types.SliceBLaunchAuthority | None = None
 
     def queue(self, verb: str, *results: tuple[int, str] | BaseException) -> None:
         """Queue DockerRunner results or exceptions, including interrupts."""
@@ -176,12 +197,22 @@ class FakeDocker:
         """Return the Docker verbs observed so far, in call order."""
         return [c[1] for c in self.calls]
 
-    def run(self, argv: Sequence[str], *, timeout: int) -> tuple[int, str]:
+    def run(
+        self,
+        argv: Sequence[str],
+        *,
+        timeout: int,
+        image_authority: writer_types.SliceBLaunchAuthority | None = None,
+    ) -> tuple[int, str]:
         """Implement DockerRunner with canned results and explicit failures."""
         argv = list(argv)
         assert isinstance(timeout, int) and timeout > 0
         self.calls.append(argv)
         verb = argv[1]
+        if verb == 'create':
+            self.create_authorities.append(image_authority)
+            if image_authority is not None:
+                self.image_authority = image_authority
         queued = self.responses.get(verb)
         if queued:
             result = queued.pop(0)
@@ -205,9 +236,23 @@ class FakeDocker:
                 if item['Id'] == target:
                     return 0, json.dumps([item])
             if self.state == 'exited':
-                return 0, json.dumps([stopped_inspect(self.spec)])
-            return 0, json.dumps([make_inspect(self.spec, CID, self.state)])
+                return 0, json.dumps([make_inspect(
+                    self.spec, CID, 'exited', self.image_authority,
+                )])
+            return 0, json.dumps([make_inspect(
+                self.spec, CID, self.state, self.image_authority,
+            )])
         raise AssertionError('unexpected argv: ' + repr(argv))
+
+    def run_authorized(
+        self,
+        argv: Sequence[str],
+        *,
+        timeout: int,
+        image_authority: writer_types.SliceBLaunchAuthority,
+    ) -> tuple[int, str]:
+        w.validate_writer_spec(self.spec, authority=image_authority)
+        return self.run(argv, timeout=timeout, image_authority=image_authority)
 
 
 class FakeProbe:
@@ -257,7 +302,7 @@ class Sleeper:
         self.calls.append(seconds)
 
 
-def lifecycle(docker: FakeDocker, probe: FakeProbe | None = None,
+def lifecycle(docker: writer_types.DockerRunner, probe: FakeProbe | None = None,
               sleeper: Sleeper | None = None) -> writer_types.WriterLifecycle:
     """Construct the production lifecycle with test-only Docker/probe/sleep seams."""
     result: writer_types.WriterLifecycle = w.WriterLifecycle(
@@ -332,13 +377,23 @@ class HappyPathTest(unittest.TestCase):
         self.assertEqual(argv[argv.index(IMAGE_REF) - 1], '-t')
 
     def test_create_exact_it_only_for_slice_b(self):
-        image_ref = 'oc2/slice-b@sha256:' + 'a' * 64
-        spec = make_spec(
-            image_ref=image_ref,
-            command=('run',), tty=True, stdin_open=True,
-        )
-        argv = w.build_create_argv(spec)
-        image_index = argv.index(image_ref)
+        key = make_key()
+        with tempfile.TemporaryDirectory() as temporary:
+            authority = slice_b_test_support.make_verified_authority(
+                pathlib.Path(temporary) / 'slice-b', key,
+            )
+            spec = make_spec(
+                gen=key.session_generation,
+                key=key,
+                image_ref=None,
+                image_config_id=authority.image_config_id,
+                image_record_sha256=authority.image_record_sha256,
+                runtime_sha256=authority.runtime_sha256,
+                image_identity_mode=w.WriterImageIdentityMode.SLICE_B_CONFIG_ID,
+                command=('run',), tty=True, stdin_open=True,
+            )
+            argv = w.build_create_argv(spec, authority=authority)
+        image_index = argv.index(authority.image_config_id)
         self.assertEqual(argv[image_index - 2:image_index], ['-i', '-t'])
         self.assertEqual(argv[image_index + 1:], ['run'])
 
@@ -373,6 +428,70 @@ class HappyPathTest(unittest.TestCase):
         self.assertEqual(docker.verbs(), ['ps', 'create', 'inspect', 'start', 'inspect'])
         self.assertEqual(ident, w.WriterIdentity(CID, IMAGE_ID, STARTED, 987654, BOOT))
 
+    def test_slice_b_config_id_lifecycle_requires_authority_and_uses_pinned_id(self):
+        key = make_key()
+        with tempfile.TemporaryDirectory() as temporary:
+            authority = slice_b_test_support.make_verified_authority(
+                pathlib.Path(temporary) / 'slice-b', key,
+            )
+            spec = make_spec(
+                gen=key.session_generation,
+                key=key,
+                image_ref=None,
+                image_config_id=authority.image_config_id,
+                image_record_sha256=authority.image_record_sha256,
+                runtime_sha256=authority.runtime_sha256,
+                image_identity_mode=w.WriterImageIdentityMode.SLICE_B_CONFIG_ID,
+                command=('run',), tty=True, stdin_open=True,
+            )
+            denied = FakeDocker(spec)
+            with self.assertRaises(w.WriterError):
+                lifecycle(denied).launch(spec)
+            self.assertEqual(denied.calls, [])
+
+            docker = FakeDocker(spec)
+            identity = lifecycle(docker).launch(spec, authority=authority)
+
+        create = next(call for call in docker.calls if call[1] == 'create')
+        self.assertEqual(create[-2:], [authority.image_config_id, 'run'])
+        self.assertEqual(docker.create_authorities, [authority])
+        self.assertEqual(identity.image_id, authority.image_config_id)
+
+    def test_slice_b_lifecycle_rejects_runner_without_authorized_create_capability(self):
+        key = make_key()
+        with tempfile.TemporaryDirectory() as temporary:
+            authority = slice_b_test_support.make_verified_authority(
+                pathlib.Path(temporary) / 'slice-b', key,
+            )
+            spec = make_spec(
+                gen=key.session_generation,
+                key=key,
+                image_ref=None,
+                image_config_id=authority.image_config_id,
+                image_record_sha256=authority.image_record_sha256,
+                runtime_sha256=authority.runtime_sha256,
+                image_identity_mode=w.WriterImageIdentityMode.SLICE_B_CONFIG_ID,
+                command=('run',), tty=True, stdin_open=True,
+            )
+
+            class RunnerWithoutCreateCapability:
+                def __init__(self) -> None:
+                    self.created = False
+
+                def run(self, argv, *, timeout: int, image_authority=None):
+                    if argv[1] == 'create':
+                        self.created = True
+                        return 1, ''
+                    if argv[1] == 'ps':
+                        return 0, ''
+                    raise AssertionError('unexpected Docker operation')
+
+            runner = RunnerWithoutCreateCapability()
+            with self.assertRaises(w.WriterError):
+                lifecycle(runner).launch(spec, authority=authority)
+
+        self.assertFalse(runner.created)
+
     def test_other_argv_builders(self):
         self.assertEqual(w.build_start_argv(CID), ['docker', 'start', CID])
         self.assertEqual(w.build_stop_argv(CID), ['docker', 'stop', '--timeout', '15', CID])
@@ -397,18 +516,35 @@ class HappyPathTest(unittest.TestCase):
         w.validate_writer_inspect(alt, make_spec())
 
     def test_inspect_checks_open_stdin_alongside_tty(self):
-        spec = make_spec(
-            image_ref='oc2/slice-b@sha256:' + 'a' * 64,
-            command=('run',), tty=True, stdin_open=True,
-        )
-        info = make_inspect(spec)
-        w.validate_writer_inspect(info, spec)
-        for altered in (
-            bad(info, 'Config', 'OpenStdin', False),
-            bad(info, 'Config', 'OpenStdin', DELETE),
-        ):
+        key = make_key()
+        with tempfile.TemporaryDirectory() as temporary:
+            authority = slice_b_test_support.make_verified_authority(
+                pathlib.Path(temporary) / 'slice-b', key,
+            )
+            spec = make_spec(
+                gen=key.session_generation,
+                key=key,
+                image_ref=None,
+                image_config_id=authority.image_config_id,
+                image_record_sha256=authority.image_record_sha256,
+                runtime_sha256=authority.runtime_sha256,
+                image_identity_mode=w.WriterImageIdentityMode.SLICE_B_CONFIG_ID,
+                command=('run',), tty=True, stdin_open=True,
+            )
+            info = make_inspect(spec, authority=authority)
+            w.validate_writer_inspect(info, spec, authority=authority)
+            inherited_label = bad(info, 'Config', 'Labels', {
+                **info['Config']['Labels'],
+                'dev.oc2.unrecognized': 'value',
+            })
             with self.assertRaises(w.WriterError):
-                w.validate_writer_inspect(altered, spec)
+                w.validate_writer_inspect(inherited_label, spec, authority=authority)
+            for altered in (
+                bad(info, 'Config', 'OpenStdin', False),
+                bad(info, 'Config', 'OpenStdin', DELETE),
+            ):
+                with self.assertRaises(w.WriterError):
+                    w.validate_writer_inspect(altered, spec, authority=authority)
 
     def test_happy_stop_verified(self):
         docker = FakeDocker(make_spec())
@@ -899,6 +1035,67 @@ class SpecValidationTest(unittest.TestCase):
                 with self.assertRaisesRegex(w.WriterError, 'image_ref'):
                     w.validate_writer_spec(make_spec(image_ref=ref))
         w.validate_writer_spec(make_spec(image_ref='ghcr.io:443/o/w@sha256:' + DIGEST))
+
+    def test_slice_b_config_id_mode_requires_verified_guest_authority(self):
+        mode = getattr(w, 'WriterImageIdentityMode', None)
+        self.assertIsNotNone(mode)
+        if mode is None:
+            return
+        with tempfile.TemporaryDirectory() as temporary:
+            authority = slice_b_test_support.make_verified_authority(
+                pathlib.Path(temporary) / 'slice-b',
+                slice_b_test_support.make_key(),
+            )
+            spec = make_spec(
+                gen=authority.key.session_generation,
+                key=authority.key,
+                image_ref=None,
+                image_config_id=authority.image_config_id,
+                image_record_sha256=authority.image_record_sha256,
+                runtime_sha256=authority.runtime_sha256,
+                image_identity_mode=mode.SLICE_B_CONFIG_ID,
+                command=('run',), tty=True, stdin_open=True,
+            )
+            with self.assertRaises(w.WriterError):
+                w.validate_writer_spec(spec)
+            w.validate_writer_spec(spec, authority=authority)
+            argv = w.build_create_argv(spec, authority=authority)
+
+        self.assertEqual(argv[-2:], [authority.image_config_id, 'run'])
+
+    def test_slice_b_config_id_inspect_binds_top_level_and_config_image(self):
+        mode = getattr(w, 'WriterImageIdentityMode', None)
+        self.assertIsNotNone(mode)
+        if mode is None:
+            return
+        with tempfile.TemporaryDirectory() as temporary:
+            authority = slice_b_test_support.make_verified_authority(
+                pathlib.Path(temporary) / 'slice-b',
+                slice_b_test_support.make_key(),
+            )
+            key = authority.key
+            spec = make_spec(
+                gen=key.session_generation,
+                key=key,
+                image_ref=None,
+                image_config_id=authority.image_config_id,
+                image_record_sha256=authority.image_record_sha256,
+                runtime_sha256=authority.runtime_sha256,
+                image_identity_mode=mode.SLICE_B_CONFIG_ID,
+                command=('run',), tty=True, stdin_open=True,
+            )
+            inspect = make_inspect(spec, authority=authority)
+            inspect['Image'] = authority.image_config_id
+            inspect['Config']['Image'] = authority.image_config_id
+            w.validate_writer_inspect(inspect, spec, authority=authority)
+            altered = copy.deepcopy(inspect)
+            altered['Config']['Image'] = IMAGE_REF
+            with self.assertRaises(w.WriterError):
+                w.validate_writer_inspect(altered, spec, authority=authority)
+            altered = copy.deepcopy(inspect)
+            altered['Image'] = 'sha256:' + 'e' * 64
+            with self.assertRaises(w.WriterError):
+                w.validate_writer_inspect(altered, spec, authority=authority)
 
     def test_repo_path_escape(self):
         root = w.GUEST_SESSION_ROOT

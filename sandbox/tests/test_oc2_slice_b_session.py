@@ -1,7 +1,9 @@
 from pathlib import Path
 from dataclasses import replace
 import fcntl
+import hashlib
 import queue
+import json
 import sys
 import tempfile
 import threading
@@ -12,15 +14,27 @@ from unittest.mock import patch
 
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
-from oc2_slice_b_git import admit_clean_repo, build_verified_bundle  # noqa: E402
+TESTS = Path(__file__).resolve().parent
+sys.path.insert(0, str(TESTS))
+from oc2_slice_b_git import (  # noqa: E402
+    admit_clean_repo,
+    build_verified_bundle,
+    verify_bundle_manifest,
+)
+from oc2_slice_b_image import ImagePin, SliceBImageRejected  # noqa: E402
+from oc2_slice_b_image import GuestImageLoadRequest, import_guest_image  # noqa: E402
+from oc2_slice_b_test_support import FakeGuestImageRunner  # noqa: E402
 from oc2_slice_b_session import (  # noqa: E402
     SliceBReceipt,
     SliceBSessionError,
+    VerifiedGuestAuthority,
     create_session_receipt,
     update_session_receipt,
     verify_session_receipt,
     import_guest_baseline,
     verify_guest_authority,
+    GuestAuthorityVerificationRequest,
+    verify_guest_authority_from_host_record,
     build_start_message,
 )
 
@@ -82,29 +96,110 @@ class SessionTests(unittest.TestCase):
         self.art = build_verified_bundle(
             self.baseline, base / "ref.bundle", key=self.key, runtime_sha256="b" * 64
         )
+        image_archive = b"trusted guest writer archive"
+        self.image_control = base / "image-control"
+        self.image_control.mkdir(mode=0o700)
+        self.image_pin = ImagePin(
+            source_revision="f" * 40,
+            artifact_sha256="c" * 64,
+            runtime_sha256="b" * 64,
+            base_image_ref="alpine@sha256:" + "a" * 64,
+            build_context_sha256="1" * 64,
+            dockerfile_sha256="2" * 64,
+            image_ref="example.test/oc2-writer@sha256:" + "e" * 64,
+            config_id="sha256:" + "d" * 64,
+            archive_sha256=hashlib.sha256(image_archive).hexdigest(),
+            archive_size_bytes=len(image_archive),
+            platform="linux/amd64",
+        )
+        self.image_archive = self.image_control / (self.image_pin.archive_sha256 + ".tar")
+        self.image_archive.write_bytes(image_archive)
+        self.image_archive.chmod(0o600)
+        self.image_authority = import_guest_image(
+            GuestImageLoadRequest(
+                archive_path=self.image_archive,
+                supervisor_root=self.image_control,
+                image_pin=self.image_pin,
+                expected_record_sha256=self.image_pin.record_sha256,
+                docker_host="unix:///var/run/docker.sock",
+            ),
+            FakeGuestImageRunner(self.image_pin),
+        )
         self.rec = SliceBReceipt(
-            self.key,
-            self.baseline,
-            self.art.bundle_sha256,
-            self.art.manifest_sha256,
-            self.art.transfer_policy_id,
-            "b" * 64,
-            "example.test/oc2-writer@sha256:" + "c" * 64,
-            "sha256:" + "d" * 64,
-            "PENDING",
-            "NOT_RUN",
-            None,
-            None,
+            key=self.key,
+            baseline=self.baseline,
+            bundle_sha256=self.art.bundle_sha256,
+            manifest_sha256=self.art.manifest_sha256,
+            transfer_policy_id=self.art.transfer_policy_id,
+            runtime_sha256="b" * 64,
+            image_record=self.image_pin,
+            image_record_sha256=self.image_pin.record_sha256,
+            state="PENDING",
+            reason="NOT_RUN",
+            writer_id=None,
+            started_at=None,
         )
         self.state = base / "state"
         self.guest = base / "guest"
 
+    def verified_receipt(self, path: Path):
+        raw = path.read_bytes()
+        return verify_session_receipt(
+            path, self.key, hashlib.sha256(raw).hexdigest(),
+        )
+
+
     def test_receipt_create_and_readback(self) -> None:
         """A pending receipt roundtrips and duplicate creation is rejected."""
         path = create_session_receipt(self.state, self.rec, self.art)
-        self.assertEqual(verify_session_receipt(path, self.key), self.rec)
+        self.assertEqual(self.verified_receipt(path).receipt, self.rec)
+        stored = json.loads(path.read_text(encoding="ascii"))
+        self.assertEqual(stored["image_record_sha256"], self.image_pin.record_sha256)
+        self.assertEqual(
+            ImagePin.from_bytes(
+                stored["image_record"].encode("ascii"), stored["image_record_sha256"],
+            ),
+            self.image_pin,
+        )
         with self.assertRaises(SliceBSessionError):
             create_session_receipt(self.state, self.rec, self.art)
+
+    def test_receipt_hash_is_required_from_trusted_host(self) -> None:
+        path = create_session_receipt(self.state, self.rec, self.art)
+        with self.assertRaises(SliceBSessionError):
+            verify_session_receipt(path, self.key, "e" * 64)
+
+    def test_invalid_image_record_is_session_error_even_with_matching_outer_hash(self) -> None:
+        path = create_session_receipt(self.state, self.rec, self.art)
+        payload = json.loads(path.read_text(encoding="ascii"))
+        image_record = "{}"
+        payload["image_record"] = image_record
+        payload["image_record_sha256"] = hashlib.sha256(image_record.encode("ascii")).hexdigest()
+        path.write_text(json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n")
+        expected_receipt_sha256 = hashlib.sha256(path.read_bytes()).hexdigest()
+
+        with self.assertRaises(SliceBSessionError) as caught:
+            verify_session_receipt(path, self.key, expected_receipt_sha256)
+
+        self.assertIsInstance(caught.exception.__cause__, SliceBImageRejected)
+
+    def test_verified_guest_authority_cannot_be_created_from_receipt_fields(self) -> None:
+        with self.assertRaises(TypeError):
+            path = create_session_receipt(self.state, self.rec, self.art)
+            verified_receipt = self.verified_receipt(path)
+            manifest = verify_bundle_manifest(
+                self.art,
+                expected_key=self.key,
+                expected_manifest_sha256=self.art.manifest_sha256,
+                expected_runtime_sha256=self.art.runtime_sha256,
+            )
+            VerifiedGuestAuthority(
+                self.key,
+                manifest,
+                self.art.manifest_sha256,
+                verified_receipt.receipt_sha256,
+                self.image_authority,
+            )
 
     def test_guest_import_and_authority(self) -> None:
         """A verified Bundle imports into a new Guest and produces a start frame."""
@@ -116,19 +211,18 @@ class SessionTests(unittest.TestCase):
             expected_key=self.key,
             expected_runtime_sha256="b" * 64,
         )
-        auth = verify_guest_authority(
-            path.parent / "bundle.manifest.json",
-            self.rec,
-            guest,
-            "sha256:" + "d" * 64,
-            local_image_inspect={
-                "Id": self.rec.image_config_id,
-                "RepoDigests": [self.rec.image_ref],
-                "Config": {
-                    "Entrypoint": ["/opt/oc2/slice-b/entrypoint"],
-                    "Cmd": ["run"],
-                },
-            },
+        receipt_hash = hashlib.sha256(path.read_bytes()).hexdigest()
+        auth = verify_guest_authority_from_host_record(
+            GuestAuthorityVerificationRequest(
+                receipt_path=path,
+                expected_key=self.key,
+                expected_receipt_sha256=receipt_hash,
+                guest_baseline=guest,
+                archive_path=self.image_archive,
+                supervisor_image_root=self.image_control,
+                docker_host="unix:///var/run/docker.sock",
+            ),
+            FakeGuestImageRunner(self.image_pin),
         )
         start = build_start_message(auth).to_wire()
         self.assertEqual(start.count(" "), 4)
@@ -148,9 +242,15 @@ class SessionTests(unittest.TestCase):
     def test_reject_receipt_identity_mutation(self) -> None:
         """Receipt updates cannot alter immutable runtime identity."""
         path = create_session_receipt(self.state, self.rec, self.art)
+        altered_pin = replace(self.image_pin, runtime_sha256="e" * 64)
         with self.assertRaises(SliceBSessionError):
-            update_session_receipt(path, replace(self.rec, runtime_sha256="e" * 64))
-        self.assertEqual(verify_session_receipt(path, self.key), self.rec)
+            update_session_receipt(path, replace(
+                self.rec,
+                runtime_sha256="e" * 64,
+                image_record=altered_pin,
+                image_record_sha256=altered_pin.record_sha256,
+            ))
+        self.assertEqual(self.verified_receipt(path).receipt, self.rec)
 
     def test_reject_guest_control_manifest_mutation(self) -> None:
         """Guest authority rejects a changed copied Bundle Manifest."""
@@ -163,22 +263,10 @@ class SessionTests(unittest.TestCase):
             expected_runtime_sha256="b" * 64,
         )
         p = path.parent / "bundle.manifest.json"
+        verified_receipt = self.verified_receipt(path)
         p.write_bytes(p.read_bytes() + b"X")
         with self.assertRaises(SliceBSessionError):
-            verify_guest_authority(
-                p,
-                self.rec,
-                guest,
-                "sha256:" + "d" * 64,
-                local_image_inspect={
-                    "Id": self.rec.image_config_id,
-                    "RepoDigests": [self.rec.image_ref],
-                    "Config": {
-                        "Entrypoint": ["/opt/oc2/slice-b/entrypoint"],
-                        "Cmd": ["run"],
-                    },
-                },
-            )
+            verify_guest_authority(verified_receipt, guest, self.image_authority)
 
     def test_running_receipt_requires_writer_identity(self) -> None:
         """RUNNING cannot be represented without both Writer identity fields."""
@@ -236,8 +324,12 @@ class SessionTests(unittest.TestCase):
                 signals.put("lock")
             original_flock(descriptor, operation)
 
-        def pause_first_read(receipt_path: Path, expected_key: object) -> SliceBReceipt:
-            result = original_verify(receipt_path, expected_key)
+        def pause_first_read(
+            receipt_path: Path,
+            expected_key: object,
+            expected_receipt_sha256: str,
+        ) -> object:
+            result = original_verify(receipt_path, expected_key, expected_receipt_sha256)
             if threading.current_thread().name == "writer-first":
                 first_read.set()
                 if not release_first.wait(timeout=5):
@@ -280,7 +372,7 @@ class SessionTests(unittest.TestCase):
         outcomes = dict((results.get_nowait(), results.get_nowait()))
         self.assertIsNone(outcomes["writer-first"])
         self.assertIsInstance(outcomes["writer-second"], SliceBSessionError)
-        self.assertEqual(verify_session_receipt(path, self.key).writer_id, first.writer_id)
+        self.assertEqual(self.verified_receipt(path).receipt.writer_id, first.writer_id)
 
 
 if __name__ == "__main__":
