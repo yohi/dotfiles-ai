@@ -23,6 +23,7 @@ from oc2_host_broker import (
     PROVIDER_ID,
     HostBrokerError,
     HostBrokerSelection,
+    fixture_guest_path,
 )
 
 HERE = pathlib.Path(__file__).resolve().parent
@@ -203,7 +204,7 @@ def broker_runtime_identity(
     parts = (
         bytes.fromhex(manifest_sha256), bytes.fromhex(generator_fingerprint),
         selection.provider.encode(), selection.model.encode(), selection.mode.encode(),
-        selection.url.encode(), (selection.fixture_root or '').encode(),
+        selection.url.encode(), (selection.fixture_rel or '').encode(),
         selection.sandbox_label.encode(),
     )
     digest = hashlib.sha256(_IDENTITY_NAMESPACE)
@@ -250,8 +251,9 @@ def build_guest_exec_args(
         '--broker-url=' + selection.url,
         '--opencode=' + opencode_path,
     ]
-    if selection.fixture_root is not None:
-        argv.append('--fixture-root=' + selection.fixture_root)
+    fixture = fixture_guest_path(selection, runtime)
+    if fixture is not None:
+        argv.append('--fixture-root=' + fixture)
     return (*argv, '--', 'run', '--standalone', validate_prompt(prompt))
 
 

@@ -16,7 +16,6 @@ to a direct provider, BYOK, or the Cloudflare Gateway credential path.
 from __future__ import annotations
 
 import os
-import pathlib
 import re
 import socket
 import stat
@@ -35,6 +34,8 @@ GUEST_ROOT: Final[str] = '/home/agent/workspace/oc2'
 CAPABILITY_ENV: Final[str] = 'OC_CF_AIG_BROKER_CAPABILITY'
 _LABEL_RE: Final[re.Pattern[str]] = re.compile(r'[A-Za-z0-9._-]{1,64}')
 _DIGEST_RE: Final[re.Pattern[str]] = re.compile(r'[0-9a-f]{64}')
+_FIXTURE_PART_RE: Final[re.Pattern[str]] = re.compile(r'[A-Za-z0-9._-]{1,64}')
+FIXTURE_BASE: Final[str] = 'fixtures'
 
 
 class HostBrokerError(Exception):
@@ -67,7 +68,9 @@ class HostBrokerSelection:
     mode: str
     sandbox_label: str
     capability_fd: int
-    fixture_root: str | None = None
+    # Normalized path RELATIVE to the Runtime directory (m2 only). The absolute
+    # Guest path is derived only after the Runtime Identity is fixed.
+    fixture_rel: str | None = None
     provider: str = PROVIDER_ID
     model: str = MODEL_ID
 
@@ -78,7 +81,7 @@ def build_selection(
     mode: object,
     sandbox_label: object,
     capability_fd: object,
-    fixture_root: object = None,
+    fixture_rel: object = None,
     provider: object = PROVIDER_ID,
     model: object = MODEL_ID,
 ) -> HostBrokerSelection:
@@ -94,19 +97,34 @@ def build_selection(
     if (not isinstance(capability_fd, int) or isinstance(capability_fd, bool)
             or not 3 <= capability_fd <= 1023):
         raise HostBrokerError('Host Broker capability fd must be an integer from 3 to 1023')
-    if mode == 'm1' and fixture_root is not None:
-        raise HostBrokerError('m1 grants no tools; a fixture root is not allowed')
+    if mode == 'm1' and fixture_rel is not None:
+        raise HostBrokerError('m1 grants no tools; a fixture is not allowed')
+    fixture: str | None = None
     if mode == 'm2':
-        if not isinstance(fixture_root, str):
-            raise HostBrokerError('m2 requires a Guest fixture root')
-        posix = pathlib.PurePosixPath(fixture_root)
-        if (not posix.is_absolute() or '..' in posix.parts
-                or str(posix) != fixture_root or '\0' in fixture_root):
-            raise HostBrokerError('Guest fixture root must be a normalized absolute path')
+        fixture = validate_fixture_rel(fixture_rel)
     return HostBrokerSelection(
-        validate_broker_url(url), mode, sandbox_label, capability_fd,
-        fixture_root if mode == 'm2' else None,
+        validate_broker_url(url), mode, sandbox_label, capability_fd, fixture,
     )
+
+
+def validate_fixture_rel(value: object) -> str:
+    """Accept only ``fixtures`` or ``fixtures/<name>...`` as a normalized relative path."""
+    message = 'm2 requires a normalized relative fixture path under ' + FIXTURE_BASE
+    if not isinstance(value, str) or not value or '\0' in value or '\\' in value:
+        raise HostBrokerError(message)
+    parts = value.split('/')
+    if (parts[0] != FIXTURE_BASE or len(parts) > 4
+            or any(_FIXTURE_PART_RE.fullmatch(part) is None or part in ('.', '..')
+                   for part in parts)):
+        raise HostBrokerError(message)
+    return value
+
+
+def fixture_guest_path(selection: HostBrokerSelection, runtime: str) -> str | None:
+    """Absolute Guest fixture path under an already-bound Runtime (re-validated)."""
+    if selection.fixture_rel is None:
+        return None
+    return f'{runtime}/{validate_fixture_rel(selection.fixture_rel)}'
 
 
 def bind_identity(selection: HostBrokerSelection, sandbox_name: str, runtime_digest: str) -> str:
@@ -119,10 +137,11 @@ def bind_identity(selection: HostBrokerSelection, sandbox_name: str, runtime_dig
         raise HostBrokerError('Host Broker sandbox label does not match the launching Sandbox')
     if _DIGEST_RE.fullmatch(runtime_digest) is None:
         raise HostBrokerError('invalid runtime digest')
-    runtime = f'{GUEST_ROOT}/runtime/{runtime_digest[:16]}'
-    if selection.fixture_root is not None and not selection.fixture_root.startswith(runtime + '/'):
-        raise HostBrokerError('Guest fixture root is outside the bound Runtime')
-    return runtime
+    if selection.mode == 'm1' and selection.fixture_rel is not None:
+        raise HostBrokerError('m1 grants no tools; a fixture is not allowed')
+    if selection.mode == 'm2':
+        validate_fixture_rel(selection.fixture_rel)
+    return f'{GUEST_ROOT}/runtime/{runtime_digest[:16]}'
 
 
 class Capability:

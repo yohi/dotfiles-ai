@@ -1548,6 +1548,15 @@ def _launch_via_host_broker(
     try:
         runtime = oc2_host_broker.bind_identity(
             broker.selection, request.name, request.digest)
+        expected_digest = oc2_host_broker_runtime.broker_runtime_identity(
+            broker.selection, broker.artifacts.manifest_sha256,
+            phase4_generator_fingerprint((
+                HERE / 'oc2_host_broker.py', HERE / 'oc2_host_broker_runtime.py',
+            )),
+        )
+        if request.digest != expected_digest:
+            raise oc2_host_broker.HostBrokerError(
+                'Runtime Identity does not match the Broker selection and artifacts')
         config_sha = oc2_host_broker_runtime.assert_broker_config(
             request.config_file, runtime)
         guest_argv = oc2_host_broker_runtime.build_guest_exec_args(
@@ -1743,7 +1752,8 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument('--host-broker-prompt',
                    help='non-interactive prompt for `opencode run`; the TUI is not offered')
     p.add_argument('--host-broker-fixture-root',
-                   help='m2 only: Guest fixture directory under the bound Runtime')
+                   help='m2 only: fixture path relative to the Runtime, '
+                        'fixtures or fixtures/<name>')
     args = p.parse_args(argv)
     oc2_workspace = importlib.import_module('oc2_workspace')
 
@@ -1768,7 +1778,7 @@ def main(argv: list[str] | None = None) -> int:
                 mode=args.host_broker_mode,
                 sandbox_label=args.host_broker_sandbox_label,
                 capability_fd=args.host_broker_capability_fd,
-                fixture_root=args.host_broker_fixture_root,
+                fixture_rel=args.host_broker_fixture_root,
             )
             if broker_selection.sandbox_label != args.sandbox:
                 raise Stop('Host Broker sandbox label does not match --sandbox')

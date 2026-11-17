@@ -17,6 +17,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from collections.abc import Callable
 from unittest.mock import patch
 
 SCRIPTS = pathlib.Path(__file__).resolve().parents[1] / 'scripts'
@@ -28,9 +29,16 @@ import oc2_host_broker as hb  # noqa: E402
 import oc2_host_broker_runtime as rbr  # noqa: E402
 
 TOKEN = 'ocb_' + 'A' * 43
-DIGEST = 'b' * 64
-RUNTIME = f'{hb.GUEST_ROOT}/runtime/{DIGEST[:16]}'
 URL = 'http://host.docker.internal:18080/v1'
+MANIFEST_SHA = 'd' * 64
+GENERATOR_FP = oc2.phase4_generator_fingerprint((
+    oc2.HERE / 'oc2_host_broker.py', oc2.HERE / 'oc2_host_broker_runtime.py'))
+
+
+def bound_digest(chosen, manifest_sha=MANIFEST_SHA):
+    return rbr.broker_runtime_identity(chosen, manifest_sha, GENERATOR_FP)
+
+
 
 
 def selection(**overrides):
@@ -41,12 +49,16 @@ def selection(**overrides):
     return hb.build_selection(**values)
 
 
+DIGEST = bound_digest(selection())
+RUNTIME = f'{hb.GUEST_ROOT}/runtime/{DIGEST[:16]}'
+
+
 class SelectionTests(unittest.TestCase):
     def test_valid_selection_is_accepted(self):
         for url in (URL, 'http://127.0.0.1:1/v1', 'http://127.0.0.1:65535/v1/'):
             self.assertTrue(selection(url=url).url.endswith('/v1'))
-        m2 = selection(mode='m2', fixture_root=RUNTIME + '/fixtures')
-        self.assertEqual(m2.fixture_root, RUNTIME + '/fixtures')
+        m2 = selection(mode='m2', fixture_rel='fixtures/data')
+        self.assertEqual(m2.fixture_rel, 'fixtures/data')
 
     def test_invalid_urls_are_rejected(self):
         for url in (
@@ -66,9 +78,19 @@ class SelectionTests(unittest.TestCase):
             {'model': 'gpt-5'}, {'sandbox_label': ''}, {'sandbox_label': 'a b'},
             {'capability_fd': 0}, {'capability_fd': 2}, {'capability_fd': 1024},
             {'capability_fd': True}, {'capability_fd': '3'},
-            {'mode': 'm1', 'fixture_root': RUNTIME + '/f'},
-            {'mode': 'm2'}, {'mode': 'm2', 'fixture_root': 'relative'},
-            {'mode': 'm2', 'fixture_root': RUNTIME + '/../x'},
+            {'mode': 'm1', 'fixture_rel': 'fixtures/f'},
+            {'mode': 'm2'}, {'mode': 'm2', 'fixture_rel': ''},
+            {'mode': 'm2', 'fixture_rel': 'relative'},
+            {'mode': 'm2', 'fixture_rel': 'fixtures/../x'},
+            {'mode': 'm2', 'fixture_rel': RUNTIME + '/fixtures'},
+            {'mode': 'm2', 'fixture_rel': '/fixtures'},
+            {'mode': 'm2', 'fixture_rel': 'fixtures//a'},
+            {'mode': 'm2', 'fixture_rel': 'fixtures/./a'},
+            {'mode': 'm2', 'fixture_rel': 'fixtures\\a'},
+            {'mode': 'm2', 'fixture_rel': 'fixtures/a\0b'},
+            {'mode': 'm2', 'fixture_rel': 'config/opencode'},
+            {'mode': 'm2', 'fixture_rel': 'fixtures/a/b/c/d'},
+            {'mode': 'm2', 'fixture_rel': 5},
         )
         for overrides in cases:
             with self.subTest(overrides=overrides), self.assertRaises(hb.HostBrokerError):
@@ -81,9 +103,13 @@ class SelectionTests(unittest.TestCase):
             hb.bind_identity(chosen, 'other-sandbox', DIGEST)
         with self.assertRaises(hb.HostBrokerError):
             hb.bind_identity(chosen, 'oc2-dev', 'xyz')
-        outside = selection(mode='m2', fixture_root=hb.GUEST_ROOT + '/runtime/' + 'c' * 16 + '/f')
+        for bad in ('../x', '/etc', 'fixtures/../../x', None):
+            forged = hb.HostBrokerSelection(URL, 'm2', 'oc2-dev', 3, bad)
+            with self.subTest(bad=bad), self.assertRaises(hb.HostBrokerError):
+                hb.bind_identity(forged, 'oc2-dev', DIGEST)
         with self.assertRaises(hb.HostBrokerError):
-            hb.bind_identity(outside, 'oc2-dev', DIGEST)
+            hb.bind_identity(
+                hb.HostBrokerSelection(URL, 'm1', 'oc2-dev', 3, 'fixtures'), 'oc2-dev', DIGEST)
 
 
 class CapabilityTests(unittest.TestCase):
@@ -141,9 +167,9 @@ class FsRunner:
     def __init__(self, root: pathlib.Path):
         self.root = root
         self.user = 'tester'
-        self.calls = []
-        self.fed = []
-        self.after_cp = None
+        self.calls: list[tuple[str, ...]] = []
+        self.fed: list[tuple[tuple[str, ...], bytes]] = []
+        self.after_cp: Callable[[pathlib.Path], None] | None = None
 
     def local(self, guest_path):
         return self.root / str(guest_path).lstrip('/')
@@ -369,13 +395,75 @@ class BrokerConfigTests(unittest.TestCase):
         self.assertRegex(base, r'^[0-9a-f]{64}$')
         self.assertEqual(base, rbr.broker_runtime_identity(selection(), 'a' * 64, 'b' * 64))
         for other in (
-            rbr.broker_runtime_identity(selection(mode='m2', fixture_root=RUNTIME + '/f'),
+            rbr.broker_runtime_identity(selection(mode='m2', fixture_rel='fixtures/f'),
                                         'a' * 64, 'b' * 64),
             rbr.broker_runtime_identity(selection(url='http://127.0.0.1:1/v1'), 'a' * 64, 'b' * 64),
             rbr.broker_runtime_identity(selection(), 'c' * 64, 'b' * 64),
             rbr.broker_runtime_identity(selection(), 'a' * 64, 'c' * 64),
         ):
             self.assertNotEqual(base, other)
+
+
+class M2IdentityChainTests(unittest.TestCase):
+    def test_m2_success_chain_places_fixture_under_the_bound_runtime(self):
+        chosen = selection(mode='m2', fixture_rel='fixtures/data')
+        digest = bound_digest(chosen)
+        runtime = hb.bind_identity(chosen, 'oc2-dev', digest)
+        self.assertEqual(runtime, f'{hb.GUEST_ROOT}/runtime/{digest[:16]}')
+        argv = rbr.build_guest_exec_args(chosen, oc2.PINNED[0], runtime, 'hello')
+        self.assertIn('--mode=m2', argv)
+        self.assertIn(f'--fixture-root={runtime}/fixtures/data', argv)
+        self.assertEqual(sum(part.startswith('--fixture-root=') for part in argv), 1)
+        self.assertFalse(any('ocb_' in part or part.startswith('--capability') for part in argv))
+        # The fixture identifier is bound into the Runtime Identity.
+        other = selection(mode='m2', fixture_rel='fixtures/other')
+        self.assertNotEqual(digest, bound_digest(other))
+
+    def test_m2_forged_selection_is_refused_when_building_guest_args(self):
+        for bad in ('../x', '/etc/passwd', 'fixtures/../x', 'config'):
+            forged = hb.HostBrokerSelection(URL, 'm2', 'oc2-dev', 3, bad)
+            with self.subTest(bad=bad), self.assertRaises(hb.HostBrokerError):
+                rbr.build_guest_exec_args(forged, oc2.PINNED[0], RUNTIME, 'hi')
+
+    def test_m2_launch_places_artifacts_and_passes_only_the_derived_fixture_path(self):
+        tmp = pathlib.Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, tmp, True)
+        chosen = selection(mode='m2', fixture_rel='fixtures/data')
+        digest = bound_digest(chosen)
+        runtime = hb.bind_identity(chosen, 'oc2-dev', digest)
+        runner = FsRunner(tmp / 'guest')
+        runner.root.mkdir()
+        config = tmp / 'opencode.jsonc'
+        config.write_bytes(rbr.config_bytes(runtime))
+        broker = oc2.HostBrokerLaunch(chosen, hb.Capability(TOKEN), verified(), 'hi')
+        with patch.dict(os.environ, {}, clear=True):
+            oc2.launch(runner, make_request(config, digest=digest), broker)
+        args, data = runner.fed[0]
+        self.assertIn(f'--fixture-root={runtime}/fixtures/data', args)
+        self.assertEqual(data, (TOKEN + '\n').encode())
+        self.assertNotIn(TOKEN, repr(args) + repr(runner.calls))
+
+    def test_runtime_identity_and_label_mismatches_stop_and_bad_capability_cannot_be_built(self):
+        tmp = pathlib.Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, tmp, True)
+        chosen = selection(mode='m2', fixture_rel='fixtures/data')
+        digest = bound_digest(chosen)
+        runtime = hb.bind_identity(chosen, 'oc2-dev', digest)
+        config = tmp / 'opencode.jsonc'
+        config.write_bytes(rbr.config_bytes(runtime))
+        broker = oc2.HostBrokerLaunch(chosen, hb.Capability(TOKEN), verified(), 'hi')
+        for request in (make_request(config, digest=bound_digest(selection())),
+                        make_request(config, digest='f' * 64),
+                        make_request(config, digest=digest, name='another-sb')):
+            runner = FsRunner(tmp / 'guest')
+            runner.root.mkdir(exist_ok=True)
+            with self.subTest(digest=request.digest[:6], name=request.name), \
+                    patch.dict(os.environ, {}, clear=True), self.assertRaises(oc2.Stop):
+                oc2.launch(runner, request, broker)
+            self.assertEqual(runner.fed, [])
+        for bad in ('ocb_short', '', 'sk-' + 'a' * 40):
+            with self.assertRaises(hb.HostBrokerError):
+                hb.Capability(bad)
 
 
 class TtyAndArgvTests(unittest.TestCase):
@@ -396,9 +484,9 @@ class TtyAndArgvTests(unittest.TestCase):
             '--', 'run', '--standalone', 'hello',
         ))
         m2 = rbr.build_guest_exec_args(
-            selection(mode='m2', fixture_root=RUNTIME + '/fx'), oc2.PINNED[0], RUNTIME, 'hi')
+            selection(mode='m2', fixture_rel='fixtures/fx'), oc2.PINNED[0], RUNTIME, 'hi')
         self.assertIn('--mode=m2', m2)
-        self.assertIn('--fixture-root=' + RUNTIME + '/fx', m2)
+        self.assertIn('--fixture-root=' + RUNTIME + '/fixtures/fx', m2)
         for part in (*argv, *m2):
             self.assertNotIn('ocb_', part)
             self.assertFalse(part.startswith('--capability'))
@@ -580,7 +668,7 @@ class RunHostBrokerTests(unittest.TestCase):
         os.close(write_fd)
         sel = hb.build_selection(
             url=URL, mode=mode, sandbox_label=label, capability_fd=read_fd,
-            fixture_root=None if mode == 'm1' else None)
+            fixture_rel=None if mode == 'm1' else 'fixtures')
         args = oc2.argparse.Namespace(
             sandbox='oc2-dev', host_broker_artifacts=self.tmp / 'src' if artifacts else None,
             host_broker_prompt='say hello')
