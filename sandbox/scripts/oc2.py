@@ -27,6 +27,8 @@ from typing import TYPE_CHECKING, Final, Literal
 from urllib.parse import urlsplit
 
 import yaml
+import oc2_host_broker
+import oc2_host_broker_runtime
 from oc2_oauth_bundle import oauth_helper_source
 from oc2_native import parse_apm_native
 from oc2_identity import (
@@ -155,6 +157,16 @@ class SandboxLaunch:
     phase4_plugin_file: pathlib.Path | None = None
     phase4_plugins_sha: str | None = None
     superpowers_source: pathlib.Path | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class HostBrokerLaunch:
+    """Explicit opt-in Host Broker connection; carries the one-shot capability."""
+
+    selection: oc2_host_broker.HostBrokerSelection
+    capability: oc2_host_broker.Capability
+    artifacts: oc2_host_broker_runtime.VerifiedArtifacts
+    prompt: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -668,6 +680,19 @@ class Runner:
         if result.returncode != 0:
             raise Stop(f'sbx command failed (exit {result.returncode})')
         return result.stdout if capture else ''
+
+    def sbx_feed(self, *args: str, data: bytes) -> None:
+        """Run sbx with ``data`` on stdin only (never argv/env); no TTY, no capture."""
+        command = operator_command(self.user, 'sbx', *args)
+        if self.dry_run:
+            print('PLAN: ' + ' '.join(command[:5]) + ' [...]')
+            return
+        try:
+            result = subprocess.run(command, input=data, check=False, timeout=None)
+        except OSError as exc:
+            raise Stop('sbx command could not complete') from exc
+        if result.returncode != 0:
+            raise Stop(f'sbx command failed (exit {result.returncode})')
 
 
 def mountless_create_args(
@@ -1320,7 +1345,8 @@ os.execvpe(target[0], target, child_environment)
 '''
 
 
-def launch(runner: Runner, request: SandboxLaunch) -> None:
+def launch(runner: Runner, request: SandboxLaunch,
+           broker: HostBrokerLaunch | None = None) -> None:
     # Use sbx exec's native --workdir and direct argv instead of bash -c
     # positional parameters. The configured runtime is fully sandbox-local.
     if re.fullmatch(r'[0-9a-f]{64}', request.digest) is None:
@@ -1435,6 +1461,8 @@ def launch(runner: Runner, request: SandboxLaunch) -> None:
         *cloudflare_environment,
     )
     helper = oauth_helper_source(HERE)
+    if broker is not None and request.cloudflare is not None:
+        raise Stop('Host Broker mode cannot be combined with the Cloudflare Gateway runtime')
     # OC2_PHASE5_RUNTIME_MODE_FIX_R2
     # Enforce Runtime directory privacy before OAuth Bootstrap.
     # mkdir -p -m does not repair an existing directory's mode.
@@ -1490,6 +1518,9 @@ finally:
         'python3', '-c', runtime_mode_program, runtime,
     )
 
+    if broker is not None:
+        _launch_via_host_broker(runner, request, broker, runtime_environment, workdir)
+        return
     runner.sbx(
         'exec', '-w', workdir, request.name,
         'python3', '-c', GUEST_EXEC_WRAPPER, '--', *runtime_environment, '--',
@@ -1500,6 +1531,107 @@ finally:
         'python3', '-c', GUEST_EXEC_WRAPPER, '--', *runtime_environment, '--',
         request.cli, '--standalone', tty=True,
     )
+
+
+def _launch_via_host_broker(
+    runner: Runner,
+    request: SandboxLaunch,
+    broker: HostBrokerLaunch,
+    runtime_environment: tuple[str, ...],
+    workdir: str,
+) -> None:
+    """Place verified Guest artifacts, then start the launcher (stdin capability, no TTY).
+
+    Skips the direct-provider OAuth bootstrap entirely. Any identity mismatch,
+    artifact/config mismatch or TTY request stops the launch; there is no fallback.
+    """
+    try:
+        runtime = oc2_host_broker.bind_identity(
+            broker.selection, request.name, request.digest)
+        config_sha = oc2_host_broker_runtime.assert_broker_config(
+            request.config_file, runtime)
+        guest_argv = oc2_host_broker_runtime.build_guest_exec_args(
+            broker.selection, request.cli, runtime, broker.prompt)
+        with tempfile.TemporaryDirectory(prefix='oc2-broker-artifacts-') as staging:
+            oc2_host_broker_runtime.place_artifacts(
+                runner, request.name, runtime, broker.artifacts, config_sha,
+                pathlib.Path(staging),
+            )
+    except oc2_host_broker.HostBrokerError as exc:
+        raise Stop(str(exc)) from exc
+    # No '-t'/'-it': stdin is the one-shot capability channel, never a terminal.
+    runner.sbx_feed(
+        'exec', '-i', '-w', workdir, request.name,
+        'python3', '-c', GUEST_EXEC_WRAPPER, '--', *runtime_environment, '--',
+        *guest_argv,
+        data=broker.capability.reveal(),
+    )
+
+
+def _run_host_broker(
+    args: argparse.Namespace,
+    workspace: pathlib.Path,
+    workspace_manifest: WorkspaceManifest,
+    selection: oc2_host_broker.HostBrokerSelection,
+) -> int:
+    """Broker-only launch: no APM export, no credential Mixin, no OAuth bootstrap."""
+    if args.host_broker_artifacts is None:
+        raise Stop('--host-broker-artifacts (trusted local oc-cf-aig-subscription checkout) is required')
+    prompt = oc2_host_broker_runtime.validate_prompt(args.host_broker_prompt)
+    manifest, manifest_sha = oc2_host_broker_runtime.load_manifest()
+    artifacts = oc2_host_broker_runtime.verify_source(
+        args.host_broker_artifacts, manifest, manifest_sha)
+    fingerprint = phase4_generator_fingerprint((
+        HERE / 'oc2_host_broker.py', HERE / 'oc2_host_broker_runtime.py',
+    ))
+    runtime_sha = oc2_host_broker_runtime.broker_runtime_identity(
+        selection, manifest_sha, fingerprint)
+    runtime = oc2_host_broker.bind_identity(selection, args.sandbox, runtime_sha)
+    oc2_host_broker.check_capability_fd(selection.capability_fd)
+    oc2_host_broker.probe_broker(selection.url)
+    if not shutil.which('sbx'):
+        raise Stop('Docker Sandboxes CLI was not found')
+    runner = Runner(getpass.getuser())
+    sandbox_version = runner.sbx('version', capture=True).strip()
+    if re.search(r'\bv\d+\.\d+\.\d+\b', sandbox_version) is None:
+        raise Stop('could not verify Docker Sandboxes version')
+    if '--kit' not in runner.sbx('create', '--help', capture=True):
+        raise Stop('installed Docker Sandboxes CLI does not support Kits')
+    print('OC2_DOCKER_SANDBOXES: ' + sandbox_version)
+    existing = {line.strip() for line in runner.sbx('ls', '-q', capture=True).splitlines()}
+    if args.sandbox in existing:
+        raise Stop('Sandbox name already exists; refusing to reuse or rebuild it')
+    print('OC2: verifying official OpenCode v2.2.5 Linux x64 artifact')
+    with tempfile.TemporaryDirectory(prefix='oc2-broker-') as temporary:
+        temporary_path = pathlib.Path(temporary)
+        config_file = temporary_path / 'opencode.jsonc'
+        config_file.write_bytes(oc2_host_broker_runtime.config_bytes(runtime))
+        cli_binary = download_verified_cli(temporary_path / 'cli-download')
+        print('OC2_CLI_ARTIFACT_VERIFIED: v2.2.5 sha256=' + CLI_ASSET_SHA256)
+        print('OC2: creating mountless shell Sandbox ' + args.sandbox
+              + ' (no credential Mixin; no direct-provider egress allowance)')
+        cli_mixin = temporary_path / 'oc2-opencode-cli'
+        cli_mixin.mkdir()
+        cli_spec = cli_mixin / 'spec.yaml'
+        cli_spec.write_bytes(opencode_cli_mixin_spec())
+        os.chmod(cli_spec, 0o600)
+        staged_cli = cli_mixin / 'opencode'
+        shutil.copyfile(cli_binary, staged_cli)
+        os.chmod(staged_cli, 0o600)
+        runner.sbx('create', '--name', args.sandbox, '--kit', str(cli_mixin), SHELL_WORKLOAD)
+        cli = provision_cli(runner, args.sandbox)
+        workdir = transfer_workspace(
+            runner, args.sandbox, temporary_path / 'workspace-snapshot',
+            workspace_manifest, runner.user,
+        )
+        capability = oc2_host_broker.read_capability(selection.capability_fd)
+        print(f'OC2_READY: sandbox={args.sandbox} opencode=v{VERSION} broker=host')
+        launch(
+            runner,
+            SandboxLaunch(args.sandbox, runtime_sha, cli, workdir, config_file),
+            HostBrokerLaunch(selection, capability, artifacts, prompt),
+        )
+    return 0
 
 
 def _session_action(args: argparse.Namespace, workspace: pathlib.Path,
@@ -1597,10 +1729,52 @@ def main(argv: list[str] | None = None) -> int:
                    help='authorize external inference for this interactive launch')
     p.add_argument('--use-cloudflare-ai-gateway', action='store_true',
                    help='enable Cloudflare AI Gateway and provision its Sandbox credential')
+    p.add_argument('--use-host-broker', action='store_true',
+                   help='explicit opt-in: use the Host Broker (m1/m2 limited contract) '
+                        'instead of any direct provider')
+    p.add_argument('--host-broker-url', help='http://host.docker.internal:<port>/v1')
+    p.add_argument('--host-broker-mode', help='m1 (no tools) or m2 (Guest read_file only)')
+    p.add_argument('--host-broker-sandbox-label',
+                   help='Broker --sandbox-label; must equal --sandbox')
+    p.add_argument('--host-broker-capability-fd', type=int,
+                   help='inherited pipe/socket fd (3-1023) carrying the one-shot capability')
+    p.add_argument('--host-broker-artifacts', type=pathlib.Path,
+                   help='trusted local oc-cf-aig-subscription checkout (never fetched)')
+    p.add_argument('--host-broker-prompt',
+                   help='non-interactive prompt for `opencode run`; the TUI is not offered')
+    p.add_argument('--host-broker-fixture-root',
+                   help='m2 only: Guest fixture directory under the bound Runtime')
     args = p.parse_args(argv)
     oc2_workspace = importlib.import_module('oc2_workspace')
 
     try:
+        broker_selection: oc2_host_broker.HostBrokerSelection | None = None
+        broker_options = (
+            args.host_broker_url, args.host_broker_mode, args.host_broker_sandbox_label,
+            args.host_broker_capability_fd, args.host_broker_fixture_root,
+            args.host_broker_artifacts, args.host_broker_prompt,
+        )
+        if args.use_host_broker:
+            if (args.prepare_only or args.verification_only or args.phase4_plugins
+                    or args.provision_artifacts or args.use_cloudflare_ai_gateway
+                    or args.allow_paid_inference):
+                raise Stop('--use-host-broker cannot be combined with other Runtime, '
+                           'credential, or inference modes')
+            if oc2_host_broker.CAPABILITY_ENV in os.environ:
+                raise Stop(oc2_host_broker.CAPABILITY_ENV
+                           + ' must not be set; the capability is read from a pipe fd only')
+            broker_selection = oc2_host_broker.build_selection(
+                url=args.host_broker_url,
+                mode=args.host_broker_mode,
+                sandbox_label=args.host_broker_sandbox_label,
+                capability_fd=args.host_broker_capability_fd,
+                fixture_root=args.host_broker_fixture_root,
+            )
+            if broker_selection.sandbox_label != args.sandbox:
+                raise Stop('Host Broker sandbox label does not match --sandbox')
+            oc2_host_broker_runtime.validate_prompt(args.host_broker_prompt)
+        elif any(option is not None for option in broker_options):
+            raise Stop('--host-broker-* options require --use-host-broker')
         if args.phase4_plugins:
             if args.verification_only:
                 raise Stop('--phase4-plugins replaces --verification-only')
@@ -1664,6 +1838,16 @@ def main(argv: list[str] | None = None) -> int:
             if not NAME_RE.fullmatch(args.sandbox):
                 raise Stop('invalid Sandbox name')
             print('OC2 PLAN: mountless shell Sandbox=' + args.sandbox)
+            if broker_selection is not None:
+                print('OC2 PLAN: explicit Host Broker provider=' + broker_selection.provider
+                      + ' model=' + broker_selection.model
+                      + ' mode=' + broker_selection.mode
+                      + ' url=' + broker_selection.url)
+                print('OC2 PLAN: capability via pipe fd -> stdin only; non-interactive '
+                      '`opencode run` (no TTY); no direct provider, OAuth bootstrap, '
+                      'credential Mixin, or Cloudflare Gateway credential; no fallback')
+                print('OC2 PLAN: Broker-only Config; verified Guest artifacts '
+                      'from a trusted local checkout (no fetch/install)')
             print('OC2 PLAN: workspace=' + str(workspace))
             print('OC2 PLAN: transfer only the verified Workspace Snapshot; no .git or OpenCode project config')
             print('OC2 PLAN: Host-side verification, then stage the verified CLI in the Sandbox Kit')
@@ -1750,6 +1934,8 @@ def main(argv: list[str] | None = None) -> int:
         workspace_manifest = oc2_workspace.snapshot(
             workspace, profile=workspace_profile,
         )
+        if broker_selection is not None:
+            return _run_host_broker(args, workspace, workspace_manifest, broker_selection)
         with tempfile.TemporaryDirectory(prefix='oc2-v2-config-') as temporary:
             temporary_path = pathlib.Path(temporary)
             bundle = temporary_path / 'export'
@@ -1890,17 +2076,17 @@ def main(argv: list[str] | None = None) -> int:
                     json.dumps(config, ensure_ascii=False, indent=2) + '\n', encoding='utf-8',
                 )
             print(f'OC2_READY: sandbox={args.sandbox} opencode=v{VERSION}')
-            launch(
-                runner,
-                SandboxLaunch(args.sandbox, runtime_sha, cli, workdir, config_file,
-                              cloudflare, asset_file, asset_sha,
-                              bundle if unified_runtime else None, config_sha,
-                              phase4_asset_file, phase4_assets_sha,
-                              superpowers_source),
+            launch_request = SandboxLaunch(
+                args.sandbox, runtime_sha, cli, workdir, config_file,
+                cloudflare, asset_file, asset_sha,
+                bundle if unified_runtime else None, config_sha,
+                phase4_asset_file, phase4_assets_sha,
+                superpowers_source,
             )
+            launch(runner, launch_request)
             return 0
     except (Stop, OSError, ValueError, subprocess.TimeoutExpired,
-            oc2_workspace.WorkspaceError) as exc:
+            oc2_workspace.WorkspaceError, oc2_host_broker.HostBrokerError) as exc:
         print('OC2_STOP: ' + str(exc), file=sys.stderr)
         return 1
 
