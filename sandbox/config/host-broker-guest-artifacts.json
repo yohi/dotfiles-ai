@@ -1,21 +1,21 @@
 {
   "schema": "dotfiles-ai/oc2-host-broker-guest-artifacts/v1",
   "source_repo": "yohi/oc-cf-aig-subscription",
-  "source_commit": "0c11b0e7f77f080c8719cbf65752af46e51131aa",
+  "source_commit": "0b36fcc985b0110928f51307a8e6ef50f0ec74c0",
   "provider": "oc-cf-aig",
   "model": "gpt-6-luna",
   "files": {
     "bin/guest-launch.mjs": {
-      "sha256": "247e299047be3d7312ffbb723ecde9b8cd5453a78afabaf79c8bcc894680232d",
-      "size": 8261
+      "sha256": "d8c23aac5be554cf17076e39ec44b32917dae0eb0737a636422ba951f78cf3d2",
+      "size": 8262
     },
     "src/guest/index.js": {
       "sha256": "d29ba0f0687eb11286cdeb5614d130f7f99bd01064e3b930e8a81497e9f79d14",
       "size": 363
     },
     "src/guest/provider.mjs": {
-      "sha256": "ed07e64045ddf031c8b67ee29144a373b73b4556cc65f2c05c029bd371eb5b92",
-      "size": 13877
+      "sha256": "0bcc301525f2d168d877468bc2aa3848eb3e5d4d950fcf7e2da2dda98f264a3c",
+      "size": 13879
     }
   }
 }

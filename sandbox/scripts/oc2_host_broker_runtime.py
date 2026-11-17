@@ -19,6 +19,8 @@ from dataclasses import dataclass
 from typing import Any, Final
 
 from oc2_host_broker import (
+    BrokerCaCertificate,
+    MAX_BROKER_CA_BYTES,
     MODEL_ID,
     PROVIDER_ID,
     HostBrokerError,
@@ -28,13 +30,14 @@ from oc2_host_broker import (
 
 HERE = pathlib.Path(__file__).resolve().parent
 PIN_PATH: Final[pathlib.Path] = HERE.parent / 'config' / 'host-broker-guest-artifacts.json'
-MANIFEST_SHA256: Final[str] = '39e17348552c424a4d6e77792e8c60166327e93799362fd807e262f53eff7a21'
+MANIFEST_SHA256: Final[str] = '619913587090e711ef2f1fee9411cd7ad9d881f7bb78b55eca383296235ef549'
 MANIFEST_SCHEMA: Final[str] = 'dotfiles-ai/oc2-host-broker-guest-artifacts/v1'
 SOURCE_REPO: Final[str] = 'yohi/oc-cf-aig-subscription'
 ALLOWED_FILES: Final[frozenset[str]] = frozenset({
     'bin/guest-launch.mjs', 'src/guest/index.js', 'src/guest/provider.mjs',
 })
 MAX_FILE_BYTES: Final[int] = 64 * 1024
+BROKER_CA_FILE: Final[str] = 'ca/host-broker-ca.pem'
 MAX_PROMPT_BYTES: Final[int] = 4096
 VERIFIED_MARKER: Final[str] = 'OC2_BROKER_GUEST_VERIFIED'
 _IDENTITY_NAMESPACE: Final[bytes] = b'dotfiles-ai/oc2-host-broker-runtime/v1\0'
@@ -42,6 +45,7 @@ _SECRET_LIKE: Final[re.Pattern[str]] = re.compile(r'ocb_[A-Za-z0-9_-]{16,}|\bsk-
 _PROVIDER_MARKERS: Final[tuple[bytes, ...]] = (
     b'export const PROVIDER_ID = "oc-cf-aig";',
     b'export const MODEL_ID = "gpt-6-luna";',
+    b'url.protocol !== "https:"',
 )
 
 
@@ -205,7 +209,7 @@ def broker_runtime_identity(
         bytes.fromhex(manifest_sha256), bytes.fromhex(generator_fingerprint),
         selection.provider.encode(), selection.model.encode(), selection.mode.encode(),
         selection.url.encode(), (selection.fixture_rel or '').encode(),
-        selection.sandbox_label.encode(),
+        selection.sandbox_label.encode(), bytes.fromhex(selection.broker_ca_sha256),
     )
     digest = hashlib.sha256(_IDENTITY_NAMESPACE)
     for part in parts:
@@ -305,12 +309,14 @@ def read_regular(fd):
     return data
 
 
-runtime, manifest_raw, config_sha = sys.argv[1:4]
+runtime, manifest_raw, config_sha, ca_sha = sys.argv[1:5]
 if re.fullmatch(re.escape(ROOT) + r'/runtime/[0-9a-f]{16}', runtime) is None:
     fail('runtime path is outside the Runtime area')
+if re.fullmatch(r'[0-9a-f]{64}', ca_sha) is None:
+    fail('Broker CA identity is invalid')
 manifest = json.loads(manifest_raw)
 files = manifest['files']
-expected_dirs = {''}
+expected_dirs = {'', 'ca'}
 for rel in files:
     parts = rel.split('/')[:-1]
     for i in range(1, len(parts) + 1):
@@ -330,20 +336,28 @@ def walk(dir_fd, prefix, seen):
             finally:
                 os.close(child)
         elif stat.S_ISREG(info.st_mode):
-            if rel not in files:
-                fail('unexpected file in Broker artifacts')
             fd = os.open(name, os.O_RDONLY | os.O_NOFOLLOW, dir_fd=dir_fd)
             try:
+                if rel == 'ca/host-broker-ca.pem' and info.st_mode & 0o077:
+                    fail('Broker CA file permissions are unsafe')
                 data = read_regular(fd)
             finally:
                 os.close(fd)
-            entry = files[rel]
-            if len(data) != entry['size'] or hashlib.sha256(data).hexdigest() != entry['sha256']:
-                fail('Broker artifact hash mismatch')
-            if rel == 'src/guest/provider.mjs' and (
-                    b'export const PROVIDER_ID = "oc-cf-aig";' not in data
-                    or b'export const MODEL_ID = "gpt-6-luna";' not in data):
-                fail('Broker provider contract markers are missing')
+            if rel == 'ca/host-broker-ca.pem':
+                if (len(data) > 65536 or hashlib.sha256(data).hexdigest() != ca_sha
+                        or b'-----BEGIN CERTIFICATE-----' not in data
+                        or b'PRIVATE KEY' in data):
+                    fail('Broker CA certificate identity mismatch')
+            else:
+                if rel not in files:
+                    fail('unexpected file in Broker artifacts')
+                entry = files[rel]
+                if len(data) != entry['size'] or hashlib.sha256(data).hexdigest() != entry['sha256']:
+                    fail('Broker artifact hash mismatch')
+                if rel == 'src/guest/provider.mjs' and (
+                        b'export const PROVIDER_ID = "oc-cf-aig";' not in data
+                        or b'export const MODEL_ID = "gpt-6-luna";' not in data):
+                    fail('Broker provider contract markers are missing')
             seen.add(rel)
         else:
             fail('unsupported entry type in Broker artifacts')
@@ -355,7 +369,7 @@ try:
     walk(root_fd, '', seen)
 finally:
     os.close(root_fd)
-if seen != set(files):
+if seen != set(files) | {'ca/host-broker-ca.pem'}:
     fail('Broker artifact set is incomplete')
 
 cfd = open_chain(runtime + '/config/opencode/opencode.jsonc', want_dir=False)
@@ -384,6 +398,7 @@ def place_artifacts(
     runtime: str,
     artifacts: VerifiedArtifacts,
     config_sha256: str,
+    ca_certificate: BrokerCaCertificate,
     staging: pathlib.Path,
 ) -> None:
     """Copy only the allowlisted files into the Runtime area, then verify in the Guest.
@@ -391,8 +406,12 @@ def place_artifacts(
     Existing files are reused only when their SHA-256 matches; nothing is overwritten.
     ``staging`` receives the already-verified bytes so the source is read once.
     """
+    if (len(ca_certificate.data) > MAX_BROKER_CA_BYTES
+            or hashlib.sha256(ca_certificate.data).hexdigest() != ca_certificate.sha256
+            or re.fullmatch(r'[0-9a-f]{64}', ca_certificate.sha256) is None):
+        raise HostBrokerError('Broker CA certificate identity is invalid')
     base = broker_dir(runtime)
-    dirs = [base, base + '/bin', base + '/src', base + '/src/guest']
+    dirs = [base, base + '/bin', base + '/src', base + '/src/guest', base + '/ca']
     for directory in dirs:
         if runner.directory_status(sandbox, directory) not in (0, 10):
             raise HostBrokerError('Broker artifact directory is unsafe or its state is unknown')
@@ -410,10 +429,22 @@ def place_artifacts(
         output = runner.sbx('exec', sandbox, 'sha256sum', destination, capture=True).split()
         if not output or output[0] != artifacts.manifest['files'][rel]['sha256']:
             raise HostBrokerError('Broker artifact SHA-256 mismatch in the Sandbox')
+    ca_local = staging / 'host-broker-ca.pem'
+    ca_local.write_bytes(ca_certificate.data)
+    ca_local.chmod(0o600)
+    ca_destination = f'{base}/{BROKER_CA_FILE}'
+    ca_status = runner.destination_status(sandbox, ca_destination)
+    if ca_status == 0:
+        runner.sbx('cp', str(ca_local), f'{sandbox}:{ca_destination}')
+    elif ca_status != 10:
+        raise HostBrokerError('Broker CA destination is unsafe or its state is unknown')
+    ca_output = runner.sbx('exec', sandbox, 'sha256sum', ca_destination, capture=True).split()
+    if not ca_output or ca_output[0] != ca_certificate.sha256:
+        raise HostBrokerError('Broker CA SHA-256 mismatch in the Sandbox')
     manifest_json = json.dumps(artifacts.manifest, sort_keys=True, separators=(',', ':'))
     verdict = runner.sbx(
         'exec', sandbox, 'python3', '-I', '-c', GUEST_VERIFY_SCRIPT,
-        runtime, manifest_json, config_sha256, capture=True,
+        runtime, manifest_json, config_sha256, ca_certificate.sha256, capture=True,
     )
     if VERIFIED_MARKER not in str(verdict):
         raise HostBrokerError('independent Guest verification of Broker artifacts failed')

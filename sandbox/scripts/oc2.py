@@ -166,6 +166,7 @@ class HostBrokerLaunch:
     selection: oc2_host_broker.HostBrokerSelection
     capability: oc2_host_broker.Capability
     artifacts: oc2_host_broker_runtime.VerifiedArtifacts
+    ca_certificate: oc2_host_broker.BrokerCaCertificate
     prompt: str
 
 
@@ -1300,6 +1301,24 @@ for entry in runtime_entries:
         stop('invalid fixed runtime environment')
     child_environment[key] = value
 
+broker_url = child_environment.pop('OC2_HOST_BROKER_URL', None)
+broker_host = None
+if broker_url is not None:
+    try:
+        parsed_broker = urlsplit(broker_url)
+        broker_port = parsed_broker.port
+    except ValueError:
+        stop('unsafe Host Broker URL')
+    if (parsed_broker.scheme != 'https'
+            or parsed_broker.hostname not in ('host.docker.internal', '127.0.0.1')
+            or broker_port is None or not 1 <= broker_port <= 65535
+            or parsed_broker.username or parsed_broker.password
+            or parsed_broker.path not in ('/v1', '/v1/')
+            or parsed_broker.query or parsed_broker.fragment
+            or re.search(r'[?#\s]', broker_url)):
+        stop('unsafe Host Broker URL')
+    broker_host = parsed_broker.hostname
+
 proxy_environment = {}
 for name in PROXY_NAMES:
     variants = [os.environ[key] for key in (name, name.lower()) if key in os.environ]
@@ -1337,8 +1356,14 @@ if bypasses:
     allowed_no_proxy = (
         'localhost', '127.0.0.1', '::1', 'gateway.docker.internal',
     )
+    if broker_host is not None:
+        allowed_no_proxy = (*allowed_no_proxy, broker_host)
     if any(entry not in allowed_no_proxy for entry in entries):
         stop('unsafe NO_PROXY entries')
+    proxy_environment['NO_PROXY'] = ','.join(entries)
+if broker_host is not None and broker_host not in proxy_environment.get('NO_PROXY', '').split(','):
+    bypasses = proxy_environment.get('NO_PROXY', '')
+    proxy_environment['NO_PROXY'] = ','.join(filter(None, (bypasses, broker_host)))
 
 child_environment.update(proxy_environment)
 os.execvpe(target[0], target, child_environment)
@@ -1548,6 +1573,11 @@ def _launch_via_host_broker(
     try:
         runtime = oc2_host_broker.bind_identity(
             broker.selection, request.name, request.digest)
+        if (broker.ca_certificate.sha256 != broker.selection.broker_ca_sha256
+                or hashlib.sha256(broker.ca_certificate.data).hexdigest()
+                != broker.ca_certificate.sha256):
+            raise oc2_host_broker.HostBrokerError(
+                'Host Broker CA certificate does not match the selected Runtime identity')
         expected_digest = oc2_host_broker_runtime.broker_runtime_identity(
             broker.selection, broker.artifacts.manifest_sha256,
             phase4_generator_fingerprint((
@@ -1564,14 +1594,19 @@ def _launch_via_host_broker(
         with tempfile.TemporaryDirectory(prefix='oc2-broker-artifacts-') as staging:
             oc2_host_broker_runtime.place_artifacts(
                 runner, request.name, runtime, broker.artifacts, config_sha,
-                pathlib.Path(staging),
+                broker.ca_certificate, pathlib.Path(staging),
             )
     except oc2_host_broker.HostBrokerError as exc:
         raise Stop(str(exc)) from exc
     # No '-t'/'-it': stdin is the one-shot capability channel, never a terminal.
+    broker_environment = (
+        *runtime_environment,
+        f'NODE_EXTRA_CA_CERTS={runtime}/broker/ca/host-broker-ca.pem',
+        'OC2_HOST_BROKER_URL=' + broker.selection.url,
+    )
     runner.sbx_feed(
         'exec', '-i', '-w', workdir, request.name,
-        'python3', '-c', GUEST_EXEC_WRAPPER, '--', *runtime_environment, '--',
+        'python3', '-c', GUEST_EXEC_WRAPPER, '--', *broker_environment, '--',
         *guest_argv,
         data=broker.capability.reveal(),
     )
@@ -1582,6 +1617,7 @@ def _run_host_broker(
     workspace: pathlib.Path,
     workspace_manifest: WorkspaceManifest,
     selection: oc2_host_broker.HostBrokerSelection,
+    ca_certificate: oc2_host_broker.BrokerCaCertificate,
 ) -> int:
     """Broker-only launch: no APM export, no credential Mixin, no OAuth bootstrap."""
     if args.host_broker_artifacts is None:
@@ -1590,6 +1626,9 @@ def _run_host_broker(
     manifest, manifest_sha = oc2_host_broker_runtime.load_manifest()
     artifacts = oc2_host_broker_runtime.verify_source(
         args.host_broker_artifacts, manifest, manifest_sha)
+    if (ca_certificate.sha256 != selection.broker_ca_sha256
+            or hashlib.sha256(ca_certificate.data).hexdigest() != ca_certificate.sha256):
+        raise Stop('Host Broker CA certificate does not match the selected Runtime identity')
     fingerprint = phase4_generator_fingerprint((
         HERE / 'oc2_host_broker.py', HERE / 'oc2_host_broker_runtime.py',
     ))
@@ -1597,7 +1636,7 @@ def _run_host_broker(
         selection, manifest_sha, fingerprint)
     runtime = oc2_host_broker.bind_identity(selection, args.sandbox, runtime_sha)
     oc2_host_broker.check_capability_fd(selection.capability_fd)
-    oc2_host_broker.probe_broker(selection.url)
+    oc2_host_broker.probe_broker(selection.url, ca_certificate.data)
     if not shutil.which('sbx'):
         raise Stop('Docker Sandboxes CLI was not found')
     runner = Runner(getpass.getuser())
@@ -1638,7 +1677,7 @@ def _run_host_broker(
         launch(
             runner,
             SandboxLaunch(args.sandbox, runtime_sha, cli, workdir, config_file),
-            HostBrokerLaunch(selection, capability, artifacts, prompt),
+            HostBrokerLaunch(selection, capability, artifacts, ca_certificate, prompt),
         )
     return 0
 
@@ -1741,7 +1780,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument('--use-host-broker', action='store_true',
                    help='explicit opt-in: use the Host Broker (m1/m2 limited contract) '
                         'instead of any direct provider')
-    p.add_argument('--host-broker-url', help='http://host.docker.internal:<port>/v1')
+    p.add_argument('--host-broker-url', help='https://host.docker.internal:<port>/v1')
+    p.add_argument('--host-broker-ca-cert', type=pathlib.Path,
+                   help='public CA certificate used to verify the Host Broker TLS connection')
     p.add_argument('--host-broker-mode', help='m1 (no tools) or m2 (Guest read_file only)')
     p.add_argument('--host-broker-sandbox-label',
                    help='Broker --sandbox-label; must equal --sandbox')
@@ -1759,10 +1800,11 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         broker_selection: oc2_host_broker.HostBrokerSelection | None = None
+        broker_ca_certificate: oc2_host_broker.BrokerCaCertificate | None = None
         broker_options = (
             args.host_broker_url, args.host_broker_mode, args.host_broker_sandbox_label,
             args.host_broker_capability_fd, args.host_broker_fixture_root,
-            args.host_broker_artifacts, args.host_broker_prompt,
+            args.host_broker_artifacts, args.host_broker_prompt, args.host_broker_ca_cert,
         )
         if args.use_host_broker:
             if (args.prepare_only or args.verification_only or args.phase4_plugins
@@ -1773,11 +1815,15 @@ def main(argv: list[str] | None = None) -> int:
             if oc2_host_broker.CAPABILITY_ENV in os.environ:
                 raise Stop(oc2_host_broker.CAPABILITY_ENV
                            + ' must not be set; the capability is read from a pipe fd only')
+            if args.host_broker_ca_cert is None:
+                raise Stop('--host-broker-ca-cert is required with --use-host-broker')
+            broker_ca_certificate = oc2_host_broker.load_broker_ca(args.host_broker_ca_cert)
             broker_selection = oc2_host_broker.build_selection(
                 url=args.host_broker_url,
                 mode=args.host_broker_mode,
                 sandbox_label=args.host_broker_sandbox_label,
                 capability_fd=args.host_broker_capability_fd,
+                broker_ca_sha256=broker_ca_certificate.sha256,
                 fixture_rel=args.host_broker_fixture_root,
             )
             if broker_selection.sandbox_label != args.sandbox:
@@ -1945,7 +1991,11 @@ def main(argv: list[str] | None = None) -> int:
             workspace, profile=workspace_profile,
         )
         if broker_selection is not None:
-            return _run_host_broker(args, workspace, workspace_manifest, broker_selection)
+            if broker_ca_certificate is None:
+                raise Stop('Host Broker CA certificate is unavailable')
+            return _run_host_broker(
+                args, workspace, workspace_manifest, broker_selection, broker_ca_certificate,
+            )
         with tempfile.TemporaryDirectory(prefix='oc2-v2-config-') as temporary:
             temporary_path = pathlib.Path(temporary)
             bundle = temporary_path / 'export'

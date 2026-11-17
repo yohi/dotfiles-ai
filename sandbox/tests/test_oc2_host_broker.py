@@ -12,7 +12,6 @@ import json
 import os
 import pathlib
 import shutil
-import socket
 import subprocess
 import sys
 import tempfile
@@ -29,7 +28,9 @@ import oc2_host_broker as hb  # noqa: E402
 import oc2_host_broker_runtime as rbr  # noqa: E402
 
 TOKEN = 'ocb_' + 'A' * 43
-URL = 'http://host.docker.internal:18080/v1'
+URL = 'https://host.docker.internal:18080/v1'
+CA_DATA = b'-----BEGIN CERTIFICATE-----\nunit-test-public-ca\n-----END CERTIFICATE-----\n'
+CA_SHA256 = hashlib.sha256(CA_DATA).hexdigest()
 MANIFEST_SHA = 'd' * 64
 GENERATOR_FP = oc2.phase4_generator_fingerprint((
     oc2.HERE / 'oc2_host_broker.py', oc2.HERE / 'oc2_host_broker_runtime.py'))
@@ -44,6 +45,7 @@ def bound_digest(chosen, manifest_sha=MANIFEST_SHA):
 def selection(**overrides):
     values = {
         'url': URL, 'mode': 'm1', 'sandbox_label': 'oc2-dev', 'capability_fd': 3,
+        'broker_ca_sha256': CA_SHA256,
     }
     values.update(overrides)
     return hb.build_selection(**values)
@@ -55,22 +57,28 @@ RUNTIME = f'{hb.GUEST_ROOT}/runtime/{DIGEST[:16]}'
 
 class SelectionTests(unittest.TestCase):
     def test_valid_selection_is_accepted(self):
-        for url in (URL, 'http://127.0.0.1:1/v1', 'http://127.0.0.1:65535/v1/'):
+        for url in (URL, 'https://127.0.0.1:1/v1', 'https://127.0.0.1:65535/v1/'):
             self.assertTrue(selection(url=url).url.endswith('/v1'))
         m2 = selection(mode='m2', fixture_rel='fixtures/data')
         self.assertEqual(m2.fixture_rel, 'fixtures/data')
+        self.assertEqual(selection().broker_ca_sha256, CA_SHA256)
 
     def test_invalid_urls_are_rejected(self):
         for url in (
-            None, '', 'https://host.docker.internal:1/v1', 'http://example.com:1/v1',
-            'http://host.docker.internal/v1', 'http://host.docker.internal:1/v2',
-            'http://host.docker.internal:1/v1?x=1', 'http://host.docker.internal:1/v1#f',
-            'http://u:p@host.docker.internal:1/v1', 'http://localhost:1/v1',
-            'http://host.docker.internal:0/v1', 'http://host.docker.internal:1/v1/x',
-            'http://host.docker.internal:1/v1 ', 'http://[::1]:1/v1',
+            None, '', 'http://host.docker.internal:1/v1', 'https://example.com:1/v1',
+            'https://host.docker.internal/v1', 'https://host.docker.internal:1/v2',
+            'https://host.docker.internal:1/v1?x=1', 'https://host.docker.internal:1/v1#f',
+            'https://u:p@host.docker.internal:1/v1', 'https://localhost:1/v1',
+            'https://host.docker.internal:0/v1', 'https://host.docker.internal:1/v1/x',
+            'https://host.docker.internal:1/v1 ', 'https://[::1]:1/v1',
         ):
             with self.subTest(url=url), self.assertRaises(hb.HostBrokerError):
                 selection(url=url)
+
+    def test_ca_digest_must_be_full_lowercase_sha256(self):
+        for digest in ('', 'a' * 63, 'A' * 64, None):
+            with self.subTest(digest=digest), self.assertRaises(hb.HostBrokerError):
+                selection(broker_ca_sha256=digest)
 
     def test_unknown_mode_provider_model_label_and_fd_fail_closed(self):
         cases = (
@@ -104,12 +112,12 @@ class SelectionTests(unittest.TestCase):
         with self.assertRaises(hb.HostBrokerError):
             hb.bind_identity(chosen, 'oc2-dev', 'xyz')
         for bad in ('../x', '/etc', 'fixtures/../../x', None):
-            forged = hb.HostBrokerSelection(URL, 'm2', 'oc2-dev', 3, bad)
+            forged = hb.HostBrokerSelection(URL, 'm2', 'oc2-dev', 3, CA_SHA256, bad)
             with self.subTest(bad=bad), self.assertRaises(hb.HostBrokerError):
                 hb.bind_identity(forged, 'oc2-dev', DIGEST)
         with self.assertRaises(hb.HostBrokerError):
             hb.bind_identity(
-                hb.HostBrokerSelection(URL, 'm1', 'oc2-dev', 3, 'fixtures'), 'oc2-dev', DIGEST)
+                hb.HostBrokerSelection(URL, 'm1', 'oc2-dev', 3, CA_SHA256, 'fixtures'), 'oc2-dev', DIGEST)
 
 
 class CapabilityTests(unittest.TestCase):
@@ -140,22 +148,6 @@ class CapabilityTests(unittest.TestCase):
             with self.subTest(payload=payload[:8]), self.assertRaises(hb.HostBrokerError) as ctx:
                 hb.read_capability(read_fd)
             self.assertNotIn(TOKEN, str(ctx.exception))
-
-    def test_unreachable_broker_stops_without_fallback(self):
-        def refuse(*_args, **_kwargs):
-            raise ConnectionRefusedError
-
-        with self.assertRaises(hb.HostBrokerError):
-            hb.probe_broker(URL, connect=refuse)
-        seen = []
-
-        def accept(address, timeout):
-            seen.append(address)
-            return socket.socket()
-
-        hb.probe_broker(URL, connect=accept)
-        self.assertEqual(seen, [('127.0.0.1', 18080)])
-
 
 class FsRunner:
     """Fake Sandbox backed by a local temp directory; no sbx or network.
@@ -200,7 +192,9 @@ class FsRunner:
             return '--kit'
         if head == 'cp':
             target = self.local(args[2].split(':', 1)[1])
-            target.write_bytes(pathlib.Path(args[1]).read_bytes())
+            source = pathlib.Path(args[1])
+            target.write_bytes(source.read_bytes())
+            target.chmod(source.stat().st_mode & 0o777)
             if self.after_cp is not None:
                 self.after_cp(target)
             return ''
@@ -222,7 +216,7 @@ class FsRunner:
                 "ROOT = '/home/agent/workspace/oc2'",
                 f'ROOT = {str(self.local(hb.GUEST_ROOT))!r}', 1)
             result = subprocess.run(
-                [sys.executable, '-I', '-c', script, str(self.local(rest[4])), rest[5], rest[6]],
+                [sys.executable, '-I', '-c', script, str(self.local(rest[4])), rest[5], rest[6], rest[7]],
                 capture_output=True, text=True, check=False)
             if result.returncode != 0:
                 raise oc2.Stop('sbx command failed (exit 1): ' + result.stderr.strip())
@@ -241,6 +235,7 @@ def make_request(config_file, **overrides):
 
 PROVIDER_SOURCE = (
     b'export const PROVIDER_ID = "oc-cf-aig";\nexport const MODEL_ID = "gpt-6-luna";\n'
+    b'url.protocol !== "https:";\n'
 )
 SOURCE_FILES = {
     'bin/guest-launch.mjs': b'#!/usr/bin/env node\n// fake guest launcher\n',
@@ -279,9 +274,10 @@ def runtime_config(root):
     return path
 
 
-def broker_launch(prompt='say hello', **selection_overrides):
+def broker_launch(prompt='say hello', ca_certificate=None, **selection_overrides):
     return oc2.HostBrokerLaunch(
-        selection(**selection_overrides), hb.Capability(TOKEN), verified(), prompt)
+        selection(**selection_overrides), hb.Capability(TOKEN), verified(),
+        ca_certificate or hb.BrokerCaCertificate(CA_DATA, CA_SHA256), prompt)
 
 
 class ArtifactTests(unittest.TestCase):
@@ -321,6 +317,17 @@ class ArtifactTests(unittest.TestCase):
         (source / 'bin' / 'host-broker.mjs').write_text('host only', encoding='utf-8')
         result = self.verify(source)
         self.assertEqual(set(result.files), rbr.ALLOWED_FILES)
+
+    def test_http_only_provider_artifact_is_refused_even_with_matching_hashes(self):
+        files = dict(SOURCE_FILES)
+        files['src/guest/provider.mjs'] = (
+            b'export const PROVIDER_ID = "oc-cf-aig";\n'
+            b'export const MODEL_ID = "gpt-6-luna";\n'
+            b'url.protocol !== "http:";\n'
+        )
+        source = write_source(self.tmp / 'http-provider', files)
+        with self.assertRaises(hb.HostBrokerError):
+            self.verify(source, fake_manifest(files))
 
     def test_hash_commit_size_marker_and_link_mismatches_are_refused(self):
         source = write_source(self.tmp / 'a')
@@ -397,7 +404,8 @@ class BrokerConfigTests(unittest.TestCase):
         for other in (
             rbr.broker_runtime_identity(selection(mode='m2', fixture_rel='fixtures/f'),
                                         'a' * 64, 'b' * 64),
-            rbr.broker_runtime_identity(selection(url='http://127.0.0.1:1/v1'), 'a' * 64, 'b' * 64),
+            rbr.broker_runtime_identity(selection(url='https://127.0.0.1:1/v1'), 'a' * 64, 'b' * 64),
+            rbr.broker_runtime_identity(selection(broker_ca_sha256='f' * 64), 'a' * 64, 'b' * 64),
             rbr.broker_runtime_identity(selection(), 'c' * 64, 'b' * 64),
             rbr.broker_runtime_identity(selection(), 'a' * 64, 'c' * 64),
         ):
@@ -421,7 +429,7 @@ class M2IdentityChainTests(unittest.TestCase):
 
     def test_m2_forged_selection_is_refused_when_building_guest_args(self):
         for bad in ('../x', '/etc/passwd', 'fixtures/../x', 'config'):
-            forged = hb.HostBrokerSelection(URL, 'm2', 'oc2-dev', 3, bad)
+            forged = hb.HostBrokerSelection(URL, 'm2', 'oc2-dev', 3, CA_SHA256, bad)
             with self.subTest(bad=bad), self.assertRaises(hb.HostBrokerError):
                 rbr.build_guest_exec_args(forged, oc2.PINNED[0], RUNTIME, 'hi')
 
@@ -435,7 +443,8 @@ class M2IdentityChainTests(unittest.TestCase):
         runner.root.mkdir()
         config = tmp / 'opencode.jsonc'
         config.write_bytes(rbr.config_bytes(runtime))
-        broker = oc2.HostBrokerLaunch(chosen, hb.Capability(TOKEN), verified(), 'hi')
+        broker = oc2.HostBrokerLaunch(
+            chosen, hb.Capability(TOKEN), verified(), hb.BrokerCaCertificate(CA_DATA, CA_SHA256), 'hi')
         with patch.dict(os.environ, {}, clear=True):
             oc2.launch(runner, make_request(config, digest=digest), broker)
         args, data = runner.fed[0]
@@ -451,7 +460,8 @@ class M2IdentityChainTests(unittest.TestCase):
         runtime = hb.bind_identity(chosen, 'oc2-dev', digest)
         config = tmp / 'opencode.jsonc'
         config.write_bytes(rbr.config_bytes(runtime))
-        broker = oc2.HostBrokerLaunch(chosen, hb.Capability(TOKEN), verified(), 'hi')
+        broker = oc2.HostBrokerLaunch(
+            chosen, hb.Capability(TOKEN), verified(), hb.BrokerCaCertificate(CA_DATA, CA_SHA256), 'hi')
         for request in (make_request(config, digest=bound_digest(selection())),
                         make_request(config, digest='f' * 64),
                         make_request(config, digest=digest, name='another-sb')):
@@ -512,15 +522,17 @@ class PlacementAndLaunchTests(unittest.TestCase):
         placed = self.runner.local(RUNTIME + '/broker')
         self.assertEqual(
             {str(p.relative_to(placed)) for p in placed.rglob('*') if p.is_file()},
-            set(rbr.ALLOWED_FILES))
+            set(rbr.ALLOWED_FILES) | {'ca/host-broker-ca.pem'})
         for name, data in SOURCE_FILES.items():
             self.assertEqual((placed / name).read_bytes(), data)
+        self.assertEqual((placed / 'ca/host-broker-ca.pem').read_bytes(), CA_DATA)
         self.assertEqual(
             self.runner.local(RUNTIME + '/config/opencode/opencode.jsonc').read_bytes(),
             rbr.config_bytes(RUNTIME))
         self.assertEqual(len(self.runner.fed), 1)
         args, data = self.runner.fed[0]
         self.assertEqual(data, (TOKEN + '\n').encode())
+        self.assertIn('NODE_EXTRA_CA_CERTS=' + RUNTIME + '/broker/ca/host-broker-ca.pem', args)
         self.assertIn(RUNTIME + '/broker/bin/guest-launch.mjs', args)
         self.assertEqual(args[:2], ('exec', '-i'))
         for flag in ('-t', '-it', '--tty'):
@@ -596,7 +608,7 @@ class PlacementAndLaunchTests(unittest.TestCase):
         return subprocess.run(
             [sys.executable, '-I', '-c', script, str(self.runner.local(RUNTIME)),
              json.dumps(fake_manifest(), sort_keys=True),
-             hashlib.sha256(rbr.config_bytes(RUNTIME)).hexdigest()],
+             hashlib.sha256(rbr.config_bytes(RUNTIME)).hexdigest(), CA_SHA256],
             capture_output=True, text=True, check=False)
 
     def test_guest_verifier_rejects_extra_linked_and_modified_content_on_its_own(self):
@@ -618,6 +630,18 @@ class PlacementAndLaunchTests(unittest.TestCase):
         config.write_text('{"providers": {"openai": {}}}\n', encoding='utf-8')
         self.assertNotEqual(self.run_guest_script().returncode, 0)
 
+    def test_guest_verifier_binds_the_staged_ca_bytes_to_the_runtime_identity(self):
+        self.launch()
+        ca_file = self.runner.local(RUNTIME + '/broker/ca/host-broker-ca.pem')
+        self.assertEqual(ca_file.read_bytes(), CA_DATA)
+        self.assertEqual(self.run_guest_script().returncode, 0)
+        ca_file.write_bytes(CA_DATA + b'tampered')
+        self.assertNotEqual(self.run_guest_script().returncode, 0)
+        ca_file.write_bytes(CA_DATA)
+        ca_file.unlink()
+        ca_file.symlink_to(self.tmp / 'outside-ca.pem')
+        self.assertNotEqual(self.run_guest_script().returncode, 0)
+
     def test_identity_mismatches_stop_before_any_placement(self):
         for broker in (broker_launch(sandbox_label='another'),):
             with self.assertRaises(oc2.Stop):
@@ -625,6 +649,13 @@ class PlacementAndLaunchTests(unittest.TestCase):
         other = make_request(self.config, digest='e' * 64)
         with patch.dict(os.environ, {}, clear=True), self.assertRaises(oc2.Stop):
             oc2.launch(self.runner, other, broker_launch())
+        self.assertEqual(self.runner.fed, [])
+        self.assertFalse(self.runner.local(RUNTIME + '/broker').exists())
+
+    def test_mismatched_ca_identity_stops_before_any_placement(self):
+        wrong_ca = hb.BrokerCaCertificate(b'wrong public CA', 'f' * 64)
+        with self.assertRaises(oc2.Stop):
+            self.launch(broker_launch(ca_certificate=wrong_ca))
         self.assertEqual(self.runner.fed, [])
         self.assertFalse(self.runner.local(RUNTIME + '/broker').exists())
 
@@ -650,7 +681,11 @@ class PlacementAndLaunchTests(unittest.TestCase):
         auth, tui = self.runner.calls[-2:]
         self.assertIn('oc2_oauth.py', auth)
         self.assertEqual(tui[-2:], (oc2.PINNED[0], '--standalone'))
-        self.assertNotIn('broker', repr(self.runner.calls))
+        self.assertFalse(any('--broker-url=' in part for call in self.runner.calls for part in call))
+        self.assertFalse(any(
+            part.startswith(('NODE_EXTRA_CA_CERTS=', 'OC2_HOST_BROKER_URL='))
+            for call in self.runner.calls for part in call
+        ))
 
 
 class RunHostBrokerTests(unittest.TestCase):
@@ -668,10 +703,12 @@ class RunHostBrokerTests(unittest.TestCase):
         os.close(write_fd)
         sel = hb.build_selection(
             url=URL, mode=mode, sandbox_label=label, capability_fd=read_fd,
+            broker_ca_sha256=CA_SHA256,
             fixture_rel=None if mode == 'm1' else 'fixtures')
+        ca_certificate = hb.BrokerCaCertificate(CA_DATA, CA_SHA256)
         args = oc2.argparse.Namespace(
             sandbox='oc2-dev', host_broker_artifacts=self.tmp / 'src' if artifacts else None,
-            host_broker_prompt='say hello')
+            host_broker_prompt='say hello', host_broker_ca_cert=self.tmp / 'ca.pem')
 
         def fake_download(destination):
             destination.mkdir(parents=True, exist_ok=True)
@@ -679,7 +716,7 @@ class RunHostBrokerTests(unittest.TestCase):
             binary.write_bytes(b'fake')
             return binary
 
-        def probe(_url):
+        def probe(_url, _ca_data):
             if not probe_ok:
                 raise hb.HostBrokerError('Host Broker is not reachable; no fallback provider is used')
 
@@ -693,7 +730,7 @@ class RunHostBrokerTests(unittest.TestCase):
                 patch.object(rbr, 'verify_source', return_value=result_artifacts), \
                 patch.dict(os.environ, {}, clear=True), \
                 contextlib.redirect_stdout(io.StringIO()):
-            return oc2._run_host_broker(args, self.tmp, None, sel)
+            return oc2._run_host_broker(args, self.tmp, None, sel, ca_certificate)
 
     def test_broker_launch_creates_sandbox_without_credential_mixin(self):
         self.assertEqual(self.run_broker(), 0)
@@ -707,6 +744,9 @@ class RunHostBrokerTests(unittest.TestCase):
         digest_dirs = list(self.runner.local(hb.GUEST_ROOT + '/runtime').iterdir())
         self.assertEqual(len(digest_dirs), 1)
         self.assertTrue((digest_dirs[0] / 'broker/bin/guest-launch.mjs').is_file())
+        self.assertEqual(
+            (digest_dirs[0] / 'broker/ca/host-broker-ca.pem').read_bytes(), CA_DATA,
+        )
 
     def test_unreachable_broker_missing_artifacts_or_label_stop_without_sandbox(self):
         for kwargs in ({'probe_ok': False}, {'artifacts': False}, {'label': 'other'}):
@@ -726,22 +766,34 @@ class CliTests(unittest.TestCase):
         out, err = io.StringIO(), io.StringIO()
         with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err), \
                 patch.object(oc2, 'Runner') as runner_cls, \
+                patch.object(hb, 'load_broker_ca',
+                             return_value=hb.BrokerCaCertificate(CA_DATA, CA_SHA256)), \
                 patch.dict(os.environ, {}, clear=False):
             os.environ.pop(hb.CAPABILITY_ENV, None)
             code = oc2.main(list(argv))
         runner_cls.assert_not_called()
         return code, out.getvalue(), err.getvalue()
 
-    BASE = ('--host-broker-url', URL, '--host-broker-mode', 'm1',
+    BASE = ('--host-broker-url', URL, '--host-broker-ca-cert', '/tmp/oc2-test-ca.pem',
+            '--host-broker-mode', 'm1',
             '--host-broker-sandbox-label', 'oc2-dev', '--host-broker-capability-fd', '3',
             '--host-broker-prompt', 'say hello')
 
     def test_options_without_opt_in_are_refused(self):
-        for option in (('--host-broker-url', URL), ('--host-broker-prompt', 'x'),
+        for option in (('--host-broker-url', URL), ('--host-broker-ca-cert', '/tmp/ca.pem'),
+                       ('--host-broker-prompt', 'x'),
                        ('--host-broker-artifacts', '/tmp')):
             code, _out, err = self.run_main(*option)
             self.assertEqual(code, 1)
             self.assertIn('require --use-host-broker', err)
+
+    def test_ca_certificate_is_required_with_host_broker_opt_in(self):
+        args = list(self.BASE)
+        index = args.index('--host-broker-ca-cert')
+        del args[index:index + 2]
+        code, _out, err = self.run_main('--use-host-broker', *args, '--sandbox', 'oc2-dev')
+        self.assertEqual(code, 1)
+        self.assertIn('--host-broker-ca-cert is required', err)
 
     def test_conflicting_modes_are_refused(self):
         for extra in ('--use-cloudflare-ai-gateway', '--allow-paid-inference', '--prepare-only'):

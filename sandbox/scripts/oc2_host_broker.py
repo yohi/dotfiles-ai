@@ -15,9 +15,12 @@ to a direct provider, BYOK, or the Cloudflare Gateway credential path.
 """
 from __future__ import annotations
 
+import hashlib
 import os
+import pathlib
 import re
 import socket
+import ssl
 import stat
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -36,15 +39,55 @@ _LABEL_RE: Final[re.Pattern[str]] = re.compile(r'[A-Za-z0-9._-]{1,64}')
 _DIGEST_RE: Final[re.Pattern[str]] = re.compile(r'[0-9a-f]{64}')
 _FIXTURE_PART_RE: Final[re.Pattern[str]] = re.compile(r'[A-Za-z0-9._-]{1,64}')
 FIXTURE_BASE: Final[str] = 'fixtures'
+MAX_BROKER_CA_BYTES: Final[int] = 64 * 1024
 
 
 class HostBrokerError(Exception):
     """Fail-closed Host Broker violation. Messages never contain secret values."""
 
 
+@dataclass(frozen=True, slots=True)
+class BrokerCaCertificate:
+    """Public Broker CA bytes and their content identity."""
+
+    data: bytes
+    sha256: str
+
+
+def load_broker_ca(path: pathlib.Path) -> BrokerCaCertificate:
+    """Load a bounded PEM CA certificate from a regular, non-symlink file."""
+    fd: int | None = None
+    try:
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+        info = os.fstat(fd)
+        if not stat.S_ISREG(info.st_mode) or not 0 < info.st_size <= MAX_BROKER_CA_BYTES:
+            raise HostBrokerError('Broker CA certificate is not a bounded regular file')
+        chunks: list[bytes] = []
+        size = 0
+        while size <= MAX_BROKER_CA_BYTES:
+            chunk = os.read(fd, MAX_BROKER_CA_BYTES + 1 - size)
+            if not chunk:
+                break
+            chunks.append(chunk)
+            size += len(chunk)
+        data = b''.join(chunks)
+    except OSError:
+        raise HostBrokerError('Broker CA certificate is missing or linked') from None
+    finally:
+        if fd is not None:
+            os.close(fd)
+    if len(data) != info.st_size or len(data) > MAX_BROKER_CA_BYTES:
+        raise HostBrokerError('Broker CA certificate size changed while reading')
+    try:
+        ssl.create_default_context(cadata=data.decode('ascii'))
+    except (ssl.SSLError, ValueError):
+        raise HostBrokerError('Broker CA certificate is not valid PEM') from None
+    return BrokerCaCertificate(data, hashlib.sha256(data).hexdigest())
+
+
 def validate_broker_url(value: object) -> str:
     """Return the canonical Broker URL or raise; same rule as the Guest provider."""
-    message = 'Host Broker URL must be http://<host.docker.internal|127.0.0.1>:<port>/v1'
+    message = 'Host Broker URL must be https://<host.docker.internal|127.0.0.1>:<port>/v1'
     if not isinstance(value, str) or not value or re.search(r'[?#\s]', value):
         raise HostBrokerError(message)
     try:
@@ -52,12 +95,12 @@ def validate_broker_url(value: object) -> str:
         port = url.port
     except ValueError:
         raise HostBrokerError(message) from None
-    if (url.scheme != 'http' or url.hostname not in BROKER_HOSTS or port is None
+    if (url.scheme != 'https' or url.hostname not in BROKER_HOSTS or port is None
             or not 1 <= port <= 65535 or url.username or url.password
             or url.query or url.fragment
             or re.fullmatch(r'/v1/?', url.path) is None):
         raise HostBrokerError(message)
-    return f'http://{url.hostname}:{port}/v1'
+    return f'https://{url.hostname}:{port}/v1'
 
 
 @dataclass(frozen=True, slots=True)
@@ -68,6 +111,7 @@ class HostBrokerSelection:
     mode: str
     sandbox_label: str
     capability_fd: int
+    broker_ca_sha256: str
     # Normalized path RELATIVE to the Runtime directory (m2 only). The absolute
     # Guest path is derived only after the Runtime Identity is fixed.
     fixture_rel: str | None = None
@@ -81,6 +125,7 @@ def build_selection(
     mode: object,
     sandbox_label: object,
     capability_fd: object,
+    broker_ca_sha256: str,
     fixture_rel: object = None,
     provider: object = PROVIDER_ID,
     model: object = MODEL_ID,
@@ -97,13 +142,15 @@ def build_selection(
     if (not isinstance(capability_fd, int) or isinstance(capability_fd, bool)
             or not 3 <= capability_fd <= 1023):
         raise HostBrokerError('Host Broker capability fd must be an integer from 3 to 1023')
+    if not isinstance(broker_ca_sha256, str) or _DIGEST_RE.fullmatch(broker_ca_sha256) is None:
+        raise HostBrokerError('Host Broker CA SHA-256 is invalid')
     if mode == 'm1' and fixture_rel is not None:
         raise HostBrokerError('m1 grants no tools; a fixture is not allowed')
     fixture: str | None = None
     if mode == 'm2':
         fixture = validate_fixture_rel(fixture_rel)
     return HostBrokerSelection(
-        validate_broker_url(url), mode, sandbox_label, capability_fd, fixture,
+        validate_broker_url(url), mode, sandbox_label, capability_fd, broker_ca_sha256, fixture,
     )
 
 
@@ -208,12 +255,21 @@ def read_capability(fd: int, *, read: Callable[[int, int], bytes] = os.read) -> 
 
 def probe_broker(
     url: str,
+    ca_data: bytes,
     *,
     connect: Callable[..., socket.socket] = socket.create_connection,
 ) -> None:
-    """Host-side reachability check on loopback. Failure stops; nothing falls back."""
-    port = urlsplit(url).port
+    """Verify the loopback Broker TLS certificate and hostname before Sandbox startup."""
+    canonical_url = validate_broker_url(url)
+    parsed = urlsplit(canonical_url)
+    host = parsed.hostname
+    port = parsed.port
+    if host is None or port is None:
+        raise HostBrokerError('Host Broker URL is invalid')
     try:
-        connect(('127.0.0.1', port), timeout=3).close()
-    except OSError:
-        raise HostBrokerError('Host Broker is not reachable; no fallback provider is used') from None
+        context = ssl.create_default_context(cadata=ca_data.decode('ascii'))
+        connection = connect(('127.0.0.1', port), timeout=3)
+        with context.wrap_socket(connection, server_hostname=host):
+            pass
+    except (OSError, ssl.SSLError, UnicodeError, ValueError):
+        raise HostBrokerError('Host Broker TLS verification failed; no fallback provider is used') from None
