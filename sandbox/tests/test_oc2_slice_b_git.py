@@ -72,6 +72,82 @@ class GitAdmission(unittest.TestCase):
         command(self.root, "add", "hello.txt")
         command(self.root, "commit", "-m", "first")
 
+    def _add_linked_worktree(self, name: str) -> Path:
+        """Create a real linked Git worktree in the test-only repository."""
+        linked = Path(self.tmp.name) / name
+        command(self.root, "worktree", "add", "-qb", name, str(linked))
+        return linked
+
+    def test_accept_main_repo_with_two_live_linked_worktrees(self) -> None:
+        """Valid linked worktree registrations do not block main HEAD admission."""
+        self._add_linked_worktree("linked-one")
+        self._add_linked_worktree("linked-two")
+        baseline = mod.admit_clean_repo(self.root)
+        self.assertEqual(baseline.branch_ref, "refs/heads/work")
+        mod.recheck_host_baseline(baseline)
+
+    def test_accept_linked_index_larger_than_control_file_limit(self) -> None:
+        """A normal linked Index need not fit the 4 KiB metadata file bound."""
+        for i in range(60):
+            (self.root / ("source_%03d_" % i + "x" * 48)).write_text("content\n")
+        command(self.root, "add", "-A")
+        command(self.root, "commit", "-m", "large index")
+        self._add_linked_worktree("linked-one")
+        index = self.root / ".git" / "worktrees" / "linked-one" / "index"
+        self.assertGreater(index.stat().st_size, 4096)
+        self.assertEqual(mod._root_metadata(self.root)[1], 20)
+
+    def test_reject_broken_registered_worktree_reverse_pointer(self) -> None:
+        """A changed .git backlink is rejected instead of silently trusted."""
+        linked = self._add_linked_worktree("linked-one")
+        (linked / ".git").write_text("gitdir: /tmp/other.git\n")
+        with self.assertRaisesRegex(mod.SliceBGitRejected, "reverse reference"):
+            mod.admit_clean_repo(self.root)
+
+    def test_reject_missing_linked_worktree_gitfile(self) -> None:
+        """Stale registration must fail closed rather than being pruned."""
+        linked = self._add_linked_worktree("linked-one")
+        (linked / ".git").unlink()
+        with self.assertRaises(mod.SliceBGitRejected):
+            mod.admit_clean_repo(self.root)
+
+    def test_reject_linked_worktree_gitfile_symlink(self) -> None:
+        """The backlink cannot be redirected through a symlink."""
+        linked = self._add_linked_worktree("linked-one")
+        backlink = linked / ".git"
+        content = backlink.read_bytes()
+        backlink.unlink()
+        real = linked / ".git-real"
+        real.write_bytes(content)
+        backlink.symlink_to(real)
+        with self.assertRaises(mod.SliceBGitRejected):
+            mod.admit_clean_repo(self.root)
+
+    def test_reject_tampered_worktree_commondir(self) -> None:
+        """A linked worktree pointing outside the main .git is rejected."""
+        self._add_linked_worktree("linked-one")
+        common = self.root / ".git" / "worktrees" / "linked-one" / "commondir"
+        common.write_text("../../..\n")
+        with self.assertRaisesRegex(mod.SliceBGitRejected, "common directory"):
+            mod.admit_clean_repo(self.root)
+
+    def test_reject_symlink_registration_directory(self) -> None:
+        """Do not follow a symlinked .git/worktrees registry."""
+        self._add_linked_worktree("linked-one")
+        registry = self.root / ".git" / "worktrees"
+        destination = self.root / ".git" / "registrations-real"
+        registry.rename(destination)
+        registry.symlink_to(destination, target_is_directory=True)
+        with self.assertRaisesRegex(mod.SliceBGitRejected, "unsafe worktree registration"):
+            mod.admit_clean_repo(self.root)
+
+    def test_reject_shallow_even_with_live_worktree(self) -> None:
+        """Existing shallow-git rejection remains in force."""
+        self._add_linked_worktree("linked-one")
+        (self.root / ".git" / "shallow").write_text("a" * 40 + "\n")
+        with self.assertRaisesRegex(mod.SliceBGitRejected, "unsupported Git object"):
+            mod.admit_clean_repo(self.root)
+
     def test_accept_clean_branch_and_manifest_roundtrip(self) -> None:
         """A clean fixture admits and its generated manifest verifies."""
         b = mod.admit_clean_repo(self.root)
