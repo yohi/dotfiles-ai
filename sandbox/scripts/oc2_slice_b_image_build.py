@@ -12,6 +12,8 @@ import stat
 from oc2_slice_b_image_record import SliceBImageRejected, _DIGEST, _REF, _sha_file
 
 _RUNTIME_FILES = ("entrypoint.py", "offline_fixture.py")
+_BUILD_INPUTS_FILENAME = "build-inputs.json"
+_OPENCODE_BINARY_FILENAME = "opencode-v2.2.5"
 _MAX_BUILD_CONTEXT_FILE = 64 * 1024 * 1024
 
 
@@ -26,7 +28,7 @@ class BuildInputs:
 def verify_build_inputs(source_root: Path) -> BuildInputs:
     root = source_root.resolve(strict=True)
     try:
-        data = json.loads(_read_file(root / "build-inputs.json", 64 * 1024))
+        data = json.loads(_read_file(root / _BUILD_INPUTS_FILENAME, 64 * 1024))
     except (OSError, ValueError) as error:
         raise SliceBImageRejected("trusted build inputs unavailable") from error
     if not isinstance(data, dict) or set(data) != {
@@ -49,18 +51,19 @@ def verify_build_inputs(source_root: Path) -> BuildInputs:
         or any(char not in "0123456789abcdef" for char in inputs.source_revision)
     ):
         raise SliceBImageRejected("missing immutable build pin")
-    if _sha_file(root / "opencode-v2.2.5", _MAX_BUILD_CONTEXT_FILE) != inputs.opencode_binary_sha256:
+    if _sha_file(root / _OPENCODE_BINARY_FILENAME, _MAX_BUILD_CONTEXT_FILE) != inputs.opencode_binary_sha256:
         raise SliceBImageRejected("OpenCode v2.2.5 binary hash mismatch")
     dockerfile = _read_file(root / "Dockerfile", 64 * 1024).decode("utf-8")
     allowed = (
         "ARG BASE_IMAGE",
         "FROM ${BASE_IMAGE}",
+        "ARG BASE_IMAGE",
         "ARG SOURCE_REVISION",
         "ARG ARTIFACT_SHA256",
         "ARG RUNTIME_SHA256",
         "ARG BUILD_CONTEXT_SHA256",
         "LABEL dev.oc2.source-revision=${SOURCE_REVISION} dev.oc2.artifact-sha256=${ARTIFACT_SHA256} dev.oc2.runtime-sha256=${RUNTIME_SHA256} dev.oc2.base-image-ref=${BASE_IMAGE} dev.oc2.build-context-sha256=${BUILD_CONTEXT_SHA256}",
-        "COPY --chmod=0555 opencode-v2.2.5 /opt/oc2/bin/opencode",
+        f"COPY --chmod=0555 {_OPENCODE_BINARY_FILENAME} /opt/oc2/bin/opencode",
         "COPY --chmod=0555 entrypoint.py /opt/oc2/slice-b/entrypoint",
         "COPY --chmod=0444 offline_fixture.py /opt/oc2/slice-b/offline_fixture.py",
         "WORKDIR /workspace",
@@ -74,7 +77,8 @@ def verify_build_inputs(source_root: Path) -> BuildInputs:
     if _runtime_sha256(root) != inputs.runtime_sha256:
         raise SliceBImageRejected("runtime source hash mismatch")
     if {path.name for path in root.iterdir()} != {
-        "Dockerfile", "entrypoint.py", "offline_fixture.py", "opencode-v2.2.5", "build-inputs.json",
+        "Dockerfile", "entrypoint.py", "offline_fixture.py",
+        _OPENCODE_BINARY_FILENAME, _BUILD_INPUTS_FILENAME,
     }:
         raise SliceBImageRejected("unexpected build-context file")
     return inputs
@@ -82,7 +86,7 @@ def verify_build_inputs(source_root: Path) -> BuildInputs:
 
 def build_context_sha256(source_root: Path) -> str:
     root = source_root.resolve(strict=True)
-    names = ("Dockerfile", "build-inputs.json", *_RUNTIME_FILES, "opencode-v2.2.5")
+    names = ("Dockerfile", _BUILD_INPUTS_FILENAME, *_RUNTIME_FILES, _OPENCODE_BINARY_FILENAME)
     digest = hashlib.sha256()
     for name in names:
         digest.update(name.encode("ascii") + b"\x00")

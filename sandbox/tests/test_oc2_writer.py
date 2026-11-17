@@ -283,7 +283,7 @@ class Sleeper:
         self.calls.append(seconds)
 
 
-def lifecycle(docker: FakeDocker, probe: FakeProbe | None = None,
+def lifecycle(docker: writer_types.DockerRunner, probe: FakeProbe | None = None,
               sleeper: Sleeper | None = None) -> writer_types.WriterLifecycle:
     """Construct the production lifecycle with test-only Docker/probe/sleep seams."""
     result: writer_types.WriterLifecycle = w.WriterLifecycle(
@@ -1062,10 +1062,7 @@ class SpecValidationTest(unittest.TestCase):
             inspect = make_inspect(spec)
             inspect['Image'] = authority.image_config_id
             inspect['Config']['Image'] = authority.image_config_id
-            try:
-                w.validate_writer_inspect(inspect, spec, authority=authority)
-            except TypeError as error:
-                self.fail(f"Writer inspect does not accept verified authority: {error}")
+            w.validate_writer_inspect(inspect, spec, authority=authority)
             altered = copy.deepcopy(inspect)
             altered['Config']['Image'] = IMAGE_REF
             with self.assertRaises(w.WriterError):

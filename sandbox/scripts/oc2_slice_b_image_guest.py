@@ -6,10 +6,14 @@ from dataclasses import dataclass, field
 import os
 from pathlib import Path
 import stat
-from typing import Any, Mapping, Protocol
+from typing import TYPE_CHECKING, Any, Mapping, Protocol
+
+if TYPE_CHECKING:
+    from sandbox.scripts.oc2_slice_b_image_record import ImagePin
+else:
+    from oc2_slice_b_image_record import ImagePin
 
 from oc2_slice_b_image_record import (
-    ImagePin,
     SliceBImageRejected,
     _validate_docker_host,
     _validate_pin,

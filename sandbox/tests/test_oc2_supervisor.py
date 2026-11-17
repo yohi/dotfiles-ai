@@ -73,6 +73,24 @@ SCOPE = '/sys/fs/cgroup' + SCOPE_REL
 INODE = 987654
 
 
+def make_authorized_writer_fixture(
+    authority_root: pathlib.Path,
+) -> tuple[writer_types.WriterSessionKey, VerifiedGuestAuthorityBase, writer_types.WriterSpec]:
+    key = tw.make_key()
+    authority = slice_b_test_support.make_verified_authority(authority_root, key)
+    spec = tw.make_spec(
+        gen=key.session_generation,
+        key=key,
+        image_ref=None,
+        image_config_id=authority.image_config_id,
+        image_record_sha256=authority.image_record_sha256,
+        runtime_sha256=authority.runtime_sha256,
+        image_identity_mode=w.WriterImageIdentityMode.SLICE_B_CONFIG_ID,
+        command=('run',), tty=True, stdin_open=True,
+    )
+    return key, authority, spec
+
+
 def status_text(uid: int, saved: int | None = None) -> str:
     """Build a minimal proc status fixture for the requested UID."""
     saved = uid if saved is None else saved
@@ -203,7 +221,9 @@ class HookDocker(FakeDockerBase):
             if self.state != 'none':
                 ids.append(CID)
             return 0, ''.join(i + '\n' for i in ids)
-        result = super().run(argv, timeout=timeout, image_authority=image_authority)
+        result: tuple[int, str] = super().run(
+            argv, timeout=timeout, image_authority=image_authority,
+        )
         if verb in ('stop', 'kill') and self.fs is not None and self.state == 'exited':
             self.fs.writer_exit()
         return result
@@ -1621,19 +1641,8 @@ class EndToEndOfflineTest(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
-        self.key = tw.make_key()
-        self.authority = slice_b_test_support.make_verified_authority(
-            pathlib.Path(self.temporary.name) / 'authority', self.key,
-        )
-        self.spec = tw.make_spec(
-            gen=self.key.session_generation,
-            key=self.key,
-            image_ref=None,
-            image_config_id=self.authority.image_config_id,
-            image_record_sha256=self.authority.image_record_sha256,
-            runtime_sha256=self.authority.runtime_sha256,
-            image_identity_mode=w.WriterImageIdentityMode.SLICE_B_CONFIG_ID,
-            command=('run',), tty=True, stdin_open=True,
+        self.key, self.authority, self.spec = make_authorized_writer_fixture(
+            pathlib.Path(self.temporary.name) / 'authority',
         )
         self.fs = FakeGuestFs.standard()
         self.docker = HookDocker(self.spec, fs=self.fs)
@@ -1814,8 +1823,14 @@ class TtyExitDocker(HookDocker):
         self.tamper: str | None = None
         self.tamper_on_exit: str | None = None
 
-    def run(self, argv: Sequence[str], *, timeout: int) -> tuple[int, str]:
-        result = super().run(argv, timeout=timeout)
+    def run(
+        self,
+        argv: Sequence[str],
+        *,
+        timeout: int,
+        image_authority: writer_types.SliceBLaunchAuthority | None = None,
+    ) -> tuple[int, str]:
+        result = super().run(argv, timeout=timeout, image_authority=image_authority)
         if argv[1] != 'inspect':
             return result
         code, stdout = result
@@ -1916,19 +1931,8 @@ class TtyScenario:
         fail_attach: bool = False,
     ) -> None:
         self.temporary = tempfile.TemporaryDirectory()
-        self.key = tw.make_key()
-        self.authority = slice_b_test_support.make_verified_authority(
-            pathlib.Path(self.temporary.name) / 'authority', self.key,
-        )
-        self.spec = tw.make_spec(
-            gen=self.key.session_generation,
-            key=self.key,
-            image_ref=None,
-            image_config_id=self.authority.image_config_id,
-            image_record_sha256=self.authority.image_record_sha256,
-            runtime_sha256=self.authority.runtime_sha256,
-            image_identity_mode=w.WriterImageIdentityMode.SLICE_B_CONFIG_ID,
-            command=('run',), tty=True, stdin_open=True,
+        self.key, self.authority, self.spec = make_authorized_writer_fixture(
+            pathlib.Path(self.temporary.name) / 'authority',
         )
         self.docker = TtyExitDocker(self.spec)
         self.runner = runner_for(BridgeTransport(self.docker))

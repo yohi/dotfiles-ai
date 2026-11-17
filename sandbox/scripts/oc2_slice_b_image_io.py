@@ -39,7 +39,7 @@ def _environment() -> dict[str, str]:
 def _inspect_record(raw: str) -> Mapping[str, Any]:
     try:
         values = json.loads(raw)
-    except (TypeError, ValueError, UnicodeError) as error:
+    except (TypeError, ValueError) as error:
         raise SliceBImageRejected("invalid Docker image inspection") from error
     if not isinstance(values, list) or len(values) != 1 or not isinstance(values[0], Mapping):
         raise SliceBImageRejected("unexpected Docker image inspection shape")
@@ -51,7 +51,7 @@ class DockerHostImageRunner:
 
     def __init__(self, docker_path: str, docker_host: str) -> None:
         self._docker_path = _docker_path(docker_path)
-        self._docker_host = _validate_docker_host(docker_host)
+        self._docker_host: str = _validate_docker_host(docker_host)
 
     @property
     def docker_host(self) -> str:
@@ -156,7 +156,7 @@ class DockerGuestImageRunner:
 
     def __init__(self, docker_path: str, docker_host: str, supervisor_root: Path) -> None:
         self._docker_path = _docker_path(docker_path)
-        self._docker_host = _validate_docker_host(docker_host)
+        self._docker_host: str = _validate_docker_host(docker_host)
         self._supervisor_root = supervisor_root
 
     @property

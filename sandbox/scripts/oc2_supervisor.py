@@ -50,24 +50,42 @@ import subprocess
 import threading
 import time
 from collections.abc import Callable, Mapping, Sequence
-from typing import Any, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
-import oc2_writer as w
-from oc2_slice_b_git import (
-    POLICY as BUNDLE_POLICY,
-    SCHEMA as BUNDLE_SCHEMA,
-    SliceBBundleManifestV1,
-    SliceBGitRejected,
-    GitBaseline,
-    _manifest_bytes,
-)
-from oc2_slice_b_session import (
-    SliceBSessionError,
-    SliceBStartMessage,
-    VerifiedGuestAuthority,
-    build_start_message,
-    is_verified_guest_authority,
-)
+if TYPE_CHECKING:
+    import sandbox.scripts.oc2_writer as w
+    from sandbox.scripts.oc2_slice_b_git import (
+        POLICY as BUNDLE_POLICY,
+        SCHEMA as BUNDLE_SCHEMA,
+        GitBaseline,
+        SliceBBundleManifestV1,
+        SliceBGitRejected,
+        _manifest_bytes,
+    )
+    from sandbox.scripts.oc2_slice_b_session import (
+        SliceBSessionError,
+        SliceBStartMessage,
+        VerifiedGuestAuthority,
+        build_start_message,
+        is_verified_guest_authority,
+    )
+else:
+    import oc2_writer as w
+    from oc2_slice_b_git import (
+        POLICY as BUNDLE_POLICY,
+        SCHEMA as BUNDLE_SCHEMA,
+        SliceBBundleManifestV1,
+        SliceBGitRejected,
+        GitBaseline,
+        _manifest_bytes,
+    )
+    from oc2_slice_b_session import (
+        SliceBSessionError,
+        SliceBStartMessage,
+        VerifiedGuestAuthority,
+        build_start_message,
+        is_verified_guest_authority,
+    )
 
 # --- Initial policy constants (not proven safe values) ---------------------
 

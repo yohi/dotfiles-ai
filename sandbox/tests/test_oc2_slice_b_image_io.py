@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import importlib
 import json
 from pathlib import Path
 import subprocess
@@ -13,18 +12,11 @@ SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 from oc2_slice_b_image import BuildInputs, ImageBuildRequest  # noqa: E402
-
-try:
-    image_io = importlib.import_module("oc2_slice_b_image_io")
-except ModuleNotFoundError:
-    image_io = None
+import oc2_slice_b_image_io as image_io  # noqa: E402
 
 
 class ImageRunnerTests(unittest.TestCase):
     def test_host_runner_inspect_uses_explicit_socket_without_context_environment(self) -> None:
-        if image_io is None:
-            self.fail("constrained Host image runner is not implemented")
-            return
         response = json.dumps([{"Id": "sha256:" + "a" * 64}])
         completed = subprocess.CompletedProcess([], 0, response, "")
         with patch.object(image_io.subprocess, "run", return_value=completed) as run:
@@ -43,9 +35,6 @@ class ImageRunnerTests(unittest.TestCase):
         self.assertNotIn("DOCKER_CONFIG", run.call_args.kwargs["env"])
 
     def test_host_runner_build_is_offline_and_uses_pinned_inputs(self) -> None:
-        if image_io is None:
-            self.fail("constrained Host image runner is not implemented")
-            return
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             request = ImageBuildRequest(
@@ -81,9 +70,6 @@ class ImageRunnerTests(unittest.TestCase):
         self.assertNotIn("DOCKER_HOST", run.call_args.kwargs["env"])
 
     def test_host_runner_saves_by_config_id_without_overwriting(self) -> None:
-        if image_io is None:
-            self.fail("constrained Host image runner is not implemented")
-            return
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             root.chmod(0o700)
@@ -106,9 +92,6 @@ class ImageRunnerTests(unittest.TestCase):
             self.assertEqual(archive.stat().st_mode & 0o777, 0o600)
 
     def test_guest_runner_load_and_inspect_are_explicitly_scoped(self) -> None:
-        if image_io is None:
-            self.fail("constrained Guest image runner is not implemented")
-            return
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             root.chmod(0o700)
@@ -141,9 +124,6 @@ class ImageRunnerTests(unittest.TestCase):
         self.assertNotIn("DOCKER_HOST", run.call_args_list[0].kwargs["env"])
 
     def test_guest_runner_rejects_archive_outside_control_root(self) -> None:
-        if image_io is None:
-            self.fail("constrained Guest image runner is not implemented")
-            return
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary) / "control"
             root.mkdir(mode=0o700)

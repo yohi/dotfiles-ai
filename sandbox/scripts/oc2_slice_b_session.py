@@ -15,39 +15,74 @@ import os
 from pathlib import Path
 import re
 import stat
+from typing import TYPE_CHECKING, TypeGuard
 
-from oc2_slice_b_git import (
-    BundleArtifact,
-    GitBaseline,
-    SliceBBundleManifestV1,
-    SliceBGitRejected,
-    _git,
-    _manifest_bytes,
-    _key_dict,
-    _SHA256,
-    _REF,
-    verify_bundle_manifest,
-    admit_clean_repo,
-)
-from oc2_writer import WriterSessionKey
-from oc2_slice_b_authority import (
-    _GUEST_AUTHORITY_TOKEN,
-    _GuestAuthorityToken,
-    has_guest_authority_seal,
-)
-from oc2_slice_b_image import (
-    GuestImageLoadRequest,
-    GuestImageRunner,
-    ImagePin,
-    SliceBImageRejected,
-    VerifiedImageAuthority,
-    _validate_pin,
-    import_guest_image,
-    is_verified_image_authority,
-)
+if TYPE_CHECKING:
+    from sandbox.scripts.oc2_slice_b_authority import (
+        _GUEST_AUTHORITY_TOKEN,
+        _GuestAuthorityToken,
+        has_guest_authority_seal,
+    )
+    from sandbox.scripts.oc2_slice_b_git import (
+        BundleArtifact,
+        GitBaseline,
+        SliceBBundleManifestV1,
+        SliceBGitRejected,
+        _git,
+        _key_dict,
+        _manifest_bytes,
+        _REF,
+        _SHA256,
+        admit_clean_repo,
+        verify_bundle_manifest,
+    )
+    from sandbox.scripts.oc2_slice_b_image_guest import (
+        GuestImageLoadRequest,
+        GuestImageRunner,
+        VerifiedImageAuthority,
+        import_guest_image,
+        is_verified_image_authority,
+    )
+    from sandbox.scripts.oc2_slice_b_image_record import (
+        ImagePin,
+        SliceBImageRejected,
+        _validate_pin,
+    )
+    from sandbox.scripts.oc2_writer import WriterSessionKey
+else:
+    from oc2_slice_b_git import (
+        BundleArtifact,
+        GitBaseline,
+        SliceBBundleManifestV1,
+        SliceBGitRejected,
+        _git,
+        _manifest_bytes,
+        _key_dict,
+        _SHA256,
+        _REF,
+        verify_bundle_manifest,
+        admit_clean_repo,
+    )
+    from oc2_writer import WriterSessionKey
+    from oc2_slice_b_authority import (
+        _GUEST_AUTHORITY_TOKEN,
+        _GuestAuthorityToken,
+        has_guest_authority_seal,
+    )
+    from oc2_slice_b_image import (
+        GuestImageLoadRequest,
+        GuestImageRunner,
+        ImagePin,
+        SliceBImageRejected,
+        VerifiedImageAuthority,
+        _validate_pin,
+        import_guest_image,
+        is_verified_image_authority,
+    )
 
 _FULL_CID = re.compile(r"[0-9a-f]{64}\Z")
 _STATES = {"REJECTED", "RUNNING", "PENDING", "PRESERVATION_UNVERIFIED"}
+_BUNDLE_MANIFEST_FILENAME = "bundle.manifest.json"
 
 
 class SliceBSessionError(RuntimeError):
@@ -170,7 +205,9 @@ class VerifiedGuestAuthority:
         return self.image_authority.image_pin.runtime_sha256
 
 
-def is_verified_guest_authority(authority: VerifiedGuestAuthority | None) -> bool:
+def is_verified_guest_authority(
+    authority: VerifiedGuestAuthority | None,
+) -> TypeGuard[VerifiedGuestAuthority]:
     if not isinstance(authority, VerifiedGuestAuthority):
         return False
     return (
@@ -358,7 +395,7 @@ def create_session_receipt(
     parent = state_root / k["workspace_id"] / k["session_generation"]
     _private_dir(parent)
     dest = parent / "receipt.json"
-    manifest = parent / "bundle.manifest.json"
+    manifest = parent / _BUNDLE_MANIFEST_FILENAME
     if dest.exists() or manifest.exists():
         raise SliceBSessionError("session receipt already exists")
     for name, payload in (
@@ -396,7 +433,7 @@ def verify_session_receipt(
         if not _SHA256.fullmatch(expected_receipt_sha256) \
                 or hashlib.sha256(raw).hexdigest() != expected_receipt_sha256:
             raise SliceBSessionError("Host Session Receipt digest mismatch")
-        mraw = _read_strict(path.with_name("bundle.manifest.json"))
+        mraw = _read_strict(path.with_name(_BUNDLE_MANIFEST_FILENAME))
         data = json.loads(raw)
         if not isinstance(data, dict) or set(data) != {
             "schema",
@@ -467,7 +504,7 @@ def verify_session_receipt(
             raise SliceBSessionError("wrong receipt generation directory")
         return VerifiedSliceBReceipt(
             rec,
-            path.with_name("bundle.manifest.json"),
+            path.with_name(_BUNDLE_MANIFEST_FILENAME),
             expected_receipt_sha256,
             _token=_RECEIPT_AUTHORITY_TOKEN,
         )
@@ -717,8 +754,6 @@ def build_start_message(authority: VerifiedGuestAuthority) -> SliceBStartMessage
         raise SliceBSessionError("unverified Guest authority")
     key = _key_dict(authority.key)
     m = authority.manifest
-    if m.key != authority.key or not _SHA256.fullmatch(authority.manifest_sha256):
-        raise SliceBSessionError("untrusted authority")
     if not _REF.fullmatch(m.baseline.branch_ref):
         raise SliceBSessionError("invalid branch authority")
     return SliceBStartMessage(

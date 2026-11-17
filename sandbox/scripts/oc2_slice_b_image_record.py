@@ -84,7 +84,7 @@ class ImagePin:
             raise SliceBImageRejected("image record SHA-256 mismatch")
         try:
             value: JsonValue = json.loads(raw, object_pairs_hook=_unique_json_object)
-        except (TypeError, ValueError, UnicodeError) as error:
+        except (TypeError, ValueError) as error:
             raise SliceBImageRejected("invalid image record JSON") from error
         if not isinstance(value, dict) or set(value) != {
             "schema", "source_revision", "artifact_sha256", "runtime_sha256",

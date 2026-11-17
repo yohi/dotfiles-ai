@@ -37,9 +37,15 @@ import re
 import time
 import uuid
 from collections.abc import Callable, Mapping, Sequence
-from typing import Any, Protocol, assert_never
+from typing import TYPE_CHECKING, Any, Protocol, assert_never
 
-from oc2_slice_b_authority import SealedGuestAuthority, has_guest_authority_seal
+if TYPE_CHECKING:
+    from sandbox.scripts.oc2_slice_b_authority import (
+        SealedGuestAuthority,
+        has_guest_authority_seal,
+    )
+else:
+    from oc2_slice_b_authority import SealedGuestAuthority, has_guest_authority_seal
 
 # --- Initial policy constants (not proven safe values) ---------------------
 
@@ -271,7 +277,7 @@ def _check_env_name_rules(name: object, *, require_allowlist: bool) -> str | Non
 
 
 def _verified_guest_authority(authority: SliceBLaunchAuthority) -> bool:
-    return has_guest_authority_seal(authority)
+    return bool(has_guest_authority_seal(authority))
 
 
 def validate_writer_spec(
@@ -783,14 +789,6 @@ class DockerRunner(Protocol):
     """Runs a docker argv; returns (returncode, stdout)."""
 
     def run(self, argv: Sequence[str], *, timeout: int) -> tuple[int, str]: ...
-
-    def run_authorized(
-        self,
-        argv: Sequence[str],
-        *,
-        timeout: int,
-        image_authority: SliceBLaunchAuthority,
-    ) -> tuple[int, str]: ...
 
 
 class HostProbe(Protocol):

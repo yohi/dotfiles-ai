@@ -14,9 +14,12 @@ from unittest.mock import patch
 
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
+TESTS = Path(__file__).resolve().parent
+sys.path.insert(0, str(TESTS))
 from oc2_slice_b_git import admit_clean_repo, build_verified_bundle  # noqa: E402
 from oc2_slice_b_image import ImagePin  # noqa: E402
 from oc2_slice_b_image import GuestImageLoadRequest, import_guest_image  # noqa: E402
+from oc2_slice_b_test_support import FakeGuestImageRunner  # noqa: E402
 from oc2_slice_b_session import (  # noqa: E402
     SliceBReceipt,
     SliceBSessionError,
@@ -49,41 +52,6 @@ class Key:
     def __eq__(self, other: object) -> bool:
         """Compare all generated fixture identity fields."""
         return vars(self) == vars(other)
-
-
-class FakeImageRunner:
-    docker_host = "unix:///var/run/docker.sock"
-
-    def __init__(self, pin: ImagePin) -> None:
-        self.pin = pin
-
-    def image_ids(self) -> tuple[str, ...]:
-        return ()
-
-    def load_image(self, archive: Path) -> None:
-        return None
-
-    def inspect_config_id(self, config_id: str):
-        return {
-            "Id": config_id,
-            "RepoDigests": [],
-            "Os": "linux",
-            "Architecture": "amd64",
-            "Config": {
-                "Entrypoint": ["/opt/oc2/slice-b/entrypoint"],
-                "Cmd": ["run"],
-                "User": "10001:10001",
-                "WorkingDir": "/workspace",
-                "Env": [],
-                "Labels": {
-                    "dev.oc2.source-revision": self.pin.source_revision,
-                    "dev.oc2.artifact-sha256": self.pin.artifact_sha256,
-                    "dev.oc2.runtime-sha256": self.pin.runtime_sha256,
-                    "dev.oc2.base-image-ref": self.pin.base_image_ref,
-                    "dev.oc2.build-context-sha256": self.pin.build_context_sha256,
-                },
-            },
-        }
 
 
 def git(root: Path, *args: str) -> None:
@@ -151,7 +119,7 @@ class SessionTests(unittest.TestCase):
                 expected_record_sha256=self.image_pin.record_sha256,
                 docker_host="unix:///var/run/docker.sock",
             ),
-            FakeImageRunner(self.image_pin),
+            FakeGuestImageRunner(self.image_pin),
         )
         self.rec = SliceBReceipt(
             key=self.key,
@@ -224,7 +192,7 @@ class SessionTests(unittest.TestCase):
                 supervisor_image_root=self.image_control,
                 docker_host="unix:///var/run/docker.sock",
             ),
-            FakeImageRunner(self.image_pin),
+            FakeGuestImageRunner(self.image_pin),
         )
         start = build_start_message(auth).to_wire()
         self.assertEqual(start.count(" "), 4)

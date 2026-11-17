@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from pathlib import Path
 from dataclasses import replace
 import hashlib
@@ -7,6 +9,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from typing import TypeAlias
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
@@ -22,6 +25,9 @@ from oc2_slice_b_image import (
 )
 
 DOCKER_HOST = "unix:///var/run/docker.sock"
+JsonValue: TypeAlias = (
+    str | int | float | bool | None | list["JsonValue"] | dict[str, "JsonValue"]
+)
 
 
 class ImageTests(unittest.TestCase):
@@ -49,7 +55,7 @@ class ImageTests(unittest.TestCase):
             archive_size_bytes=len(self.raw),
             platform="linux/amd64",
         )
-        self.inspect = {
+        self.inspect: dict[str, JsonValue] = {
             "Id": self.config,
             "RepoDigests": [self.ref],
             "Os": "linux",
@@ -82,7 +88,9 @@ class ImageTests(unittest.TestCase):
         saved = b"host-exported image archive"
         export_path = self.root.parent / "host-export.tar"
         image_config_id = self.config
-        initial_config = self.inspect["Config"]
+        initial_config_value = self.inspect["Config"]
+        assert isinstance(initial_config_value, dict)
+        initial_config: dict[str, JsonValue] = initial_config_value
 
         class FakeHostRunner:
             docker_host = "unix:///var/run/docker.sock"
@@ -119,7 +127,7 @@ class ImageTests(unittest.TestCase):
                 archive.write_bytes(saved)
 
             config_id = image_config_id
-            config = initial_config
+            config: dict[str, JsonValue] = initial_config
 
         runner = FakeHostRunner()
         request = request_type(
@@ -165,7 +173,7 @@ class ImageTests(unittest.TestCase):
             docker_host = "unix:///var/run/docker.sock"
 
             def __init__(self) -> None:
-                self.calls = []
+                self.calls: list[tuple[str, Path | str | None]] = []
 
             def image_ids(self):
                 self.calls.append(("list", None))
@@ -325,14 +333,15 @@ class ImageTests(unittest.TestCase):
 
     def test_loaded_config_id_does_not_require_repo_digest(self) -> None:
         d = {**self.inspect, "RepoDigests": []}
-        try:
-            verify_loaded_image(d, self.pin)
-        except SliceBImageRejected as error:
-            self.fail(f"archive-pinned Config ID was rejected: {error}")
+        verify_loaded_image(d, self.pin)
 
     def test_loaded_image_rejects_runtime_label_mismatch(self) -> None:
-        config = {**self.inspect["Config"], "Labels": {
-            **self.inspect["Config"]["Labels"],
+        image_config = self.inspect["Config"]
+        assert isinstance(image_config, dict)
+        labels = image_config["Labels"]
+        assert isinstance(labels, dict)
+        config = {**image_config, "Labels": {
+            **labels,
             "dev.oc2.runtime-sha256": "e" * 64,
         }}
         with self.assertRaises(SliceBImageRejected):
@@ -390,6 +399,19 @@ class ImageTests(unittest.TestCase):
 
     def test_unpinned_build_inputs_blocked(self) -> None:
         """Build input verification refuses a missing trust manifest."""
+        with self.assertRaises(SliceBImageRejected):
+            verify_build_inputs(self.root)
+
+    def test_base_image_arg_must_be_declared_inside_build_stage(self) -> None:
+        self._write_build_context()
+        dockerfile = self.root / "Dockerfile"
+        dockerfile.write_text(
+            dockerfile.read_text().replace(
+                "FROM ${BASE_IMAGE}\nARG BASE_IMAGE\n",
+                "FROM ${BASE_IMAGE}\n",
+            ),
+        )
+
         with self.assertRaises(SliceBImageRejected):
             verify_build_inputs(self.root)
 
