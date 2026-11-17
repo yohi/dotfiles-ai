@@ -66,6 +66,7 @@ from oc2_slice_b_session import (
     SliceBStartMessage,
     VerifiedGuestAuthority,
     build_start_message,
+    is_verified_guest_authority,
 )
 
 # --- Initial policy constants (not proven safe values) ---------------------
@@ -204,7 +205,20 @@ def _validate_docker_path(docker_path: object) -> str:
     return docker_path
 
 
-def _parse_create_spec(argv: list[str]) -> w.WriterSpec:
+def _validate_docker_host(docker_host: object) -> str:
+    if not isinstance(docker_host, str) or not docker_host.startswith('unix:///'):
+        raise SupervisorInputError('docker_host: explicit Unix socket required')
+    socket_path = docker_host.removeprefix('unix://')
+    if '\x00' in socket_path or socket_path.startswith('//') \
+            or posixpath.normpath(socket_path) != socket_path \
+            or any(part in ('', '.', '..') for part in socket_path.split('/')[1:]):
+        raise SupervisorInputError('docker_host: socket path not canonical')
+    return docker_host
+
+
+def _parse_create_spec(
+    argv: list[str], authority: VerifiedGuestAuthority | None,
+) -> w.WriterSpec:
     """Rebuild the WriterSpec that ``build_create_argv`` would turn into argv.
 
     Layout (from ``oc2_writer.build_create_argv``): fixed policy head that
@@ -243,18 +257,38 @@ def _parse_create_spec(argv: list[str]) -> w.WriterSpec:
     if argv[i] == '-t':
         tty = True
         i += 1
-    image_ref = argv[i]
+    image_arg = argv[i]
     command = tuple(argv[i + 1:])
     key = w.WriterSessionKey(labels[w.LABEL_WORKSPACE], labels[w.LABEL_SANDBOX],
                              labels[w.LABEL_GENERATION])
-    return w.WriterSpec(key=key, image_ref=image_ref, repo_source=repo_source,
-                        command=command, env=tuple(env), tty=tty,
-                        stdin_open=stdin_open)
+    if authority is None:
+        return w.WriterSpec(key=key, image_ref=image_arg, repo_source=repo_source,
+                            command=command, env=tuple(env), tty=tty,
+                            stdin_open=stdin_open)
+    if not is_verified_guest_authority(authority) or image_arg != authority.image_config_id:
+        raise ValueError('unverified Slice B image Config ID')
+    return w.WriterSpec(
+        key=key,
+        image_ref=None,
+        repo_source=repo_source,
+        command=command,
+        env=tuple(env),
+        tty=tty,
+        stdin_open=stdin_open,
+        image_identity_mode=w.WriterImageIdentityMode.SLICE_B_CONFIG_ID,
+        image_config_id=authority.image_config_id,
+        image_record_sha256=authority.image_record_sha256,
+        runtime_sha256=authority.runtime_sha256,
+    )
 
 
-def _allowed_shape(argv: list[str]) -> bool:
+def _allowed_shape(
+    argv: list[str], authority: VerifiedGuestAuthority | None = None,
+) -> bool:
     """Return True only for the exact argv shapes of the oc2_writer builders."""
     verb = argv[1]
+    if authority is not None and verb != 'create':
+        return False
     if verb == 'ps':
         return bool(tuple(argv) == w.LIST_ALL_ARGV)
     if verb == 'start':
@@ -268,7 +302,8 @@ def _allowed_shape(argv: list[str]) -> bool:
             return False
         return bool(w.build_stop_argv(argv[4], int(argv[3])) == argv)
     if verb == 'create':
-        return bool(w.build_create_argv(_parse_create_spec(argv)) == argv)
+        spec = _parse_create_spec(argv, authority)
+        return bool(w.build_create_argv(spec, authority=authority) == argv)
     return False
 
 
@@ -288,10 +323,11 @@ class CliDockerRunner:
       values, stdout or stderr.  A successful call returns ``(0, text)``.
     """
 
-    def __init__(self, docker_path: str, transport: Transport, *,
+    def __init__(self, docker_path: str, transport: Transport, *, docker_host: str,
                  max_timeout: int = MAX_DOCKER_TIMEOUT_S,
                  max_output: int = MAX_OUTPUT_BYTES) -> None:
         self._docker_path = _validate_docker_path(docker_path)
+        self._docker_host = _validate_docker_host(docker_host)
         if not callable(transport):
             raise SupervisorInputError('transport: expected callable')
         for value in (max_timeout, max_output):
@@ -301,13 +337,31 @@ class CliDockerRunner:
         self._max_timeout = max_timeout
         self._max_output = max_output
 
-    def run(self, argv: Sequence[str], *, timeout: int) -> tuple[int, str]:
+    def run(
+        self,
+        argv: Sequence[str],
+        *,
+        timeout: int,
+    ) -> tuple[int, str]:
         args = self._check_argv(argv)
+        return self._run_checked(args, timeout)
+
+    def run_authorized(
+        self,
+        argv: Sequence[str],
+        *,
+        timeout: int,
+        image_authority: VerifiedGuestAuthority,
+    ) -> tuple[int, str]:
+        args = self._check_argv(argv, image_authority)
+        return self._run_checked(args, timeout)
+
+    def _run_checked(self, args: list[str], timeout: int) -> tuple[int, str]:
         verb = args[1]
         if isinstance(timeout, bool) or not isinstance(timeout, int) or timeout < 1:
             raise SupervisorInputError('docker timeout: expected positive integer')
         effective = min(timeout, self._max_timeout)
-        full = [self._docker_path] + args[1:]
+        full = [self._docker_path, '--host', self._docker_host] + args[1:]
         # The transport call is deliberately outside any ``except`` block so
         # no exception context (which may carry argv/env text) is chained.
         failed = False
@@ -321,7 +375,10 @@ class CliDockerRunner:
         return 0, self._check_result(verb, result)
 
     @staticmethod
-    def _check_argv(argv: object) -> list[str]:
+    def _check_argv(
+        argv: object,
+        image_authority: VerifiedGuestAuthority | None = None,
+    ) -> list[str]:
         if not isinstance(argv, (list, tuple)) or len(argv) < 2:
             raise DockerCommandRejected('docker argv rejected: not an argv list')
         args = list(argv)
@@ -332,7 +389,7 @@ class CliDockerRunner:
         verb = args[1]
         ok = False
         try:
-            ok = _allowed_shape(args)
+            ok = _allowed_shape(args, image_authority)
         except Exception:
             ok = False
         if not ok:
@@ -1189,7 +1246,6 @@ def guest_lifecycle_factory(runner: w.DockerRunner, fs: GuestFs,
     that ``WriterIdentity`` does not need to change.
     """
     def factory(spec: w.WriterSpec) -> w.WriterLifecycle:
-        w.validate_writer_spec(spec)
         probe = GuestHostProbe(runner, fs, repo_source=spec.repo_source)
         return w.WriterLifecycle(runner, probe, sleep=sleep)
     return factory
@@ -1260,6 +1316,7 @@ class GuestSupervisor:
         key: w.WriterSessionKey,
         lifecycle_factory: LifecycleFactory,
         *,
+        image_authority: VerifiedGuestAuthority | None = None,
         snapshotter: FixtureSnapshotter | None = None,
     ) -> None:
         if not isinstance(key, w.WriterSessionKey):
@@ -1270,10 +1327,16 @@ class GuestSupervisor:
             raise SupervisorInputError('session key: invalid') from exc
         if not callable(lifecycle_factory):
             raise SupervisorInputError('lifecycle factory: expected callable')
+        if image_authority is not None and (
+            not is_verified_guest_authority(image_authority)
+            or image_authority.key != key
+        ):
+            raise SupervisorInputError('verified Guest image authority does not match SessionKey')
         if snapshotter is not None and not callable(getattr(snapshotter, 'capture', None)):
             raise SupervisorInputError('snapshotter: expected capture capability')
         self._key = key
         self._factory = lifecycle_factory
+        self._image_authority = image_authority
         self._snapshotter = snapshotter
         self._lock = threading.Lock()
         self._state = SupervisorState.NEW
@@ -1328,7 +1391,7 @@ class GuestSupervisor:
         authority: VerifiedGuestAuthority,
     ) -> bytes:
         """Revalidate the immutable Task 2 authority before producing its wire line."""
-        if not isinstance(authority, VerifiedGuestAuthority):
+        if not is_verified_guest_authority(authority) or authority is not self._image_authority:
             raise SupervisorInputError('attach: verified Guest authority required')
         if not isinstance(authority.manifest, SliceBBundleManifestV1):
             raise SupervisorInputError('attach: verified manifest required')
@@ -1337,8 +1400,12 @@ class GuestSupervisor:
             raise IdentityMismatchError('attach: SessionKey mismatch')
         if manifest.schema != BUNDLE_SCHEMA or not isinstance(manifest.baseline, GitBaseline):
             raise SupervisorInputError('attach: manifest schema or baseline invalid')
-        if authority.image_ref != spec.image_ref \
-                or authority.image_config_id != identity.image_id:
+        if (
+            authority.image_config_id != spec.image_config_id
+            or authority.image_record_sha256 != spec.image_record_sha256
+            or authority.runtime_sha256 != spec.runtime_sha256
+            or authority.image_config_id != identity.image_id
+        ):
             raise IdentityMismatchError('attach: image authority mismatch')
         if not isinstance(manifest.baseline.object_format, str):
             raise SupervisorInputError('attach: invalid Git object format')
@@ -1398,7 +1465,8 @@ class GuestSupervisor:
         self, identity: w.WriterIdentity, *, require_running: bool,
     ) -> Mapping[str, Any]:
         lifecycle, spec = self._lifecycle, self._spec
-        if lifecycle is None or spec is None:
+        authority = self._image_authority
+        if lifecycle is None or spec is None or not is_verified_guest_authority(authority):
             raise IdentityMismatchError('attach: Writer lifecycle unavailable')
         try:
             info = lifecycle._inspect(identity.container_id)
@@ -1407,7 +1475,7 @@ class GuestSupervisor:
         if not isinstance(info, Mapping):
             raise IdentityMismatchError('attach: container inspect malformed')
         try:
-            w.validate_writer_inspect(info, spec)
+            w.validate_writer_inspect(info, spec, authority=authority)
         except w.WriterError as exc:
             raise InspectMismatchError('attach: Writer inspect mismatch') from exc
         if info.get('Id') != identity.container_id or info.get('Image') != identity.image_id:
@@ -1425,12 +1493,15 @@ class GuestSupervisor:
 
     def launch(self, spec: w.WriterSpec) -> w.WriterIdentity:
         """Launch the single Writer for this Session (only from NEW)."""
+        authority = self._image_authority
+        if not is_verified_guest_authority(authority):
+            raise SupervisorInputError('launch: verified Guest image authority required')
+        if isinstance(spec, w.WriterSpec) and spec.key != self._key:
+            raise SupervisorInputError('launch: spec session key mismatch')
         try:
-            w.validate_writer_spec(spec)
+            w.validate_writer_spec(spec, authority=authority)
         except w.WriterError as exc:
             raise SupervisorInputError('launch: invalid spec') from exc
-        if spec.key != self._key:
-            raise SupervisorInputError('launch: spec session key mismatch')
         self._transition(SupervisorState.NEW, SupervisorState.STARTING)
         failure: SupervisorError | None = None
         lifecycle: w.WriterLifecycle | None = None
@@ -1439,7 +1510,7 @@ class GuestSupervisor:
             lifecycle = self._factory(spec)
             if not isinstance(lifecycle, w.WriterLifecycle):
                 raise SupervisorInputError('launch: factory did not return WriterLifecycle')
-            identity = lifecycle.launch(spec)
+            identity = lifecycle.launch(spec, authority=authority)
             if not isinstance(identity, w.WriterIdentity):
                 raise IdentityMismatchError('launch: no identity returned')
             w.validate_container_id(identity.container_id)

@@ -5,9 +5,9 @@ No Docker, Sandbox, privileged Writer, credentials or Host Git mutations.
 
 from __future__ import annotations
 
-from collections.abc import Iterator, Mapping
+from collections.abc import Iterator
 from contextlib import contextmanager
-from dataclasses import dataclass, asdict, replace
+from dataclasses import dataclass, asdict, field, replace
 import fcntl
 import hashlib
 import json
@@ -29,9 +29,23 @@ from oc2_slice_b_git import (
     verify_bundle_manifest,
     admit_clean_repo,
 )
+from oc2_writer import WriterSessionKey
+from oc2_slice_b_authority import (
+    _GUEST_AUTHORITY_TOKEN,
+    _GuestAuthorityToken,
+    has_guest_authority_seal,
+)
+from oc2_slice_b_image import (
+    GuestImageLoadRequest,
+    GuestImageRunner,
+    ImagePin,
+    SliceBImageRejected,
+    VerifiedImageAuthority,
+    _validate_pin,
+    import_guest_image,
+    is_verified_image_authority,
+)
 
-_IMAGE = re.compile(r"[a-z0-9][a-z0-9._/-]*@sha256:[0-9a-f]{64}\Z")
-_IMAGE_ID = re.compile(r"sha256:[0-9a-f]{64}\Z")
 _FULL_CID = re.compile(r"[0-9a-f]{64}\Z")
 _STATES = {"REJECTED", "RUNNING", "PENDING", "PRESERVATION_UNVERIFIED"}
 
@@ -40,29 +54,132 @@ class SliceBSessionError(RuntimeError):
     pass
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class SliceBReceipt:
-    key: object
+    key: WriterSessionKey
     baseline: GitBaseline
     bundle_sha256: str
     manifest_sha256: str
     transfer_policy_id: str
     runtime_sha256: str
-    image_ref: str
-    image_config_id: str
+    image_record: ImagePin
+    image_record_sha256: str
     state: str
     reason: str | None
     writer_id: str | None
     started_at: str | None
 
+    @property
+    def image_ref(self) -> str | None:
+        return self.image_record.image_ref
 
-@dataclass(frozen=True)
+    @property
+    def image_config_id(self) -> str:
+        return self.image_record.config_id
+
+
+class _ReceiptAuthorityToken:
+    __slots__ = ()
+
+
+_RECEIPT_AUTHORITY_TOKEN = _ReceiptAuthorityToken()
+
+
+@dataclass(frozen=True, slots=True, init=False)
+class VerifiedSliceBReceipt:
+    receipt: SliceBReceipt
+    manifest_path: Path
+    receipt_sha256: str
+    _token: _ReceiptAuthorityToken = field(repr=False, compare=False)
+
+    def __init__(
+        self,
+        receipt: SliceBReceipt,
+        manifest_path: Path,
+        receipt_sha256: str,
+        *,
+        _token: _ReceiptAuthorityToken,
+    ) -> None:
+        if _token is not _RECEIPT_AUTHORITY_TOKEN:
+            raise SliceBSessionError("verified Session Receipt requires Host hash validation")
+        object.__setattr__(self, "receipt", receipt)
+        object.__setattr__(self, "manifest_path", manifest_path)
+        object.__setattr__(self, "receipt_sha256", receipt_sha256)
+        object.__setattr__(self, "_token", _token)
+
+
+def is_verified_slice_b_receipt(receipt: VerifiedSliceBReceipt | None) -> bool:
+    if not isinstance(receipt, VerifiedSliceBReceipt):
+        return False
+    return (
+        receipt._token is _RECEIPT_AUTHORITY_TOKEN
+        and receipt.receipt_sha256 == hashlib.sha256(_encode_receipt(receipt.receipt)).hexdigest()
+    )
+
+
+@dataclass(frozen=True, slots=True, init=False)
 class VerifiedGuestAuthority:
-    key: object
+    key: WriterSessionKey
     manifest: SliceBBundleManifestV1
     manifest_sha256: str
-    image_ref: str
-    image_config_id: str
+    receipt_sha256: str
+    image_authority: VerifiedImageAuthority
+    _token: _GuestAuthorityToken = field(repr=False, compare=False)
+
+    def __init__(
+        self,
+        key: WriterSessionKey,
+        manifest: SliceBBundleManifestV1,
+        manifest_sha256: str,
+        receipt_sha256: str,
+        image_authority: VerifiedImageAuthority,
+        *,
+        _token: _GuestAuthorityToken,
+    ) -> None:
+        if _token is not _GUEST_AUTHORITY_TOKEN:
+            raise SliceBSessionError("VerifiedGuestAuthority is issued only after receipt verification")
+        object.__setattr__(self, "key", key)
+        object.__setattr__(self, "manifest", manifest)
+        object.__setattr__(self, "manifest_sha256", manifest_sha256)
+        object.__setattr__(self, "receipt_sha256", receipt_sha256)
+        object.__setattr__(self, "image_authority", image_authority)
+        object.__setattr__(self, "_token", _token)
+
+    @property
+    def image_record(self) -> ImagePin:
+        return self.image_authority.image_pin
+
+    @property
+    def authority_token(self) -> _GuestAuthorityToken:
+        return self._token
+
+    @property
+    def image_ref(self) -> str | None:
+        return self.image_authority.image_pin.image_ref
+
+    @property
+    def image_config_id(self) -> str:
+        return self.image_authority.config_id
+
+    @property
+    def image_record_sha256(self) -> str:
+        return self.image_authority.image_record_sha256
+
+    @property
+    def runtime_sha256(self) -> str:
+        return self.image_authority.image_pin.runtime_sha256
+
+
+def is_verified_guest_authority(authority: VerifiedGuestAuthority | None) -> bool:
+    if not isinstance(authority, VerifiedGuestAuthority):
+        return False
+    return (
+        has_guest_authority_seal(authority)
+        and is_verified_image_authority(authority.image_authority)
+        and authority.manifest.key == authority.key
+        and authority.manifest_sha256 == hashlib.sha256(_manifest_bytes(authority.manifest)).hexdigest()
+        and _SHA256.fullmatch(authority.receipt_sha256) is not None
+    )
 
 
 @dataclass(frozen=True)
@@ -91,6 +208,17 @@ class SliceBStartMessage:
         return line
 
 
+@dataclass(frozen=True, slots=True)
+class GuestAuthorityVerificationRequest:
+    receipt_path: Path
+    expected_key: WriterSessionKey
+    expected_receipt_sha256: str
+    guest_baseline: GitBaseline
+    archive_path: Path
+    supervisor_image_root: Path
+    docker_host: str
+
+
 def _private_dir(path: Path) -> None:
     """Create or validate a normalized private directory, rejecting symlink ancestors."""
     if not path.is_absolute() or ".." in path.parts:
@@ -111,14 +239,15 @@ def _encode_receipt(receipt: SliceBReceipt) -> bytes:
     b = asdict(receipt.baseline)
     b["root"] = str(b["root"])
     x = {
+        "schema": "dotfiles-ai/oc2-slice-b-receipt/v2",
         "key": _key_dict(receipt.key),
         "baseline": b,
         "bundle_sha256": receipt.bundle_sha256,
         "manifest_sha256": receipt.manifest_sha256,
         "transfer_policy_id": receipt.transfer_policy_id,
         "runtime_sha256": receipt.runtime_sha256,
-        "image_ref": receipt.image_ref,
-        "image_config_id": receipt.image_config_id,
+        "image_record": receipt.image_record.to_bytes().decode("ascii"),
+        "image_record_sha256": receipt.image_record_sha256,
         "state": receipt.state,
         "reason": receipt.reason,
         "writer_id": receipt.writer_id,
@@ -139,19 +268,24 @@ def _validate_receipt(receipt: SliceBReceipt) -> None:
         _key_dict(receipt.key)
     except SliceBGitRejected as e:
         raise SliceBSessionError("invalid receipt SessionKey") from e
+    try:
+        _validate_pin(receipt.image_record)
+    except SliceBImageRejected as error:
+        raise SliceBSessionError("invalid Host Image Record") from error
     if (
         receipt.state not in _STATES
         or receipt.transfer_policy_id != "oc2-slice-b-clean-git-bundle-v1"
         or any(
-            not _SHA256.fullmatch(x)
-            for x in (
+            not isinstance(value, str) or not _SHA256.fullmatch(value)
+            for value in (
                 receipt.bundle_sha256,
                 receipt.manifest_sha256,
                 receipt.runtime_sha256,
+                receipt.image_record_sha256,
             )
         )
-        or not _IMAGE.fullmatch(receipt.image_ref)
-        or not _IMAGE_ID.fullmatch(receipt.image_config_id)
+        or receipt.image_record.runtime_sha256 != receipt.runtime_sha256
+        or receipt.image_record_sha256 != receipt.image_record.record_sha256
     ):
         raise SliceBSessionError("invalid receipt identity")
     if receipt.writer_id is not None and (
@@ -248,29 +382,37 @@ def create_session_receipt(
     return Path(dest)
 
 
-def verify_session_receipt(path: Path, expected_key: object) -> SliceBReceipt:
+def verify_session_receipt(
+    path: Path,
+    expected_key: WriterSessionKey,
+    expected_receipt_sha256: str,
+) -> VerifiedSliceBReceipt:
     """Read and validate receipt plus copied Manifest; malformed data becomes SliceBSessionError.
 
     Underlying Git baseline inspection is not performed by this function.
     """
     try:
         raw = _read_strict(path)
+        if not _SHA256.fullmatch(expected_receipt_sha256) \
+                or hashlib.sha256(raw).hexdigest() != expected_receipt_sha256:
+            raise SliceBSessionError("Host Session Receipt digest mismatch")
         mraw = _read_strict(path.with_name("bundle.manifest.json"))
         data = json.loads(raw)
         if not isinstance(data, dict) or set(data) != {
+            "schema",
             "key",
             "baseline",
             "bundle_sha256",
             "manifest_sha256",
             "transfer_policy_id",
             "runtime_sha256",
-            "image_ref",
-            "image_config_id",
+            "image_record",
+            "image_record_sha256",
             "state",
             "reason",
             "writer_id",
             "started_at",
-        }:
+        } or data.get("schema") != "dotfiles-ai/oc2-slice-b-receipt/v2":
             raise SliceBSessionError("receipt schema mismatch")
         if data["key"] != _key_dict(expected_key):
             raise SliceBSessionError("receipt SessionKey changed")
@@ -294,10 +436,26 @@ def verify_session_receipt(path: Path, expected_key: object) -> SliceBReceipt:
             b["index_sha256"],
             b["worktree_sha256"],
         )
+        image_record_raw = data["image_record"]
+        image_record_sha256 = data["image_record_sha256"]
+        if not isinstance(image_record_raw, str) or not isinstance(image_record_sha256, str):
+            raise SliceBSessionError("receipt Image Record is invalid")
+        image_record = ImagePin.from_bytes(
+            image_record_raw.encode("ascii"), image_record_sha256,
+        )
         rec = SliceBReceipt(
             key=expected_key,
             baseline=base,
-            **{k: v for k, v in data.items() if k not in ("key", "baseline")},
+            bundle_sha256=data["bundle_sha256"],
+            manifest_sha256=data["manifest_sha256"],
+            transfer_policy_id=data["transfer_policy_id"],
+            runtime_sha256=data["runtime_sha256"],
+            image_record=image_record,
+            image_record_sha256=image_record_sha256,
+            state=data["state"],
+            reason=data["reason"],
+            writer_id=data["writer_id"],
+            started_at=data["started_at"],
         )
         _validate_receipt(rec)
         if (
@@ -307,7 +465,12 @@ def verify_session_receipt(path: Path, expected_key: object) -> SliceBReceipt:
             raise SliceBSessionError("noncanonical or tampered receipt/manifest")
         if path.parent.name != _key_dict(expected_key)["session_generation"]:
             raise SliceBSessionError("wrong receipt generation directory")
-        return rec
+        return VerifiedSliceBReceipt(
+            rec,
+            path.with_name("bundle.manifest.json"),
+            expected_receipt_sha256,
+            _token=_RECEIPT_AUTHORITY_TOKEN,
+        )
     except (ValueError, TypeError, UnicodeError, OSError, KeyError) as e:
         raise SliceBSessionError("receipt unavailable or malformed") from e
 
@@ -355,7 +518,11 @@ def update_session_receipt(path: Path, receipt: SliceBReceipt) -> None:
 def _update_session_receipt_locked(path: Path, receipt: SliceBReceipt) -> None:
     """Update a receipt while its sibling flock is held by the caller."""
     _validate_receipt(receipt)
-    old = verify_session_receipt(path, receipt.key)
+    old = verify_session_receipt(
+        path,
+        receipt.key,
+        hashlib.sha256(_read_strict(path)).hexdigest(),
+    ).receipt
     immutable = (
         "key",
         "baseline",
@@ -363,8 +530,8 @@ def _update_session_receipt_locked(path: Path, receipt: SliceBReceipt) -> None:
         "manifest_sha256",
         "transfer_policy_id",
         "runtime_sha256",
-        "image_ref",
-        "image_config_id",
+        "image_record",
+        "image_record_sha256",
     )
     if any(getattr(old, k) != getattr(receipt, k) for k in immutable):
         raise SliceBSessionError("immutable receipt identity changed")
@@ -457,45 +624,25 @@ def import_guest_baseline(
 
 
 def verify_guest_authority(
-    guest_control_manifest: Path,
-    receipt: SliceBReceipt,
+    host_receipt: VerifiedSliceBReceipt,
     guest_baseline: GitBaseline,
-    image_config_id: str,
-    *,
-    local_image_inspect: Mapping[str, object] | None = None,
+    verified_image: VerifiedImageAuthority,
 ) -> VerifiedGuestAuthority:
-    """Bind receipt, Guest baseline, copied Manifest, and exact local Writer image evidence.
-
-    Rejects mismatched identity or image metadata with SliceBSessionError and
-    returns authority data only. Malformed JSON becomes SliceBSessionError;
-    filesystem read errors may propagate. It does not launch a Writer or freeze
-    any input file.
-    """
+    """Bind the immutable Host Receipt, imported image capability, Manifest and Guest baseline."""
+    if not is_verified_slice_b_receipt(host_receipt):
+        raise SliceBSessionError("verified Host Session Receipt required")
+    receipt = host_receipt.receipt
     _validate_receipt(receipt)
-    if image_config_id != receipt.image_config_id:
-        raise SliceBSessionError("image config identity mismatch")
-    # Never issue Writer Baseline Authority based only on an image ID string.
-    # This inspect must come from the trusted Guest's exact digest-ref lookup.
-    if local_image_inspect is None:
-        raise SliceBSessionError("digest-qualified local image evidence required")
-    repo_digests = local_image_inspect.get("RepoDigests")
-    image_config = local_image_inspect.get("Config")
+    if not is_verified_image_authority(verified_image):
+        raise SliceBSessionError("verified Guest image import required")
     if (
-        not isinstance(repo_digests, list)
-        or any(not isinstance(ref, str) for ref in repo_digests)
-        or not isinstance(image_config, Mapping)
+        verified_image.image_pin != receipt.image_record
+        or verified_image.image_record_sha256 != receipt.image_record_sha256
+        or verified_image.config_id != receipt.image_record.config_id
+        or verified_image.image_pin.runtime_sha256 != receipt.runtime_sha256
     ):
-        raise SliceBSessionError("invalid local image evidence")
-    if (
-        local_image_inspect.get("Id") != receipt.image_config_id
-        or receipt.image_ref not in repo_digests
-        or image_config.get("Entrypoint") != ["/opt/oc2/slice-b/entrypoint"]
-        or image_config.get("Cmd") != ["run"]
-    ):
-        raise SliceBSessionError(
-            "local digest-qualified image does not match Host Receipt"
-        )
-    raw = guest_control_manifest.read_bytes()
+        raise SliceBSessionError("imported image does not match immutable Host Receipt")
+    raw = _read_strict(host_receipt.manifest_path)
     if hashlib.sha256(raw).hexdigest() != receipt.manifest_sha256:
         raise SliceBSessionError("Guest private Manifest digest mismatch")
     manifest = SliceBBundleManifestV1(
@@ -534,13 +681,40 @@ def verify_guest_authority(
         receipt.key,
         manifest,
         receipt.manifest_sha256,
-        receipt.image_ref,
-        receipt.image_config_id,
+        host_receipt.receipt_sha256,
+        verified_image,
+        _token=_GUEST_AUTHORITY_TOKEN,
     )
+
+
+def verify_guest_authority_from_host_record(
+    request: GuestAuthorityVerificationRequest,
+    runner: GuestImageRunner,
+) -> VerifiedGuestAuthority:
+    """Verify the trusted Receipt, Load its pinned archive, then issue bound Guest authority."""
+    verified_receipt = verify_session_receipt(
+        request.receipt_path,
+        request.expected_key,
+        request.expected_receipt_sha256,
+    )
+    receipt = verified_receipt.receipt
+    verified_image = import_guest_image(
+        GuestImageLoadRequest(
+            archive_path=request.archive_path,
+            supervisor_root=request.supervisor_image_root,
+            image_pin=receipt.image_record,
+            expected_record_sha256=receipt.image_record_sha256,
+            docker_host=request.docker_host,
+        ),
+        runner,
+    )
+    return verify_guest_authority(verified_receipt, request.guest_baseline, verified_image)
 
 
 def build_start_message(authority: VerifiedGuestAuthority) -> SliceBStartMessage:
     """Build the Supervisor startup frame from previously verified Guest authority."""
+    if not is_verified_guest_authority(authority):
+        raise SliceBSessionError("unverified Guest authority")
     key = _key_dict(authority.key)
     m = authority.manifest
     if m.key != authority.key or not _SHA256.fullmatch(authority.manifest_sha256):

@@ -29,6 +29,7 @@ VALUES or raw runner output.
 from __future__ import annotations
 
 import dataclasses
+from enum import StrEnum
 import hashlib
 import json
 import posixpath
@@ -36,7 +37,9 @@ import re
 import time
 import uuid
 from collections.abc import Callable, Mapping, Sequence
-from typing import Any, Protocol
+from typing import Any, Protocol, assert_never
+
+from oc2_slice_b_authority import SealedGuestAuthority, has_guest_authority_seal
 
 # --- Initial policy constants (not proven safe values) ---------------------
 
@@ -58,7 +61,6 @@ DOCKER_STOP_RUNNER_TIMEOUT_S = STOP_TIMEOUT_S + 30
 WRITER_WORKDIR = '/workspace'
 WRITER_USER = f'{WRITER_UID}:{WRITER_GID}'
 SLICE_B_COMMAND = ('run',)
-SLICE_B_IMAGE_REPOSITORY = 'oc2/slice-b'
 TMPFS_TMP_OPTS = (
     f'rw,nosuid,nodev,noexec,size=64m,uid={WRITER_UID},gid={WRITER_GID},mode=0700'
 )
@@ -153,6 +155,25 @@ class WriterSessionKey:
                 'invalid session_generation: expected canonical lowercase UUID v4')
 
 
+class WriterImageIdentityMode(StrEnum):
+    LEGACY_DIGEST_REF = 'legacy_digest_ref'
+    SLICE_B_CONFIG_ID = 'slice_b_config_id'
+
+
+class SliceBLaunchAuthority(SealedGuestAuthority, Protocol):
+    @property
+    def key(self) -> WriterSessionKey: ...
+
+    @property
+    def image_config_id(self) -> str: ...
+
+    @property
+    def image_record_sha256(self) -> str: ...
+
+    @property
+    def runtime_sha256(self) -> str: ...
+
+
 def compute_workspace_id(uid: int, canonical_git_root: str) -> str:
     """Return WorkspaceID per Design R0.2 section 6.
 
@@ -190,12 +211,16 @@ class WriterSpec:
     """Writer launch request.  ``env`` is excluded from repr (no values)."""
 
     key: WriterSessionKey
-    image_ref: str
+    image_ref: str | None
     repo_source: str
     command: tuple[str, ...]
     env: tuple[tuple[str, str], ...] = dataclasses.field(repr=False)
     tty: bool = False
     stdin_open: bool = False
+    image_identity_mode: WriterImageIdentityMode = WriterImageIdentityMode.LEGACY_DIGEST_REF
+    image_config_id: str | None = None
+    image_record_sha256: str | None = None
+    runtime_sha256: str | None = None
 
 
 def expected_repo_source(key: WriterSessionKey) -> str:
@@ -245,15 +270,55 @@ def _check_env_name_rules(name: object, *, require_allowlist: bool) -> str | Non
     return None
 
 
-def validate_writer_spec(spec: WriterSpec) -> None:
+def _verified_guest_authority(authority: SliceBLaunchAuthority) -> bool:
+    return has_guest_authority_seal(authority)
+
+
+def validate_writer_spec(
+    spec: WriterSpec,
+    *,
+    authority: SliceBLaunchAuthority | None = None,
+) -> None:
     """Validate ``spec`` strictly; raise ``WriterError`` on any problem."""
     if not isinstance(spec, WriterSpec):
         raise WriterError('invalid spec type')
+    if not isinstance(spec.image_identity_mode, WriterImageIdentityMode):
+        raise WriterError('invalid image identity mode')
     if not isinstance(spec.key, WriterSessionKey):
         raise WriterError('invalid session key type')
     spec.key.validate()
-    if not isinstance(spec.image_ref, str) or not _IMAGE_REF_RE.match(spec.image_ref):
-        raise WriterError('image_ref must be <name>@sha256:<64 hex>')
+    match spec.image_identity_mode:
+        case WriterImageIdentityMode.LEGACY_DIGEST_REF:
+            if not isinstance(spec.image_ref, str) or not _IMAGE_REF_RE.match(spec.image_ref):
+                raise WriterError('image_ref must be <name>@sha256:<64 hex>')
+            if any(value is not None for value in (
+                spec.image_config_id, spec.image_record_sha256, spec.runtime_sha256,
+            )) or authority is not None:
+                raise WriterError('legacy digest mode cannot carry Slice B authority')
+        case WriterImageIdentityMode.SLICE_B_CONFIG_ID:
+            if (
+                spec.image_ref is not None
+                or not isinstance(spec.image_config_id, str)
+                or not _IMAGE_ID_RE.fullmatch(spec.image_config_id)
+                or not isinstance(spec.image_record_sha256, str)
+                or not re.fullmatch(r'[0-9a-f]{64}', spec.image_record_sha256)
+                or not isinstance(spec.runtime_sha256, str)
+                or not re.fullmatch(r'[0-9a-f]{64}', spec.runtime_sha256)
+            ):
+                raise WriterError('Slice B requires a Host-pinned Config ID and record')
+            if authority is None or not _verified_guest_authority(authority):
+                raise WriterError('verified Guest image authority required')
+            if (
+                authority.key != spec.key
+                or authority.image_config_id != spec.image_config_id
+                or authority.image_record_sha256 != spec.image_record_sha256
+                or authority.runtime_sha256 != spec.runtime_sha256
+            ):
+                raise WriterError('Slice B image authority does not match WriterSpec')
+            if spec.command != SLICE_B_COMMAND or not spec.tty or not spec.stdin_open:
+                raise WriterError('Slice B Config ID mode requires the fixed interactive command')
+        case unreachable:
+            assert_never(unreachable)
     if not isinstance(spec.repo_source, str) or spec.repo_source != expected_repo_source(
             spec.key):
         raise WriterError(
@@ -270,7 +335,7 @@ def validate_writer_spec(spec: WriterSpec) -> None:
     if spec.stdin_open and (
         not spec.tty
         or spec.command != SLICE_B_COMMAND
-        or spec.image_ref.partition('@')[0] != SLICE_B_IMAGE_REPOSITORY
+        or spec.image_identity_mode is not WriterImageIdentityMode.SLICE_B_CONFIG_ID
     ):
         raise WriterError('stdin_open requires the pinned Slice B image, command and TTY')
     if not isinstance(spec.env, tuple):
@@ -302,9 +367,13 @@ def validate_container_id(cid: object) -> str:
 
 # --- argv builders -----------------------------------------------------------------
 
-def build_create_argv(spec: WriterSpec) -> list[str]:
+def build_create_argv(
+    spec: WriterSpec,
+    *,
+    authority: SliceBLaunchAuthority | None = None,
+) -> list[str]:
     """Return the ``docker create`` argv for a validated ``spec``."""
-    validate_writer_spec(spec)
+    validate_writer_spec(spec, authority=authority)
     argv = [
         'docker', 'create',
         '--name', writer_container_name(spec.key),
@@ -331,9 +400,26 @@ def build_create_argv(spec: WriterSpec) -> list[str]:
         argv.append('-i')
     if spec.tty:
         argv.append('-t')
-    argv.append(spec.image_ref)
+    argv.append(_writer_image_argument(spec, authority))
     argv.extend(spec.command)
     return argv
+
+
+def _writer_image_argument(
+    spec: WriterSpec,
+    authority: SliceBLaunchAuthority | None,
+) -> str:
+    match spec.image_identity_mode:
+        case WriterImageIdentityMode.LEGACY_DIGEST_REF:
+            if spec.image_ref is None:
+                raise WriterError('legacy image reference is unavailable')
+            return spec.image_ref
+        case WriterImageIdentityMode.SLICE_B_CONFIG_ID:
+            if authority is None or spec.image_config_id is None:
+                raise WriterError('verified Slice B image identity is unavailable')
+            return authority.image_config_id
+        case unreachable:
+            assert_never(unreachable)
 
 
 def build_start_argv(cid: str) -> list[str]:
@@ -410,7 +496,12 @@ def parse_inspect_output(stdout: str) -> dict[str, Any]:
     return data[0]
 
 
-def validate_writer_inspect(inspect: Mapping[str, Any], spec: WriterSpec) -> None:
+def validate_writer_inspect(
+    inspect: Mapping[str, Any],
+    spec: WriterSpec,
+    *,
+    authority: SliceBLaunchAuthority | None = None,
+) -> None:
     """Strictly validate a container inspect against ``spec`` (fail closed).
 
     Tolerated docker 29 forms: ``Name`` with a leading slash, ``Tmpfs`` as a
@@ -427,7 +518,7 @@ def validate_writer_inspect(inspect: Mapping[str, Any], spec: WriterSpec) -> Non
     only when they pass those rules.  Every spec env pair must be present
     with its exact value.  Values are never included in error messages.
     """
-    validate_writer_spec(spec)
+    validate_writer_spec(spec, authority=authority)
     if not isinstance(inspect, Mapping):
         raise WriterError('inspect is not an object')
     problems: list[str] = []
@@ -443,9 +534,17 @@ def validate_writer_inspect(inspect: Mapping[str, Any], spec: WriterSpec) -> Non
            'Id is not a 64 hex container id')
     expect(('Name',), lambda v: _strip_name(v) == writer_container_name(spec.key),
            'container Name mismatch')
-    expect(('Image',), lambda v: isinstance(v, str) and bool(_IMAGE_ID_RE.match(v)),
-           'Image id is not sha256:<64 hex>')
-    expect(('Config', 'Image'), lambda v: v == spec.image_ref, 'Config.Image mismatch')
+    match spec.image_identity_mode:
+        case WriterImageIdentityMode.LEGACY_DIGEST_REF:
+            expect(('Image',), lambda v: isinstance(v, str) and bool(_IMAGE_ID_RE.match(v)),
+                   'Image id is not sha256:<64 hex>')
+        case WriterImageIdentityMode.SLICE_B_CONFIG_ID:
+            expected_image_id = _writer_image_argument(spec, authority)
+            expect(('Image',), lambda v: v == expected_image_id, 'Image Config ID mismatch')
+        case unreachable:
+            assert_never(unreachable)
+    expected_image = _writer_image_argument(spec, authority)
+    expect(('Config', 'Image'), lambda v: v == expected_image, 'Config.Image mismatch')
     expect(('Config', 'User'), lambda v: v == WRITER_USER,
            'Config.User must be 10001:10001')
     expect(('Config', 'Cmd'), lambda v: isinstance(v, list) and v == list(spec.command),
@@ -573,13 +672,18 @@ def validate_writer_inspect(inspect: Mapping[str, Any], spec: WriterSpec) -> Non
         raise WriterError('writer inspect rejected: ' + '; '.join(problems))
 
 
-def check_no_conflict(existing: Sequence[Mapping[str, Any]], spec: WriterSpec) -> None:
+def check_no_conflict(
+    existing: Sequence[Mapping[str, Any]],
+    spec: WriterSpec,
+    *,
+    authority: SliceBLaunchAuthority | None = None,
+) -> None:
     """Reject if any existing container (running or exited) conflicts.
 
     Conflict = same container name, same session-generation label, or a RW
     bind of the same repo_source.  Malformed entries fail closed.
     """
-    validate_writer_spec(spec)
+    validate_writer_spec(spec, authority=authority)
     name = writer_container_name(spec.key)
     generation = spec.key.session_generation
     for item in existing:
@@ -679,6 +783,14 @@ class DockerRunner(Protocol):
     """Runs a docker argv; returns (returncode, stdout)."""
 
     def run(self, argv: Sequence[str], *, timeout: int) -> tuple[int, str]: ...
+
+    def run_authorized(
+        self,
+        argv: Sequence[str],
+        *,
+        timeout: int,
+        image_authority: SliceBLaunchAuthority,
+    ) -> tuple[int, str]: ...
 
 
 class HostProbe(Protocol):
@@ -819,9 +931,23 @@ class WriterLifecycle:
 
     # -- docker helpers (all failures surface as WriterError) --
 
-    def _run(self, argv: Sequence[str], timeout: int = DOCKER_CMD_TIMEOUT_S) -> str:
+    def _run(
+        self,
+        argv: Sequence[str],
+        timeout: int = DOCKER_CMD_TIMEOUT_S,
+        *,
+        image_authority: SliceBLaunchAuthority | None = None,
+    ) -> str:
         try:
-            result = self._runner.run(list(argv), timeout=timeout)
+            if image_authority is None:
+                result = self._runner.run(list(argv), timeout=timeout)
+            else:
+                authorized_run = getattr(self._runner, 'run_authorized', None)
+                if not callable(authorized_run):
+                    raise WriterError('authority-aware Docker runner required for Slice B create')
+                result = authorized_run(
+                    list(argv), timeout=timeout, image_authority=image_authority,
+                )
         except Exception as exc:
             raise WriterError(f'docker {argv[1]} failed to run') from exc
         if not isinstance(result, tuple) or len(result) != 2:
@@ -860,11 +986,19 @@ class WriterLifecycle:
 
     # -- launch --
 
-    def launch(self, spec: WriterSpec) -> WriterIdentity:
+    def launch(
+        self,
+        spec: WriterSpec,
+        *,
+        authority: SliceBLaunchAuthority | None = None,
+    ) -> WriterIdentity:
         """Create, verify and start a new Writer; return its identity."""
-        validate_writer_spec(spec)
-        check_no_conflict(self._list_all(), spec)
-        out = self._run(build_create_argv(spec))
+        validate_writer_spec(spec, authority=authority)
+        check_no_conflict(self._list_all(), spec, authority=authority)
+        out = self._run(
+            build_create_argv(spec, authority=authority),
+            image_authority=authority,
+        )
         lines = [ln.strip() for ln in out.splitlines() if ln.strip()]
         if len(lines) != 1 or not _CONTAINER_ID_RE.match(lines[0]):
             raise WriterError('docker create did not return a container id; '
@@ -874,7 +1008,7 @@ class WriterLifecycle:
         pre = self._inspect(cid)
         if _get(pre, 'Id') != cid:
             raise WriterError('pre-start inspect Id mismatch; not started')
-        validate_writer_inspect(pre, spec)
+        validate_writer_inspect(pre, spec, authority=authority)
         if _get(pre, 'State', 'Status') != 'created' or _get(pre, 'State', 'Running') \
                 is not False:
             raise WriterError('pre-start state is not created; not started')
@@ -883,7 +1017,7 @@ class WriterLifecycle:
             post = self._inspect(cid)
             if _get(post, 'Id') != cid:
                 raise WriterError('post-start inspect Id mismatch')
-            validate_writer_inspect(post, spec)
+            validate_writer_inspect(post, spec, authority=authority)
             state_ok = (
                 _get(post, 'State', 'Status') == 'running'
                 and _get(post, 'State', 'Running') is True
