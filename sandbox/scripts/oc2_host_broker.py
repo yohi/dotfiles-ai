@@ -41,6 +41,9 @@ _DIGEST_RE: Final[re.Pattern[str]] = re.compile(r'[0-9a-f]{64}')
 _FIXTURE_PART_RE: Final[re.Pattern[str]] = re.compile(r'[A-Za-z0-9._-]{1,64}')
 FIXTURE_BASE: Final[str] = 'fixtures'
 MAX_BROKER_CA_BYTES: Final[int] = 64 * 1024
+_PEM_BLOCK_RE: Final[re.Pattern[bytes]] = re.compile(
+    rb'-----BEGIN ([A-Z0-9 ]+)-----.*?-----END \1-----', re.DOTALL,
+)
 
 
 class HostBrokerError(Exception):
@@ -79,6 +82,10 @@ def load_broker_ca(path: pathlib.Path) -> BrokerCaCertificate:
             os.close(fd)
     if len(data) != info.st_size or len(data) > MAX_BROKER_CA_BYTES:
         raise HostBrokerError('Broker CA certificate size changed while reading')
+    blocks = tuple(_PEM_BLOCK_RE.finditer(data))
+    if (not blocks or any(block.group(1) != b'CERTIFICATE' for block in blocks)
+            or _PEM_BLOCK_RE.sub(b'', data).strip()):
+        raise HostBrokerError('Broker CA input must contain only PEM certificates')
     try:
         ssl.create_default_context(cadata=data.decode('ascii'))
     except (ssl.SSLError, ValueError):

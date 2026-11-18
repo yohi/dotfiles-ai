@@ -206,6 +206,21 @@ class CertificateTests(unittest.TestCase):
             with self.subTest(path=candidate.name), self.assertRaises(hb.HostBrokerError):
                 hb.load_broker_ca(candidate)
 
+    def test_ca_loader_rejects_private_key_and_non_certificate_pem_blocks(self) -> None:
+        certificate = self.trusted_ca.read_bytes()
+        private_key = self.trusted_key.read_bytes()
+        public_key = (
+            b'-----BEGIN PUBLIC KEY-----\nAAAA\n-----END PUBLIC KEY-----\n'
+        )
+        for name, contents in (
+            ('private-key', certificate + private_key),
+            ('public-key', certificate + public_key),
+        ):
+            candidate = self.root / f'{name}.pem'
+            candidate.write_bytes(contents)
+            with self.subTest(name=name), self.assertRaises(hb.HostBrokerError):
+                hb.load_broker_ca(candidate)
+
     def test_probe_accepts_trusted_ca_for_an_allowlisted_hostname(self) -> None:
         self._probe_and_join(
             'https://host.docker.internal:{port}/v1', self.trusted_ca.read_bytes(),

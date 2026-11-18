@@ -1653,7 +1653,9 @@ def _run_host_broker(
         temporary_path = pathlib.Path(temporary)
         config_file = temporary_path / 'opencode.jsonc'
         config_file.write_bytes(oc2_host_broker_runtime.config_bytes(runtime))
-        cli_binary = download_verified_cli(temporary_path / 'cli-download')
+        cli_download_dir = temporary_path / 'cli-download'
+        cli_download_dir.mkdir(mode=0o700)
+        cli_binary = download_verified_cli(cli_download_dir)
         print('OC2_CLI_ARTIFACT_VERIFIED: v2.2.5 sha256=' + CLI_ASSET_SHA256)
         print('OC2: creating mountless shell Sandbox ' + args.sandbox
               + ' (no credential Mixin; no direct-provider egress allowance)')

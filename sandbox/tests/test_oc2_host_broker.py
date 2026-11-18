@@ -731,8 +731,11 @@ class RunHostBrokerTests(unittest.TestCase):
             sandbox='oc2-dev', host_broker_artifacts=self.tmp / 'src' if artifacts else None,
             host_broker_prompt='say hello', host_broker_ca_cert=self.tmp / 'ca.pem')
 
-        def fake_download(destination):
-            destination.mkdir(parents=True, exist_ok=True)
+        def fake_download(destination: pathlib.Path) -> pathlib.Path:
+            """Write a fake binary into the private empty directory supplied by the caller."""
+            assert destination.is_dir()
+            assert destination.stat().st_mode & 0o077 == 0
+            assert not any(destination.iterdir())
             binary = destination / 'opencode'
             binary.write_bytes(b'fake')
             return binary
