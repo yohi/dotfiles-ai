@@ -1614,7 +1614,6 @@ def _launch_via_host_broker(
 
 def _run_host_broker(
     args: argparse.Namespace,
-    workspace: pathlib.Path,
     workspace_manifest: WorkspaceManifest,
     selection: oc2_host_broker.HostBrokerSelection,
     ca_certificate: oc2_host_broker.BrokerCaCertificate,
@@ -1994,7 +1993,7 @@ def main(argv: list[str] | None = None) -> int:
             if broker_ca_certificate is None:
                 raise Stop('Host Broker CA certificate is unavailable')
             return _run_host_broker(
-                args, workspace, workspace_manifest, broker_selection, broker_ca_certificate,
+                args, workspace_manifest, broker_selection, broker_ca_certificate,
             )
         with tempfile.TemporaryDirectory(prefix='oc2-v2-config-') as temporary:
             temporary_path = pathlib.Path(temporary)

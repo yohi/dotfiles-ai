@@ -12,6 +12,7 @@ import json
 import os
 import pathlib
 import shutil
+import ssl
 import subprocess
 import sys
 import tempfile
@@ -148,6 +149,26 @@ class CapabilityTests(unittest.TestCase):
             with self.subTest(payload=payload[:8]), self.assertRaises(hb.HostBrokerError) as ctx:
                 hb.read_capability(read_fd)
             self.assertNotIn(TOKEN, str(ctx.exception))
+
+
+class ProbeBrokerTests(unittest.TestCase):
+    def test_tls_wrap_failure_closes_connected_socket(self):
+        class Connection:
+            closed = False
+
+            def close(self):
+                self.closed = True
+
+        class Context:
+            def wrap_socket(self, connection, *, server_hostname):
+                raise ssl.SSLError('handshake failed')
+
+        connection = Connection()
+        with patch.object(hb.ssl, 'create_default_context', return_value=Context()):
+            with self.assertRaisesRegex(hb.HostBrokerError, 'TLS verification failed'):
+                hb.probe_broker(URL, CA_DATA, connect=lambda *_args, **_kwargs: connection)
+        self.assertTrue(connection.closed)
+
 
 class FsRunner:
     """Fake Sandbox backed by a local temp directory; no sbx or network.
@@ -730,7 +751,7 @@ class RunHostBrokerTests(unittest.TestCase):
                 patch.object(rbr, 'verify_source', return_value=result_artifacts), \
                 patch.dict(os.environ, {}, clear=True), \
                 contextlib.redirect_stdout(io.StringIO()):
-            return oc2._run_host_broker(args, self.tmp, None, sel, ca_certificate)
+            return oc2._run_host_broker(args, None, sel, ca_certificate)
 
     def test_broker_launch_creates_sandbox_without_credential_mixin(self):
         self.assertEqual(self.run_broker(), 0)

@@ -23,6 +23,7 @@ import socket
 import ssl
 import stat
 from collections.abc import Callable
+from contextlib import closing
 from dataclasses import dataclass
 from typing import Final
 from urllib.parse import urlsplit
@@ -268,8 +269,8 @@ def probe_broker(
         raise HostBrokerError('Host Broker URL is invalid')
     try:
         context = ssl.create_default_context(cadata=ca_data.decode('ascii'))
-        connection = connect(('127.0.0.1', port), timeout=3)
-        with context.wrap_socket(connection, server_hostname=host):
-            pass
+        with closing(connect(('127.0.0.1', port), timeout=3)) as connection:
+            with context.wrap_socket(connection, server_hostname=host):
+                pass
     except (OSError, ssl.SSLError, UnicodeError, ValueError):
         raise HostBrokerError('Host Broker TLS verification failed; no fallback provider is used') from None
