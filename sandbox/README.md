@@ -215,6 +215,36 @@ Human Ownerが権限変更を承認した場合に限り、管理者が `sudo us
 完全にログアウトして再ログインした後、`sbx diagnose` と `id -nG` で反映を確認してください。
 Docker Sandboxesの更新が必要と判断した場合も、この手順とは別に承認を得てください。
 
+### Host Broker (限定Guest Provider)
+
+`--use-host-broker`はHost上の専用Brokerを経由する限定モードです。Guest-to-Host接続はHTTPSのみで、
+`host.docker.internal`または`127.0.0.1`の証明書を専用CAで検証します。CA秘密鍵はオフラインで保管し、
+Broker秘密鍵はHostに残します。Sandboxへ渡すのは公開CA証明書のみです。CAの作成・更新とBrokerのTLS設定は
+[上流のHost setup手順](https://github.com/yohi/oc-cf-aig-subscription/blob/0b36fcc985b0110928f51307a8e6ef50f0ec74c0/docs/host-setup.md)
+を参照してください。
+
+起動時は公開CA証明書を明示します:
+
+```sh
+# BROKER_PORT and CAPABILITY_FD come from the already running Host Broker.
+oc2 --use-host-broker \
+  --sandbox oc2-host-broker-test \
+  --host-broker-url "https://host.docker.internal:${BROKER_PORT}/v1" \
+  --host-broker-ca-cert "$TLS_DIR/oc2-broker-ca.pem" \
+  --host-broker-mode m1 \
+  --host-broker-sandbox-label oc2-host-broker-test \
+  --host-broker-capability-fd "$CAPABILITY_FD" \
+  --host-broker-artifacts "$HOME/path/to/oc-cf-aig-subscription" \
+  --host-broker-prompt "safe test prompt"
+```
+
+Guest Artifact pinは`0c11b0e7f77f080c8719cbf65752af46e51131aa`から
+`0b36fcc985b0110928f51307a8e6ef50f0ec74c0`へ更新しました。差分ではBrokerをTLS待受けにし、
+Guest ProviderをHTTPS専用にしています。Host Broker capabilityがGuestからHostへ送られるため、
+通信の暗号化とhostname検証を行います。同期時はManifestのsource commit、3ファイルのSHA-256/size、
+Manifest自体のSHA-256を同時に更新します。変更差分は[上流のcommit比較](https://github.com/yohi/oc-cf-aig-subscription/compare/0c11b0e7f77f080c8719cbf65752af46e51131aa...0b36fcc985b0110928f51307a8e6ef50f0ec74c0)、
+確認は`npm test && npm run check`と`uv run --frozen python3 -m unittest sandbox.tests.test_oc2_host_broker.ArtifactTests -v`で行います。
+
 ## 雛形ファイル（自動適用されない）
 
 | ファイル | 役割 |

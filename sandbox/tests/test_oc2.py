@@ -150,14 +150,14 @@ class FakeSecretRunner:
 
 
 class HostTest(unittest.TestCase):
-    def run_guest_wrapper(self, guest_environment, runtime_environment=()):
+    def run_guest_wrapper(self, guest_environment, runtime_environment=(), target_args=()):
         target = (
             'import json, os; '
             'print(json.dumps(dict(os.environ), sort_keys=True))'
         )
         command = [
             sys.executable, '-c', oc2.GUEST_EXEC_WRAPPER, '--',
-            *runtime_environment, '--', sys.executable, '-c', target,
+            *runtime_environment, '--', sys.executable, '-c', target, *target_args,
         ]
         return subprocess.run(
             command, capture_output=True, text=True, check=False,
@@ -254,6 +254,38 @@ class HostTest(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(json.loads(result.stdout)['NO_PROXY'], no_proxy)
+
+    def test_guest_wrapper_bypasses_proxy_only_for_the_validated_host_broker(self):
+        result = self.run_guest_wrapper(
+            {
+                'PATH': os.environ['PATH'],
+                'HTTPS_PROXY': 'http://guest-proxy.example.test:8080',
+                'NO_PROXY': 'localhost',
+            },
+            runtime_environment=(
+                'OC2_HOST_BROKER_URL=https://host.docker.internal:18080/v1',
+                'NODE_EXTRA_CA_CERTS=/oc2/runtime/abc/broker/ca/host-broker-ca.pem',
+            ),
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        child_environment = json.loads(result.stdout)
+        self.assertEqual(child_environment['NO_PROXY'], 'localhost,host.docker.internal')
+        self.assertEqual(
+            child_environment['NODE_EXTRA_CA_CERTS'],
+            '/oc2/runtime/abc/broker/ca/host-broker-ca.pem',
+        )
+        self.assertNotIn('OC2_HOST_BROKER_URL', child_environment)
+
+    def test_guest_wrapper_does_not_add_host_bypass_for_ordinary_launches(self):
+        result = self.run_guest_wrapper({
+            'PATH': os.environ['PATH'],
+            'HTTPS_PROXY': 'http://guest-proxy.example.test:8080',
+            'NO_PROXY': 'localhost',
+        })
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(json.loads(result.stdout)['NO_PROXY'], 'localhost')
 
     def test_guest_wrapper_rejects_nonexact_or_unsafe_no_proxy_entries(self):
         for no_proxy in (
