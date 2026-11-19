@@ -182,7 +182,7 @@ def validate_policy_check(raw: str, exit_code: int, sandbox: str, resource: str,
 def _check(runner: PolicyRunner, sandbox: str, target: str,
            resource_value: str, allowed: bool) -> None:
     exit_code, output = runner.sbx_result(
-        'policy', 'check', '--json', '--sandbox', sandbox,
+        'policy', 'check', 'network', '--json', '--sandbox', sandbox,
         '--protocol', 'tcp', target,
     )
     validate_policy_check(

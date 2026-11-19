@@ -182,7 +182,10 @@ class GateFlowTests(unittest.TestCase):
 
         runner = FakeRunner()
         gate.run_network_gate(runner, SANDBOX, 49187)
-        self.assertEqual(runner.calls[0][-1], 'localhost:49187')
+        self.assertEqual(runner.calls[0], (
+            'policy', 'check', 'network', '--json', '--sandbox', SANDBOX,
+            '--protocol', 'tcp', 'localhost:49187',
+        ))
         self.assertIn('--no-input', runner.calls[1])
         self.assertIn('policy', runner.calls[2])
         self.assertTrue(any(call[-1] == 'host.docker.internal:49187' for call in runner.calls))
