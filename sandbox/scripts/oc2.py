@@ -30,6 +30,7 @@ from urllib.parse import urlsplit
 import yaml
 import oc2_host_broker
 import oc2_host_broker_runtime
+import oc2_network_gate
 from oc2_oauth_bundle import oauth_helper_source
 from oc2_native import parse_apm_native
 from oc2_identity import (
@@ -702,13 +703,19 @@ def run_operator(user: str, *args: str, timeout: int = 30) -> str:
 
 
 class Runner:
-    def __init__(self, user: str, *, dry_run: bool = False):
+    def __init__(self, user: str, *, dry_run: bool = False,
+                 app_name: str | None = None):
         self.user = user
         self.dry_run = dry_run
+        self.app_name = app_name
+
+    def _command(self, *args: str) -> list[str]:
+        app = [] if self.app_name is None else ['--app-name', self.app_name]
+        return operator_command(self.user, 'sbx', *app, *args)
 
     def destination_status(self, name: str, destination: str) -> int:
-        command = operator_command(self.user, 'sbx', 'exec', name, 'python3', '-c',
-                                   DESTINATION_CHECK_SCRIPT, destination)
+        command = self._command('exec', name, 'python3', '-c',
+                                DESTINATION_CHECK_SCRIPT, destination)
         if self.dry_run:
             raise Stop('DESTINATION_CHECK_COMMAND_FAILED')
         try:
@@ -721,8 +728,8 @@ class Runner:
 
     def directory_status(self, name: str, destination: str) -> int:
         """Check whether a remote path is absent or an existing real directory."""
-        command = operator_command(
-            self.user, 'sbx', 'exec', name, 'python3', '-c',
+        command = self._command(
+            'exec', name, 'python3', '-c',
             DIRECTORY_DESTINATION_CHECK_SCRIPT, destination,
         )
         if self.dry_run:
@@ -735,14 +742,15 @@ class Runner:
             raise Stop('DESTINATION_CHECK_COMMAND_FAILED') from exc
         return result.returncode
 
-    def sbx(self, *args: str, capture: bool = False, tty: bool = False) -> str:
-        command = operator_command(self.user, 'sbx', *args)
+    def sbx(self, *args: str, capture: bool = False, tty: bool = False,
+            timeout: int | None = 180) -> str:
+        command = self._command(*args)
         if self.dry_run:
             print('PLAN: ' + ' '.join(command[:5]) + ' [...]')
             return ''
         try:
             result = subprocess.run(command, check=False, text=True,
-                                    capture_output=capture, timeout=None if tty else 180)
+                                    capture_output=capture, timeout=None if tty else timeout)
         except subprocess.TimeoutExpired as exc:
             raise SandboxCommandTimeout('sbx command could not complete') from exc
         except OSError as exc:
@@ -751,9 +759,23 @@ class Runner:
             raise Stop(f'sbx command failed (exit {result.returncode})')
         return result.stdout if capture else ''
 
+    def sbx_result(self, *args: str, timeout: int | None = 180) -> tuple[int, str]:
+        if self.dry_run:
+            raise Stop('policy checks cannot run in dry-run mode')
+        try:
+            result = subprocess.run(
+                self._command(*args), check=False, text=True,
+                capture_output=True, timeout=timeout,
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise SandboxCommandTimeout('sbx command could not complete') from exc
+        except OSError as exc:
+            raise Stop('sbx command could not complete') from exc
+        return result.returncode, result.stdout
+
     def sbx_feed(self, *args: str, data: bytes) -> None:
         """Run sbx with ``data`` on stdin only (never argv/env); no TTY, no capture."""
-        command = operator_command(self.user, 'sbx', *args)
+        command = self._command(*args)
         if self.dry_run:
             print('PLAN: ' + ' '.join(command[:5]) + ' [...]')
             return
@@ -1693,6 +1715,10 @@ def _run_host_broker(
         raise Stop('--host-broker-cli-archive must be an absolute path in Host Broker mode')
     if args.host_broker_artifacts is None:
         raise Stop('--host-broker-artifacts (trusted local oc-cf-aig-subscription checkout) is required')
+    try:
+        app_name = oc2_network_gate.validate_app_name(args.host_broker_app_name)
+    except oc2_network_gate.NetworkGateError as exc:
+        raise Stop(str(exc)) from exc
     prompt = oc2_host_broker_runtime.validate_prompt(args.host_broker_prompt)
     manifest, manifest_sha = oc2_host_broker_runtime.load_manifest()
     artifacts = oc2_host_broker_runtime.verify_source(
@@ -1710,7 +1736,13 @@ def _run_host_broker(
     oc2_host_broker.probe_broker(selection.url, ca_certificate.data)
     if not shutil.which('sbx'):
         raise Stop('Docker Sandboxes CLI was not found')
-    runner = Runner(getpass.getuser())
+    runner = Runner(getpass.getuser(), app_name=app_name)
+    try:
+        oc2_network_gate.verify_dedicated_daemon(runner, app_name)
+        initial_policy = runner.sbx('policy', 'ls', '--json', capture=True)
+        oc2_network_gate.validate_policy_listing(initial_policy, args.sandbox, 'global')
+    except oc2_network_gate.NetworkGateError as exc:
+        raise Stop(str(exc)) from exc
     sandbox_version = runner.sbx('version', capture=True).strip()
     if re.search(r'\bv\d+\.\d+\.\d+\b', sandbox_version) is None:
         raise Stop('could not verify Docker Sandboxes version')
@@ -1878,6 +1910,8 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument('--use-host-broker', action='store_true',
                    help='explicit opt-in: use the Host Broker (m1/m2 limited contract) '
                         'instead of any direct provider')
+    p.add_argument('--host-broker-app-name',
+                   help='required dedicated Docker Sandboxes daemon name for Host Broker mode')
     p.add_argument('--host-broker-url', help='https://host.docker.internal:<port>/v1')
     p.add_argument('--host-broker-ca-cert', type=pathlib.Path,
                    help='public CA certificate used to verify the Host Broker TLS connection')
@@ -1902,7 +1936,8 @@ def main(argv: list[str] | None = None) -> int:
         broker_selection: oc2_host_broker.HostBrokerSelection | None = None
         broker_ca_certificate: oc2_host_broker.BrokerCaCertificate | None = None
         broker_options = (
-            args.host_broker_url, args.host_broker_mode, args.host_broker_sandbox_label,
+            args.host_broker_app_name, args.host_broker_url,
+            args.host_broker_mode, args.host_broker_sandbox_label,
             args.host_broker_capability_fd, args.host_broker_fixture_root,
             args.host_broker_artifacts, args.host_broker_cli_archive,
             args.host_broker_prompt, args.host_broker_ca_cert,

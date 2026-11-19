@@ -28,6 +28,7 @@ if str(SCRIPTS) not in sys.path:
 
 import oc2  # noqa: E402
 import oc2_host_broker as hb  # noqa: E402
+import oc2_network_gate  # noqa: E402
 import oc2_host_broker_runtime as rbr  # noqa: E402
 
 TOKEN = 'ocb_' + 'A' * 43
@@ -211,8 +212,14 @@ class FsRunner:
     def sbx(self, *args, capture=False, tty=False):
         self.calls.append(args)
         head = args[0]
+        if head == 'rm' and self.fail_rm:
+            raise oc2.Stop('sandbox removal failed')
         if head == 'version':
             return 'sbx v0.51.0'
+        if args[:2] == ('inspect', 'oc2-dev'):
+            return 'Name: oc2-dev\n'
+        if args[:3] == ('policy', 'ls', '--json'):
+            return '{"rules": []}'
         if args[:2] == ('create', '--help'):
             return '--kit'
         if head == 'cp':
@@ -722,7 +729,9 @@ class RunHostBrokerTests(unittest.TestCase):
         self.runner = FsRunner(self.tmp / 'guest')
         self.runner.root.mkdir()
 
-    def run_broker(self, *, artifacts=True, probe_ok=True, mode='m1', label='oc2-dev'):
+    def run_broker(self, *, artifacts=True, probe_ok=True, mode='m1', label='oc2-dev',
+                   gate_failure=False, global_policy_failure=False,
+                   cleanup_failure=False):
         read_fd, write_fd = os.pipe()
         os.write(write_fd, (TOKEN + '\n').encode())
         os.close(write_fd)
@@ -753,9 +762,21 @@ class RunHostBrokerTests(unittest.TestCase):
             if not probe_ok:
                 raise hb.HostBrokerError('Host Broker is not reachable; no fallback provider is used')
 
+        def run_gate(*_args):
+            self.runner.calls.append(('NETWORK_GATE',))
+            if gate_failure:
+                raise oc2_network_gate.NetworkGateError('offline gate failure')
+
+        def validate_listing(_raw, _sandbox, stage, *_args):
+            if global_policy_failure and stage == 'global':
+                raise oc2_network_gate.NetworkGateError('unsafe daemon policy')
+
         result_artifacts = verified()
         with patch.object(oc2, 'Runner', return_value=self.runner), \
                 patch.object(oc2.shutil, 'which', return_value='/usr/bin/sbx'), \
+                patch.object(oc2_network_gate, 'verify_dedicated_daemon'), \
+                patch.object(oc2_network_gate, 'validate_policy_listing', side_effect=validate_listing), \
+                patch.object(oc2_network_gate, 'run_network_gate', side_effect=run_gate) as network_gate, \
                 patch.object(oc2, 'download_verified_cli', fake_download), \
                 patch.object(oc2, 'transfer_workspace', return_value='/workspace/project'), \
                 patch.object(oc2_host_broker_probe(), 'probe_broker', probe), \
@@ -763,6 +784,22 @@ class RunHostBrokerTests(unittest.TestCase):
                 patch.object(rbr, 'verify_source', return_value=result_artifacts), \
                 patch.dict(os.environ, {}, clear=True), \
                 contextlib.redirect_stdout(io.StringIO()):
+            if gate_failure:
+                cleanup_message = (
+                    'owned Sandbox cleanup also failed' if cleanup_failure
+                    else 'owned Sandbox was removed'
+                )
+                with self.assertRaisesRegex(oc2.Stop, cleanup_message):
+                    oc2._run_host_broker(args, None, sel, ca_certificate)
+                self.assertEqual(self.runner.calls[-1], ('rm', 'oc2-dev'))
+                self.assertFalse(any(call[0] in {'exec', 'cp'} for call in self.runner.calls))
+                network_gate.assert_called_once()
+                return 1
+            if global_policy_failure:
+                with self.assertRaisesRegex(oc2.Stop, 'unsafe daemon policy'):
+                    oc2._run_host_broker(args, None, sel, ca_certificate)
+                self.assertFalse(any(call[0] == 'create' for call in self.runner.calls))
+                return 1
             return oc2._run_host_broker(args, None, sel, ca_certificate)
 
     def test_broker_launch_creates_sandbox_without_credential_mixin(self):
@@ -795,6 +832,47 @@ class RunHostBrokerTests(unittest.TestCase):
                 self.run_broker(**kwargs)
             self.assertEqual(self.runner.fed, [])
             self.assertFalse([c for c in self.runner.calls if c[0] == 'create' and '--name' in c])
+
+    def test_network_gate_failure_removes_only_the_new_sandbox_before_guest_setup(self):
+        self.assertEqual(self.run_broker(gate_failure=True), 1)
+        created = next(i for i, call in enumerate(self.runner.calls) if call[0] == 'create')
+        inspected = next(i for i, call in enumerate(self.runner.calls)
+                         if call[:2] == ('inspect', 'oc2-dev'))
+        gated = next(i for i, call in enumerate(self.runner.calls) if call[0] == 'NETWORK_GATE')
+        removed = next(i for i, call in enumerate(self.runner.calls)
+                       if call[:2] == ('rm', 'oc2-dev'))
+        self.assertLess(created, inspected)
+        self.assertLess(inspected, gated)
+        self.assertLess(gated, removed)
+
+    def test_network_gate_cleanup_failure_is_reported(self):
+        self.runner.fail_rm = True
+        self.assertEqual(self.run_broker(gate_failure=True, cleanup_failure=True), 1)
+
+    def test_unsafe_global_policy_stops_before_sandbox_creation(self):
+        self.assertEqual(self.run_broker(global_policy_failure=True), 1)
+
+
+class RunnerDaemonScopeTests(unittest.TestCase):
+    def test_all_runner_sbx_entrypoints_pin_the_dedicated_daemon(self):
+        runner = oc2.Runner(oc2.getpass.getuser(), app_name='oc2-isolated')
+        result = oc2.subprocess.CompletedProcess(['sbx'], 0, 'ok', '')
+        with patch.object(oc2.subprocess, 'run', return_value=result) as run:
+            runner.sbx('version', capture=True)
+            runner.sbx_result('policy', 'check', 'network')
+            runner.destination_status('sandbox-a', '/runtime/check')
+            runner.directory_status('sandbox-a', '/runtime/check')
+            runner.sbx_feed('exec', 'sandbox-a', 'cat', '/secret', data=b'fixture')
+        self.assertEqual(run.call_count, 5)
+        for call in run.call_args_list:
+            self.assertEqual(call.args[0][:3], ['sbx', '--app-name', 'oc2-isolated'])
+
+    def test_runner_without_app_name_preserves_normal_oc2_command(self):
+        runner = oc2.Runner(oc2.getpass.getuser())
+        result = oc2.subprocess.CompletedProcess(['sbx'], 0, 'v0.53.0', '')
+        with patch.object(oc2.subprocess, 'run', return_value=result) as run:
+            self.assertEqual(runner.sbx('version', capture=True), 'v0.53.0')
+        self.assertEqual(run.call_args.args[0], ['sbx', 'version'])
 
 
 def oc2_host_broker_probe():
@@ -1051,6 +1129,24 @@ class LocalCliArchiveTests(unittest.TestCase):
                     patch.object(oc2.subprocess, 'run', side_effect=AssertionError('network forbidden')):
                 with self.assertRaisesRegex(oc2.Stop, 'archive contents are invalid'):
                     oc2.download_verified_cli(destination, local_archive=archive)
+
+
+class RunnerTimeoutContractTests(unittest.TestCase):
+    def test_sbx_accepts_and_forwards_the_protocol_timeout(self):
+        runner = oc2.Runner(oc2.getpass.getuser())
+        result = oc2.subprocess.CompletedProcess(['sbx'], 0, 'ok', '')
+        with patch.object(oc2.subprocess, 'run', return_value=result) as run:
+            output = runner.sbx('version', capture=True, timeout=7)
+        self.assertEqual(output, 'ok')
+        self.assertEqual(run.call_args.kwargs['timeout'], 7)
+
+    def test_sbx_result_accepts_and_forwards_the_protocol_timeout(self):
+        runner = oc2.Runner(oc2.getpass.getuser())
+        result = oc2.subprocess.CompletedProcess(['sbx'], 1, '{}', '')
+        with patch.object(oc2.subprocess, 'run', return_value=result) as run:
+            response = runner.sbx_result('policy', 'check', 'network', timeout=9)
+        self.assertEqual(response, (1, '{}'))
+        self.assertEqual(run.call_args.kwargs['timeout'], 9)
 
 
 if __name__ == '__main__':
