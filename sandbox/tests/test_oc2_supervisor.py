@@ -630,8 +630,8 @@ class SubprocessTransportTest(unittest.TestCase):
         self.assertIn('start_new_session=True', source)
         self.assertIn('stdin=subprocess.DEVNULL', source)
         self.assertIn('stderr=subprocess.DEVNULL', source)
-        # SubprocessTransport is never instantiated by the module itself.
-        self.assertNotIn('SubprocessTransport(', source)
+        self.assertEqual(source.count('SubprocessTransport('), 1)
+        self.assertIn('def production_guest_supervisor(', source)
 
     def test_popen_kwargs_and_env_not_inherited(self):
         with mock.patch.dict(os.environ, {'OC2_TEST_SECRET': SENTINEL}):
@@ -1285,6 +1285,56 @@ class SupervisorBase(unittest.TestCase):
         return self.docker.verbs().count('create')
 
 
+class ProductionWiringTest(SupervisorBase):
+    def test_supervisor_exposes_only_its_exact_sealed_authority_binding(self):
+        supervisor = self.make()
+        self.assertTrue(supervisor.authority_is_bound(self.image_authority))
+
+        other_key = tw.make_key(tw.GEN2)
+        other_authority = slice_b_test_support.make_verified_authority(
+            pathlib.Path(self.temporary.name) / 'other-bound-authority', other_key,
+        )
+        self.assertFalse(supervisor.authority_is_bound(other_authority))
+
+    def test_production_assembly_uses_fixed_guest_docker_and_lifecycle(self):
+        transport = BridgeTransport(self.docker)
+        with mock.patch.object(sup, 'SubprocessTransport', return_value=transport):
+            supervisor = sup.production_guest_supervisor(
+                self.key, self.image_authority,
+            )
+
+        self.assertEqual(transport.calls, [])
+        lifecycle = supervisor._factory(self.spec)
+        self.assertIsInstance(lifecycle._probe, sup.GuestHostProbe)
+        self.assertEqual(lifecycle._probe._repo_source, self.spec.repo_source)
+        self.assertIsInstance(lifecycle._probe._fs, sup.LocalGuestFs)
+        self.assertEqual(lifecycle._runner.run(w.LIST_ALL_ARGV, timeout=10), (0, ''))
+        self.assertEqual(self.docker.verbs(), ['ps'])
+        self.assertEqual(transport.calls[0], [
+            DOCKER_PATH, '--host', DOCKER_HOST, 'ps', '-a', '-q', '--no-trunc',
+        ])
+
+    def test_production_assembly_rejects_session_authority_mismatch(self):
+        other_key = tw.make_key(tw.GEN2)
+        authority = slice_b_test_support.make_verified_authority(
+            pathlib.Path(self.temporary.name) / 'mismatched-authority', other_key,
+        )
+        with self.assertRaises(sup.SupervisorInputError):
+            sup.production_guest_supervisor(self.key, authority)
+
+    def test_production_assembly_rejects_nonfixed_docker_endpoint(self):
+        for docker_path, docker_host in (
+            ('/usr/local/bin/docker', DOCKER_HOST),
+            (DOCKER_PATH, 'unix:///run/user/1000/docker.sock'),
+        ):
+            with self.subTest(docker_path=docker_path, docker_host=docker_host):
+                with self.assertRaises(sup.SupervisorInputError):
+                    sup.production_guest_supervisor(
+                        self.key, self.image_authority,
+                        docker_path=docker_path, docker_host=docker_host,
+                    )
+
+
 class SupervisorLaunchTest(SupervisorBase):
     def test_happy_path(self):
         s = self.make()
@@ -1751,7 +1801,8 @@ class ApiSurfaceTest(unittest.TestCase):
         public = {n for n in dir(sup.GuestSupervisor) if not n.startswith('_')}
         self.assertEqual(
             public,
-            {'launch', 'stop', 'state', 'identity', 'session_key', 'attach_writer'},
+            {'launch', 'stop', 'state', 'identity', 'session_key', 'attach_writer',
+             'authority_is_bound'},
         )
         self.assertEqual({s.value for s in sup.SupervisorState},
                          {'NEW', 'STARTING', 'RUNNING', 'ATTACHING', 'STOPPING',

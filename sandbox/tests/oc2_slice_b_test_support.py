@@ -3,30 +3,59 @@ from __future__ import annotations
 import hashlib
 from pathlib import Path
 import uuid
+from typing import TYPE_CHECKING, final
 
-from oc2_slice_b_git import GitBaseline, POLICY, SCHEMA, SliceBBundleManifestV1, _manifest_bytes
-from oc2_slice_b_image import ImagePin
-from oc2_slice_b_session import (
-    GuestAuthorityVerificationRequest,
-    SliceBReceipt,
-    VerifiedGuestAuthority,
-    _encode_receipt,
-    verify_guest_authority_from_host_record,
-)
-from oc2_writer import WriterSessionKey
+if TYPE_CHECKING:
+    import sandbox.scripts.oc2_slice_b_image as slice_b_image
+    from sandbox.scripts.oc2_slice_b_git import (
+        GitBaseline,
+        POLICY,
+        SCHEMA,
+        SliceBBundleManifestV1,
+        _manifest_bytes,
+    )
+    from sandbox.scripts.oc2_slice_b_image import ImagePin
+    from sandbox.scripts.oc2_slice_b_session import (
+        GuestAuthorityVerificationRequest,
+        SliceBReceipt,
+        VerifiedGuestAuthority,
+        _encode_receipt,
+        verify_guest_authority_from_host_record,
+    )
+    from sandbox.scripts.oc2_writer import WriterSessionKey
+else:
+    from oc2_slice_b_git import GitBaseline, POLICY, SCHEMA, SliceBBundleManifestV1, _manifest_bytes
+    from oc2_slice_b_image import ImagePin
+    from oc2_slice_b_session import (
+        GuestAuthorityVerificationRequest,
+        SliceBReceipt,
+        VerifiedGuestAuthority,
+        _encode_receipt,
+        verify_guest_authority_from_host_record,
+    )
+    from oc2_writer import WriterSessionKey
 
 
+@final
 class FakeGuestImageRunner:
-    docker_host = "unix:///var/run/docker.sock"
+    docker_host: str = "unix:///var/run/docker.sock"
 
-    def __init__(self, pin: ImagePin) -> None:
-        self.pin = pin
+    def __init__(self, pin: slice_b_image.ImagePin) -> None:
+        self.pin: slice_b_image.ImagePin = pin
 
     def image_ids(self) -> tuple[str, ...]:
         return ()
 
     def load_image(self, archive: Path) -> None:
+        if not archive.is_file():
+            raise AssertionError('test archive missing')
         return None
+
+    def daemon_id(self) -> str:
+        return 'test-daemon-id'
+
+    def container_ids(self) -> tuple[str, ...]:
+        return ()
 
     def inspect_config_id(self, config_id: str):
         return {
@@ -55,7 +84,9 @@ def make_key() -> WriterSessionKey:
     return WriterSessionKey("a" * 32, str(uuid.uuid4()), str(uuid.uuid4()))
 
 
-def make_verified_authority(root: Path, key: WriterSessionKey) -> VerifiedGuestAuthority:
+def make_verified_authority(
+    root: Path, key: WriterSessionKey, *, baseline: GitBaseline | None = None,
+) -> VerifiedGuestAuthority:
     root.mkdir(mode=0o700)
     control = root / "image-control"
     control.mkdir(mode=0o700)
@@ -76,15 +107,16 @@ def make_verified_authority(root: Path, key: WriterSessionKey) -> VerifiedGuestA
     archive = control / (pin.archive_sha256 + ".tar")
     archive.write_bytes(raw)
     archive.chmod(0o600)
-    baseline = GitBaseline(
-        root / "repo",
-        "refs/heads/sliceb",
-        "4" * 40,
-        "5" * 40,
-        "sha1",
-        "6" * 64,
-        "7" * 64,
-    )
+    if baseline is None:
+        baseline = GitBaseline(
+            root / "repo",
+            "refs/heads/sliceb",
+            "4" * 40,
+            "5" * 40,
+            "sha1",
+            "6" * 64,
+            "7" * 64,
+        )
     manifest = SliceBBundleManifestV1(
         SCHEMA,
         key,
