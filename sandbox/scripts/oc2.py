@@ -19,6 +19,7 @@ import platform
 import re
 import secrets
 import shutil
+import stat
 import subprocess
 import sys
 import tarfile
@@ -50,6 +51,9 @@ if str(REPO_ROOT) not in sys.path:
 VERSION = '2.2.5'
 ROOT = '/home/agent/workspace/oc2'
 SHELL_WORKLOAD: Final[str] = 'docker.io/docker/sbx-kit-shell:1.0.0'
+HOST_BROKER_SHELL_WORKLOAD: Final[str] = (
+    'docker.io/sbx/shell@sha256:89ed5d63def6bfb2373d408e3ab6ad55aa5c010f884a182a78299fcf85ea42d1'
+)
 CLI_ASSET_URL: Final[str] = (
     'https://github.com/anomalyco/opencode/releases/download/v2.2.5/'
     'opencode-linux-x64.tar.gz'
@@ -294,8 +298,71 @@ def opencode_cli_mixin_spec() -> bytes:
     ).encode('utf-8')
 
 
-def download_verified_cli(destination: pathlib.Path) -> pathlib.Path:
-    """Download, authenticate, and safely extract the pinned official CLI."""
+def _copy_local_cli_archive(source: pathlib.Path, destination: pathlib.Path) -> None:
+    if not source.is_absolute() or any(path.is_symlink() for path in (source, *source.parents)):
+        raise Stop('local OpenCode archive path is unsafe')
+    source_fd: int | None = None
+    destination_fd: int | None = None
+    try:
+        source_fd = os.open(
+            source,
+            os.O_RDONLY | os.O_NOFOLLOW | getattr(os, 'O_CLOEXEC', 0),
+        )
+        before = os.fstat(source_fd)
+        if not stat.S_ISREG(before.st_mode) or before.st_size != CLI_ASSET_SIZE:
+            raise Stop('local OpenCode archive size or type mismatch')
+        flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, 'O_NOFOLLOW', 0)
+        destination_fd = os.open(destination, flags, 0o600)
+        os.fchmod(destination_fd, 0o600)
+        total = 0
+        with os.fdopen(destination_fd, 'wb', closefd=False) as output:
+            while chunk := os.read(source_fd, 1024 * 1024):
+                total += len(chunk)
+                if total > CLI_ASSET_SIZE:
+                    raise Stop('local OpenCode archive size mismatch')
+                output.write(chunk)
+            output.flush()
+            os.fsync(destination_fd)
+        after = os.fstat(source_fd)
+        before_identity = (
+            before.st_dev, before.st_ino, before.st_size,
+            before.st_mtime_ns, before.st_ctime_ns,
+        )
+        after_identity = (
+            after.st_dev, after.st_ino, after.st_size,
+            after.st_mtime_ns, after.st_ctime_ns,
+        )
+        current_path = source.lstat()
+        if (not stat.S_ISREG(current_path.st_mode)
+                or any(path.is_symlink() for path in (source, *source.parents))):
+            raise Stop('local OpenCode archive path changed during verification')
+        path_identity = (
+            current_path.st_dev, current_path.st_ino, current_path.st_size,
+            current_path.st_mtime_ns, current_path.st_ctime_ns,
+        )
+        copied = os.fstat(destination_fd)
+        if before_identity != after_identity or before_identity != path_identity:
+            raise Stop('local OpenCode archive changed during verification')
+        if total != CLI_ASSET_SIZE:
+            raise Stop('local OpenCode archive size mismatch')
+        if (not stat.S_ISREG(copied.st_mode) or copied.st_size != CLI_ASSET_SIZE
+                or stat.S_IMODE(copied.st_mode) != 0o600 or copied.st_nlink != 1):
+            raise Stop('local OpenCode archive copy is unsafe')
+    except OSError as exc:
+        raise Stop('local OpenCode archive could not be read safely') from exc
+    finally:
+        if destination_fd is not None:
+            os.close(destination_fd)
+        if source_fd is not None:
+            os.close(source_fd)
+
+
+def download_verified_cli(
+    destination: pathlib.Path,
+    *,
+    local_archive: pathlib.Path | None = None,
+) -> pathlib.Path:
+    """Verify and extract the pinned CLI from a local archive or HTTPS download."""
     if (sys.platform != 'linux' or platform.machine().lower() not in
             ('x86_64', 'amd64')):
         raise Stop('pinned OpenCode release asset requires Linux x86-64')
@@ -304,50 +371,52 @@ def download_verified_cli(destination: pathlib.Path) -> pathlib.Path:
         raise Stop('official CLI download requires a private temporary directory')
     if any(destination.iterdir()):
         raise Stop('official CLI temporary directory must be empty')
-    curl = shutil.which('curl')
-    if curl is None:
-        raise Stop('curl is required to download the official OpenCode release')
-
     archive_path = destination / 'opencode-linux-x64.tar.gz'
     binary_path = destination / 'opencode'
-    command = [
-        curl, '--disable', '--fail', '--location', '--max-redirs', '5',
-        '--proto', '=https', '--proto-redir', '=https', '--tlsv1.2',
-        '--connect-timeout', '20', '--max-time', '240', '--max-filesize',
-        str(CLI_ASSET_SIZE), '--silent', '--show-error', '--output',
-        str(archive_path), '--write-out',
-        '\nOC2_HTTP_STATUS=%{http_code}\nOC2_FINAL_URL=%{url_effective}\n',
-        CLI_ASSET_URL,
-    ]
     binary_created = False
     try:
-        try:
-            result = subprocess.run(
-                command, capture_output=True, text=True, check=False, timeout=300,
-            )
-        except subprocess.TimeoutExpired as exc:
-            raise Stop('official OpenCode release download timed out') from exc
-        except OSError as exc:
-            raise Stop('official OpenCode release download could not run') from exc
+        if local_archive is not None:
+            _copy_local_cli_archive(local_archive, archive_path)
+        else:
+            curl = shutil.which('curl')
+            if curl is None:
+                raise Stop('curl is required to download the official OpenCode release')
+            command = [
+                curl, '--disable', '--fail', '--location', '--max-redirs', '5',
+                '--proto', '=https', '--proto-redir', '=https', '--tlsv1.2',
+                '--connect-timeout', '20', '--max-time', '240', '--max-filesize',
+                str(CLI_ASSET_SIZE), '--silent', '--show-error', '--output',
+                str(archive_path), '--write-out',
+                '\nOC2_HTTP_STATUS=%{http_code}\nOC2_FINAL_URL=%{url_effective}\n',
+                CLI_ASSET_URL,
+            ]
+            try:
+                result = subprocess.run(
+                    command, capture_output=True, text=True, check=False, timeout=300,
+                )
+            except subprocess.TimeoutExpired as exc:
+                raise Stop('official OpenCode release download timed out') from exc
+            except OSError as exc:
+                raise Stop('official OpenCode release download could not run') from exc
 
-        fields = dict(
-            line.split('=', 1) for line in result.stdout.splitlines()
-            if line.startswith(('OC2_HTTP_STATUS=', 'OC2_FINAL_URL='))
-        )
-        if result.returncode != 0:
-            if result.returncode == 6:
-                raise Stop('official OpenCode release download failed: Host DNS resolution failed')
-            if result.returncode == 7:
-                raise Stop('official OpenCode release download failed: Host connection failed')
-            if result.returncode == 28:
-                raise Stop('official OpenCode release download timed out')
-            raise Stop(f'official OpenCode release download failed (curl exit {result.returncode})')
-        if fields.get('OC2_HTTP_STATUS') != '200':
-            raise Stop('official OpenCode release returned an unexpected HTTP status')
-        final_url = urlsplit(fields.get('OC2_FINAL_URL', ''))
-        if (final_url.scheme != 'https'
-                or (final_url.hostname or '').lower() not in CLI_REDIRECT_HOSTS):
-            raise Stop('official OpenCode release redirected to an untrusted host')
+            fields = dict(
+                line.split('=', 1) for line in result.stdout.splitlines()
+                if line.startswith(('OC2_HTTP_STATUS=', 'OC2_FINAL_URL='))
+            )
+            if result.returncode != 0:
+                if result.returncode == 6:
+                    raise Stop('official OpenCode release download failed: Host DNS resolution failed')
+                if result.returncode == 7:
+                    raise Stop('official OpenCode release download failed: Host connection failed')
+                if result.returncode == 28:
+                    raise Stop('official OpenCode release download timed out')
+                raise Stop(f'official OpenCode release download failed (curl exit {result.returncode})')
+            if fields.get('OC2_HTTP_STATUS') != '200':
+                raise Stop('official OpenCode release returned an unexpected HTTP status')
+            final_url = urlsplit(fields.get('OC2_FINAL_URL', ''))
+            if (final_url.scheme != 'https'
+                    or (final_url.hostname or '').lower() not in CLI_REDIRECT_HOSTS):
+                raise Stop('official OpenCode release redirected to an untrusted host')
         if archive_path.stat().st_size != CLI_ASSET_SIZE:
             raise Stop('official OpenCode release asset size mismatch')
 
@@ -1619,6 +1688,9 @@ def _run_host_broker(
     ca_certificate: oc2_host_broker.BrokerCaCertificate,
 ) -> int:
     """Broker-only launch: no APM export, no credential Mixin, no OAuth bootstrap."""
+    if (args.host_broker_cli_archive is None
+            or not args.host_broker_cli_archive.is_absolute()):
+        raise Stop('--host-broker-cli-archive must be an absolute path in Host Broker mode')
     if args.host_broker_artifacts is None:
         raise Stop('--host-broker-artifacts (trusted local oc-cf-aig-subscription checkout) is required')
     prompt = oc2_host_broker_runtime.validate_prompt(args.host_broker_prompt)
@@ -1655,7 +1727,9 @@ def _run_host_broker(
         config_file.write_bytes(oc2_host_broker_runtime.config_bytes(runtime))
         cli_download_dir = temporary_path / 'cli-download'
         cli_download_dir.mkdir(mode=0o700)
-        cli_binary = download_verified_cli(cli_download_dir)
+        cli_binary = download_verified_cli(
+            cli_download_dir, local_archive=args.host_broker_cli_archive,
+        )
         print('OC2_CLI_ARTIFACT_VERIFIED: v2.2.5 sha256=' + CLI_ASSET_SHA256)
         print('OC2: creating mountless shell Sandbox ' + args.sandbox
               + ' (no credential Mixin; no direct-provider egress allowance)')
@@ -1667,7 +1741,30 @@ def _run_host_broker(
         staged_cli = cli_mixin / 'opencode'
         shutil.copyfile(cli_binary, staged_cli)
         os.chmod(staged_cli, 0o600)
-        runner.sbx('create', '--name', args.sandbox, '--kit', str(cli_mixin), SHELL_WORKLOAD)
+        runner.sbx(
+            'create', '--pull', 'never', '--name', args.sandbox,
+            '--kit', str(cli_mixin), HOST_BROKER_SHELL_WORKLOAD,
+        )
+        try:
+            inspect = runner.sbx('inspect', args.sandbox, capture=True)
+            oc2_network_gate.validate_sandbox_identity(inspect, args.sandbox)
+            created_policy = runner.sbx('policy', 'ls', '--json', capture=True)
+            oc2_network_gate.validate_policy_listing(
+                created_policy, args.sandbox, 'before',
+            )
+            broker_port = urlsplit(selection.url).port
+            if broker_port is None:
+                raise oc2_network_gate.NetworkGateError('Broker URL has no port')
+            oc2_network_gate.run_network_gate(runner, args.sandbox, broker_port)
+        except (oc2_network_gate.NetworkGateError, Stop) as exc:
+            try:
+                runner.sbx('rm', args.sandbox)
+            except Stop as cleanup_error:
+                raise Stop(
+                    f'Host Broker Network Gate failed; owned Sandbox cleanup also failed: '
+                    f'{cleanup_error}'
+                ) from cleanup_error
+            raise Stop(f'Host Broker Network Gate failed; owned Sandbox was removed: {exc}') from exc
         cli = provision_cli(runner, args.sandbox)
         workdir = transfer_workspace(
             runner, args.sandbox, temporary_path / 'workspace-snapshot',
@@ -1791,6 +1888,8 @@ def main(argv: list[str] | None = None) -> int:
                    help='inherited pipe/socket fd (3-1023) carrying the one-shot capability')
     p.add_argument('--host-broker-artifacts', type=pathlib.Path,
                    help='trusted local oc-cf-aig-subscription checkout (never fetched)')
+    p.add_argument('--host-broker-cli-archive', type=pathlib.Path,
+                   help='local verified OpenCode v2.2.5 Linux x64 archive (Host Broker only)')
     p.add_argument('--host-broker-prompt',
                    help='non-interactive prompt for `opencode run`; the TUI is not offered')
     p.add_argument('--host-broker-fixture-root',
@@ -1805,7 +1904,8 @@ def main(argv: list[str] | None = None) -> int:
         broker_options = (
             args.host_broker_url, args.host_broker_mode, args.host_broker_sandbox_label,
             args.host_broker_capability_fd, args.host_broker_fixture_root,
-            args.host_broker_artifacts, args.host_broker_prompt, args.host_broker_ca_cert,
+            args.host_broker_artifacts, args.host_broker_cli_archive,
+            args.host_broker_prompt, args.host_broker_ca_cert,
         )
         if args.use_host_broker:
             if (args.prepare_only or args.verification_only or args.phase4_plugins
@@ -1813,6 +1913,14 @@ def main(argv: list[str] | None = None) -> int:
                     or args.allow_paid_inference):
                 raise Stop('--use-host-broker cannot be combined with other Runtime, '
                            'credential, or inference modes')
+            try:
+                oc2_network_gate.validate_app_name(args.host_broker_app_name)
+            except oc2_network_gate.NetworkGateError as exc:
+                raise Stop(str(exc)) from exc
+            if args.host_broker_cli_archive is None:
+                raise Stop('--host-broker-cli-archive is required with --use-host-broker')
+            if not args.host_broker_cli_archive.is_absolute():
+                raise Stop('--host-broker-cli-archive must be an absolute path')
             if oc2_host_broker.CAPABILITY_ENV in os.environ:
                 raise Stop(oc2_host_broker.CAPABILITY_ENV
                            + ' must not be set; the capability is read from a pipe fd only')

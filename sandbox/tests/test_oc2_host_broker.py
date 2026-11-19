@@ -11,11 +11,13 @@ import io
 import json
 import os
 import pathlib
+import stat
 import shutil
 import ssl
 import subprocess
 import sys
 import tempfile
+import tarfile
 import unittest
 from collections.abc import Callable
 from unittest.mock import patch
@@ -183,6 +185,8 @@ class FsRunner:
         self.calls: list[tuple[str, ...]] = []
         self.fed: list[tuple[tuple[str, ...], bytes]] = []
         self.after_cp: Callable[[pathlib.Path], None] | None = None
+        self.fail_rm = False
+        self.downloaded_cli_archive: pathlib.Path | None = None
 
     def local(self, guest_path):
         return self.root / str(guest_path).lstrip('/')
@@ -729,13 +733,18 @@ class RunHostBrokerTests(unittest.TestCase):
         ca_certificate = hb.BrokerCaCertificate(CA_DATA, CA_SHA256)
         args = oc2.argparse.Namespace(
             sandbox='oc2-dev', host_broker_artifacts=self.tmp / 'src' if artifacts else None,
-            host_broker_prompt='say hello', host_broker_ca_cert=self.tmp / 'ca.pem')
+            host_broker_prompt='say hello', host_broker_ca_cert=self.tmp / 'ca.pem',
+            host_broker_app_name='oc2-env004-isolation',
+            host_broker_cli_archive=self.tmp / 'opencode-linux-x64.tar.gz')
+        args.host_broker_cli_archive.write_bytes(b'fake verified archive input')
 
-        def fake_download(destination: pathlib.Path) -> pathlib.Path:
+        def fake_download(destination: pathlib.Path,
+                          local_archive: pathlib.Path | None = None) -> pathlib.Path:
             """Write a fake binary into the private empty directory supplied by the caller."""
             assert destination.is_dir()
             assert destination.stat().st_mode & 0o077 == 0
             assert not any(destination.iterdir())
+            self.runner.downloaded_cli_archive = local_archive
             binary = destination / 'opencode'
             binary.write_bytes(b'fake')
             return binary
@@ -760,6 +769,13 @@ class RunHostBrokerTests(unittest.TestCase):
         self.assertEqual(self.run_broker(), 0)
         creates = [c for c in self.runner.calls if c[0] == 'create' and '--name' in c]
         self.assertEqual(len(creates), 1)
+        self.assertEqual(creates[0][1:4], ('--pull', 'never', '--name'))
+        self.assertEqual(creates[0][-1], oc2.HOST_BROKER_SHELL_WORKLOAD)
+        self.assertEqual(oc2.SHELL_WORKLOAD, 'docker.io/docker/sbx-kit-shell:1.0.0')
+        self.assertEqual(
+            self.runner.downloaded_cli_archive,
+            self.tmp / 'opencode-linux-x64.tar.gz',
+        )
         self.assertEqual(creates[0].count('--kit'), 1)
         self.assertNotIn('oc2-credentials', repr(self.runner.calls))
         self.assertEqual(len(self.runner.fed), 1)
@@ -798,7 +814,9 @@ class CliTests(unittest.TestCase):
         runner_cls.assert_not_called()
         return code, out.getvalue(), err.getvalue()
 
-    BASE = ('--host-broker-url', URL, '--host-broker-ca-cert', '/tmp/oc2-test-ca.pem',
+    BASE = ('--host-broker-app-name', 'oc2-env004-isolation',
+            '--host-broker-cli-archive', '/tmp/oc2-test-opencode.tar.gz',
+            '--host-broker-url', URL, '--host-broker-ca-cert', '/tmp/oc2-test-ca.pem',
             '--host-broker-mode', 'm1',
             '--host-broker-sandbox-label', 'oc2-dev', '--host-broker-capability-fd', '3',
             '--host-broker-prompt', 'say hello')
@@ -806,7 +824,8 @@ class CliTests(unittest.TestCase):
     def test_options_without_opt_in_are_refused(self):
         for option in (('--host-broker-url', URL), ('--host-broker-ca-cert', '/tmp/ca.pem'),
                        ('--host-broker-prompt', 'x'),
-                       ('--host-broker-artifacts', '/tmp')):
+                       ('--host-broker-artifacts', '/tmp'),
+                       ('--host-broker-cli-archive', '/tmp/oc2-test-opencode.tar.gz')):
             code, _out, err = self.run_main(*option)
             self.assertEqual(code, 1)
             self.assertIn('require --use-host-broker', err)
@@ -819,6 +838,23 @@ class CliTests(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn('--host-broker-ca-cert is required', err)
 
+    def test_daemon_name_is_required_with_host_broker_opt_in(self):
+        args = list(self.BASE)
+        index = args.index('--host-broker-app-name')
+        del args[index:index + 2]
+        code, _out, err = self.run_main('--use-host-broker', *args, '--sandbox', 'oc2-dev')
+        self.assertEqual(code, 1)
+        self.assertIn('requires a valid dedicated daemon name', err)
+
+    def test_host_broker_cli_archive_is_required(self):
+        args = list(self.BASE)
+        index = args.index('--host-broker-cli-archive')
+        del args[index:index + 2]
+        code, _out, err = self.run_main('--use-host-broker', *args, '--sandbox', 'oc2-dev')
+        self.assertEqual(code, 1)
+        self.assertIn('--host-broker-cli-archive is required', err)
+
+
     def test_conflicting_modes_are_refused(self):
         for extra in ('--use-cloudflare-ai-gateway', '--allow-paid-inference', '--prepare-only'):
             with self.subTest(extra=extra):
@@ -829,7 +865,8 @@ class CliTests(unittest.TestCase):
 
     def test_invalid_cli_values_and_tui_request_are_refused(self):
         for override in (('--host-broker-mode', 'm9'), ('--host-broker-url', 'https://x:1/v1'),
-                         ('--host-broker-capability-fd', '1')):
+                         ('--host-broker-capability-fd', '1'),
+                         ('--host-broker-cli-archive', 'relative.tar.gz')):
             argv = list(self.BASE)
             argv[argv.index(override[0]) + 1] = override[1]
             with self.subTest(override=override):
@@ -869,6 +906,151 @@ class CliTests(unittest.TestCase):
             '--sandbox', 'oc2-dev', '--dry-run', '--workspace', str(pathlib.Path.cwd()))
         self.assertEqual(code, 0)
         self.assertNotIn('Host Broker', out)
+
+
+class LocalCliArchiveTests(unittest.TestCase):
+    def verified_archive(self) -> pathlib.Path:
+        for candidate in pathlib.Path(tempfile.gettempdir()).rglob('opencode-linux-x64.tar.gz'):
+            try:
+                metadata = candidate.lstat()
+                if not stat.S_ISREG(metadata.st_mode) or metadata.st_size != oc2.CLI_ASSET_SIZE:
+                    continue
+                digest = hashlib.sha256()
+                with candidate.open('rb') as source:
+                    for chunk in iter(lambda: source.read(1024 * 1024), b''):
+                        digest.update(chunk)
+            except OSError:
+                continue
+            if digest.hexdigest() == oc2.CLI_ASSET_SHA256:
+                return candidate
+        self.skipTest('no locally cached OpenCode archive matches the pinned size and SHA-256')
+
+    def test_verified_local_archive_extracts_without_curl_or_network(self):
+        archive = self.verified_archive()
+        with tempfile.TemporaryDirectory() as temporary:
+            destination = pathlib.Path(temporary) / 'cli'
+            destination.mkdir(mode=0o700)
+            with patch.object(oc2.shutil, 'which', side_effect=AssertionError('curl lookup forbidden')), \
+                    patch.object(oc2.subprocess, 'run', side_effect=AssertionError('network forbidden')):
+                binary = oc2.download_verified_cli(destination, local_archive=archive)
+            self.assertEqual(binary.stat().st_size, oc2.CLI_BINARY_SIZE)
+            self.assertTrue(stat.S_ISREG(binary.lstat().st_mode))
+
+    def test_https_download_path_remains_available_for_default_callers(self):
+        cached = self.verified_archive()
+        with tempfile.TemporaryDirectory() as temporary:
+            destination = pathlib.Path(temporary) / 'cli'
+            destination.mkdir(mode=0o700)
+
+            def fake_curl(command, **_kwargs):
+                archive_path = pathlib.Path(command[command.index('--output') + 1])
+                shutil.copyfile(cached, archive_path)
+                return subprocess.CompletedProcess(
+                    command, 0,
+                    'OC2_HTTP_STATUS=200\n'
+                    'OC2_FINAL_URL=https://github.com/anomalyco/opencode/release.tar.gz\n',
+                    '',
+                )
+
+            with patch.object(oc2.shutil, 'which', return_value='/usr/bin/curl'), \
+                    patch.object(oc2.subprocess, 'run', side_effect=fake_curl) as run:
+                binary = oc2.download_verified_cli(destination)
+            self.assertEqual(binary.stat().st_size, oc2.CLI_BINARY_SIZE)
+            self.assertEqual(run.call_count, 1)
+            self.assertIn(oc2.CLI_ASSET_URL, run.call_args.args[0])
+
+    def test_invalid_local_archive_fails_without_curl_fallback(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            source = pathlib.Path(temporary) / 'wrong.tar.gz'
+            source.write_bytes(b'not the pinned archive')
+            destination = pathlib.Path(temporary) / 'cli'
+            destination.mkdir(mode=0o700)
+            with patch.object(oc2.shutil, 'which', side_effect=AssertionError('curl lookup forbidden')), \
+                    patch.object(oc2.subprocess, 'run', side_effect=AssertionError('network forbidden')):
+                with self.assertRaisesRegex(oc2.Stop, 'size or type mismatch'):
+                    oc2.download_verified_cli(destination, local_archive=source)
+
+    def test_local_archive_sha_mismatch_fails_without_curl_fallback(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            source = pathlib.Path(temporary) / 'wrong-hash.tar.gz'
+            with source.open('wb') as archive_file:
+                archive_file.truncate(oc2.CLI_ASSET_SIZE)
+            destination = pathlib.Path(temporary) / 'cli'
+            destination.mkdir(mode=0o700)
+            with patch.object(oc2.shutil, 'which', side_effect=AssertionError('curl lookup forbidden')), \
+                    patch.object(oc2.subprocess, 'run', side_effect=AssertionError('network forbidden')):
+                with self.assertRaisesRegex(oc2.Stop, 'integrity verification failed'):
+                    oc2.download_verified_cli(destination, local_archive=source)
+
+    def test_symlinked_local_archive_is_rejected_without_curl_fallback(self):
+        archive = self.verified_archive()
+        with tempfile.TemporaryDirectory() as temporary:
+            source = pathlib.Path(temporary) / 'linked.tar.gz'
+            source.symlink_to(archive)
+            destination = pathlib.Path(temporary) / 'cli'
+            destination.mkdir(mode=0o700)
+            with patch.object(oc2.shutil, 'which', side_effect=AssertionError('curl lookup forbidden')), \
+                    patch.object(oc2.subprocess, 'run', side_effect=AssertionError('network forbidden')):
+                with self.assertRaises(oc2.Stop):
+                    oc2.download_verified_cli(destination, local_archive=source)
+
+    def test_relative_local_archive_path_is_rejected_without_curl_fallback(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            destination = pathlib.Path(temporary) / 'cli'
+            destination.mkdir(mode=0o700)
+            with patch.object(oc2.shutil, 'which', side_effect=AssertionError('curl lookup forbidden')), \
+                    patch.object(oc2.subprocess, 'run', side_effect=AssertionError('network forbidden')):
+                with self.assertRaisesRegex(oc2.Stop, 'path is unsafe'):
+                    oc2.download_verified_cli(destination, local_archive=pathlib.Path('relative.tar.gz'))
+
+    def test_local_archive_changed_during_copy_is_rejected(self):
+        cached = self.verified_archive()
+        with tempfile.TemporaryDirectory() as temporary:
+            source = pathlib.Path(temporary) / 'mutable.tar.gz'
+            shutil.copyfile(cached, source)
+            destination = pathlib.Path(temporary) / 'cli'
+            destination.mkdir(mode=0o700)
+            original_read = os.read
+            reads = 0
+
+            def read_and_change(fd, size):
+                nonlocal reads
+                chunk = original_read(fd, size)
+                reads += 1
+                if reads == 1:
+                    os.utime(source, None, follow_symlinks=False)
+                return chunk
+
+            with patch.object(oc2.os, 'read', side_effect=read_and_change), \
+                    patch.object(oc2.shutil, 'which', side_effect=AssertionError('curl lookup forbidden')), \
+                    patch.object(oc2.subprocess, 'run', side_effect=AssertionError('network forbidden')):
+                with self.assertRaisesRegex(oc2.Stop, 'changed during verification'):
+                    oc2.download_verified_cli(destination, local_archive=source)
+
+    def test_invalid_archive_member_is_rejected_after_fixed_hash_check(self):
+        archive = self.verified_archive()
+        malicious_member = tarfile.TarInfo('../escape')
+        malicious_member.mode = 0o755
+        malicious_member.size = oc2.CLI_BINARY_SIZE
+
+        class FakeArchive:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_args):
+                return False
+
+            def getmembers(self):
+                return [malicious_member]
+
+        with tempfile.TemporaryDirectory() as temporary:
+            destination = pathlib.Path(temporary) / 'cli'
+            destination.mkdir(mode=0o700)
+            with patch.object(oc2.tarfile, 'open', return_value=FakeArchive()), \
+                    patch.object(oc2.shutil, 'which', side_effect=AssertionError('curl lookup forbidden')), \
+                    patch.object(oc2.subprocess, 'run', side_effect=AssertionError('network forbidden')):
+                with self.assertRaisesRegex(oc2.Stop, 'archive contents are invalid'):
+                    oc2.download_verified_cli(destination, local_archive=archive)
 
 
 if __name__ == '__main__':
