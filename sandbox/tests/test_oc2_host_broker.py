@@ -26,6 +26,7 @@ if str(SCRIPTS) not in sys.path:
 
 import oc2  # noqa: E402
 import oc2_host_broker as hb  # noqa: E402
+import oc2_network_gate  # noqa: E402
 import oc2_host_broker_runtime as rbr  # noqa: E402
 
 TOKEN = 'ocb_' + 'A' * 43
@@ -183,6 +184,7 @@ class FsRunner:
         self.calls: list[tuple[str, ...]] = []
         self.fed: list[tuple[tuple[str, ...], bytes]] = []
         self.after_cp: Callable[[pathlib.Path], None] | None = None
+        self.fail_rm = False
 
     def local(self, guest_path):
         return self.root / str(guest_path).lstrip('/')
@@ -207,8 +209,14 @@ class FsRunner:
     def sbx(self, *args, capture=False, tty=False):
         self.calls.append(args)
         head = args[0]
+        if head == 'rm' and self.fail_rm:
+            raise oc2.Stop('sandbox removal failed')
         if head == 'version':
             return 'sbx v0.51.0'
+        if args[:2] == ('inspect', 'oc2-dev'):
+            return 'Name: oc2-dev\n'
+        if args[:3] == ('policy', 'ls', '--json'):
+            return '{"rules": []}'
         if args[:2] == ('create', '--help'):
             return '--kit'
         if head == 'cp':
@@ -718,7 +726,9 @@ class RunHostBrokerTests(unittest.TestCase):
         self.runner = FsRunner(self.tmp / 'guest')
         self.runner.root.mkdir()
 
-    def run_broker(self, *, artifacts=True, probe_ok=True, mode='m1', label='oc2-dev'):
+    def run_broker(self, *, artifacts=True, probe_ok=True, mode='m1', label='oc2-dev',
+                   gate_failure=False, global_policy_failure=False,
+                   cleanup_failure=False):
         read_fd, write_fd = os.pipe()
         os.write(write_fd, (TOKEN + '\n').encode())
         os.close(write_fd)
@@ -729,7 +739,8 @@ class RunHostBrokerTests(unittest.TestCase):
         ca_certificate = hb.BrokerCaCertificate(CA_DATA, CA_SHA256)
         args = oc2.argparse.Namespace(
             sandbox='oc2-dev', host_broker_artifacts=self.tmp / 'src' if artifacts else None,
-            host_broker_prompt='say hello', host_broker_ca_cert=self.tmp / 'ca.pem')
+            host_broker_prompt='say hello', host_broker_ca_cert=self.tmp / 'ca.pem',
+            host_broker_app_name='oc2-env004-isolation')
 
         def fake_download(destination: pathlib.Path) -> pathlib.Path:
             """Write a fake binary into the private empty directory supplied by the caller."""
@@ -745,8 +756,20 @@ class RunHostBrokerTests(unittest.TestCase):
                 raise hb.HostBrokerError('Host Broker is not reachable; no fallback provider is used')
 
         result_artifacts = verified()
+        def run_gate(*_args):
+            self.runner.calls.append(('NETWORK_GATE',))
+            if gate_failure:
+                raise oc2_network_gate.NetworkGateError('offline gate failure')
+
+        def validate_listing(_raw, _sandbox, stage, *_args):
+            if global_policy_failure and stage == 'global':
+                raise oc2_network_gate.NetworkGateError('unsafe daemon policy')
+
         with patch.object(oc2, 'Runner', return_value=self.runner), \
                 patch.object(oc2.shutil, 'which', return_value='/usr/bin/sbx'), \
+                patch.object(oc2_network_gate, 'verify_dedicated_daemon'), \
+                patch.object(oc2_network_gate, 'validate_policy_listing', side_effect=validate_listing), \
+                patch.object(oc2_network_gate, 'run_network_gate', side_effect=run_gate) as network_gate, \
                 patch.object(oc2, 'download_verified_cli', fake_download), \
                 patch.object(oc2, 'transfer_workspace', return_value='/workspace/project'), \
                 patch.object(oc2_host_broker_probe(), 'probe_broker', probe), \
@@ -754,7 +777,24 @@ class RunHostBrokerTests(unittest.TestCase):
                 patch.object(rbr, 'verify_source', return_value=result_artifacts), \
                 patch.dict(os.environ, {}, clear=True), \
                 contextlib.redirect_stdout(io.StringIO()):
-            return oc2._run_host_broker(args, None, sel, ca_certificate)
+            if gate_failure:
+                cleanup_message = (
+                    'owned Sandbox cleanup also failed' if cleanup_failure
+                    else 'owned Sandbox was removed'
+                )
+                with self.assertRaisesRegex(oc2.Stop, cleanup_message):
+                    oc2._run_host_broker(args, None, sel, ca_certificate)
+                self.assertEqual(self.runner.calls[-1], ('rm', 'oc2-dev'))
+                self.assertFalse(any(call[0] in {'exec', 'cp'} for call in self.runner.calls))
+                network_gate.assert_called_once()
+                return 1
+            if global_policy_failure:
+                with self.assertRaisesRegex(oc2.Stop, 'unsafe daemon policy'):
+                    oc2._run_host_broker(args, None, sel, ca_certificate)
+                self.assertFalse(any(call[0] == 'create' for call in self.runner.calls))
+                return 1
+            result = oc2._run_host_broker(args, None, sel, ca_certificate)
+            return result
 
     def test_broker_launch_creates_sandbox_without_credential_mixin(self):
         self.assertEqual(self.run_broker(), 0)
@@ -780,6 +820,23 @@ class RunHostBrokerTests(unittest.TestCase):
             self.assertEqual(self.runner.fed, [])
             self.assertFalse([c for c in self.runner.calls if c[0] == 'create' and '--name' in c])
 
+    def test_network_gate_failure_removes_only_the_new_sandbox_before_guest_setup(self):
+        self.assertEqual(self.run_broker(gate_failure=True), 1)
+        created = next(i for i, call in enumerate(self.runner.calls) if call[0] == 'create')
+        inspected = next(i for i, call in enumerate(self.runner.calls) if call[:2] == ('inspect', 'oc2-dev'))
+        gated = next(i for i, call in enumerate(self.runner.calls) if call[0] == 'NETWORK_GATE')
+        removed = next(i for i, call in enumerate(self.runner.calls) if call[:2] == ('rm', 'oc2-dev'))
+        self.assertLess(created, inspected)
+        self.assertLess(inspected, gated)
+        self.assertLess(gated, removed)
+
+    def test_cleanup_failure_is_reported(self):
+        self.runner.fail_rm = True
+        self.assertEqual(self.run_broker(gate_failure=True, cleanup_failure=True), 1)
+
+    def test_unsafe_global_policy_stops_before_sandbox_creation(self):
+        self.assertEqual(self.run_broker(global_policy_failure=True), 1)
+
 
 def oc2_host_broker_probe():
     return hb
@@ -798,7 +855,8 @@ class CliTests(unittest.TestCase):
         runner_cls.assert_not_called()
         return code, out.getvalue(), err.getvalue()
 
-    BASE = ('--host-broker-url', URL, '--host-broker-ca-cert', '/tmp/oc2-test-ca.pem',
+    BASE = ('--host-broker-app-name', 'oc2-env004-isolation',
+            '--host-broker-url', URL, '--host-broker-ca-cert', '/tmp/oc2-test-ca.pem',
             '--host-broker-mode', 'm1',
             '--host-broker-sandbox-label', 'oc2-dev', '--host-broker-capability-fd', '3',
             '--host-broker-prompt', 'say hello')
@@ -818,6 +876,14 @@ class CliTests(unittest.TestCase):
         code, _out, err = self.run_main('--use-host-broker', *args, '--sandbox', 'oc2-dev')
         self.assertEqual(code, 1)
         self.assertIn('--host-broker-ca-cert is required', err)
+
+    def test_daemon_name_is_required_with_host_broker_opt_in(self):
+        args = list(self.BASE)
+        index = args.index('--host-broker-app-name')
+        del args[index:index + 2]
+        code, _out, err = self.run_main('--use-host-broker', *args, '--sandbox', 'oc2-dev')
+        self.assertEqual(code, 1)
+        self.assertIn('requires a valid dedicated daemon name', err)
 
     def test_conflicting_modes_are_refused(self):
         for extra in ('--use-cloudflare-ai-gateway', '--allow-paid-inference', '--prepare-only'):
