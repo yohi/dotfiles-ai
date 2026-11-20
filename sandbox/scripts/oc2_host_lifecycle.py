@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum, unique
 from typing import TYPE_CHECKING, Protocol
 
@@ -105,6 +105,19 @@ class LifecycleFailure(StrEnum):
 
 
 @dataclass(frozen=True, slots=True)
+class GuestStopVerification:
+    verdict: w.StopVerdict
+    restart_epoch: int
+
+
+@dataclass(slots=True)
+class GuestStopVerificationState:
+    """Mutable retry state retained by a stop request."""
+
+    verified: GuestStopVerification | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class HostControlledStopRequest:
     guest: GuestStopPort
     authority: VerifiedGuestAuthority
@@ -112,6 +125,9 @@ class HostControlledStopRequest:
     host_identity: HostVmIdentity
     host_control: HostVmControl
     preserver: OfflinePreserver
+    guest_verification: GuestStopVerificationState = field(
+        default_factory=GuestStopVerificationState,
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -126,12 +142,19 @@ class HostControlledStopResult:
 def _guest_stop_verified(
     guest: GuestStopPort,
     verdict: w.StopVerdict | None,
-) -> bool:
-    return (
-        verdict is not None
-        and verdict.verified
-        and guest.state is SupervisorState.STOPPED_VERIFIED
-    )
+    verified_restart_epoch: int | None,
+    current_restart_epoch: int | None,
+) -> GuestStopVerification | None:
+    if (
+        verdict is None
+        or not verdict.verified
+        or guest.state is not SupervisorState.STOPPED_VERIFIED
+        or verified_restart_epoch is None
+        or verified_restart_epoch != current_restart_epoch
+        or current_restart_epoch is None
+    ):
+        return None
+    return GuestStopVerification(verdict, current_restart_epoch)
 
 
 def _failed(
@@ -184,7 +207,13 @@ def coordinate_host_controlled_stop(
         return _failed((LifecycleFailure.HOST_PREFLIGHT_FAILED, *preflight_failures))
 
     stages = ([] if resuming else [HostLifecycleStage.WRITER_STOP_REQUESTED])
-    verdict: w.StopVerdict | None = None
+    prior_verification = request.guest_verification.verified
+    verdict = prior_verification.verdict if resuming and prior_verification else None
+    verified_restart_epoch = (
+        prior_verification.restart_epoch
+        if resuming and prior_verification is not None
+        else initial.restart_epoch if initial is not None else None
+    )
     failures: list[LifecycleFailure | HostFailureCode] = []
     if not resuming:
         try:
@@ -193,18 +222,17 @@ def coordinate_host_controlled_stop(
             failures.append(LifecycleFailure.GUEST_STOP_UNVERIFIED)
 
     before_shutdown = request.host_control.observe(identity)
-    restart_epoch_unchanged = (
-        initial is not None
-        and before_shutdown is not None
-        and initial.restart_epoch is not None
-        and initial.restart_epoch == before_shutdown.restart_epoch
+    current_restart_epoch = (
+        before_shutdown.restart_epoch if before_shutdown is not None else None
     )
-    guest_verified = (
-        resuming and restart_epoch_unchanged
-    ) or _guest_stop_verified(guest, verdict)
-    if guest_verified:
+    guest_verification = _guest_stop_verified(
+        guest, verdict, verified_restart_epoch, current_restart_epoch,
+    )
+    if guest_verification is not None:
+        request.guest_verification.verified = guest_verification
         stages.append(HostLifecycleStage.GUEST_QUIESCENCE_VERIFIED)
     else:
+        request.guest_verification.verified = None
         stages.append(HostLifecycleStage.GUEST_QUIESCENCE_UNVERIFIED)
         if LifecycleFailure.GUEST_STOP_UNVERIFIED not in failures:
             failures.append(LifecycleFailure.GUEST_STOP_UNVERIFIED)

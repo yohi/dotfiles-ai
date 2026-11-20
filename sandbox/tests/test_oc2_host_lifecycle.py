@@ -82,12 +82,14 @@ class HostControlledLifecycleTests(unittest.TestCase):
             f.observation(stopped=True),
         ), events)
         preserver = FakePreserver(f.preservation_evidence(), events)
-
-        result = lifecycle.coordinate_host_controlled_stop(
-            lifecycle.HostControlledStopRequest(
-                guest, f.authority, f.writer, f.host_identity, host, preserver,
-            )
+        request = lifecycle.HostControlledStopRequest(
+            guest, f.authority, f.writer, f.host_identity, host, preserver,
         )
+        request.guest_verification.verified = lifecycle.GuestStopVerification(
+            w.StopVerdict(w.STATUS_STOPPED_VERIFIED), 4,
+        )
+
+        result = lifecycle.coordinate_host_controlled_stop(request)
 
         self.assertEqual(events, ['host.observe', 'host.observe', 'host.wait', 'preserve'])
         self.assertIn(lifecycle.HostLifecycleStage.VM_ISOLATION_VERIFIED, result.stages)
@@ -115,12 +117,41 @@ class HostControlledLifecycleTests(unittest.TestCase):
         self.assertNotIn(lifecycle.HostLifecycleStage.GUEST_QUIESCENCE_VERIFIED,
                          result.stages)
 
+    def test_retry_rechecks_guest_stop_epoch_from_previous_attempt(self) -> None:
+        f = self.fixture
+        request, events, guest = f.make_request((
+            f.observation(),
+            f.observation(),
+            replace(f.observation(stopped=True), restart_epoch=5),
+            replace(f.observation(stopped=True), restart_epoch=5),
+            replace(f.observation(stopped=True), restart_epoch=5),
+            replace(f.observation(stopped=True), restart_epoch=5),
+        ))
+        host = request.host_control
+
+        with mock.patch.object(
+            host, 'request_graceful_shutdown', side_effect=(False, True),
+        ):
+            first = lifecycle.coordinate_host_controlled_stop(request)
+            second = lifecycle.coordinate_host_controlled_stop(request)
+
+        self.assertIn(lifecycle.LifecycleFailure.VM_SHUTDOWN_REQUEST_FAILED,
+                      first.failures)
+        self.assertIn(lifecycle.LifecycleFailure.GUEST_STOP_UNVERIFIED,
+                      second.failures)
+        self.assertIn(lifecycle.HostLifecycleStage.GUEST_QUIESCENCE_UNVERIFIED,
+                      second.stages)
+        self.assertEqual(events.count('guest.stop'), 1)
+
     def test_coordinator_retries_shutdown_when_resumed_guest_vm_is_running(self) -> None:
         f = self.fixture
         request, events, guest = f.make_request((
             f.observation(), f.observation(), f.observation(stopped=True),
         ))
         guest.state = SupervisorState.STOPPED_VERIFIED
+        request.guest_verification.verified = lifecycle.GuestStopVerification(
+            w.StopVerdict(w.STATUS_STOPPED_VERIFIED), 4,
+        )
 
         result = lifecycle.coordinate_host_controlled_stop(request)
 
