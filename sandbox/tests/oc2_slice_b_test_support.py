@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 from pathlib import Path
 import uuid
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Mapping
 
 if TYPE_CHECKING:
     import sandbox.scripts.oc2_slice_b_image as slice_b_image
@@ -56,7 +56,7 @@ class FakeGuestImageRunner:
     def container_ids(self) -> tuple[str, ...]:
         return ()
 
-    def inspect_config_id(self, config_id: str):
+    def inspect_config_id(self, config_id: str) -> Mapping[str, Any]:
         return {
             "Id": config_id,
             "RepoDigests": [],

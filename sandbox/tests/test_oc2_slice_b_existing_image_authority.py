@@ -5,7 +5,7 @@ import hashlib
 from pathlib import Path
 import sys
 import unittest
-from typing import Any, Mapping, TypedDict, Unpack
+from typing import TYPE_CHECKING, Any, Mapping, TypedDict, Unpack
 from unittest.mock import patch
 
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
@@ -29,7 +29,10 @@ from oc2_slice_b_session import (  # noqa: E402
     verify_guest_authority_from_existing_image,
 )
 from oc2_slice_b_image_record import ImagePin  # noqa: E402
-from oc2_slice_b_test_support import FakeGuestImageRunner  # noqa: E402
+if TYPE_CHECKING:
+    from sandbox.tests.oc2_slice_b_test_support import FakeGuestImageRunner
+else:
+    from oc2_slice_b_test_support import FakeGuestImageRunner  # noqa: E402
 
 
 class ImageRequestChanges(TypedDict, total=False):
