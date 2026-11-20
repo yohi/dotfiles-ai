@@ -150,6 +150,27 @@ class RootObservationProviderTests(unittest.TestCase):
         self.assertEqual(observation.disk_openers, (hc.HostProcessReference(123, 12345),))
         self.assertTrue(observation.ssh_forward_listener_present)
 
+    def test_procfs_helper_counts_malformed_process_records_as_unreadable(self) -> None:
+        for record in ('stat', 'status'):
+            with self.subTest(record=record):
+                current = build_procfs_fixture(self.fixture)
+                if record == 'stat':
+                    current.process.joinpath('stat').write_text(
+                        '123 (truncated process record', encoding='ascii',
+                    )
+                else:
+                    current.process.joinpath('status').write_text(
+                        'Uid:\n', encoding='ascii',
+                    )
+
+                with mock.patch.object(os, 'geteuid', return_value=0):
+                    observation = current.helper.read(current.identity)
+
+                self.assertIsNotNone(observation)
+                if observation is None:
+                    self.fail('procfs observation missing')
+                self.assertEqual(observation.unreadable_processes, 1)
+
     def test_procfs_helper_captures_new_session_identity(self) -> None:
         """Verify capture binds a freshly observed QEMU identity to the requested session."""
         fixture = build_procfs_fixture(self.fixture)

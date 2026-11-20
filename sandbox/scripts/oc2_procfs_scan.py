@@ -28,7 +28,11 @@ def proc_pid_name(name: str) -> bool:
 def parse_start_ticks(stat_text: str) -> int:
     """Parse the kernel process start-tick field from one procfs stat record."""
     closing = stat_text.rfind(')')
+    if closing < 0:
+        raise ValueError('procfs stat record is missing the command delimiter')
     fields = stat_text[closing + 2:].split()
+    if len(fields) <= 19:
+        raise ValueError('procfs stat record is truncated')
     return int(fields[19])
 
 
@@ -36,7 +40,10 @@ def read_status_uid(status_path: Path) -> int:
     """Read the real UID from procfs status or raise ProcfsReadError."""
     for line in status_path.read_text().splitlines():
         if line.startswith('Uid:'):
-            return int(line.split()[1])
+            fields = line.split()
+            if len(fields) < 2:
+                raise ValueError('procfs status UID field is truncated')
+            return int(fields[1])
     raise ProcfsReadError
 
 

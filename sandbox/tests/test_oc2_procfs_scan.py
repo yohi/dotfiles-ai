@@ -13,6 +13,22 @@ import oc2_host_control as hc  # noqa: E402
 
 
 class ProcfsScanTests(unittest.TestCase):
+    def test_parse_start_ticks_rejects_missing_closing_parenthesis(self) -> None:
+        with self.assertRaises(ValueError):
+            scan.parse_start_ticks('123 (qemu S 0')
+
+    def test_parse_start_ticks_rejects_truncated_fields(self) -> None:
+        with self.assertRaises(ValueError):
+            scan.parse_start_ticks('123 (qemu) S 0 0')
+
+    def test_read_status_uid_rejects_missing_uid_value(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            status = Path(temporary) / 'status'
+            status.write_text('Uid:\n', encoding='ascii')
+
+            with self.assertRaises(ValueError):
+                scan.read_status_uid(status)
+
     def test_fd_enumeration_keeps_scandir_open_during_readlink(self) -> None:
         """Keep the enumeration descriptor live until every listed FD is inspected."""
         class Entry:
