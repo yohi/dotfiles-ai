@@ -11,6 +11,8 @@ PINNED_HOST_KEY_FINGERPRINT = 'SHA256:YVgkTOE0oaHKhbz0kXQYOc2V1qdWME1S/wuo2RsGc5
 
 @dataclass(frozen=True, slots=True)
 class HostProviderConfig:
+    """Fixed management and SSH identity required by the direct-QEMU adapter."""
+
     management_mode: str
     vm_name: str
     ssh_host: str

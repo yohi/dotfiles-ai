@@ -71,6 +71,28 @@ class HostControlledLifecycleTests(unittest.TestCase):
             self.fail('preservation decision missing')
         self.assertEqual(result.preservation.disposition.value, 'verified')
 
+    def test_coordinator_resumes_from_verified_guest_stop_without_reissuing_shutdown(self) -> None:
+        """Resume isolation and preservation after a verified Writer stop."""
+        f = self.fixture
+        events: list[str] = []
+        guest = FakeGuestStopper(f.key, f.writer, f.authority, events)
+        guest.state = SupervisorState.STOPPED_VERIFIED
+        host = FakeHostControl((
+            f.observation(stopped=True), f.observation(stopped=True),
+            f.observation(stopped=True),
+        ), events)
+        preserver = FakePreserver(f.preservation_evidence(), events)
+
+        result = lifecycle.coordinate_host_controlled_stop(
+            lifecycle.HostControlledStopRequest(
+                guest, f.authority, f.writer, f.host_identity, host, preserver,
+            )
+        )
+
+        self.assertEqual(events, ['host.observe', 'host.observe', 'host.wait', 'preserve'])
+        self.assertIn(lifecycle.HostLifecycleStage.VM_ISOLATION_VERIFIED, result.stages)
+        self.assertEqual(result.failures, ())
+
     def test_host_identity_mismatch_stops_before_guest_stop(self) -> None:
         f = self.fixture
         events: list[str] = []

@@ -62,23 +62,35 @@ __all__ = (
 class RootObservationHelper(Protocol):
     """Read a complete Host snapshot through a separately installed root helper."""
 
-    def read(self, identity: HostVmIdentity) -> HostObservation | None: ...
+    def read(self, identity: HostVmIdentity) -> HostObservation | None:
+        """Return a root-backed observation or None when its source is unavailable."""
+        ...
 
 
 class PinnedGuestShutdown(Protocol):
     """Send only the fixed graceful poweroff through a pinned SSH connection."""
 
-    def poweroff(self, config: HostProviderConfig) -> bool: ...
+    def poweroff(self, config: HostProviderConfig) -> bool:
+        """Request the fixed poweroff through verified SSH; false may be ambiguous."""
+        ...
 
 
 class HostControlEffects(Protocol):
-    def observe(self, identity: HostVmIdentity) -> HostObservation | None: ...
+    """Host observations and shutdown effects consumed by the control adapter."""
 
-    def shutdown(self, config: HostProviderConfig) -> bool: ...
+    def observe(self, identity: HostVmIdentity) -> HostObservation | None:
+        """Return one observation bound to the requested VM identity, if available."""
+        ...
+
+    def shutdown(self, config: HostProviderConfig) -> bool:
+        """False on rejection or failure; false does not generally prove no request ran."""
+        ...
 
     def wait_stopped(
         self, identity: HostVmIdentity, *, timeout_seconds: int,
-    ) -> HostObservation | None: ...
+    ) -> HostObservation | None:
+        """Return a bounded stopped-state observation, not a full isolation proof."""
+        ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -88,9 +100,11 @@ class DirectQemuHostEffects:
     shutdown_client: PinnedGuestShutdown
 
     def observe(self, identity: HostVmIdentity) -> HostObservation | None:
+        """Return one root-helper observation for the supplied Host identity."""
         return self.observer.observe(identity)
 
     def shutdown(self, config: HostProviderConfig) -> bool:
+        """Return false without execution for config mismatch; transport failure is ambiguous."""
         if config != self.config:
             return False
         return self.shutdown_client.poweroff(self.config)
@@ -98,6 +112,7 @@ class DirectQemuHostEffects:
     def wait_stopped(
         self, identity: HostVmIdentity, *, timeout_seconds: int,
     ) -> HostObservation | None:
+        """Wait boundedly for stopped QEMU identity; does not prove full isolation."""
         if timeout_seconds <= 0:
             return None
         deadline = time.monotonic() + min(timeout_seconds, 180)
@@ -118,6 +133,7 @@ def build_direct_qemu_host_control(
     helper: RootObservationHelper,
     command_runner: CommandRunner,
 ) -> DirectQemuHostVmControl:
+    """Build the direct-QEMU control adapter using injected observation and command seams."""
     observer = RootObservationProvider(helper)
     shutdown = OpenSshPoweroff(command_runner)
     effects = DirectQemuHostEffects(config, observer, shutdown)
@@ -129,7 +145,7 @@ class RootObservationProvider:
     helper: RootObservationHelper
 
     def observe(self, identity: HostVmIdentity) -> HostObservation | None:
-        """Fail closed on partial root snapshots and unproven isolation controls."""
+        """Return complete identity/process/FD observations, keeping unproven controls unknown."""
         observation = self.helper.read(identity)
         if observation is None:
             return None
@@ -160,6 +176,7 @@ class DirectQemuHostVmControl:
     effects: HostControlEffects
 
     def _supported(self, identity: HostVmIdentity) -> bool:
+        """Check that configured management and SSH identities match fixed policy."""
         return (
             self.configuration_failure() is None
             and self.config.vm_name == identity.vm_name
@@ -172,6 +189,7 @@ class DirectQemuHostVmControl:
         )
 
     def configuration_failure(self) -> HostFailureCode | None:
+        """Return the configuration failure or None when fixed direct-QEMU policy matches."""
         if self.config.management_mode != 'direct-qemu':
             return HostFailureCode.UNSUPPORTED_MANAGEMENT_MODE
         if (
@@ -188,11 +206,13 @@ class DirectQemuHostVmControl:
         return None
 
     def observe(self, identity: HostVmIdentity) -> HostObservation | None:
+        """Observe the VM only when its requested identity matches the configured target."""
         if not self._supported(identity):
             return None
         return self.effects.observe(identity)
 
     def request_graceful_shutdown(self, identity: HostVmIdentity) -> bool:
+        """Request pinned SSH shutdown only after a fresh running-identity observation."""
         if not self._supported(identity):
             return False
         if verify_host_running(identity, self.effects.observe(identity)):
@@ -202,6 +222,7 @@ class DirectQemuHostVmControl:
     def wait_for_stopped(
         self, identity: HostVmIdentity, *, timeout_seconds: int,
     ) -> HostObservation | None:
+        """Return a same-identity stopped observation, not a full isolation verdict."""
         if not self._supported(identity) or timeout_seconds <= 0:
             return None
         observation = self.effects.wait_stopped(

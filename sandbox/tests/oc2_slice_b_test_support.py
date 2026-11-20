@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 from pathlib import Path
 import uuid
-from typing import TYPE_CHECKING, final
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     import sandbox.scripts.oc2_slice_b_image as slice_b_image
@@ -36,7 +36,6 @@ else:
     from oc2_writer import WriterSessionKey
 
 
-@final
 class FakeGuestImageRunner:
     docker_host: str = "unix:///var/run/docker.sock"
 
@@ -87,6 +86,7 @@ def make_key() -> WriterSessionKey:
 def make_verified_authority(
     root: Path, key: WriterSessionKey, *, baseline: GitBaseline | None = None,
 ) -> VerifiedGuestAuthority:
+    """Create an isolated, cryptographically verified Guest authority test fixture."""
     root.mkdir(mode=0o700)
     control = root / "image-control"
     control.mkdir(mode=0o700)

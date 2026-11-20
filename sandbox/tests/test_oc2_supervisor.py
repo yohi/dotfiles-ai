@@ -1297,12 +1297,16 @@ class ProductionWiringTest(SupervisorBase):
         self.assertFalse(supervisor.authority_is_bound(other_authority))
 
     def test_production_assembly_uses_fixed_guest_docker_and_lifecycle(self):
+        """Pass the required snapshot capability through the production Supervisor factory."""
         transport = BridgeTransport(self.docker)
+        snapshotter = mock.Mock()
+        snapshotter.capture.return_value = True
         with mock.patch.object(sup, 'SubprocessTransport', return_value=transport):
             supervisor = sup.production_guest_supervisor(
-                self.key, self.image_authority,
+                self.key, self.image_authority, snapshotter=snapshotter,
             )
 
+        self.assertIs(supervisor._snapshotter, snapshotter)
         self.assertEqual(transport.calls, [])
         lifecycle = supervisor._factory(self.spec)
         self.assertIsInstance(lifecycle._probe, sup.GuestHostProbe)
@@ -1320,7 +1324,9 @@ class ProductionWiringTest(SupervisorBase):
             pathlib.Path(self.temporary.name) / 'mismatched-authority', other_key,
         )
         with self.assertRaises(sup.SupervisorInputError):
-            sup.production_guest_supervisor(self.key, authority)
+            sup.production_guest_supervisor(
+                self.key, authority, snapshotter=mock.Mock(capture=lambda *_: True),
+            )
 
     def test_production_assembly_rejects_nonfixed_docker_endpoint(self):
         for docker_path, docker_host in (
@@ -1331,6 +1337,7 @@ class ProductionWiringTest(SupervisorBase):
                 with self.assertRaises(sup.SupervisorInputError):
                     sup.production_guest_supervisor(
                         self.key, self.image_authority,
+                        snapshotter=mock.Mock(capture=lambda *_: True),
                         docker_path=docker_path, docker_host=docker_host,
                     )
 

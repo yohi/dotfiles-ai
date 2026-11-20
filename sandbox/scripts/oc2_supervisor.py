@@ -1275,6 +1275,7 @@ def production_guest_supervisor(
     key: w.WriterSessionKey,
     authority: VerifiedGuestAuthority,
     *,
+    snapshotter: FixtureSnapshotter,
     docker_path: str = GUEST_DOCKER_PATH,
     docker_host: str = GUEST_DOCKER_HOST,
 ) -> GuestSupervisor:
@@ -1292,13 +1293,17 @@ def production_guest_supervisor(
         raise SupervisorInputError('session key: invalid') from exc
     if not is_verified_guest_authority(authority) or authority.key != key:
         raise SupervisorInputError('verified Guest image authority does not match SessionKey')
+    if not callable(getattr(snapshotter, 'capture', None)):
+        raise SupervisorInputError('snapshotter: expected capture capability')
     if (_validate_docker_path(docker_path) != GUEST_DOCKER_PATH
             or _validate_docker_host(docker_host) != GUEST_DOCKER_HOST):
         raise SupervisorInputError('Docker endpoint does not match the fixed Guest runtime')
 
     runner = CliDockerRunner(docker_path, SubprocessTransport(), docker_host=docker_host)
     lifecycle_factory = guest_lifecycle_factory(runner, LocalGuestFs())
-    return GuestSupervisor(key, lifecycle_factory, image_authority=authority)
+    return GuestSupervisor(
+        key, lifecycle_factory, image_authority=authority, snapshotter=snapshotter,
+    )
 
 
 _LAUNCH_TEXT_RULES: tuple[tuple[tuple[str, ...], type[SupervisorError], str], ...] = (

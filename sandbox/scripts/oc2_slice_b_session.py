@@ -773,6 +773,14 @@ def verify_guest_authority_from_existing_image(
     request: ExistingGuestAuthorityVerificationRequest,
     runner: ExistingGuestImageRunner,
 ) -> VerifiedGuestAuthority:
+    """Verify a Session receipt and guest baseline against trusted existing-image authority.
+
+    The daemon ID in ``request`` must be sourced from trusted Host/Session
+    state. Verification is read-only and performs no Docker Load. The result
+    binds the receipt, manifest, baseline, and pinned image for this check;
+    invalid or changed evidence raises ``SliceBSessionError`` or the wrapped
+    image verification error.
+    """
     verified_receipt = verify_session_receipt(
         request.receipt_path,
         request.expected_key,

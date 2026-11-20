@@ -209,6 +209,16 @@ def verify_host_running(
     return tuple(dict.fromkeys(failures))
 
 
+def verify_host_stopped(
+    identity: HostVmIdentity, observation: HostObservation | None,
+) -> tuple[HostFailureCode, ...]:
+    """Verify one fresh observation proves this identified VM is stopped and isolated."""
+    if not host_vm_identity_valid(identity):
+        return (HostFailureCode.INVALID_IDENTITY,)
+    epoch = observation.restart_epoch if observation is not None else None
+    return tuple(dict.fromkeys(_stopped_failures(identity, observation, epoch)))
+
+
 def _stopped_failures(
     identity: HostVmIdentity,
     observation: HostObservation | None,
@@ -241,15 +251,21 @@ def _stopped_failures(
 def verify_host_isolation(
     identity: HostVmIdentity,
     observations: HostStopObservations,
+    *,
+    already_stopped: bool = False,
 ) -> HostIsolationResult:
-    """Verify stable Host VM identity, shutdown, no openers, and no restart."""
+    """Verify stable Host identity and isolation across shutdown or stopped-state retry."""
     if not host_vm_identity_valid(identity):
         return HostIsolationResult(False, False, (HostFailureCode.INVALID_IDENTITY,))
     initial = observations.before_guest_stop
     before_shutdown = observations.before_vm_shutdown
     after_shutdown = observations.after_vm_shutdown
-    failures = list(verify_host_running(identity, initial))
-    failures.extend(verify_host_running(identity, before_shutdown))
+    if already_stopped:
+        failures = list(verify_host_stopped(identity, initial))
+        failures.extend(verify_host_stopped(identity, before_shutdown))
+    else:
+        failures = list(verify_host_running(identity, initial))
+        failures.extend(verify_host_running(identity, before_shutdown))
     restart_epoch = initial.restart_epoch if initial is not None else None
     if (initial is not None and before_shutdown is not None
             and initial.restart_epoch != before_shutdown.restart_epoch):

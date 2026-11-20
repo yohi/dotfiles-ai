@@ -35,13 +35,20 @@ else:
 class FakeOfflineOps:
     def __init__(
         self, fixture: HostFixture, *, dirty: bool | None = False,
-        copy_failure: bool = False,
+        copy_failure: bool = False, data_file: str | None = None,
+        data_file_raw: bool | None = False,
     ) -> None:
         self.fixture = fixture
         self.dirty = dirty
         self.copy_failure = copy_failure
+        self.data_file = data_file
+        self.data_file_raw = data_file_raw
         self.calls: list[str] = []
         self.audit = fixture.preservation_evidence()
+        self.output_dir: Path | None = None
+        self.audit_failed = False
+        self.change_source_after_audit = False
+        self.source_hash_calls = 0
 
     def source_identity_matches(self, identity: hc.HostVmIdentity) -> bool | None:
         return identity.disk == self.fixture.disk
@@ -49,7 +56,7 @@ class FakeOfflineOps:
     def inspect_qcow2(self, path: Path) -> preserve.Qcow2Metadata:
         self.calls.append('inspect:' + path.name)
         return preserve.Qcow2Metadata(
-            'qcow2', 1, None, self.dirty, False,
+            'qcow2', 1, None, self.dirty, False, self.data_file, self.data_file_raw,
         )
 
     def create_output_dir(self, output_root: Path) -> Path:
@@ -57,6 +64,7 @@ class FakeOfflineOps:
         output_root.mkdir()
         destination = output_root / 'oc2-t7-offline.fixture'
         destination.mkdir(mode=0o700)
+        self.output_dir = destination
         return destination
 
     def destination_isolated(
@@ -77,6 +85,10 @@ class FakeOfflineOps:
 
     def sha256(self, path: Path) -> str:
         self.calls.append('sha256:' + path.name)
+        if path == Path(self.fixture.disk.path):
+            self.source_hash_calls += 1
+            if self.change_source_after_audit and self.source_hash_calls > 1:
+                return 'e' * 64
         return 'd' * 64
 
     def byte_identical(self, source: Path, copy: Path) -> bool:
@@ -103,6 +115,10 @@ class FakeOfflineOps:
         if authority.key != identity.session_key or not settings.kernel_version:
             return None
         self.calls.append('guestfish-ro')
+        if self.audit_failed:
+            return None
+        if self.change_source_after_audit:
+            Path(identity.disk.path).write_bytes(b'changed during audit')
         return replace(
             self.audit, repository_path=config.guest_repository_path,
         )
@@ -152,7 +168,8 @@ class OfflinePreserverTests(unittest.TestCase):
             self.fail('offline preservation evidence missing')
         self.assertEqual(evidence.session_key, f.key)
         self.assertEqual(evidence.source_sha256, evidence.copy_sha256)
-        self.assertEqual(ops.calls[-1], 'guestfish-ro')
+        self.assertEqual(ops.calls[-2], 'guestfish-ro')
+        self.assertEqual(ops.calls[-1], 'sha256:recovery.qcow2')
 
     def test_qcow_metadata_reads_dirty_flag_and_nested_corruption(self) -> None:
         metadata = disk.parse_qcow2_metadata(
@@ -162,6 +179,17 @@ class OfflinePreserverTests(unittest.TestCase):
 
         self.assertIs(metadata.dirty_flag, True)
         self.assertIs(metadata.corrupt, True)
+
+    def test_qcow_metadata_retains_external_data_file_dependency(self) -> None:
+        """Keep external data-file metadata available to the single-copy gate."""
+        metadata = disk.parse_qcow2_metadata(
+            b'{"format":"qcow2","format-specific":{"data":'
+            b'{"corrupt":false,"data-file":"external.raw",'
+            b'"data-file-raw":true}}}'
+        )
+
+        self.assertEqual(metadata.data_file, 'external.raw')
+        self.assertIs(metadata.data_file_raw, True)
 
     def test_missing_qcow_metadata_remains_unknown(self) -> None:
         metadata = disk.parse_qcow2_metadata(b'{"format":"qcow2"}')
@@ -181,6 +209,38 @@ class OfflinePreserverTests(unittest.TestCase):
 
         self.assertIsNone(evidence)
         self.assertNotIn('copy', ops.calls)
+
+    def test_external_qcow_data_file_stops_before_single_file_copy(self) -> None:
+        """Reject an image depending on an external QCOW2 data file before copying."""
+        ops = FakeOfflineOps(self.fixture, data_file='external.raw')
+
+        evidence = self.make_preserver(ops).preserve(
+            self.fixture.host_identity, self.fixture.authority,
+            hc.HostIsolationResult(True, True, ()),
+        )
+
+        self.assertIsNone(evidence)
+        self.assertNotIn('copy', ops.calls)
+
+    def test_output_resolving_inside_repository_is_rejected_before_creation(self) -> None:
+        """Reject a destination whose intermediate symlink resolves inside the repository."""
+        ops = FakeOfflineOps(self.fixture)
+        repository = self.fixture.authority.manifest.baseline.root
+        link = self.fixture.root / 'repository-link'
+        link.symlink_to(repository, target_is_directory=True)
+        preserver = self.make_preserver(ops)
+        preserver = replace(
+            preserver,
+            config=replace(preserver.config, output_root=link / 'offline'),
+        )
+
+        evidence = preserver.preserve(
+            self.fixture.host_identity, self.fixture.authority,
+            hc.HostIsolationResult(True, True, ()),
+        )
+
+        self.assertIsNone(evidence)
+        self.assertNotIn('create-output', ops.calls)
 
     def test_unknown_qcow2_dirty_state_stops_before_copy(self) -> None:
         f = self.fixture
@@ -220,6 +280,39 @@ class OfflinePreserverTests(unittest.TestCase):
 
         self.assertIsNone(evidence)
         self.assertNotIn('guestfish-ro', ops.calls)
+        self.assertIsNotNone(ops.output_dir)
+        if ops.output_dir is not None:
+            self.assertFalse(ops.output_dir.exists())
+
+    def test_source_change_during_audit_prevents_evidence_and_cleans_copy(self) -> None:
+        """Discard evidence and the trial copy when the source changes during audit."""
+        ops = FakeOfflineOps(self.fixture)
+        ops.change_source_after_audit = True
+
+        evidence = self.make_preserver(ops).preserve(
+            self.fixture.host_identity, self.fixture.authority,
+            hc.HostIsolationResult(True, True, ()),
+        )
+
+        self.assertIsNone(evidence)
+        self.assertIsNotNone(ops.output_dir)
+        if ops.output_dir is not None:
+            self.assertFalse(ops.output_dir.exists())
+
+    def test_guestfish_audit_failure_cleans_trial_copy(self) -> None:
+        """Remove the trial directory when guest filesystem auditing returns no evidence."""
+        ops = FakeOfflineOps(self.fixture)
+        ops.audit_failed = True
+
+        evidence = self.make_preserver(ops).preserve(
+            self.fixture.host_identity, self.fixture.authority,
+            hc.HostIsolationResult(True, True, ()),
+        )
+
+        self.assertIsNone(evidence)
+        self.assertIsNotNone(ops.output_dir)
+        if ops.output_dir is not None:
+            self.assertFalse(ops.output_dir.exists())
 
 
 if __name__ == '__main__':

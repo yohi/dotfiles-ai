@@ -131,10 +131,12 @@ class LocalOfflinePreservationOps:
         return True
 
     def destination_isolated(self, destination: Path, baseline: GitBaseline) -> bool:
+        resolved_destination = destination.resolve(strict=False)
+        resolved_repository = baseline.root.resolve(strict=False)
         return (
-            destination != baseline.root
-            and baseline.root not in destination.parents
-            and destination not in baseline.root.parents
+            resolved_destination != resolved_repository
+            and resolved_repository not in resolved_destination.parents
+            and resolved_destination not in resolved_repository.parents
         )
 
     def audit_readonly(
@@ -165,14 +167,18 @@ def parse_qcow2_metadata(raw: bytes) -> Qcow2Metadata:
     format_specific = first.get('format-specific')
     data = format_specific.get('data') if isinstance(format_specific, dict) else None
     corrupt = data.get('corrupt') if isinstance(data, dict) else None
+    data_file = data.get('data-file') if isinstance(data, dict) else None
+    data_file_raw = data.get('data-file-raw') if isinstance(data, dict) else None
     return Qcow2Metadata(
         image_format if isinstance(image_format, str) else None,
         len(chain),
         backing_file if isinstance(backing_file, str) else None,
         dirty if type(dirty) is bool else None,
         corrupt if type(corrupt) is bool else None,
+        data_file if isinstance(data_file, str) else None,
+        data_file_raw if type(data_file_raw) is bool else None,
     )
 
 
 def _unknown_metadata() -> Qcow2Metadata:
-    return Qcow2Metadata(None, None, None, None, None)
+    return Qcow2Metadata(None, None, None, None, None, None, None)

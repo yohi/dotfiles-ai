@@ -9,6 +9,7 @@ import tarfile
 import tempfile
 import unittest
 from typing import TYPE_CHECKING, final
+from unittest.mock import patch
 
 TESTS = Path(__file__).resolve().parent
 SCRIPTS = TESTS.parent / 'scripts'
@@ -19,6 +20,7 @@ for search_path in (SCRIPTS, TESTS):
 if TYPE_CHECKING:
     import sandbox.scripts.oc2_guestfs_audit as guestfs_audit
     import sandbox.scripts.oc2_guestfs_transport as guestfs_transport
+    import sandbox.scripts.oc2_guestfs_session as guestfs_session
     import sandbox.scripts.oc2_host_control as hc
     import sandbox.scripts.oc2_offline_preservation as op
     import sandbox.scripts.oc2_offline_preserver as preserve
@@ -28,6 +30,7 @@ if TYPE_CHECKING:
 else:
     import oc2_guestfs_audit as guestfs_audit
     import oc2_guestfs_transport as guestfs_transport
+    import oc2_guestfs_session as guestfs_session
     import oc2_host_control as hc
     import oc2_offline_preservation as op
     import oc2_offline_preserver as preserve
@@ -44,6 +47,7 @@ class FakeGuestfishRunner:
             'receipt.json': receipt,
             'bundle.manifest.json': manifest,
         }
+        self.receipt_returncode = 0
         self.calls: list[tuple[tuple[str, ...], tuple[tuple[str, str], ...]]] = []
 
     def run(
@@ -57,6 +61,10 @@ class FakeGuestfishRunner:
             return guestfs_transport.GuestfishCommandResult(0, self.archive)
         command_index = argv.index('download')
         guest_file_path = argv[command_index + 1]
+        if Path(guest_file_path).name == 'receipt.json':
+            return guestfs_transport.GuestfishCommandResult(
+                self.receipt_returncode, self.files['receipt.json'],
+            )
         return guestfs_transport.GuestfishCommandResult(
             0, self.files[Path(guest_file_path).name],
         )
@@ -109,13 +117,15 @@ class GuestfsAuditTests(unittest.TestCase):
 
     @staticmethod
     def make_clean_repo(path: Path) -> Path:
+        """Create a committed one-file repository suitable for verified session fixtures."""
         path.mkdir()
         subprocess.run(('git', 'init', '-q', str(path)), check=True)
         subprocess.run(('git', '-C', str(path), 'config', 'user.name', 'OC2 Test'), check=True)
         subprocess.run(('git', '-C', str(path), 'config', 'user.email', 'oc2@example.invalid'), check=True)
         (path / 'tracked.txt').write_text('clean fixture\n')
         subprocess.run(('git', '-C', str(path), 'add', 'tracked.txt'), check=True)
-        subprocess.run(('git', '-C', str(path), 'commit', '-qm', 'fixture'), check=True)
+        subprocess.run(('git', '-C', str(path), '-c', 'commit.gpgsign=false',
+                        'commit', '-qm', 'fixture'), check=True)
         return path
 
     @staticmethod
@@ -177,6 +187,28 @@ class GuestfsAuditTests(unittest.TestCase):
         self.assertEqual(len(runner.calls), 1)
 
     def test_guestfish_rejects_receipt_from_another_session(self) -> None:
+        """Reject a valid Receipt and Manifest pair sealed for another Session key."""
+        other_key = make_key()
+        make_verified_authority(
+            self.root / 'other-authority', other_key, baseline=self.baseline,
+        )
+        other_control = (self.root / 'other-authority' / 'image-control'
+                         / other_key.session_generation)
+        runner = FakeGuestfishRunner(
+            archive=self.tar_repository(self.repo),
+            receipt=(other_control / 'receipt.json').read_bytes(),
+            manifest=(other_control / 'bundle.manifest.json').read_bytes(),
+        )
+
+        evidence = self.make_provider(runner).audit_readonly(
+            self.disk_copy, self.config.libguestfs, self.identity,
+            self.authority, self.config,
+        )
+
+        self.assertIsNone(evidence)
+
+    def test_guestfish_rejects_malformed_receipt(self) -> None:
+        """Reject malformed Receipt content independently of session-key mismatch."""
         runner = FakeGuestfishRunner(
             archive=self.tar_repository(self.repo),
             receipt=b'not the pinned Receipt',
@@ -189,6 +221,23 @@ class GuestfsAuditTests(unittest.TestCase):
         )
 
         self.assertIsNone(evidence)
+
+    def test_invalid_receipt_export_stops_before_manifest_download(self) -> None:
+        """Stop Guestfish I/O after a receipt export failure, before manifest retrieval."""
+        runner = FakeGuestfishRunner(
+            archive=self.tar_repository(self.repo),
+            receipt=(self.control / 'receipt.json').read_bytes(),
+            manifest=(self.control / 'bundle.manifest.json').read_bytes(),
+        )
+        runner.receipt_returncode = 1
+
+        evidence = self.make_provider(runner).audit_readonly(
+            self.disk_copy, self.config.libguestfs, self.identity,
+            self.authority, self.config,
+        )
+
+        self.assertIsNone(evidence)
+        self.assertEqual(len(runner.calls), 2)
 
     def test_guestfish_rejects_guest_paths_with_command_delimiters_before_io(self) -> None:
         runner = FakeGuestfishRunner(
@@ -208,6 +257,29 @@ class GuestfsAuditTests(unittest.TestCase):
 
         self.assertIsNone(evidence)
         self.assertEqual(runner.calls, [])
+
+    def test_tracked_file_count_uses_index_and_excludes_ignored_files(self) -> None:
+        """Count the committed Index entries without counting ignored worktree files."""
+        ignored = self.repo / 'ignored.log'
+        (self.repo / '.gitignore').write_text('ignored.log\n', encoding='utf-8')
+        subprocess.run(('git', '-C', str(self.repo), 'add', '.gitignore'), check=True)
+        subprocess.run(('git', '-C', str(self.repo), '-c', 'commit.gpgsign=false',
+                        'commit', '-qm', 'ignore fixture'), check=True)
+        ignored.write_text('not tracked\n', encoding='utf-8')
+
+        git = guestfs_session.inspect_clean_session_git(self.repo)
+
+        self.assertIsNotNone(git)
+        if git is None:
+            self.fail('clean Git Index inspection missing')
+        self.assertEqual(git.tracked_file_count, 2)
+
+    def test_unicode_error_in_ref_inspection_is_unverified(self) -> None:
+        """Convert unsupported-ref decoding failures to an unavailable inspection."""
+        with patch.object(guestfs_session, 'admit_clean_repo', side_effect=UnicodeError):
+            inspection = guestfs_session.inspect_clean_session_git(self.repo)
+
+        self.assertIsNone(inspection)
 
 
 if __name__ == '__main__':

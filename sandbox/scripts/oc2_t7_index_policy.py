@@ -24,4 +24,5 @@ T7_ACCEPTED_INDEX_MISMATCH: Final[tuple[str, ...]] = (
 
 
 def is_accepted_t7_index_fingerprint(fingerprint: tuple[str, ...]) -> bool:
+    """Match only the complete pinned historical T7 index-mismatch evidence tuple."""
     return fingerprint == T7_ACCEPTED_INDEX_MISMATCH

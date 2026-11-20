@@ -4,6 +4,7 @@ from io import BytesIO
 import os
 from pathlib import Path, PurePosixPath
 import tarfile
+from typing import Literal
 
 MAX_SESSION_ARCHIVE_BYTES = 64 * 1024 * 1024
 MAX_SESSION_ARCHIVE_ENTRIES = 100_000
@@ -13,6 +14,13 @@ MAX_MANIFEST_BYTES = 64 * 1024
 
 
 def extract_regular_tar(data: bytes, destination: Path) -> bool:
+    """Extract bounded ordinary directories and regular files from a tar archive.
+
+    Rejects unsafe paths, special entries, duplicates, excessive entry counts,
+    and size limits before writing the corresponding entry. Returns false for
+    malformed or unsafe archives; valid directory and regular-file entries are
+    accepted.
+    """
     if len(data) > MAX_SESSION_ARCHIVE_BYTES:
         return False
     seen_files: set[Path] = set()
@@ -22,21 +30,16 @@ def extract_regular_tar(data: bytes, destination: Path) -> bool:
             for index, member in enumerate(archive):
                 if index >= MAX_SESSION_ARCHIVE_ENTRIES:
                     return False
-                relative = PurePosixPath(member.name)
-                if relative.is_absolute() or '..' in relative.parts:
+                target = _safe_tar_target(member, destination)
+                kind = _tar_entry_kind(member)
+                if target is None or kind is None:
                     return False
-                parts = tuple(part for part in relative.parts if part not in {'', '.'})
-                if not parts:
-                    if member.isdir():
+                if kind == 'directory':
+                    if target == destination:
                         continue
-                    return False
-                target = destination.joinpath(*parts)
-                if not target.is_relative_to(destination) or member.mode & 0o7000:
-                    return False
-                if member.isdir():
                     target.mkdir(mode=0o700, parents=True, exist_ok=True)
                     continue
-                if not member.isreg() or member.size < 0 or member.size > MAX_SESSION_FILE_BYTES:
+                if member.size < 0 or member.size > MAX_SESSION_FILE_BYTES:
                     return False
                 total_bytes += member.size
                 if total_bytes > MAX_SESSION_ARCHIVE_BYTES or target in seen_files:
@@ -55,6 +58,25 @@ def extract_regular_tar(data: bytes, destination: Path) -> bool:
     except (OSError, tarfile.TarError, ValueError):
         return False
     return True
+
+
+def _safe_tar_target(member: tarfile.TarInfo, destination: Path) -> Path | None:
+    relative = PurePosixPath(member.name)
+    if relative.is_absolute() or '..' in relative.parts or member.mode & 0o7000:
+        return None
+    parts = tuple(part for part in relative.parts if part not in {'', '.'})
+    if not parts:
+        return destination if member.isdir() else None
+    target = destination.joinpath(*parts)
+    return target if target.is_relative_to(destination) else None
+
+
+def _tar_entry_kind(member: tarfile.TarInfo) -> Literal['directory', 'file'] | None:
+    if member.isdir():
+        return 'directory'
+    if member.isreg():
+        return 'file'
+    return None
 
 
 def find_repo_root(export_root: Path) -> Path | None:

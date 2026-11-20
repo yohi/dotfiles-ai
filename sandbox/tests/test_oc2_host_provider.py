@@ -92,12 +92,19 @@ class FakeCommandRunner:
         self.results = list(results)
         self.argv: list[tuple[str, ...]] = []
         self.inputs: list[bytes] = []
+        self.known_hosts_snapshots: list[bytes] = []
 
     def run(
         self, argv: tuple[str, ...], *, input_bytes: bytes = b'',
     ) -> hs.CommandResult:
         self.argv.append(argv)
         self.inputs.append(input_bytes)
+        if argv[0] == '/usr/bin/ssh':
+            path = next(
+                Path(value.split('=', 1)[1]) for value in argv
+                if value.startswith('UserKnownHostsFile=')
+            )
+            self.known_hosts_snapshots.append(path.read_bytes())
         return self.results.pop(0)
 
 
@@ -173,6 +180,53 @@ class DirectQemuProviderTests(unittest.TestCase):
 
         self.assertTrue(accepted)
         self.assertEqual(effects.shutdown_commands, [hs.POWER_OFF_COMMAND])
+
+    def test_ssh_uses_only_the_verified_host_key_and_disables_user_config(self) -> None:
+        """Constrain SSH config, trust sources, and multiplexing to the verified snapshot."""
+        key_line = b'[127.0.0.1]:2223 ssh-ed25519 AAAA\n'
+        runner = FakeCommandRunner((
+            hs.CommandResult(0, key_line, b''),
+            hs.CommandResult(0, b'256 SHA256:YVgkTOE0oaHKhbz0kXQYOc2V1qdWME1S/wuo2RsGc5c comment\n', b''),
+            hs.CommandResult(0, b'', b''),
+        ))
+        config = hp.HostProviderConfig(
+            management_mode='direct-qemu', vm_name=hp.DIRECT_QEMU_VM_NAME,
+            ssh_host=hp.SSH_HOST, ssh_port=hp.SSH_PORT, ssh_user=hp.SSH_USER,
+            private_key_path=str(Path.home() / 'oc2-f002-kvm-probe' / 'ssh_client_ed25519'),
+            known_hosts_path='/unused/known_hosts',
+            host_key_fingerprint=hp.PINNED_HOST_KEY_FINGERPRINT,
+        )
+
+        accepted = hs.OpenSshPoweroff(runner).poweroff(config)
+
+        self.assertTrue(accepted)
+        ssh_argv = runner.argv[-1]
+        self.assertIn('-F', ssh_argv)
+        self.assertIn('/dev/null', ssh_argv)
+        self.assertTrue(any('ControlMaster=no' in arg for arg in ssh_argv))
+        self.assertTrue(any('GlobalKnownHostsFile=none' in arg for arg in ssh_argv))
+        self.assertTrue(any('UserKnownHostsFile=' in arg for arg in ssh_argv))
+        self.assertEqual(runner.known_hosts_snapshots, [key_line])
+
+    def test_ssh_rejects_fingerprint_occurring_only_in_comment(self) -> None:
+        """Reject a fingerprint found in a comment instead of a fingerprint field."""
+        runner = FakeCommandRunner((
+            hs.CommandResult(0, b'[127.0.0.1]:2223 ssh-ed25519 AAAA\n', b''),
+            hs.CommandResult(0, b'256 SHA256:WRONG comment '
+                             + hp.PINNED_HOST_KEY_FINGERPRINT.encode() + b'\n', b''),
+        ))
+        config = hp.HostProviderConfig(
+            management_mode='direct-qemu', vm_name=hp.DIRECT_QEMU_VM_NAME,
+            ssh_host=hp.SSH_HOST, ssh_port=hp.SSH_PORT, ssh_user=hp.SSH_USER,
+            private_key_path=str(Path.home() / 'oc2-f002-kvm-probe' / 'ssh_client_ed25519'),
+            known_hosts_path='/unused/known_hosts',
+            host_key_fingerprint=hp.PINNED_HOST_KEY_FINGERPRINT,
+        )
+
+        accepted = hs.OpenSshPoweroff(runner).poweroff(config)
+
+        self.assertFalse(accepted)
+        self.assertFalse(any(argv[0] == '/usr/bin/ssh' for argv in runner.argv))
 
     def test_ssh_success_does_not_claim_vm_stopped_or_isolated(self) -> None:
         f = self.fixture

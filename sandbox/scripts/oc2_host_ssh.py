@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+import tempfile
 import subprocess
 from typing import TYPE_CHECKING, Protocol
 
@@ -80,24 +81,45 @@ class OpenSshPoweroff:
             ))
             if keys.returncode != 0 or not keys.stdout:
                 return False
-            fingerprints = self.runner.run(
-                ('/usr/bin/ssh-keygen', '-lf', '-'), input_bytes=keys.stdout,
-            )
-            if (fingerprints.returncode != 0
-                    or config.host_key_fingerprint.encode() not in fingerprints.stdout):
+            verified_keys: list[bytes] = []
+            for line in keys.stdout.splitlines():
+                if not line or line.startswith(b'#'):
+                    continue
+                fingerprints = self.runner.run(
+                    ('/usr/bin/ssh-keygen', '-lf', '-'), input_bytes=line + b'\n',
+                )
+                if fingerprints.returncode != 0:
+                    continue
+                try:
+                    rows = fingerprints.stdout.decode('utf-8').splitlines()
+                except UnicodeError:
+                    return False
+                if any(len(columns := row.split()) >= 2
+                       and columns[1] == config.host_key_fingerprint
+                       for row in rows):
+                    verified_keys.append(line)
+            if not verified_keys:
                 return False
             remote = f'{config.ssh_user}@{config.ssh_host}'
-            result = self.runner.run((
-                '/usr/bin/ssh', '-i', config.private_key_path,
-                '-p', str(config.ssh_port),
-                '-o', 'BatchMode=yes',
-                '-o', 'IdentitiesOnly=yes',
-                '-o', 'StrictHostKeyChecking=yes',
-                '-o', f'UserKnownHostsFile={config.known_hosts_path}',
-                '-o', 'ClearAllForwardings=yes',
-                '-o', 'ConnectTimeout=10',
-                '--', remote, POWER_OFF_COMMAND,
-            ))
+            with tempfile.TemporaryDirectory(prefix='oc2-known-hosts.') as scratch:
+                snapshot = Path(scratch) / 'known_hosts'
+                snapshot.write_bytes(b'\n'.join(verified_keys) + b'\n')
+                snapshot.chmod(0o600)
+                result = self.runner.run((
+                    '/usr/bin/ssh', '-F', '/dev/null', '-i', config.private_key_path,
+                    '-p', str(config.ssh_port),
+                    '-o', 'BatchMode=yes',
+                    '-o', 'IdentitiesOnly=yes',
+                    '-o', 'StrictHostKeyChecking=yes',
+                    '-o', f'UserKnownHostsFile={snapshot}',
+                    '-o', 'GlobalKnownHostsFile=none',
+                    '-o', 'ControlMaster=no',
+                    '-o', 'ControlPath=none',
+                    '-o', 'ControlPersist=no',
+                    '-o', 'ClearAllForwardings=yes',
+                    '-o', 'ConnectTimeout=10',
+                    '--', remote, POWER_OFF_COMMAND,
+                ))
         except (OSError, subprocess.TimeoutExpired):
             return False
         return result.returncode == 0

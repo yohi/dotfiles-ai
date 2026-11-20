@@ -187,6 +187,15 @@ def reverify_existing_guest_image(
     request: ExistingGuestImageVerificationRequest,
     runner: ExistingGuestImageRunner,
 ) -> VerifiedImageAuthority:
+    """Revalidate an already-loaded image without issuing Docker Load.
+
+    ``expected_docker_daemon_id`` must come from trusted existing Host or
+    Session state, not from the Guest being checked. The archive must remain in
+    the Supervisor-owned private image store. The returned authority proves
+    only the pinned archive and exact loaded Config ID against the supplied
+    daemon identity at the verification observations; it does not prove later
+    Docker state. Raises ``SliceBImageRejected`` for every failed check.
+    """
     pin = request.image_pin
     _validate_pin(pin)
     docker_host = _validate_docker_host(request.docker_host)
@@ -231,7 +240,7 @@ def _verify_existing_image_store(
         not isinstance(image_id, str) for image_id in image_ids
     ):
         raise SliceBImageRejected("Guest Docker image listing is invalid")
-    if image_ids != (pin.config_id,):
+    if set(image_ids) != {pin.config_id}:
         raise SliceBImageRejected("Guest Image Store is not exactly the expected image")
     container_ids = runner.container_ids()
     if not isinstance(container_ids, tuple) or any(

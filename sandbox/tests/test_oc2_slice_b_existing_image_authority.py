@@ -5,6 +5,7 @@ import hashlib
 from pathlib import Path
 import sys
 import unittest
+from typing import Any, Mapping, TypedDict, Unpack
 from unittest.mock import patch
 
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
@@ -31,10 +32,16 @@ from oc2_slice_b_image_record import ImagePin  # noqa: E402
 from oc2_slice_b_test_support import FakeGuestImageRunner  # noqa: E402
 
 
+class ImageRequestChanges(TypedDict, total=False):
+    expected_docker_daemon_id: str
+    expected_record_sha256: str
+    docker_host: str
+
+
 class ReadOnlyImageRunner(FakeGuestImageRunner):
     docker_host = "unix:///var/run/docker.sock"
 
-    def __init__(self, pin):
+    def __init__(self, pin: ImagePin) -> None:
         super().__init__(pin)
         self.daemon_ids: list[str] = ["a" * 64]
         self.images: tuple[str, ...] = (pin.config_id,)
@@ -57,7 +64,7 @@ class ReadOnlyImageRunner(FakeGuestImageRunner):
         self.calls.append("load")
         raise AssertionError("existing-image verification must never load an image")
 
-    def inspect_config_id(self, config_id: str):
+    def inspect_config_id(self, config_id: str) -> Mapping[str, Any]:
         self.calls.append("inspect")
         return super().inspect_config_id(config_id)
 
@@ -77,7 +84,10 @@ class ExistingImageAuthorityTests(unittest.TestCase):
 
         SessionTests.setUp(self)
 
-    def image_request(self, runner: ReadOnlyImageRunner, **changes):
+    def image_request(
+        self, runner: ReadOnlyImageRunner, **changes: Unpack[ImageRequestChanges],
+    ) -> ExistingGuestImageVerificationRequest:
+        """Build an existing-image verifier request with test-controlled overrides."""
         args = {
             "archive_path": self.image_archive,
             "supervisor_root": self.image_control,
@@ -95,12 +105,20 @@ class ExistingImageAuthorityTests(unittest.TestCase):
         self.assertTrue(is_verified_image_authority(authority))
         self.assertNotIn("load", runner.calls)
 
-    def test_reverify_checks_daemon_store_and_containers_before_and_after(self) -> None:
+    def test_reverify_rejects_daemon_change_during_inspection(self) -> None:
+        """Reject a daemon identity changed by inspection before the second observation."""
         runner = ReadOnlyImageRunner(self.image_pin)
-        reverify_existing_guest_image(self.image_request(runner), runner)
-        self.assertEqual(runner.calls.count("daemon"), 2)
-        self.assertEqual(runner.calls.count("images"), 2)
-        self.assertEqual(runner.calls.count("containers"), 2)
+        inspect = runner.inspect_config_id
+
+        def change_daemon_during_inspection(config_id: str) -> Mapping[str, Any]:
+            result = inspect(config_id)
+            runner.daemon_ids = ["b" * 64]
+            return result
+
+        with patch.object(
+            runner, "inspect_config_id", side_effect=change_daemon_during_inspection,
+        ), self.assertRaises(SliceBImageRejected):
+            reverify_existing_guest_image(self.image_request(runner), runner)
 
     def test_reverify_rejects_wrong_trusted_daemon_id(self) -> None:
         runner = ReadOnlyImageRunner(self.image_pin)
@@ -128,6 +146,15 @@ class ExistingImageAuthorityTests(unittest.TestCase):
         with self.assertRaises(SliceBImageRejected):
             reverify_existing_guest_image(self.image_request(runner), runner)
 
+    def test_reverify_accepts_duplicate_tags_for_the_same_unique_image_id(self) -> None:
+        """Accept duplicate listing rows when the unique image Config ID is pinned."""
+        runner = ReadOnlyImageRunner(self.image_pin)
+        runner.images = (self.image_pin.config_id, self.image_pin.config_id)
+
+        authority = reverify_existing_guest_image(self.image_request(runner), runner)
+
+        self.assertTrue(is_verified_image_authority(authority))
+
     def test_reverify_rejects_running_containers(self) -> None:
         runner = ReadOnlyImageRunner(self.image_pin)
         runner.containers = ("container-id",)
@@ -135,18 +162,34 @@ class ExistingImageAuthorityTests(unittest.TestCase):
             reverify_existing_guest_image(self.image_request(runner), runner)
 
     def test_reverify_rejects_containers_appearing_after_inspection(self) -> None:
+        """Reject a container introduced between the two store observations."""
         runner = ReadOnlyImageRunner(self.image_pin)
-        states = iter(((), ("container-id",)))
-        with patch.object(runner, "container_ids", side_effect=lambda: next(states)):
-            with self.assertRaises(SliceBImageRejected):
-                reverify_existing_guest_image(self.image_request(runner), runner)
+        inspect = runner.inspect_config_id
+
+        def add_container_during_inspection(config_id: str) -> Mapping[str, Any]:
+            result = inspect(config_id)
+            runner.containers = ("container-id",)
+            return result
+
+        with patch.object(
+            runner, "inspect_config_id", side_effect=add_container_during_inspection,
+        ), self.assertRaises(SliceBImageRejected):
+            reverify_existing_guest_image(self.image_request(runner), runner)
 
     def test_reverify_rejects_image_store_change_after_inspection(self) -> None:
+        """Reject an image store changed by inspection before the second observation."""
         runner = ReadOnlyImageRunner(self.image_pin)
-        states = iter(((self.image_pin.config_id,), ()))
-        with patch.object(runner, "image_ids", side_effect=lambda: next(states)):
-            with self.assertRaises(SliceBImageRejected):
-                reverify_existing_guest_image(self.image_request(runner), runner)
+        inspect = runner.inspect_config_id
+
+        def clear_image_store_during_inspection(config_id: str) -> Mapping[str, Any]:
+            result = inspect(config_id)
+            runner.images = ()
+            return result
+
+        with patch.object(
+            runner, "inspect_config_id", side_effect=clear_image_store_during_inspection,
+        ), self.assertRaises(SliceBImageRejected):
+            reverify_existing_guest_image(self.image_request(runner), runner)
 
     def test_reverify_rejects_wrong_record_hash_before_docker_queries(self) -> None:
         runner = ReadOnlyImageRunner(self.image_pin)

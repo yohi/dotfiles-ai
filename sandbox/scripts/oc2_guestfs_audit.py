@@ -92,12 +92,13 @@ class GuestfishReadOnlyAuditProvider:
                 (*guestfish, 'download', config.guest_receipt_path, '-'),
                 settings=settings,
             )
+            if not _export_valid(receipt_export, MAX_RECEIPT_BYTES):
+                return None
             manifest_export = self.runner.run(
                 (*guestfish, 'download', config.guest_manifest_path, '-'),
                 settings=settings,
             )
-            if (not _export_valid(receipt_export, MAX_RECEIPT_BYTES)
-                    or not _export_valid(manifest_export, MAX_MANIFEST_BYTES)):
+            if not _export_valid(manifest_export, MAX_MANIFEST_BYTES):
                 return None
             receipt_file = write_receipt_pair(
                 scratch_root,

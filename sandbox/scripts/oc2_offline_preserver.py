@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 from pathlib import Path
+import shutil
 import subprocess
 from typing import TYPE_CHECKING, Protocol
 
@@ -32,6 +33,8 @@ class Qcow2Metadata:
     backing_file: str | None
     dirty_flag: bool | None
     corrupt: bool | None
+    data_file: str | None = None
+    data_file_raw: bool | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -80,7 +83,9 @@ class OfflinePreservationOps(Protocol):
 
     def inspect_qcow2(self, path: Path) -> Qcow2Metadata: ...
 
-    def create_output_dir(self, output_root: Path) -> Path: ...
+    def create_output_dir(self, output_root: Path) -> Path:
+        """Create and return a new private trial directory below output_root."""
+        ...
 
     def copy_disk(
         self, source: Path, destination: Path, expected_source: HostDiskIdentity,
@@ -140,10 +145,37 @@ class OfflinePreserver:
         source_info = self.ops.inspect_qcow2(self.config.source_disk_path)
         if not self._clean_single_qcow(source_info):
             return None
-        output_dir = self.ops.create_output_dir(self.config.output_root)
-        if (output_dir.is_symlink() or not output_dir.is_dir()
-                or not self.ops.destination_isolated(output_dir, baseline)):
+        try:
+            output_root = self.config.output_root.resolve(strict=False)
+            repository_root = baseline.root.resolve(strict=False)
+        except OSError:
             return None
+        if output_root == repository_root or repository_root in output_root.parents:
+            return None
+        output_dir = self.ops.create_output_dir(self.config.output_root)
+        if output_dir.is_symlink() or not output_dir.is_dir():
+            return None
+        if not self.ops.destination_isolated(output_dir, baseline):
+            shutil.rmtree(output_dir)
+            return None
+        evidence = None
+        try:
+            evidence = self._preserve_output(
+                identity, authority, output_dir, source_info,
+            )
+            return evidence
+        finally:
+            if evidence is None:
+                shutil.rmtree(output_dir)
+
+    def _preserve_output(
+        self,
+        identity: HostVmIdentity,
+        authority: VerifiedGuestAuthority,
+        output_dir: Path,
+        source_info: Qcow2Metadata,
+    ) -> OfflinePreservationEvidence | None:
+        baseline = authority.manifest.baseline
         copy_path = output_dir / 'recovered-audit.qcow2'
         copy_disk = self.ops.copy_disk(
             self.config.source_disk_path, copy_path, identity.disk,
@@ -167,6 +199,9 @@ class OfflinePreserver:
             copy_path, self.config.libguestfs, identity, authority, self.config,
         )
         if evidence is None:
+            return None
+        final_source_sha = self.ops.sha256(self.config.source_disk_path)
+        if final_source_sha != source_sha:
             return None
         if (
             evidence.session_key != authority.key
@@ -199,4 +234,6 @@ class OfflinePreserver:
             and metadata.backing_file is None
             and metadata.dirty_flag is False
             and metadata.corrupt is False
+            and metadata.data_file is None
+            and metadata.data_file_raw is not True
         )

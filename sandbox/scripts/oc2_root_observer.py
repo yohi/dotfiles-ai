@@ -60,6 +60,7 @@ class ProcfsRootObservationHelper:
     def capture(
         self, target: DirectQemuTarget, key: WriterSessionKey,
     ) -> HostVmIdentity | None:
+        """Capture a fresh QEMU identity only when process, disk, and listener evidence agree."""
         if target.vm_name != DIRECT_QEMU_VM_NAME or target.ssh_forward_host != SSH_HOST:
             return None
         try:
@@ -98,6 +99,7 @@ class ProcfsRootObservationHelper:
         )
 
     def read(self, identity: HostVmIdentity) -> HostObservation | None:
+        """Observe procfs process, disk opener, and listener state for this Host identity."""
         if os.geteuid() != 0:
             return None
         try:

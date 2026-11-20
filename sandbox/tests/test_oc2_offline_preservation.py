@@ -144,9 +144,39 @@ class OfflinePreservationGateTests(unittest.TestCase):
         self.assertIn(op.PreservationFailure.GIT_STRUCTURE_UNVERIFIED,
                       decision.failures)
 
+    def test_known_untracked_file_is_mismatch_when_tracked_count_is_unknown(self) -> None:
+        """Prefer a known untracked-file mismatch over an unknown tracked count."""
+        f = self.fixture
+        evidence = replace(
+            f.preservation_evidence(), tracked_file_count=None,
+            untracked_file_count=1,
+        )
+
+        decision = op.evaluate_offline_preservation(
+            self.expectation(), f.host_identity, evidence,
+        )
+
+        self.assertIs(decision.disposition, op.PreservationDisposition.MISMATCH)
+        self.assertIn(op.PreservationFailure.GIT_DIRTY_OR_UNTRACKED, decision.failures)
+
+    def test_known_repository_change_wins_over_unknown_destination_isolation(self) -> None:
+        """Prefer known Host mutation over unknown copy isolation evidence."""
+        f = self.fixture
+        evidence = replace(
+            f.preservation_evidence(), copy_destination_isolated=None,
+            host_repository_unchanged=False,
+        )
+
+        decision = op.evaluate_offline_preservation(
+            self.expectation(), f.host_identity, evidence,
+        )
+
+        self.assertIs(decision.disposition, op.PreservationDisposition.MISMATCH)
+
     def t7_evidence(self) -> tuple[op.PreservationExpectation,
                                    hc.HostVmIdentity,
                                    op.OfflinePreservationEvidence]:
+        """Build the exact pinned historical T7 mismatch evidence and its expected baseline."""
         key = w.WriterSessionKey(
             '6cbe81664153a2b59eb9755448763aee',
             '37ad86ef-7ed2-449a-b0dc-04575d30bf63',

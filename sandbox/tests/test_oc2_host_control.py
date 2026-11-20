@@ -43,15 +43,20 @@ class HostIsolationGateTests(unittest.TestCase):
         self.assertTrue(result.verified)
         self.assertEqual(result.failures, ())
 
-    def test_qemu_residual_and_pid_reuse_are_rejected(self) -> None:
+    def test_qemu_residual_is_rejected(self) -> None:
+        """Reject an observation that still contains the identified QEMU process."""
         qemu_residual = self.evaluate(self.fixture.observation())
-        reused = self.evaluate(replace(
-            self.fixture.observation(stopped=True), expected_pid_start_ticks=54321,
-        ))
 
         self.assertFalse(qemu_residual.verified)
         self.assertIn(hc.HostFailureCode.VM_STATE_UNEXPECTED, qemu_residual.failures)
         self.assertIn(hc.HostFailureCode.QEMU_REMAINS, qemu_residual.failures)
+
+    def test_pid_reuse_is_rejected(self) -> None:
+        """Reject a stopped observation whose expected PID start time changed."""
+        reused = self.evaluate(replace(
+            self.fixture.observation(stopped=True), expected_pid_start_ticks=54321,
+        ))
+
         self.assertIn(hc.HostFailureCode.PID_REUSED_OR_UNKNOWN, reused.failures)
 
     def test_qemu_command_identity_must_match_the_fixed_vm(self) -> None:
@@ -78,16 +83,21 @@ class HostIsolationGateTests(unittest.TestCase):
         self.assertIn(hc.HostFailureCode.DISK_OPENERS_UNKNOWN, result.failures)
         self.assertIn(hc.HostFailureCode.PID_REUSED_OR_UNKNOWN, result.failures)
 
-    def test_disk_opener_or_shared_writer_blocks_isolation(self) -> None:
+    def test_disk_opener_blocks_isolation(self) -> None:
+        """Reject Host isolation while a process still has the disk open."""
         opener = hc.HostProcessReference(902, 67890)
         with_opener = self.evaluate(replace(
             self.fixture.observation(stopped=True), disk_openers=(opener,),
         ))
+
+        self.assertIn(hc.HostFailureCode.DISK_OPENERS_PRESENT, with_opener.failures)
+
+    def test_shared_writer_blocks_isolation(self) -> None:
+        """Reject Host isolation when shared-write remains possible."""
         with_shared_write = self.evaluate(replace(
             self.fixture.observation(stopped=True), shared_write_possible=True,
         ))
 
-        self.assertIn(hc.HostFailureCode.DISK_OPENERS_PRESENT, with_opener.failures)
         self.assertIn(hc.HostFailureCode.SHARED_WRITE_POSSIBLE, with_shared_write.failures)
 
     def test_unknown_shared_write_and_autostart_state_are_unverified(self) -> None:
@@ -127,22 +137,31 @@ class HostIsolationGateTests(unittest.TestCase):
         self.assertIn(hc.HostFailureCode.RESTART_AUDIT_INCOMPLETE, isolation.failures)
         self.assertIn(hc.HostFailureCode.SHARED_WRITE_UNKNOWN, isolation.failures)
 
-    def test_disk_identity_ssh_and_restart_changes_fail_closed(self) -> None:
+    def test_disk_identity_change_fails_closed(self) -> None:
+        """Reject a stopped observation whose disk inode differs from the identity."""
         f = self.fixture
         disk_changed = self.evaluate(replace(
             f.observation(stopped=True), disk=hc.HostDiskIdentity(
                 f.disk.path, f.disk.device, f.disk.inode + 1,
             ),
         ))
-        ssh_remains = self.evaluate(replace(
-            f.observation(stopped=True), ssh_forward_listener_present=True,
-        ))
-        restarted = self.evaluate(replace(
-            f.observation(stopped=True), restart_epoch=5,
-        ))
 
         self.assertIn(hc.HostFailureCode.DISK_IDENTITY_MISMATCH, disk_changed.failures)
+
+    def test_ssh_listener_remaining_fails_closed(self) -> None:
+        """Reject a stopped VM observation while its forwarded SSH listener remains."""
+        ssh_remains = self.evaluate(replace(
+            self.fixture.observation(stopped=True), ssh_forward_listener_present=True,
+        ))
+
         self.assertIn(hc.HostFailureCode.SSH_FORWARD_PRESENT, ssh_remains.failures)
+
+    def test_restart_fails_closed(self) -> None:
+        """Reject an observation whose restart epoch differs from the initial epoch."""
+        restarted = self.evaluate(replace(
+            self.fixture.observation(stopped=True), restart_epoch=5,
+        ))
+
         self.assertIn(hc.HostFailureCode.VM_RESTARTED, restarted.failures)
 
     def test_missing_pre_stop_forward_is_distinct_from_listener_remaining(self) -> None:

@@ -5,6 +5,7 @@ import hashlib
 import json
 from pathlib import Path
 import stat
+import subprocess
 from typing import TYPE_CHECKING, Protocol
 
 if TYPE_CHECKING:
@@ -59,14 +60,45 @@ class SessionGitInspector(Protocol):
 
 
 def inspect_clean_session_git(root: Path) -> GitInspection | None:
+    """Inspect a clean repository and count paths recorded in its verified Git Index.
+
+    Returns None when admission, Index enumeration, or consistency checks fail.
+    Ignored untracked worktree files are not included in the tracked count.
+    """
     try:
         baseline = admit_clean_repo(root)
-    except (OSError, SliceBGitRejected):
+    except (OSError, SliceBGitRejected, UnicodeError):
         return None
-    tracked = sum(
-        1 for path in root.rglob('*')
-        if path.is_file() and path.relative_to(root).parts[0] != '.git'
-    )
+    try:
+        index_path_raw = subprocess.run(
+            ('git', '-C', str(baseline.root), 'rev-parse', '--git-path', 'index'),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=True,
+            shell=False,
+        ).stdout.rstrip(b'\n')
+        index_path = Path(index_path_raw.decode('utf-8'))
+        if not index_path.is_absolute():
+            index_path = baseline.root / index_path
+        index_stat = index_path.stat(follow_symlinks=False)
+        if index_path.is_symlink() or not stat.S_ISREG(index_stat.st_mode):
+            return None
+        indexed_paths = subprocess.run(
+            ('git', '-C', str(baseline.root), 'ls-files', '--cached', '-z'),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=True,
+            shell=False,
+        ).stdout
+    except (OSError, UnicodeError, subprocess.CalledProcessError):
+        return None
+    try:
+        raw_index = index_path.read_bytes()
+    except OSError:
+        return None
+    if hashlib.sha256(raw_index).hexdigest() != baseline.index_sha256:
+        return None
+    tracked = len(tuple(path for path in indexed_paths.split(b'\0') if path))
     return GitInspection(
         baseline.root,
         baseline.branch_ref,
@@ -96,6 +128,7 @@ class GuestSessionEvidenceBuilder:
     git_inspector: SessionGitInspector = inspect_clean_session_git
 
     def build(self, exported: GuestSessionExport) -> OfflinePreservationEvidence | None:
+        """Build evidence only when receipt, authority, clean Git, and copy identities bind."""
         identity = exported.identity
         authority = exported.authority
         config = exported.config

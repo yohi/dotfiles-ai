@@ -22,6 +22,7 @@ _SHA256 = re.compile(r"[0-9a-f]{64}\Z")
 
 @unique
 class FilesystemState(StrEnum):
+    """Observed guest filesystem state and inspection strength."""
     CLEAN_CHECKED = "clean-checked"
     READ_ONLY_INSPECTED = "read-only-inspected"
     UNKNOWN = "unknown"
@@ -30,6 +31,7 @@ class FilesystemState(StrEnum):
 
 @unique
 class PreservationDisposition(StrEnum):
+    """Outcome class ordered from verified evidence to known mismatch."""
     VERIFIED = "verified"
     CONDITIONALLY_ACCEPTED = "conditionally-accepted"
     UNVERIFIED = "unverified"
@@ -38,6 +40,7 @@ class PreservationDisposition(StrEnum):
 
 @unique
 class PreservationFailure(StrEnum):
+    """Stable failure categories emitted by offline preservation evaluation."""
     SESSION_MISMATCH = "session-mismatch"
     DISK_IDENTITY_MISMATCH = "disk-identity-mismatch"
     COPY_INTEGRITY_MISMATCH = "copy-integrity-mismatch"
@@ -57,6 +60,7 @@ class PreservationFailure(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class PreservationExpectation:
+    """Trusted session hashes and clean Host Git baseline expected in evidence."""
     session_key: w.WriterSessionKey
     receipt_sha256: str
     manifest_sha256: str
@@ -65,6 +69,7 @@ class PreservationExpectation:
 
 @dataclass(frozen=True, slots=True)
 class OfflinePreservationEvidence:
+    """Observed source, copy, Guest, and Git facts; None denotes unverified evidence."""
     session_key: w.WriterSessionKey
     source_disk: HostDiskIdentity
     copy_disk: HostDiskIdentity
@@ -98,6 +103,7 @@ class OfflinePreservationEvidence:
 
 @dataclass(frozen=True, slots=True)
 class PreservationDecision:
+    """Disposition and deduplicated reasons produced by the preservation gate."""
     disposition: PreservationDisposition
     failures: tuple[PreservationFailure, ...]
 
@@ -106,6 +112,7 @@ def _is_t7_index_exception(
     expected: PreservationExpectation,
     evidence: OfflinePreservationEvidence,
 ) -> bool:
+    """Check the exact legacy evidence fingerprint eligible for the T7 exception."""
     baseline = expected.baseline
     fingerprint = (
         expected.session_key.workspace_id, expected.session_key.sandbox_id,
@@ -124,6 +131,15 @@ def evaluate_offline_preservation(
     identity: HostVmIdentity,
     evidence: OfflinePreservationEvidence,
 ) -> PreservationDecision:
+    """Compare preservation evidence with trusted session and Host expectations.
+
+    Expectations must originate from verified authority and an admitted baseline.
+    A ``None`` evidence field means that fact is unknown, never successful.
+    Any known mismatch takes precedence over unknown evidence; otherwise unknown
+    evidence yields UNVERIFIED. T7 conditional acceptance applies only to the
+    exact full fingerprint in ``oc2_t7_index_policy`` and only to its index
+    digest discrepancy; it does not waive other failed or unknown checks.
+    """
     if evidence.session_key != expected.session_key or identity.session_key != expected.session_key:
         return PreservationDecision(
             PreservationDisposition.MISMATCH,
@@ -150,13 +166,13 @@ def evaluate_offline_preservation(
     failures: list[PreservationFailure] = []
     mismatch = False
     unknown = False
+    if evidence.copy_destination_isolated is False or evidence.host_repository_unchanged is False:
+        failures.append(PreservationFailure.HOST_REPOSITORY_CHANGED)
+        mismatch = True
     if (evidence.copy_destination_isolated is None
             or evidence.host_repository_unchanged is None):
         failures.append(PreservationFailure.HOST_WRITE_ISOLATION_UNVERIFIED)
         unknown = True
-    elif not evidence.copy_destination_isolated or not evidence.host_repository_unchanged:
-        failures.append(PreservationFailure.HOST_REPOSITORY_CHANGED)
-        mismatch = True
 
     for verified in (evidence.qcow2_structure_verified,
                      evidence.qcow2_logical_content_verified):
@@ -223,6 +239,9 @@ def evaluate_offline_preservation(
     elif evidence.git_dirty:
         failures.append(PreservationFailure.GIT_DIRTY_OR_UNTRACKED)
         mismatch = True
+    if evidence.untracked_file_count is not None and evidence.untracked_file_count > 0:
+        failures.append(PreservationFailure.GIT_DIRTY_OR_UNTRACKED)
+        mismatch = True
     if (evidence.tracked_file_count is None or evidence.untracked_file_count is None):
         failures.append(PreservationFailure.GIT_STRUCTURE_UNVERIFIED)
         unknown = True
@@ -230,9 +249,6 @@ def evaluate_offline_preservation(
           or isinstance(evidence.untracked_file_count, bool)
           or evidence.tracked_file_count < 0 or evidence.untracked_file_count < 0):
         failures.append(PreservationFailure.GIT_STRUCTURE_UNVERIFIED)
-        mismatch = True
-    elif evidence.untracked_file_count:
-        failures.append(PreservationFailure.GIT_DIRTY_OR_UNTRACKED)
         mismatch = True
     baseline = expected.baseline
     if not _SHA256.fullmatch(evidence.index_sha256):
