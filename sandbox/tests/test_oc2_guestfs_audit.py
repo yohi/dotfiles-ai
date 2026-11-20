@@ -77,8 +77,8 @@ class GuestfsAuditTests(unittest.TestCase):
             self.authority_root, self.key, baseline=self.baseline,
         )
         self.control = self.authority_root / 'image-control' / self.key.session_generation
-        self.guest_repo_path = '/home/ubuntu/.cache/session-fixture/guest-repo'
-        self.guest_state = f'/home/ubuntu/.cache/session-fixture/state/{self.key.workspace_id}/{self.key.session_generation}'
+        self.guest_repo_path = '/home/agent/.cache/session-fixture/guest-repo'
+        self.guest_state = f'/home/agent/.cache/session-fixture/state/{self.key.workspace_id}/{self.key.session_generation}'
         self.source_disk = self.root / 'recovered.qcow2'
         self.source_disk.write_bytes(b'original offline disk fixture')
         source_stat = self.source_disk.stat()
@@ -198,7 +198,7 @@ class GuestfsAuditTests(unittest.TestCase):
         )
         unsafe_config = replace(
             self.config,
-            guest_repository_path='/home/ubuntu/repo:download/guest-repo',
+            guest_repository_path='/home/agent/repo:download/guest-repo',
         )
 
         evidence = self.make_provider(runner).audit_readonly(

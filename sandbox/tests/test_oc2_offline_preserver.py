@@ -122,9 +122,9 @@ class OfflinePreserverTests(unittest.TestCase):
             preserve.OfflinePreservationConfig(
                 source_disk_path=Path(self.fixture.disk.path),
                 output_root=self.fixture.root / 'cache',
-                guest_repository_path='/home/ubuntu/.cache/guest-repo',
-                guest_receipt_path='/home/ubuntu/.cache/receipt.json',
-                guest_manifest_path='/home/ubuntu/.cache/manifest.json',
+                guest_repository_path='/home/agent/.cache/guest-repo',
+                guest_receipt_path='/home/agent/.cache/receipt.json',
+                guest_manifest_path='/home/agent/.cache/manifest.json',
                 libguestfs=preserve.LibguestfsSettings(
                     kernel_version='7.0.0-34-generic',
                     kernel_image=Path('/injected/kernel'),
