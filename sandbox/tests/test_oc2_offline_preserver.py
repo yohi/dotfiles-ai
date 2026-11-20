@@ -47,6 +47,7 @@ class FakeOfflineOps:
         self.audit = fixture.preservation_evidence()
         self.output_dir: Path | None = None
         self.audit_failed = False
+        self.isolation_check_failed = False
         self.change_source_after_audit = False
         self.source_hash_calls = 0
 
@@ -70,6 +71,8 @@ class FakeOfflineOps:
     def destination_isolated(
         self, destination: Path, baseline: slice_b_git.GitBaseline,
     ) -> bool | None:
+        if self.isolation_check_failed:
+            raise OSError('injected isolation check failure')
         return destination != baseline.root
 
     def copy_disk(
@@ -303,6 +306,20 @@ class OfflinePreserverTests(unittest.TestCase):
         """Remove the trial directory when guest filesystem auditing returns no evidence."""
         ops = FakeOfflineOps(self.fixture)
         ops.audit_failed = True
+
+        evidence = self.make_preserver(ops).preserve(
+            self.fixture.host_identity, self.fixture.authority,
+            hc.HostIsolationResult(True, True, ()),
+        )
+
+        self.assertIsNone(evidence)
+        self.assertIsNotNone(ops.output_dir)
+        if ops.output_dir is not None:
+            self.assertFalse(ops.output_dir.exists())
+
+    def test_isolation_check_io_failure_cleans_trial_directory(self) -> None:
+        ops = FakeOfflineOps(self.fixture)
+        ops.isolation_check_failed = True
 
         evidence = self.make_preserver(ops).preserve(
             self.fixture.host_identity, self.fixture.authority,

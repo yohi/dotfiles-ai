@@ -153,20 +153,22 @@ class OfflinePreserver:
         if output_root == repository_root or repository_root in output_root.parents:
             return None
         output_dir = self.ops.create_output_dir(self.config.output_root)
-        if output_dir.is_symlink() or not output_dir.is_dir():
-            return None
-        if not self.ops.destination_isolated(output_dir, baseline):
-            shutil.rmtree(output_dir)
-            return None
         evidence = None
         try:
+            if output_dir.is_symlink() or not output_dir.is_dir():
+                return None
+            if not self.ops.destination_isolated(output_dir, baseline):
+                return None
             evidence = self._preserve_output(
                 identity, authority, output_dir, source_info,
             )
             return evidence
         finally:
             if evidence is None:
-                shutil.rmtree(output_dir)
+                if output_dir.is_symlink():
+                    output_dir.unlink()
+                else:
+                    shutil.rmtree(output_dir)
 
     def _preserve_output(
         self,

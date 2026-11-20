@@ -12,6 +12,7 @@ if TYPE_CHECKING:
         HostStopObservations,
         HostVmControl,
         HostVmIdentity,
+        HostVmState,
         verify_host_isolation,
         verify_host_running,
         verify_host_stopped,
@@ -36,6 +37,7 @@ else:
         HostStopObservations,
         HostVmControl,
         HostVmIdentity,
+        HostVmState,
         verify_host_isolation,
         verify_host_running,
         verify_host_stopped,
@@ -148,9 +150,9 @@ def coordinate_host_controlled_stop(
 ) -> HostControlledStopResult:
     """Stop one Writer and require independent Host isolation before preservation.
 
-    A same-object ``STOPPED_VERIFIED`` Guest may resume only Host isolation and
-    preservation after authority and Writer identity checks; no Guest stop or
-    VM shutdown request is repeated, and fresh Host observations remain required.
+    A same-object ``STOPPED_VERIFIED`` Guest may resume Host isolation and
+    preservation after authority and Writer identity checks. If its VM is still
+    running, graceful shutdown is retried after fresh Host observations.
     """
     configuration_failure = request.host_control.configuration_failure()
     if configuration_failure is not None:
@@ -172,8 +174,12 @@ def coordinate_host_controlled_stop(
         return _failed((LifecycleFailure.WRITER_IDENTITY_MISMATCH,))
 
     initial = request.host_control.observe(identity)
-    preflight_failures = (verify_host_stopped(identity, initial) if resuming
-                          else verify_host_running(identity, initial))
+    host_was_running = (
+        not resuming
+        or (initial is not None and initial.state is HostVmState.RUNNING)
+    )
+    preflight_failures = (verify_host_running(identity, initial) if host_was_running
+                          else verify_host_stopped(identity, initial))
     if preflight_failures:
         return _failed((LifecycleFailure.HOST_PREFLIGHT_FAILED, *preflight_failures))
 
@@ -195,8 +201,10 @@ def coordinate_host_controlled_stop(
             failures.append(LifecycleFailure.GUEST_STOP_UNVERIFIED)
 
     before_shutdown = request.host_control.observe(identity)
-    pre_shutdown_failures = (verify_host_stopped(identity, before_shutdown) if resuming
-                             else verify_host_running(identity, before_shutdown))
+    pre_shutdown_failures = (
+        verify_host_running(identity, before_shutdown) if host_was_running
+        else verify_host_stopped(identity, before_shutdown)
+    )
     if (
         initial is None
         or before_shutdown is None
@@ -209,7 +217,7 @@ def coordinate_host_controlled_stop(
                    *pre_shutdown_failures)), tuple(stages), verdict,
         )
 
-    if not resuming:
+    if host_was_running:
         stages.append(HostLifecycleStage.VM_STOP_REQUESTED)
         if not request.host_control.request_graceful_shutdown(identity):
             return _failed(
@@ -222,7 +230,7 @@ def coordinate_host_controlled_stop(
     isolation = verify_host_isolation(
         identity,
         HostStopObservations(initial, before_shutdown, after_shutdown),
-        already_stopped=resuming,
+        already_stopped=not host_was_running,
     )
     if isolation.vm_stopped_observed:
         stages.append(HostLifecycleStage.VM_STOPPED_OBSERVED)

@@ -93,6 +93,21 @@ class HostControlledLifecycleTests(unittest.TestCase):
         self.assertIn(lifecycle.HostLifecycleStage.VM_ISOLATION_VERIFIED, result.stages)
         self.assertEqual(result.failures, ())
 
+    def test_coordinator_retries_shutdown_when_resumed_guest_vm_is_running(self) -> None:
+        f = self.fixture
+        request, events, guest = f.make_request((
+            f.observation(), f.observation(), f.observation(stopped=True),
+        ))
+        guest.state = SupervisorState.STOPPED_VERIFIED
+
+        result = lifecycle.coordinate_host_controlled_stop(request)
+
+        self.assertEqual(events, [
+            'host.observe', 'host.observe', 'host.shutdown', 'host.wait', 'preserve',
+        ])
+        self.assertEqual(result.failures, ())
+        self.assertIn(lifecycle.HostLifecycleStage.VM_ISOLATION_VERIFIED, result.stages)
+
     def test_host_identity_mismatch_stops_before_guest_stop(self) -> None:
         f = self.fixture
         events: list[str] = []
