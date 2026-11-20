@@ -18,14 +18,16 @@ from oc2_slice_b_image import (  # noqa: E402
     is_verified_image_authority,
     reverify_existing_guest_image,
 )
-from oc2_slice_b_git import admit_clean_repo  # noqa: E402
+from oc2_slice_b_git import BundleArtifact, admit_clean_repo  # noqa: E402
 from oc2_slice_b_session import (  # noqa: E402
     ExistingGuestAuthorityVerificationRequest,
+    SliceBReceipt,
     SliceBSessionError,
     create_session_receipt,
     import_guest_baseline,
     verify_guest_authority_from_existing_image,
 )
+from oc2_slice_b_image_record import ImagePin  # noqa: E402
 from oc2_slice_b_test_support import FakeGuestImageRunner  # noqa: E402
 
 
@@ -34,9 +36,9 @@ class ReadOnlyImageRunner(FakeGuestImageRunner):
 
     def __init__(self, pin):
         super().__init__(pin)
-        self.daemon_ids = ["a" * 64]
-        self.images = (pin.config_id,)
-        self.containers = ()
+        self.daemon_ids: list[str] = ["a" * 64]
+        self.images: tuple[str, ...] = (pin.config_id,)
+        self.containers: tuple[str, ...] = ()
         self.calls: list[str] = []
 
     def daemon_id(self) -> str:
@@ -61,6 +63,15 @@ class ReadOnlyImageRunner(FakeGuestImageRunner):
 
 
 class ExistingImageAuthorityTests(unittest.TestCase):
+    key: object
+    art: BundleArtifact
+    image_archive: Path
+    image_control: Path
+    image_pin: ImagePin
+    rec: SliceBReceipt
+    state: Path
+    guest: Path
+
     def setUp(self) -> None:
         from test_oc2_slice_b_session import SessionTests
 
@@ -126,16 +137,16 @@ class ExistingImageAuthorityTests(unittest.TestCase):
     def test_reverify_rejects_containers_appearing_after_inspection(self) -> None:
         runner = ReadOnlyImageRunner(self.image_pin)
         states = iter(((), ("container-id",)))
-        runner.container_ids = lambda: next(states)
-        with self.assertRaises(SliceBImageRejected):
-            reverify_existing_guest_image(self.image_request(runner), runner)
+        with patch.object(runner, "container_ids", side_effect=lambda: next(states)):
+            with self.assertRaises(SliceBImageRejected):
+                reverify_existing_guest_image(self.image_request(runner), runner)
 
     def test_reverify_rejects_image_store_change_after_inspection(self) -> None:
         runner = ReadOnlyImageRunner(self.image_pin)
         states = iter(((self.image_pin.config_id,), ()))
-        runner.image_ids = lambda: next(states)
-        with self.assertRaises(SliceBImageRejected):
-            reverify_existing_guest_image(self.image_request(runner), runner)
+        with patch.object(runner, "image_ids", side_effect=lambda: next(states)):
+            with self.assertRaises(SliceBImageRejected):
+                reverify_existing_guest_image(self.image_request(runner), runner)
 
     def test_reverify_rejects_wrong_record_hash_before_docker_queries(self) -> None:
         runner = ReadOnlyImageRunner(self.image_pin)
@@ -155,11 +166,15 @@ class ExistingImageAuthorityTests(unittest.TestCase):
     def test_reverify_rejects_config_id_mismatch(self) -> None:
         runner = ReadOnlyImageRunner(self.image_pin)
         inspect = runner.inspect_config_id
-        runner.inspect_config_id = lambda config_id: {
-            **inspect(config_id), "Id": "sha256:" + "f" * 64
-        }
-        with self.assertRaises(SliceBImageRejected):
-            reverify_existing_guest_image(self.image_request(runner), runner)
+        with patch.object(
+            runner,
+            "inspect_config_id",
+            side_effect=lambda config_id: {
+                **inspect(config_id), "Id": "sha256:" + "f" * 64
+            },
+        ):
+            with self.assertRaises(SliceBImageRejected):
+                reverify_existing_guest_image(self.image_request(runner), runner)
 
     def test_reverify_rejects_archive_change_during_read_only_verification(self) -> None:
         runner = ReadOnlyImageRunner(self.image_pin)
