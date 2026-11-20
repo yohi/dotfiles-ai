@@ -198,6 +198,53 @@ class HostControlledLifecycleTests(unittest.TestCase):
             'host.observe', 'guest.stop', 'host.observe', 'host.shutdown',
         ])
 
+    def test_shutdown_failure_retries_with_same_authority_and_writer(self) -> None:
+        f = self.fixture
+        request, events, guest = f.make_request((
+            f.observation(), f.observation(),
+            f.observation(), f.observation(), f.observation(stopped=True),
+        ))
+        host = request.host_control
+        with mock.patch.object(
+            host, 'request_graceful_shutdown', side_effect=(False, True),
+        ) as shutdown:
+            first = lifecycle.coordinate_host_controlled_stop(request)
+            second = lifecycle.coordinate_host_controlled_stop(request)
+
+        self.assertIn(lifecycle.LifecycleFailure.VM_SHUTDOWN_REQUEST_FAILED,
+                      first.failures)
+        self.assertEqual(second.failures, ())
+        self.assertEqual(events.count('guest.stop'), 1)
+        self.assertEqual(shutdown.call_count, 2)
+        self.assertIn(lifecycle.HostLifecycleStage.VM_ISOLATION_VERIFIED,
+                      second.stages)
+        self.assertIs(guest.state, SupervisorState.STOPPED_VERIFIED)
+
+    def test_preservation_failure_retries_from_host_isolation(self) -> None:
+        f = self.fixture
+        request, events, guest = f.make_request((
+            f.observation(), f.observation(), f.observation(stopped=True),
+            f.observation(stopped=True), f.observation(stopped=True),
+            f.observation(stopped=True),
+        ))
+        evidence = f.preservation_evidence()
+        with mock.patch.object(
+            request.preserver, 'preserve', side_effect=(None, evidence),
+        ) as preserve:
+            first = lifecycle.coordinate_host_controlled_stop(request)
+            second = lifecycle.coordinate_host_controlled_stop(request)
+
+        self.assertIn(lifecycle.LifecycleFailure.PRESERVATION_UNAVAILABLE,
+                      first.failures)
+        self.assertEqual(second.failures, ())
+        self.assertEqual(events.count('guest.stop'), 1)
+        self.assertEqual(events.count('host.observe'), 4)
+        self.assertEqual(events.count('host.wait'), 2)
+        self.assertEqual(preserve.call_count, 2)
+        self.assertIn(lifecycle.HostLifecycleStage.VM_ISOLATION_VERIFIED,
+                      second.stages)
+        self.assertIs(guest.state, SupervisorState.STOPPED_VERIFIED)
+
     def test_authority_from_another_session_blocks_all_operations(self) -> None:
         f = self.fixture
         other_root = f.root / 'foreign'
