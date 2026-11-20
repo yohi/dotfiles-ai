@@ -187,20 +187,25 @@ class FsRunner:
         self.fed: list[tuple[tuple[str, ...], bytes]] = []
         self.after_cp: Callable[[pathlib.Path], None] | None = None
         self.fail_rm = False
+        self.fail_cli_chmod = False
+        self.cli_version = '2.2.5'
         self.downloaded_cli_archive: pathlib.Path | None = None
+        self.copied_cli_data: bytes | None = None
 
     def local(self, guest_path):
         return self.root / str(guest_path).lstrip('/')
 
     def directory_status(self, name, destination):
         path = self.local(destination)
-        if path.is_symlink():
+        if any(parent.is_symlink() for parent in (path, *path.parents)
+               if parent != self.root.parent):
             return 12
         return 10 if path.is_dir() else (0 if not path.exists() else 12)
 
     def destination_status(self, name, destination):
         path = self.local(destination)
-        if path.is_symlink():
+        if any(parent.is_symlink() for parent in (path, *path.parents)
+               if parent != self.root.parent):
             return 12
         if path.is_dir():
             return 13
@@ -208,6 +213,7 @@ class FsRunner:
 
     def sbx_feed(self, *args, data):
         self.fed.append((args, data))
+        self.calls.append(('GUEST_LAUNCH',))
 
     def sbx(self, *args, capture=False, tty=False):
         self.calls.append(args)
@@ -225,8 +231,11 @@ class FsRunner:
         if head == 'cp':
             target = self.local(args[2].split(':', 1)[1])
             source = pathlib.Path(args[1])
-            target.write_bytes(source.read_bytes())
+            data = source.read_bytes()
+            target.write_bytes(data)
             target.chmod(source.stat().st_mode & 0o777)
+            if target == self.local('/opt/oc2/bin/opencode'):
+                self.copied_cli_data = data
             if self.after_cp is not None:
                 self.after_cp(target)
             return ''
@@ -234,15 +243,34 @@ class FsRunner:
             return ''
         rest = args[2:]
         if rest[0] == 'mkdir':
+            mode = int(rest[rest.index('-m') + 1], 8) if '-m' in rest else 0o777
             for item in rest:
                 if item.startswith('/'):
-                    self.local(item).mkdir(parents=True, exist_ok=True)
+                    target = self.local(item)
+                    target.mkdir(parents=True, exist_ok=True, mode=mode)
+                    target.chmod(mode)
             return ''
         if rest[0] == 'sha256sum':
             data = self.local(rest[1]).read_bytes()
             return hashlib.sha256(data).hexdigest() + '  ' + rest[1] + '\n'
+        if rest[0] == 'chmod':
+            if self.fail_cli_chmod and rest[-1] == '/opt/oc2/bin/opencode':
+                raise oc2.Stop('sandbox command failed (exit 1)')
+            self.local(rest[-1]).chmod(int(rest[1], 8))
+            return ''
         if rest[0] == 'sh':
-            return '2.2.5'
+            return self.cli_version
+        if (rest[:3] == ('python3', '-I', '-c')
+                and rest[3] == getattr(oc2, 'CLI_FILE_METADATA_CHECK_SCRIPT', None)):
+            local_cli = self.local(rest[4])
+            script = rest[3].replace('/opt/oc2', str(local_cli.parent.parent))
+            result = subprocess.run(
+                [sys.executable, '-I', '-c', script, str(local_cli)],
+                capture_output=True, text=True, check=False,
+            )
+            if result.returncode != 0:
+                raise oc2.Stop('sandbox command failed (exit 1)')
+            return result.stdout
         if rest[:3] == ('python3', '-I', '-c'):
             script = rbr.GUEST_VERIFY_SCRIPT.replace(
                 "ROOT = '/home/agent/workspace/oc2'",
@@ -753,9 +781,11 @@ class RunHostBrokerTests(unittest.TestCase):
             assert destination.is_dir()
             assert destination.stat().st_mode & 0o077 == 0
             assert not any(destination.iterdir())
+            self.runner.calls.append(('CLI_ARCHIVE_VERIFY',))
             self.runner.downloaded_cli_archive = local_archive
             binary = destination / 'opencode'
             binary.write_bytes(b'fake')
+            binary.chmod(0o600)
             return binary
 
         def probe(_url, _ca_data):
@@ -767,21 +797,32 @@ class RunHostBrokerTests(unittest.TestCase):
             if gate_failure:
                 raise oc2_network_gate.NetworkGateError('offline gate failure')
 
+        def transfer_workspace(*_args):
+            self.runner.calls.append(('WORKSPACE_TRANSFER',))
+            return '/workspace/project'
+
+        def verify_dedicated_daemon(*_args):
+            self.runner.calls.append(('DEDICATED_DAEMON_VERIFY',))
+
         def validate_listing(_raw, _sandbox, stage, *_args):
+            if stage == 'global':
+                self.runner.calls.append(('GLOBAL_POLICY',))
             if global_policy_failure and stage == 'global':
                 raise oc2_network_gate.NetworkGateError('unsafe daemon policy')
 
         result_artifacts = verified()
         with patch.object(oc2, 'Runner', return_value=self.runner), \
                 patch.object(oc2.shutil, 'which', return_value='/usr/bin/sbx'), \
-                patch.object(oc2_network_gate, 'verify_dedicated_daemon'), \
+                patch.object(oc2_network_gate, 'verify_dedicated_daemon',
+                             side_effect=verify_dedicated_daemon), \
                 patch.object(oc2_network_gate, 'validate_policy_listing', side_effect=validate_listing), \
                 patch.object(oc2_network_gate, 'run_network_gate', side_effect=run_gate) as network_gate, \
                 patch.object(oc2, 'download_verified_cli', fake_download), \
-                patch.object(oc2, 'transfer_workspace', return_value='/workspace/project'), \
+                patch.object(oc2, 'transfer_workspace', side_effect=transfer_workspace), \
                 patch.object(oc2_host_broker_probe(), 'probe_broker', probe), \
                 patch.object(rbr, 'load_manifest', return_value=(fake_manifest(), 'd' * 64)), \
                 patch.object(rbr, 'verify_source', return_value=result_artifacts), \
+                patch.object(oc2, 'CLI_BINARY_SIZE', 4), \
                 patch.dict(os.environ, {}, clear=True), \
                 contextlib.redirect_stdout(io.StringIO()):
             if gate_failure:
@@ -813,7 +854,7 @@ class RunHostBrokerTests(unittest.TestCase):
             self.runner.downloaded_cli_archive,
             self.tmp / 'opencode-linux-x64.tar.gz',
         )
-        self.assertEqual(creates[0].count('--kit'), 1)
+        self.assertNotIn('--kit', creates[0])
         self.assertNotIn('oc2-credentials', repr(self.runner.calls))
         self.assertEqual(len(self.runner.fed), 1)
         self.assertNotIn('secret', repr([c for c in self.runner.calls if c[0] != 'cp']))
@@ -824,6 +865,110 @@ class RunHostBrokerTests(unittest.TestCase):
         self.assertEqual(
             (digest_dirs[0] / 'broker/ca/host-broker-ca.pem').read_bytes(), CA_DATA,
         )
+
+    def test_cli_archive_is_verified_before_daemon_and_policy_checks(self):
+        self.assertEqual(self.run_broker(), 0)
+        archive = self.runner.calls.index(('CLI_ARCHIVE_VERIFY',))
+        daemon = self.runner.calls.index(('DEDICATED_DAEMON_VERIFY',))
+        policy = self.runner.calls.index(('GLOBAL_POLICY',))
+        create = next(
+            index for index, call in enumerate(self.runner.calls)
+            if call[0] == 'create' and '--name' in call
+        )
+        self.assertLess(archive, daemon)
+        self.assertLess(daemon, policy)
+        self.assertLess(policy, create)
+
+    def test_host_cli_transfer_follows_network_gate_and_precedes_workspace(self):
+        self.assertEqual(self.run_broker(), 0)
+        gate = self.runner.calls.index(('NETWORK_GATE',))
+        cli_copy = next(
+            index for index, call in enumerate(self.runner.calls)
+            if call[0] == 'cp' and call[2].endswith(':/opt/oc2/bin/opencode')
+        )
+        version_check = next(
+            index for index, call in enumerate(self.runner.calls)
+            if call[:3] == ('exec', 'oc2-dev', 'sh')
+        )
+        workspace = self.runner.calls.index(('WORKSPACE_TRANSFER',))
+        guest_launch = self.runner.calls.index(('GUEST_LAUNCH',))
+        self.assertLess(gate, cli_copy)
+        self.assertLess(cli_copy, version_check)
+        self.assertLess(version_check, workspace)
+        self.assertLess(workspace, guest_launch)
+
+    def test_host_cli_copy_has_matching_sha_and_owner_only_execute_mode(self):
+        self.assertEqual(self.run_broker(), 0)
+        guest_cli = self.runner.local('/opt/oc2/bin/opencode')
+        self.assertEqual(self.runner.copied_cli_data, b'fake')
+        self.assertEqual(guest_cli.read_bytes(), b'fake')
+        metadata = guest_cli.lstat()
+        self.assertTrue(stat.S_ISREG(metadata.st_mode))
+        self.assertEqual(metadata.st_uid, os.geteuid())
+        self.assertEqual(stat.S_IMODE(metadata.st_mode), 0o700)
+
+    def test_cli_checksum_mismatch_cleans_sandbox_before_workspace_transfer(self):
+        def tamper_cli(path: pathlib.Path) -> None:
+            if path == self.runner.local('/opt/oc2/bin/opencode'):
+                path.write_bytes(b'tampered')
+
+        self.runner.after_cp = tamper_cli
+        with self.assertRaisesRegex(oc2.Stop, 'checksum mismatch'):
+            self.run_broker()
+        self.assertEqual(self.runner.calls[-1], ('rm', 'oc2-dev'))
+        self.assertNotIn(('WORKSPACE_TRANSFER',), self.runner.calls)
+        self.assertNotIn(('GUEST_LAUNCH',), self.runner.calls)
+
+    def test_unexpected_cli_parent_symlink_cleans_sandbox(self):
+        opt = self.runner.local('/opt')
+        opt.mkdir()
+        outside = self.tmp / 'outside'
+        outside.mkdir()
+        (opt / 'oc2').symlink_to(outside, target_is_directory=True)
+        with self.assertRaises(oc2.Stop):
+            self.run_broker()
+        self.assertEqual(self.runner.calls[-1], ('rm', 'oc2-dev'))
+        self.assertFalse(any(
+            call[0] == 'cp' and call[2].endswith(':/opt/oc2/bin/opencode')
+            for call in self.runner.calls
+        ))
+
+    def test_existing_cli_file_is_not_overwritten(self):
+        guest_cli = self.runner.local('/opt/oc2/bin/opencode')
+        guest_cli.parent.mkdir(parents=True)
+        guest_cli.write_bytes(b'preexisting')
+        with self.assertRaises(oc2.Stop):
+            self.run_broker()
+        self.assertEqual(guest_cli.read_bytes(), b'preexisting')
+        self.assertEqual(self.runner.calls[-1], ('rm', 'oc2-dev'))
+        self.assertNotIn(('WORKSPACE_TRANSFER',), self.runner.calls)
+
+    def test_cli_chmod_failure_cleans_sandbox(self):
+        self.runner.fail_cli_chmod = True
+        with self.assertRaises(oc2.Stop):
+            self.run_broker()
+        self.assertEqual(self.runner.calls[-1], ('rm', 'oc2-dev'))
+        self.assertNotIn(('WORKSPACE_TRANSFER',), self.runner.calls)
+
+    def test_cli_version_mismatch_cleans_sandbox_before_workspace_transfer(self):
+        self.runner.cli_version = '2.2.4'
+        with self.assertRaises(oc2.Stop):
+            self.run_broker()
+        self.assertEqual(self.runner.calls[-1], ('rm', 'oc2-dev'))
+        self.assertNotIn(('WORKSPACE_TRANSFER',), self.runner.calls)
+        self.assertNotIn(('GUEST_LAUNCH',), self.runner.calls)
+
+    def test_cli_cleanup_failure_is_reported(self):
+        self.runner.fail_rm = True
+
+        def tamper_cli(path: pathlib.Path) -> None:
+            if path == self.runner.local('/opt/oc2/bin/opencode'):
+                path.write_bytes(b'tampered')
+
+        self.runner.after_cp = tamper_cli
+        with self.assertRaisesRegex(oc2.Stop, 'cleanup also failed'):
+            self.run_broker()
+        self.assertNotIn(('WORKSPACE_TRANSFER',), self.runner.calls)
 
     def test_unreachable_broker_missing_artifacts_or_label_stop_without_sandbox(self):
         for kwargs in ({'probe_ok': False}, {'artifacts': False}, {'label': 'other'}):
@@ -984,6 +1129,43 @@ class CliTests(unittest.TestCase):
             '--sandbox', 'oc2-dev', '--dry-run', '--workspace', str(pathlib.Path.cwd()))
         self.assertEqual(code, 0)
         self.assertNotIn('Host Broker', out)
+
+
+class VerifiedCliBinaryTests(unittest.TestCase):
+    def test_hashes_only_the_private_fixed_size_regular_cli(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            binary = pathlib.Path(temporary) / 'opencode'
+            binary.write_bytes(b'fake')
+            binary.chmod(0o600)
+            with patch.object(oc2, 'CLI_BINARY_SIZE', 4):
+                self.assertEqual(
+                    oc2._sha256_verified_cli(binary), hashlib.sha256(b'fake').hexdigest(),
+                )
+
+    def test_rejects_symlinked_cli_binary(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            target = root / 'target'
+            target.write_bytes(b'fake')
+            target.chmod(0o600)
+            link = root / 'opencode'
+            link.symlink_to(target)
+            with patch.object(oc2, 'CLI_BINARY_SIZE', 4):
+                with self.assertRaises(oc2.Stop):
+                    oc2._sha256_verified_cli(link)
+
+    def test_rejects_wrong_binary_size_or_permissions(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            binary = pathlib.Path(temporary) / 'opencode'
+            binary.write_bytes(b'fake')
+            binary.chmod(0o600)
+            with patch.object(oc2, 'CLI_BINARY_SIZE', 5):
+                with self.assertRaises(oc2.Stop):
+                    oc2._sha256_verified_cli(binary)
+            with patch.object(oc2, 'CLI_BINARY_SIZE', 4):
+                binary.chmod(0o644)
+                with self.assertRaises(oc2.Stop):
+                    oc2._sha256_verified_cli(binary)
 
 
 class LocalCliArchiveTests(unittest.TestCase):

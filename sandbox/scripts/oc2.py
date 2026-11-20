@@ -137,6 +137,23 @@ finally:
         os.close(fd)
 '''
 
+CLI_FILE_METADATA_CHECK_SCRIPT: Final[str] = '''import os, stat, sys
+path = sys.argv[1] if len(sys.argv) == 2 else ""
+if path != "/opt/oc2/bin/opencode": sys.exit(12)
+try:
+    for directory in ("/opt/oc2", "/opt/oc2/bin"):
+        info = os.lstat(directory)
+        if (not stat.S_ISDIR(info.st_mode) or info.st_uid != os.geteuid()
+                or stat.S_IMODE(info.st_mode) != 0o700):
+            sys.exit(12)
+    info = os.lstat(path)
+except OSError:
+    sys.exit(11)
+if (not stat.S_ISREG(info.st_mode) or info.st_uid != os.geteuid()
+        or stat.S_IMODE(info.st_mode) != 0o700):
+    sys.exit(12)
+'''
+
 
 
 @dataclass(frozen=True, slots=True)
@@ -468,6 +485,40 @@ def download_verified_cli(
         if binary_created:
             binary_path.unlink(missing_ok=True)
         raise Stop('official OpenCode release artifact could not be validated') from exc
+
+
+def _sha256_verified_cli(path: pathlib.Path) -> str:
+    descriptor: int | None = None
+    try:
+        descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
+        before = os.fstat(descriptor)
+        if (not stat.S_ISREG(before.st_mode) or before.st_size != CLI_BINARY_SIZE
+                or stat.S_IMODE(before.st_mode) != 0o600 or before.st_nlink != 1):
+            raise Stop('verified OpenCode CLI binary is unsafe')
+        digest = hashlib.sha256()
+        total = 0
+        with os.fdopen(descriptor, 'rb') as binary:
+            descriptor = None
+            while chunk := binary.read(1024 * 1024):
+                total += len(chunk)
+                if total > CLI_BINARY_SIZE:
+                    raise Stop('verified OpenCode CLI binary exceeds its fixed size')
+                digest.update(chunk)
+            after = os.fstat(binary.fileno())
+        current = path.lstat()
+        if (total != CLI_BINARY_SIZE or not stat.S_ISREG(current.st_mode)
+                or current.st_dev != before.st_dev or current.st_ino != before.st_ino
+                or current.st_size != before.st_size or current.st_mtime_ns != before.st_mtime_ns
+                or after.st_size != before.st_size or after.st_mtime_ns != before.st_mtime_ns):
+            raise Stop('verified OpenCode CLI binary changed during hashing')
+        return digest.hexdigest()
+    except Stop:
+        raise
+    except OSError as exc:
+        raise Stop('verified OpenCode CLI binary could not be read safely') from exc
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
 
 
 def cloudflare_gateway_runtime(
@@ -1361,6 +1412,40 @@ def provision_cli(runner: Runner, name: str) -> str:
     return found
 
 
+def provision_host_broker_cli(runner: Runner, name: str, binary: pathlib.Path) -> str:
+    expected_sha = _sha256_verified_cli(binary)
+    for directory in ('/opt/oc2', '/opt/oc2/bin'):
+        if runner.directory_status(name, directory) != 0:
+            raise Stop('fixed OpenCode CLI parent directory is not absent')
+        execute(runner, name, 'mkdir', '-m', '0700', directory)
+        if runner.directory_status(name, directory) != 10:
+            raise Stop('fixed OpenCode CLI parent directory is unsafe')
+
+    destination = PINNED[0]
+    if runner.destination_status(name, destination) != 0:
+        raise Stop('fixed OpenCode CLI destination is not absent')
+    _transfer_verified_file(
+        runner,
+        name,
+        VerifiedFileTransfer(
+            source=binary,
+            destination=destination,
+            sha256=expected_sha,
+            unsafe_message='fixed OpenCode CLI destination is unsafe',
+            unknown_status_message='fixed OpenCode CLI destination status is unknown',
+            mismatch_message='fixed OpenCode CLI transfer checksum mismatch',
+        ),
+    )
+    if runner.destination_status(name, destination) != 10:
+        raise Stop('fixed OpenCode CLI Guest file is not regular')
+    runner.sbx('exec', name, 'chmod', '0700', destination)
+    runner.sbx(
+        'exec', name, 'python3', '-I', '-c',
+        CLI_FILE_METADATA_CHECK_SCRIPT, destination,
+    )
+    return provision_cli(runner, name)
+
+
 GUEST_EXEC_WRAPPER = r'''import os
 import re
 import sys
@@ -1737,22 +1822,6 @@ def _run_host_broker(
     if not shutil.which('sbx'):
         raise Stop('Docker Sandboxes CLI was not found')
     runner = Runner(getpass.getuser(), app_name=app_name)
-    try:
-        oc2_network_gate.verify_dedicated_daemon(runner, app_name)
-        initial_policy = runner.sbx('policy', 'ls', '--json', capture=True)
-        oc2_network_gate.validate_policy_listing(initial_policy, args.sandbox, 'global')
-    except oc2_network_gate.NetworkGateError as exc:
-        raise Stop(str(exc)) from exc
-    sandbox_version = runner.sbx('version', capture=True).strip()
-    if re.search(r'\bv\d+\.\d+\.\d+\b', sandbox_version) is None:
-        raise Stop('could not verify Docker Sandboxes version')
-    if '--kit' not in runner.sbx('create', '--help', capture=True):
-        raise Stop('installed Docker Sandboxes CLI does not support Kits')
-    print('OC2_DOCKER_SANDBOXES: ' + sandbox_version)
-    existing = {line.strip() for line in runner.sbx('ls', '-q', capture=True).splitlines()}
-    if args.sandbox in existing:
-        raise Stop('Sandbox name already exists; refusing to reuse or rebuild it')
-    print('OC2: verifying official OpenCode v2.2.5 Linux x64 artifact')
     with tempfile.TemporaryDirectory(prefix='oc2-broker-') as temporary:
         temporary_path = pathlib.Path(temporary)
         config_file = temporary_path / 'opencode.jsonc'
@@ -1763,19 +1832,24 @@ def _run_host_broker(
             cli_download_dir, local_archive=args.host_broker_cli_archive,
         )
         print('OC2_CLI_ARTIFACT_VERIFIED: v2.2.5 sha256=' + CLI_ASSET_SHA256)
+        try:
+            oc2_network_gate.verify_dedicated_daemon(runner, app_name)
+            initial_policy = runner.sbx('policy', 'ls', '--json', capture=True)
+            oc2_network_gate.validate_policy_listing(initial_policy, args.sandbox, 'global')
+        except oc2_network_gate.NetworkGateError as exc:
+            raise Stop(str(exc)) from exc
+        sandbox_version = runner.sbx('version', capture=True).strip()
+        if re.search(r'\bv\d+\.\d+\.\d+\b', sandbox_version) is None:
+            raise Stop('could not verify Docker Sandboxes version')
+        print('OC2_DOCKER_SANDBOXES: ' + sandbox_version)
+        existing = {line.strip() for line in runner.sbx('ls', '-q', capture=True).splitlines()}
+        if args.sandbox in existing:
+            raise Stop('Sandbox name already exists; refusing to reuse or rebuild it')
         print('OC2: creating mountless shell Sandbox ' + args.sandbox
-              + ' (no credential Mixin; no direct-provider egress allowance)')
-        cli_mixin = temporary_path / 'oc2-opencode-cli'
-        cli_mixin.mkdir()
-        cli_spec = cli_mixin / 'spec.yaml'
-        cli_spec.write_bytes(opencode_cli_mixin_spec())
-        os.chmod(cli_spec, 0o600)
-        staged_cli = cli_mixin / 'opencode'
-        shutil.copyfile(cli_binary, staged_cli)
-        os.chmod(staged_cli, 0o600)
+              + ' (no Kit, credential Mixin, or direct-provider egress allowance)')
         runner.sbx(
             'create', '--pull', 'never', '--name', args.sandbox,
-            '--kit', str(cli_mixin), HOST_BROKER_SHELL_WORKLOAD,
+            HOST_BROKER_SHELL_WORKLOAD,
         )
         try:
             inspect = runner.sbx('inspect', args.sandbox, capture=True)
@@ -1788,27 +1862,30 @@ def _run_host_broker(
             if broker_port is None:
                 raise oc2_network_gate.NetworkGateError('Broker URL has no port')
             oc2_network_gate.run_network_gate(runner, args.sandbox, broker_port)
-        except (oc2_network_gate.NetworkGateError, Stop) as exc:
+            cli = provision_host_broker_cli(runner, args.sandbox, cli_binary)
+            workdir = transfer_workspace(
+                runner, args.sandbox, temporary_path / 'workspace-snapshot',
+                workspace_manifest, runner.user,
+            )
+            capability = oc2_host_broker.read_capability(selection.capability_fd)
+            print(f'OC2_READY: sandbox={args.sandbox} opencode=v{VERSION} broker=host')
+            launch(
+                runner,
+                SandboxLaunch(args.sandbox, runtime_sha, cli, workdir, config_file),
+                HostBrokerLaunch(selection, capability, artifacts, ca_certificate, prompt),
+            )
+        except (oc2_network_gate.NetworkGateError, oc2_host_broker.HostBrokerError,
+                Stop, OSError) as exc:
             try:
                 runner.sbx('rm', args.sandbox)
             except Stop as cleanup_error:
                 raise Stop(
-                    f'Host Broker Network Gate failed; owned Sandbox cleanup also failed: '
+                    f'Host Broker post-create step failed; owned Sandbox cleanup also failed: '
                     f'{cleanup_error}'
                 ) from cleanup_error
-            raise Stop(f'Host Broker Network Gate failed; owned Sandbox was removed: {exc}') from exc
-        cli = provision_cli(runner, args.sandbox)
-        workdir = transfer_workspace(
-            runner, args.sandbox, temporary_path / 'workspace-snapshot',
-            workspace_manifest, runner.user,
-        )
-        capability = oc2_host_broker.read_capability(selection.capability_fd)
-        print(f'OC2_READY: sandbox={args.sandbox} opencode=v{VERSION} broker=host')
-        launch(
-            runner,
-            SandboxLaunch(args.sandbox, runtime_sha, cli, workdir, config_file),
-            HostBrokerLaunch(selection, capability, artifacts, ca_certificate, prompt),
-        )
+            raise Stop(
+                f'Host Broker post-create step failed; owned Sandbox was removed: {exc}'
+            ) from exc
     return 0
 
 
