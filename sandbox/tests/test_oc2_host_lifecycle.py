@@ -93,6 +93,28 @@ class HostControlledLifecycleTests(unittest.TestCase):
         self.assertIn(lifecycle.HostLifecycleStage.VM_ISOLATION_VERIFIED, result.stages)
         self.assertEqual(result.failures, ())
 
+    def test_resumed_guest_stop_is_not_reused_after_restart_epoch_changes(self) -> None:
+        f = self.fixture
+        events: list[str] = []
+        guest = FakeGuestStopper(f.key, f.writer, f.authority, events)
+        guest.state = SupervisorState.STOPPED_VERIFIED
+        host = FakeHostControl((
+            f.observation(stopped=True),
+            replace(f.observation(stopped=True), restart_epoch=5),
+        ), events)
+        preserver = FakePreserver(f.preservation_evidence(), events)
+
+        result = lifecycle.coordinate_host_controlled_stop(
+            lifecycle.HostControlledStopRequest(
+                guest, f.authority, f.writer, f.host_identity, host, preserver,
+            )
+        )
+
+        self.assertIn(lifecycle.HostLifecycleStage.GUEST_QUIESCENCE_UNVERIFIED,
+                      result.stages)
+        self.assertNotIn(lifecycle.HostLifecycleStage.GUEST_QUIESCENCE_VERIFIED,
+                         result.stages)
+
     def test_coordinator_retries_shutdown_when_resumed_guest_vm_is_running(self) -> None:
         f = self.fixture
         request, events, guest = f.make_request((

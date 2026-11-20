@@ -6,6 +6,7 @@ import sys
 import tempfile
 import unittest
 from typing import TYPE_CHECKING, final
+from unittest.mock import patch
 
 TESTS = Path(__file__).resolve().parent
 SCRIPTS = TESTS.parent / 'scripts'
@@ -94,10 +95,6 @@ class FakeOfflineOps:
                 return 'e' * 64
         return 'd' * 64
 
-    def byte_identical(self, source: Path, copy: Path) -> bool:
-        self.calls.append('byte-compare')
-        return source != copy
-
     def logical_compare(self, source: Path, copy: Path) -> bool:
         self.calls.append('logical-compare')
         return source != copy
@@ -114,10 +111,13 @@ class FakeOfflineOps:
         identity: hc.HostVmIdentity,
         authority: session.VerifiedGuestAuthority,
         config: preserve.OfflinePreservationConfig,
+        hashes: preserve.DiskHashes,
     ) -> op.OfflinePreservationEvidence | None:
         if authority.key != identity.session_key or not settings.kernel_version:
             return None
         self.calls.append('guestfish-ro')
+        if hashes.source_sha256 != hashes.copy_sha256:
+            return None
         if self.audit_failed:
             return None
         if self.change_source_after_audit:
@@ -173,6 +173,18 @@ class OfflinePreserverTests(unittest.TestCase):
         self.assertEqual(evidence.source_sha256, evidence.copy_sha256)
         self.assertEqual(ops.calls[-2], 'guestfish-ro')
         self.assertEqual(ops.calls[-1], 'sha256:recovery.qcow2')
+        self.assertEqual(ops.calls.count('byte-compare'), 0)
+        self.assertEqual(ops.source_hash_calls, 2)
+
+    def test_host_repository_unicode_recheck_failure_returns_false(self) -> None:
+        baseline = self.fixture.authority.manifest.baseline
+
+        with patch.object(disk, 'recheck_host_baseline', side_effect=UnicodeError):
+            unchanged = disk.LocalOfflinePreservationOps().host_repository_unchanged(
+                baseline,
+            )
+
+        self.assertIs(unchanged, False)
 
     def test_qcow_metadata_reads_dirty_flag_and_nested_corruption(self) -> None:
         metadata = disk.parse_qcow2_metadata(

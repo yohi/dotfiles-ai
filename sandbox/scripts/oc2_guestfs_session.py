@@ -5,7 +5,6 @@ import hashlib
 import json
 from pathlib import Path
 import stat
-import subprocess
 from typing import TYPE_CHECKING, Protocol
 
 if TYPE_CHECKING:
@@ -14,11 +13,12 @@ if TYPE_CHECKING:
         FilesystemState,
         OfflinePreservationEvidence,
     )
-    from sandbox.scripts.oc2_offline_preserver import OfflinePreservationConfig
+    from sandbox.scripts.oc2_offline_preserver import DiskHashes, OfflinePreservationConfig
     from sandbox.scripts.oc2_guestfs_files import write_new_file
     from sandbox.scripts.oc2_slice_b_git import (
         GitBaseline,
         SliceBGitRejected,
+        _git,
         admit_clean_repo,
     )
     from sandbox.scripts.oc2_slice_b_session import (
@@ -31,9 +31,9 @@ if TYPE_CHECKING:
 else:
     from oc2_host_control import HostDiskIdentity, HostVmIdentity
     from oc2_offline_preservation import FilesystemState, OfflinePreservationEvidence
-    from oc2_offline_preserver import OfflinePreservationConfig
+    from oc2_offline_preserver import DiskHashes, OfflinePreservationConfig
     from oc2_guestfs_files import write_new_file
-    from oc2_slice_b_git import GitBaseline, SliceBGitRejected, admit_clean_repo
+    from oc2_slice_b_git import GitBaseline, SliceBGitRejected, _git, admit_clean_repo
     from oc2_slice_b_session import (
         SliceBSessionError,
         VerifiedGuestAuthority,
@@ -70,27 +70,15 @@ def inspect_clean_session_git(root: Path) -> GitInspection | None:
     except (OSError, SliceBGitRejected, UnicodeError):
         return None
     try:
-        index_path_raw = subprocess.run(
-            ('git', '-C', str(baseline.root), 'rev-parse', '--git-path', 'index'),
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            check=True,
-            shell=False,
-        ).stdout.rstrip(b'\n')
+        index_path_raw = _git(baseline.root, 'rev-parse', '--git-path', 'index').rstrip(b'\n')
         index_path = Path(index_path_raw.decode('utf-8'))
         if not index_path.is_absolute():
             index_path = baseline.root / index_path
         index_stat = index_path.stat(follow_symlinks=False)
         if index_path.is_symlink() or not stat.S_ISREG(index_stat.st_mode):
             return None
-        indexed_paths = subprocess.run(
-            ('git', '-C', str(baseline.root), 'ls-files', '--cached', '-z'),
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            check=True,
-            shell=False,
-        ).stdout
-    except (OSError, UnicodeError, subprocess.CalledProcessError):
+        indexed_paths = _git(baseline.root, 'ls-files', '--cached', '-z')
+    except (OSError, UnicodeError, SliceBGitRejected):
         return None
     try:
         raw_index = index_path.read_bytes()
@@ -121,6 +109,7 @@ class GuestSessionExport:
     identity: HostVmIdentity
     authority: VerifiedGuestAuthority
     config: OfflinePreservationConfig
+    disk_hashes: DiskHashes
 
 
 @dataclass(frozen=True, slots=True)
@@ -155,10 +144,8 @@ class GuestSessionEvidenceBuilder:
             return None
         if not stat.S_ISREG(copied.st_mode) or copied.st_nlink != 1:
             return None
-        source_sha = _sha256_file(Path(identity.disk.path))
-        copy_sha = _sha256_file(exported.copy_path)
-        if source_sha is None or copy_sha is None:
-            return None
+        source_sha = exported.disk_hashes.source_sha256
+        copy_sha = exported.disk_hashes.copy_sha256
         export_manifest = json.dumps({
             'schema': 'dotfiles-ai/oc2-offline-export/v1',
             'session_generation': authority.key.session_generation,
@@ -238,14 +225,3 @@ def _authority_matches(
         and observed.receipt_sha256 == expected.receipt_sha256
         and observed.image_authority == expected.image_authority
     )
-
-
-def _sha256_file(path: Path) -> str | None:
-    digest = hashlib.sha256()
-    try:
-        with path.open('rb') as stream:
-            for chunk in iter(lambda: stream.read(1024 * 1024), b''):
-                digest.update(chunk)
-    except OSError:
-        return None
-    return digest.hexdigest()

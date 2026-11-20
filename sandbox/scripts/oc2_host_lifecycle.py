@@ -192,7 +192,16 @@ def coordinate_host_controlled_stop(
         except SupervisorError:
             failures.append(LifecycleFailure.GUEST_STOP_UNVERIFIED)
 
-    guest_verified = resuming or _guest_stop_verified(guest, verdict)
+    before_shutdown = request.host_control.observe(identity)
+    restart_epoch_unchanged = (
+        initial is not None
+        and before_shutdown is not None
+        and initial.restart_epoch is not None
+        and initial.restart_epoch == before_shutdown.restart_epoch
+    )
+    guest_verified = (
+        resuming and restart_epoch_unchanged
+    ) or _guest_stop_verified(guest, verdict)
     if guest_verified:
         stages.append(HostLifecycleStage.GUEST_QUIESCENCE_VERIFIED)
     else:
@@ -200,7 +209,6 @@ def coordinate_host_controlled_stop(
         if LifecycleFailure.GUEST_STOP_UNVERIFIED not in failures:
             failures.append(LifecycleFailure.GUEST_STOP_UNVERIFIED)
 
-    before_shutdown = request.host_control.observe(identity)
     pre_shutdown_failures = (
         verify_host_running(identity, before_shutdown) if host_was_running
         else verify_host_stopped(identity, before_shutdown)

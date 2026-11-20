@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from sandbox.scripts.oc2_guestfs_transport import SubprocessGuestfishRunner
     from sandbox.scripts.oc2_offline_preservation import OfflinePreservationEvidence
     from sandbox.scripts.oc2_offline_preserver import (
+        DiskHashes,
         GuestfsAuditProvider,
         LibguestfsSettings,
         OfflinePreservationConfig,
@@ -34,6 +35,7 @@ else:
     from oc2_guestfs_transport import SubprocessGuestfishRunner
     from oc2_offline_preservation import OfflinePreservationEvidence
     from oc2_offline_preserver import (
+        DiskHashes,
         GuestfsAuditProvider,
         LibguestfsSettings,
         OfflinePreservationConfig,
@@ -114,9 +116,6 @@ class LocalOfflinePreservationOps:
                 digest.update(chunk)
         return digest.hexdigest()
 
-    def byte_identical(self, source: Path, copy: Path) -> bool:
-        return self.sha256(source) == self.sha256(copy)
-
     def logical_compare(self, source: Path, copy: Path) -> bool:
         return self.runner.run((
             '/usr/bin/qemu-img', 'compare', '-f', 'qcow2', '-F', 'qcow2',
@@ -126,7 +125,7 @@ class LocalOfflinePreservationOps:
     def host_repository_unchanged(self, baseline: GitBaseline) -> bool | None:
         try:
             recheck_host_baseline(baseline)
-        except SliceBGitRejected:
+        except (SliceBGitRejected, UnicodeError):
             return False
         return True
 
@@ -146,12 +145,13 @@ class LocalOfflinePreservationOps:
         identity: HostVmIdentity,
         authority: VerifiedGuestAuthority,
         config: OfflinePreservationConfig,
+        hashes: DiskHashes,
     ) -> OfflinePreservationEvidence | None:
         provider = self.audit_provider or GuestfishReadOnlyAuditProvider(
             SubprocessGuestfishRunner(),
         )
         return provider.audit_readonly(
-            copy, settings, identity, authority, config,
+            copy, settings, identity, authority, config, hashes,
         )
 
 

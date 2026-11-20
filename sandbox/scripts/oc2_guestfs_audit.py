@@ -26,6 +26,7 @@ if TYPE_CHECKING:
     from sandbox.scripts.oc2_host_control import HostVmIdentity
     from sandbox.scripts.oc2_offline_preservation import OfflinePreservationEvidence
     from sandbox.scripts.oc2_offline_preserver import (
+        DiskHashes,
         LibguestfsSettings,
         OfflinePreservationConfig,
     )
@@ -43,7 +44,7 @@ else:
     from oc2_guestfs_transport import GuestfishCommandResult, GuestfishRunner
     from oc2_host_control import HostVmIdentity
     from oc2_offline_preservation import OfflinePreservationEvidence
-    from oc2_offline_preserver import LibguestfsSettings, OfflinePreservationConfig
+    from oc2_offline_preserver import DiskHashes, LibguestfsSettings, OfflinePreservationConfig
     from oc2_slice_b_session import VerifiedGuestAuthority
 
 _GUEST_PATH_PART = re.compile(r'[A-Za-z0-9._+-]+\Z')
@@ -61,6 +62,7 @@ class GuestfishReadOnlyAuditProvider:
         identity: HostVmIdentity,
         authority: VerifiedGuestAuthority,
         config: OfflinePreservationConfig,
+        hashes: DiskHashes,
     ) -> OfflinePreservationEvidence | None:
         if (
             authority.key != identity.session_key
@@ -118,6 +120,7 @@ class GuestfishReadOnlyAuditProvider:
                 identity,
                 authority,
                 config,
+                hashes,
             ))
 
 

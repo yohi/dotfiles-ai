@@ -38,6 +38,12 @@ class Qcow2Metadata:
 
 
 @dataclass(frozen=True, slots=True)
+class DiskHashes:
+    source_sha256: str
+    copy_sha256: str
+
+
+@dataclass(frozen=True, slots=True)
 class LibguestfsSettings:
     kernel_version: str
     kernel_image: Path
@@ -75,6 +81,7 @@ class GuestfsAuditProvider(Protocol):
         identity: HostVmIdentity,
         authority: VerifiedGuestAuthority,
         config: OfflinePreservationConfig,
+        hashes: DiskHashes,
     ) -> OfflinePreservationEvidence | None: ...
 
 
@@ -93,8 +100,6 @@ class OfflinePreservationOps(Protocol):
 
     def sha256(self, path: Path) -> str: ...
 
-    def byte_identical(self, source: Path, copy: Path) -> bool: ...
-
     def logical_compare(self, source: Path, copy: Path) -> bool: ...
 
     def host_repository_unchanged(self, baseline: GitBaseline) -> bool | None: ...
@@ -108,6 +113,7 @@ class OfflinePreservationOps(Protocol):
         identity: HostVmIdentity,
         authority: VerifiedGuestAuthority,
         config: OfflinePreservationConfig,
+        hashes: DiskHashes,
     ) -> OfflinePreservationEvidence | None: ...
 
 
@@ -192,13 +198,13 @@ class OfflinePreserver:
             not self._clean_single_qcow(copy_info)
             or source_info != copy_info
             or source_sha != copy_sha
-            or not self.ops.byte_identical(self.config.source_disk_path, copy_path)
             or not self.ops.logical_compare(self.config.source_disk_path, copy_path)
             or self.ops.source_identity_matches(identity) is not True
         ):
             return None
         evidence = self.ops.audit_readonly(
             copy_path, self.config.libguestfs, identity, authority, self.config,
+            DiskHashes(source_sha, copy_sha),
         )
         if evidence is None:
             return None

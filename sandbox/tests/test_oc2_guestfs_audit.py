@@ -154,7 +154,7 @@ class GuestfsAuditTests(unittest.TestCase):
 
         evidence = provider.audit_readonly(
             self.disk_copy, self.config.libguestfs, self.identity,
-            self.authority, self.config,
+            self.authority, self.config, preserve.DiskHashes('d' * 64, 'd' * 64),
         )
 
         if evidence is None:
@@ -163,6 +163,8 @@ class GuestfsAuditTests(unittest.TestCase):
         self.assertEqual(evidence.head_oid, self.baseline.head_oid)
         self.assertEqual(evidence.receipt_sha256, self.authority.receipt_sha256)
         self.assertEqual(evidence.manifest_sha256, self.authority.manifest_sha256)
+        self.assertEqual(evidence.source_sha256, 'd' * 64)
+        self.assertEqual(evidence.copy_sha256, 'd' * 64)
         self.assertTrue(evidence.session_artifacts_verified)
         self.assertIs(evidence.filesystem_state, op.FilesystemState.READ_ONLY_INSPECTED)
         self.assertFalse(evidence.filesystem_repair_performed)
@@ -180,7 +182,7 @@ class GuestfsAuditTests(unittest.TestCase):
 
         evidence = self.make_provider(runner).audit_readonly(
             self.disk_copy, self.config.libguestfs, self.identity,
-            self.authority, self.config,
+            self.authority, self.config, preserve.DiskHashes('d' * 64, 'd' * 64),
         )
 
         self.assertIsNone(evidence)
@@ -202,7 +204,7 @@ class GuestfsAuditTests(unittest.TestCase):
 
         evidence = self.make_provider(runner).audit_readonly(
             self.disk_copy, self.config.libguestfs, self.identity,
-            self.authority, self.config,
+            self.authority, self.config, preserve.DiskHashes('d' * 64, 'd' * 64),
         )
 
         self.assertIsNone(evidence)
@@ -217,7 +219,7 @@ class GuestfsAuditTests(unittest.TestCase):
 
         evidence = self.make_provider(runner).audit_readonly(
             self.disk_copy, self.config.libguestfs, self.identity,
-            self.authority, self.config,
+            self.authority, self.config, preserve.DiskHashes('d' * 64, 'd' * 64),
         )
 
         self.assertIsNone(evidence)
@@ -233,7 +235,7 @@ class GuestfsAuditTests(unittest.TestCase):
 
         evidence = self.make_provider(runner).audit_readonly(
             self.disk_copy, self.config.libguestfs, self.identity,
-            self.authority, self.config,
+            self.authority, self.config, preserve.DiskHashes('d' * 64, 'd' * 64),
         )
 
         self.assertIsNone(evidence)
@@ -252,7 +254,7 @@ class GuestfsAuditTests(unittest.TestCase):
 
         evidence = self.make_provider(runner).audit_readonly(
             self.disk_copy, unsafe_config.libguestfs, self.identity,
-            self.authority, unsafe_config,
+            self.authority, unsafe_config, preserve.DiskHashes('d' * 64, 'd' * 64),
         )
 
         self.assertIsNone(evidence)
@@ -280,6 +282,20 @@ class GuestfsAuditTests(unittest.TestCase):
             inspection = guestfs_session.inspect_clean_session_git(self.repo)
 
         self.assertIsNone(inspection)
+
+    def test_session_git_commands_use_bounded_fixed_environment(self) -> None:
+        with patch.object(guestfs_session, 'admit_clean_repo') as admit, \
+                patch.object(slice_b_git.subprocess, 'run', wraps=subprocess.run) as run:
+            admit.return_value = self.baseline
+
+            guestfs_session.inspect_clean_session_git(self.repo)
+
+        self.assertEqual(run.call_count, 2)
+        for call in run.call_args_list:
+            self.assertEqual(call.kwargs['env']['PATH'], '/usr/bin:/bin')
+            self.assertEqual(call.kwargs['timeout'], 15)
+            self.assertEqual(call.kwargs['env']['GIT_CONFIG_NOSYSTEM'], '1')
+            self.assertEqual(call.kwargs['env']['GIT_CONFIG_GLOBAL'], '/dev/null')
 
 
 if __name__ == '__main__':
