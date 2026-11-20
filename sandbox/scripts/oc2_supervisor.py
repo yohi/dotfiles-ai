@@ -99,6 +99,8 @@ MAX_FS_READ_BYTES = 1024 * 1024
 CGROUP_ROOT = '/sys/fs/cgroup'
 PROC_ROOT = '/proc'
 BOOT_ID_PATH = '/proc/sys/kernel/random/boot_id'
+GUEST_DOCKER_PATH = '/usr/bin/docker'
+GUEST_DOCKER_HOST = 'unix:///var/run/docker.sock'
 
 _DOCKER_VERBS = ('create', 'start', 'stop', 'kill', 'inspect', 'ps')
 _CGROUP_COMPONENT_RE = re.compile(r'^[A-Za-z0-9_@:+.-]+$')
@@ -1269,6 +1271,41 @@ def guest_lifecycle_factory(runner: w.DockerRunner, fs: GuestFs,
     return factory
 
 
+def production_guest_supervisor(
+    key: w.WriterSessionKey,
+    authority: VerifiedGuestAuthority,
+    *,
+    snapshotter: FixtureSnapshotter,
+    docker_path: str = GUEST_DOCKER_PATH,
+    docker_host: str = GUEST_DOCKER_HOST,
+) -> GuestSupervisor:
+    """Assemble a production Guest Supervisor for one sealed Slice B Session.
+
+    The Docker CLI endpoint is fixed inside the Guest. The Writer's only bind
+    mount remains enforced by ``validate_writer_spec`` and inspect validation;
+    this assembly never passes Host paths or credentials to the Writer.
+    """
+    if not isinstance(key, w.WriterSessionKey):
+        raise SupervisorInputError('session key: invalid type')
+    try:
+        key.validate()
+    except w.WriterError as exc:
+        raise SupervisorInputError('session key: invalid') from exc
+    if not is_verified_guest_authority(authority) or authority.key != key:
+        raise SupervisorInputError('verified Guest image authority does not match SessionKey')
+    if not callable(getattr(snapshotter, 'capture', None)):
+        raise SupervisorInputError('snapshotter: expected capture capability')
+    if (_validate_docker_path(docker_path) != GUEST_DOCKER_PATH
+            or _validate_docker_host(docker_host) != GUEST_DOCKER_HOST):
+        raise SupervisorInputError('Docker endpoint does not match the fixed Guest runtime')
+
+    runner = CliDockerRunner(docker_path, SubprocessTransport(), docker_host=docker_host)
+    lifecycle_factory = guest_lifecycle_factory(runner, LocalGuestFs())
+    return GuestSupervisor(
+        key, lifecycle_factory, image_authority=authority, snapshotter=snapshotter,
+    )
+
+
 _LAUNCH_TEXT_RULES: tuple[tuple[tuple[str, ...], type[SupervisorError], str], ...] = (
     (('Id mismatch', 'identity not confirmed'), IdentityMismatchError,
      'identity-mismatch'),
@@ -1365,6 +1402,13 @@ class GuestSupervisor:
     @property
     def session_key(self) -> w.WriterSessionKey:
         return self._key
+
+    def authority_is_bound(self, authority: VerifiedGuestAuthority) -> bool:
+        return (
+            is_verified_guest_authority(authority)
+            and authority is self._image_authority
+            and authority.key == self._key
+        )
 
     @property
     def state(self) -> SupervisorState:

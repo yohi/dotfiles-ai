@@ -170,6 +170,19 @@ class DockerGuestImageRunner:
             raise SliceBImageRejected("Guest Docker image listing is malformed")
         return ids
 
+    def daemon_id(self) -> str:
+        daemon_id = self._run("info", "--format", "{{.ID}}").strip()
+        if not daemon_id or "\n" in daemon_id:
+            raise SliceBImageRejected("Guest Docker Daemon ID is malformed")
+        return daemon_id
+
+    def container_ids(self) -> tuple[str, ...]:
+        output = self._run("container", "ls", "--all", "--quiet", "--no-trunc")
+        container_ids = tuple(line for line in output.splitlines() if line)
+        if any(not re.fullmatch(r"[0-9a-f]{64}", container_id) for container_id in container_ids):
+            raise SliceBImageRejected("Guest Docker container listing is malformed")
+        return container_ids
+
     def load_image(self, archive: Path) -> None:
         self._validate_archive_path(archive)
         self._run("image", "load", "--input", str(archive))

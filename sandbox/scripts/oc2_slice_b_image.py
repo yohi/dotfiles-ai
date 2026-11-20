@@ -6,11 +6,14 @@ from oc2_slice_b_image_build import (
     verify_build_inputs,
 )
 from oc2_slice_b_image_guest import (
+    ExistingGuestImageRunner,
+    ExistingGuestImageVerificationRequest,
     GuestImageLoadRequest,
     GuestImageRunner,
     VerifiedImageAuthority,
     import_guest_image,
     is_verified_image_authority,
+    reverify_existing_guest_image,
 )
 from oc2_slice_b_image_host import (
     HostImageRunner,
@@ -34,6 +37,8 @@ from oc2_slice_b_image_verify import (
 
 __all__ = [
     "BuildInputs",
+    "ExistingGuestImageRunner",
+    "ExistingGuestImageVerificationRequest",
     "GuestImageLoadRequest",
     "GuestImageRunner",
     "HostImageRunner",
@@ -52,6 +57,7 @@ __all__ = [
     "verify_build_inputs",
     "verify_image_archive",
     "verify_loaded_image",
+    "reverify_existing_guest_image",
     "verify_local_base_image",
     "verify_runtime_pin_against_manifest",
 ]
