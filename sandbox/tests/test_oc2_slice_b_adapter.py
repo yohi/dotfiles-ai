@@ -1,15 +1,12 @@
 from __future__ import annotations
 
 import hashlib
-import re
 import subprocess
 import sys
 import tempfile
 import unittest
-import uuid
 from dataclasses import dataclass, replace
 from pathlib import Path
-from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import patch
 
@@ -26,7 +23,7 @@ if TYPE_CHECKING:
     )
     import sandbox.scripts.oc2_slice_b as adapter
     import sandbox.scripts.oc2_slice_b_git as git
-    import sandbox.scripts.oc2_slice_b_image as image
+    import sandbox.scripts.oc2_slice_b_image as image  # noqa: F401
     import sandbox.scripts.oc2_slice_b_session as session
     import sandbox.oc2_slice_b.offline_fixture as offline_fixture
     from sandbox.scripts.oc2_slice_b import (
@@ -44,7 +41,7 @@ if TYPE_CHECKING:
     )
     from sandbox.tests.oc2_slice_b_test_support import (
         FakeGuestImageRunner as FakeGuestImageRunnerType,
-        make_key,
+        make_key,  # noqa: F401
     )
 
 def git_run(root: Path, *args: str) -> str:
