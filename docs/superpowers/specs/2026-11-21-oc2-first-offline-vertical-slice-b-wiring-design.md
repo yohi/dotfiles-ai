@@ -1,10 +1,11 @@
-# OC2 — First Offline Vertical Slice B Wiring Design R0.1.1
+# OC2 — First Offline Vertical Slice B Wiring Design R0.1.2
 
 - Date: 2026-11-21 (JST)
 - Repository: `yohi/dotfiles-ai`
 - Base: `master@34d0c023925d01f2bb4f91a5b61ee7c871c4a5df` (merged PR #191)
 - Status: **DESIGN_LIMITED_CORRECTION / OWNER_ADOPTION_PENDING / IMPLEMENTATION_NOT_AUTHORIZED / LIVE_ACCEPTANCE_NOT_RUN**
-- Revision: **R0.1.1 — RG-OC2-B-001 and RG-OC2-B-002 limited correction only**
+- Review base: `feature/oc2-slice-b-offline-e2e-wiring-design-20261121@8ae1d916b830ee2cfa6355429321f7583e13739c` (local correction, not committed)
+- Revision: **R0.1.2 — RG-OC2-B-003/004/005 only; RG-OC2-B-001/002 retained**
 - Scope: **One bounded offline TDD vertical slice; design document only in this branch.**
 - Parent: [OC2 Daily Launcher Design R0.2](2026-11-13-oc2-daily-launcher-design.md)
 - Existing bounded contract: [Alternative A — Vertical Slice B Integration Design R0.1.5](2026-11-16-oc2-alternative-a-vertical-slice-b-design.md)
@@ -50,27 +51,32 @@ PR #191 delivered offline Host lifecycle/preservation components, not a live acc
 ```text
 bin/oc2 -> oc2.py
   |-- no --slice-b: existing Phase 1–5 behavior unchanged
-  `-- --slice-b (including --dry-run): fixed Production HOLD
-       SLICE_B_LIVE_NOT_ACCEPTED; nonzero; no ops or infrastructure effects
+  `-- effective raw argv contains --slice-b (also --slice-b=...):
+       fixed Production HOLD **before argparse**
+       even with --help/--version/unknown/--dry-run
+       SLICE_B_LIVE_NOT_ACCEPTED; return 1; no runtime effects
 
 Python unittest only (not reachable from CLI flags or environment):
   -> run_slice_b(repo_root, workspace, sandbox_name, *, dry_run, ops=FakeSliceBOps)
        |-- verified clean Git Baseline + Bundle/Manifest
+       |-- imported Guest actual Git re-observed pre-authority/pre-Writer
        |-- private Host Receipt + verified Guest authority
        |-- same-Session Fake Writer/TUI/fixture
        |-- FakeHostControl lifecycle event order
-       `-- bounded outcome; PENDING on Guest-stop uncertainty;
+       `-- test-only OFFLINE_FAKE_PASS / PENDING /
+           PRESERVATION_UNVERIFIED / REJECTED;
+           production Receipt remains in existing schema;
            no real Host Isolation PASS, Collector or Apply
 
 NO real Host/VM/Docker/sbx, Credential, Inference, Collector, Apply.
 ```
 
-### 4.1 Entry and selection contract
+### 4.1 Entry and selection contract — RG-OC2-B-004
 
-1. Add **only** an explicit `--slice-b` selector in `oc2.py`. Its **fixed HOLD gate**, not the internal orchestration function, runs before normal launcher runtime setup, APM export, OAuth/bootstrap, broker probe, credential Mixin, Sandbox creation, CLI download, or TUI launch. Preserve no-flag `oc2` semantics.
-2. Reject combinations with credential/inference options (`--use-host-broker`, `--host-broker-*`, `--allow-paid-inference`, `--use-cloudflare-ai-gateway`) and provisioning/verification/Phase-4 options before side effects. Explicitly reject any unsupported state or unknown flag; no implicit fallback to normal mode.
-3. `oc2 --slice-b --dry-run` also returns the **same fixed nonzero HOLD**, without calling `run_slice_b`, allocating `SliceBOps`, touching infrastructure or claiming readiness. No CLI option or environment variable may inject Fake ports or bypass this gate.
-4. **Production HOLD:** all production `oc2 --slice-b` invocations stop **nonzero** with fixed non-secret `SLICE_B_LIVE_NOT_ACCEPTED` **before calling `run_slice_b` or any Host/VM/Docker/Sandbox effects**. Verify HOLD through an actual CLI subprocess test. Test doubles are passed only by the separate Python test harness, never through a CLI `--fake`, environment opt-in or alternate entrypoint.
+1. In `oc2.py` `main(argv: list[str] | None = None) -> int`, derive the **effective raw arguments** from explicit `argv` or `sys.argv[1:]` **before constructing `argparse.ArgumentParser` or calling `parse_args()`**. If any token is exactly `--slice-b` or begins `--slice-b=`, **return `1`** after writing exactly `OC2_STOP: SLICE_B_LIVE_NOT_ACCEPTED\n` to stderr. Do not emit help/version/normal runtime text to stdout; do not import/call `run_slice_b`, create `SliceBOps` or access infrastructure. This is an early fixed HOLD, **not** a dispatch to the internal harness.
+2. Selector precedence is unconditional, including `oc2 --slice-b`, `--slice-b --dry-run`, `--slice-b --help`, `--slice-b --version`, `--slice-b --unknown`, incompatible credential/inference/provisioning flags and `--slice-b=...`. Exact standalone `--slice-b` after `--` is also conservatively HOLD. No Fake flag/environment value or extra option can bypass it. No combination may fall through to ordinary launch.
+3. **Without a Slice B selector**, retain existing `argparse` behavior: `--help` and `--version` print normal information and raise `SystemExit(0)`; unknown args use the normal argparse error diagnostic and raise `SystemExit(2)`. The no-flag Phase 1–5 launcher behavior remains unchanged. No new parsing rules affect legacy invocations.
+4. CLI negative tests assert exit/exception, exact diagnostic class and stdout/stderr, and **zero runtime/Host effects separately**. All selector cases use fixed `return 1`/fixed stderr rather than argparse exit `0`/`2`; legacy help/version/unknown follow the original argparse outcomes. All cases, including informational and invalid options, are side-effect-free with respect to Runtime/Host/VM/Docker/credentials.
 
 ### 4.2 Integration boundary, not reimplementation
 
@@ -78,15 +84,15 @@ Create `sandbox/scripts/oc2_slice_b.py` only for orchestration and bounded outco
 
 Only a **Python test harness** (Plan Task 6 target `sandbox/tests/test_oc2_slice_b_adapter.py`) invokes `run_slice_b(..., ops=fake)` directly, with explicitly supplied `SliceBOps` Fake ports and deterministic event recording. Production `oc2.py` never instantiates these Fake ports or invokes `run_slice_b`, including for `--dry-run`. No injection via user CLI flags, environment variables, generic shell port or privileged fallback. Real adapters remain disabled; no delegation to legacy `sbx exec` or `_session_action`. Test-local Git fixture activity is permitted; real Host lifecycle/VM/Docker/sbx calls are forbidden.
 
-Trusted authority is **never** constructed from arbitrary Guest-reported identity. Use the existing `GuestAuthorityVerificationRequest` and `verify_guest_authority_from_host_record(request, runner)` with `FakeGuestImageRunner` from `sandbox/tests/oc2_slice_b_test_support.py` in the offline harness. Issue `VerifiedGuestAuthority` only after existing Host Receipt/Manifest, Archive/Config-ID, Runtime/Image Record, SessionKey and independently observed Guest Baseline checks succeed. Keep full Writer Container ID/StartedAt correlation. No forged sealed authority, mutable Guest `.git` expected identity or bare Docker image tag may substitute for those checks.
+Trusted authority is **never** constructed from arbitrary Guest-reported identity. Use the existing `GuestAuthorityVerificationRequest` and `verify_guest_authority_from_host_record(request, runner)` with `FakeGuestImageRunner` from `sandbox/tests/oc2_slice_b_test_support.py` in the offline harness. Issue `VerifiedGuestAuthority` only after existing Host Receipt/Manifest, Archive/Config-ID, Runtime/Image Record, SessionKey and a **fresh independent real Guest Git observation** succeed. `verify_guest_authority_from_host_record()` validates the supplied `GuestBaseline` against the Receipt but **does not re-read actual Guest Git**; never treat its invocation as proof the repository is still unchanged. Immediately after `import_guest_baseline()` completes, re-run `admit_clean_repo(guest_repo)` and compare the returned `GitBaseline` with the imported frozen Guest baseline (including root, HEAD, tree, ref, Index and worktree). Immediately **before** `ops.run_writer`, call `recheck_host_baseline(host_baseline)` and `recheck_host_baseline(imported_guest_baseline)` again. In both phases reject independently observed drift **before Writer** with `REJECTED`/`OBSERVED_MISMATCH`, retaining Guest original and Session evidence when created. Keep full Writer Container ID/StartedAt correlation. No forged sealed authority, mutable Guest `.git` expected identity or bare Docker image tag may substitute for those checks.
 
 Host original Git `HEAD`, branch, Index, Working Tree and any pre-existing Guest data must remain unchanged by the offline test. Do not transport raw Host `.git`, mount a Host RW worktree, run `git reset`/`checkout` on Host, or infer Git history from a file snapshot. Keep current unsupported Git topologies and secret policy fail-closed; do not loosen `admit_clean_repo` merely to make the fixture pass.
 
 ### 4.3 Single test-scenario transaction
 
-1. Preflight: clean local branch, valid Git baseline and digest-bound Bundle/Manifest; reject unsupported/dirty/changed Host state before any effect.
-2. Admission: create and validate private Session Receipt, then issue `VerifiedGuestAuthority` only via existing `verify_guest_authority_from_host_record()` and `FakeGuestImageRunner` with pinned Host evidence; all immutable identities remain fixed. A missing/mismatched Receipt, Archive, Config ID, Manifest, Runtime/SessionKey or independently observed Guest Baseline fails closed; recheck Host baseline at the required boundary.
-3. Execute: in the **offline Fake only**, model one accepted Writer identity and same Writer's TUI exit, deterministic fixture edit/test and one-path Git Commit contract. The fake emits identity-bound observations; it does **not** prove that a real OpenCode TUI ran or that AI inference happened.
+1. Preflight: clean local branch, valid Host Git baseline and digest-bound Bundle/Manifest; reject unsupported/dirty/changed Host state before any Writer or infrastructure effect. Local temporary Bundle/import artifacts are permissible only under the offline harness.
+2. Admission: run real `import_guest_baseline()` to a **new isolated temporary Guest Git repository**; after Import, call `admit_clean_repo(guest_repo)` and compare all actual returned Git identity fields against the immutable imported Guest baseline **before** issuing Authority. Create/validate the private Session Receipt; then issue `VerifiedGuestAuthority` via `verify_guest_authority_from_host_record()` + `FakeGuestImageRunner` with pinned Host evidence. Its Guest baseline argument is the freshly verified Git observation, not a stale structure or Guest self-report. Missing/mismatched Receipt/Archive/Config-ID/Manifest/Runtime/SessionKey or Git state fails closed.
+3. Execute: **immediately before Fake Writer launch**, recheck both Host and Guest using `recheck_host_baseline(host_baseline)` and `recheck_host_baseline(imported_guest_baseline)`; changed HEAD, Index or Worktree at either boundary means `REJECTED`/`OBSERVED_MISMATCH`, no Writer start, Guest original/Receipt retained. Only after this check model one accepted Writer identity and same Writer's Fake TUI exit, deterministic fixture edit/test and one-path Git Commit. A Fake TUI/Commit is not live OpenCode or inference proof.
 4. Terminate: invoke existing `coordinate_host_controlled_stop(HostControlledStopRequest(...))` through `FakeGuestStopper`, `FakeHostControl` and `FakePreserver`, not real infrastructure. The verified Fake Lifecycle can legitimately emit `host.observe → guest.stop → host.observe → host.shutdown → host.wait → preserve`, including `FakeHostControl.request_graceful_shutdown()`. Alternative retry/already-stopped ordering follows existing tests. **Assert Fake event ordering and zero real Host/VM/Docker/sbx effects separately**. Fake successes are not live Host Isolation PASS.
 5. Retain: if `HostControlledStopResult.failures` includes `GUEST_STOP_UNVERIFIED`, or quiescence is `GUEST_QUIESCENCE_UNVERIFIED`, **overall status is `PENDING` even when later Fake Host isolation or preservation stages appear successful**. Never determine overall success from a positive stage alone. Retain Guest original/Session evidence when `PENDING` or `PRESERVATION_UNVERIFIED`, record bounded reasons and forbid Collection Digest, ApplyAuthorization or Host Apply. Do not mutate the Host checkout.
 
@@ -105,6 +111,17 @@ The action is idempotent only where the existing identity-bound stop/retry contr
 | Independently observed identity/commit/blob mismatch | Failure, **not** `NOT_VERIFIED`; retain evidence for Owner |
 | Real Host/VM/GuestFS/Writer/TTY tests not performed | `NOT_RUN` in the human-facing acceptance record regardless of offline test success |
 
+**Distinct result domains — RG-OC2-B-003:** The persistent production `SliceBReceipt.state` is **unchanged** and accepts exactly `REJECTED`, `RUNNING`, `PENDING` or `PRESERVATION_UNVERIFIED` (as validated by existing `_STATES`). It has **no success terminal state**, and offline Fake success must **never** be stored as `RUNNING` or written as an invented Receipt `SUCCESS`/`PASS`. The Python-only harness instead records the explicit test-only `SliceBOfflineOutcome = Literal["OFFLINE_FAKE_PASS", "REJECTED", "PENDING", "PRESERVATION_UNVERIFIED"]` through `ops.record_result(outcome, reason, lifecycle_result)`; this operation is not Receipt persistence or live acceptance evidence.
+
+| Test-only outcome | Classification / `reason` | `run_slice_b` return | Production Receipt and real acceptance |
+| --- | --- | --- | --- |
+| `OFFLINE_FAKE_PASS` | All real fixture Git/authority, same-Writer Fake TUI/Commit, Fake Guest-stop, Host isolation and Fake preservation checks succeed with no coordinator failures; `reason=None` | `0` | Receipt remains `PENDING` (no live terminal success); real Host Isolation/Preservation still `NOT_RUN`/`NOT_VERIFIED` |
+| `PENDING` | `GUEST_STOP_UNVERIFIED`/`GUEST_QUIESCENCE_UNVERIFIED`, restart/isolation uncertainty, or other absent proof; bounded reason, **regardless of later Fake success stages** | `1` | Original Guest/Session evidence retained; Receipt `PENDING`; no Apply |
+| `PRESERVATION_UNVERIFIED` | Guest stop and isolation verified in Fake, but preservation is missing/unverified; bounded reason | `1` | Receipt remains `PENDING` or existing `PRESERVATION_UNVERIFIED`; never real preservation PASS |
+| `REJECTED` | Independently **observed** Git/identity/digest/commit mismatch; `reason=OBSERVED_MISMATCH` (or bounded preflight rejection reason), no Writer on prelaunch mismatch | `1` | Receipt stays in existing schema; originals retained if created; never relabel real observed mismatch as unknown |
+
+Observed mismatch is not `NOT_VERIFIED`. Evaluate independently observed mismatch first; otherwise Guest-stop uncertainty takes precedence over later Fake-positive stages; otherwise Host isolation uncertainty, then preservation unknown. `OFFLINE_FAKE_PASS` is possible only after all Fake checks actually pass. No Fake result upgrades the live evidence state.
+
 Keep the three AC-13 claims separate: credential non-injection, external communication path absence, and absence of inference requests. Offline Fake tests can verify control-flow **non-invocation** and static constraints, but cannot set those three live assertions to `PASS`.
 
 Do not install systemd units, disable Host isolation checks, change credentials, grant paid inference, auto-enable T8/T9 Preservation, or add broad exception handlers that convert unexpected failures to success. Failed cleanup must never silently delete a Guest original.
@@ -115,10 +132,11 @@ TDD follows **RED → GREEN → REFACTOR**. Test the fixed production CLI HOLD a
 
 | Test focus | RED expectation before wiring | GREEN/acceptance expectation |
 | --- | --- | --- |
-| **CLI production HOLD** | `--slice-b` unavailable / no fixed HOLD | Real CLI `oc2 --slice-b` (also `--dry-run`) exits nonzero with `SLICE_B_LIVE_NOT_ACCEPTED` before `run_slice_b`/`SliceBOps`/external effects; default `oc2` unchanged |
+| **CLI production HOLD / precedence** | `--slice-b` unavailable / parse-time `SystemExit(0)` for help/version | Raw-argv pre-parse selector with `--help`, `--version`, unknown, `--dry-run`, `--slice-b=...` or credential flags returns **1**, exact fixed stderr and no stdout/effects; no-selector help/version/unknown keep argparse `SystemExit(0/2)` |
 | Selection rejects conflict | Disallowed option may enter normal bootstrap | Every forbidden combination rejects before any external effect |
-| **Python-only Fake E2E** | No one-piece integration flow | Test harness directly calls Plan Task 6 `run_slice_b(..., ops: SliceBOps)` with Fake; clean Baseline/verified Guest Authority/same-Writer TUI-fixture/Host Lifecycle result, never via CLI |
-| Git negative cases | Missing integrated rejection evidence | Dirty, changed, unsupported or unsafe repo rejects before launch; baseline still unchanged |
+| **Python-only Fake E2E** | No one-piece integration flow | Test harness directly calls Plan Task 6 `run_slice_b(..., ops: SliceBOps)`; actual Guest `admit_clean_repo`/`recheck_host_baseline`, verified Authority, same-Writer Fake TUI/fixture, Host Lifecycle; no CLI entry |
+| **Offline outcome vs Receipt (RG-OC2-B-003)** | Success wrongly maps to Receipt `RUNNING` or invented `SUCCESS` | Test-only `OFFLINE_FAKE_PASS`/`None`/return `0` on fully green Fake; other outcomes distinct/nonzero; Receipt never stores Fake success; live acceptance remains `NOT_RUN` |
+| **Git negative / post-import drift (RG-OC2-B-005)** | Saved `GitBaseline` might mask later Guest mutation | Actual imported Guest is re-observed **before Authority** and rechecked with Host **immediately before Writer**; mutations after Import/Authority reject before Writer, retain Guest/Receipt and original Host |
 | Digest/identity negative cases | Adapter permits missing/mismatched evidence | `verify_guest_authority_from_host_record()` with existing `FakeGuestImageRunner` must validate Receipt/Archive/Config-ID/Runtime; mismatched/forged authority, Guest Baseline, Writer/epoch fail closed |
 | **Guest-stop-unknown precedence** | Positive Fake stage could conceal unverified Guest stop | `GUEST_STOP_UNVERIFIED` / `GUEST_QUIESCENCE_UNVERIFIED` => `PENDING` despite later Fake success; Guest originals retained, live Host Isolation NOT_VERIFIED |
 | Other stop/preservation negatives | Overconfident terminal status | Isolation unknown => `PENDING`; Guest original/readback missing => `PRESERVATION_UNVERIFIED`; no Collector/Apply |
@@ -145,7 +163,7 @@ Out of scope: daily `oc2` default-mode migration, Sandbox selection/reuse, dirty
 
 ## 8. Exit criteria, risk and Human Owner checkpoint
 
-Design deliverable: **this one Markdown document only**. Creating and pushing its feature branch is authorized by the user's current request; **the design is not thereby adopted** and implementation is not authorized.
+This bounded review remediation updates **only this Design and its paired implementation-plan Markdown in local output**. Existing prior GitHub commits are evidence, not authority for new GitHub writes. **No Commit/Push/PR or implementation is authorized by this correction**; Design adoption and Tasks 1–3 implementation remain separate Human Owner decisions.
 
 The future first slice is complete only if:
 
