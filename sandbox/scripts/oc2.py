@@ -1753,6 +1753,12 @@ def _session_action(args: argparse.Namespace, workspace: pathlib.Path,
 
 
 def main(argv: list[str] | None = None) -> int:
+    effective_argv = argv if argv is not None else sys.argv[1:]
+    if any(argument == '--slice-b' or argument.startswith('--slice-b=')
+           for argument in effective_argv):
+        print('OC2_STOP: SLICE_B_LIVE_NOT_ACCEPTED', file=sys.stderr)
+        return 1
+
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--version', action='version', version=f'oc2 launcher 1.0; OpenCode v{VERSION}')
     p.add_argument('--repo-root', type=pathlib.Path, default=REPO_ROOT)
@@ -1796,7 +1802,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument('--host-broker-fixture-root',
                    help='m2 only: fixture path relative to the Runtime, '
                         'fixtures or fixtures/<name>')
-    args = p.parse_args(argv)
+    args = p.parse_args(effective_argv)
     oc2_workspace = importlib.import_module('oc2_workspace')
 
     try:
