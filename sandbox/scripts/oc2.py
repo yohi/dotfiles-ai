@@ -867,7 +867,7 @@ def workspace_transfer_profile(workspace: pathlib.Path) -> str | None:
         r'https://github\.com/yohi/dotfiles-ai(?:\.git)?',
     )
     if any(re.fullmatch(pattern, origin.stdout.strip()) for pattern in approved_origins):
-        return 'dotfiles-ai/workspace-safe-transfer/r1'
+        return 'dotfiles-ai/workspace-safe-transfer/r2'
     return None
 
 

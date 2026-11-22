@@ -77,7 +77,25 @@ DOTFILES_AI_PROFILE = WorkspaceProfile(
         'opencode/docs/global-rules',
     ),
 )
-WORKSPACE_PROFILES: Final[tuple[WorkspaceProfile, ...]] = (DOTFILES_AI_PROFILE,)
+DOTFILES_AI_PROFILE_R2_ID: Final[str] = 'dotfiles-ai/workspace-safe-transfer/r2'
+DOTFILES_AI_PROFILE_R2_ADDITIONAL_PATHS: Final[frozenset[str]] = frozenset({
+    'sandbox/tests/test_oc2_slice_b_git.py',
+    'sandbox/tests/test_oc2_broker_tls_acceptance.py',
+    'sandbox/tests/test_oc2.py',
+    'sandbox/tests/test_oc2_phase4_assets.py',
+})
+DOTFILES_AI_PROFILE_R2 = WorkspaceProfile(
+    profile_id=DOTFILES_AI_PROFILE_R2_ID,
+    excluded_paths=(
+        DOTFILES_AI_PROFILE.excluded_paths
+        | DOTFILES_AI_PROFILE_R2_ADDITIONAL_PATHS
+    ),
+    excluded_prefixes=DOTFILES_AI_PROFILE.excluded_prefixes,
+)
+WORKSPACE_PROFILES: Final[tuple[WorkspaceProfile, ...]] = (
+    DOTFILES_AI_PROFILE,
+    DOTFILES_AI_PROFILE_R2,
+)
 
 
 @dataclass(frozen=True, slots=True)
