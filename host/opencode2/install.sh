@@ -75,8 +75,21 @@ if [[ ! -e "$prefix" ]]; then
   mkdir -p -- "$parent"
   stage="$(mktemp -d "$parent/.opencode-v2-$version.XXXXXXXX")"
   trap 'rm -rf -- "$stage"' EXIT
+  # npm >=11 requires project-local approval for dependency install scripts.
+  # OpenCode needs its postinstall to select the platform binary. Approve only
+  # the pinned CLI version; never enable all dependency lifecycle scripts.
+  cat > "$stage/package.json" <<'PACKAGE'
+{
+  "name": "opencode-v2-host-private-install",
+  "private": true,
+  "allowScripts": {
+    "@opencode/cli@2.3.2": true
+  }
+}
+PACKAGE
   npm_config_cache="$HOME/.cache/opencode-v2/npm" \
-    npm --prefix "$stage" install --no-save --no-package-lock --no-audit --no-fund -- "$package"
+    npm --prefix "$stage" install --no-save --no-package-lock --no-audit --no-fund \
+      --strict-allow-scripts -- "$package"
   if [[ ! -x "$stage/node_modules/.bin/opencode" ]]; then
     printf 'install: npm did not provide an executable; refusing deployment\n' >&2
     exit 69
