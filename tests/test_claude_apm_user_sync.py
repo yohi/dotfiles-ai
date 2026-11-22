@@ -3,8 +3,62 @@ import os
 import subprocess
 from pathlib import Path
 
+import yaml
+
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_apm_manifest_removes_sonarqube_mcp_server() -> None:
+    manifest = yaml.safe_load((REPO_ROOT / "apm.yml").read_text(encoding="utf-8"))
+
+    assert "io.github.SonarSource/sonarqube-mcp-server" not in manifest[
+        "dependencies"
+    ]["mcp"]
+
+
+def test_apm_mcp_servers_use_project_scoped_commands() -> None:
+    manifest = yaml.safe_load((REPO_ROOT / "apm.yml").read_text(encoding="utf-8"))
+    servers = {
+        server["name"]: server
+        for server in manifest["dependencies"]["mcp"]
+        if isinstance(server, dict)
+    }
+
+    assert servers["codegraph"]["command"] == "codegraph"
+    assert servers["codegraph"]["args"] == ["serve", "--mcp"]
+    assert servers["filesystem"]["args"][-1] == "."
+    assert servers["nexus"]["command"] == "npx"
+    assert servers["nexus"]["args"] == [
+        "-y",
+        "@yohi/nexus@2.6.0",
+        "http-bridge",
+    ]
+    assert {
+        name: servers["nexus"]["env"][name]
+        for name in (
+            "NEXUS_EMBEDDING_PROVIDER",
+            "NEXUS_EMBEDDING_MODEL",
+            "NEXUS_EMBEDDING_DIMENSIONS",
+            "NEXUS_EMBEDDING_BASE_URL",
+            "NEXUS_EMBEDDING_MAX_CONCURRENCY",
+        )
+    } == {
+        "NEXUS_EMBEDDING_PROVIDER": "",
+        "NEXUS_EMBEDDING_MODEL": "",
+        "NEXUS_EMBEDDING_DIMENSIONS": "",
+        "NEXUS_EMBEDDING_BASE_URL": "",
+        "NEXUS_EMBEDDING_MAX_CONCURRENCY": "",
+    }
+    nexus_config = json.loads((REPO_ROOT / ".nexus.json").read_text(encoding="utf-8"))
+    assert nexus_config["embedding"]["dimensions"] == 1024
+    assert nexus_config["embedding"]["model"] == "bge-m3"
+    assert servers["semgrep"]["command"] == "bash"
+    assert servers["semgrep"]["args"] == [
+        "-c",
+        'exec "$HOME/.local/bin/semgrep" mcp -t stdio',
+    ]
+    assert "bash" not in (servers["codegraph"]["command"], servers["nexus"]["command"])
 
 
 def test_sync_claude_uses_project_manifest_and_preserves_user_config(
