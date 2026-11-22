@@ -14,6 +14,8 @@ import sys
 import tempfile
 import uuid
 
+import yaml
+
 REPO = Path(__file__).resolve().parents[2]
 REQUIRED_APM = (0, 37, 0)
 
@@ -44,6 +46,65 @@ def apm_version(command: str) -> tuple[int, int, int]:
     if version < REQUIRED_APM:
         stop("APM 0.37.0 or newer is required; upgrade it separately, not via this script")
     return version
+
+
+def prepare_apm_manifest() -> tuple[dict, str]:
+    """Project only APM-owned fields out of the anchor-bearing source SSOT."""
+    source = REPO / "apm.yml"
+    if source.is_symlink() or not source.is_file() or source.stat().st_size > 2 * 1024 * 1024:
+        stop("APM SSOT must be a regular file no larger than 2 MiB")
+    try:
+        parsed = yaml.safe_load(source.read_text(encoding="utf-8"))
+    except yaml.YAMLError as exc:
+        stop(f"cannot parse source APM SSOT: {exc}")
+    if not isinstance(parsed, dict) or not isinstance(parsed.get("dependencies"), dict):
+        stop("APM SSOT lacks dependencies mapping")
+    dependencies = parsed["dependencies"]
+    packages, servers = dependencies.get("apm"), dependencies.get("mcp")
+    if not isinstance(packages, list) or not isinstance(servers, list):
+        stop("APM SSOT must contain dependencies.apm and dependencies.mcp lists")
+    if not packages and not servers:
+        stop("APM SSOT has no dependencies to synchronize")
+    if any(not isinstance(item, (str, dict)) for item in [*packages, *servers]):
+        stop("APM SSOT dependencies contain an unsupported entry")
+    if not isinstance(parsed.get("name"), str) or not parsed["name"]:
+        stop("APM SSOT name is missing")
+    # Preserve original dependency declarations, not V1 provider/model settings.
+    manifest = {
+        "name": parsed["name"],
+        "version": str(parsed.get("version", "1.0.0")),
+        "targets": ["opencode"],
+        "dependencies": {"apm": packages, "mcp": servers},
+    }
+    # APM 0.37 rejects all YAML anchors/aliases; even shared objects must be
+    # rendered as literal mappings, independent of the source provider section.
+    class NoAliasDumper(yaml.SafeDumper):
+        def ignore_aliases(self, data: object) -> bool:
+            return True
+
+    rendered = yaml.dump(manifest, Dumper=NoAliasDumper, sort_keys=False, allow_unicode=True)
+    return manifest, rendered
+
+
+def stage_apm_source(stage: Path, rendered: str) -> None:
+    (stage / "apm.yml").write_text(rendered, encoding="utf-8")
+    # APM compiles local primitives from cwd/.apm, not from --root. Copy only
+    # approved instruction sources; never follow symlinks or copy credentials.
+    source = REPO / ".apm/instructions"
+    if source.exists() or source.is_symlink():
+        if not source.is_dir() or source.is_symlink():
+            stop("unsafe source .apm/instructions")
+        target = stage / ".apm/instructions"
+        target.mkdir(parents=True)
+        instructions = list(source.iterdir())
+        if len(instructions) > 64:
+            stop("too many local APM instruction files")
+        for item in instructions:
+            if (item.is_symlink() or not item.is_file()
+                    or not item.name.endswith(".instructions.md")
+                    or item.stat().st_size > 256 * 1024):
+                stop("unsafe local APM instruction primitive")
+            shutil.copyfile(item, target / item.name)
 
 
 def destination_ok(dest: Path, prior: dict | None, name: str) -> None:
@@ -81,16 +142,20 @@ def apply(apm: str, home: Path) -> None:
 
     # APM's --root redirects project package, MCP and lockfile outputs to stage.
     # The seed forces native V2 mcp.servers layout rather than legacy V1 mcp.
+    # Validate the source before writing any stage files or invoking APM.
+    manifest, rendered = prepare_apm_manifest()
     snapshots = home / ".local/share/opencode-v2/apm-host-snapshots"
     snapshots.mkdir(parents=True, exist_ok=True)
     stage = Path(tempfile.mkdtemp(prefix=".stage-", dir=snapshots))
     promoted = False
     try:
+        stage_apm_source(stage, rendered)
         (stage / ".opencode").mkdir()
         (stage / "opencode.json").write_text('{"mcp":{"servers":{}}}\n', encoding="utf-8")
         for args in (["install", "--root", str(stage), "--target", "opencode"],
                      ["compile", "--root", str(stage), "--target", "opencode"]):
-            subprocess.run([apm, *args], cwd=REPO, check=True)
+            # --root redirects writes only; it cannot redirect manifest input.
+            subprocess.run([apm, *args], cwd=stage, check=True)
         generated = read_object(stage / "opencode.json")
         source_mcp = generated.get("mcp")
         if not isinstance(source_mcp, dict) or not isinstance(source_mcp.get("servers"), dict):
@@ -165,7 +230,12 @@ def main() -> int:
     version = apm_version(apm)
     print(f"APM {'.'.join(map(str, version))}; source={REPO / 'apm.yml'}; target=opencode")
     if args.check:
-        print("CHECK_ONLY: no files changed. --apply uses an isolated APM --root.")
+        manifest, rendered = prepare_apm_manifest()
+        print(f"CHECK_ONLY: APM-only manifest valid; "
+              f"{len(manifest['dependencies']['apm'])} packages, "
+              f"{len(manifest['dependencies']['mcp'])} MCP entries; "
+              f"normalized SHA-256={hashlib.sha256(rendered.encode()).hexdigest()}")
+        print("No files changed; this does not resolve or execute dependencies.")
         return 0
     apply(apm, home)
     return 0

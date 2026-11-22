@@ -19,6 +19,16 @@ if args == ['--version']:
 if os.environ.get('FAKE_APM_FAIL') == args[0]:
     sys.exit(25)
 root = pathlib.Path(args[args.index('--root')+1])
+# --root does not control manifest discovery; cwd must be a private stage.
+if root != pathlib.Path.cwd() or not (root / 'apm.yml').is_file():
+    sys.exit(42)
+manifest = (root / 'apm.yml').read_text()
+if 'x-variants:' in manifest or '&gpt_variants' in manifest or 'provider:' in manifest:
+    sys.exit(43)
+if 'dependencies:' not in manifest or 'targets:' not in manifest:
+    sys.exit(44)
+if not (root / '.apm/instructions').is_dir():
+    sys.exit(45)
 if args[0] == 'install':
     (root / '.agents/skills/test-skill').mkdir(parents=True)
     (root / '.agents/skills/test-skill/SKILL.md').write_text('skill')
@@ -68,6 +78,27 @@ class APMHostV2Tests(unittest.TestCase):
         for name in ['AGENTS.md','skills','commands']:
             self.assertTrue((self.config.parent / name).is_symlink())
         self.assertEqual((self.config.parent/'AGENTS.md').read_text(), 'instructions')
+
+    def test_apm_manifest_normalized_and_source_unchanged(self):
+        original = (SCRIPT.parents[2] / 'apm.yml').read_bytes()
+        result = self.run_cli('--apply')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual((SCRIPT.parents[2] / 'apm.yml').read_bytes(), original)
+        snapshots = self.home / '.local/share/opencode-v2/apm-host-snapshots'
+        stages = list(snapshots.glob('snapshot-*'))
+        self.assertEqual(len(stages), 1)
+        reduced = (stages[0] / 'apm.yml').read_text()
+        self.assertIn('dependencies:', reduced)
+        self.assertIn('opencode', reduced)
+        self.assertNotIn('&gpt_variants', reduced)
+        self.assertNotIn('x-variants:', reduced)
+        self.assertNotIn('provider:', reduced)
+
+    def test_check_parses_real_apm_yaml_without_deployment(self):
+        result = self.run_cli('--check')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('APM-only manifest valid', result.stdout)
+        self.assertFalse((self.home / '.local').exists())
 
     def test_repeat_apply_safe(self):
         self.assertEqual(self.run_cli('--apply').returncode,0)

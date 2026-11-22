@@ -34,15 +34,20 @@ performed automatically.
 
 ```bash
 python3 -m unittest discover -s tests -p 'test_host_v2_apm.py' -v
-python3 host/opencode2/sync_apm.py --check  # read-only, version/source checks
+python3 host/opencode2/sync_apm.py --check  # read-only, validates normalized manifest
 python3 host/opencode2/sync_apm.py --apply  # explicit APM install/compile + apply
 opencode2 mcp list
 ```
 
-- `--apply` runs `apm install --root <private stage> --target opencode`
-  followed by `apm compile --root <private stage> --target opencode`.
-  Both use the repository's existing `apm.yml` and write APM
-  artifacts into a versioned snapshot under
+- `--apply` parses the existing `apm.yml` (including YAML
+  anchors) but writes only `dependencies.apm`, `dependencies.mcp`,
+  package identity, and the OpenCode target to a temporary **anchor-free**
+  manifest. It also copies regular `.apm/instructions/*.instructions.md`
+  sources without following symlinks. The original SSOT remains unchanged.
+- `apm install --root <private stage> --target opencode` and
+  `apm compile --root <private stage> --target opencode` run **with cwd
+  set to the private stage**, because `--root` redirects writes but does
+  not change input manifest discovery. Outputs stay under
   `~/.local/share/opencode-v2/apm-host-snapshots/`.
   APM may use its normal shared cache/receipt infrastructure, but no
   V1 OpenCode files or source `apm.lock.yaml` are deliberately changed.
