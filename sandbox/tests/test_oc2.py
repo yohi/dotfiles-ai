@@ -1485,6 +1485,111 @@ class HostTest(unittest.TestCase):
         self.assertEqual(oc2.VERSION, '2.2.5')
         self.assertNotIn('--collect', help_result.stdout)
 
+    def test_slice_b_hold_precedes_help_version_and_unknown(self):
+        for arguments in (
+            ['--slice-b', '--help'],
+            ['--slice-b', '--version'],
+            ['--slice-b', '--unknown'],
+            ['--slice-b=1'],
+        ):
+            with self.subTest(arguments=arguments):
+                stdout = io.StringIO()
+                stderr = io.StringIO()
+                with (
+                    contextlib.redirect_stdout(stdout),
+                    contextlib.redirect_stderr(stderr),
+                    patch.object(oc2, 'run_slice_b', create=True) as run_slice_b,
+                    patch.object(oc2, 'Runner') as runner,
+                ):
+                    result = oc2.main(arguments)
+                self.assertEqual(result, 1)
+                self.assertEqual(stderr.getvalue(), 'OC2_STOP: SLICE_B_LIVE_NOT_ACCEPTED\n')
+                self.assertEqual(stdout.getvalue(), '')
+                run_slice_b.assert_not_called()
+                runner.assert_not_called()
+
+        isolated_env = {
+            'PATH': os.environ['PATH'],
+            'HOME': tempfile.gettempdir(),
+            'LANG': 'C.UTF-8',
+        }
+        for argument in ('--help', '--version'):
+            with self.subTest(subprocess_argument=argument):
+                result = subprocess.run(
+                    [sys.executable, str(SCRIPTS / 'oc2.py'), '--slice-b', argument],
+                    capture_output=True, text=True, check=False, env=isolated_env,
+                )
+                self.assertEqual(result.returncode, 1)
+                self.assertEqual(result.stderr, 'OC2_STOP: SLICE_B_LIVE_NOT_ACCEPTED\n')
+                self.assertEqual(result.stdout, '')
+
+    def test_slice_b_dry_run_cannot_bypass_hold(self):
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+        with (
+            contextlib.redirect_stdout(stdout),
+            contextlib.redirect_stderr(stderr),
+            patch.object(oc2, 'Runner') as runner,
+        ):
+            result = oc2.main(['--slice-b', '--dry-run'])
+        self.assertEqual(result, 1)
+        self.assertEqual(stderr.getvalue(), 'OC2_STOP: SLICE_B_LIVE_NOT_ACCEPTED\n')
+        self.assertEqual(stdout.getvalue(), '')
+        runner.assert_not_called()
+
+    def test_slice_b_rejects_credential_and_inference_modes(self):
+        for arguments in (
+            ['--slice-b', '--allow-paid-inference'],
+            ['--slice-b', '--use-host-broker'],
+        ):
+            with self.subTest(arguments=arguments):
+                stdout = io.StringIO()
+                stderr = io.StringIO()
+                with (
+                    contextlib.redirect_stdout(stdout),
+                    contextlib.redirect_stderr(stderr),
+                    patch.object(oc2, 'Runner') as runner,
+                ):
+                    result = oc2.main(arguments)
+                self.assertEqual(result, 1)
+                self.assertEqual(stderr.getvalue(), 'OC2_STOP: SLICE_B_LIVE_NOT_ACCEPTED\n')
+                self.assertEqual(stdout.getvalue(), '')
+                runner.assert_not_called()
+
+    def test_slice_b_env_cannot_inject_fake(self):
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+        with (
+            patch.dict(os.environ, {'OC2_SLICE_B_FAKE': '1'}, clear=True),
+            contextlib.redirect_stdout(stdout),
+            contextlib.redirect_stderr(stderr),
+            patch.object(oc2, 'Runner') as runner,
+        ):
+            result = oc2.main(['--slice-b'])
+        self.assertEqual(result, 1)
+        self.assertEqual(stderr.getvalue(), 'OC2_STOP: SLICE_B_LIVE_NOT_ACCEPTED\n')
+        self.assertEqual(stdout.getvalue(), '')
+        runner.assert_not_called()
+
+    def test_legacy_argparse_help_version_unknown_unchanged(self):
+        for arguments, expected_code in (
+            (['--help'], 0),
+            (['--version'], 0),
+            (['--unknown'], 2),
+        ):
+            with self.subTest(arguments=arguments):
+                stdout = io.StringIO()
+                stderr = io.StringIO()
+                with (
+                    contextlib.redirect_stdout(stdout),
+                    contextlib.redirect_stderr(stderr),
+                    patch.object(oc2, 'Runner') as runner,
+                ):
+                    with self.assertRaises(SystemExit) as caught:
+                        oc2.main(arguments)
+                self.assertEqual(caught.exception.code, expected_code)
+                self.assertEqual(runner.call_count, 0)
+
     def test_missing_sandbox(self):
         runner = FakeRunner()
         self.assertFalse(oc2.is_compatible_sandbox(runner, 'oc2-dev'))
