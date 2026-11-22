@@ -153,10 +153,14 @@ class HostV2ModelTests(unittest.TestCase):
         self.assertNotIn("must-never-be-copied", self.target.read_text())
         self.assertEqual(cloud["headers"]["Authorization"], "")
         self.assertEqual(cloud["headers"]["cf-aig-authorization"], "Bearer {env:OC_CF_API_TOKEN}")
-        self.assertEqual([p["resource"] for p in result["policies"]], ["*", *models.PROVIDERS])
+        self.assertEqual([p["resource"] for p in result["policies"]],
+                         ["*", *models.PROVIDERS, models.CLAUDE_AGENT_PROVIDER])
         self.assertTrue(all(p["effect"] == "allow" for p in result["policies"][1:]))
         self.assertEqual(len(result["providers"]), 9)
         self.assertNotIn("cloudflare-ai-gateway-dynamic", result["providers"])
+        # Claude Agent is built into the OpenCode runtime; no ad-hoc SDK
+        # package or source-model catalog is installed by this sync.
+        self.assertNotIn(models.CLAUDE_AGENT_PROVIDER, result["providers"])
         self.assertEqual(result["providers"]["opencode-go"]["models"], {
             "kimi-k2.7-code": {"modelID": "kimi-k2.7-code"},
             "glm-5.3-flash": {"modelID": "glm-5.3-flash"},
@@ -176,6 +180,43 @@ class HostV2ModelTests(unittest.TestCase):
                          {"reasoningEffort": "max"})
 
         self.assertEqual(self.target.stat().st_mode & 0o777, 0o600)
+
+    def test_upgrade_existing_nine_provider_policy_to_claude_agent(self):
+        # Mirrors the already-applied 9-provider Host V2 configuration and
+        # its recorded digest. A policy-only extension must not trip the
+        # conservative change detector or reset existing MCP enablement.
+        old = models.expected_config()
+        old["policies"] = old["policies"][:-1]
+        current = json.loads(self.target.read_text())
+        current.update(old)
+        self.target.write_text(json.dumps(current))
+        state_file = self.dir / "model-host-sync-state.json"
+        state_file.write_text(json.dumps({
+            "source": "apm.yml:opencode_v2",
+            "managed_sha256": models.fingerprint(old),
+        }))
+        self.assertEqual(models.main(["--check"]), 0)
+        self.assertEqual(models.main(["--apply"]), 0)
+        updated = json.loads(self.target.read_text())
+        self.assertEqual(updated["mcp"], current["mcp"])
+        self.assertEqual(updated["model"], current["model"])
+        self.assertEqual(updated["providers"], current["providers"])
+        self.assertEqual(updated["policies"][:-1], current["policies"])
+        self.assertEqual(updated["policies"][-1], {
+            "action": "provider.use", "resource": "claude-agent", "effect": "allow",
+        })
+        self.assertEqual(self.v1.read_text(), "v1-sentinel")
+        self.assertEqual(json.loads(state_file.read_text())["managed_sha256"],
+                         models.fingerprint(models.expected_config()))
+
+    def test_manual_claude_agent_policy_change_blocks_resync(self):
+        self.assertEqual(models.main(["--apply"]), 0)
+        data = json.loads(self.target.read_text())
+        data["policies"][-1]["effect"] = "deny"
+        self.target.write_text(json.dumps(data))
+        with self.assertRaisesRegex(RuntimeError, "changed after last sync"):
+            models.main(["--apply"])
+        self.assertEqual(json.loads(self.target.read_text())["policies"][-1]["effect"], "deny")
 
     def test_repeat_apply_safe(self):
         self.assertEqual(models.main(["--apply"]), 0)

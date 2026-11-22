@@ -20,6 +20,10 @@ PROVIDERS = (
     "cloudflare-ai-gateway-octg", "opencode", "ollama-cloud",
     "opencode-go", "amazon-bedrock", "google",
 )
+# OpenCode V2 includes Claude Agent as a native integration, not an APM
+# dependency or a V1 provider catalog entry. Its models are discovered only
+# after the user connects the host Claude CLI in /connect.
+CLAUDE_AGENT_PROVIDER = "claude-agent"
 CUSTOM = "cloudflare-ai-gateway-custom"
 UNIFIED = "cloudflare-ai-gateway"
 OCTG = "cloudflare-ai-gateway-octg"
@@ -232,6 +236,7 @@ def expected_config() -> dict:
         "policies": [
             {"action": "provider.use", "resource": "*", "effect": "deny"},
             *({"action": "provider.use", "resource": p, "effect": "allow"} for p in enabled),
+            {"action": "provider.use", "resource": CLAUDE_AGENT_PROVIDER, "effect": "allow"},
         ],
     }
 

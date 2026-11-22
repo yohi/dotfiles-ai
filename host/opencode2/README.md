@@ -161,6 +161,51 @@ Official docs:
 - https://opencode.ai/docs/models/
 - https://opencode.ai/docs/policies/
 
+## Claude Agent (Host V2 native integration)
+
+OpenCode V2.2.3+ includes the built-in **Claude Agent** provider
+(`claude-agent`). This is not an MCP server and does not require installing
+a third-party OpenCode plugin. The Host model sync adds one
+`provider.use` allow statement for `claude-agent`, after the existing
+nine V1-enabled provider policies. The default remains
+`openai/gpt-6-luna`; the `providers` catalog remains at nine entries.
+Claude Agent models appear only after connecting a local Claude Code login.
+
+```bash
+# Update the Host V2 generated policies (not the V1/Sandbox settings).
+uv run --no-project --with PyYAML python host/opencode2/sync_models.py --check
+uv run --no-project --with PyYAML python host/opencode2/sync_models.py --apply
+
+# Inspect whether the Claude Code CLI exists and is signed in on this host.
+command -v claude
+claude auth status
+
+# If not signed in, run separately and complete the Claude login flow:
+# claude auth login
+# Launch Host V2 and select "Claude Agent" from /connect:
+~/.local/bin/opencode2
+```
+
+The native provider launches the installed `claude` CLI from `PATH` or
+`OPENCODE_CLAUDE_PATH`. OpenCode does not copy Claude Code login tokens.
+Authentication and availability are not proven by configuration alone; the
+Owner must select **Claude Agent** in `/connect` and confirm that its
+models appear and work. CLI accounts backed by API keys or AWS/Vertex
+may incur usage charges independent of a Claude subscription.
+
+The launcher intentionally keeps `OPENCODE_DISABLE_CLAUDE_CODE=1`.
+This flag disables automatic loading of `CLAUDE.md` and `.claude`
+skills; it does **not** disable the native `claude-agent` provider.
+Keeping it set prevents the Host V2 launcher from implicitly importing
+V1's project-specific Claude instructions and skills.
+
+The model sync preserves existing MCP enablement and the separately
+managed APM state. No Claude executable is installed automatically and
+no login, model inference, PR, or other external action is performed by
+the sync script.
+
+Official reference: https://opencode.ai/changelog/v2.2.3
+
 ## Local setup (manual opt-in)
 
 Run from the dotfiles-ai checkout on the target Ubuntu host:
