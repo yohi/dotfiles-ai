@@ -15,7 +15,7 @@ INSTALLER = ROOT / "host/opencode2/install.sh"
 FAKE_CLI = '''#!/usr/bin/env python3
 import json, os, sys
 if sys.argv[1:] == ["--version"]:
-    print("2.3.2")
+    print("opencode v2.3.2")
 else:
     keys = ["XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_CACHE_HOME", "XDG_STATE_HOME",
         "OPENCODE_DB", "OPENCODE_CONFIG", "OPENCODE_CONFIG_DIR", "OPENCODE_CONFIG_CONTENT",
@@ -117,6 +117,23 @@ class HostOpenCode2Tests(unittest.TestCase):
         config = self.home / ".config/opencode-v2/opencode/opencode.json"
         self.assertEqual(json.loads(config.read_text())["mcp"]["servers"], {})
         self.assertEqual(config.stat().st_mode & 0o777, 0o600)
+
+    def test_wrong_version_stops_before_installing_launcher(self) -> None:
+        self._mock_npm()
+        self.fake.write_text(FAKE_CLI.replace("opencode v2.3.2", "opencode v2.3.3"))
+        result = self._run(INSTALLER, "--install")
+        self.assertEqual(result.returncode, 69, result.stderr)
+        self.assertIn("opencode\\ v2.3.3", result.stderr)
+        self.assertFalse(self.bin.exists())
+        self.assertFalse((self.home / ".local/bin/opencode2").exists())
+
+    def test_existing_bare_version_is_accepted(self) -> None:
+        self._cli()
+        self.bin.write_text(FAKE_CLI.replace("opencode v2.3.2", "2.3.2"))
+        self._mock_npm()
+        result = self._run(INSTALLER, "--install")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue((self.home / ".local/bin/opencode2").exists())
 
     def test_existing_nonidentical_launcher_is_rejected_before_npm(self) -> None:
         self._mock_npm()

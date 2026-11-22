@@ -42,6 +42,15 @@ if [[ ! -f "$launcher_source" || -L "$launcher_source" ]]; then
   exit 69
 fi
 
+# The v2 native CLI prints "opencode v2.3.2", while some wrappers/mocks
+# print only "2.3.2". Accept only these exact version strings.
+matches_pinned_version() {
+  case "$1" in
+    "$version"|"opencode v$version") return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 # Validate all existing targets BEFORE any installation writes. Never replace a
 # different executable, unexpected prefix, or a symlinked config file.
 if [[ -e "$prefix" || -L "$prefix" ]]; then
@@ -49,9 +58,12 @@ if [[ -e "$prefix" || -L "$prefix" ]]; then
     printf 'install: unexpected V2 prefix; refusing to overwrite\n' >&2
     exit 73
   fi
-  actual="$("$cli" --version)"
-  if [[ "$actual" != "$version" ]]; then
-    printf 'install: installed V2 version mismatch; refusing to overwrite\n' >&2
+  if ! actual="$("$cli" --version 2>&1)"; then
+    printf 'install: existing V2 --version failed; refusing to overwrite\n' >&2
+    exit 73
+  fi
+  if ! matches_pinned_version "$actual"; then
+    printf 'install: installed V2 version mismatch (observed: %q); refusing to overwrite\n' "${actual:0:120}" >&2
     exit 73
   fi
 fi
@@ -94,9 +106,12 @@ PACKAGE
     printf 'install: npm did not provide an executable; refusing deployment\n' >&2
     exit 69
   fi
-  actual="$("$stage/node_modules/.bin/opencode" --version)"
-  if [[ "$actual" != "$version" ]]; then
-    printf 'install: unexpected npm package version; refusing deployment\n' >&2
+  if ! actual="$("$stage/node_modules/.bin/opencode" --version 2>&1)"; then
+    printf 'install: staged V2 --version failed; refusing deployment\n' >&2
+    exit 69
+  fi
+  if ! matches_pinned_version "$actual"; then
+    printf 'install: unexpected npm CLI version (observed: %q); refusing deployment\n' "${actual:0:120}" >&2
     exit 69
   fi
   if [[ -e "$prefix" || -L "$prefix" ]]; then
