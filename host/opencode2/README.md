@@ -73,6 +73,18 @@ opencode2 mcp list
 - Failures in APM installation, compilation or validation stop before the
   V2 active settings are applied. The snapshot stage is discarded on failure;
   no rollback, cleanup or removal of prior snapshots is automatic.
+- CodeGraph uses its official installed CLI entrypoint `codegraph serve --mcp`
+  (not `_scripts/codegraph-bootstrap.sh`). The MCP process runs in the
+  active project directory; it never performs an implicit `codegraph init`.
+  The CLI must already be installed on the Host and any per-project index
+  must be initialized explicitly with `codegraph init`.
+  For an existing Host V2 snapshot whose CodeGraph command still points
+  at the old wrapper, use the targeted, no-network update:
+  `uv run --no-project --with PyYAML python host/opencode2/sync_apm.py --refresh-codegraph`.
+  It validates APM ownership, updates only CodeGraph's native command,
+  preserves all current MCP enabled/disabled flags and the other Host V2
+  settings, and refreshes the APM receipt. Do not rerun full `--apply` just
+  to repair CodeGraph: a full APM sync may replace MCP enablement choices.
 - APM v0.37.0 real dependency-resolution and Host V2 live MCP/skill
   recognition have not been verified by the offline mock tests. Treat the
   first `--apply` as live acceptance. The actual APM manifest may require

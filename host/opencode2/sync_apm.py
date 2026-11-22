@@ -151,6 +151,95 @@ def destination_ok(dest: Path, prior: dict | None, name: str) -> None:
         stop(f"changed adapter; refusing replacement: {dest}")
 
 
+def refresh_codegraph_mcp(home: Path) -> None:
+    """Refresh only CodeGraph's Host V2 command, retaining MCP enablement."""
+    manifest, _ = prepare_apm_manifest()
+    matches = [item for item in manifest["dependencies"]["mcp"]
+               if isinstance(item, dict) and item.get("name") == "codegraph"]
+    if (len(matches) != 1 or matches[0].get("command") != "codegraph"
+            or matches[0].get("args") != ["serve", "--mcp"]
+            or "cwd" in matches[0]):
+        stop("CodeGraph SSOT must use the official direct 'codegraph serve --mcp' entrypoint")
+    private = home / ".config/opencode-v2/opencode"
+    if not private.is_dir() or private.is_symlink():
+        stop("Host V2 private configuration directory is unsafe")
+    config_path = private / "opencode.json"
+    state_path = private / "apm-host-sync-state.json"
+    config = read_object(config_path)
+    state = read_object(state_path)
+    mcp = config.get("mcp")
+    if not isinstance(mcp, dict) or not isinstance(mcp.get("servers"), dict):
+        stop("Host V2 has no mcp.servers")
+    servers = mcp["servers"]
+    if state.get("source") != "apm.yml" or json_hash(servers) != state.get("mcp_sha256"):
+        stop("APM-managed MCP state changed; refusing overwrite")
+    snapshot_text = state.get("snapshot")
+    root = home / ".local/share/opencode-v2/apm-host-snapshots"
+    if not isinstance(snapshot_text, str) or not snapshot_text:
+        stop("APM snapshot identity is missing")
+    snapshot = Path(snapshot_text)
+    if (not snapshot.is_absolute() or snapshot.is_symlink()
+            or snapshot.parent != root or not snapshot.name.startswith("snapshot-")
+            or not snapshot.is_dir()):
+        stop("APM snapshot is missing or outside the Host V2 private area")
+    staged = read_object(snapshot / "opencode.json")
+    staged_mcp = staged.get("mcp")
+    if (not isinstance(staged_mcp, dict)
+            or not isinstance(staged_mcp.get("servers"), dict)
+            or set(staged_mcp["servers"]) != set(servers)):
+        stop("APM snapshot MCP ownership mismatch")
+    existing = servers.get("codegraph")
+    if not isinstance(existing, dict) or existing.get("type") != "local":
+        stop("CodeGraph is not an APM-managed local MCP")
+    command = existing.get("command")
+    args = existing.get("args")
+    if isinstance(command, list):
+        if (len(command) != 3 or command[1:] != ["serve", "--mcp"]
+                or not isinstance(command[0], str)):
+            stop("CodeGraph MCP command has unexpected structure")
+        executable = command[0]
+    elif isinstance(command, str) and args == ["serve", "--mcp"]:
+        executable = command
+    else:
+        stop("CodeGraph MCP command has unexpected structure")
+    legacy = (executable in ("_scripts/codegraph-bootstrap.sh",
+                             "./_scripts/codegraph-bootstrap.sh")
+              or executable.endswith("/_scripts/codegraph-bootstrap.sh"))
+    if not legacy and executable != "codegraph":
+        stop("CodeGraph MCP is not on the known bootstrap or official entrypoint")
+    # Keep every other CodeGraph attribute (including disabled/codemode/env)
+    # and every other MCP entry intact. Convert into native V2 command list.
+    updated = {k: v for k, v in existing.items() if k not in ("command", "args", "cwd")}
+    updated["command"] = ["codegraph", "serve", "--mcp"]
+    if updated == existing:
+        print("NO_CHANGE: CodeGraph already uses codegraph serve --mcp")
+        return
+    newer = dict(servers)
+    newer["codegraph"] = updated
+    # Check for concurrent edits before replacing either owned state file.
+    if read_object(config_path) != config or read_object(state_path) != state:
+        stop("Host V2 configuration changed during CodeGraph update")
+    config["mcp"] = {**mcp, "servers": newer}
+    new_state = {**state, "mcp_sha256": json_hash(newer)}
+    # The files are individually atomic; a failure between the two writes
+    # leaves a mismatched receipt and blocks later APM-managed changes.
+    for target, data in ((config_path, config), (state_path, new_state)):
+        fd, tmp = tempfile.mkstemp(prefix=".codegraph-sync-", dir=private)
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as stream:
+                json.dump(data, stream, indent=2, ensure_ascii=False)
+                stream.write("\n")
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.chmod(tmp, 0o600)
+            os.replace(tmp, target)
+        finally:
+            if os.path.lexists(tmp):
+                os.unlink(tmp)
+    print("UPDATED: Host V2 CodeGraph now uses codegraph serve --mcp")
+    print("All MCP enablement flags preserved; no index initialization or network calls.")
+
+
 def apply(apm: str, home: Path) -> None:
     private = home / ".config/opencode-v2/opencode"
     config_path = private / "opencode.json"
@@ -251,12 +340,17 @@ def main() -> int:
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--check", action="store_true", help="read-only compatibility check")
     group.add_argument("--apply", action="store_true", help="explicit APM staging and V2-only sync")
+    group.add_argument("--refresh-codegraph", action="store_true",
+                       help="repair only CodeGraph MCP entry from SSOT without reinstalling APM")
     args = parser.parse_args()
     home = Path(os.environ.get("HOME", ""))
     if not home.is_absolute() or not home.is_dir():
         stop("HOME must be an existing absolute directory")
     if not (REPO / "apm.yml").is_file():
         stop("run from the dotfiles-ai checkout")
+    if args.refresh_codegraph:
+        refresh_codegraph_mcp(home)
+        return 0
     apm = os.environ.get("HOST_V2_APM_BIN", "apm")
     version = apm_version(apm)
     print(f"APM {'.'.join(map(str, version))}; source={REPO / 'apm.yml'}; target=opencode")

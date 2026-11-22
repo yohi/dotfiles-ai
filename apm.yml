@@ -171,12 +171,13 @@ dependencies:
       standalone: true
       timeout: 120000
 
+    # Official CodeGraph MCP entrypoint. Do not initialize the graph here;
+    # run "codegraph init" explicitly per project when desired.
     - name: codegraph
       title: "CodeGraph MCP"
       registry: false
       transport: stdio
-      command: "_scripts/codegraph-bootstrap.sh"
-      cwd: "."
+      command: "codegraph"
       args:
         - "serve"
         - "--mcp"

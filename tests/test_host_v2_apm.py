@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import os
 from pathlib import Path
 import subprocess
@@ -44,7 +45,9 @@ if args[0] == 'install':
     (root / '.opencode/commands').mkdir(parents=True, exist_ok=True)
     (root / '.opencode/commands/test.md').write_text('command')
     (root / 'opencode.json').write_text(json.dumps({'mcp':{'servers':{
-        'example':{'type':'remote', 'url':'https://example.invalid/mcp', 'disabled':False}}}}))
+        'example':{'type':'remote', 'url':'https://example.invalid/mcp', 'disabled':False},
+        'codegraph':{'type':'local', 'command':['_scripts/codegraph-bootstrap.sh','serve','--mcp'],
+                     'cwd':'.', 'disabled':True}}}}))
 if args[0] == 'compile':
     (root / 'AGENTS.md').write_text('instructions')
 '''
@@ -155,6 +158,77 @@ class APMHostV2Tests(unittest.TestCase):
         result=self.run_cli('--apply')
         self.assertNotEqual(result.returncode,0)
         self.assertIn('unmanaged',result.stderr)
+
+    def test_codegraph_ssot_is_official_direct_cli(self):
+        source = yaml.safe_load((SCRIPT.parents[2] / 'apm.yml').read_text())
+        servers = [x for x in source['dependencies']['mcp']
+                   if isinstance(x, dict) and x.get('name') == 'codegraph']
+        self.assertEqual(len(servers), 1)
+        self.assertEqual(servers[0]['command'], 'codegraph')
+        self.assertEqual(servers[0]['args'], ['serve', '--mcp'])
+        self.assertNotIn('cwd', servers[0])
+
+    def test_refresh_codegraph_updates_only_command_and_receipt(self):
+        self.assertEqual(self.run_cli('--apply').returncode, 0)
+        original = json.loads(self.config.read_text())
+        state_file = self.config.parent / 'apm-host-sync-state.json'
+        old_state = json.loads(state_file.read_text())
+        # Simulate manually enabled MCPs recorded through manage_mcp.py.
+        original['mcp']['servers']['codegraph']['disabled'] = False
+        original['mcp']['servers']['example']['disabled'] = True
+        original['model'] = 'openai/gpt-6-luna'
+        self.config.write_text(json.dumps(original))
+        old_state['mcp_sha256'] = hashlib.sha256(json.dumps(
+            original['mcp']['servers'], sort_keys=True, separators=(',', ':')
+        ).encode()).hexdigest()
+        state_file.write_text(json.dumps(old_state))
+        result = self.run_cli('--refresh-codegraph', env={
+            **self.env, 'HOST_V2_APM_BIN': '/not/installed/apm'
+        })
+        self.assertEqual(result.returncode, 0, result.stderr)
+        changed = json.loads(self.config.read_text())
+        self.assertEqual(changed['model'], original['model'])
+        self.assertEqual(changed['mcp']['servers']['example'],
+                         original['mcp']['servers']['example'])
+        entry = changed['mcp']['servers']['codegraph']
+        self.assertEqual(entry['command'], ['codegraph', 'serve', '--mcp'])
+        self.assertNotIn('cwd', entry)
+        self.assertFalse(entry['disabled'])
+        self.assertEqual(self.global_v1.read_text(), 'sentinel-v1')
+        state = json.loads(state_file.read_text())
+        self.assertEqual(state['snapshot'], old_state['snapshot'])
+        self.assertEqual(state['mcp_sha256'], hashlib.sha256(json.dumps(
+            changed['mcp']['servers'], sort_keys=True, separators=(',', ':')
+        ).encode()).hexdigest())
+        self.assertEqual(self.run_cli('--refresh-codegraph').returncode, 0)
+
+    def test_refresh_codegraph_rejects_unowned_config_without_write(self):
+        self.assertEqual(self.run_cli('--apply').returncode, 0)
+        obj = json.loads(self.config.read_text())
+        obj['mcp']['servers']['codegraph']['disabled'] = False
+        self.config.write_text(json.dumps(obj))
+        before = self.config.read_bytes()
+        result = self.run_cli('--refresh-codegraph')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('changed', result.stderr)
+        self.assertEqual(self.config.read_bytes(), before)
+
+    def test_refresh_codegraph_rejects_unknown_command_without_write(self):
+        self.assertEqual(self.run_cli('--apply').returncode, 0)
+        obj = json.loads(self.config.read_text())
+        obj['mcp']['servers']['codegraph']['command'] = ['other-tool', 'serve', '--mcp']
+        self.config.write_text(json.dumps(obj))
+        state_file = self.config.parent / 'apm-host-sync-state.json'
+        state = json.loads(state_file.read_text())
+        state['mcp_sha256'] = hashlib.sha256(json.dumps(
+            obj['mcp']['servers'], sort_keys=True, separators=(',', ':')
+        ).encode()).hexdigest()
+        state_file.write_text(json.dumps(state))
+        before = self.config.read_bytes()
+        result = self.run_cli('--refresh-codegraph')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('not on the known', result.stderr)
+        self.assertEqual(self.config.read_bytes(), before)
 
     def test_old_apm_is_rejected(self):
         result = self.run_cli('--apply',env={**self.env,'FAKE_APM_VERSION':'apm 0.31.0'})
