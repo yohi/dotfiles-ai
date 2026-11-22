@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import hashlib
 import subprocess
 import sys
@@ -219,9 +220,12 @@ class FakeOps:
         )
         host = FakeHostControlRuntime(observations, self.lifecycle_events)
         preserver = FakePreserverRuntime(evidence, self.lifecycle_events)
-        return HostControlledStopRequestRuntime(
+        request = HostControlledStopRequestRuntime(
             stopper, authority, writer, host_identity, host, preserver,
         )
+        if self.mode == "changed-authority":
+            return replace(request, authority=copy.copy(authority))
+        return request
 
     def record_result(
         self, outcome: SliceBOfflineOutcomeType, reason: str | None, result: object | None,
@@ -236,7 +240,8 @@ class SliceBAdapterTests(unittest.TestCase):
     s: Scenario = cast(Scenario, cast(object, None))
     _last_lifecycle_result: HostControlledStopResultType | None = None
 
-    def setUp(self):
+    def setUp(self) -> None:
+        """Create isolated host, image, and guest inputs for each adapter test."""
         global adapter, git, image, lifecycle, offline_fixture, session
         global FakeGuestImageRunnerRuntime, SliceBOfflineInputsRuntime
         global SliceBWriterObservationRuntime, StopRequestRuntime
@@ -298,7 +303,7 @@ class SliceBAdapterTests(unittest.TestCase):
         self.s = Scenario(root, host, root / "guest", make_key(), pin, archive,
                           root / "bundle.bundle", root / "state", runtime)
 
-    def test_imported_guest_git_and_verified_authority_reach_same_writer(self):
+    def test_imported_guest_git_and_verified_authority_reach_same_writer(self) -> None:
         ops = FakeOps(self.s)
         host_before = git.admit_clean_repo(self.s.host)
         status = run_slice_b(self.s.root, self.s.host, "oc2-offline-test",
@@ -348,47 +353,47 @@ class SliceBAdapterTests(unittest.TestCase):
                          ["host.observe", "guest.stop", "host.observe", "host.shutdown",
                           "host.wait", "preserve"])
 
-    def test_dirty_or_changed_host_rejected_before_writer(self):
+    def test_dirty_or_changed_host_rejected_before_writer(self) -> None:
         (self.s.host / "dirty.txt").write_text("dirty")
         ops = FakeOps(self.s)
         self.assertEqual(run_slice_b(self.s.root, self.s.host, "bad", dry_run=False, ops=ops), 1)
         self.assertEqual(ops.writer_calls, 0)
 
-    def test_guest_path_already_exists_or_overlaps_host_rejected(self):
+    def test_guest_path_already_exists_or_overlaps_host_rejected(self) -> None:
         self.s.guest.mkdir()
         ops = FakeOps(self.s)
         self.assertEqual(run_slice_b(self.s.root, self.s.host, "bad", dry_run=False, ops=ops), 1)
         self.assertEqual(ops.writer_calls, 0)
 
-    def test_guest_path_overlapping_host_rejected(self):
+    def test_guest_path_overlapping_host_rejected(self) -> None:
         ops = FakeOps(self.s)
         ops.mode = "overlap"
         self.assertEqual(run_slice_b(self.s.root, self.s.host, "bad", dry_run=False, ops=ops), 1)
         self.assertEqual(ops.writer_calls, 0)
 
-    def test_writer_identity_or_tui_failure_preserves_guest(self):
+    def test_writer_identity_or_tui_failure_preserves_guest(self) -> None:
         ops = FakeOps(self.s, "bad-tui")
         self.assertEqual(run_slice_b(self.s.root, self.s.host, "bad", dry_run=False, ops=ops), 1)
         self.assertEqual(ops.recorded[-1][:2], ("REJECTED", "OBSERVED_MISMATCH"))
         self.assertEqual(ops.writer_calls, 1)
         self.assertFalse((self.s.guest / offline_fixture.FIXTURE_NAME).exists())
 
-    def test_writer_image_id_differs_from_authority_rejected(self):
+    def test_writer_image_id_differs_from_authority_rejected(self) -> None:
         self._assert_writer_rejected("bad-image")
 
-    def test_writer_invalid_full_cid_rejected(self):
+    def test_writer_invalid_full_cid_rejected(self) -> None:
         self._assert_writer_rejected("bad-cid")
 
-    def test_writer_invalid_or_changed_started_at_rejected(self):
+    def test_writer_invalid_or_changed_started_at_rejected(self) -> None:
         for mode in ("bad-time", "missing-time", "invalid-time", "changed-time"):
             with self.subTest(mode=mode):
                 self._reset_fixture()
                 self._assert_writer_rejected(mode)
 
-    def test_wrong_fixture_commit_rejected(self):
+    def test_wrong_fixture_commit_rejected(self) -> None:
         self._assert_writer_rejected("bad-fixture")
 
-    def test_fake_host_stop_order_and_zero_real_infrastructure_calls(self):
+    def test_fake_host_stop_order_and_zero_real_infrastructure_calls(self) -> None:
         ops = FakeOps(self.s)
         self.assertEqual(run_slice_b(self.s.root, self.s.host, "offline", dry_run=False, ops=ops), 0)
         self.assertEqual(ops.recorded[-1][:2], ("OFFLINE_FAKE_PASS", None))
@@ -419,7 +424,7 @@ class SliceBAdapterTests(unittest.TestCase):
         self.assertEqual(saved.state, "PENDING")
         self.assertNotEqual(saved.state, "OFFLINE_FAKE_PASS")
 
-    def test_guest_stop_unverified_is_pending_despite_later_success(self):
+    def test_guest_stop_unverified_is_pending_despite_later_success(self) -> None:
         self._assert_lifecycle_outcome("guest-unverified", "PENDING",
                                        "GUEST_QUIESCENCE_UNVERIFIED")
         result = self._get_lifecycle_result()
@@ -427,7 +432,7 @@ class SliceBAdapterTests(unittest.TestCase):
         self.assertIn(lifecycle.HostLifecycleStage.VM_ISOLATION_VERIFIED, result.stages)
         self.assertIn(lifecycle.HostLifecycleStage.OFFLINE_PRESERVATION_VERIFIED, result.stages)
 
-    def test_guest_quiescence_unverified_precedes_preservation_mismatch(self):
+    def test_guest_quiescence_unverified_precedes_preservation_mismatch(self) -> None:
         decision = op.PreservationDecision(
             op.PreservationDisposition.MISMATCH,
             (op.PreservationFailure.COPY_INTEGRITY_MISMATCH,),
@@ -436,7 +441,7 @@ class SliceBAdapterTests(unittest.TestCase):
             self._assert_lifecycle_outcome("guest-unverified-mismatch", "PENDING",
                                            "GUEST_QUIESCENCE_UNVERIFIED")
 
-    def test_restart_epoch_drift_or_isolation_unknown_not_success(self):
+    def test_restart_epoch_drift_or_isolation_unknown_not_success(self) -> None:
         self._assert_lifecycle_outcome("restart-epoch-drift", "PENDING",
                                        "GUEST_QUIESCENCE_UNVERIFIED")
         self._reset_fixture()
@@ -446,13 +451,13 @@ class SliceBAdapterTests(unittest.TestCase):
         assert result.host_isolation is not None
         self.assertFalse(result.host_isolation.verified)
 
-    def test_preservation_readback_unknown_remains_unverified(self):
+    def test_preservation_readback_unknown_remains_unverified(self) -> None:
         self._assert_lifecycle_outcome("preservation-unknown", "PRESERVATION_UNVERIFIED",
                                        "PRESERVATION_UNVERIFIED")
         self.assertEqual(self._get_lifecycle_result().failures,
                          (lifecycle.LifecycleFailure.PRESERVATION_UNVERIFIED,))
 
-    def test_conditionally_accepted_preservation_never_passes_even_without_failures(self):
+    def test_conditionally_accepted_preservation_never_passes_even_without_failures(self) -> None:
         decision = op.PreservationDecision(
             op.PreservationDisposition.CONDITIONALLY_ACCEPTED,
             (op.PreservationFailure.INDEX_MISMATCH_REQUIRES_OWNER,),
@@ -467,20 +472,20 @@ class SliceBAdapterTests(unittest.TestCase):
         self.assertNotIn(lifecycle.HostLifecycleStage.OFFLINE_PRESERVATION_VERIFIED,
                          result.stages)
 
-    def test_observed_digest_mismatch_is_rejected_not_unknown(self):
+    def test_observed_digest_mismatch_is_rejected_not_unknown(self) -> None:
         self._assert_lifecycle_outcome("digest-mismatch", "REJECTED", "OBSERVED_MISMATCH")
         result = self._get_lifecycle_result()
         assert result.preservation is not None
         self.assertEqual(result.preservation.disposition,
                          op.PreservationDisposition.MISMATCH)
 
-    def test_wrong_writer_image_id_never_reaches_fake_success(self):
+    def test_wrong_writer_image_id_never_reaches_fake_success(self) -> None:
         ops = FakeOps(self.s, "bad-image")
         self.assertEqual(run_slice_b(self.s.root, self.s.host, "offline", dry_run=False, ops=ops), 1)
         self.assertEqual(ops.recorded[-1][:2], ("REJECTED", "OBSERVED_MISMATCH"))
         self.assertEqual(ops.lifecycle_events, [])
 
-    def test_fake_success_does_not_persist_receipt_success(self):
+    def test_fake_success_does_not_persist_receipt_success(self) -> None:
         ops = FakeOps(self.s)
         self.assertEqual(run_slice_b(self.s.root, self.s.host, "offline", dry_run=False, ops=ops), 0)
         receipt_path = (self.s.state / self.s.key.workspace_id /
@@ -493,7 +498,11 @@ class SliceBAdapterTests(unittest.TestCase):
         self.assertIsNone(saved.writer_id)
         self.assertIsNone(saved.started_at)
 
-    def _assert_lifecycle_outcome(self, mode, expected_outcome, expected_reason):
+    def _assert_lifecycle_outcome(
+        self, mode: str, expected_outcome: SliceBOfflineOutcomeType,
+        expected_reason: str | None,
+    ) -> None:
+        """Assert the selected lifecycle outcome and preservation invariants."""
         ops = FakeOps(self.s, mode)
         self._last_lifecycle_result = None
         self.assertEqual(run_slice_b(self.s.root, self.s.host, "offline", dry_run=False, ops=ops),
@@ -513,10 +522,11 @@ class SliceBAdapterTests(unittest.TestCase):
         self.assertEqual(ops.events.count("writer"), 1)
 
     def _get_lifecycle_result(self) -> HostControlledStopResultType:
+        """Return the lifecycle result captured by the outcome helper."""
         assert self._last_lifecycle_result is not None
         return self._last_lifecycle_result
 
-    def test_manifest_archive_runtime_or_config_id_drift_rejected(self):
+    def test_manifest_archive_runtime_or_config_id_drift_rejected(self) -> None:
         for drift in ("archive", "runtime", "image-record"):
             with self.subTest(drift=drift):
                 self._reset_fixture()
@@ -538,9 +548,10 @@ class SliceBAdapterTests(unittest.TestCase):
                 self.assertEqual(ops.recorded[-1][:2],
                                  ("REJECTED", "OBSERVED_MISMATCH"))
 
-    def test_unverified_guest_baseline_or_forged_authority_rejected(self):
+    def test_unverified_guest_baseline_or_forged_authority_rejected(self) -> None:
+        """Reject forged authority and independently forged imported baseline."""
         original = adapter.verify_guest_authority_from_host_record
-        def forge(*args, **kwargs):
+        def forge(*args: Any, **kwargs: Any) -> object:
             original(*args, **kwargs)
             return object()
         with patch.object(adapter, "verify_guest_authority_from_host_record", side_effect=forge):
@@ -549,20 +560,49 @@ class SliceBAdapterTests(unittest.TestCase):
                                          dry_run=False, ops=ops), 1)
         self.assertEqual(ops.writer_calls, 0)
         self.assertEqual(ops.recorded[-1][:2], ("REJECTED", "OBSERVED_MISMATCH"))
+        self._reset_fixture()
         from dataclasses import replace
         original_import = adapter.import_guest_baseline
-        def forge_baseline(*args, **kwargs):
+        forged_baseline_calls = 0
+        def forge_baseline(*args: Any, **kwargs: Any) -> GitBaseline:
+            nonlocal forged_baseline_calls
+            forged_baseline_calls += 1
             return replace(original_import(*args, **kwargs), head_oid="0" * 40)
-        with patch.object(adapter, "import_guest_baseline", side_effect=forge_baseline):
+        with (
+            patch.object(adapter, "import_guest_baseline", side_effect=forge_baseline),
+            patch.object(
+                adapter, "verify_guest_authority_from_host_record",
+                wraps=adapter.verify_guest_authority_from_host_record,
+            ) as verify_authority,
+        ):
             ops = FakeOps(self.s)
             self.assertEqual(run_slice_b(self.s.root, self.s.host, "bad",
                                          dry_run=False, ops=ops), 1)
         self.assertEqual(ops.writer_calls, 0)
         self.assertEqual(ops.recorded[-1][:2], ("REJECTED", "OBSERVED_MISMATCH"))
+        self.assertEqual(forged_baseline_calls, 1)
+        verify_authority.assert_not_called()
 
-    def test_guest_mutated_after_import_rejected_before_authority(self):
+    def test_started_at_rejects_both_unstarted_sentinels(self) -> None:
+        """Reject parsed zero timestamps while accepting a real start time."""
+        self.assertFalse(adapter._validate_started_at("0001-01-01T00:00:00Z"))
+        self.assertFalse(adapter._validate_started_at("0001-01-01T00:00:00.0Z"))
+        self.assertTrue(adapter._validate_started_at("2026-11-21T12:00:00Z"))
+
+    def test_changed_stop_request_authority_is_rejected_before_coordination(self) -> None:
+        """Reject a stop request not bound to the authority used at start."""
+        ops = FakeOps(self.s, "changed-authority")
+        self.assertEqual(
+            run_slice_b(self.s.root, self.s.host, "offline", dry_run=False, ops=ops), 1,
+        )
+        self.assertEqual(ops.events, ["inputs", "writer", "stop"])
+        self.assertEqual(ops.recorded[-1][:2], ("REJECTED", "OBSERVED_MISMATCH"))
+        self.assertIsNone(ops.recorded[-1][2])
+        self.assertEqual(ops.lifecycle_events, [])
+
+    def test_guest_mutated_after_import_rejected_before_authority(self) -> None:
         original = adapter.import_guest_baseline
-        def mutate(*args, **kwargs):
+        def mutate(*args: Any, **kwargs: Any) -> GitBaseline:
             baseline = original(*args, **kwargs)
             (baseline.root / "source.txt").write_text("mutated\n")
             return baseline
@@ -572,9 +612,9 @@ class SliceBAdapterTests(unittest.TestCase):
                                          dry_run=False, ops=ops), 1)
         self.assertEqual(ops.writer_calls, 0)
 
-    def test_guest_mutated_after_authority_rejected_before_writer(self):
+    def test_guest_mutated_after_authority_rejected_before_writer(self) -> None:
         original = adapter.verify_guest_authority_from_host_record
-        def mutate(*args, **kwargs):
+        def mutate(*args: Any, **kwargs: Any) -> VerifiedGuestAuthority:
             authority = original(*args, **kwargs)
             (self.s.guest / "source.txt").write_text("mutated\n")
             return authority
@@ -584,9 +624,9 @@ class SliceBAdapterTests(unittest.TestCase):
                                          dry_run=False, ops=ops), 1)
         self.assertEqual(ops.writer_calls, 0)
 
-    def test_host_changed_after_authority_rejected_before_writer(self):
+    def test_host_changed_after_authority_rejected_before_writer(self) -> None:
         original = adapter.verify_guest_authority_from_host_record
-        def mutate(*args, **kwargs):
+        def mutate(*args: Any, **kwargs: Any) -> VerifiedGuestAuthority:
             authority = original(*args, **kwargs)
             (self.s.host / "source.txt").write_text("host changed\n")
             return authority
@@ -596,9 +636,9 @@ class SliceBAdapterTests(unittest.TestCase):
                                          dry_run=False, ops=ops), 1)
         self.assertEqual(ops.writer_calls, 0)
 
-    def test_changed_manifest_rejected_before_guest_import(self):
+    def test_changed_manifest_rejected_before_guest_import(self) -> None:
         original = adapter.verify_bundle_manifest
-        def tamper(artifact, **kwargs):
+        def tamper(artifact: Any, **kwargs: Any) -> Any:
             artifact.manifest_path.write_bytes(artifact.manifest_path.read_bytes() + b" ")
             return original(artifact, **kwargs)
         with patch.object(adapter, "verify_bundle_manifest", side_effect=tamper):
@@ -607,12 +647,13 @@ class SliceBAdapterTests(unittest.TestCase):
                                          dry_run=False, ops=ops), 1)
         self.assertEqual(ops.writer_calls, 0)
 
-    def test_dry_run_exits_before_inputs(self):
+    def test_dry_run_exits_before_inputs(self) -> None:
         ops = FakeOps(self.s)
         self.assertEqual(run_slice_b(self.s.root, self.s.host, "bad", dry_run=True, ops=ops), 1)
         self.assertEqual(ops.events, [])
 
-    def _assert_writer_rejected(self, mode):
+    def _assert_writer_rejected(self, mode: str) -> None:
+        """Assert a Writer observation mode is rejected with Guest artifacts retained."""
         ops = FakeOps(self.s, mode)
         self.assertEqual(run_slice_b(self.s.root, self.s.host, "bad", dry_run=False, ops=ops), 1)
         self.assertEqual(ops.recorded[-1][:2], ("REJECTED", "OBSERVED_MISMATCH"))
@@ -624,7 +665,8 @@ class SliceBAdapterTests(unittest.TestCase):
             receipt_path, self.s.key, hashlib.sha256(receipt_path.read_bytes()).hexdigest(),
         ).receipt.state, "PENDING")
 
-    def _reset_fixture(self):
+    def _reset_fixture(self) -> None:
+        """Recreate all temporary repositories and pinned image inputs."""
         self.setUp()
 
 

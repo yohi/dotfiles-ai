@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 import hashlib
 from pathlib import Path
 import re
@@ -105,38 +105,55 @@ class SliceBWriterObservation:
 
 
 class SliceBOps(Protocol):
-    def inputs(self, baseline: GitBaseline, sandbox_name: str) -> SliceBOfflineInputs: ...
+    """Injected offline operations; implementations must honor these contracts."""
+
+    def inputs(self, baseline: GitBaseline, sandbox_name: str) -> SliceBOfflineInputs:
+        """Return isolated paths and pinned inputs without starting infrastructure."""
+        ...
 
     def run_writer(
         self, authority: VerifiedGuestAuthority, start: SliceBStartMessage,
         guest_repo: Path,
-    ) -> SliceBWriterObservation: ...
+    ) -> SliceBWriterObservation:
+        """Return only after the fake Writer exits, with final identity, status, and fixture commit.
+
+        A successful observation requires exit code zero; the adapter independently
+        verifies the identity, timestamp, image, and fixture commit before stopping.
+        """
+        ...
 
     def stop_request(
         self, authority: VerifiedGuestAuthority, writer: WriterIdentity,
-    ) -> HostControlledStopRequest: ...
+    ) -> HostControlledStopRequest:
+        """Build a stop request bound to the exact start authority and Writer identity."""
+        ...
 
     def record_result(
         self, outcome: SliceBOfflineOutcome, reason: str | None,
         result: HostControlledStopResult | None,
-    ) -> None: ...
+    ) -> None:
+        """Record a pre-coordination rejection or the completed lifecycle result."""
+        ...
 
 
 def _same_baseline(left: GitBaseline, right: GitBaseline) -> bool:
+    """Compare all captured host or imported Guest baseline evidence."""
     return left == right
 
 
 def _validate_started_at(value: object) -> bool:
+    """Accept canonical UTC timestamps except either representation of the zero sentinel."""
     if not isinstance(value, str) or not _STARTED_AT.fullmatch(value):
         return False
     try:
-        _ = datetime.fromisoformat(value[:-1] + "+00:00")
+        parsed = datetime.fromisoformat(value[:-1] + "+00:00")
     except ValueError:
         return False
-    return value != "0001-01-01T00:00:00Z"
+    return parsed != datetime.min.replace(tzinfo=timezone.utc)
 
 
 def _verify_fixture(repo: Path, baseline: GitBaseline, commit: str | None) -> bool:
+    """Verify the injected fixture is the sole commit directly atop the Guest baseline."""
     if not isinstance(commit, str) or not re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", commit):
         return False
     try:
@@ -161,6 +178,7 @@ def _verify_fixture(repo: Path, baseline: GitBaseline, commit: str | None) -> bo
 
 
 def _record(ops: SliceBOps, outcome: SliceBOfflineOutcome, reason: str) -> int:
+    """Record a rejection before lifecycle coordination and return the failure status."""
     ops.record_result(outcome, reason, None)
     return 1
 
@@ -168,7 +186,11 @@ def _record(ops: SliceBOps, outcome: SliceBOfflineOutcome, reason: str) -> int:
 def run_slice_b(
     repo_root: Path, workspace: Path, sandbox_name: str, *, dry_run: bool, ops: SliceBOps
 ) -> int:
-    """Run the strict offline import/authority/fake-writer slice only."""
+    """Run the offline slice while preserving artifacts on every post-creation failure.
+
+    The Session Receipt remains PENDING evidence of admission; the returned integer
+    reports this invocation's lifecycle outcome and never rewrites the Receipt.
+    """
     if dry_run:
         return 1
     receipt_path: Path | None = None
@@ -262,6 +284,8 @@ def run_slice_b(
         request = ops.stop_request(authority, identity)
         stop_identity = getattr(request, "writer_identity", None)
         if not isinstance(stop_identity, WriterIdentity) or stop_identity != identity:
+            return _record(ops, "REJECTED", "OBSERVED_MISMATCH")
+        if request.authority is not authority:
             return _record(ops, "REJECTED", "OBSERVED_MISMATCH")
         result = coordinate_host_controlled_stop(request)
         stages = set(result.stages)
