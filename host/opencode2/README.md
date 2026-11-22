@@ -17,10 +17,56 @@ changes are required or invoked.
 | Service | existing | --standalone private server per invocation |
 | Project config | existing | disabled by default, explicit opt-in |
 
-apm.yml remains the SSOT for **existing V1/OC2** flows; Host V2 uses a
-separate minimal config. It does not compile or import APM MCP/Provider
-configuration. sandbox/ remains untouched and pinned to its own version.
-No credentials are copied from V1 to V2.
+apm.yml remains the SSOT for **existing V1/OC2** flows; Host V2 starts
+with a separate minimal config. The optional APM Host sync below creates
+a separate APM deployment snapshot, links selected asset directories into
+Host V2, and adds **disabled-by-default** APM MCP declarations. Neither V1
+nor sandbox/ is updated. No credentials are copied from V1 to V2.
+
+
+## Microsoft APM (Host V2 only, opt-in)
+
+Microsoft APM **v0.37.0 or newer** is required. The lockfile's
+`apm_version: 0.31.0` is a previous generation marker, not necessarily
+the installed APM CLI version. Install/upgrade APM separately using its
+current package manager, and verify `apm --version`. No APM upgrade is
+performed automatically.
+
+```bash
+python3 -m unittest discover -s tests -p 'test_host_v2_apm.py' -v
+python3 host/opencode2/sync_apm.py --check  # read-only, version/source checks
+python3 host/opencode2/sync_apm.py --apply  # explicit APM install/compile + apply
+opencode2 mcp list
+```
+
+- `--apply` runs `apm install --root <private stage> --target opencode`
+  followed by `apm compile --root <private stage> --target opencode`.
+  Both use the repository's existing `apm.yml` and write APM
+  artifacts into a versioned snapshot under
+  `~/.local/share/opencode-v2/apm-host-snapshots/`.
+  APM may use its normal shared cache/receipt infrastructure, but no
+  V1 OpenCode files or source `apm.lock.yaml` are deliberately changed.
+- The source snapshot's `.agents/skills`, `.opencode/commands`, and
+  compiled `AGENTS.md`, where present, are symlinked **only** into
+  `~/.config/opencode-v2/opencode/`. Existing unrelated files/links cause
+  a stop rather than being overwritten.
+- The APM-generated `opencode.json` must contain native V2
+  `mcp.servers`. Every imported server has `disabled: true`, even
+  if APM enables it in its generated output. No MCP process is launched
+  during the sync. Inspect each server and its credential/permission scope
+  before any separate manual enablement.
+- The private `opencode.json` preserves other keys, including authentication
+  and provider settings. Subsequent syncs refuse to overwrite MCP settings
+  manually changed since the previous sync.
+- Failures in APM installation, compilation or validation stop before the
+  V2 active settings are applied. The snapshot stage is discarded on failure;
+  no rollback, cleanup or removal of prior snapshots is automatic.
+- APM v0.37.0 real dependency-resolution and Host V2 live MCP/skill
+  recognition have not been verified by the offline mock tests. Treat the
+  first `--apply` as live acceptance. The actual APM manifest may require
+  explicit trust/approval for some MCP and package dependencies.
+
+APM release: https://github.com/microsoft/apm/releases/tag/v0.37.0
 
 ## Local setup (manual opt-in)
 
