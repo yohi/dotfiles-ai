@@ -9,6 +9,8 @@ import sys
 import tempfile
 import unittest
 
+import yaml
+
 SCRIPT = Path(__file__).resolve().parents[1] / 'host/opencode2/sync_apm.py'
 MOCK_APM = '''#!/usr/bin/env python3
 import json, os, pathlib, sys
@@ -27,6 +29,13 @@ if 'x-variants:' in manifest or '&gpt_variants' in manifest or 'provider:' in ma
     sys.exit(43)
 if 'dependencies:' not in manifest or 'targets:' not in manifest:
     sys.exit(44)
+for required in ['greptileai/skills/skills/check-pr', 'greptileai/skills/skills/greploop']:
+    if required not in manifest:
+        sys.exit(46)
+for forbidden in ['greptileai/skills//check-pr', 'greptileai/skills//greploop',
+                  'anthropics/claude-code//plugins/code-review']:
+    if forbidden in manifest:
+        sys.exit(47)
 if not (root / '.apm/instructions').is_dir():
     sys.exit(45)
 if args[0] == 'install':
@@ -93,6 +102,31 @@ class APMHostV2Tests(unittest.TestCase):
         self.assertNotIn('&gpt_variants', reduced)
         self.assertNotIn('x-variants:', reduced)
         self.assertNotIn('provider:', reduced)
+        original_deps = yaml.safe_load(original)['dependencies']['apm']
+        staged_deps = yaml.safe_load(reduced)['dependencies']['apm']
+        rewrites = {
+            'greptileai/skills//check-pr': 'greptileai/skills/skills/check-pr',
+            'greptileai/skills//greploop': 'greptileai/skills/skills/greploop',
+        }
+        excluded = 'anthropics/claude-code//plugins/code-review'
+        self.assertEqual(
+            staged_deps,
+            [rewrites.get(dep, dep) for dep in original_deps if dep != excluded],
+        )
+        self.assertEqual(len(staged_deps), len(original_deps) - 1)
+        self.assertEqual(yaml.safe_load(reduced)['dependencies']['mcp'],
+                         yaml.safe_load(original)['dependencies']['mcp'])
+
+    def test_check_logs_only_explicit_host_dependency_changes(self):
+        result = self.run_cli('--check')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('22 packages, 12 MCP entries', result.stdout)
+        self.assertEqual(result.stderr.count('APM_HOST_V2_REWRITE:'), 2)
+        self.assertEqual(result.stderr.count('APM_HOST_V2_EXCLUDE:'), 1)
+        self.assertIn('greptileai/skills/skills/check-pr', result.stderr)
+        self.assertIn('greptileai/skills/skills/greploop', result.stderr)
+        self.assertIn('anthropics/claude-code//plugins/code-review', result.stderr)
+        self.assertFalse((self.home / '.local').exists())
 
     def test_check_parses_real_apm_yaml_without_deployment(self):
         result = self.run_cli('--check')

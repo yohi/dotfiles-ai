@@ -19,6 +19,18 @@ import yaml
 REPO = Path(__file__).resolve().parents[2]
 REQUIRED_APM = (0, 37, 0)
 
+# APM 0.37 reads virtual subfolders relative to the repository root.
+# Keep source apm.yml immutable; adjust only the Host V2 stage manifest.
+HOST_V2_APM_PATH_REWRITES = {
+    "greptileai/skills//check-pr": "greptileai/skills/skills/check-pr",
+    "greptileai/skills//greploop": "greptileai/skills/skills/greploop",
+}
+HOST_V2_APM_EXCLUDED = {
+    "anthropics/claude-code//plugins/code-review":
+        "Claude Code plugin path is absent upstream; not a Host V2 skill",
+}
+
+
 
 def stop(message: str) -> None:
     raise RuntimeError(message)
@@ -69,12 +81,31 @@ def prepare_apm_manifest() -> tuple[dict, str]:
         stop("APM SSOT dependencies contain an unsupported entry")
     if not isinstance(parsed.get("name"), str) or not parsed["name"]:
         stop("APM SSOT name is missing")
-    # Preserve original dependency declarations, not V1 provider/model settings.
+    # Repair the two confirmed Greptile monorepo paths for APM 0.37. Exclude
+    # the confirmed non-existent Claude Code-only plugin reference. Do not
+    # silently filter any other dependency; preserve remaining entries exactly.
+    remapped_packages = []
+    for dependency in packages:
+        if isinstance(dependency, str) and dependency in HOST_V2_APM_EXCLUDED:
+            print(f"APM_HOST_V2_EXCLUDE: {dependency} "
+                  f"({HOST_V2_APM_EXCLUDED[dependency]})", file=sys.stderr)
+            continue
+        if isinstance(dependency, str) and dependency in HOST_V2_APM_PATH_REWRITES:
+            corrected = HOST_V2_APM_PATH_REWRITES[dependency]
+            if corrected in packages or corrected in remapped_packages:
+                stop(f"ambiguous duplicate Host V2 dependency: {corrected}")
+            print(f"APM_HOST_V2_REWRITE: {dependency} -> {corrected}",
+                  file=sys.stderr)
+            remapped_packages.append(corrected)
+        else:
+            remapped_packages.append(dependency)
+    if not remapped_packages and not servers:
+        stop("Host V2 manifest would have no dependencies")
     manifest = {
         "name": parsed["name"],
         "version": str(parsed.get("version", "1.0.0")),
         "targets": ["opencode"],
-        "dependencies": {"apm": packages, "mcp": servers},
+        "dependencies": {"apm": remapped_packages, "mcp": servers},
     }
     # APM 0.37 rejects all YAML anchors/aliases; even shared objects must be
     # rendered as literal mappings, independent of the source provider section.

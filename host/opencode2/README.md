@@ -44,6 +44,13 @@ opencode2 mcp list
   package identity, and the OpenCode target to a temporary **anchor-free**
   manifest. It also copies regular `.apm/instructions/*.instructions.md`
   sources without following symlinks. The original SSOT remains unchanged.
+  The Host V2 projection corrects the two known Greptile skill paths
+  (`greptileai/skills/skills/check-pr` and
+  `greptileai/skills/skills/greploop`) and omits the non-existent
+  Claude Code-only `anthropics/claude-code//plugins/code-review`
+  dependency. All three explicit adaptations are logged on both
+  `--check` and `--apply`. All other APM package and MCP entries remain
+  unchanged. This does **not** fix the source manifest's legacy references.
 - `apm install --root <private stage> --target opencode` and
   `apm compile --root <private stage> --target opencode` run **with cwd
   set to the private stage**, because `--root` redirects writes but does
