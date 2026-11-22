@@ -221,6 +221,10 @@ class Stop(Exception):
     pass
 
 
+class HostBrokerCleanupPartial(Stop):
+    """A Task-owned Host Broker resource could not be proven clean."""
+
+
 class SandboxCommandTimeout(Stop):
     pass
 
@@ -1788,6 +1792,380 @@ def _launch_via_host_broker(
     )
 
 
+def _write_runner_sandbox_owner(sandbox: str) -> None:
+    """Record exact Sandbox ownership only after successful create and Name readback."""
+    names = ('OC2_ENV004_TASK_DIR', 'OC2_ENV004_RUN_ID', 'OC2_ENV004_SANDBOX_NAME')
+    values = tuple(os.environ.get(name, '') for name in names)
+    if not any(values):
+        return
+    task_dir_text, run_id, expected_sandbox = values
+    if (not all(values) or re.fullmatch(r'[0-9a-f]{32}', run_id) is None
+            or expected_sandbox != sandbox or sandbox != f'oc2-env004-m1-{run_id}'):
+        raise Stop('Runner Sandbox ownership identity is invalid')
+    task_dir = pathlib.Path(task_dir_text)
+    evidence_dir = task_dir / 'evidence'
+    try:
+        task_info = task_dir.lstat()
+        evidence_info = evidence_dir.lstat()
+    except OSError:
+        raise Stop('Runner Task evidence directory is unavailable') from None
+    if (task_dir.is_symlink() or evidence_dir.is_symlink()
+            or not stat.S_ISDIR(task_info.st_mode) or task_info.st_uid != os.geteuid()
+            or stat.S_IMODE(task_info.st_mode) != 0o700
+            or not stat.S_ISDIR(evidence_info.st_mode)
+            or evidence_info.st_uid != os.geteuid()
+            or stat.S_IMODE(evidence_info.st_mode) != 0o700):
+        raise Stop('Runner Task evidence directory is unsafe')
+    _runner_marker(task_dir, 'daemon-start.intent')
+    _runner_marker(task_dir, 'sandbox-create.intent')
+    payload = f'run_id={run_id}\nsandbox={sandbox}\n'.encode('ascii')
+    path = evidence_dir / 'sandbox-owned.intent'
+    descriptor: int | None = None
+    try:
+        descriptor = os.open(
+            path,
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | getattr(os, 'O_CLOEXEC', 0),
+            0o600,
+        )
+        os.fchmod(descriptor, 0o600)
+        info = os.fstat(descriptor)
+        if (not stat.S_ISREG(info.st_mode) or info.st_uid != os.geteuid()
+                or stat.S_IMODE(info.st_mode) != 0o600 or info.st_nlink != 1):
+            raise OSError('unsafe Task Sandbox ownership marker')
+        with os.fdopen(descriptor, 'wb', closefd=False) as output:
+            output.write(payload)
+            output.flush()
+        os.fsync(descriptor)
+    except OSError:
+        raise Stop('Runner Task Sandbox ownership could not be recorded') from None
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
+
+
+def cleanup_host_broker_sandbox(
+    runner: Runner,
+    sandbox: str,
+    resource: str | None = None,
+    *,
+    sandbox_owned: bool,
+) -> oc2_network_gate.ScopedNetworkAllow | None:
+    """Stop and remove only the verified Task Sandbox and its exact Broker rule."""
+    if not sandbox_owned:
+        raise HostBrokerCleanupPartial('Task Sandbox ownership was not confirmed')
+
+    failures: list[str] = []
+    sandbox_present = False
+    sandbox_list_read = False
+    sandbox_identity_valid = False
+    allow_identity: oc2_network_gate.ScopedNetworkAllow | None = None
+    try:
+        names = runner.sbx('ls', '-q', capture=True).splitlines()
+        sandbox_present = sandbox in names
+        sandbox_list_read = True
+    except Stop:
+        failures.append('sandbox-list-before')
+
+    if sandbox_present:
+        sandbox_state: oc2_network_gate.SandboxState | None = None
+        try:
+            inspect = runner.sbx('inspect', sandbox, capture=True)
+            sandbox_state = oc2_network_gate.sandbox_state(inspect, sandbox)
+            sandbox_identity_valid = True
+        except (Stop, oc2_network_gate.NetworkGateError):
+            failures.append('sandbox-identity')
+        if sandbox_identity_valid and sandbox_state is oc2_network_gate.SandboxState.RUNNING:
+            try:
+                runner.sbx('stop', sandbox)
+            except Stop:
+                failures.append('sandbox-stop')
+            try:
+                stopped = runner.sbx('inspect', sandbox, capture=True)
+                oc2_network_gate.validate_sandbox_stopped(stopped, sandbox)
+            except (Stop, oc2_network_gate.NetworkGateError):
+                failures.append('sandbox-stop-readback')
+
+    if sandbox_list_read and (not sandbox_present or sandbox_identity_valid):
+        try:
+            policy = runner.sbx('policy', 'ls', '--json', capture=True)
+            allow_identity = (
+                oc2_network_gate.find_task_broker_allow(policy, sandbox)
+                if resource is None else
+                oc2_network_gate.find_scoped_network_allow(policy, sandbox, resource)
+            )
+            if allow_identity is not None:
+                oc2_network_gate.revoke_network_allow(runner, allow_identity)
+        except (Stop, oc2_network_gate.NetworkGateError):
+            failures.append('policy-revoke-or-readback')
+    else:
+        failures.append('policy-revoke-owner-identity')
+
+    if sandbox_present and sandbox_identity_valid:
+        try:
+            runner.sbx('--no-input', 'rm', '--force', sandbox)
+        except Stop:
+            failures.append('sandbox-remove')
+
+    try:
+        remaining = runner.sbx('ls', '-q', capture=True).splitlines()
+        if sandbox in remaining:
+            failures.append('sandbox-remains')
+    except Stop:
+        failures.append('sandbox-removal-readback')
+
+    try:
+        final_policy = runner.sbx('policy', 'ls', '--json', capture=True)
+        oc2_network_gate.validate_policy_listing(final_policy, sandbox, 'before')
+    except (Stop, oc2_network_gate.NetworkGateError):
+        failures.append('policy-removal-readback')
+
+    if failures:
+        detail = ', '.join(dict.fromkeys(failures))
+        if allow_identity is not None:
+            detail += (
+                '; task-rule-id=' + allow_identity.rule_id
+                + '; task-policy-id=' + allow_identity.policy_id
+                + '; task-resource=' + allow_identity.resource
+            )
+        raise HostBrokerCleanupPartial(
+            f'Task cleanup is partial for Sandbox {sandbox}: {detail}'
+        )
+    return allow_identity
+
+
+def cleanup_host_broker_unit(
+    runner: Runner,
+    app_name: str,
+    sandbox: str,
+    *,
+    daemon_owned: bool,
+    sandbox_owned: bool,
+) -> oc2_network_gate.ScopedNetworkAllow | None:
+    """Clean the Task Sandbox and stop only its verified dedicated daemon."""
+    if sandbox_owned and not daemon_owned:
+        raise HostBrokerCleanupPartial('Task Sandbox ownership lacks a dedicated-daemon owner')
+    try:
+        status = runner.sbx('daemon', 'status', capture=True)
+    except Stop:
+        raise HostBrokerCleanupPartial('dedicated daemon status is unavailable') from None
+
+    running = re.search(r'^\s*Status:\s*(?:●\s*)?running\s*$', status, re.MULTILINE)
+    expected_socket = oc2_network_gate.expected_socket_path(
+        app_name, pathlib.Path(os.environ.get(
+            'XDG_STATE_HOME', str(pathlib.Path.home() / '.local' / 'state'),
+        )).expanduser(),
+    )
+    if running is None:
+        try:
+            oc2_network_gate.validate_daemon_stopped(status, expected_socket)
+        except oc2_network_gate.NetworkGateError:
+            raise HostBrokerCleanupPartial('dedicated daemon state is unknown') from None
+        if not sandbox_owned:
+            return
+        try:
+            runner.sbx('daemon', 'start', '--detach')
+            oc2_network_gate.verify_dedicated_daemon(runner, app_name)
+        except (Stop, oc2_network_gate.NetworkGateError):
+            raise HostBrokerCleanupPartial(
+                'dedicated daemon could not be started for Task cleanup'
+            ) from None
+    elif not daemon_owned:
+        raise HostBrokerCleanupPartial('refusing to stop an unowned dedicated daemon')
+    else:
+        try:
+            oc2_network_gate.verify_dedicated_daemon(runner, app_name)
+        except (Stop, oc2_network_gate.NetworkGateError):
+            raise HostBrokerCleanupPartial('dedicated daemon identity is invalid') from None
+
+    failures: list[str] = []
+    allow_identity: oc2_network_gate.ScopedNetworkAllow | None = None
+    if sandbox_owned:
+        try:
+            allow_identity = cleanup_host_broker_sandbox(
+                runner, sandbox, None, sandbox_owned=True,
+            )
+        except HostBrokerCleanupPartial as exc:
+            failures.append(str(exc))
+    else:
+        try:
+            names = runner.sbx('ls', '-q', capture=True).splitlines()
+        except Stop:
+            raise HostBrokerCleanupPartial(
+                'Sandbox inventory unavailable without a Task ownership receipt'
+            ) from None
+        if names:
+            raise HostBrokerCleanupPartial(
+                'Sandbox inventory is non-empty without a Task ownership receipt'
+            )
+        try:
+            listing = runner.sbx('policy', 'ls', '--json', capture=True)
+            oc2_network_gate.validate_policy_listing(listing, sandbox, 'before')
+        except (Stop, oc2_network_gate.NetworkGateError):
+            raise HostBrokerCleanupPartial(
+                'Network policy is not at the no-Task-resource baseline'
+            ) from None
+
+    try:
+        runner.sbx('daemon', 'stop')
+    except Stop:
+        failures.append('dedicated daemon stop')
+    try:
+        stopped = runner.sbx('daemon', 'status', capture=True)
+        oc2_network_gate.validate_daemon_stopped(stopped, expected_socket)
+    except (Stop, oc2_network_gate.NetworkGateError):
+        failures.append('dedicated daemon stop readback')
+    if failures:
+        raise HostBrokerCleanupPartial(
+            'Task cleanup is partial: ' + '; '.join(failures)
+        )
+    return allow_identity
+
+
+def _runner_marker(task_dir: pathlib.Path, filename: str) -> bool:
+    path = task_dir / 'evidence' / filename
+    descriptor: int | None = None
+    try:
+        descriptor = os.open(
+            path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | getattr(os, 'O_CLOEXEC', 0),
+        )
+    except FileNotFoundError:
+        return False
+    except OSError:
+        raise HostBrokerCleanupPartial('Task cleanup marker could not be read') from None
+    try:
+        info = os.fstat(descriptor)
+        if (not stat.S_ISREG(info.st_mode) or info.st_uid != os.geteuid()
+                or stat.S_IMODE(info.st_mode) != 0o600 or info.st_nlink != 1
+                or info.st_size > 128):
+            raise HostBrokerCleanupPartial('Task cleanup marker is unsafe')
+        data = os.read(descriptor, 129)
+        after = os.fstat(descriptor)
+        if (len(data) != info.st_size or (info.st_dev, info.st_ino, info.st_size)
+                != (after.st_dev, after.st_ino, after.st_size)):
+            raise HostBrokerCleanupPartial('Task cleanup marker changed while reading')
+    except OSError:
+        raise HostBrokerCleanupPartial('Task cleanup marker could not be read') from None
+    finally:
+        os.close(descriptor)
+    expected = {
+        'daemon-start.intent': b'OC2_ENV004_DAEMON_START_INTENT\n',
+        'sandbox-create.intent': b'OC2_ENV004_SANDBOX_CREATE_INTENT\n',
+        'broker-start.intent': b'OC2_ENV004_BROKER_START_INTENT\n',
+        'sandbox-owned.intent': (
+            f"run_id={os.environ.get('OC2_ENV004_RUN_ID', '')}\n"
+            f"sandbox={os.environ.get('OC2_ENV004_SANDBOX_NAME', '')}\n"
+        ).encode('utf-8'),
+    }.get(filename)
+    if expected is None or data != expected:
+        raise HostBrokerCleanupPartial('Task cleanup marker content is invalid')
+    return True
+
+
+def _write_cleanup_result(task_dir: pathlib.Path, status: str) -> None:
+    path = task_dir / 'evidence' / 'cleanup-result.txt'
+    payload = (status + '\n').encode('utf-8')
+    try:
+        descriptor = os.open(
+            path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, 'O_NOFOLLOW', 0),
+            0o600,
+        )
+        with os.fdopen(descriptor, 'wb') as output:
+            output.write(payload)
+            output.flush()
+            os.fsync(output.fileno())
+    except OSError:
+        raise HostBrokerCleanupPartial('Task cleanup result evidence could not be written') from None
+
+
+def _cleanup_host_broker_from_unit() -> int:
+    if getpass.getuser() != 'y_ohi' or os.geteuid() == 0:
+        raise HostBrokerCleanupPartial('Cleanup must run as the Human Owner inside the Task Unit')
+    run_id = os.environ.get('OC2_ENV004_RUN_ID', '')
+    unit_name = os.environ.get('OC2_ENV004_UNIT_NAME', '')
+    invocation_id = os.environ.get('INVOCATION_ID', '')
+    systemd_unit = os.environ.get('SYSTEMD_UNIT', unit_name)
+    expected_task_dir = pathlib.Path.home() / '.local' / 'share' / 'oc2' / 'vms' / 'host-m1-accept-001'
+    task_dir_text = os.environ.get('OC2_ENV004_TASK_DIR', '')
+    if (re.fullmatch(r'[0-9a-f]{32}', run_id) is None
+            or unit_name != f'oc2-env004-host-m1-{run_id}.service'
+            or systemd_unit != unit_name
+            or re.fullmatch(r'[0-9a-f]{32}', invocation_id) is None
+            or task_dir_text != str(expected_task_dir)):
+        raise HostBrokerCleanupPartial('Cleanup systemd Task identity is invalid')
+    task_dir = expected_task_dir
+    if (task_dir.is_symlink() or not task_dir.is_dir()
+            or stat.S_IMODE(task_dir.stat().st_mode) != 0o700):
+        raise HostBrokerCleanupPartial('Cleanup Task directory is unsafe')
+    evidence_dir = task_dir / 'evidence'
+    if (evidence_dir.is_symlink() or not evidence_dir.is_dir()
+            or stat.S_IMODE(evidence_dir.stat().st_mode) != 0o700):
+        raise HostBrokerCleanupPartial('Cleanup Evidence directory is unsafe')
+    sandbox = os.environ.get('OC2_ENV004_SANDBOX_NAME', '')
+    if sandbox != f'oc2-env004-m1-{run_id}':
+        raise HostBrokerCleanupPartial('Cleanup Sandbox ownership identity is invalid')
+    try:
+        daemon_owned = _runner_marker(task_dir, 'daemon-start.intent')
+        sandbox_attempted = _runner_marker(task_dir, 'sandbox-create.intent')
+        sandbox_owned = _runner_marker(task_dir, 'sandbox-owned.intent')
+    except HostBrokerCleanupPartial as exc:
+        raise HostBrokerCleanupPartial(
+            f'Cleanup identity for Sandbox {sandbox} is unavailable: {exc}'
+        ) from None
+    if ((sandbox_attempted and not daemon_owned)
+            or (sandbox_owned and not sandbox_attempted)):
+        raise HostBrokerCleanupPartial(
+            f'Cleanup ownership markers conflict for Sandbox {sandbox}'
+        )
+    state_home = os.environ.get('XDG_STATE_HOME', '')
+    expected_state_home = str(pathlib.Path.home() / '.local' / 'state')
+    if state_home != expected_state_home:
+        raise HostBrokerCleanupPartial('Cleanup XDG state root is not the fixed Owner path')
+    app_name = 'oc2-env004-isolation'
+    runner = Runner(getpass.getuser(), app_name=app_name)
+    if not daemon_owned:
+        try:
+            status = runner.sbx('daemon', 'status', capture=True)
+        except Stop:
+            raise HostBrokerCleanupPartial(
+                'Dedicated daemon state is unavailable without an ownership marker'
+            ) from None
+        expected_socket = oc2_network_gate.expected_socket_path(
+            app_name, pathlib.Path(state_home),
+        )
+        try:
+            oc2_network_gate.validate_daemon_stopped(status, expected_socket)
+        except oc2_network_gate.NetworkGateError:
+            raise HostBrokerCleanupPartial(
+                'Dedicated daemon is running without a Task ownership marker'
+            ) from None
+        _write_cleanup_result(task_dir, 'status=NO_RESOURCES;daemon=stopped')
+        print('OC2_CLEANUP_COMPLETE: no Task resources were started')
+        return 0
+    try:
+        allow_identity = cleanup_host_broker_unit(
+            runner, app_name, sandbox, daemon_owned=daemon_owned,
+            sandbox_owned=sandbox_owned,
+        )
+        rule_id = 'none' if allow_identity is None else allow_identity.rule_id
+        policy_id = 'none' if allow_identity is None else allow_identity.policy_id
+        sandbox_identity = (
+            'name:' + sandbox if allow_identity is None else allow_identity.sandbox_id
+        )
+        resource = 'none' if allow_identity is None else allow_identity.resource
+        _write_cleanup_result(
+            task_dir,
+            f'status=CLEAN;unit={unit_name};sandbox={sandbox};sandbox_identity={sandbox_identity};'
+            f'rule_id={rule_id};policy_id={policy_id};resource={resource};daemon=stopped',
+        )
+    except HostBrokerCleanupPartial as exc:
+        _write_cleanup_result(
+            task_dir, f'status=PARTIAL;unit={unit_name};sandbox={sandbox};detail={exc}',
+        )
+        raise
+    print(f'OC2_CLEANUP_COMPLETE: sandbox={sandbox}; daemon=stopped')
+    return 0
+
+
 def _run_host_broker(
     args: argparse.Namespace,
     workspace_manifest: WorkspaceManifest,
@@ -1854,6 +2232,7 @@ def _run_host_broker(
         try:
             inspect = runner.sbx('inspect', args.sandbox, capture=True)
             oc2_network_gate.validate_sandbox_identity(inspect, args.sandbox)
+            _write_runner_sandbox_owner(args.sandbox)
             created_policy = runner.sbx('policy', 'ls', '--json', capture=True)
             oc2_network_gate.validate_policy_listing(
                 created_policy, args.sandbox, 'before',
@@ -1861,7 +2240,21 @@ def _run_host_broker(
             broker_port = urlsplit(selection.url).port
             if broker_port is None:
                 raise oc2_network_gate.NetworkGateError('Broker URL has no port')
-            oc2_network_gate.run_network_gate(runner, args.sandbox, broker_port)
+            allow_identity = oc2_network_gate.run_network_gate(
+                runner, args.sandbox, broker_port,
+            )
+            print(
+                f'OC2_NETWORK_POLICY_GATE_PASS: sandbox={allow_identity.sandbox} '
+                f'rule_id={allow_identity.rule_id} policy_id={allow_identity.policy_id} '
+                f'resource={allow_identity.resource}'
+            )
+            broker_host = urlsplit(selection.url).hostname
+            if broker_host is None:
+                raise oc2_network_gate.NetworkGateError('Broker URL has no hostname')
+            oc2_network_gate.probe_guest_broker(
+                runner, args.sandbox, broker_host, broker_port, ca_certificate.data,
+            )
+            print('OC2_GUEST_TLS_AND_EGRESS_GATE_PASS')
             cli = provision_host_broker_cli(runner, args.sandbox, cli_binary)
             workdir = transfer_workspace(
                 runner, args.sandbox, temporary_path / 'workspace-snapshot',
@@ -2006,10 +2399,29 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument('--host-broker-fixture-root',
                    help='m2 only: fixture path relative to the Runtime, '
                         'fixtures or fixtures/<name>')
+    p.add_argument('--host-broker-cleanup-only', action='store_true',
+                   help='cleanup Task-owned Host Broker resources from the systemd ExecStopPost')
     args = p.parse_args(argv)
     oc2_workspace = importlib.import_module('oc2_workspace')
 
     try:
+        if args.host_broker_cleanup_only:
+            cleanup_options = (
+                args.use_host_broker, args.host_broker_app_name,
+                args.sandbox != 'oc2-v2', args.allow_paid_inference,
+                args.use_cloudflare_ai_gateway, args.prepare_only,
+                args.verification_only, args.phase4_plugins, args.provision_artifacts,
+                args.host_broker_url, args.host_broker_ca_cert,
+                args.host_broker_mode, args.host_broker_sandbox_label,
+                args.host_broker_capability_fd, args.host_broker_artifacts,
+                args.host_broker_cli_archive, args.host_broker_prompt,
+                args.host_broker_fixture_root,
+            )
+            if any(cleanup_options):
+                raise HostBrokerCleanupPartial(
+                    'Cleanup-only mode cannot be combined with launch or credential options')
+            return _cleanup_host_broker_from_unit()
+
         broker_selection: oc2_host_broker.HostBrokerSelection | None = None
         broker_ca_certificate: oc2_host_broker.BrokerCaCertificate | None = None
         broker_options = (
@@ -2366,6 +2778,9 @@ def main(argv: list[str] | None = None) -> int:
             )
             launch(runner, launch_request)
             return 0
+    except HostBrokerCleanupPartial as exc:
+        print('OC2_PARTIAL: ' + str(exc), file=sys.stderr)
+        return 2
     except (Stop, OSError, ValueError, subprocess.TimeoutExpired,
             oc2_workspace.WorkspaceError, oc2_host_broker.HostBrokerError) as exc:
         print('OC2_STOP: ' + str(exc), file=sys.stderr)

@@ -139,6 +139,39 @@ class DedicatedDaemonTests(unittest.TestCase):
         with self.assertRaises(gate.NetworkGateError):
             gate.validate_daemon_identity(status.replace('running', 'stopped'), expected, 0o140000)
 
+    def test_dedicated_daemon_stop_readback_requires_exact_socket(self):
+        expected = pathlib.Path('/state/sandboxes/sandboxes-oc2-isolated/sandboxd/sandboxd.sock')
+        gate.validate_daemon_stopped(
+            f'Status: stopped\nSocket: {expected} (not connected)\n', expected,
+        )
+        with self.assertRaises(gate.NetworkGateError):
+            gate.validate_daemon_stopped(
+                'Status: running\nSocket: /tmp/other.sock\n', expected,
+            )
+
+    def test_sandbox_stop_readback_binds_name_and_stopped_state(self):
+        gate.validate_sandbox_stopped('Name: task-sandbox\nStatus: stopped\n', 'task-sandbox')
+
+        for inspect in (
+            'Name: unrelated\nStatus: stopped\n',
+            'Name: task-sandbox\nStatus: running\n',
+            'Name: task-sandbox\n',
+        ):
+            with self.subTest(inspect=inspect), self.assertRaises(gate.NetworkGateError):
+                gate.validate_sandbox_stopped(inspect, 'task-sandbox')
+
+    def test_sandbox_state_readback_accepts_only_running_or_stopped(self):
+        self.assertEqual(
+            gate.sandbox_state('Name: task-sandbox\nStatus: running\n', 'task-sandbox'),
+            'running',
+        )
+        self.assertEqual(
+            gate.sandbox_state('Name: task-sandbox\nStatus: stopped\n', 'task-sandbox'),
+            'stopped',
+        )
+        with self.assertRaises(gate.NetworkGateError):
+            gate.sandbox_state('Name: task-sandbox\nStatus: unknown\n', 'task-sandbox')
+
     def test_runner_pins_app_name_on_every_sbx_invocation(self):
         runner = oc2.Runner('tester', app_name='oc2-isolated')
         with patch.object(oc2.subprocess, 'run', return_value=oc2.subprocess.CompletedProcess(
@@ -168,10 +201,11 @@ class GateFlowTests(unittest.TestCase):
             def sbx_result(self, *args, timeout=180):
                 self.calls.append(args)
                 target = args[-1]
-                allowed = (self.allow_enabled
+                protocol = args[args.index('--protocol') + 1]
+                allowed = (self.allow_enabled and protocol == 'tcp'
                            and target in {'localhost:49187', 'host.docker.internal:49187'})
                 value = {
-                    'action': 'net:connect:tcp', 'allowed': allowed,
+                    'action': 'net:connect:' + protocol, 'allowed': allowed,
                     'context': f'sandbox:{SANDBOX}', 'resource_type': 'net:domain',
                     'resource_value': 'localhost:49187' if allowed else target,
                     'target': 'localhost:49187' if allowed else target, 'type': 'network',

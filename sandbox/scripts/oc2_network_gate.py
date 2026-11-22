@@ -5,33 +5,66 @@ import os
 import pathlib
 import re
 import stat
-from typing import Final, Protocol, TypeAlias
+from enum import StrEnum
+from typing import Final, Literal
 
-
-class NetworkGateError(Exception):
-    pass
-
-
-class PolicyRunner(Protocol):
-    def sbx(self, *args: str, capture: bool = False, tty: bool = False,
-            timeout: int | None = 180) -> str: ...
-
-    def sbx_result(self, *args: str, timeout: int | None = 180) -> tuple[int, str]: ...
-
-
-JsonValue: TypeAlias = (
-    str | int | float | bool | None | list['JsonValue'] | dict[str, 'JsonValue']
+from oc2_network_policy import (
+    JsonValue,
+    NetworkGateError,
+    PolicyRunner,
+    ScopedNetworkAllow,
+    find_scoped_network_allow as find_scoped_network_allow,
+    find_task_broker_allow as find_task_broker_allow,
+    revoke_network_allow as revoke_network_allow,
+    scoped_network_allow,
+    validate_policy_listing,
 )
+
+
+class SandboxState(StrEnum):
+    RUNNING = 'running'
+    STOPPED = 'stopped'
+
+
+
+
 
 _APP_NAME: Final[re.Pattern[str]] = re.compile(r'[A-Za-z0-9][A-Za-z0-9.-]{0,61}[A-Za-z0-9]')
-_RULE_ID: Final[re.Pattern[str]] = re.compile(
-    r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}',
-)
-_NETWORK_ACTIONS: Final[frozenset[str]] = frozenset({
-    'net:connect:tcp', 'net:connect:udp',
-})
-
-
+_GUEST_NETWORK_PROBE: Final[str] = '''import socket, ssl, sys
+host, port = sys.argv[1], int(sys.argv[2])
+ca_data = sys.stdin.buffer.read(65537)
+if not 0 < len(ca_data) <= 65536:
+    raise SystemExit("BROKER_CA_INPUT_INVALID")
+context = ssl.create_default_context(cadata=ca_data.decode("ascii"))
+for address in ("1.1.1.1", "8.8.8.8"):
+    try:
+        connection = socket.create_connection((address, 443), timeout=2)
+    except OSError:
+        continue
+    else:
+        connection.close()
+        raise SystemExit("SANDBOX_TCP_EGRESS_ALLOWED")
+try:
+    socket.getaddrinfo("example.com", 443)
+except OSError:
+    pass
+else:
+    raise SystemExit("SANDBOX_DNS_EGRESS_ALLOWED")
+query = bytes.fromhex("123401000001000000000000076578616d706c6503636f6d0000010001")
+with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as dns:
+    dns.settimeout(2)
+    try:
+        dns.sendto(query, ("1.1.1.1", 53))
+        dns.recvfrom(512)
+    except OSError:
+        pass
+    else:
+        raise SystemExit("SANDBOX_DNS_EGRESS_ALLOWED")
+with socket.create_connection((host, port), timeout=3) as connection:
+    with context.wrap_socket(connection, server_hostname=host):
+        pass
+print("OC2_GUEST_NETWORK_PROBES_PASS")
+'''
 def validate_app_name(value: str | None) -> str:
     if value is None or _APP_NAME.fullmatch(value) is None:
         raise NetworkGateError('Host Broker requires a valid dedicated daemon name')
@@ -52,6 +85,16 @@ def validate_daemon_identity(status: str, expected_socket: pathlib.Path,
         raise NetworkGateError('dedicated Sandbox daemon socket identity mismatch')
     if socket_mode is None or not stat.S_ISSOCK(socket_mode):
         raise NetworkGateError('dedicated Sandbox daemon socket is unavailable')
+
+
+def validate_daemon_stopped(status: str, expected_socket: pathlib.Path) -> None:
+    """Require the dedicated daemon to report stopped on its exact socket path."""
+    state = re.search(r'^\s*Status:\s*(?:●\s*)?stopped\s*$', status, re.MULTILINE)
+    socket_match = re.search(r'^\s*Socket:\s*(\S+)\s+\(not connected\)\s*$',
+                             status, re.MULTILINE)
+    if (state is None or socket_match is None
+            or pathlib.Path(socket_match.group(1)) != expected_socket):
+        raise NetworkGateError('dedicated Sandbox daemon stop was not verified')
 
 
 def verify_dedicated_daemon(runner: PolicyRunner, app_name: str) -> None:
@@ -82,83 +125,46 @@ def validate_sandbox_identity(inspect: str, sandbox: str) -> None:
         raise NetworkGateError('created Sandbox identity could not be verified')
 
 
-def _decode_rules(raw: str) -> list[dict[str, JsonValue]]:
+def validate_sandbox_stopped(inspect: str, sandbox: str) -> None:
+    """Require the exact Task Sandbox name and a stopped-state inspection row."""
+    if sandbox_state(inspect, sandbox) is not SandboxState.STOPPED:
+        raise NetworkGateError('Task Sandbox stopped state was not verified')
+
+
+def sandbox_state(inspect: str, sandbox: str) -> SandboxState:
+    """Parse the state only after binding the inspection to the expected Sandbox name."""
+    validate_sandbox_identity(inspect, sandbox)
+    match = re.search(r'^\s*(?:Status|State):\s*(running|stopped)\s*$', inspect,
+                      re.MULTILINE | re.IGNORECASE)
+    if match is None:
+        raise NetworkGateError('Task Sandbox state is unavailable or unknown')
     try:
-        value: JsonValue = json.loads(raw)
-    except (json.JSONDecodeError, UnicodeError) as exc:
-        raise NetworkGateError('daemon policy readback is not valid JSON') from exc
-    if not isinstance(value, dict):
-        raise NetworkGateError('daemon policy readback has no rules array')
-    rules = value.get('rules')
-    if not isinstance(rules, list):
-        raise NetworkGateError('daemon policy readback has no rules array')
-    parsed_rules: list[dict[str, JsonValue]] = []
-    for rule in rules:
-        if not isinstance(rule, dict):
-            raise NetworkGateError('daemon policy readback contains an invalid rule')
-        parsed_rules.append(rule)
-    return parsed_rules
+        return SandboxState(match.group(1).lower())
+    except ValueError:
+        raise NetworkGateError('Task Sandbox state is unavailable or unknown') from None
 
 
-def validate_policy_listing(raw: str, sandbox: str, stage: str,
-                            allow_resource: str | None = None) -> None:
-    if stage not in {'global', 'before', 'after'}:
-        raise NetworkGateError('unknown policy validation stage')
-    rules = _decode_rules(raw)
-    fallback: list[dict[str, JsonValue]] = []
-    scoped: list[dict[str, JsonValue]] = []
-    for rule in rules:
-        resource_type = rule.get('resource_type')
-        if resource_type not in {'network', 'filesystem:read', 'filesystem:write'}:
-            if rule.get('status') == 'active':
-                raise NetworkGateError('daemon policy contains an unknown active rule')
-            continue
-        if resource_type != 'network' or rule.get('status') != 'active':
-            continue
-        if rule.get('scope') == 'global':
-            actions = rule.get('actions')
-            action_names = (
-                [action for action in actions if isinstance(action, str)]
-                if isinstance(actions, list) else []
-            )
-            if (rule.get('id') == 'default-deny-all'
-                    and rule.get('name') == 'default-deny-all'
-                    and rule.get('decision') == 'deny'
-                    and rule.get('applies_to') == 'all'
-                    and rule.get('resources') == ['**']
-                    and isinstance(actions, list)
-                    and len(action_names) == len(actions)
-                    and sorted(action_names) == sorted(_NETWORK_ACTIONS)
-                    and len(action_names) == len(_NETWORK_ACTIONS)):
-                fallback.append(rule)
-            else:
-                raise NetworkGateError('daemon has an unrecognized active global network rule')
-        elif rule.get('scope') == f'sandbox:{sandbox}':
-            scoped.append(rule)
-        else:
-            raise NetworkGateError('daemon has an active network rule for an unexpected scope')
-    if len(fallback) != 1:
-        raise NetworkGateError('active global default-deny-all policy is missing or ambiguous')
-    if stage in {'global', 'before'}:
-        if scoped:
-            raise NetworkGateError('Sandbox has unexpected active network policy before allow')
-        return
-    if allow_resource is None or len(scoped) != 1:
-        raise NetworkGateError('Sandbox-scoped Broker allow policy is missing or ambiguous')
-    allow = scoped[0]
-    rule_id = allow.get('id')
-    policy_id = allow.get('policy_id')
-    if (not isinstance(rule_id, str) or _RULE_ID.fullmatch(rule_id) is None
-            or not isinstance(policy_id, str) or _RULE_ID.fullmatch(policy_id) is None
-            or allow.get('decision') != 'allow' or allow.get('resources') != [allow_resource]
-            or allow.get('actions') != ['net:connect:tcp']
-            or allow.get('sandbox_id') != sandbox
-            or allow.get('applies_to') != f'sandbox:{sandbox}'):
-        raise NetworkGateError('Sandbox-scoped Broker allow policy does not match expected identity')
+def probe_guest_broker(
+    runner: PolicyRunner,
+    sandbox: str,
+    host: str,
+    port: int,
+    ca_data: bytes,
+) -> None:
+    """Measure Guest egress denials and verify the Broker TLS route before M1."""
+    if (host not in {'host.docker.internal', '127.0.0.1'}
+            or not 1 <= port <= 65535
+            or not 0 < len(ca_data) <= 64 * 1024):
+        raise NetworkGateError('Guest Broker probe inputs are outside the fixed contract')
+    runner.sbx_feed(
+        'exec', '-i', sandbox, 'python3', '-c', _GUEST_NETWORK_PROBE,
+        host, str(port), data=ca_data,
+    )
 
 
 def validate_policy_check(raw: str, exit_code: int, sandbox: str, resource: str,
-                          expected_allowed: bool, *, expected_target: str | None = None) -> None:
+                          expected_allowed: bool, *, expected_target: str | None = None,
+                          protocol: Literal['tcp', 'udp'] = 'tcp') -> None:
     try:
         value: JsonValue = json.loads(raw)
     except (json.JSONDecodeError, UnicodeError) as exc:
@@ -168,7 +174,7 @@ def validate_policy_check(raw: str, exit_code: int, sandbox: str, resource: str,
     if (not isinstance(value, dict) or type(value.get('allowed')) is not bool
             or value.get('allowed') is not expected_allowed
             or exit_code != expected_exit
-            or value.get('action') != 'net:connect:tcp'
+            or value.get('action') != f'net:connect:{protocol}'
             or value.get('context') != f'sandbox:{sandbox}'
             or value.get('resource_type') != 'net:domain'
             or value.get('resource_value') != resource or value.get('target') != target
@@ -180,18 +186,21 @@ def validate_policy_check(raw: str, exit_code: int, sandbox: str, resource: str,
 
 
 def _check(runner: PolicyRunner, sandbox: str, target: str,
-           resource_value: str, allowed: bool) -> None:
+           resource_value: str, allowed: bool,
+           protocol: Literal['tcp', 'udp'] = 'tcp') -> None:
     exit_code, output = runner.sbx_result(
         'policy', 'check', 'network', '--json', '--sandbox', sandbox,
-        '--protocol', 'tcp', target,
+        '--protocol', protocol, target,
     )
     validate_policy_check(
         output, exit_code, sandbox, resource_value, allowed,
-        expected_target=resource_value,
+        expected_target=resource_value, protocol=protocol,
     )
 
 
-def run_network_gate(runner: PolicyRunner, sandbox: str, broker_port: int) -> None:
+def run_network_gate(
+    runner: PolicyRunner, sandbox: str, broker_port: int,
+) -> ScopedNetworkAllow:
     if not 1 <= broker_port <= 65535:
         raise NetworkGateError('Broker port is outside the valid TCP port range')
     resource = f'localhost:{broker_port}'
@@ -208,3 +217,10 @@ def run_network_gate(runner: PolicyRunner, sandbox: str, broker_port: int) -> No
     other_target = f'localhost:{other_port}'
     _check(runner, sandbox, other_target, other_target, False)
     _check(runner, sandbox, 'example.com:443', 'example.com:443', False)
+    _check(runner, sandbox, '1.1.1.1:53', '1.1.1.1:53', False, 'udp')
+    _check(runner, sandbox, 'example.com:53', 'example.com:53', False, 'udp')
+    _check(
+        runner, sandbox, f'host.docker.internal:{broker_port}',
+        f'host.docker.internal:{broker_port}', False, 'udp',
+    )
+    return scoped_network_allow(after, sandbox, resource)

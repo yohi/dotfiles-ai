@@ -14,9 +14,9 @@ from typing import Final, NoReturn
 EXCLUDED_NAMES = frozenset({
     '.git', '.hg', '.svn', '.env', '.env.local', '.env.production',
     '.ssh', '.aws', '.azure', '.gnupg', '.docker', '.kube', '.config',
-    '.opencode', '.claude', '.claude.json', '.codex', '.npmrc', '.pypirc', '.netrc',
+    '.opencode', '.claude', '.claude.json', '.codex', '.justice', '.npmrc', '.pypirc', '.netrc',
     'id_rsa', 'id_ed25519', 'credentials', 'secrets', 'token', 'tokens', 'node_modules',
-    '.venv', '__pycache__',
+    '.venv', '__pycache__', '.ruff_cache', '.mypy_cache', '.pytest_cache', '.basedpyright',
 })
 ROOT_PROJECT_CONFIG_NAMES = frozenset({'opencode.json', 'opencode.jsonc', 'cli.json'})
 ROOT_GENERATED_DIRECTORY_NAMES = frozenset({'.worktrees', '.nexus', 'apm_modules'})

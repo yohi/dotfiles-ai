@@ -183,6 +183,7 @@ class FsRunner:
     def __init__(self, root: pathlib.Path):
         self.root = root
         self.user = 'tester'
+        self.sandbox_name = 'oc2-dev'
         self.calls: list[tuple[str, ...]] = []
         self.fed: list[tuple[tuple[str, ...], bytes]] = []
         self.after_cp: Callable[[pathlib.Path], None] | None = None
@@ -222,8 +223,8 @@ class FsRunner:
             raise oc2.Stop('sandbox removal failed')
         if head == 'version':
             return 'sbx v0.51.0'
-        if args[:2] == ('inspect', 'oc2-dev'):
-            return 'Name: oc2-dev\n'
+        if len(args) >= 2 and args[0] == 'inspect' and args[1] == self.sandbox_name:
+            return f'Name: {self.sandbox_name}\nStatus: running\n'
         if args[:3] == ('policy', 'ls', '--json'):
             return '{"rules": []}'
         if args[:2] == ('create', '--help'):
@@ -759,7 +760,8 @@ class RunHostBrokerTests(unittest.TestCase):
 
     def run_broker(self, *, artifacts=True, probe_ok=True, mode='m1', label='oc2-dev',
                    gate_failure=False, global_policy_failure=False,
-                   cleanup_failure=False):
+                   guest_probe_failure=False, cleanup_failure=False,
+                   sandbox='oc2-dev', runner_context=None):
         read_fd, write_fd = os.pipe()
         os.write(write_fd, (TOKEN + '\n').encode())
         os.close(write_fd)
@@ -768,8 +770,9 @@ class RunHostBrokerTests(unittest.TestCase):
             broker_ca_sha256=CA_SHA256,
             fixture_rel=None if mode == 'm1' else 'fixtures')
         ca_certificate = hb.BrokerCaCertificate(CA_DATA, CA_SHA256)
+        self.runner.sandbox_name = sandbox
         args = oc2.argparse.Namespace(
-            sandbox='oc2-dev', host_broker_artifacts=self.tmp / 'src' if artifacts else None,
+            sandbox=sandbox, host_broker_artifacts=self.tmp / 'src' if artifacts else None,
             host_broker_prompt='say hello', host_broker_ca_cert=self.tmp / 'ca.pem',
             host_broker_app_name='oc2-env004-isolation',
             host_broker_cli_archive=self.tmp / 'opencode-linux-x64.tar.gz')
@@ -796,6 +799,17 @@ class RunHostBrokerTests(unittest.TestCase):
             self.runner.calls.append(('NETWORK_GATE',))
             if gate_failure:
                 raise oc2_network_gate.NetworkGateError('offline gate failure')
+            return oc2_network_gate.ScopedNetworkAllow(
+                'oc2-dev', 'oc2-dev',
+                'd0c763fe-de6c-4efb-871f-6a1ddf8bbc2d',
+                'e0dd734a-60e7-4589-959e-4ecfa798eb7f',
+                'localhost:18080',
+            )
+
+        def probe_guest(*_args):
+            self.runner.calls.append(('GUEST_BROKER_TLS_PROBE',))
+            if guest_probe_failure:
+                raise oc2_network_gate.NetworkGateError('guest broker TLS probe failed')
 
         def transfer_workspace(*_args):
             self.runner.calls.append(('WORKSPACE_TRANSFER',))
@@ -811,19 +825,28 @@ class RunHostBrokerTests(unittest.TestCase):
                 raise oc2_network_gate.NetworkGateError('unsafe daemon policy')
 
         result_artifacts = verified()
+        environment = {}
+        if runner_context is not None:
+            environment = {
+                'OC2_ENV004_TASK_DIR': str(runner_context),
+                'OC2_ENV004_RUN_ID': 'a' * 32,
+                'OC2_ENV004_SANDBOX_NAME': sandbox,
+                'OC2_ENV004_APP_NAME': 'oc2-env004-isolation',
+            }
         with patch.object(oc2, 'Runner', return_value=self.runner), \
                 patch.object(oc2.shutil, 'which', return_value='/usr/bin/sbx'), \
                 patch.object(oc2_network_gate, 'verify_dedicated_daemon',
                              side_effect=verify_dedicated_daemon), \
                 patch.object(oc2_network_gate, 'validate_policy_listing', side_effect=validate_listing), \
                 patch.object(oc2_network_gate, 'run_network_gate', side_effect=run_gate) as network_gate, \
+                patch.object(oc2_network_gate, 'probe_guest_broker', side_effect=probe_guest), \
                 patch.object(oc2, 'download_verified_cli', fake_download), \
                 patch.object(oc2, 'transfer_workspace', side_effect=transfer_workspace), \
                 patch.object(oc2_host_broker_probe(), 'probe_broker', probe), \
                 patch.object(rbr, 'load_manifest', return_value=(fake_manifest(), 'd' * 64)), \
                 patch.object(rbr, 'verify_source', return_value=result_artifacts), \
                 patch.object(oc2, 'CLI_BINARY_SIZE', 4), \
-                patch.dict(os.environ, {}, clear=True), \
+                patch.dict(os.environ, environment, clear=True), \
                 contextlib.redirect_stdout(io.StringIO()):
             if gate_failure:
                 cleanup_message = (
@@ -857,6 +880,7 @@ class RunHostBrokerTests(unittest.TestCase):
         self.assertNotIn('--kit', creates[0])
         self.assertNotIn('oc2-credentials', repr(self.runner.calls))
         self.assertEqual(len(self.runner.fed), 1)
+        self.assertFalse(any(call[:2] == ('rm', 'oc2-dev') for call in self.runner.calls))
         self.assertNotIn('secret', repr([c for c in self.runner.calls if c[0] != 'cp']))
         self.assertNotIn(TOKEN, repr(self.runner.calls))
         digest_dirs = list(self.runner.local(hb.GUEST_ROOT + '/runtime').iterdir())
@@ -865,6 +889,33 @@ class RunHostBrokerTests(unittest.TestCase):
         self.assertEqual(
             (digest_dirs[0] / 'broker/ca/host-broker-ca.pem').read_bytes(), CA_DATA,
         )
+
+    def test_runner_records_sandbox_ownership_after_create_and_name_readback(self):
+        run_id = 'a' * 32
+        sandbox = 'oc2-env004-m1-' + run_id
+        task_dir = self.tmp / 'runner-task'
+        evidence = task_dir / 'evidence'
+        evidence.mkdir(parents=True, mode=0o700)
+        task_dir.chmod(0o700)
+        for name, marker in (
+            ('daemon-start.intent', b'OC2_ENV004_DAEMON_START_INTENT\n'),
+            ('sandbox-create.intent', b'OC2_ENV004_SANDBOX_CREATE_INTENT\n'),
+        ):
+            path = evidence / name
+            path.write_bytes(marker)
+            path.chmod(0o600)
+
+        self.assertEqual(self.run_broker(
+            sandbox=sandbox, label=sandbox, runner_context=task_dir,
+        ), 0)
+
+        receipt = evidence / 'sandbox-owned.intent'
+        self.assertEqual(receipt.read_text(), f'run_id={run_id}\nsandbox={sandbox}\n')
+        self.assertEqual(stat.S_IMODE(receipt.stat().st_mode), 0o600)
+        created = next(i for i, call in enumerate(self.runner.calls) if call[0] == 'create')
+        inspected = next(i for i, call in enumerate(self.runner.calls)
+                         if call[:2] == ('inspect', sandbox))
+        self.assertLess(created, inspected)
 
     def test_cli_archive_is_verified_before_daemon_and_policy_checks(self):
         self.assertEqual(self.run_broker(), 0)
@@ -882,6 +933,7 @@ class RunHostBrokerTests(unittest.TestCase):
     def test_host_cli_transfer_follows_network_gate_and_precedes_workspace(self):
         self.assertEqual(self.run_broker(), 0)
         gate = self.runner.calls.index(('NETWORK_GATE',))
+        guest_probe = self.runner.calls.index(('GUEST_BROKER_TLS_PROBE',))
         cli_copy = next(
             index for index, call in enumerate(self.runner.calls)
             if call[0] == 'cp' and call[2].endswith(':/opt/oc2/bin/opencode')
@@ -893,9 +945,23 @@ class RunHostBrokerTests(unittest.TestCase):
         workspace = self.runner.calls.index(('WORKSPACE_TRANSFER',))
         guest_launch = self.runner.calls.index(('GUEST_LAUNCH',))
         self.assertLess(gate, cli_copy)
+        self.assertLess(gate, guest_probe)
+        self.assertLess(guest_probe, cli_copy)
         self.assertLess(cli_copy, version_check)
         self.assertLess(version_check, workspace)
         self.assertLess(workspace, guest_launch)
+
+    def test_guest_broker_probe_failure_cleans_sandbox_before_guest_setup(self):
+        with self.assertRaisesRegex(oc2.Stop, 'owned Sandbox was removed'):
+            self.run_broker(guest_probe_failure=True)
+
+        gate = self.runner.calls.index(('NETWORK_GATE',))
+        probe = self.runner.calls.index(('GUEST_BROKER_TLS_PROBE',))
+        removed = next(i for i, call in enumerate(self.runner.calls)
+                       if call[:2] == ('rm', 'oc2-dev'))
+        self.assertLess(gate, probe)
+        self.assertLess(probe, removed)
+        self.assertFalse(any(call[0] in {'cp', 'GUEST_LAUNCH'} for call in self.runner.calls))
 
     def test_host_cli_copy_has_matching_sha_and_owner_only_execute_mode(self):
         self.assertEqual(self.run_broker(), 0)
@@ -998,6 +1064,235 @@ class RunHostBrokerTests(unittest.TestCase):
         self.assertEqual(self.run_broker(global_policy_failure=True), 1)
 
 
+class TaskSandboxCleanupTests(unittest.TestCase):
+    sandbox = 'oc2-env004-m1-abc123'
+    resource = 'localhost:49187'
+
+    def setUp(self):
+        self.runner = self.CleanupRunner(self.sandbox, self.resource)
+
+    def test_cleanup_stops_retracts_allow_reads_back_and_removes_only_task_sandbox(self):
+        oc2.cleanup_host_broker_sandbox(
+            self.runner, self.sandbox, self.resource, sandbox_owned=True,
+        )
+
+        stop = self.runner.calls.index(('stop', self.sandbox))
+        stopped_readback = self.runner.calls.index(('inspect', self.sandbox), stop + 1)
+        revoke = next(i for i, call in enumerate(self.runner.calls)
+                      if call[:4] == ('--no-input', 'policy', 'rm', 'network'))
+        remove = self.runner.calls.index(('--no-input', 'rm', '--force', self.sandbox))
+        sandbox_readback = self.runner.calls.index(('ls', '-q'), remove + 1)
+        self.assertLess(stop, stopped_readback)
+        self.assertLess(stopped_readback, revoke)
+        self.assertLess(revoke, remove)
+        self.assertLess(remove, sandbox_readback)
+        self.assertFalse(self.runner.sandbox_present)
+        self.assertEqual(self.runner.policy['rules'], [self.runner.default_deny])
+        self.assertEqual(self.runner.calls[-1], ('policy', 'ls', '--json'))
+
+    def test_cleanup_refuses_to_remove_sandbox_when_identity_mismatches(self):
+        self.runner.inspect_name = 'unrelated-sandbox'
+
+        with self.assertRaises(oc2.HostBrokerCleanupPartial):
+            oc2.cleanup_host_broker_sandbox(
+                self.runner, self.sandbox, self.resource, sandbox_owned=True,
+            )
+
+        self.assertTrue(self.runner.sandbox_present)
+        self.assertFalse(any(call[:3] == ('--no-input', 'rm', '--force')
+                             for call in self.runner.calls))
+        self.assertFalse(any(call[:4] == ('--no-input', 'policy', 'rm', 'network')
+                             for call in self.runner.calls))
+
+    def test_cleanup_skips_stop_operation_when_task_sandbox_is_already_stopped(self):
+        self.runner.running = False
+
+        oc2.cleanup_host_broker_sandbox(
+            self.runner, self.sandbox, self.resource, sandbox_owned=True,
+        )
+
+        self.assertFalse(any(call[:2] == ('stop', self.sandbox) for call in self.runner.calls))
+        self.assertFalse(self.runner.sandbox_present)
+
+    def test_cleanup_reports_policy_revoke_failure_and_continues_owned_sandbox_removal(self):
+        self.runner.fail_policy_remove = True
+
+        with self.assertRaisesRegex(oc2.HostBrokerCleanupPartial, 'policy-revoke'):
+            oc2.cleanup_host_broker_sandbox(
+                self.runner, self.sandbox, self.resource, sandbox_owned=True,
+            )
+
+        self.assertFalse(self.runner.sandbox_present)
+        self.assertTrue(any(rule['id'] == self.runner.allow_rule['id']
+                            for rule in self.runner.policy['rules']))
+
+    def test_cleanup_reports_sandbox_removal_failure_and_preserves_global_deny(self):
+        self.runner.fail_sandbox_remove = True
+
+        with self.assertRaisesRegex(oc2.HostBrokerCleanupPartial, 'sandbox-remove'):
+            oc2.cleanup_host_broker_sandbox(
+                self.runner, self.sandbox, self.resource, sandbox_owned=True,
+            )
+
+        self.assertTrue(self.runner.sandbox_present)
+        self.assertEqual(self.runner.policy['rules'], [self.runner.default_deny])
+
+    def test_cleanup_rejects_unowned_sandbox_before_any_mutation(self):
+        with self.assertRaises(oc2.HostBrokerCleanupPartial):
+            oc2.cleanup_host_broker_sandbox(
+                self.runner, self.sandbox, self.resource, sandbox_owned=False,
+            )
+
+        self.assertFalse(any(call[0] in {'stop', '--no-input'} for call in self.runner.calls))
+
+    def test_cleanup_retracts_rule_when_launcher_already_removed_task_sandbox(self):
+        self.runner.sandbox_present = False
+
+        oc2.cleanup_host_broker_sandbox(
+            self.runner, self.sandbox, self.resource, sandbox_owned=True,
+        )
+
+        self.assertFalse(any(call[:2] == ('stop', self.sandbox) for call in self.runner.calls))
+        self.assertFalse(any(call[:3] == ('--no-input', 'rm', '--force')
+                             for call in self.runner.calls))
+        self.assertEqual(self.runner.policy['rules'], [self.runner.default_deny])
+
+    class CleanupRunner:
+        def __init__(self, sandbox, resource):
+            self.sandbox = sandbox
+            self.resource = resource
+            self.calls = []
+            self.sandbox_present = True
+            self.running = True
+            self.inspect_name = sandbox
+            self.fail_policy_remove = False
+            self.fail_sandbox_remove = False
+            self.default_deny = {
+                'id': 'default-deny-all', 'name': 'default-deny-all',
+                'scope': 'global', 'applies_to': 'all', 'resource_type': 'network',
+                'decision': 'deny', 'resources': ['**'], 'status': 'active',
+                'actions': ['net:connect:tcp', 'net:connect:udp'],
+            }
+            self.allow_rule = {
+                'id': 'e0dd734a-60e7-4589-959e-4ecfa798eb7f',
+                'policy_id': 'd0c763fe-de6c-4efb-871f-6a1ddf8bbc2d',
+                'scope': f'sandbox:{sandbox}', 'applies_to': f'sandbox:{sandbox}',
+                'sandbox_id': sandbox, 'resource_type': 'network', 'decision': 'allow',
+                'resources': [resource], 'status': 'active',
+                'actions': ['net:connect:tcp'],
+            }
+            self.policy = {'rules': [self.allow_rule, self.default_deny]}
+
+        def sbx(self, *args, capture=False, tty=False, timeout=180):
+            self.calls.append(args)
+            if args[:2] == ('ls', '-q'):
+                return self.sandbox + '\n' if self.sandbox_present else ''
+            if args[:2] == ('inspect', self.sandbox):
+                state = 'running' if self.running else 'stopped'
+                return f'Name: {self.inspect_name}\nStatus: {state}\n'
+            if args[:2] == ('stop', self.sandbox):
+                self.running = False
+                return ''
+            if args[:3] == ('policy', 'ls', '--json'):
+                return json.dumps(self.policy)
+            if args[:4] == ('--no-input', 'policy', 'rm', 'network'):
+                if self.fail_policy_remove:
+                    raise oc2.Stop('simulated policy removal failure')
+                rule_id = args[args.index('--id') + 1]
+                self.policy['rules'] = [
+                    rule for rule in self.policy['rules'] if rule.get('id') != rule_id
+                ]
+                return ''
+            if args[:3] == ('--no-input', 'rm', '--force'):
+                if self.fail_sandbox_remove:
+                    raise oc2.Stop('simulated Sandbox removal failure')
+                self.sandbox_present = False
+                return ''
+            return ''
+
+
+class DedicatedDaemonCleanupTests(unittest.TestCase):
+    def test_cleanup_restart_does_not_reinitialize_the_global_policy(self):
+        runner = self.DaemonRunner(status='stopped')
+        with patch.object(oc2_network_gate, 'verify_dedicated_daemon'):
+            oc2.cleanup_host_broker_unit(
+                runner, 'oc2-env004-isolation', 'oc2-env004-m1-abc123',
+                daemon_owned=True, sandbox_owned=True,
+            )
+
+        starts = [call for call in runner.calls if call[:2] == ('daemon', 'start')]
+        self.assertEqual(starts, [('daemon', 'start', '--detach')])
+        self.assertNotIn('--policy', starts[0])
+
+    def test_cleanup_stops_only_owned_daemon_and_verifies_exact_socket(self):
+        runner = self.DaemonRunner()
+        with patch.object(oc2_network_gate, 'verify_dedicated_daemon'):
+            oc2.cleanup_host_broker_unit(
+                runner, 'oc2-env004-isolation', 'oc2-env004-m1-abc123',
+                daemon_owned=True, sandbox_owned=False,
+            )
+
+        self.assertIn(('daemon', 'stop'), runner.calls)
+        self.assertEqual(runner.status, 'stopped')
+
+    def test_cleanup_refuses_to_stop_unowned_running_daemon(self):
+        runner = self.DaemonRunner()
+        with patch.object(oc2_network_gate, 'verify_dedicated_daemon'):
+            with self.assertRaises(oc2.HostBrokerCleanupPartial):
+                oc2.cleanup_host_broker_unit(
+                    runner, 'oc2-env004-isolation', 'oc2-env004-m1-abc123',
+                    daemon_owned=False, sandbox_owned=False,
+                )
+
+        self.assertNotIn(('daemon', 'stop'), runner.calls)
+
+    def test_cleanup_stop_failure_is_partial(self):
+        runner = self.DaemonRunner()
+        runner.fail_stop = True
+        with patch.object(oc2_network_gate, 'verify_dedicated_daemon'):
+            with self.assertRaises(oc2.HostBrokerCleanupPartial):
+                oc2.cleanup_host_broker_unit(
+                    runner, 'oc2-env004-isolation', 'oc2-env004-m1-abc123',
+                    daemon_owned=True, sandbox_owned=False,
+                )
+
+    class DaemonRunner:
+        def __init__(self, status='running'):
+            self.calls = []
+            self.status = status
+            self.fail_stop = False
+            self.sandbox_present = False
+
+        def sbx(self, *args, capture=False, tty=False, timeout=180):
+            self.calls.append(args)
+            if args[:2] == ('daemon', 'status'):
+                state = 'running' if self.status == 'running' else 'stopped'
+                socket_path = oc2_network_gate.expected_socket_path(
+                    'oc2-env004-isolation', pathlib.Path.home() / '.local' / 'state',
+                )
+                suffix = '' if state == 'running' else ' (not connected)'
+                return f'Status: {state}\nSocket: {socket_path}{suffix}\n'
+            if args[:2] == ('daemon', 'start'):
+                self.status = 'running'
+                return ''
+            if args[:2] == ('daemon', 'stop'):
+                if self.fail_stop:
+                    raise oc2.Stop('daemon stop failure')
+                self.status = 'stopped'
+                return ''
+            if args[:3] == ('policy', 'ls', '--json'):
+                return json.dumps({'rules': [{
+                    'id': 'default-deny-all', 'name': 'default-deny-all',
+                    'scope': 'global', 'applies_to': 'all',
+                    'resource_type': 'network', 'decision': 'deny',
+                    'resources': ['**'], 'status': 'active',
+                    'actions': ['net:connect:tcp', 'net:connect:udp'],
+                }]})
+            if args[:2] == ('ls', '-q'):
+                return 'oc2-env004-m1-abc123\n' if self.sandbox_present else ''
+            return ''
+
+
 class RunnerDaemonScopeTests(unittest.TestCase):
     def test_all_runner_sbx_entrypoints_pin_the_dedicated_daemon(self):
         runner = oc2.Runner(oc2.getpass.getuser(), app_name='oc2-isolated')
@@ -1052,6 +1347,13 @@ class CliTests(unittest.TestCase):
             code, _out, err = self.run_main(*option)
             self.assertEqual(code, 1)
             self.assertIn('require --use-host-broker', err)
+
+    def test_cleanup_only_requires_systemd_task_identity(self):
+        code, out, err = self.run_main('--host-broker-cleanup-only')
+
+        self.assertEqual(code, 2)
+        self.assertIn('OC2_PARTIAL', err)
+        self.assertNotIn(TOKEN, out + err)
 
     def test_ca_certificate_is_required_with_host_broker_opt_in(self):
         args = list(self.BASE)
