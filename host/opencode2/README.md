@@ -33,9 +33,9 @@ current package manager, and verify `apm --version`. No APM upgrade is
 performed automatically.
 
 ```bash
-python3 -m unittest discover -s tests -p 'test_host_v2_apm.py' -v
-python3 host/opencode2/sync_apm.py --check  # read-only, validates normalized manifest
-python3 host/opencode2/sync_apm.py --apply  # explicit APM install/compile + apply
+uv run --no-project --with PyYAML python -m unittest discover -s tests -p 'test_host_v2_apm.py' -v
+uv run --no-project --with PyYAML python host/opencode2/sync_apm.py --check
+uv run --no-project --with PyYAML python host/opencode2/sync_apm.py --apply
 opencode2 mcp list
 ```
 
@@ -79,6 +79,60 @@ opencode2 mcp list
   explicit trust/approval for some MCP and package dependencies.
 
 APM release: https://github.com/microsoft/apm/releases/tag/v0.37.0
+
+## Host V2 model settings (APM SSOT, independent of APM install)
+
+Model configuration is deliberately a **separate explicit step** from
+`sync_apm.py`. It works even if APM package fetching is blocked. The source
+is the existing `apm.yml` `opencode_v2` selection and the two corresponding
+provider catalog entries. It never edits the SSOT, V1 settings, sandbox
+configuration, or credential stores.
+
+```bash
+# From the dotfiles-ai checkout; Host V2 installation already exists.
+uv run --no-project --with PyYAML python -m unittest discover -s tests -p 'test_host_v2_models.py' -v
+uv run --no-project --with PyYAML python host/opencode2/sync_models.py --check
+uv run --no-project --with PyYAML python host/opencode2/sync_models.py --apply
+
+# Confirm available model IDs, then authorize the Host V2 profile separately.
+~/.local/bin/opencode2 models openai
+~/.local/bin/opencode2 auth login
+```
+
+On the current SSOT, the default is `openai/gpt-6-luna`. The optional
+Cloudflare AI Gateway Custom entry exposes only
+`cloudflare-ai-gateway-custom/custom-ollama-cloud/kimi-k2.7-code`
+from the selected catalog. The V2-native `providers` format is used;
+do not copy the V1 `provider` or its `npm` keys unchanged. Provider policy
+denies all other providers and allows OpenAI and Cloudflare Custom only.
+**Provider policy does not enforce an individual model allowlist or guarantee
+that OpenCode will never select a different model from an allowed provider**;
+the SSOT `allowed_models` is validated for the generated default and the
+custom-model entry, not installed as a strict runtime per-model gate.
+
+OpenAI uses an independently authorized Host V2 ChatGPT sign-in; no V1 or
+Sandbox authentication is imported. Cloudflare requires the server process
+environment variables `OC_CF_ACCOUNT_ID`, `OC_CF_GATEWAY_ID`, and
+`OC_CF_API_TOKEN` (supply them securely outside the repository).
+The generated configuration keeps references such as
+`{env:OC_CF_API_TOKEN}`, not plaintext tokens. It uses a non-secret dummy
+API key with the dedicated `cf-aig-authorization` header and explicitly
+blank `Authorization`. **Cloudflare live requests and actual header merging
+remain NOT_VERIFIED**. Do not assume subscription billing is restricted solely
+by the two selected model IDs.
+
+Existing APM-managed `mcp.servers`, skills, commands and instructions are
+preserved. This sync manages only `model`, `providers`, and `policies`,
+records their digest in `model-host-sync-state.json`, and rejects a later
+overwrite if those settings were manually changed. `--check` performs no
+writes. It does not authenticate, send prompts, or launch a provider process.
+For a manual model switch, choose an available model in `/models` or specify
+`--model` for one run. No API calls are made by this setup script.
+
+Official config and provider references:
+- https://dev.opencode.ai/docs/config/
+- https://dev.opencode.ai/docs/providers/
+- https://dev.opencode.ai/docs/policies/
 
 ## Local setup (manual opt-in)
 
