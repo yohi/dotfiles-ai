@@ -58,9 +58,9 @@ class FakeGuestStopper:
 
 @final
 class FakeHostControl:
-    def __init__(self, observations: tuple[hc.HostObservation, ...],
+    def __init__(self, observations: tuple[hc.HostObservation | None, ...],
                  events: list[str], *, request_ok: bool = True) -> None:
-        self.observations: list[hc.HostObservation] = list(observations)
+        self.observations: list[hc.HostObservation | None] = list(observations)
         self.events: list[str] = events
         self.request_ok: bool = request_ok
 

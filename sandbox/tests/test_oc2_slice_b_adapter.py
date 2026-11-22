@@ -7,7 +7,8 @@ import tempfile
 import unittest
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from types import ModuleType
+from typing import TYPE_CHECKING, Any, Callable, cast
 from unittest.mock import patch
 
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
@@ -21,6 +22,7 @@ if TYPE_CHECKING:
         HostControlledStopRequest as HostControlledStopRequestType,
         HostControlledStopResult as HostControlledStopResultType,
     )
+    from sandbox.scripts.oc2_host_control import HostVmIdentity as HostVmIdentityType
     import sandbox.scripts.oc2_slice_b as adapter
     import sandbox.scripts.oc2_slice_b_git as git
     import sandbox.scripts.oc2_slice_b_image as image  # noqa: F401
@@ -36,6 +38,7 @@ if TYPE_CHECKING:
     from sandbox.scripts.oc2_slice_b_image import ImagePin as ImagePinType
     from sandbox.scripts.oc2_slice_b_session import VerifiedGuestAuthority
     from sandbox.scripts.oc2_writer import (
+        StopVerdict as WriterStopVerdictType,
         WriterIdentity as WriterIdentityType,
         WriterSessionKey as WriterSessionKeyType,
     )
@@ -43,6 +46,29 @@ if TYPE_CHECKING:
         FakeGuestImageRunner as FakeGuestImageRunnerType,
         make_key,  # noqa: F401
     )
+    from sandbox.tests.oc2_host_lifecycle_test_support import (
+        FakeGuestStopper as FakeGuestStopperType,
+        FakeHostControl as FakeHostControlType,
+        FakePreserver as FakePreserverType,
+        HostFixture as HostFixtureType,
+    )
+    from sandbox.scripts.oc2_host_control import HostObservation as HostObservationType
+
+    FakeGuestImageRunnerRuntime: type[FakeGuestImageRunnerType]
+    FakeGuestStopperRuntime: type[FakeGuestStopperType]
+    FakeHostControlRuntime: type[FakeHostControlType]
+    FakePreserverRuntime: type[FakePreserverType]
+    HostFixtureRuntime: type[HostFixtureType]
+    SliceBOfflineInputsRuntime: type[SliceBOfflineInputsType]
+    SliceBWriterObservationRuntime: type[SliceBWriterObservationType]
+    HostControlledStopRequestRuntime: type[HostControlledStopRequestType]
+    StopRequestRuntime: type[HostControlledStopRequestType]
+    HostVmIdentityRuntime: type[HostVmIdentityType]
+    WriterIdentityRuntime: type[WriterIdentityType]
+    WriterStopVerdictRuntime: type[WriterStopVerdictType]
+    WriterGuestUnverifiedRuntime: str
+    run_slice_b: Callable[..., int]
+    op: ModuleType
 
 def git_run(root: Path, *args: str) -> str:
     env = {
@@ -176,10 +202,12 @@ class FakeOps:
             authority.key, fixture.host_identity.ssh_forward_host,
             fixture.host_identity.ssh_forward_port,
         )
-        observations = (fixture.observation(), fixture.observation(),
-                        fixture.observation(stopped=True))
+        observations: tuple[
+            HostObservationType | None, HostObservationType | None, HostObservationType | None,
+        ] = (fixture.observation(), fixture.observation(),
+             fixture.observation(stopped=True))
         if self.mode == "restart-epoch-drift":
-            observations = (observations[0], replace(observations[1], restart_epoch=5),
+            observations = (observations[0], replace(fixture.observation(), restart_epoch=5),
                             observations[2])
         if self.mode == "isolation-unknown":
             observations = (observations[0], observations[1], None)
