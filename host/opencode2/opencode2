@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+# OpenCode V2 Host launcher. Does not share OpenCode V1 state, service or config.
+set -euo pipefail
+
+if [[ -z "${HOME:-}" || "$HOME" != /* ]]; then
+  printf 'opencode2: HOME must be an absolute path\n' >&2
+  exit 64
+fi
+
+version='2.3.2'
+cli="$HOME/.local/opt/opencode-v2-$version/node_modules/.bin/opencode"
+if [[ ! -x "$cli" || -L "$cli" && ! -e "$cli" ]]; then
+  printf 'opencode2: V2 executable missing; run host/opencode2/install.sh --install\n' >&2
+  exit 69
+fi
+
+# The shared service and upgrade/uninstall operations can cross host version
+# boundaries. The launcher deliberately accepts neither service commands nor
+# an explicit remote/shared server connection.
+case "${1:-}" in
+  upgrade|uninstall|service)
+    printf 'opencode2: %s is disabled in the coexistence launcher\n' "$1" >&2
+    exit 64
+    ;;
+esac
+for arg in "$@"; do
+  case "$arg" in
+    --server|--server=*|--standalone)
+      printf 'opencode2: server flags are managed by the coexistence launcher\n' >&2
+      exit 64
+      ;;
+  esac
+done
+
+case "${OPENCODE2_ALLOW_PROJECT_CONFIG:-0}" in
+  0|1) ;;
+  *) printf 'opencode2: OPENCODE2_ALLOW_PROJECT_CONFIG must be 0 or 1\n' >&2; exit 64 ;;
+esac
+
+# Suppress inherited OpenCode-specific overrides that could redirect writes to
+# the V1 database or config. Provider environment credentials are *not* scrubbed.
+unset OPENCODE_DB OPENCODE_CONFIG OPENCODE_CONFIG_DIR OPENCODE_CONFIG_CONTENT
+unset OPENCODE_SERVER_HOSTNAME OPENCODE_SERVER_PORT OPENCODE_SERVER_PASSWORD
+
+export XDG_CONFIG_HOME="$HOME/.config/opencode-v2"
+export XDG_DATA_HOME="$HOME/.local/share/opencode-v2"
+export XDG_CACHE_HOME="$HOME/.cache/opencode-v2"
+export XDG_STATE_HOME="$HOME/.local/state/opencode-v2"
+export OPENCODE_DISABLE_AUTOUPDATE=1
+export OPENCODE_DISABLE_CLAUDE_CODE=1
+
+# Project config, local plugins and project AGENTS.md are ignored by default;
+# users may opt in when they have inspected the repository configuration.
+if [[ "${OPENCODE2_ALLOW_PROJECT_CONFIG:-0}" == 1 ]]; then
+  unset OPENCODE_DISABLE_PROJECT_CONFIG
+else
+  export OPENCODE_DISABLE_PROJECT_CONFIG=1
+fi
+
+# A dedicated private server avoids attaching to the V2 shared background
+# service (and, potentially, a V1 server from an existing installation).
+exec "$cli" --standalone "$@"
