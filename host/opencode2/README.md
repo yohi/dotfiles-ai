@@ -277,3 +277,43 @@ Official docs:
 - https://opencode.ai/docs/cli
 - https://opencode.ai/docs/cli/providers
 - https://github.com/anomalyco/opencode/releases/tag/v2.3.2
+
+## Explicit all-environment SSOT sync
+
+Use one command from the repository root after editing `apm.yml`.
+Nothing runs on a timer or at OpenCode startup:
+
+```bash
+make check-apm-all  # read-only plan, manifest validation and Host V2 checks
+make sync-apm-all   # explicit apply to enabled/existing environments
+```
+
+The runner reuses existing Make/APM generators instead of introducing
+independent platform configs. Its current routing:
+
+- Root APM `targets` (`opencode`, `codex`): install/compile, skill adapters,
+  generated instructions and commands, then V1 and Codex host bindings
+- Existing Claude Code profile: Claude user-scope APM MCP/settings sync
+- Existing Antigravity profile: explicit Antigravity APM target sync
+- Gemini CLI: only if explicitly included in root `targets` and already
+  configured; the current disabled Gemini integration stays off
+- Existing Host OpenCode V2: model/provider sync and APM MCP/skill/command
+  snapshot sync, with Owner-selected MCP `disabled` flags preserved
+- OC2 Sandboxes: live runtime explicitly excluded; require separate Owner
+  approval and runtime-specific acceptance for any changed Sandbox
+
+New MCP names remain **disabled by default**. The shared `cf-mcp-portal`
+remains disabled by policy. The sync does not copy credentials, install
+binaries, pull Git, toggle disabled features, or modify running Sandboxes.
+If a generated tracked file has local edits, the preflight stops before any
+apply steps. Existing user changes in unrelated working-tree paths are
+not reset or stashed.
+
+This is **per-step safe stopping**, not a transaction across all agents.
+On a failure, it prints the failed step and how many subsequent steps were
+not run; previously completed steps remain applied. A `CHECK_PASS` does
+not prove remote APM resolution, authentication, MCP connection, model
+inference, or real Sandbox acceptance. Review any `SKIPPED` entries:
+a command cannot silently claim that an unavailable or disabled
+environment was synchronized. If required tools or dependencies are
+missing, the command stops instead of installing them implicitly.

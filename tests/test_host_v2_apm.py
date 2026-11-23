@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import hashlib
+import hashlib
 import os
 from pathlib import Path
 import subprocess
@@ -141,6 +142,24 @@ class APMHostV2Tests(unittest.TestCase):
         self.assertEqual(self.run_cli('--apply').returncode,0)
         result = self.run_cli('--apply')
         self.assertEqual(result.returncode,0,result.stderr)
+
+    def test_resync_preserves_confirmed_enabled_mcp(self):
+        self.assertEqual(self.run_cli('--apply').returncode, 0)
+        obj = json.loads(self.config.read_text())
+        obj['mcp']['servers']['example']['disabled'] = False
+        self.config.write_text(json.dumps(obj))
+        state_path = self.config.parent / 'apm-host-sync-state.json'
+        state = json.loads(state_path.read_text())
+        state['mcp_sha256'] = hashlib.sha256(json.dumps(
+            obj['mcp']['servers'], sort_keys=True, separators=(',', ':')
+        ).encode()).hexdigest()
+        state_path.write_text(json.dumps(state))
+        result = self.run_cli('--apply')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        updated = json.loads(self.config.read_text())
+        self.assertFalse(updated['mcp']['servers']['example']['disabled'])
+        self.assertTrue(updated['mcp']['servers']['codegraph']['disabled'])
+        self.assertEqual(self.global_v1.read_text(), 'sentinel-v1')
 
     def test_modified_mcp_is_rejected(self):
         self.assertEqual(self.run_cli('--apply').returncode,0)

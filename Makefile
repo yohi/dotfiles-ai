@@ -57,3 +57,12 @@ sync-agents-run: sync-codex-apm-seed
 	@$(MAKE) setup-opencode
 	@$(MAKE) sync-agents-core
 	@$(MAKE) index-skillport
+
+# Explicit SSOT convergence for configured host environments. No automatic
+# startup/watch sync, CLI upgrades, git pull, or live Sandbox changes.
+.PHONY: check-apm-all sync-apm-all
+check-apm-all: ## apm.yml -> 全環境の同期計画と安全チェック（書込みなし）
+	@uv run --no-project --with PyYAML python _scripts/sync_apm_all.py --check
+
+sync-apm-all: ## apm.yml -> 有効・設定済み全Host環境へ明示同期
+	@uv run --no-project --with PyYAML python _scripts/sync_apm_all.py --apply

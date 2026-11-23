@@ -287,7 +287,18 @@ def apply(apm: str, home: Path) -> None:
                 stop("invalid APM MCP server declaration")
             if settings.get("type") not in ("local", "remote"):
                 stop(f"unsupported MCP type in APM output: {name}")
-            servers[name] = {**settings, "disabled": True}
+            # Preserve the Owner-selected state of previously deployed MCPs.
+            # APM owns executable/transport/args; resync never resets choices.
+            previous = old_servers.get(name)
+            if previous is not None and not isinstance(previous, dict):
+                stop(f"invalid previously deployed MCP server: {name}")
+            disabled = previous.get("disabled", True) if previous is not None else True
+            if not isinstance(disabled, bool):
+                stop(f"invalid MCP disabled state: {name}")
+            # Source documents a strict hold on the shared Cloudflare Portal.
+            if name == "cf-mcp-portal":
+                disabled = True
+            servers[name] = {**settings, "disabled": disabled}
         # Existing user-defined V2 settings are retained; imported tools are
         # disabled until the human owner explicitly chooses which to activate.
         config["mcp"] = {**mcp, "servers": servers}
