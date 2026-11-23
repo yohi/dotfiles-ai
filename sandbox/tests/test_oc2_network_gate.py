@@ -70,6 +70,16 @@ class PolicyParserTests(unittest.TestCase):
         with self.assertRaises(gate.NetworkGateError):
             gate.validate_policy_listing(json.dumps(value), SANDBOX, 'before')
 
+    def test_rejects_non_string_active_resource_type_without_type_error(self):
+        for resource_type in (None, 7, [], {}):
+            value = json.loads(json.dumps(POLICY_BEFORE))
+            value['rules'].append({
+                'scope': 'global', 'resource_type': resource_type, 'status': 'active',
+            })
+            with self.subTest(resource_type=resource_type), \
+                    self.assertRaises(gate.NetworkGateError):
+                gate.validate_policy_listing(json.dumps(value), SANDBOX, 'before')
+
     def test_allow_listing_must_bind_exact_sandbox_host_port_and_tcp(self):
         value = json.loads(json.dumps(POLICY_BEFORE))
         value['rules'].insert(0, {
@@ -173,7 +183,7 @@ class DedicatedDaemonTests(unittest.TestCase):
             gate.sandbox_state('Name: task-sandbox\nStatus: unknown\n', 'task-sandbox')
 
     def test_runner_pins_app_name_on_every_sbx_invocation(self):
-        runner = oc2.Runner('tester', app_name='oc2-isolated')
+        runner = oc2.Runner(oc2.getpass.getuser(), app_name='oc2-isolated')
         with patch.object(oc2.subprocess, 'run', return_value=oc2.subprocess.CompletedProcess(
                 ['sbx'], 0, 'ok', '')) as run:
             runner.sbx('policy', 'ls', '--json', capture=True)

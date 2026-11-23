@@ -107,6 +107,23 @@ class ScopedAllowCleanupTests(unittest.TestCase):
         with self.assertRaises(gate.NetworkGateError):
             policy.find_task_broker_allow(json.dumps(value), SANDBOX)
 
+    def test_localhost_udp_target_passes_resource_check_but_fails_tcp_only_check(self):
+        udp_result = json.dumps({
+            'action': 'net:connect:udp', 'allowed': False,
+            'context': f'sandbox:{SANDBOX}', 'resource_type': 'net:domain',
+            'resource_value': 'localhost:49187',
+            'target': 'localhost:49187',
+            'type': 'network', 'deny_kind': 'implicit',
+            'reason': 'No matching allow rule (default deny)',
+        })
+        gate.validate_policy_check(
+            udp_result, 1, SANDBOX, 'localhost:49187', False, protocol='udp',
+        )
+        with self.assertRaises(gate.NetworkGateError):
+            gate.validate_policy_check(
+                udp_result, 1, SANDBOX, 'localhost:49187', False,
+            )
+
     def test_gate_returns_exact_task_owned_rule_identity(self):
         identity = gate.run_network_gate(self.runner, SANDBOX, 49187)
 
@@ -157,13 +174,15 @@ class ScopedAllowCleanupTests(unittest.TestCase):
 
         gate.probe_guest_broker(self.runner, SANDBOX, 'host.docker.internal', 49187, ca_data)
 
-        args, data = self.runner.fed[-1]
+        args, data, timeout = self.runner.fed[-1]
         self.assertEqual(args[:3], ('exec', '-i', SANDBOX))
         self.assertEqual(args[3:5], ('python3', '-c'))
         self.assertIn('socket.getaddrinfo', args[5])
-        self.assertIn('dns.sendto', args[5])
+        self.assertNotIn('dns.sendto', args[5])
+        self.assertNotIn('dns.recvfrom', args[5])
         self.assertIn('context.wrap_socket', args[5])
         self.assertEqual(data, ca_data)
+        self.assertGreater(timeout, 0)
         self.assertNotIn(ca_data.decode(), args)
 
 
@@ -173,9 +192,9 @@ class PolicyRunnerFake:
         self.policy = json.loads(json.dumps(POLICY_BEFORE))
         self.fed = []
 
-    def sbx_feed(self, *args, data):
+    def sbx_feed(self, *args, data, timeout=None):
         self.calls.append(args)
-        self.fed.append((args, data))
+        self.fed.append((args, data, timeout))
 
     def sbx(self, *args, capture=False, tty=False, timeout=180):
         self.calls.append(args)

@@ -16,7 +16,9 @@ class PolicyRunner(Protocol):
 
     def sbx_result(self, *args: str, timeout: int | None = 180) -> tuple[int, str]: ...
 
-    def sbx_feed(self, *args: str, data: bytes) -> None: ...
+    def sbx_feed(
+        self, *args: str, data: bytes, timeout: int | None = None,
+    ) -> None: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -71,6 +73,10 @@ def validate_policy_listing(
     scoped: list[dict[str, JsonValue]] = []
     for rule in rules:
         resource_type = rule.get('resource_type')
+        if not isinstance(resource_type, str):
+            if rule.get('status') == 'active':
+                raise NetworkGateError('daemon policy contains an unknown active rule')
+            continue
         if resource_type not in {'network', 'filesystem:read', 'filesystem:write'}:
             if rule.get('status') == 'active':
                 raise NetworkGateError('daemon policy contains an unknown active rule')

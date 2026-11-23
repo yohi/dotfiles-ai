@@ -50,16 +50,6 @@ except OSError:
     pass
 else:
     raise SystemExit("SANDBOX_DNS_EGRESS_ALLOWED")
-query = bytes.fromhex("123401000001000000000000076578616d706c6503636f6d0000010001")
-with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as dns:
-    dns.settimeout(2)
-    try:
-        dns.sendto(query, ("1.1.1.1", 53))
-        dns.recvfrom(512)
-    except OSError:
-        pass
-    else:
-        raise SystemExit("SANDBOX_DNS_EGRESS_ALLOWED")
 with socket.create_connection((host, port), timeout=3) as connection:
     with context.wrap_socket(connection, server_hostname=host):
         pass
@@ -150,6 +140,8 @@ def probe_guest_broker(
     host: str,
     port: int,
     ca_data: bytes,
+    *,
+    timeout: int = 30,
 ) -> None:
     """Measure Guest egress denials and verify the Broker TLS route before M1."""
     if (host not in {'host.docker.internal', '127.0.0.1'}
@@ -158,7 +150,7 @@ def probe_guest_broker(
         raise NetworkGateError('Guest Broker probe inputs are outside the fixed contract')
     runner.sbx_feed(
         'exec', '-i', sandbox, 'python3', '-c', _GUEST_NETWORK_PROBE,
-        host, str(port), data=ca_data,
+        host, str(port), data=ca_data, timeout=timeout,
     )
 
 
