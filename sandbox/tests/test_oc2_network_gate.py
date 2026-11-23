@@ -71,7 +71,8 @@ class PolicyParserTests(unittest.TestCase):
             gate.validate_policy_listing(json.dumps(value), SANDBOX, 'before')
 
     def test_rejects_non_string_active_resource_type_without_type_error(self):
-        for resource_type in (None, 7, [], {}):
+        resource_types: tuple[object, ...] = (None, 7, [], {})
+        for resource_type in resource_types:
             value = json.loads(json.dumps(POLICY_BEFORE))
             value['rules'].append({
                 'scope': 'global', 'resource_type': resource_type, 'status': 'active',
