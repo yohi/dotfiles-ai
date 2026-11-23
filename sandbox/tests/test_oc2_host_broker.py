@@ -1267,8 +1267,11 @@ class DedicatedDaemonCleanupTests(unittest.TestCase):
             self.calls.append(args)
             if args[:2] == ('daemon', 'status'):
                 state = 'running' if self.status == 'running' else 'stopped'
+                state_home = pathlib.Path(os.environ.get(
+                    'XDG_STATE_HOME', str(pathlib.Path.home() / '.local' / 'state'),
+                )).expanduser()
                 socket_path = oc2_network_gate.expected_socket_path(
-                    'oc2-env004-isolation', pathlib.Path.home() / '.local' / 'state',
+                    'oc2-env004-isolation', state_home,
                 )
                 suffix = '' if state == 'running' else ' (not connected)'
                 return f'Status: {state}\nSocket: {socket_path}{suffix}\n'
