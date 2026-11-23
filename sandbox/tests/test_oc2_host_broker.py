@@ -1474,6 +1474,19 @@ class VerifiedCliBinaryTests(unittest.TestCase):
 
 
 class LocalCliArchiveTests(unittest.TestCase):
+    def setUp(self):
+        self.archive_root_context = tempfile.TemporaryDirectory()
+        self.archive_root = pathlib.Path(self.archive_root_context.name) / 'cli-archives'
+        self.archive_root.mkdir(mode=0o700)
+        self.archive_root_patch = patch.object(
+            oc2, 'CLI_ARCHIVE_DIR', self.archive_root, create=True,
+        )
+        self.archive_root_patch.start()
+
+    def tearDown(self):
+        self.archive_root_patch.stop()
+        self.archive_root_context.cleanup()
+
     def verified_archive(self) -> pathlib.Path:
         for candidate in pathlib.Path(tempfile.gettempdir()).rglob('opencode-linux-x64.tar.gz'):
             try:
@@ -1487,8 +1500,38 @@ class LocalCliArchiveTests(unittest.TestCase):
             except OSError:
                 continue
             if digest.hexdigest() == oc2.CLI_ASSET_SHA256:
-                return candidate
+                cached = self.archive_root / 'opencode-linux-x64.tar.gz'
+                shutil.copyfile(candidate, cached)
+                cached.chmod(0o600)
+                return cached
         self.skipTest('no locally cached OpenCode archive matches the pinned size and SHA-256')
+
+    def test_local_archive_outside_dedicated_archive_directory_is_rejected(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            source = pathlib.Path(temporary) / 'opencode-linux-x64.tar.gz'
+            source.write_bytes(b'outside the trusted archive directory')
+            destination = self.archive_root / 'cli'
+            destination.mkdir(mode=0o700)
+            with self.assertRaisesRegex(oc2.Stop, 'outside the dedicated archive directory'):
+                oc2.download_verified_cli(destination, local_archive=source)
+
+    def test_local_archive_parent_traversal_is_rejected(self):
+        outside = self.archive_root.parent / 'outside.tar.gz'
+        outside.write_bytes(b'not an archive')
+        source = self.archive_root / '..' / outside.name
+        destination = self.archive_root / 'cli'
+        destination.mkdir(mode=0o700)
+        with self.assertRaisesRegex(oc2.Stop, 'outside the dedicated archive directory'):
+            oc2.download_verified_cli(destination, local_archive=source)
+
+    def test_local_archive_directory_must_be_private(self):
+        self.archive_root.chmod(0o755)
+        source = self.archive_root / 'opencode-linux-x64.tar.gz'
+        source.write_bytes(b'not an archive')
+        destination = self.archive_root / 'cli'
+        destination.mkdir(mode=0o700)
+        with self.assertRaisesRegex(oc2.Stop, 'archive directory is unsafe'):
+            oc2.download_verified_cli(destination, local_archive=source)
 
     def test_verified_local_archive_extracts_without_curl_or_network(self):
         archive = self.verified_archive()
@@ -1525,39 +1568,36 @@ class LocalCliArchiveTests(unittest.TestCase):
             self.assertIn(oc2.CLI_ASSET_URL, run.call_args.args[0])
 
     def test_invalid_local_archive_fails_without_curl_fallback(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            source = pathlib.Path(temporary) / 'wrong.tar.gz'
-            source.write_bytes(b'not the pinned archive')
-            destination = pathlib.Path(temporary) / 'cli'
-            destination.mkdir(mode=0o700)
-            with patch.object(oc2.shutil, 'which', side_effect=AssertionError('curl lookup forbidden')), \
-                    patch.object(oc2.subprocess, 'run', side_effect=AssertionError('network forbidden')):
-                with self.assertRaisesRegex(oc2.Stop, 'size or type mismatch'):
-                    oc2.download_verified_cli(destination, local_archive=source)
+        source = self.archive_root / 'wrong.tar.gz'
+        source.write_bytes(b'not the pinned archive')
+        destination = self.archive_root / 'cli'
+        destination.mkdir(mode=0o700)
+        with patch.object(oc2.shutil, 'which', side_effect=AssertionError('curl lookup forbidden')), \
+                patch.object(oc2.subprocess, 'run', side_effect=AssertionError('network forbidden')):
+            with self.assertRaisesRegex(oc2.Stop, 'size or type mismatch'):
+                oc2.download_verified_cli(destination, local_archive=source)
 
     def test_local_archive_sha_mismatch_fails_without_curl_fallback(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            source = pathlib.Path(temporary) / 'wrong-hash.tar.gz'
-            with source.open('wb') as archive_file:
-                archive_file.truncate(oc2.CLI_ASSET_SIZE)
-            destination = pathlib.Path(temporary) / 'cli'
-            destination.mkdir(mode=0o700)
-            with patch.object(oc2.shutil, 'which', side_effect=AssertionError('curl lookup forbidden')), \
-                    patch.object(oc2.subprocess, 'run', side_effect=AssertionError('network forbidden')):
-                with self.assertRaisesRegex(oc2.Stop, 'integrity verification failed'):
-                    oc2.download_verified_cli(destination, local_archive=source)
+        source = self.archive_root / 'wrong-hash.tar.gz'
+        with source.open('wb') as archive_file:
+            archive_file.truncate(oc2.CLI_ASSET_SIZE)
+        destination = self.archive_root / 'cli'
+        destination.mkdir(mode=0o700)
+        with patch.object(oc2.shutil, 'which', side_effect=AssertionError('curl lookup forbidden')), \
+                patch.object(oc2.subprocess, 'run', side_effect=AssertionError('network forbidden')):
+            with self.assertRaisesRegex(oc2.Stop, 'integrity verification failed'):
+                oc2.download_verified_cli(destination, local_archive=source)
 
     def test_symlinked_local_archive_is_rejected_without_curl_fallback(self):
         archive = self.verified_archive()
-        with tempfile.TemporaryDirectory() as temporary:
-            source = pathlib.Path(temporary) / 'linked.tar.gz'
-            source.symlink_to(archive)
-            destination = pathlib.Path(temporary) / 'cli'
-            destination.mkdir(mode=0o700)
-            with patch.object(oc2.shutil, 'which', side_effect=AssertionError('curl lookup forbidden')), \
-                    patch.object(oc2.subprocess, 'run', side_effect=AssertionError('network forbidden')):
-                with self.assertRaises(oc2.Stop):
-                    oc2.download_verified_cli(destination, local_archive=source)
+        source = self.archive_root / 'linked.tar.gz'
+        source.symlink_to(archive)
+        destination = self.archive_root / 'cli'
+        destination.mkdir(mode=0o700)
+        with patch.object(oc2.shutil, 'which', side_effect=AssertionError('curl lookup forbidden')), \
+                patch.object(oc2.subprocess, 'run', side_effect=AssertionError('network forbidden')):
+            with self.assertRaises(oc2.Stop):
+                oc2.download_verified_cli(destination, local_archive=source)
 
     def test_relative_local_archive_path_is_rejected_without_curl_fallback(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -1570,27 +1610,26 @@ class LocalCliArchiveTests(unittest.TestCase):
 
     def test_local_archive_changed_during_copy_is_rejected(self):
         cached = self.verified_archive()
-        with tempfile.TemporaryDirectory() as temporary:
-            source = pathlib.Path(temporary) / 'mutable.tar.gz'
-            shutil.copyfile(cached, source)
-            destination = pathlib.Path(temporary) / 'cli'
-            destination.mkdir(mode=0o700)
-            original_read = os.read
-            reads = 0
+        source = self.archive_root / 'mutable.tar.gz'
+        shutil.copyfile(cached, source)
+        destination = self.archive_root / 'cli'
+        destination.mkdir(mode=0o700)
+        original_read = os.read
+        reads = 0
 
-            def read_and_change(fd, size):
-                nonlocal reads
-                chunk = original_read(fd, size)
-                reads += 1
-                if reads == 1:
-                    os.utime(source, None, follow_symlinks=False)
-                return chunk
+        def read_and_change(fd, size):
+            nonlocal reads
+            chunk = original_read(fd, size)
+            reads += 1
+            if reads == 1:
+                os.utime(source, None, follow_symlinks=False)
+            return chunk
 
-            with patch.object(oc2.os, 'read', side_effect=read_and_change), \
-                    patch.object(oc2.shutil, 'which', side_effect=AssertionError('curl lookup forbidden')), \
-                    patch.object(oc2.subprocess, 'run', side_effect=AssertionError('network forbidden')):
-                with self.assertRaisesRegex(oc2.Stop, 'changed during verification'):
-                    oc2.download_verified_cli(destination, local_archive=source)
+        with patch.object(oc2.os, 'read', side_effect=read_and_change), \
+                patch.object(oc2.shutil, 'which', side_effect=AssertionError('curl lookup forbidden')), \
+                patch.object(oc2.subprocess, 'run', side_effect=AssertionError('network forbidden')):
+            with self.assertRaisesRegex(oc2.Stop, 'changed during verification'):
+                oc2.download_verified_cli(destination, local_archive=source)
 
     def test_invalid_archive_member_is_rejected_after_fixed_hash_check(self):
         archive = self.verified_archive()

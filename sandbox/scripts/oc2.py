@@ -62,6 +62,9 @@ CLI_ASSET_URL: Final[str] = (
 CLI_ASSET_SIZE: Final[int] = 119_196_162
 CLI_ASSET_SHA256: Final[str] = '09f44302c10fd036912f59c81fd1aef5df45dd06f649197f9dfc9bbe2a79614e'
 CLI_BINARY_SIZE: Final[int] = 252_713_136
+CLI_ARCHIVE_DIR: Final[pathlib.Path] = (
+    pathlib.Path.home() / '.cache' / 'oc2' / 'cli-archives'
+)
 CLI_REDIRECT_HOSTS: Final[frozenset[str]] = frozenset({
     'github.com',
     'release-assets.githubusercontent.com',
@@ -321,13 +324,30 @@ def opencode_cli_mixin_spec() -> bytes:
 
 
 def _copy_local_cli_archive(source: pathlib.Path, destination: pathlib.Path) -> None:
-    if not source.is_absolute() or any(path.is_symlink() for path in (source, *source.parents)):
+    if not source.is_absolute():
         raise Stop('local OpenCode archive path is unsafe')
+    archive_root = pathlib.Path(os.path.abspath(CLI_ARCHIVE_DIR))
+    source_path = pathlib.Path(os.path.abspath(source))
+    try:
+        source_path.relative_to(archive_root)
+    except ValueError:
+        raise Stop('local OpenCode archive is outside the dedicated archive directory') from None
+    if (any(path.is_symlink() for path in (archive_root, *archive_root.parents))
+            or any(path.is_symlink() for path in (source_path, *source_path.parents))):
+        raise Stop('local OpenCode archive path is unsafe')
+    try:
+        archive_root_info = archive_root.lstat()
+    except OSError:
+        raise Stop('dedicated local OpenCode archive directory is unavailable') from None
+    if (not stat.S_ISDIR(archive_root_info.st_mode)
+            or archive_root_info.st_uid != os.geteuid()
+            or stat.S_IMODE(archive_root_info.st_mode) != 0o700):
+        raise Stop('dedicated local OpenCode archive directory is unsafe')
     source_fd: int | None = None
     destination_fd: int | None = None
     try:
         source_fd = os.open(
-            source,
+            source_path,
             os.O_RDONLY | os.O_NOFOLLOW | getattr(os, 'O_CLOEXEC', 0),
         )
         before = os.fstat(source_fd)
@@ -354,9 +374,9 @@ def _copy_local_cli_archive(source: pathlib.Path, destination: pathlib.Path) -> 
             after.st_dev, after.st_ino, after.st_size,
             after.st_mtime_ns, after.st_ctime_ns,
         )
-        current_path = source.lstat()
+        current_path = source_path.lstat()
         if (not stat.S_ISREG(current_path.st_mode)
-                or any(path.is_symlink() for path in (source, *source.parents))):
+                or any(path.is_symlink() for path in (source_path, *source_path.parents))):
             raise Stop('local OpenCode archive path changed during verification')
         path_identity = (
             current_path.st_dev, current_path.st_ino, current_path.st_size,
@@ -2399,7 +2419,8 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument('--host-broker-artifacts', type=pathlib.Path,
                    help='trusted local oc-cf-aig-subscription checkout (never fetched)')
     p.add_argument('--host-broker-cli-archive', type=pathlib.Path,
-                   help='local verified OpenCode v2.2.5 Linux x64 archive (Host Broker only)')
+                   help='local verified OpenCode archive in ~/.cache/oc2/cli-archives '
+                        '(Host Broker only)')
     p.add_argument('--host-broker-prompt',
                    help='non-interactive prompt for `opencode run`; the TUI is not offered')
     p.add_argument('--host-broker-fixture-root',
