@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import pathlib
 import sys
 import tempfile
@@ -13,6 +15,27 @@ import oc2_workspace  # noqa: E402
 
 
 class WorkspaceSnapshotExclusionTests(unittest.TestCase):
+    def test_r1_manifest_created_before_basedpyright_exclusion_remains_decodable(self):
+        profile = oc2_workspace.profile_by_id('dotfiles-ai/workspace-safe-transfer/r1')
+        self.assertIsNotNone(profile)
+        content = b'legacy cache'
+        manifest = {
+            'schema': 'dotfiles-ai/oc2-workspace/v1',
+            'profile': 'dotfiles-ai/workspace-safe-transfer/r1',
+            'files': [{
+                'path': '.basedpyright/cache.bin',
+                'size': len(content),
+                'sha256': hashlib.sha256(content).hexdigest(),
+            }],
+        }
+
+        with tempfile.TemporaryDirectory() as temporary:
+            decoded = oc2_workspace.decode_manifest(
+                json.dumps(manifest).encode(), pathlib.Path(temporary),
+            )
+
+        self.assertEqual([entry.path for entry in decoded.files], ['.basedpyright/cache.bin'])
+
     def test_snapshot_excludes_local_justice_state(self):
         profile = oc2_workspace.profile_by_id('dotfiles-ai/workspace-safe-transfer/r2')
         self.assertIsNotNone(profile)
