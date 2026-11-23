@@ -186,8 +186,10 @@ class FsRunner:
         self.sandbox_name = 'oc2-dev'
         self.calls: list[tuple[str, ...]] = []
         self.fed: list[tuple[tuple[str, ...], bytes]] = []
+        self.sandbox_present = False
         self.after_cp: Callable[[pathlib.Path], None] | None = None
         self.fail_rm = False
+        self.create_timeout = False
         self.fail_cli_chmod = False
         self.cli_version = '2.2.5'
         self.downloaded_cli_archive: pathlib.Path | None = None
@@ -219,8 +221,19 @@ class FsRunner:
     def sbx(self, *args, capture=False, tty=False):
         self.calls.append(args)
         head = args[0]
+        if head == 'create' and self.create_timeout:
+            self.sandbox_present = True
+            raise oc2.SandboxCommandTimeout('create timed out')
+        if args[:2] == ('ls', '-q'):
+            return self.sandbox_name + '\n' if self.sandbox_present else ''
         if head == 'rm' and self.fail_rm:
             raise oc2.Stop('sandbox removal failed')
+        if head == 'rm':
+            self.sandbox_present = False
+            return ''
+        if head == 'create':
+            self.sandbox_present = True
+            return ''
         if head == 'version':
             return 'sbx v0.51.0'
         if len(args) >= 2 and args[0] == 'inspect' and args[1] == self.sandbox_name:
@@ -760,8 +773,10 @@ class RunHostBrokerTests(unittest.TestCase):
 
     def run_broker(self, *, artifacts=True, probe_ok=True, mode='m1', label='oc2-dev',
                    gate_failure=False, global_policy_failure=False,
-                   guest_probe_failure=False, cleanup_failure=False,
-                   sandbox='oc2-dev', runner_context=None):
+                   guest_probe_failure=False, guest_probe_timeout=False,
+                   cleanup_failure=False,
+                   sandbox='oc2-dev', runner_context=None, owner_failure=False,
+                   create_timeout=False):
         read_fd, write_fd = os.pipe()
         os.write(write_fd, (TOKEN + '\n').encode())
         os.close(write_fd)
@@ -771,6 +786,7 @@ class RunHostBrokerTests(unittest.TestCase):
             fixture_rel=None if mode == 'm1' else 'fixtures')
         ca_certificate = hb.BrokerCaCertificate(CA_DATA, CA_SHA256)
         self.runner.sandbox_name = sandbox
+        self.runner.create_timeout = create_timeout
         args = oc2.argparse.Namespace(
             sandbox=sandbox, host_broker_artifacts=self.tmp / 'src' if artifacts else None,
             host_broker_prompt='say hello', host_broker_ca_cert=self.tmp / 'ca.pem',
@@ -808,6 +824,8 @@ class RunHostBrokerTests(unittest.TestCase):
 
         def probe_guest(*_args):
             self.runner.calls.append(('GUEST_BROKER_TLS_PROBE',))
+            if guest_probe_timeout:
+                raise oc2.SandboxCommandTimeout('Guest Broker probe timed out')
             if guest_probe_failure:
                 raise oc2_network_gate.NetworkGateError('guest broker TLS probe failed')
 
@@ -825,6 +843,12 @@ class RunHostBrokerTests(unittest.TestCase):
                 raise oc2_network_gate.NetworkGateError('unsafe daemon policy')
 
         result_artifacts = verified()
+        owner_writer_patch = (
+            patch.object(
+                oc2, '_write_runner_sandbox_owner',
+                side_effect=oc2.Stop('owner receipt could not be written'),
+            ) if owner_failure else contextlib.nullcontext()
+        )
         environment = {}
         if runner_context is not None:
             environment = {
@@ -833,7 +857,7 @@ class RunHostBrokerTests(unittest.TestCase):
                 'OC2_ENV004_SANDBOX_NAME': sandbox,
                 'OC2_ENV004_APP_NAME': 'oc2-env004-isolation',
             }
-        with patch.object(oc2, 'Runner', return_value=self.runner), \
+        with owner_writer_patch, patch.object(oc2, 'Runner', return_value=self.runner), \
                 patch.object(oc2.shutil, 'which', return_value='/usr/bin/sbx'), \
                 patch.object(oc2_network_gate, 'verify_dedicated_daemon',
                              side_effect=verify_dedicated_daemon), \
@@ -858,6 +882,21 @@ class RunHostBrokerTests(unittest.TestCase):
                 self.assertEqual(self.runner.calls[-1], ('rm', 'oc2-dev'))
                 self.assertFalse(any(call[0] in {'exec', 'cp'} for call in self.runner.calls))
                 network_gate.assert_called_once()
+                return 1
+            if owner_failure:
+                with self.assertRaisesRegex(oc2.Stop, 'Sandbox was not removed'):
+                    oc2._run_host_broker(args, None, sel, ca_certificate)
+                self.assertFalse(any(call[0] == 'rm' for call in self.runner.calls))
+                return 1
+            if create_timeout:
+                with self.assertRaisesRegex(oc2.Stop, 'Sandbox was removed'):
+                    oc2._run_host_broker(args, None, sel, ca_certificate)
+                self.assertTrue(any(call[0] == 'rm' for call in self.runner.calls))
+                return 1
+            if guest_probe_timeout:
+                with self.assertRaises(oc2.SandboxCommandTimeout):
+                    oc2._run_host_broker(args, None, sel, ca_certificate)
+                self.assertTrue(any(call[0] == 'rm' for call in self.runner.calls))
                 return 1
             if global_policy_failure:
                 with self.assertRaisesRegex(oc2.Stop, 'unsafe daemon policy'):
@@ -916,6 +955,52 @@ class RunHostBrokerTests(unittest.TestCase):
         inspected = next(i for i, call in enumerate(self.runner.calls)
                          if call[:2] == ('inspect', sandbox))
         self.assertLess(created, inspected)
+
+    def test_runner_does_not_record_owner_without_both_create_intents(self):
+        run_id = 'a' * 32
+        sandbox = 'oc2-env004-m1-' + run_id
+        task_dir = self.tmp / 'runner-task-missing-intent'
+        evidence = task_dir / 'evidence'
+        evidence.mkdir(parents=True, mode=0o700)
+        task_dir.chmod(0o700)
+        marker = evidence / 'daemon-start.intent'
+        marker.write_bytes(b'OC2_ENV004_DAEMON_START_INTENT\n')
+        marker.chmod(0o600)
+
+        with patch.dict(os.environ, {
+            'OC2_ENV004_TASK_DIR': str(task_dir),
+            'OC2_ENV004_RUN_ID': run_id,
+            'OC2_ENV004_SANDBOX_NAME': sandbox,
+        }):
+            with self.assertRaises(oc2.HostBrokerCleanupPartial):
+                oc2._write_runner_sandbox_owner(sandbox)
+
+        self.assertFalse((evidence / 'sandbox-owned.intent').exists())
+
+    def test_create_timeout_records_proven_owner_for_cleanup_recovery(self):
+        run_id = 'a' * 32
+        sandbox = 'oc2-env004-m1-' + run_id
+        task_dir = self.tmp / 'runner-timeout-task'
+        evidence = task_dir / 'evidence'
+        evidence.mkdir(parents=True, mode=0o700)
+        task_dir.chmod(0o700)
+        for name, marker_bytes in (
+            ('daemon-start.intent', b'OC2_ENV004_DAEMON_START_INTENT\n'),
+            ('sandbox-create.intent', b'OC2_ENV004_SANDBOX_CREATE_INTENT\n'),
+        ):
+            marker = evidence / name
+            marker.write_bytes(marker_bytes)
+            marker.chmod(0o600)
+
+        self.assertEqual(self.run_broker(
+            sandbox=sandbox, label=sandbox, runner_context=task_dir,
+            create_timeout=True,
+        ), 1)
+
+        self.assertTrue((evidence / 'sandbox-owned.intent').is_file())
+
+    def test_owner_recording_failure_does_not_remove_unowned_sandbox(self):
+        self.assertEqual(self.run_broker(owner_failure=True), 1)
 
     def test_cli_archive_is_verified_before_daemon_and_policy_checks(self):
         self.assertEqual(self.run_broker(), 0)
@@ -998,6 +1083,9 @@ class RunHostBrokerTests(unittest.TestCase):
             call[0] == 'cp' and call[2].endswith(':/opt/oc2/bin/opencode')
             for call in self.runner.calls
         ))
+
+    def test_guest_broker_probe_timeout_remains_sandbox_command_timeout(self):
+        self.assertEqual(self.run_broker(guest_probe_timeout=True), 1)
 
     def test_existing_cli_file_is_not_overwritten(self):
         guest_cli = self.runner.local('/opt/oc2/bin/opencode')
@@ -1317,6 +1405,17 @@ class RunnerDaemonScopeTests(unittest.TestCase):
             self.assertEqual(runner.sbx('version', capture=True), 'v0.53.0')
         self.assertEqual(run.call_args.args[0], ['sbx', 'version'])
 
+    def test_runner_feed_timeout_is_converted_to_sandbox_command_timeout(self):
+        runner = oc2.Runner(oc2.getpass.getuser())
+        with patch.object(
+            oc2.subprocess, 'run',
+            side_effect=oc2.subprocess.TimeoutExpired(['sbx'], 7),
+        ) as run:
+            with self.assertRaises(oc2.SandboxCommandTimeout):
+                runner.sbx_feed('exec', 'sandbox-a', 'python3', data=b'ca', timeout=7)
+
+        self.assertEqual(run.call_args.kwargs['timeout'], 7)
+
 
 def oc2_host_broker_probe():
     return hb
@@ -1427,7 +1526,16 @@ class CliTests(unittest.TestCase):
         self.assertEqual(code, 0, err)
         self.assertIn('explicit Host Broker provider=oc-cf-aig model=gpt-6-luna mode=m1', out)
         self.assertIn('no TTY', out)
+        self.assertIn('fixed local archive', out)
+        self.assertIn('network gate', out)
+        self.assertIn('copy the verified CLI directly into the Guest', out)
+        self.assertNotIn('download and SHA-256 verify', out)
         self.assertNotIn('ocb_', out + err)
+
+    def test_cleanup_only_rejects_dry_run(self):
+        code, _out, err = self.run_main('--host-broker-cleanup-only', '--dry-run')
+        self.assertEqual(code, 2)
+        self.assertIn('dry-run', err)
 
     def test_dry_run_without_opt_in_has_no_broker_plan(self):
         code, out, _err = self.run_main(
@@ -1437,6 +1545,34 @@ class CliTests(unittest.TestCase):
 
 
 class VerifiedCliBinaryTests(unittest.TestCase):
+    def test_fifo_local_archive_is_opened_nonblocking_then_rejected(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            archive_root = root / '.cache/oc2/cli-archives'
+            archive_root.mkdir(parents=True, mode=0o700)
+            archive_root.chmod(0o700)
+            fifo = archive_root / 'opencode-linux-x64.tar.gz'
+            os.mkfifo(fifo)
+            destination = root / 'copy.tar.gz'
+            original_open = oc2.os.open
+            flags_seen = []
+
+            def checked_open(path, flags, *args, **kwargs):
+                if path == oc2.CLI_ARCHIVE_NAME:
+                    flags_seen.append(flags)
+                    if not flags & os.O_NONBLOCK:
+                        raise AssertionError('archive open omitted O_NONBLOCK')
+                return original_open(path, flags, *args, **kwargs)
+
+            with patch.object(oc2, 'CLI_ARCHIVE_DIR', str(archive_root)), \
+                    patch.object(oc2, 'CLI_ARCHIVE_NAME', fifo.name), \
+                    patch.object(oc2.os, 'open', side_effect=checked_open):
+                with self.assertRaises(oc2.Stop):
+                    oc2._copy_local_cli_archive(fifo, destination)
+
+            self.assertTrue(flags_seen)
+            self.assertTrue(flags_seen[0] & os.O_NONBLOCK)
+
     def test_hashes_only_the_private_fixed_size_regular_cli(self):
         with tempfile.TemporaryDirectory() as temporary:
             binary = pathlib.Path(temporary) / 'opencode'

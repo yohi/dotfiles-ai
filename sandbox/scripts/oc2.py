@@ -359,7 +359,7 @@ def _copy_local_cli_archive(source: pathlib.Path, destination: pathlib.Path) -> 
     try:
         source_fd = os.open(
             CLI_ARCHIVE_NAME,
-            os.O_RDONLY | os.O_NOFOLLOW | getattr(os, 'O_CLOEXEC', 0),
+            os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | getattr(os, 'O_CLOEXEC', 0),
             dir_fd=archive_root_fd,
         )
         before = os.fstat(source_fd)
@@ -863,14 +863,18 @@ class Runner:
             raise Stop('sbx command could not complete') from exc
         return result.returncode, result.stdout
 
-    def sbx_feed(self, *args: str, data: bytes) -> None:
+    def sbx_feed(
+        self, *args: str, data: bytes, timeout: int | None = None,
+    ) -> None:
         """Run sbx with ``data`` on stdin only (never argv/env); no TTY, no capture."""
         command = self._command(*args)
         if self.dry_run:
             print('PLAN: ' + ' '.join(command[:5]) + ' [...]')
             return
         try:
-            result = subprocess.run(command, input=data, check=False, timeout=None)
+            result = subprocess.run(command, input=data, check=False, timeout=timeout)
+        except subprocess.TimeoutExpired as exc:
+            raise SandboxCommandTimeout('sbx command could not complete') from exc
         except OSError as exc:
             raise Stop('sbx command could not complete') from exc
         if result.returncode != 0:
@@ -1851,8 +1855,12 @@ def _write_runner_sandbox_owner(sandbox: str) -> None:
             or evidence_info.st_uid != os.geteuid()
             or stat.S_IMODE(evidence_info.st_mode) != 0o700):
         raise Stop('Runner Task evidence directory is unsafe')
-    _runner_marker(task_dir, 'daemon-start.intent')
-    _runner_marker(task_dir, 'sandbox-create.intent')
+    daemon_start_intent = _runner_marker(task_dir, 'daemon-start.intent')
+    sandbox_create_intent = _runner_marker(task_dir, 'sandbox-create.intent')
+    if not (daemon_start_intent and sandbox_create_intent):
+        raise HostBrokerCleanupPartial(
+            'Task Sandbox ownership intents are missing',
+        )
     payload = f'run_id={run_id}\nsandbox={sandbox}\n'.encode('ascii')
     path = evidence_dir / 'sandbox-owned.intent'
     descriptor: int | None = None
@@ -2260,14 +2268,29 @@ def _run_host_broker(
             raise Stop('Sandbox name already exists; refusing to reuse or rebuild it')
         print('OC2: creating mountless shell Sandbox ' + args.sandbox
               + ' (no Kit, credential Mixin, or direct-provider egress allowance)')
-        runner.sbx(
-            'create', '--pull', 'never', '--name', args.sandbox,
-            HOST_BROKER_SHELL_WORKLOAD,
-        )
+        sandbox_owned = False
         try:
+            try:
+                runner.sbx(
+                    'create', '--pull', 'never', '--name', args.sandbox,
+                    HOST_BROKER_SHELL_WORKLOAD,
+                )
+            except SandboxCommandTimeout:
+                # v0.53.0 cancellation is prompt, but a hard subprocess timeout
+                # cannot prove whether the daemon registered the named Sandbox.
+                # Claim ownership only after an inventory and exact identity readback.
+                names = runner.sbx('ls', '-q', capture=True).splitlines()
+                if args.sandbox not in names:
+                    raise
+                inspect = runner.sbx('inspect', args.sandbox, capture=True)
+                oc2_network_gate.validate_sandbox_identity(inspect, args.sandbox)
+                _write_runner_sandbox_owner(args.sandbox)
+                sandbox_owned = True
+                raise
             inspect = runner.sbx('inspect', args.sandbox, capture=True)
             oc2_network_gate.validate_sandbox_identity(inspect, args.sandbox)
             _write_runner_sandbox_owner(args.sandbox)
+            sandbox_owned = True
             created_policy = runner.sbx('policy', 'ls', '--json', capture=True)
             oc2_network_gate.validate_policy_listing(
                 created_policy, args.sandbox, 'before',
@@ -2304,14 +2327,23 @@ def _run_host_broker(
             )
         except (oc2_network_gate.NetworkGateError, oc2_host_broker.HostBrokerError,
                 Stop, OSError) as exc:
+            error_type = (
+                SandboxCommandTimeout
+                if isinstance(exc, SandboxCommandTimeout) else Stop
+            )
+            if not sandbox_owned:
+                raise error_type(
+                    'Host Broker post-create step failed; Sandbox was not removed because '
+                    f'ownership was not recorded: {exc}'
+                ) from exc
             try:
                 runner.sbx('rm', args.sandbox)
             except Stop as cleanup_error:
-                raise Stop(
+                raise error_type(
                     f'Host Broker post-create step failed; owned Sandbox cleanup also failed: '
                     f'{cleanup_error}'
                 ) from cleanup_error
-            raise Stop(
+            raise error_type(
                 f'Host Broker post-create step failed; owned Sandbox was removed: {exc}'
             ) from exc
     return 0
@@ -2448,6 +2480,9 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         if args.host_broker_cleanup_only:
+            if args.dry_run:
+                raise HostBrokerCleanupPartial(
+                    'Cleanup-only mode cannot be combined with --dry-run')
             cleanup_options = (
                 args.use_host_broker, args.host_broker_app_name,
                 args.sandbox != 'oc2-v2', args.allow_paid_inference,
@@ -2581,11 +2616,15 @@ def main(argv: list[str] | None = None) -> int:
                       'from a trusted local checkout (no fetch/install)')
             print('OC2 PLAN: workspace=' + str(workspace))
             print('OC2 PLAN: transfer only the verified Workspace Snapshot; no .git or OpenCode project config')
-            print('OC2 PLAN: Host-side verification, then stage the verified CLI in the Sandbox Kit')
-            print(
-                f'OC2 PLAN: download and SHA-256 verify @opencode/cli@{VERSION} on the Host; '
-                'bake it into the Sandbox Kit at /opt/oc2/bin/opencode'
-            )
+            if broker_selection is not None:
+                print('OC2 PLAN: verify the fixed local archive and SHA-256 pin; no HTTPS download')
+                print('OC2 PLAN: pass the network gate, then copy the verified CLI directly into the Guest')
+            else:
+                print('OC2 PLAN: Host-side verification, then stage the verified CLI in the Sandbox Kit')
+                print(
+                    f'OC2 PLAN: download and SHA-256 verify @opencode/cli@{VERSION} on the Host; '
+                    'bake it into the Sandbox Kit at /opt/oc2/bin/opencode'
+                )
             dry_repo = args.repo_root.resolve(strict=True)
             if not (dry_repo / 'apm.yml').is_file():
                 raise Stop('dotfiles-ai apm.yml not found')
