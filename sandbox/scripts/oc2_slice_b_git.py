@@ -173,14 +173,106 @@ def _checked_index(raw: bytes, oid_bytes: int) -> None:
             raise SliceBGitRejected("unknown Index extension")
 
 
+def _read_worktree_metadata(path: Path) -> bytes:
+    """Read one bounded regular admin file without following a final symlink."""
+    fd = None
+    try:
+        fd = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) |
+                     getattr(os, "O_NONBLOCK", 0))
+        info = os.fstat(fd)
+        if (not stat.S_ISREG(info.st_mode) or info.st_nlink != 1 or
+                info.st_uid != os.geteuid() or info.st_size > 4096):
+            raise SliceBGitRejected("unsupported registered worktree metadata")
+        data = os.read(fd, 4097)
+        if len(data) != info.st_size or len(data) > 4096:
+            raise SliceBGitRejected("registered worktree metadata changed")
+        return data
+    except OSError as exc:
+        raise SliceBGitRejected("registered worktree metadata unavailable") from exc
+    finally:
+        if fd is not None:
+            os.close(fd)
+
+
+def _check_registered_worktrees(gitdir: Path) -> None:
+    """Admit only live, bidirectionally linked Git worktree registrations.
+
+    Never repairs or prunes registrations. Main worktree HEAD/Index remains the
+    sole admitted baseline; linked worktrees have independent working trees.
+    """
+    registry = gitdir / "worktrees"
+    try:
+        root_info = registry.lstat()
+    except FileNotFoundError:
+        return
+    except OSError as exc:
+        raise SliceBGitRejected("worktree registration unavailable") from exc
+    if (not stat.S_ISDIR(root_info.st_mode) or
+            root_info.st_uid != os.geteuid() or root_info.st_mode & 0o022):
+        raise SliceBGitRejected("unsafe worktree registration directory")
+    try:
+        entries = sorted(registry.iterdir())
+    except OSError as exc:
+        raise SliceBGitRejected("worktree registration unavailable") from exc
+    if len(entries) > 32:
+        raise SliceBGitRejected("too many registered worktrees")
+    for entry in entries:
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}", entry.name):
+            raise SliceBGitRejected("unsupported registered worktree name")
+        try:
+            info = entry.lstat()
+        except OSError as exc:
+            raise SliceBGitRejected("worktree registration unavailable") from exc
+        if (not stat.S_ISDIR(info.st_mode) or
+                info.st_uid != os.geteuid() or info.st_mode & 0o022):
+            raise SliceBGitRejected("unsafe registered worktree directory")
+        if _read_worktree_metadata(entry / "commondir") != b"../..\n":
+            raise SliceBGitRejected("worktree common directory mismatch")
+        raw_path = _read_worktree_metadata(entry / "gitdir")
+        if (not raw_path.endswith(b"\n") or raw_path.count(b"\n") != 1 or
+                b"\x00" in raw_path or b"\r" in raw_path):
+            raise SliceBGitRejected("invalid linked worktree path")
+        try:
+            linked_gitfile = Path(raw_path[:-1].decode("utf-8"))
+        except UnicodeDecodeError as exc:
+            raise SliceBGitRejected("invalid linked worktree path encoding") from exc
+        if (not linked_gitfile.is_absolute() or linked_gitfile.name != ".git" or
+                os.path.normpath(str(linked_gitfile)) != str(linked_gitfile)):
+            raise SliceBGitRejected("noncanonical linked worktree path")
+        try:
+            # Reject aliases via symlinked ancestor directories, as well as
+            # missing/broken linked worktrees; no worktree repair is attempted.
+            if (linked_gitfile.parent.resolve(strict=True) != linked_gitfile.parent or
+                    linked_gitfile.parent == gitdir.parent):
+                raise SliceBGitRejected("linked worktree path is not independent")
+        except (OSError, RuntimeError) as exc:
+            raise SliceBGitRejected("linked worktree directory unavailable") from exc
+        expected = ("gitdir: " + str(entry) + "\n").encode("utf-8")
+        if _read_worktree_metadata(linked_gitfile) != expected:
+            raise SliceBGitRejected("linked worktree reverse reference mismatch")
+        # Reject partial administration directories before accepting the main
+        # worktree. A normal checked-out linked worktree has both files.
+        _read_worktree_metadata(entry / "HEAD")
+        # A legitimate linked Index may exceed the 4 KiB control-file bound.
+        # Only inspect its type/owner; its contents are not a Host baseline.
+        try:
+            index_info = (entry / "index").lstat()
+        except OSError as exc:
+            raise SliceBGitRejected("linked worktree Index unavailable") from exc
+        if (not stat.S_ISREG(index_info.st_mode) or index_info.st_nlink != 1 or
+                index_info.st_uid != os.geteuid()):
+            raise SliceBGitRejected("unsupported linked worktree Index")
+
+
 def _root_metadata(root: Path) -> tuple[Path, int]:
     """Validate ordinary repository topology and return its object-ID width."""
     resolved = root.resolve(strict=True)
     gitdir = resolved / ".git"
     if not gitdir.is_dir() or gitdir.is_symlink():
         raise SliceBGitRejected("only ordinary non-linked Git directory is supported")
-    if any((gitdir / p).exists() for p in ("shallow", "objects/info/alternates", "worktrees", "modules")):
+    if any((gitdir / p).exists() for p in ("shallow", "objects/info/alternates", "modules")):
         raise SliceBGitRejected("unsupported Git object/worktree topology")
+    _check_registered_worktrees(gitdir)
     cfg = _git(resolved, "config", "--local", "--no-includes", "--name-only", "--list", "-z")
     keys = [x.decode("ascii") for x in cfg.split(b"\x00") if x]
     if any(x not in _ALLOWED_CONFIG for x in keys):

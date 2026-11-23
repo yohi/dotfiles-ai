@@ -37,11 +37,14 @@ if TYPE_CHECKING:
         verify_bundle_manifest,
     )
     from sandbox.scripts.oc2_slice_b_image_guest import (
+        ExistingGuestImageRunner,
+        ExistingGuestImageVerificationRequest,
         GuestImageLoadRequest,
         GuestImageRunner,
         VerifiedImageAuthority,
         import_guest_image,
         is_verified_image_authority,
+        reverify_existing_guest_image,
     )
     from sandbox.scripts.oc2_slice_b_image_record import (
         ImagePin,
@@ -70,6 +73,8 @@ else:
         has_guest_authority_seal,
     )
     from oc2_slice_b_image import (
+        ExistingGuestImageRunner,
+        ExistingGuestImageVerificationRequest,
         GuestImageLoadRequest,
         GuestImageRunner,
         ImagePin,
@@ -77,6 +82,7 @@ else:
         VerifiedImageAuthority,
         _validate_pin,
         import_guest_image,
+        reverify_existing_guest_image,
         is_verified_image_authority,
     )
 
@@ -254,6 +260,18 @@ class GuestAuthorityVerificationRequest:
     archive_path: Path
     supervisor_image_root: Path
     docker_host: str
+
+
+@dataclass(frozen=True, slots=True)
+class ExistingGuestAuthorityVerificationRequest:
+    receipt_path: Path
+    expected_key: WriterSessionKey
+    expected_receipt_sha256: str
+    guest_baseline: GitBaseline
+    archive_path: Path
+    supervisor_image_root: Path
+    docker_host: str
+    expected_docker_daemon_id: str
 
 
 def _private_dir(path: Path) -> None:
@@ -760,6 +778,59 @@ def verify_guest_authority_from_host_record(
         runner,
     )
     return verify_guest_authority(verified_receipt, request.guest_baseline, verified_image)
+
+
+def verify_guest_authority_from_existing_image(
+    request: ExistingGuestAuthorityVerificationRequest,
+    runner: ExistingGuestImageRunner,
+) -> VerifiedGuestAuthority:
+    """Verify a Session receipt and guest baseline against trusted existing-image authority.
+
+    The daemon ID in ``request`` must be sourced from trusted Host/Session
+    state. Verification is read-only and performs no Docker Load. The result
+    binds the receipt, manifest, baseline, and pinned image for this check;
+    invalid or changed evidence raises ``SliceBSessionError`` or the wrapped
+    image verification error.
+    """
+    verified_receipt = verify_session_receipt(
+        request.receipt_path,
+        request.expected_key,
+        request.expected_receipt_sha256,
+    )
+    receipt_baseline = verified_receipt.receipt.baseline
+    expected_guest = request.guest_baseline
+    if (
+        expected_guest.head_oid != receipt_baseline.head_oid
+        or expected_guest.tree_oid != receipt_baseline.tree_oid
+        or expected_guest.branch_ref != receipt_baseline.branch_ref
+        or expected_guest.object_format != receipt_baseline.object_format
+        or expected_guest.worktree_sha256 != receipt_baseline.worktree_sha256
+    ):
+        raise SliceBSessionError("Guest baseline does not match immutable Session Receipt")
+    _verify_guest_baseline_admission(expected_guest)
+    receipt = verified_receipt.receipt
+    verified_image = reverify_existing_guest_image(
+        ExistingGuestImageVerificationRequest(
+            archive_path=request.archive_path,
+            supervisor_root=request.supervisor_image_root,
+            image_pin=receipt.image_record,
+            expected_record_sha256=receipt.image_record_sha256,
+            docker_host=request.docker_host,
+            expected_docker_daemon_id=request.expected_docker_daemon_id,
+        ),
+        runner,
+    )
+    _verify_guest_baseline_admission(expected_guest)
+    return verify_guest_authority(verified_receipt, expected_guest, verified_image)
+
+
+def _verify_guest_baseline_admission(expected: GitBaseline) -> None:
+    try:
+        observed = admit_clean_repo(expected.root)
+    except SliceBGitRejected as error:
+        raise SliceBSessionError("Guest Git admission failed") from error
+    if observed != expected:
+        raise SliceBSessionError("Guest Git changed from the recorded pre-edit baseline")
 
 
 def build_start_message(authority: VerifiedGuestAuthority) -> SliceBStartMessage:

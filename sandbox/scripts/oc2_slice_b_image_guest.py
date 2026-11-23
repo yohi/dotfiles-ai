@@ -30,13 +30,40 @@ class GuestImageLoadRequest:
     docker_host: str
 
 
+@dataclass(frozen=True, slots=True)
+class ExistingGuestImageVerificationRequest:
+    archive_path: Path
+    supervisor_root: Path
+    image_pin: ImagePin
+    expected_record_sha256: str
+    docker_host: str
+    expected_docker_daemon_id: str
+
+
 class GuestImageRunner(Protocol):
     @property
     def docker_host(self) -> str: ...
 
     def image_ids(self) -> tuple[str, ...]: ...
 
+    def daemon_id(self) -> str: ...
+
+    def container_ids(self) -> tuple[str, ...]: ...
+
     def load_image(self, archive: Path) -> None: ...
+
+    def inspect_config_id(self, config_id: str) -> Mapping[str, Any]: ...
+
+
+class ExistingGuestImageRunner(Protocol):
+    @property
+    def docker_host(self) -> str: ...
+
+    def image_ids(self) -> tuple[str, ...]: ...
+
+    def daemon_id(self) -> str: ...
+
+    def container_ids(self) -> tuple[str, ...]: ...
 
     def inspect_config_id(self, config_id: str) -> Mapping[str, Any]: ...
 
@@ -154,3 +181,71 @@ def import_guest_image(
         pin.platform,
         _token=_IMAGE_AUTHORITY_TOKEN,
     )
+
+
+def reverify_existing_guest_image(
+    request: ExistingGuestImageVerificationRequest,
+    runner: ExistingGuestImageRunner,
+) -> VerifiedImageAuthority:
+    """Revalidate an already-loaded image without issuing Docker Load.
+
+    ``expected_docker_daemon_id`` must come from trusted existing Host or
+    Session state, not from the Guest being checked. The archive must remain in
+    the Supervisor-owned private image store. The returned authority proves
+    only the pinned archive and exact loaded Config ID against the supplied
+    daemon identity at the verification observations; it does not prove later
+    Docker state. Raises ``SliceBImageRejected`` for every failed check.
+    """
+    pin = request.image_pin
+    _validate_pin(pin)
+    docker_host = _validate_docker_host(request.docker_host)
+    if runner.docker_host != docker_host:
+        raise SliceBImageRejected("Guest Docker socket does not match the verification request")
+    if request.expected_record_sha256 != pin.record_sha256:
+        raise SliceBImageRejected("Host Image Record digest mismatch")
+    if not isinstance(request.expected_docker_daemon_id, str) or not request.expected_docker_daemon_id:
+        raise SliceBImageRejected("trusted Guest Docker Daemon ID is required")
+
+    archive_before = _supervisor_archive_identity(
+        request.archive_path, request.supervisor_root, pin
+    )
+    verify_image_archive(request.archive_path, pin)
+    _verify_existing_image_store(runner, pin, request.expected_docker_daemon_id)
+    inspect = runner.inspect_config_id(pin.config_id)
+    verify_loaded_image(inspect, pin)
+    _verify_existing_image_store(runner, pin, request.expected_docker_daemon_id)
+    if archive_before != _supervisor_archive_identity(
+        request.archive_path, request.supervisor_root, pin
+    ):
+        raise SliceBImageRejected("Guest archive changed during read-only image verification")
+    verify_image_archive(request.archive_path, pin)
+    return VerifiedImageAuthority(
+        pin,
+        pin.record_sha256,
+        pin.config_id,
+        pin.platform,
+        _token=_IMAGE_AUTHORITY_TOKEN,
+    )
+
+
+def _verify_existing_image_store(
+    runner: ExistingGuestImageRunner,
+    pin: ImagePin,
+    expected_daemon_id: str,
+) -> None:
+    if runner.daemon_id() != expected_daemon_id:
+        raise SliceBImageRejected("Guest Docker Daemon ID does not match trusted input")
+    image_ids = runner.image_ids()
+    if not isinstance(image_ids, tuple) or any(
+        not isinstance(image_id, str) for image_id in image_ids
+    ):
+        raise SliceBImageRejected("Guest Docker image listing is invalid")
+    if set(image_ids) != {pin.config_id}:
+        raise SliceBImageRejected("Guest Image Store is not exactly the expected image")
+    container_ids = runner.container_ids()
+    if not isinstance(container_ids, tuple) or any(
+        not isinstance(container_id, str) for container_id in container_ids
+    ):
+        raise SliceBImageRejected("Guest Docker container listing is invalid")
+    if container_ids:
+        raise SliceBImageRejected("Guest Docker has containers during image verification")

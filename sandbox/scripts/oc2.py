@@ -2352,6 +2352,12 @@ def _session_action(args: argparse.Namespace, workspace: pathlib.Path,
 
 
 def main(argv: list[str] | None = None) -> int:
+    effective_argv = argv if argv is not None else sys.argv[1:]
+    if any(argument == '--slice-b' or argument.startswith('--slice-b=')
+           for argument in effective_argv):
+        print('OC2_STOP: SLICE_B_LIVE_NOT_ACCEPTED', file=sys.stderr)
+        return 1
+
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--version', action='version', version=f'oc2 launcher 1.0; OpenCode v{VERSION}')
     p.add_argument('--repo-root', type=pathlib.Path, default=REPO_ROOT)
@@ -2401,7 +2407,7 @@ def main(argv: list[str] | None = None) -> int:
                         'fixtures or fixtures/<name>')
     p.add_argument('--host-broker-cleanup-only', action='store_true',
                    help='cleanup Task-owned Host Broker resources from the systemd ExecStopPost')
-    args = p.parse_args(argv)
+    args = p.parse_args(effective_argv)
     oc2_workspace = importlib.import_module('oc2_workspace')
 
     try:
