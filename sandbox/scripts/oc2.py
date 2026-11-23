@@ -1961,7 +1961,7 @@ def cleanup_host_broker_unit(
         except oc2_network_gate.NetworkGateError:
             raise HostBrokerCleanupPartial('dedicated daemon state is unknown') from None
         if not sandbox_owned:
-            return
+            return None
         try:
             runner.sbx('daemon', 'start', '--detach')
             oc2_network_gate.verify_dedicated_daemon(runner, app_name)

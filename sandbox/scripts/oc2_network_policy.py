@@ -179,8 +179,9 @@ def find_task_broker_allow(raw: str, sandbox: str) -> ScopedNetworkAllow | None:
     if not isinstance(resources, list) or len(resources) != 1:
         raise NetworkGateError('Task Broker allow resource is ambiguous')
     resource = resources[0]
-    match = re.fullmatch(r'localhost:([1-9][0-9]{0,4})', resource) \
-        if isinstance(resource, str) else None
+    if not isinstance(resource, str):
+        raise NetworkGateError('Task Broker allow is not a loopback TCP resource')
+    match = re.fullmatch(r'localhost:([1-9][0-9]{0,4})', resource)
     if match is None or not 1 <= int(match.group(1)) <= 65535:
         raise NetworkGateError('Task Broker allow is not a loopback TCP resource')
     return scoped_network_allow(raw, sandbox, resource)
