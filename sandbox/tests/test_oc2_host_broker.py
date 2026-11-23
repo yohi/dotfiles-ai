@@ -1524,9 +1524,17 @@ class LocalCliArchiveTests(unittest.TestCase):
         with self.assertRaisesRegex(oc2.Stop, 'outside the dedicated archive directory'):
             oc2.download_verified_cli(destination, local_archive=source)
 
+    def test_local_archive_must_use_the_pinned_filename(self):
+        source = self.archive_root / 'alternate-name.tar.gz'
+        source.write_bytes(b'not an archive')
+        destination = self.archive_root / 'cli'
+        destination.mkdir(mode=0o700)
+        with self.assertRaisesRegex(oc2.Stop, 'must be the pinned archive path'):
+            oc2.download_verified_cli(destination, local_archive=source)
+
     def test_local_archive_directory_must_be_private(self):
         self.archive_root.chmod(0o755)
-        source = self.archive_root / 'opencode-linux-x64.tar.gz'
+        source = self.archive_root / oc2.CLI_ARCHIVE_NAME
         source.write_bytes(b'not an archive')
         destination = self.archive_root / 'cli'
         destination.mkdir(mode=0o700)
@@ -1568,7 +1576,7 @@ class LocalCliArchiveTests(unittest.TestCase):
             self.assertIn(oc2.CLI_ASSET_URL, run.call_args.args[0])
 
     def test_invalid_local_archive_fails_without_curl_fallback(self):
-        source = self.archive_root / 'wrong.tar.gz'
+        source = self.archive_root / oc2.CLI_ARCHIVE_NAME
         source.write_bytes(b'not the pinned archive')
         destination = self.archive_root / 'cli'
         destination.mkdir(mode=0o700)
@@ -1578,7 +1586,7 @@ class LocalCliArchiveTests(unittest.TestCase):
                 oc2.download_verified_cli(destination, local_archive=source)
 
     def test_local_archive_sha_mismatch_fails_without_curl_fallback(self):
-        source = self.archive_root / 'wrong-hash.tar.gz'
+        source = self.archive_root / oc2.CLI_ARCHIVE_NAME
         with source.open('wb') as archive_file:
             archive_file.truncate(oc2.CLI_ASSET_SIZE)
         destination = self.archive_root / 'cli'
@@ -1590,8 +1598,10 @@ class LocalCliArchiveTests(unittest.TestCase):
 
     def test_symlinked_local_archive_is_rejected_without_curl_fallback(self):
         archive = self.verified_archive()
-        source = self.archive_root / 'linked.tar.gz'
-        source.symlink_to(archive)
+        target = self.archive_root.parent / oc2.CLI_ARCHIVE_NAME
+        archive.rename(target)
+        source = self.archive_root / oc2.CLI_ARCHIVE_NAME
+        source.symlink_to(target)
         destination = self.archive_root / 'cli'
         destination.mkdir(mode=0o700)
         with patch.object(oc2.shutil, 'which', side_effect=AssertionError('curl lookup forbidden')), \
@@ -1609,9 +1619,7 @@ class LocalCliArchiveTests(unittest.TestCase):
                     oc2.download_verified_cli(destination, local_archive=pathlib.Path('relative.tar.gz'))
 
     def test_local_archive_changed_during_copy_is_rejected(self):
-        cached = self.verified_archive()
-        source = self.archive_root / 'mutable.tar.gz'
-        shutil.copyfile(cached, source)
+        source = self.verified_archive()
         destination = self.archive_root / 'cli'
         destination.mkdir(mode=0o700)
         original_read = os.read

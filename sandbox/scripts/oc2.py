@@ -65,6 +65,7 @@ CLI_BINARY_SIZE: Final[int] = 252_713_136
 CLI_ARCHIVE_DIR: Final[pathlib.Path] = (
     pathlib.Path.home() / '.cache' / 'oc2' / 'cli-archives'
 )
+CLI_ARCHIVE_NAME: Final[str] = 'opencode-linux-x64.tar.gz'
 CLI_REDIRECT_HOSTS: Final[frozenset[str]] = frozenset({
     'github.com',
     'release-assets.githubusercontent.com',
@@ -332,23 +333,34 @@ def _copy_local_cli_archive(source: pathlib.Path, destination: pathlib.Path) -> 
         source_path.relative_to(archive_root)
     except ValueError:
         raise Stop('local OpenCode archive is outside the dedicated archive directory') from None
+    if source_path != archive_root / CLI_ARCHIVE_NAME:
+        raise Stop('local OpenCode archive must be the pinned archive path')
     if (any(path.is_symlink() for path in (archive_root, *archive_root.parents))
-            or any(path.is_symlink() for path in (source_path, *source_path.parents))):
+            or any(path.is_symlink() for path in source_path.parents)):
         raise Stop('local OpenCode archive path is unsafe')
+    archive_root_fd: int | None = None
     try:
-        archive_root_info = archive_root.lstat()
+        archive_root_fd = os.open(
+            archive_root,
+            os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | getattr(os, 'O_CLOEXEC', 0),
+        )
+        archive_root_info = os.fstat(archive_root_fd)
     except OSError:
+        if archive_root_fd is not None:
+            os.close(archive_root_fd)
         raise Stop('dedicated local OpenCode archive directory is unavailable') from None
     if (not stat.S_ISDIR(archive_root_info.st_mode)
             or archive_root_info.st_uid != os.geteuid()
             or stat.S_IMODE(archive_root_info.st_mode) != 0o700):
+        os.close(archive_root_fd)
         raise Stop('dedicated local OpenCode archive directory is unsafe')
     source_fd: int | None = None
     destination_fd: int | None = None
     try:
         source_fd = os.open(
-            source_path,
+            CLI_ARCHIVE_NAME,
             os.O_RDONLY | os.O_NOFOLLOW | getattr(os, 'O_CLOEXEC', 0),
+            dir_fd=archive_root_fd,
         )
         before = os.fstat(source_fd)
         if not stat.S_ISREG(before.st_mode) or before.st_size != CLI_ASSET_SIZE:
@@ -374,9 +386,10 @@ def _copy_local_cli_archive(source: pathlib.Path, destination: pathlib.Path) -> 
             after.st_dev, after.st_ino, after.st_size,
             after.st_mtime_ns, after.st_ctime_ns,
         )
-        current_path = source_path.lstat()
-        if (not stat.S_ISREG(current_path.st_mode)
-                or any(path.is_symlink() for path in (source_path, *source_path.parents))):
+        current_path = os.stat(
+            CLI_ARCHIVE_NAME, dir_fd=archive_root_fd, follow_symlinks=False,
+        )
+        if not stat.S_ISREG(current_path.st_mode):
             raise Stop('local OpenCode archive path changed during verification')
         path_identity = (
             current_path.st_dev, current_path.st_ino, current_path.st_size,
@@ -397,6 +410,8 @@ def _copy_local_cli_archive(source: pathlib.Path, destination: pathlib.Path) -> 
             os.close(destination_fd)
         if source_fd is not None:
             os.close(source_fd)
+        if archive_root_fd is not None:
+            os.close(archive_root_fd)
 
 
 def download_verified_cli(
