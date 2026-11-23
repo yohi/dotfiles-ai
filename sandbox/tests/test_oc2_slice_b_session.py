@@ -29,6 +29,7 @@ from oc2_slice_b_session import (  # noqa: E402
     SliceBSessionError,
     VerifiedGuestAuthority,
     create_session_receipt,
+    bootstrap_host_session_authority,
     update_session_receipt,
     verify_session_receipt,
     import_guest_baseline,
@@ -164,6 +165,19 @@ class SessionTests(unittest.TestCase):
         with self.assertRaises(SliceBSessionError):
             create_session_receipt(self.state, self.rec, self.art)
 
+    def test_host_bootstrap_returns_hash_verified_receipt_authority(self) -> None:
+        authority = bootstrap_host_session_authority(
+            self.state,
+            self.rec,
+            self.art,
+        )
+
+        self.assertEqual(authority.receipt, self.rec)
+        self.assertEqual(
+            authority.receipt_sha256,
+            hashlib.sha256(authority.manifest_path.with_name("receipt.json").read_bytes()).hexdigest(),
+        )
+
     def test_receipt_hash_is_required_from_trusted_host(self) -> None:
         path = create_session_receipt(self.state, self.rec, self.art)
         with self.assertRaises(SliceBSessionError):
@@ -203,7 +217,12 @@ class SessionTests(unittest.TestCase):
 
     def test_guest_import_and_authority(self) -> None:
         """A verified Bundle imports into a new Guest and produces a start frame."""
-        path = create_session_receipt(self.state, self.rec, self.art)
+        host_authority = bootstrap_host_session_authority(
+            self.state,
+            self.rec,
+            self.art,
+        )
+        path = host_authority.manifest_path.with_name("receipt.json")
         guest = import_guest_baseline(
             self.art,
             self.guest,
@@ -211,12 +230,11 @@ class SessionTests(unittest.TestCase):
             expected_key=self.key,
             expected_runtime_sha256="b" * 64,
         )
-        receipt_hash = hashlib.sha256(path.read_bytes()).hexdigest()
         auth = verify_guest_authority_from_host_record(
             GuestAuthorityVerificationRequest(
                 receipt_path=path,
                 expected_key=self.key,
-                expected_receipt_sha256=receipt_hash,
+                expected_receipt_sha256=host_authority.receipt_sha256,
                 guest_baseline=guest,
                 archive_path=self.image_archive,
                 supervisor_image_root=self.image_control,

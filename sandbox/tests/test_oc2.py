@@ -931,6 +931,152 @@ class HostTest(unittest.TestCase):
             self.assertEqual([entry.path for entry in manifest.files], ['main.py'])
             self.assertEqual(manifest.profile_id, 'dotfiles-ai/workspace-safe-transfer/r1')
 
+    def test_workspace_profile_r2_adds_only_approved_exclusions(self):
+        workspace = load('oc2_workspace')
+        r1 = workspace.profile_by_id('dotfiles-ai/workspace-safe-transfer/r1')
+        r2 = workspace.profile_by_id('dotfiles-ai/workspace-safe-transfer/r2')
+
+        self.assertIsNotNone(r1)
+        self.assertIsNotNone(r2)
+        approved = {
+            'sandbox/tests/test_oc2_slice_b_git.py',
+            'sandbox/tests/test_oc2_broker_tls_acceptance.py',
+            'sandbox/tests/test_oc2.py',
+            'sandbox/tests/test_oc2_phase4_assets.py',
+        }
+        self.assertEqual(r2.excluded_paths - r1.excluded_paths, approved)
+        self.assertEqual(r2.excluded_prefixes, r1.excluded_prefixes)
+
+    def test_workspace_profile_r2_snapshot_keeps_unlisted_test_files(self):
+        workspace = load('oc2_workspace')
+        profile = workspace.profile_by_id('dotfiles-ai/workspace-safe-transfer/r2')
+        self.assertIsNotNone(profile)
+        excluded = {
+            'sandbox/tests/test_oc2_slice_b_git.py',
+            'sandbox/tests/test_oc2_broker_tls_acceptance.py',
+            'sandbox/tests/test_oc2.py',
+            'sandbox/tests/test_oc2_phase4_assets.py',
+            '_docs/aws-resource-inventory.md',
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            (root / 'main.py').write_text('print("safe")\n')
+            for relative in excluded:
+                path = root / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text('apiKey: ' + 'A' * 32 + '\n')
+            unrelated_test = root / 'sandbox/tests/test_safe.py'
+            unrelated_test.parent.mkdir(parents=True, exist_ok=True)
+            unrelated_test.write_text('print("safe test")\n')
+
+            manifest = workspace.snapshot(root, profile=profile)
+
+            self.assertEqual(
+                [entry.path for entry in manifest.files],
+                ['main.py', 'sandbox/tests/test_safe.py'],
+            )
+            self.assertEqual(
+                manifest.profile_id,
+                'dotfiles-ai/workspace-safe-transfer/r2',
+            )
+
+    def test_workspace_profile_r2_manifest_roundtrip_and_rejects_reintroduced_path(self):
+        workspace = load('oc2_workspace')
+        profile = workspace.profile_by_id('dotfiles-ai/workspace-safe-transfer/r2')
+        self.assertIsNotNone(profile)
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            (root / 'main.py').write_text('print("safe")\n')
+            manifest = workspace.snapshot(root, profile=profile)
+
+            decoded = workspace.decode_manifest(manifest.encode(), root)
+
+            self.assertEqual(
+                decoded.profile_id,
+                'dotfiles-ai/workspace-safe-transfer/r2',
+            )
+            for relative in (
+                'sandbox/tests/test_oc2_slice_b_git.py',
+                'sandbox/tests/test_oc2_broker_tls_acceptance.py',
+                'sandbox/tests/test_oc2.py',
+                'sandbox/tests/test_oc2_phase4_assets.py',
+            ):
+                with self.subTest(relative=relative):
+                    payload = json.loads(manifest.encode())
+                    payload['files'].append({
+                        'path': relative,
+                        'size': 0,
+                        'sha256': hashlib.sha256(b'').hexdigest(),
+                    })
+                    payload['files'].sort(key=lambda entry: entry['path'])
+                    with self.assertRaisesRegex(
+                        workspace.WorkspaceError,
+                        'unsafe or excluded',
+                    ):
+                        workspace.decode_manifest(
+                            json.dumps(payload).encode(), root,
+                        )
+
+    def test_workspace_profile_r1_manifest_remains_decode_compatible(self):
+        workspace = load('oc2_workspace')
+        profile = workspace.profile_by_id('dotfiles-ai/workspace-safe-transfer/r1')
+        self.assertIsNotNone(profile)
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            (root / 'main.py').write_text('print("safe")\n')
+            manifest = workspace.snapshot(root, profile=profile)
+
+            decoded = workspace.decode_manifest(manifest.encode(), root)
+
+            self.assertEqual(
+                decoded.profile_id,
+                'dotfiles-ai/workspace-safe-transfer/r1',
+            )
+
+    def test_workspace_profile_r2_keeps_credential_detection_fail_closed(self):
+        workspace = load('oc2_workspace')
+        profile = workspace.profile_by_id('dotfiles-ai/workspace-safe-transfer/r2')
+        self.assertIsNotNone(profile)
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            safe_test = root / 'sandbox/tests/test_safe.py'
+            safe_test.parent.mkdir(parents=True)
+            safe_test.write_text('apiKey: ' + 'B' * 32 + '\n')
+
+            with self.assertRaisesRegex(
+                workspace.WorkspaceError,
+                'credential material',
+            ):
+                workspace.snapshot(root, profile=profile)
+
+    def test_workspace_profile_r2_keeps_symlink_and_special_file_rejections(self):
+        workspace = load('oc2_workspace')
+        profile = workspace.profile_by_id('dotfiles-ai/workspace-safe-transfer/r2')
+        self.assertIsNotNone(profile)
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp) / 'symlink-root'
+            root.mkdir()
+            outside = pathlib.Path(tmp) / 'outside.py'
+            outside.write_text('print("outside")\n')
+            nested = root / 'sandbox/tests'
+            nested.mkdir(parents=True)
+            (nested / 'linked.py').symlink_to(outside)
+
+            with self.assertRaisesRegex(workspace.WorkspaceError, 'symlink'):
+                workspace.snapshot(root, profile=profile)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            nested = root / 'sandbox/tests'
+            nested.mkdir(parents=True)
+            os.mkfifo(nested / 'pipe')
+
+            with self.assertRaisesRegex(
+                workspace.WorkspaceError,
+                'special or oversized file',
+            ):
+                workspace.snapshot(root, profile=profile)
+
     def test_workspace_profile_is_not_applied_to_an_unrelated_repository(self):
         workspace = load('oc2_workspace')
         with tempfile.TemporaryDirectory() as tmp:
@@ -991,7 +1137,7 @@ class HostTest(unittest.TestCase):
 
             profile = oc2.workspace_transfer_profile(root)
 
-            self.assertEqual(profile, 'dotfiles-ai/workspace-safe-transfer/r1')
+            self.assertEqual(profile, 'dotfiles-ai/workspace-safe-transfer/r2')
 
             subprocess.run(
                 ['git', '-C', str(root), 'remote', 'set-url', 'origin',

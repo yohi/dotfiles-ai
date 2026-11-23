@@ -1,4 +1,3 @@
-import importlib.util
 import hashlib
 from pathlib import Path
 import json
@@ -10,13 +9,9 @@ import unittest
 import uuid
 from unittest.mock import patch
 
-src = Path(__file__).resolve().parents[1] / "scripts" / "oc2_slice_b_git.py"
-spec = importlib.util.spec_from_file_location("oc2_slice_b_git", src)
-assert spec is not None and spec.loader is not None
-mod = importlib.util.module_from_spec(spec)
-
-sys.modules[spec.name] = mod
-spec.loader.exec_module(mod)
+SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
+sys.path.insert(0, str(SCRIPTS))
+import oc2_slice_b_git as mod  # noqa: E402
 
 
 def command(repo: Path, *args: str) -> bytes:
@@ -32,7 +27,7 @@ def command(repo: Path, *args: str) -> bytes:
             "GIT_CONFIG_KEY_0": "core.hooksPath", "GIT_CONFIG_VALUE_0": "/dev/null",
             "GIT_CONFIG_KEY_1": "commit.gpgSign", "GIT_CONFIG_VALUE_1": "false",
             "GIT_CONFIG_KEY_2": "core.fsmonitor", "GIT_CONFIG_VALUE_2": "false",
-        }
+        }, preexec_fn=lambda: os.umask(0o077),
     )
     if r.returncode:
         raise AssertionError((args, r.stderr.decode()))

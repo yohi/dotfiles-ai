@@ -533,6 +533,17 @@ def verify_session_receipt(
         raise SliceBSessionError("receipt unavailable or malformed") from e
 
 
+def bootstrap_host_session_authority(
+    state_root: Path,
+    receipt: SliceBReceipt,
+    artifact: BundleArtifact,
+) -> VerifiedSliceBReceipt:
+    """Create canonical Host session artifacts and return the verified receipt."""
+    path = create_session_receipt(state_root, receipt, artifact)
+    receipt_sha256 = hashlib.sha256(_read_strict(path)).hexdigest()
+    return verify_session_receipt(path, receipt.key, receipt_sha256)
+
+
 @contextmanager
 def _receipt_update_lock(path: Path) -> Iterator[None]:
     """Hold a stable sibling lockfile exclusively until the update transaction ends."""

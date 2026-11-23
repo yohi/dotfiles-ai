@@ -14,9 +14,9 @@ from typing import Final, NoReturn
 EXCLUDED_NAMES = frozenset({
     '.git', '.hg', '.svn', '.env', '.env.local', '.env.production',
     '.ssh', '.aws', '.azure', '.gnupg', '.docker', '.kube', '.config',
-    '.opencode', '.claude', '.claude.json', '.codex', '.npmrc', '.pypirc', '.netrc',
+    '.opencode', '.claude', '.claude.json', '.codex', '.justice', '.npmrc', '.pypirc', '.netrc',
     'id_rsa', 'id_ed25519', 'credentials', 'secrets', 'token', 'tokens', 'node_modules',
-    '.venv', '__pycache__',
+    '.venv', '__pycache__', '.ruff_cache', '.mypy_cache', '.pytest_cache', '.basedpyright',
 })
 ROOT_PROJECT_CONFIG_NAMES = frozenset({'opencode.json', 'opencode.jsonc', 'cli.json'})
 ROOT_GENERATED_DIRECTORY_NAMES = frozenset({'.worktrees', '.nexus', 'apm_modules'})
@@ -77,7 +77,25 @@ DOTFILES_AI_PROFILE = WorkspaceProfile(
         'opencode/docs/global-rules',
     ),
 )
-WORKSPACE_PROFILES: Final[tuple[WorkspaceProfile, ...]] = (DOTFILES_AI_PROFILE,)
+DOTFILES_AI_PROFILE_R2_ID: Final[str] = 'dotfiles-ai/workspace-safe-transfer/r2'
+DOTFILES_AI_PROFILE_R2_ADDITIONAL_PATHS: Final[frozenset[str]] = frozenset({
+    'sandbox/tests/test_oc2_slice_b_git.py',
+    'sandbox/tests/test_oc2_broker_tls_acceptance.py',
+    'sandbox/tests/test_oc2.py',
+    'sandbox/tests/test_oc2_phase4_assets.py',
+})
+DOTFILES_AI_PROFILE_R2 = WorkspaceProfile(
+    profile_id=DOTFILES_AI_PROFILE_R2_ID,
+    excluded_paths=(
+        DOTFILES_AI_PROFILE.excluded_paths
+        | DOTFILES_AI_PROFILE_R2_ADDITIONAL_PATHS
+    ),
+    excluded_prefixes=DOTFILES_AI_PROFILE.excluded_prefixes,
+)
+WORKSPACE_PROFILES: Final[tuple[WorkspaceProfile, ...]] = (
+    DOTFILES_AI_PROFILE,
+    DOTFILES_AI_PROFILE_R2,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -122,6 +140,8 @@ def profile_by_id(profile_id: str | None) -> WorkspaceProfile | None:
 def _excluded(
     relative: pathlib.PurePosixPath,
     profile: WorkspaceProfile | None = None,
+    *,
+    allow_legacy_basedpyright: bool = False,
 ) -> bool:
     """Return whether a relative workspace path matches built-in or selected profile exclusions."""
     relative_name = relative.as_posix()
@@ -135,7 +155,9 @@ def _excluded(
                 or any(relative_name == prefix or relative_name.startswith(prefix + '/')
                        for prefix in profile.excluded_prefixes)
             ))
-            or any(part in EXCLUDED_NAMES or part.startswith('.env')
+            or any((part in EXCLUDED_NAMES
+                    and not (allow_legacy_basedpyright and part == '.basedpyright'))
+                    or part.startswith('.env')
                    or part.endswith('.env') or '.env.' in part
                    or any(term in part.lower() for term in ('secret', 'credential', 'token'))
                    or part.endswith(('.pem', '.key', '.p12', '.pfx')) for part in relative.parts))
@@ -196,12 +218,15 @@ def _fail(message: str) -> NoReturn:
 def _validate_relative(
     value: object,
     profile: WorkspaceProfile | None = None,
+    *,
+    allow_legacy_basedpyright: bool = False,
 ) -> str:
     if not isinstance(value, str) or not value or '\x00' in value or '\\' in value:
         _fail('manifest path is invalid')
     relative = pathlib.PurePosixPath(value)
     if (relative.is_absolute() or any(part in ('', '.', '..') for part in value.split('/'))
-            or relative.as_posix() != value or _excluded(relative, profile)):
+            or relative.as_posix() != value
+            or _excluded(relative, profile, allow_legacy_basedpyright=allow_legacy_basedpyright)):
         _fail('manifest path is unsafe or excluded')
     return value
 
@@ -237,7 +262,12 @@ def _decode_manifest_entries(
         item = _string_mapping(raw_item)
         if set(item) != {'path', 'size', 'sha256'}:
             _fail('workspace manifest entry is invalid')
-        relative = _validate_relative(item.get('path'), profile)
+        relative = _validate_relative(
+            item.get('path'), profile,
+            allow_legacy_basedpyright=(
+                profile is not None and profile.profile_id == DOTFILES_AI_PROFILE_ID
+            ),
+        )
         size = item.get('size')
         if relative in seen or type(size) is not int or not 0 <= size <= MAX_FILE_BYTES:
             _fail('workspace manifest entry is invalid')

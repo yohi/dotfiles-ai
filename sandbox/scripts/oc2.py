@@ -19,6 +19,7 @@ import platform
 import re
 import secrets
 import shutil
+import stat
 import subprocess
 import sys
 import tarfile
@@ -29,6 +30,7 @@ from urllib.parse import urlsplit
 import yaml
 import oc2_host_broker
 import oc2_host_broker_runtime
+import oc2_network_gate
 from oc2_oauth_bundle import oauth_helper_source
 from oc2_native import parse_apm_native
 from oc2_identity import (
@@ -50,6 +52,9 @@ if str(REPO_ROOT) not in sys.path:
 VERSION = '2.2.5'
 ROOT = '/home/agent/workspace/oc2'
 SHELL_WORKLOAD: Final[str] = 'docker.io/docker/sbx-kit-shell:1.0.0'
+HOST_BROKER_SHELL_WORKLOAD: Final[str] = (
+    'docker.io/sbx/shell@sha256:89ed5d63def6bfb2373d408e3ab6ad55aa5c010f884a182a78299fcf85ea42d1'
+)
 CLI_ASSET_URL: Final[str] = (
     'https://github.com/anomalyco/opencode/releases/download/v2.2.5/'
     'opencode-linux-x64.tar.gz'
@@ -57,6 +62,10 @@ CLI_ASSET_URL: Final[str] = (
 CLI_ASSET_SIZE: Final[int] = 119_196_162
 CLI_ASSET_SHA256: Final[str] = '09f44302c10fd036912f59c81fd1aef5df45dd06f649197f9dfc9bbe2a79614e'
 CLI_BINARY_SIZE: Final[int] = 252_713_136
+CLI_ARCHIVE_DIR: Final[pathlib.Path] = (
+    pathlib.Path.home() / '.cache' / 'oc2' / 'cli-archives'
+)
+CLI_ARCHIVE_NAME: Final[str] = 'opencode-linux-x64.tar.gz'
 CLI_REDIRECT_HOSTS: Final[frozenset[str]] = frozenset({
     'github.com',
     'release-assets.githubusercontent.com',
@@ -132,6 +141,23 @@ finally:
         os.close(fd)
 '''
 
+CLI_FILE_METADATA_CHECK_SCRIPT: Final[str] = '''import os, stat, sys
+path = sys.argv[1] if len(sys.argv) == 2 else ""
+if path != "/opt/oc2/bin/opencode": sys.exit(12)
+try:
+    for directory in ("/opt/oc2", "/opt/oc2/bin"):
+        info = os.lstat(directory)
+        if (not stat.S_ISDIR(info.st_mode) or info.st_uid != os.geteuid()
+                or stat.S_IMODE(info.st_mode) != 0o700):
+            sys.exit(12)
+    info = os.lstat(path)
+except OSError:
+    sys.exit(11)
+if (not stat.S_ISREG(info.st_mode) or info.st_uid != os.geteuid()
+        or stat.S_IMODE(info.st_mode) != 0o700):
+    sys.exit(12)
+'''
+
 
 
 @dataclass(frozen=True, slots=True)
@@ -197,6 +223,10 @@ class VerifiedFileTransfer:
 
 class Stop(Exception):
     pass
+
+
+class HostBrokerCleanupPartial(Stop):
+    """A Task-owned Host Broker resource could not be proven clean."""
 
 
 class SandboxCommandTimeout(Stop):
@@ -294,8 +324,102 @@ def opencode_cli_mixin_spec() -> bytes:
     ).encode('utf-8')
 
 
-def download_verified_cli(destination: pathlib.Path) -> pathlib.Path:
-    """Download, authenticate, and safely extract the pinned official CLI."""
+def _copy_local_cli_archive(source: pathlib.Path, destination: pathlib.Path) -> None:
+    if not source.is_absolute():
+        raise Stop('local OpenCode archive path is unsafe')
+    archive_root = pathlib.Path(os.path.abspath(CLI_ARCHIVE_DIR))
+    source_path = pathlib.Path(os.path.abspath(source))
+    try:
+        source_path.relative_to(archive_root)
+    except ValueError:
+        raise Stop('local OpenCode archive is outside the dedicated archive directory') from None
+    if source_path != archive_root / CLI_ARCHIVE_NAME:
+        raise Stop('local OpenCode archive must be the pinned archive path')
+    if (any(path.is_symlink() for path in (archive_root, *archive_root.parents))
+            or any(path.is_symlink() for path in source_path.parents)):
+        raise Stop('local OpenCode archive path is unsafe')
+    archive_root_fd: int | None = None
+    try:
+        archive_root_fd = os.open(
+            archive_root,
+            os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | getattr(os, 'O_CLOEXEC', 0),
+        )
+        archive_root_info = os.fstat(archive_root_fd)
+    except OSError:
+        if archive_root_fd is not None:
+            os.close(archive_root_fd)
+        raise Stop('dedicated local OpenCode archive directory is unavailable') from None
+    if (not stat.S_ISDIR(archive_root_info.st_mode)
+            or archive_root_info.st_uid != os.geteuid()
+            or stat.S_IMODE(archive_root_info.st_mode) != 0o700):
+        os.close(archive_root_fd)
+        raise Stop('dedicated local OpenCode archive directory is unsafe')
+    source_fd: int | None = None
+    destination_fd: int | None = None
+    try:
+        source_fd = os.open(
+            CLI_ARCHIVE_NAME,
+            os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | getattr(os, 'O_CLOEXEC', 0),
+            dir_fd=archive_root_fd,
+        )
+        before = os.fstat(source_fd)
+        if not stat.S_ISREG(before.st_mode) or before.st_size != CLI_ASSET_SIZE:
+            raise Stop('local OpenCode archive size or type mismatch')
+        flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, 'O_NOFOLLOW', 0)
+        destination_fd = os.open(destination, flags, 0o600)
+        os.fchmod(destination_fd, 0o600)
+        total = 0
+        with os.fdopen(destination_fd, 'wb', closefd=False) as output:
+            while chunk := os.read(source_fd, 1024 * 1024):
+                total += len(chunk)
+                if total > CLI_ASSET_SIZE:
+                    raise Stop('local OpenCode archive size mismatch')
+                output.write(chunk)
+            output.flush()
+            os.fsync(destination_fd)
+        after = os.fstat(source_fd)
+        before_identity = (
+            before.st_dev, before.st_ino, before.st_size,
+            before.st_mtime_ns, before.st_ctime_ns,
+        )
+        after_identity = (
+            after.st_dev, after.st_ino, after.st_size,
+            after.st_mtime_ns, after.st_ctime_ns,
+        )
+        current_path = os.stat(
+            CLI_ARCHIVE_NAME, dir_fd=archive_root_fd, follow_symlinks=False,
+        )
+        if not stat.S_ISREG(current_path.st_mode):
+            raise Stop('local OpenCode archive path changed during verification')
+        path_identity = (
+            current_path.st_dev, current_path.st_ino, current_path.st_size,
+            current_path.st_mtime_ns, current_path.st_ctime_ns,
+        )
+        copied = os.fstat(destination_fd)
+        if before_identity != after_identity or before_identity != path_identity:
+            raise Stop('local OpenCode archive changed during verification')
+        if total != CLI_ASSET_SIZE:
+            raise Stop('local OpenCode archive size mismatch')
+        if (not stat.S_ISREG(copied.st_mode) or copied.st_size != CLI_ASSET_SIZE
+                or stat.S_IMODE(copied.st_mode) != 0o600 or copied.st_nlink != 1):
+            raise Stop('local OpenCode archive copy is unsafe')
+    except OSError as exc:
+        raise Stop('local OpenCode archive could not be read safely') from exc
+    finally:
+        if destination_fd is not None:
+            os.close(destination_fd)
+        if source_fd is not None:
+            os.close(source_fd)
+        if archive_root_fd is not None:
+            os.close(archive_root_fd)
+
+
+def download_verified_cli(
+    destination: pathlib.Path,
+    *,
+    local_archive: pathlib.Path | None = None,
+) -> pathlib.Path:
+    """Verify and extract the pinned CLI from a local archive or HTTPS download."""
     if (sys.platform != 'linux' or platform.machine().lower() not in
             ('x86_64', 'amd64')):
         raise Stop('pinned OpenCode release asset requires Linux x86-64')
@@ -304,50 +428,52 @@ def download_verified_cli(destination: pathlib.Path) -> pathlib.Path:
         raise Stop('official CLI download requires a private temporary directory')
     if any(destination.iterdir()):
         raise Stop('official CLI temporary directory must be empty')
-    curl = shutil.which('curl')
-    if curl is None:
-        raise Stop('curl is required to download the official OpenCode release')
-
     archive_path = destination / 'opencode-linux-x64.tar.gz'
     binary_path = destination / 'opencode'
-    command = [
-        curl, '--disable', '--fail', '--location', '--max-redirs', '5',
-        '--proto', '=https', '--proto-redir', '=https', '--tlsv1.2',
-        '--connect-timeout', '20', '--max-time', '240', '--max-filesize',
-        str(CLI_ASSET_SIZE), '--silent', '--show-error', '--output',
-        str(archive_path), '--write-out',
-        '\nOC2_HTTP_STATUS=%{http_code}\nOC2_FINAL_URL=%{url_effective}\n',
-        CLI_ASSET_URL,
-    ]
     binary_created = False
     try:
-        try:
-            result = subprocess.run(
-                command, capture_output=True, text=True, check=False, timeout=300,
-            )
-        except subprocess.TimeoutExpired as exc:
-            raise Stop('official OpenCode release download timed out') from exc
-        except OSError as exc:
-            raise Stop('official OpenCode release download could not run') from exc
+        if local_archive is not None:
+            _copy_local_cli_archive(local_archive, archive_path)
+        else:
+            curl = shutil.which('curl')
+            if curl is None:
+                raise Stop('curl is required to download the official OpenCode release')
+            command = [
+                curl, '--disable', '--fail', '--location', '--max-redirs', '5',
+                '--proto', '=https', '--proto-redir', '=https', '--tlsv1.2',
+                '--connect-timeout', '20', '--max-time', '240', '--max-filesize',
+                str(CLI_ASSET_SIZE), '--silent', '--show-error', '--output',
+                str(archive_path), '--write-out',
+                '\nOC2_HTTP_STATUS=%{http_code}\nOC2_FINAL_URL=%{url_effective}\n',
+                CLI_ASSET_URL,
+            ]
+            try:
+                result = subprocess.run(
+                    command, capture_output=True, text=True, check=False, timeout=300,
+                )
+            except subprocess.TimeoutExpired as exc:
+                raise Stop('official OpenCode release download timed out') from exc
+            except OSError as exc:
+                raise Stop('official OpenCode release download could not run') from exc
 
-        fields = dict(
-            line.split('=', 1) for line in result.stdout.splitlines()
-            if line.startswith(('OC2_HTTP_STATUS=', 'OC2_FINAL_URL='))
-        )
-        if result.returncode != 0:
-            if result.returncode == 6:
-                raise Stop('official OpenCode release download failed: Host DNS resolution failed')
-            if result.returncode == 7:
-                raise Stop('official OpenCode release download failed: Host connection failed')
-            if result.returncode == 28:
-                raise Stop('official OpenCode release download timed out')
-            raise Stop(f'official OpenCode release download failed (curl exit {result.returncode})')
-        if fields.get('OC2_HTTP_STATUS') != '200':
-            raise Stop('official OpenCode release returned an unexpected HTTP status')
-        final_url = urlsplit(fields.get('OC2_FINAL_URL', ''))
-        if (final_url.scheme != 'https'
-                or (final_url.hostname or '').lower() not in CLI_REDIRECT_HOSTS):
-            raise Stop('official OpenCode release redirected to an untrusted host')
+            fields = dict(
+                line.split('=', 1) for line in result.stdout.splitlines()
+                if line.startswith(('OC2_HTTP_STATUS=', 'OC2_FINAL_URL='))
+            )
+            if result.returncode != 0:
+                if result.returncode == 6:
+                    raise Stop('official OpenCode release download failed: Host DNS resolution failed')
+                if result.returncode == 7:
+                    raise Stop('official OpenCode release download failed: Host connection failed')
+                if result.returncode == 28:
+                    raise Stop('official OpenCode release download timed out')
+                raise Stop(f'official OpenCode release download failed (curl exit {result.returncode})')
+            if fields.get('OC2_HTTP_STATUS') != '200':
+                raise Stop('official OpenCode release returned an unexpected HTTP status')
+            final_url = urlsplit(fields.get('OC2_FINAL_URL', ''))
+            if (final_url.scheme != 'https'
+                    or (final_url.hostname or '').lower() not in CLI_REDIRECT_HOSTS):
+                raise Stop('official OpenCode release redirected to an untrusted host')
         if archive_path.stat().st_size != CLI_ASSET_SIZE:
             raise Stop('official OpenCode release asset size mismatch')
 
@@ -398,6 +524,40 @@ def download_verified_cli(destination: pathlib.Path) -> pathlib.Path:
         if binary_created:
             binary_path.unlink(missing_ok=True)
         raise Stop('official OpenCode release artifact could not be validated') from exc
+
+
+def _sha256_verified_cli(path: pathlib.Path) -> str:
+    descriptor: int | None = None
+    try:
+        descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
+        before = os.fstat(descriptor)
+        if (not stat.S_ISREG(before.st_mode) or before.st_size != CLI_BINARY_SIZE
+                or stat.S_IMODE(before.st_mode) != 0o600 or before.st_nlink != 1):
+            raise Stop('verified OpenCode CLI binary is unsafe')
+        digest = hashlib.sha256()
+        total = 0
+        with os.fdopen(descriptor, 'rb') as binary:
+            descriptor = None
+            while chunk := binary.read(1024 * 1024):
+                total += len(chunk)
+                if total > CLI_BINARY_SIZE:
+                    raise Stop('verified OpenCode CLI binary exceeds its fixed size')
+                digest.update(chunk)
+            after = os.fstat(binary.fileno())
+        current = path.lstat()
+        if (total != CLI_BINARY_SIZE or not stat.S_ISREG(current.st_mode)
+                or current.st_dev != before.st_dev or current.st_ino != before.st_ino
+                or current.st_size != before.st_size or current.st_mtime_ns != before.st_mtime_ns
+                or after.st_size != before.st_size or after.st_mtime_ns != before.st_mtime_ns):
+            raise Stop('verified OpenCode CLI binary changed during hashing')
+        return digest.hexdigest()
+    except Stop:
+        raise
+    except OSError as exc:
+        raise Stop('verified OpenCode CLI binary could not be read safely') from exc
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
 
 
 def cloudflare_gateway_runtime(
@@ -633,13 +793,19 @@ def run_operator(user: str, *args: str, timeout: int = 30) -> str:
 
 
 class Runner:
-    def __init__(self, user: str, *, dry_run: bool = False):
+    def __init__(self, user: str, *, dry_run: bool = False,
+                 app_name: str | None = None):
         self.user = user
         self.dry_run = dry_run
+        self.app_name = app_name
+
+    def _command(self, *args: str) -> list[str]:
+        app = [] if self.app_name is None else ['--app-name', self.app_name]
+        return operator_command(self.user, 'sbx', *app, *args)
 
     def destination_status(self, name: str, destination: str) -> int:
-        command = operator_command(self.user, 'sbx', 'exec', name, 'python3', '-c',
-                                   DESTINATION_CHECK_SCRIPT, destination)
+        command = self._command('exec', name, 'python3', '-c',
+                                DESTINATION_CHECK_SCRIPT, destination)
         if self.dry_run:
             raise Stop('DESTINATION_CHECK_COMMAND_FAILED')
         try:
@@ -652,8 +818,8 @@ class Runner:
 
     def directory_status(self, name: str, destination: str) -> int:
         """Check whether a remote path is absent or an existing real directory."""
-        command = operator_command(
-            self.user, 'sbx', 'exec', name, 'python3', '-c',
+        command = self._command(
+            'exec', name, 'python3', '-c',
             DIRECTORY_DESTINATION_CHECK_SCRIPT, destination,
         )
         if self.dry_run:
@@ -666,14 +832,15 @@ class Runner:
             raise Stop('DESTINATION_CHECK_COMMAND_FAILED') from exc
         return result.returncode
 
-    def sbx(self, *args: str, capture: bool = False, tty: bool = False) -> str:
-        command = operator_command(self.user, 'sbx', *args)
+    def sbx(self, *args: str, capture: bool = False, tty: bool = False,
+            timeout: int | None = 180) -> str:
+        command = self._command(*args)
         if self.dry_run:
             print('PLAN: ' + ' '.join(command[:5]) + ' [...]')
             return ''
         try:
             result = subprocess.run(command, check=False, text=True,
-                                    capture_output=capture, timeout=None if tty else 180)
+                                    capture_output=capture, timeout=None if tty else timeout)
         except subprocess.TimeoutExpired as exc:
             raise SandboxCommandTimeout('sbx command could not complete') from exc
         except OSError as exc:
@@ -682,14 +849,32 @@ class Runner:
             raise Stop(f'sbx command failed (exit {result.returncode})')
         return result.stdout if capture else ''
 
-    def sbx_feed(self, *args: str, data: bytes) -> None:
+    def sbx_result(self, *args: str, timeout: int | None = 180) -> tuple[int, str]:
+        if self.dry_run:
+            raise Stop('policy checks cannot run in dry-run mode')
+        try:
+            result = subprocess.run(
+                self._command(*args), check=False, text=True,
+                capture_output=True, timeout=timeout,
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise SandboxCommandTimeout('sbx command could not complete') from exc
+        except OSError as exc:
+            raise Stop('sbx command could not complete') from exc
+        return result.returncode, result.stdout
+
+    def sbx_feed(
+        self, *args: str, data: bytes, timeout: int | None = None,
+    ) -> None:
         """Run sbx with ``data`` on stdin only (never argv/env); no TTY, no capture."""
-        command = operator_command(self.user, 'sbx', *args)
+        command = self._command(*args)
         if self.dry_run:
             print('PLAN: ' + ' '.join(command[:5]) + ' [...]')
             return
         try:
-            result = subprocess.run(command, input=data, check=False, timeout=None)
+            result = subprocess.run(command, input=data, check=False, timeout=timeout)
+        except subprocess.TimeoutExpired as exc:
+            raise SandboxCommandTimeout('sbx command could not complete') from exc
         except OSError as exc:
             raise Stop('sbx command could not complete') from exc
         if result.returncode != 0:
@@ -725,7 +910,7 @@ def workspace_transfer_profile(workspace: pathlib.Path) -> str | None:
         r'https://github\.com/yohi/dotfiles-ai(?:\.git)?',
     )
     if any(re.fullmatch(pattern, origin.stdout.strip()) for pattern in approved_origins):
-        return 'dotfiles-ai/workspace-safe-transfer/r1'
+        return 'dotfiles-ai/workspace-safe-transfer/r2'
     return None
 
 
@@ -1270,6 +1455,40 @@ def provision_cli(runner: Runner, name: str) -> str:
     return found
 
 
+def provision_host_broker_cli(runner: Runner, name: str, binary: pathlib.Path) -> str:
+    expected_sha = _sha256_verified_cli(binary)
+    for directory in ('/opt/oc2', '/opt/oc2/bin'):
+        if runner.directory_status(name, directory) != 0:
+            raise Stop('fixed OpenCode CLI parent directory is not absent')
+        execute(runner, name, 'mkdir', '-m', '0700', directory)
+        if runner.directory_status(name, directory) != 10:
+            raise Stop('fixed OpenCode CLI parent directory is unsafe')
+
+    destination = PINNED[0]
+    if runner.destination_status(name, destination) != 0:
+        raise Stop('fixed OpenCode CLI destination is not absent')
+    _transfer_verified_file(
+        runner,
+        name,
+        VerifiedFileTransfer(
+            source=binary,
+            destination=destination,
+            sha256=expected_sha,
+            unsafe_message='fixed OpenCode CLI destination is unsafe',
+            unknown_status_message='fixed OpenCode CLI destination status is unknown',
+            mismatch_message='fixed OpenCode CLI transfer checksum mismatch',
+        ),
+    )
+    if runner.destination_status(name, destination) != 10:
+        raise Stop('fixed OpenCode CLI Guest file is not regular')
+    runner.sbx('exec', name, 'chmod', '0700', destination)
+    runner.sbx(
+        'exec', name, 'python3', '-I', '-c',
+        CLI_FILE_METADATA_CHECK_SCRIPT, destination,
+    )
+    return provision_cli(runner, name)
+
+
 GUEST_EXEC_WRAPPER = r'''import os
 import re
 import sys
@@ -1612,6 +1831,384 @@ def _launch_via_host_broker(
     )
 
 
+def _write_runner_sandbox_owner(sandbox: str) -> None:
+    """Record exact Sandbox ownership only after successful create and Name readback."""
+    names = ('OC2_ENV004_TASK_DIR', 'OC2_ENV004_RUN_ID', 'OC2_ENV004_SANDBOX_NAME')
+    values = tuple(os.environ.get(name, '') for name in names)
+    if not any(values):
+        return
+    task_dir_text, run_id, expected_sandbox = values
+    if (not all(values) or re.fullmatch(r'[0-9a-f]{32}', run_id) is None
+            or expected_sandbox != sandbox or sandbox != f'oc2-env004-m1-{run_id}'):
+        raise Stop('Runner Sandbox ownership identity is invalid')
+    task_dir = pathlib.Path(task_dir_text)
+    evidence_dir = task_dir / 'evidence'
+    try:
+        task_info = task_dir.lstat()
+        evidence_info = evidence_dir.lstat()
+    except OSError:
+        raise Stop('Runner Task evidence directory is unavailable') from None
+    if (task_dir.is_symlink() or evidence_dir.is_symlink()
+            or not stat.S_ISDIR(task_info.st_mode) or task_info.st_uid != os.geteuid()
+            or stat.S_IMODE(task_info.st_mode) != 0o700
+            or not stat.S_ISDIR(evidence_info.st_mode)
+            or evidence_info.st_uid != os.geteuid()
+            or stat.S_IMODE(evidence_info.st_mode) != 0o700):
+        raise Stop('Runner Task evidence directory is unsafe')
+    daemon_start_intent = _runner_marker(task_dir, 'daemon-start.intent')
+    sandbox_create_intent = _runner_marker(task_dir, 'sandbox-create.intent')
+    if not (daemon_start_intent and sandbox_create_intent):
+        raise HostBrokerCleanupPartial(
+            'Task Sandbox ownership intents are missing',
+        )
+    payload = f'run_id={run_id}\nsandbox={sandbox}\n'.encode('ascii')
+    path = evidence_dir / 'sandbox-owned.intent'
+    descriptor: int | None = None
+    try:
+        descriptor = os.open(
+            path,
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | getattr(os, 'O_CLOEXEC', 0),
+            0o600,
+        )
+        os.fchmod(descriptor, 0o600)
+        info = os.fstat(descriptor)
+        if (not stat.S_ISREG(info.st_mode) or info.st_uid != os.geteuid()
+                or stat.S_IMODE(info.st_mode) != 0o600 or info.st_nlink != 1):
+            raise OSError('unsafe Task Sandbox ownership marker')
+        with os.fdopen(descriptor, 'wb', closefd=False) as output:
+            output.write(payload)
+            output.flush()
+        os.fsync(descriptor)
+    except OSError:
+        raise Stop('Runner Task Sandbox ownership could not be recorded') from None
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
+
+
+def cleanup_host_broker_sandbox(
+    runner: Runner,
+    sandbox: str,
+    resource: str | None = None,
+    *,
+    sandbox_owned: bool,
+) -> oc2_network_gate.ScopedNetworkAllow | None:
+    """Stop and remove only the verified Task Sandbox and its exact Broker rule."""
+    if not sandbox_owned:
+        raise HostBrokerCleanupPartial('Task Sandbox ownership was not confirmed')
+
+    failures: list[str] = []
+    sandbox_present = False
+    sandbox_list_read = False
+    sandbox_identity_valid = False
+    allow_identity: oc2_network_gate.ScopedNetworkAllow | None = None
+    try:
+        names = runner.sbx('ls', '-q', capture=True).splitlines()
+        sandbox_present = sandbox in names
+        sandbox_list_read = True
+    except Stop:
+        failures.append('sandbox-list-before')
+
+    if sandbox_present:
+        sandbox_state: oc2_network_gate.SandboxState | None = None
+        try:
+            inspect = runner.sbx('inspect', sandbox, capture=True)
+            sandbox_state = oc2_network_gate.sandbox_state(inspect, sandbox)
+            sandbox_identity_valid = True
+        except (Stop, oc2_network_gate.NetworkGateError):
+            failures.append('sandbox-identity')
+        if sandbox_identity_valid and sandbox_state is oc2_network_gate.SandboxState.RUNNING:
+            try:
+                runner.sbx('stop', sandbox)
+            except Stop:
+                failures.append('sandbox-stop')
+            try:
+                stopped = runner.sbx('inspect', sandbox, capture=True)
+                oc2_network_gate.validate_sandbox_stopped(stopped, sandbox)
+            except (Stop, oc2_network_gate.NetworkGateError):
+                failures.append('sandbox-stop-readback')
+
+    if sandbox_list_read and (not sandbox_present or sandbox_identity_valid):
+        try:
+            policy = runner.sbx('policy', 'ls', '--json', capture=True)
+            allow_identity = (
+                oc2_network_gate.find_task_broker_allow(policy, sandbox)
+                if resource is None else
+                oc2_network_gate.find_scoped_network_allow(policy, sandbox, resource)
+            )
+            if allow_identity is not None:
+                oc2_network_gate.revoke_network_allow(runner, allow_identity)
+        except (Stop, oc2_network_gate.NetworkGateError):
+            failures.append('policy-revoke-or-readback')
+    else:
+        failures.append('policy-revoke-owner-identity')
+
+    if sandbox_present and sandbox_identity_valid:
+        try:
+            runner.sbx('--no-input', 'rm', '--force', sandbox)
+        except Stop:
+            failures.append('sandbox-remove')
+
+    try:
+        remaining = runner.sbx('ls', '-q', capture=True).splitlines()
+        if sandbox in remaining:
+            failures.append('sandbox-remains')
+    except Stop:
+        failures.append('sandbox-removal-readback')
+
+    try:
+        final_policy = runner.sbx('policy', 'ls', '--json', capture=True)
+        oc2_network_gate.validate_policy_listing(final_policy, sandbox, 'before')
+    except (Stop, oc2_network_gate.NetworkGateError):
+        failures.append('policy-removal-readback')
+
+    if failures:
+        detail = ', '.join(dict.fromkeys(failures))
+        if allow_identity is not None:
+            detail += (
+                '; task-rule-id=' + allow_identity.rule_id
+                + '; task-policy-id=' + allow_identity.policy_id
+                + '; task-resource=' + allow_identity.resource
+            )
+        raise HostBrokerCleanupPartial(
+            f'Task cleanup is partial for Sandbox {sandbox}: {detail}'
+        )
+    return allow_identity
+
+
+def cleanup_host_broker_unit(
+    runner: Runner,
+    app_name: str,
+    sandbox: str,
+    *,
+    daemon_owned: bool,
+    sandbox_owned: bool,
+) -> oc2_network_gate.ScopedNetworkAllow | None:
+    """Clean the Task Sandbox and stop only its verified dedicated daemon."""
+    if sandbox_owned and not daemon_owned:
+        raise HostBrokerCleanupPartial('Task Sandbox ownership lacks a dedicated-daemon owner')
+    try:
+        status = runner.sbx('daemon', 'status', capture=True)
+    except Stop:
+        raise HostBrokerCleanupPartial('dedicated daemon status is unavailable') from None
+
+    running = re.search(r'^\s*Status:\s*(?:●\s*)?running\s*$', status, re.MULTILINE)
+    expected_socket = oc2_network_gate.expected_socket_path(
+        app_name, pathlib.Path(os.environ.get(
+            'XDG_STATE_HOME', str(pathlib.Path.home() / '.local' / 'state'),
+        )).expanduser(),
+    )
+    if running is None:
+        try:
+            oc2_network_gate.validate_daemon_stopped(status, expected_socket)
+        except oc2_network_gate.NetworkGateError:
+            raise HostBrokerCleanupPartial('dedicated daemon state is unknown') from None
+        if not sandbox_owned:
+            return None
+        try:
+            runner.sbx('daemon', 'start', '--detach')
+            oc2_network_gate.verify_dedicated_daemon(runner, app_name)
+        except (Stop, oc2_network_gate.NetworkGateError):
+            raise HostBrokerCleanupPartial(
+                'dedicated daemon could not be started for Task cleanup'
+            ) from None
+    elif not daemon_owned:
+        raise HostBrokerCleanupPartial('refusing to stop an unowned dedicated daemon')
+    else:
+        try:
+            oc2_network_gate.verify_dedicated_daemon(runner, app_name)
+        except (Stop, oc2_network_gate.NetworkGateError):
+            raise HostBrokerCleanupPartial('dedicated daemon identity is invalid') from None
+
+    failures: list[str] = []
+    allow_identity: oc2_network_gate.ScopedNetworkAllow | None = None
+    if sandbox_owned:
+        try:
+            allow_identity = cleanup_host_broker_sandbox(
+                runner, sandbox, None, sandbox_owned=True,
+            )
+        except HostBrokerCleanupPartial as exc:
+            failures.append(str(exc))
+    else:
+        try:
+            names = runner.sbx('ls', '-q', capture=True).splitlines()
+        except Stop:
+            raise HostBrokerCleanupPartial(
+                'Sandbox inventory unavailable without a Task ownership receipt'
+            ) from None
+        if names:
+            raise HostBrokerCleanupPartial(
+                'Sandbox inventory is non-empty without a Task ownership receipt'
+            )
+        try:
+            listing = runner.sbx('policy', 'ls', '--json', capture=True)
+            oc2_network_gate.validate_policy_listing(listing, sandbox, 'before')
+        except (Stop, oc2_network_gate.NetworkGateError):
+            raise HostBrokerCleanupPartial(
+                'Network policy is not at the no-Task-resource baseline'
+            ) from None
+
+    try:
+        runner.sbx('daemon', 'stop')
+    except Stop:
+        failures.append('dedicated daemon stop')
+    try:
+        stopped = runner.sbx('daemon', 'status', capture=True)
+        oc2_network_gate.validate_daemon_stopped(stopped, expected_socket)
+    except (Stop, oc2_network_gate.NetworkGateError):
+        failures.append('dedicated daemon stop readback')
+    if failures:
+        raise HostBrokerCleanupPartial(
+            'Task cleanup is partial: ' + '; '.join(failures)
+        )
+    return allow_identity
+
+
+def _runner_marker(task_dir: pathlib.Path, filename: str) -> bool:
+    path = task_dir / 'evidence' / filename
+    descriptor: int | None = None
+    try:
+        descriptor = os.open(
+            path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | getattr(os, 'O_CLOEXEC', 0),
+        )
+    except FileNotFoundError:
+        return False
+    except OSError:
+        raise HostBrokerCleanupPartial('Task cleanup marker could not be read') from None
+    try:
+        info = os.fstat(descriptor)
+        if (not stat.S_ISREG(info.st_mode) or info.st_uid != os.geteuid()
+                or stat.S_IMODE(info.st_mode) != 0o600 or info.st_nlink != 1
+                or info.st_size > 128):
+            raise HostBrokerCleanupPartial('Task cleanup marker is unsafe')
+        data = os.read(descriptor, 129)
+        after = os.fstat(descriptor)
+        if (len(data) != info.st_size or (info.st_dev, info.st_ino, info.st_size)
+                != (after.st_dev, after.st_ino, after.st_size)):
+            raise HostBrokerCleanupPartial('Task cleanup marker changed while reading')
+    except OSError:
+        raise HostBrokerCleanupPartial('Task cleanup marker could not be read') from None
+    finally:
+        os.close(descriptor)
+    expected = {
+        'daemon-start.intent': b'OC2_ENV004_DAEMON_START_INTENT\n',
+        'sandbox-create.intent': b'OC2_ENV004_SANDBOX_CREATE_INTENT\n',
+        'broker-start.intent': b'OC2_ENV004_BROKER_START_INTENT\n',
+        'sandbox-owned.intent': (
+            f"run_id={os.environ.get('OC2_ENV004_RUN_ID', '')}\n"
+            f"sandbox={os.environ.get('OC2_ENV004_SANDBOX_NAME', '')}\n"
+        ).encode('utf-8'),
+    }.get(filename)
+    if expected is None or data != expected:
+        raise HostBrokerCleanupPartial('Task cleanup marker content is invalid')
+    return True
+
+
+def _write_cleanup_result(task_dir: pathlib.Path, status: str) -> None:
+    path = task_dir / 'evidence' / 'cleanup-result.txt'
+    payload = (status + '\n').encode('utf-8')
+    try:
+        descriptor = os.open(
+            path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, 'O_NOFOLLOW', 0),
+            0o600,
+        )
+        with os.fdopen(descriptor, 'wb') as output:
+            output.write(payload)
+            output.flush()
+            os.fsync(output.fileno())
+    except OSError:
+        raise HostBrokerCleanupPartial('Task cleanup result evidence could not be written') from None
+
+
+def _cleanup_host_broker_from_unit() -> int:
+    if getpass.getuser() != 'y_ohi' or os.geteuid() == 0:
+        raise HostBrokerCleanupPartial('Cleanup must run as the Human Owner inside the Task Unit')
+    run_id = os.environ.get('OC2_ENV004_RUN_ID', '')
+    unit_name = os.environ.get('OC2_ENV004_UNIT_NAME', '')
+    invocation_id = os.environ.get('INVOCATION_ID', '')
+    systemd_unit = os.environ.get('SYSTEMD_UNIT', unit_name)
+    expected_task_dir = pathlib.Path.home() / '.local' / 'share' / 'oc2' / 'vms' / 'host-m1-accept-001'
+    task_dir_text = os.environ.get('OC2_ENV004_TASK_DIR', '')
+    if (re.fullmatch(r'[0-9a-f]{32}', run_id) is None
+            or unit_name != f'oc2-env004-host-m1-{run_id}.service'
+            or systemd_unit != unit_name
+            or re.fullmatch(r'[0-9a-f]{32}', invocation_id) is None
+            or task_dir_text != str(expected_task_dir)):
+        raise HostBrokerCleanupPartial('Cleanup systemd Task identity is invalid')
+    task_dir = expected_task_dir
+    if (task_dir.is_symlink() or not task_dir.is_dir()
+            or stat.S_IMODE(task_dir.stat().st_mode) != 0o700):
+        raise HostBrokerCleanupPartial('Cleanup Task directory is unsafe')
+    evidence_dir = task_dir / 'evidence'
+    if (evidence_dir.is_symlink() or not evidence_dir.is_dir()
+            or stat.S_IMODE(evidence_dir.stat().st_mode) != 0o700):
+        raise HostBrokerCleanupPartial('Cleanup Evidence directory is unsafe')
+    sandbox = os.environ.get('OC2_ENV004_SANDBOX_NAME', '')
+    if sandbox != f'oc2-env004-m1-{run_id}':
+        raise HostBrokerCleanupPartial('Cleanup Sandbox ownership identity is invalid')
+    try:
+        daemon_owned = _runner_marker(task_dir, 'daemon-start.intent')
+        sandbox_attempted = _runner_marker(task_dir, 'sandbox-create.intent')
+        sandbox_owned = _runner_marker(task_dir, 'sandbox-owned.intent')
+    except HostBrokerCleanupPartial as exc:
+        raise HostBrokerCleanupPartial(
+            f'Cleanup identity for Sandbox {sandbox} is unavailable: {exc}'
+        ) from None
+    if ((sandbox_attempted and not daemon_owned)
+            or (sandbox_owned and not sandbox_attempted)):
+        raise HostBrokerCleanupPartial(
+            f'Cleanup ownership markers conflict for Sandbox {sandbox}'
+        )
+    state_home = os.environ.get('XDG_STATE_HOME', '')
+    expected_state_home = str(pathlib.Path.home() / '.local' / 'state')
+    if state_home != expected_state_home:
+        raise HostBrokerCleanupPartial('Cleanup XDG state root is not the fixed Owner path')
+    app_name = 'oc2-env004-isolation'
+    runner = Runner(getpass.getuser(), app_name=app_name)
+    if not daemon_owned:
+        try:
+            status = runner.sbx('daemon', 'status', capture=True)
+        except Stop:
+            raise HostBrokerCleanupPartial(
+                'Dedicated daemon state is unavailable without an ownership marker'
+            ) from None
+        expected_socket = oc2_network_gate.expected_socket_path(
+            app_name, pathlib.Path(state_home),
+        )
+        try:
+            oc2_network_gate.validate_daemon_stopped(status, expected_socket)
+        except oc2_network_gate.NetworkGateError:
+            raise HostBrokerCleanupPartial(
+                'Dedicated daemon is running without a Task ownership marker'
+            ) from None
+        _write_cleanup_result(task_dir, 'status=NO_RESOURCES;daemon=stopped')
+        print('OC2_CLEANUP_COMPLETE: no Task resources were started')
+        return 0
+    try:
+        allow_identity = cleanup_host_broker_unit(
+            runner, app_name, sandbox, daemon_owned=daemon_owned,
+            sandbox_owned=sandbox_owned,
+        )
+        rule_id = 'none' if allow_identity is None else allow_identity.rule_id
+        policy_id = 'none' if allow_identity is None else allow_identity.policy_id
+        sandbox_identity = (
+            'name:' + sandbox if allow_identity is None else allow_identity.sandbox_id
+        )
+        resource = 'none' if allow_identity is None else allow_identity.resource
+        _write_cleanup_result(
+            task_dir,
+            f'status=CLEAN;unit={unit_name};sandbox={sandbox};sandbox_identity={sandbox_identity};'
+            f'rule_id={rule_id};policy_id={policy_id};resource={resource};daemon=stopped',
+        )
+    except HostBrokerCleanupPartial as exc:
+        _write_cleanup_result(
+            task_dir, f'status=PARTIAL;unit={unit_name};sandbox={sandbox};detail={exc}',
+        )
+        raise
+    print(f'OC2_CLEANUP_COMPLETE: sandbox={sandbox}; daemon=stopped')
+    return 0
+
+
 def _run_host_broker(
     args: argparse.Namespace,
     workspace_manifest: WorkspaceManifest,
@@ -1619,8 +2216,15 @@ def _run_host_broker(
     ca_certificate: oc2_host_broker.BrokerCaCertificate,
 ) -> int:
     """Broker-only launch: no APM export, no credential Mixin, no OAuth bootstrap."""
+    if (args.host_broker_cli_archive is None
+            or not args.host_broker_cli_archive.is_absolute()):
+        raise Stop('--host-broker-cli-archive must be an absolute path in Host Broker mode')
     if args.host_broker_artifacts is None:
         raise Stop('--host-broker-artifacts (trusted local oc-cf-aig-subscription checkout) is required')
+    try:
+        app_name = oc2_network_gate.validate_app_name(args.host_broker_app_name)
+    except oc2_network_gate.NetworkGateError as exc:
+        raise Stop(str(exc)) from exc
     prompt = oc2_host_broker_runtime.validate_prompt(args.host_broker_prompt)
     manifest, manifest_sha = oc2_host_broker_runtime.load_manifest()
     artifacts = oc2_host_broker_runtime.verify_source(
@@ -1638,48 +2242,110 @@ def _run_host_broker(
     oc2_host_broker.probe_broker(selection.url, ca_certificate.data)
     if not shutil.which('sbx'):
         raise Stop('Docker Sandboxes CLI was not found')
-    runner = Runner(getpass.getuser())
-    sandbox_version = runner.sbx('version', capture=True).strip()
-    if re.search(r'\bv\d+\.\d+\.\d+\b', sandbox_version) is None:
-        raise Stop('could not verify Docker Sandboxes version')
-    if '--kit' not in runner.sbx('create', '--help', capture=True):
-        raise Stop('installed Docker Sandboxes CLI does not support Kits')
-    print('OC2_DOCKER_SANDBOXES: ' + sandbox_version)
-    existing = {line.strip() for line in runner.sbx('ls', '-q', capture=True).splitlines()}
-    if args.sandbox in existing:
-        raise Stop('Sandbox name already exists; refusing to reuse or rebuild it')
-    print('OC2: verifying official OpenCode v2.2.5 Linux x64 artifact')
+    runner = Runner(getpass.getuser(), app_name=app_name)
     with tempfile.TemporaryDirectory(prefix='oc2-broker-') as temporary:
         temporary_path = pathlib.Path(temporary)
         config_file = temporary_path / 'opencode.jsonc'
         config_file.write_bytes(oc2_host_broker_runtime.config_bytes(runtime))
         cli_download_dir = temporary_path / 'cli-download'
         cli_download_dir.mkdir(mode=0o700)
-        cli_binary = download_verified_cli(cli_download_dir)
+        cli_binary = download_verified_cli(
+            cli_download_dir, local_archive=args.host_broker_cli_archive,
+        )
         print('OC2_CLI_ARTIFACT_VERIFIED: v2.2.5 sha256=' + CLI_ASSET_SHA256)
+        try:
+            oc2_network_gate.verify_dedicated_daemon(runner, app_name)
+            initial_policy = runner.sbx('policy', 'ls', '--json', capture=True)
+            oc2_network_gate.validate_policy_listing(initial_policy, args.sandbox, 'global')
+        except oc2_network_gate.NetworkGateError as exc:
+            raise Stop(str(exc)) from exc
+        sandbox_version = runner.sbx('version', capture=True).strip()
+        if re.search(r'\bv\d+\.\d+\.\d+\b', sandbox_version) is None:
+            raise Stop('could not verify Docker Sandboxes version')
+        print('OC2_DOCKER_SANDBOXES: ' + sandbox_version)
+        existing = {line.strip() for line in runner.sbx('ls', '-q', capture=True).splitlines()}
+        if args.sandbox in existing:
+            raise Stop('Sandbox name already exists; refusing to reuse or rebuild it')
         print('OC2: creating mountless shell Sandbox ' + args.sandbox
-              + ' (no credential Mixin; no direct-provider egress allowance)')
-        cli_mixin = temporary_path / 'oc2-opencode-cli'
-        cli_mixin.mkdir()
-        cli_spec = cli_mixin / 'spec.yaml'
-        cli_spec.write_bytes(opencode_cli_mixin_spec())
-        os.chmod(cli_spec, 0o600)
-        staged_cli = cli_mixin / 'opencode'
-        shutil.copyfile(cli_binary, staged_cli)
-        os.chmod(staged_cli, 0o600)
-        runner.sbx('create', '--name', args.sandbox, '--kit', str(cli_mixin), SHELL_WORKLOAD)
-        cli = provision_cli(runner, args.sandbox)
-        workdir = transfer_workspace(
-            runner, args.sandbox, temporary_path / 'workspace-snapshot',
-            workspace_manifest, runner.user,
-        )
-        capability = oc2_host_broker.read_capability(selection.capability_fd)
-        print(f'OC2_READY: sandbox={args.sandbox} opencode=v{VERSION} broker=host')
-        launch(
-            runner,
-            SandboxLaunch(args.sandbox, runtime_sha, cli, workdir, config_file),
-            HostBrokerLaunch(selection, capability, artifacts, ca_certificate, prompt),
-        )
+              + ' (no Kit, credential Mixin, or direct-provider egress allowance)')
+        sandbox_owned = False
+        try:
+            try:
+                runner.sbx(
+                    'create', '--pull', 'never', '--name', args.sandbox,
+                    HOST_BROKER_SHELL_WORKLOAD,
+                )
+            except SandboxCommandTimeout:
+                # v0.53.0 cancellation is prompt, but a hard subprocess timeout
+                # cannot prove whether the daemon registered the named Sandbox.
+                # Claim ownership only after an inventory and exact identity readback.
+                names = runner.sbx('ls', '-q', capture=True).splitlines()
+                if args.sandbox not in names:
+                    raise
+                inspect = runner.sbx('inspect', args.sandbox, capture=True)
+                oc2_network_gate.validate_sandbox_identity(inspect, args.sandbox)
+                _write_runner_sandbox_owner(args.sandbox)
+                sandbox_owned = True
+                raise
+            inspect = runner.sbx('inspect', args.sandbox, capture=True)
+            oc2_network_gate.validate_sandbox_identity(inspect, args.sandbox)
+            _write_runner_sandbox_owner(args.sandbox)
+            sandbox_owned = True
+            created_policy = runner.sbx('policy', 'ls', '--json', capture=True)
+            oc2_network_gate.validate_policy_listing(
+                created_policy, args.sandbox, 'before',
+            )
+            broker_port = urlsplit(selection.url).port
+            if broker_port is None:
+                raise oc2_network_gate.NetworkGateError('Broker URL has no port')
+            allow_identity = oc2_network_gate.run_network_gate(
+                runner, args.sandbox, broker_port,
+            )
+            print(
+                f'OC2_NETWORK_POLICY_GATE_PASS: sandbox={allow_identity.sandbox} '
+                f'rule_id={allow_identity.rule_id} policy_id={allow_identity.policy_id} '
+                f'resource={allow_identity.resource}'
+            )
+            broker_host = urlsplit(selection.url).hostname
+            if broker_host is None:
+                raise oc2_network_gate.NetworkGateError('Broker URL has no hostname')
+            oc2_network_gate.probe_guest_broker(
+                runner, args.sandbox, broker_host, broker_port, ca_certificate.data,
+            )
+            print('OC2_GUEST_TLS_AND_EGRESS_GATE_PASS')
+            cli = provision_host_broker_cli(runner, args.sandbox, cli_binary)
+            workdir = transfer_workspace(
+                runner, args.sandbox, temporary_path / 'workspace-snapshot',
+                workspace_manifest, runner.user,
+            )
+            capability = oc2_host_broker.read_capability(selection.capability_fd)
+            print(f'OC2_READY: sandbox={args.sandbox} opencode=v{VERSION} broker=host')
+            launch(
+                runner,
+                SandboxLaunch(args.sandbox, runtime_sha, cli, workdir, config_file),
+                HostBrokerLaunch(selection, capability, artifacts, ca_certificate, prompt),
+            )
+        except (oc2_network_gate.NetworkGateError, oc2_host_broker.HostBrokerError,
+                Stop, OSError) as exc:
+            error_type = (
+                SandboxCommandTimeout
+                if isinstance(exc, SandboxCommandTimeout) else Stop
+            )
+            if not sandbox_owned:
+                raise error_type(
+                    'Host Broker post-create step failed; Sandbox was not removed because '
+                    f'ownership was not recorded: {exc}'
+                ) from exc
+            try:
+                runner.sbx('rm', args.sandbox)
+            except Stop as cleanup_error:
+                raise error_type(
+                    f'Host Broker post-create step failed; owned Sandbox cleanup also failed: '
+                    f'{cleanup_error}'
+                ) from cleanup_error
+            raise error_type(
+                f'Host Broker post-create step failed; owned Sandbox was removed: {exc}'
+            ) from exc
     return 0
 
 
@@ -1787,6 +2453,8 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument('--use-host-broker', action='store_true',
                    help='explicit opt-in: use the Host Broker (m1/m2 limited contract) '
                         'instead of any direct provider')
+    p.add_argument('--host-broker-app-name',
+                   help='required dedicated Docker Sandboxes daemon name for Host Broker mode')
     p.add_argument('--host-broker-url', help='https://host.docker.internal:<port>/v1')
     p.add_argument('--host-broker-ca-cert', type=pathlib.Path,
                    help='public CA certificate used to verify the Host Broker TLS connection')
@@ -1797,21 +2465,48 @@ def main(argv: list[str] | None = None) -> int:
                    help='inherited pipe/socket fd (3-1023) carrying the one-shot capability')
     p.add_argument('--host-broker-artifacts', type=pathlib.Path,
                    help='trusted local oc-cf-aig-subscription checkout (never fetched)')
+    p.add_argument('--host-broker-cli-archive', type=pathlib.Path,
+                   help='local verified OpenCode archive in ~/.cache/oc2/cli-archives '
+                        '(Host Broker only)')
     p.add_argument('--host-broker-prompt',
                    help='non-interactive prompt for `opencode run`; the TUI is not offered')
     p.add_argument('--host-broker-fixture-root',
                    help='m2 only: fixture path relative to the Runtime, '
                         'fixtures or fixtures/<name>')
+    p.add_argument('--host-broker-cleanup-only', action='store_true',
+                   help='cleanup Task-owned Host Broker resources from the systemd ExecStopPost')
     args = p.parse_args(effective_argv)
     oc2_workspace = importlib.import_module('oc2_workspace')
 
     try:
+        if args.host_broker_cleanup_only:
+            if args.dry_run:
+                raise HostBrokerCleanupPartial(
+                    'Cleanup-only mode cannot be combined with --dry-run')
+            cleanup_options = (
+                args.use_host_broker, args.host_broker_app_name,
+                args.sandbox != 'oc2-v2', args.allow_paid_inference,
+                args.use_cloudflare_ai_gateway, args.prepare_only,
+                args.verification_only, args.phase4_plugins, args.provision_artifacts,
+                args.host_broker_url, args.host_broker_ca_cert,
+                args.host_broker_mode, args.host_broker_sandbox_label,
+                args.host_broker_capability_fd, args.host_broker_artifacts,
+                args.host_broker_cli_archive, args.host_broker_prompt,
+                args.host_broker_fixture_root,
+            )
+            if any(cleanup_options):
+                raise HostBrokerCleanupPartial(
+                    'Cleanup-only mode cannot be combined with launch or credential options')
+            return _cleanup_host_broker_from_unit()
+
         broker_selection: oc2_host_broker.HostBrokerSelection | None = None
         broker_ca_certificate: oc2_host_broker.BrokerCaCertificate | None = None
         broker_options = (
-            args.host_broker_url, args.host_broker_mode, args.host_broker_sandbox_label,
+            args.host_broker_app_name, args.host_broker_url,
+            args.host_broker_mode, args.host_broker_sandbox_label,
             args.host_broker_capability_fd, args.host_broker_fixture_root,
-            args.host_broker_artifacts, args.host_broker_prompt, args.host_broker_ca_cert,
+            args.host_broker_artifacts, args.host_broker_cli_archive,
+            args.host_broker_prompt, args.host_broker_ca_cert,
         )
         if args.use_host_broker:
             if (args.prepare_only or args.verification_only or args.phase4_plugins
@@ -1819,6 +2514,14 @@ def main(argv: list[str] | None = None) -> int:
                     or args.allow_paid_inference):
                 raise Stop('--use-host-broker cannot be combined with other Runtime, '
                            'credential, or inference modes')
+            try:
+                oc2_network_gate.validate_app_name(args.host_broker_app_name)
+            except oc2_network_gate.NetworkGateError as exc:
+                raise Stop(str(exc)) from exc
+            if args.host_broker_cli_archive is None:
+                raise Stop('--host-broker-cli-archive is required with --use-host-broker')
+            if not args.host_broker_cli_archive.is_absolute():
+                raise Stop('--host-broker-cli-archive must be an absolute path')
             if oc2_host_broker.CAPABILITY_ENV in os.environ:
                 raise Stop(oc2_host_broker.CAPABILITY_ENV
                            + ' must not be set; the capability is read from a pipe fd only')
@@ -1913,11 +2616,15 @@ def main(argv: list[str] | None = None) -> int:
                       'from a trusted local checkout (no fetch/install)')
             print('OC2 PLAN: workspace=' + str(workspace))
             print('OC2 PLAN: transfer only the verified Workspace Snapshot; no .git or OpenCode project config')
-            print('OC2 PLAN: Host-side verification, then stage the verified CLI in the Sandbox Kit')
-            print(
-                f'OC2 PLAN: download and SHA-256 verify @opencode/cli@{VERSION} on the Host; '
-                'bake it into the Sandbox Kit at /opt/oc2/bin/opencode'
-            )
+            if broker_selection is not None:
+                print('OC2 PLAN: verify the fixed local archive and SHA-256 pin; no HTTPS download')
+                print('OC2 PLAN: pass the network gate, then copy the verified CLI directly into the Guest')
+            else:
+                print('OC2 PLAN: Host-side verification, then stage the verified CLI in the Sandbox Kit')
+                print(
+                    f'OC2 PLAN: download and SHA-256 verify @opencode/cli@{VERSION} on the Host; '
+                    'bake it into the Sandbox Kit at /opt/oc2/bin/opencode'
+                )
             dry_repo = args.repo_root.resolve(strict=True)
             if not (dry_repo / 'apm.yml').is_file():
                 raise Stop('dotfiles-ai apm.yml not found')
@@ -2152,6 +2859,9 @@ def main(argv: list[str] | None = None) -> int:
             )
             launch(runner, launch_request)
             return 0
+    except HostBrokerCleanupPartial as exc:
+        print('OC2_PARTIAL: ' + str(exc), file=sys.stderr)
+        return 2
     except (Stop, OSError, ValueError, subprocess.TimeoutExpired,
             oc2_workspace.WorkspaceError, oc2_host_broker.HostBrokerError) as exc:
         print('OC2_STOP: ' + str(exc), file=sys.stderr)
